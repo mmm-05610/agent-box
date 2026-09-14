@@ -1,5 +1,10 @@
 # Desktop产品交付状态（执行工作树维护）
 
+> **当前有效状态以本文件末尾的「更正（2026-09-15）P06 诚实性返修」及其后的 release 行为准。**
+> 开头这几行是 `9fe414a2` 时的记录；该点的 `P06_GREEN` / `DESKTOP_IMPLEMENTATION_READY` /
+> `writer_lease=RELEASED` 因协调验收发现两个本端缺陷而**暂停**，修复与 r2 新证据见末尾。
+> 历史行一律保留，不删除、不改写。
+
 调度：**FRONTEND_GOAL_CLOSED / writer_lease=RELEASED — 等待后端执行者按 handoff-policy 接管全栈**。
 本文件是产品工作树的执行事实（前端侧已冻结）；
 发布源初始表不代表实时状态。消费文档更新时保留执行状态行，只合入规则/新订单。
@@ -776,7 +781,7 @@ wire-review.md通道自39阶段协调。执行者下个检查点消费这些规�
 | P03 用例状态与API | IN_PROGRESS（主 route 生产调用者与 event reducer 接入已完成；真实 Server 源待 P04） | 与 P02 穿插 |
 | P04 宿主与遗留退役 | IN_PROGRESS（production request/Session-event transport + IPC + supervisor；两道急切 autostart 门已退役，**惰性 `hermes:api` 门已于 `f7759148` 收口**——agentbox runtime 下任何 `hermes:api` 请求都在路由/`ensureBackend` 之前以 `LEGACY_RUNTIME_DISABLED_FOR_PRODUCT` 拒绝；**HTTP/WS loopback 判据已统一、WS 无连接可观测已由 `4efd1ec5` 关闭（切片 9）**；B7 已于 `e087c976` 关闭；**B9 profile 分享 legacy 数据面已于 `d31897dc` 在 renderer 侧关闭（该点 electron/ 零改动，门与 transport 未变）**；B8 归类 `UNREACHABLE_OR_PROTECTED`（无已挂载消费点 + 硬门保护，非活动阻断）；Server connection 合同待后端） | 与 P03 穿插 |
 | P05 正式合同接入 | **`P05_GREEN — CLIENT_IMPLEMENTATION_COMPLETE`（成立于 `d31897dc`）**（`6ca5d17a` 最终审计：28 方法矩阵 **28 生产可达 / 0 前端缺口**、集合与计数机械全等、摘要三方一致、事件链生产接线完整；legacy 可达性 5 条 `ACTIVE_AGENTBOX_BLOCKER` + 1 条已上膛**已在 `f7759148`/`a6b751ff` 收口（B1–B6）**；**B7、命令面板 legacy 快捷项（含 `Toggle logs`）、§9.5/§9.6/§9.8 fixture 深度、HTTP/WS transport 一致性、陈旧 `IN_FLIGHT` 已由 `4efd1ec5`/`e087c976` 关闭；B9 profile 分享已由 `d31897dc` 关闭**；全量 UI 811 files / 7882 tests 全通过。`30e3cf42` 的 GREEN 声明因同检查点刚登记 B9 而**作废**，该点记为 `P05_PARTIAL`。仍不声明 `REAL_FLOW_VERIFIED`（lifecycle connection 为后端/集成外部缺口）、P06 GREEN、DESKTOP_IMPLEMENTATION_READY；**B8 = `UNREACHABLE_OR_PROTECTED`；B9 已关闭——无已知 AgentBox 可达 legacy 调用路径**） | wire 双端锁定 |
-| P06 前端验收与交接 | **`P06_GREEN — FRONTEND_INDEPENDENT_ACCEPTANCE`**（`evidence/P06.md`：Linux/WSL 全门、Windows 同测试 loopback 裁决、Windows 原应用驱动 20 PASS/0 FAIL/0 SKIP/0 PENDING、静态只读核验、交付 handoff；`DESKTOP_IMPLEMENTATION_READY`；`REAL_FLOW_VERIFIED=否`，真实全栈门由后续集成人负责） | P05 已 GREEN、P07 wire 已锁定；lifecycle connection 属外部缺口，不阻塞本端 READY |
+| P06 前端验收与交接 | **`P06_GREEN — FRONTEND_INDEPENDENT_ACCEPTANCE`**（`evidence/P06.md`：Linux/WSL 全门、Windows 同测试 loopback 裁决、静态只读核验、交付 handoff；**r2 Windows 原应用驱动 22 PASS/0 FAIL/0 SKIP/0 PENDING，`allOk=true`，两道 legacy REST 门独立成立**；`DESKTOP_IMPLEMENTATION_READY`；`REAL_FLOW_VERIFIED=否`，真实全栈门由后续集成人负责）。**r1 的「20 PASS」读数已被证伪并保留为失败门历史**（`P06.md` §1–§9、`evidence/P06-assets/`、`evidence/P06-assets-r2-attempt1/`），本次 GREEN 建立在 §10 的缺陷修复与 §11 的新证据上 | P05 已 GREEN、P07 wire 已锁定；lifecycle connection 属外部缺口，不阻塞本端 READY |
 | P07 核心合同与状态交接 | 检查点1–6已提交；WIRE_LOCKED（**检查点 3 的 fixture 深度经最终审计下调**：§9.5/§9.6/§9.8 无测试，不得声称完整覆盖） | 28 方法双端摘要一致；fixture/客户端已锁定 |
 
 ## 测试与证据基线（本轮实跑）
@@ -837,3 +842,46 @@ wire-review.md通道自39阶段协调。执行者下个检查点消费这些规�
   `evidence/P02.md`/`P04.md`/`P05.md`（只追加必要更正）、本文件。
 - 不动后端/wire schema/contracts/package/lock；不读密钥；不运行模型；不 reset/stash/clean/push/merge。
 - 旧 `evidence/P06-assets/` **原样保留**为失败门证据；新证据写入 `evidence/P06-assets-r2/`。
+
+---
+
+## 执行快照（handoff-policy 每阶段必填）— P06 诚实性返修
+
+- updated_at: 2026-09-15（+08:00），writer_lease = `ACTIVE — P06 honesty repair`（本行之后本文件
+  仍由本会话持有，直到末尾 release 行）
+- 执行者: Zcode 前端产品 goal（新一轮会话）；**用户通过派单显式重新授予有限前端写权**
+- 工作树/分支: `/home/maoqh/projects/agent-box-desktop-next-wsl-round1` @ feature/agentbox-desktop-product
+- 起点核验: HEAD `9fe414a2`（与派单一致）、`git status --short` 为空、无并发写入、
+  WSL 无残留 Vite/Vitest/Playwright/Electron 进程、Windows 构建树无 Electron/node 进程；
+  未 reset/stash/clean/push/merge，未读密钥，未运行模型，未改后端/wire schema/contracts/package/lock
+- 执行方式: 两个并行子代理（A 产品 authority 与 legacy config/MCP 控制流；B P06 驱动 fail-closed），
+  写集互不重叠；主执行者负责审查、共享状态、Windows 构建树、提交与最终验收
+- **范围与结果**:
+  （a）**关闭四条可达 legacy 控制流**（并非 r1 登记的「一处外围合同缺口」）：组合根
+  `useHermesConfigRecord()`（`/api/config`）、每次窗口启动并 10×3s 重试的 i18n locale port
+  （`/api/config`）、无条件安装的 MCP legacy 健康巡检、内置默认开启的 `hermes-bots` relay 经
+  `host.profileRoutes()` 发起的 `GET /api/profiles`。**未修改** `use-config-record.ts` /
+  `mcp-health.ts` 的 Hermes 兼容实现，**未放宽**两道 legacy REST 硬门，未隐藏日志，
+  未靠清空 `reportedPaths` 凑绿。
+  （b）**驱动 fail-closed 五处**：`record()` 参数错位（使 r1 的 21 条 steps 只统计 20 条）、
+  `summarizeResults` 静默忽略未知 status、必需步缺失/重复/PENDING/SKIP/非法 status 未强制、
+  legacy REST 只有一道门且 renderer 残余不设门、console 捕获晚于 `domcontentloaded`。
+  现为**两道独立必需门**（main refusals 恰为 0；renderer `residualLegacyPaths` 严格 `[]`），
+  并要求覆盖被证明。
+  （c）**Linux/WSL 定向门**：组合根 13 files/171 tests、驱动单测 1 file/45 tests、渲染端全量
+  816 files/7929 tests（0 failed）、三项目 typecheck、改动文件 ESLint、`git diff --check`、
+  `apps/desktop build` 全部 exit 0；另有**自校验 CDP 探针**（临时、未入库）沿驱动同一路径得到
+  renderer 残余 `[]`、main refusals 0，且两条正向对照（注入门日志行被识别、直连 preload bridge
+  使 main refusals 0→2）同时成立。
+  （d）**Windows 重新验收**：同步 13+4 项 tracked 改动（逐文件 SHA-256 一致，未重装依赖）、
+  `npm run build` exit 0；**r2 第一次运行 21 PASS/1 FAIL**，唯一 FAIL 是驱动的 boot 覆盖证明
+  竞态（产品侧 `residualLegacyPaths=[]`），失败输出保留为 `evidence/P06-assets-r2-attempt1/`；
+  修好驱动后**r2 最终 22 PASS / 0 FAIL / 0 SKIP / 0 PENDING，`allOk=true`，exit 0**，
+  计数与 steps 数机械一致（脚本复核）。旧 `evidence/P06-assets/` **原样保留未动**。
+- 本阶段提交: `f47e5219`（产品 authority 门 + 驱动 fail-closed）、`1ed11197`（驱动挣得 boot 覆盖证明）
+- **首次失败与真实修复**（不靠重跑掩盖）: ①我移植的 `requiredStepIssues` 用例写法错误
+  （只传非必需步 ⇒ 所有必需 id 成了 missing），改为「完整必需集 + 两条非必需步」后通过；
+  ②r2 第一次运行 FAIL 判为**驱动**缺陷并修驱动，**未降低任何断言**。
+- **终态**: `P06_GREEN — FRONTEND_INDEPENDENT_ACCEPTANCE`、`DESKTOP_IMPLEMENTATION_READY`
+  在 r2 证据齐备后重新声明；`REAL_FLOW_VERIFIED=否`、`AGENTBOX_DESKTOP_PRODUCT_GREEN=否/待全栈`
+  不变；`history.snapshot` 旧页分页与不可达 `SessionPickerOverlay` 保持已知项，本单未扩范围。

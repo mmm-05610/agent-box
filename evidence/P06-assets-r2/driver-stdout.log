@@ -1,0 +1,25 @@
+PASS  driver-target  electron.exe=C:\Users\maoqh\agentbox-wsl-round1\apps\desktop\node_modules\electron\dist\electron.exe; dist/index.html=true
+INFO  baseline Hermes-named processes before launch: []
+PASS  sandbox-isolation  userData=C:\Users\maoqh\agentbox-p06-sandbox-r2b\user-data (expected C:\Users\maoqh\agentbox-p06-sandbox-r2b\user-data); HERMES_HOME=C:\Users\maoqh\agentbox-p06-sandbox-r2b\hermes-home; appName=HermesP06Acceptance
+PASS  no-service-provided  no server env, no agentbox connection slot file, no credentials dir under the sandbox home
+PASS  window-appears  first window in 860ms (deadline 30000ms); windows=1
+PASS  no-blocking-overlay  largest [data-glass-opaque] covers 0.0% (must be <90%); nodes=0; failurePanels=0; sidebar=1
+PASS  workspace-entries  sidebar entries: local folder=true; remote/WSL=true; agentbox session rows=0 (must be 0)
+PASS  legacy-fake-boot-ignored  HERMES_DESKTOP_BOOT_FAKE=1 + FAKE_ERROR set; runtime launched=false; blocking coverage=0.0%
+PASS  send-fails-closed  submit present=true; disabled=true; unavailable banner="AgentBox service is unavailable"; session rows after click=0 (must be 0)
+PASS  settings-opens-closes  after open: hash=#/settings?tab=product:models, text=1082 chars; after close: hash=#/
+PASS  profiles-honest  hash=#/profiles; unavailable copy present=true; session rows=0; text="@keyframes hermes-zone-fade { from { opacity: 0.001 } to { opacity: 1 } } [data-tree-group] :is(aside, [data-slot=sidebar]) { border-left-width: 0; border-right-width: 0; box-shado"
+PASS  product-settings-honest  product:models: controls=0, honest=true; product:resources: controls=0, honest=true; product:identities: controls=0, honest=true; product:harnesses: controls=0, honest=true; product:data: controls=0, honest=true
+PASS  command-center-agentbox  hash=#/command-center?section=sessions; legacy-looking actions=[]; text="@keyframes hermes-zone-fade { from { opacity: 0.001 } to { opacity: 1 } } [data-tree-group] :is(aside, [data-slot=sidebar]) { border-left-width: 0; border-right"
+PASS  command-palette-agentbox  options=30; profiles row=true; legacy entries=[]; first options=["New sessionCtrlN","New windowCtrlShiftN","SettingsCtrl,","Profiles","Open folder as project…CtrlO","Toggle layout edit modeoffCtrlShift\\","Reload desktop plugins","Reset layout","Toggle status baronCtrlShiftS","Toggle tabsoffCtrlAltT","Keyboard shortcuts","New Bot…"]
+PASS  sidebar-operable  settings entry accepted a real click; hash after click=#/settings
+PASS  legacy-view-routes-retired  #/cron → #/settings?tab=product:resources; #/agents → #/settings?tab=product:resources; #/starmap → #/settings?tab=product:resources; #/webhooks → #/settings?tab=product:resources
+INFO  launched process tree before close: [20232,28952,15996,24496,30992,17108]
+PASS  no-hermes-process  new Hermes-named processes=[]; fake runtime stub invoked with serve=false
+PASS  exit-no-orphans  process tree at close=[20232,28952,15996,24496,30992,17108]; still alive after 20s=[]
+PASS  no-legacy-rest-reached-main  main-process refusals=0 (must be exactly 0)
+PASS  no-legacy-rest-issued-by-renderer  renderer residual legacy paths=[] (must be []); console capture: first window predated the listener; the renderer boot was re-run under capture (reload); renderer-console.log=405 chars
+PASS  logs-token-free  main-process-safe.log=2789 chars; token-shaped material=false; renderer-console.log=405 chars
+PASS  required-screenshots  arrival-no-service.png, command-center-agentbox.png, command-palette-agentbox.png, profiles-unavailable.png, settings-no-service.png, workspace-sidebar.png
+PASS  required-steps-executed  22 steps, none missing/duplicated/PENDING/SKIP
+ACCEPTANCE: executed 22 → allOk=true; counts={"PASS":22,"FAIL":0,"SKIP":0,"PENDING":0}; unknownStatuses=[] (allOk covers executed steps only; every required step must be present exactly once and must not be PENDING/SKIP)
