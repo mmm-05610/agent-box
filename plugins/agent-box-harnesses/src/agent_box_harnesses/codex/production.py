@@ -26,8 +26,11 @@ guest 的挂载点、官方配置（`config.toml` + 完整 `models.json`）在�
   Server/bwrap 按"受保护 state 路径"排除出 checkpoint（`home_projection` 的派生
   规则），恢复时同名的相对路径被类型化拒绝。
 
-凭据（本阶段实测，见 `codex-production-chain-gate.py` 的报告）只经
-SecretStore → Worker secret 帧 → 环境注入到达适配器进程，不写进任何文件或参数：
+凭据的 **AgentBox 注入路径**只经
+SecretStore → Worker secret 帧 → 环境变量到达适配器进程（AgentBox 自身不把凭据写进任何
+文件或参数）；适配器/原生 Harness 拿到环境值之后是否落盘，由下面的 ephemeral 说明与
+门内凭据扫描兜底——已证实 `auth.json` 未生成，其他 native state 路径已有反例（见
+state-error-boundary.md §4.3），未经证明前不得进入真实凭据门：
 
 * ACP 适配器 `@agentclientprotocol/codex-acp` 1.1.14 的 `api-key` 认证**只**读
   `CODEX_API_KEY`/`OPENAI_API_KEY` 两个环境变量（bundle 里 `readApiKeyFromEnv()`），

@@ -19,7 +19,6 @@
 #     This proves only that auth.json is absent; other native-state paths are
 #     not yet proven safe and have an observed counterexample (a gate run whose
 #     credential scan hit a fake token inside the native state - fail-closed).
-#     state (and therefore never reaches a checkpoint).
 model = "deepseek-flash"
 model_provider = "deepseek"
 preferred_auth_method = "apikey"
