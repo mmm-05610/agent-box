@@ -2301,6 +2301,18 @@ export const en: Translations = {
   },
 
   sidebar: {
+
+    agentBoxArchive: {
+
+      action: 'Archive in AgentBox',
+
+      title: name => `Archive “${name}” in AgentBox?`,
+
+      desc: 'Archives the service workspace record only. The sidebar entry, files, sessions and history stay, and running tasks are not stopped.',
+
+      failed: 'Workspace could not be archived'
+
+    },
     gatewayGroups: {
       grouping: 'Gateway & profile',
       rename: 'Rename group',

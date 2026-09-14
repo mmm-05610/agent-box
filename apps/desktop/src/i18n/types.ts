@@ -2027,6 +2027,14 @@ export interface Translations {
   }
 
   sidebar: {
+    /** AgentBox service actions on a workspace row — distinct from the local
+     *  "Remove from sidebar" hide and the WSL host's own remove. */
+    agentBoxArchive: {
+      action: string
+      title: (name: string) => string
+      desc: string
+      failed: string
+    }
     gatewayGroups: {
       grouping: string
       rename: string

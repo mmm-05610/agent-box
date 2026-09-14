@@ -1961,6 +1961,18 @@ export const ja = defineLocale({
   },
 
   sidebar: {
+
+    agentBoxArchive: {
+
+      action: 'AgentBox でアーカイブ',
+
+      title: name => `「${name}」を AgentBox でアーカイブしますか？`,
+
+      desc: 'サービス側のワークスペース記録のみをアーカイブします。サイドバーの項目、ファイル、Session、履歴は保持され、実行中のタスクも停止しません。',
+
+      failed: 'ワークスペースをアーカイブできませんでした'
+
+    },
     gatewayGroups: {
       grouping: 'ゲートウェイとプロファイル',
       rename: 'グループ名を変更',

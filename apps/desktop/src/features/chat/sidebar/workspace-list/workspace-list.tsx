@@ -3,8 +3,13 @@ import { useStore } from '@nanostores/react'
 import type * as React from 'react'
 import { useState } from 'react'
 
+import { agentBoxRuntimeClient } from '@/api/agentbox-runtime-client'
+import { archiveAgentBoxWorkspace, resolveAgentBoxWorkspace } from '@/application/workspace/wire-workspace-catalog'
 import { projectWorkspaceList } from '@/application/workspace/workspace-projection'
-import { archiveWslWorkspaceProjection, renameWslWorkspaceProjection } from '@/application/workspace/wsl-workspace-usecases'
+import {
+  archiveWslWorkspaceProjection,
+  renameWslWorkspaceProjection
+} from '@/application/workspace/wsl-workspace-usecases'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -12,10 +17,19 @@ import { Input } from '@/components/ui/input'
 import { SidebarGroup } from '@/components/ui/sidebar'
 import { type NewSessionSplitHandler } from '@/features/chat/new-session-drag'
 import { useI18n } from '@/i18n'
+import {
+  $agentBoxHello,
+  $agentBoxService,
+  $agentBoxWorkspaces,
+  agentBoxCapabilitySupported,
+  upsertAgentBoxWorkspace
+} from '@/store/agentbox-service'
 import { notifyError } from '@/store/notifications'
 import type { SidebarProjectTree } from '@/store/projects/membership'
+import { $workspaceViewSelectedId, clearWorkspaceViewSelection } from '@/store/workspace-view'
 import { $wslWorkspaceInfoId, $wslWorkspaces, $wslWorkspaceValidation } from '@/store/wsl-workspace'
 import type { SessionInfo } from '@/types/hermes'
+import type { WorkspaceRecord } from '@/types/wire/wire-v1'
 
 import { latestProjectSessions, PROJECT_PREVIEW_COUNT } from '../projects/model'
 import { ReorderableList, useSortableBindings } from '../reorderable-list'
@@ -72,13 +86,33 @@ export function WorkspaceList({
 }) {
   const { t } = useI18n()
   const w = t.wslWorkspace
+  const copy = t.sidebar.agentBoxArchive
   const wslWorkspaces = useStore($wslWorkspaces)
   const validation = useStore($wslWorkspaceValidation)
   const infoId = useStore($wslWorkspaceInfoId)
+  const agentBoxWorkspaces = useStore($agentBoxWorkspaces)
+  const agentBoxHello = useStore($agentBoxHello)
+  const agentBoxService = useStore($agentBoxService)
   // One rename dialog + one remove confirm for the whole list, aimed at the
   // row whose menu action fired.
   const [renameTarget, setRenameTarget] = useState<null | { id: string; name: string }>(null)
   const [removeTarget, setRemoveTarget] = useState<null | { id: string; name: string }>(null)
+  // The list owns the ONLY AgentBox archive dialog and target: rows and menus
+  // receive a callback, never the wire client.
+  const [archiveTarget, setArchiveTarget] = useState<null | { shellId: string; workspace: WorkspaceRecord }>(null)
+
+  // The service-side twin of a shell row, by the same complete identity the
+  // registration uses. No match — or no declared capability — means no action.
+  const agentBoxArchiveFor = (target: {
+    localPath?: string
+    wsl?: { distribution: string; rootPath: string; user: null | string }
+  }) => {
+    if (agentBoxService.phase !== 'ready' || !agentBoxCapabilitySupported(agentBoxHello, 'workspaces.archive')) {
+      return undefined
+    }
+
+    return resolveAgentBoxWorkspace(agentBoxWorkspaces, target) ?? undefined
+  }
 
   const items = projectWorkspaceList({ projects: projectRows, wslWorkspaces })
   const itemsById = new Map(items.map(item => [item.id, item]))
@@ -107,6 +141,11 @@ export function WorkspaceList({
         : renderRows?.(preview)
       : undefined
 
+    // Home is a bucket, not a record, and a row without its own folder has no
+    // location — neither can carry a service Workspace.
+    const serviceWorkspace =
+      !project.isNoProject && project.path ? agentBoxArchiveFor({ localPath: project.path }) : undefined
+
     return (
       <LocalWorkspaceRow
         activeProjectId={activeProjectId}
@@ -123,6 +162,9 @@ export function WorkspaceList({
             detail: null,
             sessionCount: project.sessionCount
           }
+        }
+        onArchiveInAgentBox={
+          serviceWorkspace ? () => setArchiveTarget({ shellId: project.id, workspace: serviceWorkspace }) : undefined
         }
         onEnter={onEnterProject}
         onNewSession={onNewSessionInWorkspace}
@@ -172,6 +214,19 @@ export function WorkspaceList({
           // path through the legacy local-workspace callback would make
           // Electron probe it as a host path, so WSL enters a detached draft
           // until the neutral wire client resolves the workspace by id.
+          onArchiveInAgentBox={(() => {
+            const serviceWorkspace = agentBoxArchiveFor({
+              wsl: {
+                distribution: workspace.distribution,
+                rootPath: workspace.rootPath,
+                user: workspace.actualUser
+              }
+            })
+
+            return serviceWorkspace
+              ? () => setArchiveTarget({ shellId: workspace.id, workspace: serviceWorkspace })
+              : undefined
+          })()}
           onEnter={() => onNewSessionInWorkspace?.(null)}
           onRemove={setRemoveTarget}
           onRename={setRenameTarget}
@@ -214,6 +269,36 @@ export function WorkspaceList({
         open={removeTarget !== null}
         title={w.removeTitle(removeTarget?.name ?? '')}
       />
+
+      {/* Archiving the SERVICE record. Local hides and the WSL host's own
+          remove stay separate actions; this one edits nothing on disk and
+          stops nothing that is running. Mounted only once a row matched a
+          service Workspace, so no copy is read for a row that has none. */}
+      {archiveTarget && (
+        <ConfirmDialog
+          confirmLabel={copy.action}
+          description={copy.desc}
+          onClose={() => setArchiveTarget(null)}
+          onConfirm={async () => {
+            const returned = await archiveAgentBoxWorkspace(agentBoxRuntimeClient(), {
+              expectedVersion: archiveTarget.workspace.version,
+              workspaceId: archiveTarget.workspace.id
+            })
+
+            // Selection first, service projection second: the main chat must
+            // never observe "the row is still selected but its service
+            // Workspace is gone", which would re-register the workspace just
+            // archived.
+            if (returned.archivedAt !== null && $workspaceViewSelectedId.get() === archiveTarget.shellId) {
+              clearWorkspaceViewSelection()
+            }
+
+            upsertAgentBoxWorkspace(returned)
+          }}
+          open
+          title={copy.title(archiveTarget.workspace.displayName)}
+        />
+      )}
     </SidebarGroup>
   )
 }

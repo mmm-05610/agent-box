@@ -45,11 +45,15 @@ function useProjectActions({
   project,
   isActive,
   scoped,
+  onArchiveInAgentBox,
   onExitScope
 }: {
   project: SidebarProjectTree
   isActive: boolean
   scoped: boolean
+  /** Injected by the surface that matched this row to a service Workspace.
+   *  These menus never reach for the wire client themselves. */
+  onArchiveInAgentBox?: () => void
   onExitScope?: () => void
 }) {
   const { t } = useI18n()
@@ -127,7 +131,19 @@ function useProjectActions({
     variant: 'destructive'
   }
 
-  return { dangerItem, identityItems, pathItems }
+  // Offered only when the surface proved a matching service Workspace. It sits
+  // apart from the removal entry: "Remove from sidebar" hides this row, while
+  // archive touches the service record and nothing local.
+  const agentBoxItem: ActionItemSpec | null = onArchiveInAgentBox
+    ? {
+        icon: 'archive',
+        key: 'agentbox-archive',
+        label: t.sidebar.agentBoxArchive.action,
+        onSelect: onArchiveInAgentBox
+      }
+    : null
+
+  return { agentBoxItem, dangerItem, identityItems, pathItems }
 }
 
 // Per-project actions. The kebab keeps its row-anchored Appearance popover; the
@@ -137,11 +153,13 @@ export function ProjectMenu({
   project,
   isActive,
   scoped = false,
+  onArchiveInAgentBox,
   onExitScope,
   anchorRef
 }: {
   project: SidebarProjectTree
   isActive: boolean
+  onArchiveInAgentBox?: () => void
   // True when rendered in the entered-project header, so removal can leave the
   // now-defunct scope.
   scoped?: boolean
@@ -159,8 +177,9 @@ export function ProjectMenu({
   // when the panes are flipped (sidebar on the right).
   const panesFlipped = useStore($panesFlipped)
 
-  const { dangerItem, identityItems, pathItems } = useProjectActions({
+  const { agentBoxItem, dangerItem, identityItems, pathItems } = useProjectActions({
     isActive,
+    onArchiveInAgentBox,
     onExitScope,
     project,
     scoped
@@ -243,6 +262,12 @@ export function ProjectMenu({
           )}
           {pathItems.map(item => renderActionItem(DROPDOWN_KIT, item))}
           <DropdownMenuSeparator />
+          {agentBoxItem ? (
+            <>
+              {renderActionItem(DROPDOWN_KIT, agentBoxItem)}
+              <DropdownMenuSeparator />
+            </>
+          ) : null}
           {renderActionItem(DROPDOWN_KIT, dangerItem)}
         </DropdownMenuContent>
       </DropdownMenu>
@@ -269,6 +294,7 @@ interface ProjectContextMenuProps {
   project: SidebarProjectTree
   isActive: boolean
   scoped?: boolean
+  onArchiveInAgentBox?: () => void
   onExitScope?: () => void
   children: React.ReactNode
 }
@@ -280,14 +306,16 @@ export function ProjectContextMenu({
   project,
   isActive,
   scoped = false,
+  onArchiveInAgentBox,
   onExitScope,
   children
 }: ProjectContextMenuProps) {
   const { t } = useI18n()
   const p = t.sidebar.projects
 
-  const { dangerItem, identityItems, pathItems } = useProjectActions({
+  const { agentBoxItem, dangerItem, identityItems, pathItems } = useProjectActions({
     isActive,
+    onArchiveInAgentBox,
     onExitScope,
     project,
     scoped
@@ -322,6 +350,12 @@ export function ProjectContextMenu({
       {(identityItems.length > 0 || canTheme) && <kit.Separator />}
       {pathItems.map(item => renderActionItem(kit, item))}
       <kit.Separator />
+      {agentBoxItem && (
+        <>
+          {renderActionItem(kit, agentBoxItem)}
+          <kit.Separator />
+        </>
+      )}
       {renderActionItem(kit, dangerItem)}
     </>
   )

@@ -2,6 +2,7 @@ import type { WireV1Client } from '@/api/wire-v1-client'
 import { $agentBoxWorkspaces } from '@/store/agentbox-service'
 import {
   asRequestId,
+  asWireId,
   type EnvironmentIdentity,
   type RequestId,
   type WorkspaceRecord,
@@ -29,6 +30,15 @@ export interface OpenAgentBoxWorkspaceInput {
 }
 
 export interface OpenAgentBoxWorkspaceOptions {
+  createRequestId?: () => RequestId
+}
+
+export interface ArchiveAgentBoxWorkspaceInput {
+  workspaceId: string
+  expectedVersion: number
+}
+
+export interface ArchiveAgentBoxWorkspaceOptions {
   createRequestId?: () => RequestId
 }
 
@@ -65,6 +75,27 @@ export async function openAgentBoxWorkspace(
     ...(input.expectedVersion === undefined ? {} : { expectedVersion: input.expectedVersion }),
     requestId: (options.createRequestId ?? defaultRequestId)()
   })
+}
+
+/**
+ * Archives the SERVICE Workspace record (core v1 §3: archive keeps the record —
+ * it is not a delete, and it cascades to nothing: no files, no Sessions, no
+ * history, no running task). The caller decides what the projection does with
+ * the answer; this function only reports it, so a failure cannot leave the
+ * service record removed while the shell selection still points at it.
+ */
+export async function archiveAgentBoxWorkspace(
+  client: WireV1Client,
+  input: ArchiveAgentBoxWorkspaceInput,
+  options: ArchiveAgentBoxWorkspaceOptions = {}
+): Promise<WorkspaceRecord> {
+  const result = await client.call('workspaces.archive', {
+    expectedVersion: input.expectedVersion,
+    requestId: (options.createRequestId ?? defaultRequestId)(),
+    workspaceId: asWireId(input.workspaceId)
+  })
+
+  return result.workspace
 }
 
 /** Resolve a shell selection to a server-owned Workspace identity by the

@@ -4,7 +4,12 @@ import type { WireV1Client } from '@/api/wire-v1-client'
 import { $agentBoxWorkspaces } from '@/store/agentbox-service'
 import { asRequestId, asWireId, type WorkspaceRecord, type WorkspacesOpenResult } from '@/types/wire/wire-v1'
 
-import { openAgentBoxWorkspace, refreshAgentBoxWorkspaces, resolveAgentBoxWorkspace } from './wire-workspace-catalog'
+import {
+  archiveAgentBoxWorkspace,
+  openAgentBoxWorkspace,
+  refreshAgentBoxWorkspaces,
+  resolveAgentBoxWorkspace
+} from './wire-workspace-catalog'
 
 function workspace(
   id: string,
@@ -125,9 +130,9 @@ describe('AgentBox Workspace catalog', () => {
 
     // A Session's own workspaceId is authoritative even when the shell
     // selection could never have matched that record's identity.
-    expect(
-      resolveAgentBoxWorkspace([direct], { localPath: '/elsewhere', serviceWorkspaceId: 'workspace-1' })
-    ).toBe(direct)
+    expect(resolveAgentBoxWorkspace([direct], { localPath: '/elsewhere', serviceWorkspaceId: 'workspace-1' })).toBe(
+      direct
+    )
     expect(resolveAgentBoxWorkspace([direct], { serviceWorkspaceId: 'missing' })).toBeNull()
   })
 
@@ -204,5 +209,77 @@ describe('AgentBox Workspace catalog', () => {
   it('fails closed when a shell selection cannot be proven equivalent to a service Workspace', () => {
     expect(resolveAgentBoxWorkspace([workspace('service', 'local', '/known')], { localPath: '/unknown' })).toBeNull()
     expect(resolveAgentBoxWorkspace([workspace('service', 'local', '/known')], {})).toBeNull()
+  })
+})
+
+describe('archiveAgentBoxWorkspace', () => {
+  const requestId = asRequestId('request-archive-0001')
+
+  it('sends the service id and the version it is replacing', async () => {
+    const archived: WorkspaceRecord = {
+      ...workspace('workspace-1', 'local', 'C:/work/app'),
+      archivedAt: '2026-09-14T02:00:00.000Z',
+      version: 4
+    }
+
+    const call = vi.fn(async (_method: string, _params?: unknown) => ({ workspace: archived }))
+    const client = { call } as unknown as WireV1Client
+
+    await expect(
+      archiveAgentBoxWorkspace(
+        client,
+        { expectedVersion: 3, workspaceId: 'workspace-1' },
+        { createRequestId: () => requestId }
+      )
+    ).resolves.toBe(archived)
+
+    expect(call.mock.calls.map(entry => entry[0])).toEqual(['workspaces.archive'])
+    expect(call).toHaveBeenCalledWith('workspaces.archive', {
+      expectedVersion: 3,
+      requestId,
+      workspaceId: 'workspace-1'
+    })
+  })
+
+  it('mints a fresh request id for every archive intent', async () => {
+    const call = vi.fn(async (_method: string, _params?: unknown) => ({
+      workspace: { ...workspace('workspace-1', 'local', 'C:/work/app'), archivedAt: '2026-09-14T02:00:00.000Z' }
+    }))
+
+    const client = { call } as unknown as WireV1Client
+
+    await archiveAgentBoxWorkspace(client, { expectedVersion: 1, workspaceId: 'workspace-1' })
+    await archiveAgentBoxWorkspace(client, { expectedVersion: 1, workspaceId: 'workspace-1' })
+
+    const ids = call.mock.calls.map(entry => (entry[1] as { requestId: string }).requestId)
+
+    expect(new Set(ids).size).toBe(2)
+    expect(ids.every(id => id.startsWith('desktop-'))).toBe(true)
+  })
+
+  it('lets a version conflict and a transport failure surface untouched, changing nothing locally', async () => {
+    const conflict = {
+      call: vi.fn(async () => {
+        throw new Error('CONFLICT_VERSION')
+      })
+    } as unknown as WireV1Client
+
+    await expect(
+      archiveAgentBoxWorkspace(conflict, { expectedVersion: 1, workspaceId: 'workspace-1' })
+    ).rejects.toThrow('CONFLICT_VERSION')
+
+    const offline = {
+      call: vi.fn(async () => {
+        throw new Error('UNAVAILABLE')
+      })
+    } as unknown as WireV1Client
+
+    await expect(archiveAgentBoxWorkspace(offline, { expectedVersion: 1, workspaceId: 'workspace-1' })).rejects.toThrow(
+      'UNAVAILABLE'
+    )
+
+    // The application layer never writes the projection itself: only a caller
+    // that received an answer decides what the cache does.
+    expect($agentBoxWorkspaces.get()).toEqual([])
   })
 })

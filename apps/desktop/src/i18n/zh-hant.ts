@@ -1901,6 +1901,18 @@ export const zhHant = defineLocale({
   },
 
   sidebar: {
+
+    agentBoxArchive: {
+
+      action: '在 AgentBox 中封存',
+
+      title: name => `在 AgentBox 中封存「${name}」？`,
+
+      desc: '只封存服務中的工作區記錄；側欄入口、檔案、Session 與歷史都會保留，執行中的任務也不會停止。',
+
+      failed: '無法封存工作區'
+
+    },
     gatewayGroups: {
       grouping: '閘道與設定檔',
       rename: '重新命名群組',

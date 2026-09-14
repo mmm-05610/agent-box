@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import type { SidebarProjectTree } from '@/store/projects/membership'
+import { $workspaceLocalHiddenIds } from '@/store/workspace-view'
 
 import { ProjectMenu } from './project-menu'
 
@@ -27,6 +28,7 @@ vi.mock('@/i18n', () => ({
     t: {
       common: { cancel: 'Cancel', confirm: 'Confirm', done: 'Done', loading: 'Loading…' },
       sidebar: {
+        agentBoxArchive: { action: 'Archive in AgentBox' },
         projects: {
           copyPath: 'Copy path',
           deleteConfirm: 'This cannot be undone.',
@@ -116,4 +118,34 @@ describe('ProjectMenu', () => {
     // chain rather than getting silently dropped on an intermediate wrapper.
     expect(await screen.findByRole('button', { name: 'No color' })).toBeTruthy()
   }, 15000)
+})
+
+describe('ProjectMenu AgentBox archive injection', () => {
+  it('offers the injected AgentBox archive beside the sidebar hide, as two different actions', async () => {
+    const onArchiveInAgentBox = vi.fn()
+
+    render(<ProjectMenu isActive={false} onArchiveInAgentBox={onArchiveInAgentBox} project={project} />)
+
+    openTriggerMenu(screen.getByRole('button', { name: 'Actions' }))
+
+    const archive = await screen.findByRole('menuitem', { name: 'Archive in AgentBox' })
+    const hide = await screen.findByRole('menuitem', { name: 'Remove from sidebar' })
+
+    expect(archive).not.toBe(hide)
+
+    fireEvent.click(archive)
+
+    expect(onArchiveInAgentBox).toHaveBeenCalledTimes(1)
+    // The boxed archive is not the local hide: nothing was hidden.
+    expect($workspaceLocalHiddenIds.get()).toEqual([])
+  })
+
+  it('renders no AgentBox action when the surface injected none', async () => {
+    render(<ProjectMenu isActive={false} project={project} />)
+
+    openTriggerMenu(screen.getByRole('button', { name: 'Actions' }))
+
+    expect(await screen.findByRole('menuitem', { name: 'Remove from sidebar' })).toBeTruthy()
+    expect(screen.queryByRole('menuitem', { name: 'Archive in AgentBox' })).toBeNull()
+  })
 })

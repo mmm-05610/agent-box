@@ -1612,6 +1612,12 @@ export const ar = defineLocale({
     missingBody: 'لم يعد هذا الناتج موجودًا في السجل المحلي.'
   },
   sidebar: {
+    agentBoxArchive: {
+      action: 'أرشفة في AgentBox',
+      title: name => `أرشفة «${name}» في AgentBox؟`,
+      desc: 'تؤرشف سجل مساحة العمل في الخدمة فقط. يبقى مدخل الشريط الجانبي والملفات وSession والسجل كما هي، ولا تُوقف المهام الجارية.',
+      failed: 'تعذر أرشفة مساحة العمل'
+    },
     gatewayGroups: {
       grouping: 'البوابة والملف الشخصي',
       rename: 'إعادة تسمية المجموعة',

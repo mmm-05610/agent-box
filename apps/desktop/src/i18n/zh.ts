@@ -2464,6 +2464,18 @@ export const zh: Translations = {
   },
 
   sidebar: {
+
+    agentBoxArchive: {
+
+      action: '在 AgentBox 中归档',
+
+      title: name => `在 AgentBox 中归档“${name}”？`,
+
+      desc: '只归档服务中的工作区记录；侧栏入口、文件、Session 与历史都会保留，运行中的任务也不会停止。',
+
+      failed: '无法归档工作区'
+
+    },
     gatewayGroups: {
       grouping: '网关与配置',
       rename: '重命名分组',

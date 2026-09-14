@@ -99,6 +99,10 @@ export interface LocalWorkspaceRowProps {
   content?: React.ReactNode
   /** True when there is something to reveal (previews) — gates the caret. */
   expandable: boolean
+  /** AgentBox service archive for THIS row, injected by the list that owns the
+   *  match, dialog and request. Absent = no service Workspace (or no declared
+   *  capability), so no affordance is offered. */
+  onArchiveInAgentBox?: () => void
   onEnter?: (id: string) => void
   onNewSession?: (path: null | string) => void
   onNewSessionSplit?: NewSessionSplitHandler
@@ -121,6 +125,7 @@ export function LocalWorkspaceRow({
   activeProjectId,
   content,
   expandable,
+  onArchiveInAgentBox,
   onEnter,
   onNewSession,
   onNewSessionSplit,
@@ -178,7 +183,14 @@ export function LocalWorkspaceRow({
               delete — but it still starts sessions: a null path is the "no
               folder" chat. New session sits outermost: it's the one you reach
               for. */}
-          {!project.isNoProject && <ProjectMenu anchorRef={rowRef} isActive={isActive} project={project} />}
+          {!project.isNoProject && (
+            <ProjectMenu
+              anchorRef={rowRef}
+              isActive={isActive}
+              onArchiveInAgentBox={onArchiveInAgentBox}
+              project={project}
+            />
+          )}
           {onNewSession && (
             <WorkspaceAddButton
               label={s.newSessionIn(project.label)}
@@ -246,7 +258,7 @@ export function LocalWorkspaceRow({
       {project.isNoProject ? (
         shell
       ) : (
-        <ProjectContextMenu isActive={isActive} project={project}>
+        <ProjectContextMenu isActive={isActive} onArchiveInAgentBox={onArchiveInAgentBox} project={project}>
           {shell}
         </ProjectContextMenu>
       )}
@@ -257,6 +269,9 @@ export function LocalWorkspaceRow({
 export interface WslWorkspaceRowProps {
   infoOpen: boolean
   item: WorkspaceListItem
+  /** AgentBox service archive for this row — separate from the host's own
+   *  remove. Injected by the list; this row never talks to the wire client. */
+  onArchiveInAgentBox?: () => void
   onEnter?: (workspace: WslWorkspaceRecord) => void
   onRemove: (target: { id: string; name: string }) => void
   onRename: (target: { id: string; name: string }) => void
@@ -272,7 +287,16 @@ export interface WslWorkspaceRowProps {
  * SELECTS the workspace — connection info stays on its dedicated button and
  * menu entry, never on the main row.
  */
-export function WslWorkspaceRow({ infoOpen, item, onEnter, onRemove, onRename, state, workspace }: WslWorkspaceRowProps) {
+export function WslWorkspaceRow({
+  infoOpen,
+  item,
+  onArchiveInAgentBox,
+  onEnter,
+  onRemove,
+  onRename,
+  state,
+  workspace
+}: WslWorkspaceRowProps) {
   const { t } = useI18n()
   const w = t.wslWorkspace
   const validating = state?.status === 'validating'
@@ -379,6 +403,12 @@ export function WslWorkspaceRow({ infoOpen, item, onEnter, onRemove, onRename, s
                 <span>{w.menuRemove}</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
+              {onArchiveInAgentBox ? (
+                <DropdownMenuItem onSelect={onArchiveInAgentBox}>
+                  <Codicon name="archive" size="0.875rem" />
+                  <span>{t.sidebar.agentBoxArchive.action}</span>
+                </DropdownMenuItem>
+              ) : null}
               <DropdownMenuItem onSelect={() => openWslWorkspaceInfo(workspace.id)}>
                 <Codicon name="info" size="0.875rem" />
                 <span>{w.connectionInfo}</span>
