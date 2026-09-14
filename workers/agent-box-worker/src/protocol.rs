@@ -244,12 +244,36 @@ mod tests {
             instance_nonce: "nonce-test".into(),
             server_instance_id: "server-test".into(),
             lease_ms: 5_000,
+            protocol_version: PROTOCOL_VERSION,
             executables: Vec::new(),
         };
         assert_eq!(
             decode_bootstrap(&encode_bootstrap(&value).unwrap()).unwrap(),
             value
         );
+    }
+
+    #[test]
+    fn legacy_bootstrap_without_protocol_version_decodes_as_zero() {
+        // A 40-B-era client sent no `protocolVersion`. It must decode (so the
+        // handshake can answer) but carry 0, which the worker rejects loudly
+        // instead of running with one-shot semantics.
+        let legacy = serde_json::json!({
+            "workerVersion": "0.1.0",
+            "workerDigest": format!("sha256:{}", "a".repeat(64)),
+            "connectionId": "connection-test",
+            "projectId": "project-test",
+            "effectiveUser": "tester",
+            "instanceNonce": "nonce-test",
+            "serverInstanceId": "server-test",
+            "leaseMs": 5_000,
+        });
+        let payload = serde_json::to_vec(&legacy).expect("legacy bootstrap encodes");
+        let encoded = encode_frame(&Frame::new(FrameKind::Hello, 0, 1, payload))
+            .expect("legacy bootstrap frame encodes");
+        let decoded = decode_bootstrap(&encoded).expect("legacy bootstrap decodes");
+        assert_eq!(decoded.protocol_version, 0);
+        assert_ne!(decoded.protocol_version, PROTOCOL_VERSION);
     }
 
     fn hex(bytes: &[u8]) -> String {

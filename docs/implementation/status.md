@@ -9,7 +9,7 @@
 | 单号 | 状态 | 证据 | 下一步 |
 | --- | --- | --- | --- |
 | [39](work-orders/39-server-boundaries.md) | **READY_FOR_HARNESS** | [阶段证据](../server-round1/server-boundary/stage-a-b-c.md)：幂等并发双派发缺陷先复现后修复、能力声明改为注册派生、双中立provider测试、legacy codex 退出生产装配 | wire反馈通道 [wire-review.md](../server-round1/wire-review.md) 已建立并写入首轮 |
-| [40](work-orders/40-four-harness-integration.md) | **COMPONENTS_READY（A/B/C 完成，D 待汇总）** | [40-A 底座](../server-round1/harness-integration/stage-a.md) / [40-B 通道](../server-round1/harness-integration/stage-b.md) / [40-C 矩阵](../server-round1/harness-integration/stage-c.md) + [握手证据JSON](../server-round1/harness-integration/handshake-40c.json)：四家组件门 25/25；真实二进制零凭据握手 pi/hermes INITIALIZED、opencode HEALTH_OK、codex 诚实要求凭据 | 40-D 汇总后进入 41；真实模型门留待 42 §D |
+| [40](work-orders/40-four-harness-integration.md) | **FOUR_HARNESS_COMPONENTS_READY** | [40-A 底座](../server-round1/harness-integration/stage-a.md) / [40-B 通道](../server-round1/harness-integration/stage-b.md) / [40-C 矩阵](../server-round1/harness-integration/stage-c.md) / [40-D 汇总](../server-round1/harness-integration/stage-d.md) + [握手证据JSON](../server-round1/harness-integration/handshake-40c.json)：四家组件门 25/25；全量 227 passed/4 skipped/0 failed；Rust 4 passed；真实二进制零凭据握手 pi/hermes INITIALIZED、opencode HEALTH_OK、codex 诚实要求凭据 | 本单终态；Server 侧编排与 wire 锁定进入 41；真实模型门留待 42 §D |
 | [41](work-orders/41-core-service-acceptance.md) | **QUEUED** | core-semantics/1已批准；前端P07 wire仍未产出（checkpoint 1，只读核对于39/A） | 40-D 后按41编制/核对wire候选并锁定，再做核心业务实现与独立验收 |
 | [42](work-orders/42-fullstack-delivery.md) | **QUEUED** | 循环检查与双门后全栈接管已授权；DeepSeek官方API授权见§D | 后端READY后每5分钟检查前端；联调、修复、两仓提交 |
 | [37](work-orders/37-http-codex.md) | **SERVER_HTTP_CODEX_R1_PARTIAL** | [原完成审计](../server-round1/completion-audit.md) / [C/D证据](../server-round1/stage-c-d.md)保留；检查点5a45303/5b71393/cd5efbe/67c6b40。独立定向23 passed；同键并发双accept已由39复现并修复；能力不诚实已由39结构性修复 | abandon 断言经探针定性为**测试侧竞态**（终止状态持久化后约50ms才 abandon；负载高时10/10失败），已改为有界等待、断言强度不变，修后10/10通过；原生语义迁移由40执行 |
@@ -27,6 +27,8 @@
 - integration_owner: NONE；workbench_model_verified_count: **0**（指本轮；组件门通过不等于真实模型可用）。
 - model_authorization: DEEPSEEK_OFFICIAL_AUTHORIZED_MAX_CNY_10；凭据locator见42 §D，不写内容。
 - 本轮调用数0，已知费用0，预留0；后续执行者统一记账，所有Harness/重试累计计算。
+- 40 全量门实绩（40-D 记录）：python 227 passed/4 skipped/0 failed；node 25/25；
+  cargo 4 passed。平台未执行项=Windows 真机 WSL 全链路与全部真实模型门。
 - four_harness_matrix（组件级）：
   - codex：COMPONENT_VERIFIED（快照+fake peer 全门通过；真实二进制握手 TYPED_FAILURE，
     适配器要求 API key，app-server 路径已由工件证据确认，未退回 exec JSONL）；
