@@ -45,7 +45,9 @@ export interface RequiredStepIssue {
 }
 
 export interface LegacyRestGateInput {
-  captureStartedAtWindow: unknown
+  /** Proof that a whole renderer boot ran with the console capture already
+   *  live. Only the exact boolean `true` counts. */
+  captureCoversBoot: unknown
   mainRefusals: unknown
   residualPaths: unknown
 }

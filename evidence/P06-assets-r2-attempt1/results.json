@@ -1,0 +1,168 @@
+{
+  "allOk": false,
+  "counts": {
+    "PASS": 21,
+    "FAIL": 1,
+    "SKIP": 0,
+    "PENDING": 0
+  },
+  "executed": 22,
+  "finishedAt": "2026-09-14T15:41:04.793Z",
+  "notes": [
+    "baseline Hermes-named processes before launch: []",
+    "launched process tree before close: [21860,13048,13996,31824,33288,1540]"
+  ],
+  "screenshots": [
+    "C:\\Users\\maoqh\\agentbox-p06-evidence-r2\\arrival-no-service.png",
+    "C:\\Users\\maoqh\\agentbox-p06-evidence-r2\\workspace-sidebar.png",
+    "C:\\Users\\maoqh\\agentbox-p06-evidence-r2\\settings-no-service.png",
+    "C:\\Users\\maoqh\\agentbox-p06-evidence-r2\\profiles-unavailable.png",
+    "C:\\Users\\maoqh\\agentbox-p06-evidence-r2\\command-center-agentbox.png",
+    "C:\\Users\\maoqh\\agentbox-p06-evidence-r2\\command-palette-agentbox.png"
+  ],
+  "sha256": {
+    "arrival-no-service.png": "08c9fd8a5cdaf39cce58fadaeeb3f02e38a2a1b39f6b25871a952371bb6f96d0",
+    "command-center-agentbox.png": "ee8d2f66d7e1a1bb36b9a04ecf832a4d7109f241f7c1becd3e19c60a30f41b88",
+    "command-palette-agentbox.png": "6cca4ab1ac491e9e312d9c619b366a54e60e7af28c9840e304cd84376820d758",
+    "main-process-safe.log": "48de3f094b64f91af3fdcbb6202342125c4353f850c2dbb9318d9f585e6a592c",
+    "profiles-unavailable.png": "7d7e1133984b7d01dfa104940ed12f24690b534cdb9788040652394b537d80f8",
+    "renderer-console.log": "15e822db098dd66bacc74db735fefc08c573a192a34e79aea0845ea387b3dd23",
+    "settings-no-service.png": "8b45bf4ee81d9b6866c6ab503c6bee2cf56c77b7eeef61492e7672ad930ec0ff",
+    "workspace-sidebar.png": "08c9fd8a5cdaf39cce58fadaeeb3f02e38a2a1b39f6b25871a952371bb6f96d0"
+  },
+  "steps": [
+    {
+      "detail": "electron.exe=C:\\Users\\maoqh\\agentbox-wsl-round1\\apps\\desktop\\node_modules\\electron\\dist\\electron.exe; dist/index.html=true",
+      "id": "driver-target",
+      "status": "PASS",
+      "step": "driver target"
+    },
+    {
+      "detail": "userData=C:\\Users\\maoqh\\agentbox-p06-sandbox-r2\\user-data (expected C:\\Users\\maoqh\\agentbox-p06-sandbox-r2\\user-data); HERMES_HOME=C:\\Users\\maoqh\\agentbox-p06-sandbox-r2\\hermes-home; appName=HermesP06Acceptance",
+      "id": "sandbox-isolation",
+      "status": "PASS",
+      "step": "the run uses its own HERMES_HOME, userData and app name"
+    },
+    {
+      "detail": "no server env, no agentbox connection slot file, no credentials dir under the sandbox home",
+      "id": "no-service-provided",
+      "status": "PASS",
+      "step": "no Server, Harness, credential or model is provided"
+    },
+    {
+      "detail": "first window in 1269ms (deadline 30000ms); windows=1",
+      "id": "window-appears",
+      "status": "PASS",
+      "step": "the main window appears within the deadline"
+    },
+    {
+      "detail": "largest [data-glass-opaque] covers 0.0% (must be <90%); nodes=0; failurePanels=0; sidebar=1",
+      "id": "no-blocking-overlay",
+      "status": "PASS",
+      "step": "the arrival screen is not covered by a blocking surface"
+    },
+    {
+      "detail": "sidebar entries: local folder=true; remote/WSL=true; agentbox session rows=0 (must be 0)",
+      "id": "workspace-entries",
+      "status": "PASS",
+      "step": "local and remote/WSL workspace entries are co-visible, with no fabricated session"
+    },
+    {
+      "detail": "HERMES_DESKTOP_BOOT_FAKE=1 + FAKE_ERROR set; runtime launched=false; blocking coverage=0.0%",
+      "id": "legacy-fake-boot-ignored",
+      "status": "PASS",
+      "step": "the legacy Hermes fake-boot/fake-error environment neither blocks nor starts a runtime"
+    },
+    {
+      "detail": "submit present=true; disabled=true; unavailable banner=\"AgentBox service is unavailable\"; session rows after click=0 (must be 0)",
+      "id": "send-fails-closed",
+      "status": "PASS",
+      "step": "the send entry fails closed and creates no Session with no backend"
+    },
+    {
+      "detail": "after open: hash=#/settings?tab=product:models, text=1082 chars; after close: hash=#/",
+      "id": "settings-opens-closes",
+      "status": "PASS",
+      "step": "Settings opens and closes"
+    },
+    {
+      "detail": "hash=#/profiles; unavailable copy present=true; session rows=0; text=\"@keyframes hermes-zone-fade { from { opacity: 0.001 } to { opacity: 1 } } [data-tree-group] :is(aside, [data-slot=sidebar]) { border-left-width: 0; border-right-width: 0; box-shado\"",
+      "id": "profiles-honest",
+      "status": "PASS",
+      "step": "Profiles opens and states unavailability instead of showing fabricated records"
+    },
+    {
+      "detail": "product:models: controls=0, honest=true; product:resources: controls=0, honest=true; product:identities: controls=0, honest=true; product:harnesses: controls=0, honest=true; product:data: controls=0, honest=true",
+      "id": "product-settings-honest",
+      "status": "PASS",
+      "step": "Models and the other product settings open; unavailable capabilities are stated, not faked"
+    },
+    {
+      "detail": "hash=#/command-center?section=sessions; legacy-looking actions=[]; text=\"@keyframes hermes-zone-fade { from { opacity: 0.001 } to { opacity: 1 } } [data-tree-group] :is(aside, [data-slot=sidebar]) { border-left-width: 0; border-right\"",
+      "id": "command-center-agentbox",
+      "status": "PASS",
+      "step": "the Command Center opens as AgentBox authority with no legacy System/Usage/Maintenance action"
+    },
+    {
+      "detail": "options=30; profiles row=true; legacy entries=[]; first options=[\"New sessionCtrlN\",\"New windowCtrlShiftN\",\"SettingsCtrl,\",\"Profiles\",\"Open folder as project…CtrlO\",\"Toggle layout edit modeoffCtrlShift\\\\\",\"Reload desktop plugins\",\"Reset layout\",\"Toggle status baronCtrlShiftS\",\"Toggle tabsoffCtrlAltT\",\"Keyboard shortcuts\",\"New Bot…\"]",
+      "id": "command-palette-agentbox",
+      "status": "PASS",
+      "step": "the command palette offers AgentBox navigation and no legacy restart/logs/profile share rows"
+    },
+    {
+      "detail": "settings entry accepted a real click; hash after click=#/settings",
+      "id": "sidebar-operable",
+      "status": "PASS",
+      "step": "the sidebar is operable with no backend (its Settings entry takes a real click)"
+    },
+    {
+      "detail": "#/cron → #/settings?tab=product:resources; #/agents → #/settings?tab=product:resources; #/starmap → #/settings?tab=product:resources; #/webhooks → #/settings?tab=product:resources",
+      "id": "legacy-view-routes-retired",
+      "status": "PASS",
+      "step": "Cron/Agents/Starmap/Webhooks deep links land on the honest product page, not a legacy view"
+    },
+    {
+      "detail": "new Hermes-named processes=[]; fake runtime stub invoked with serve=false",
+      "id": "no-hermes-process",
+      "status": "PASS",
+      "step": "no Hermes runtime process appears while the product runs"
+    },
+    {
+      "detail": "process tree at close=[21860,13048,13996,31824,33288,1540]; still alive after 20s=[]",
+      "id": "exit-no-orphans",
+      "status": "PASS",
+      "step": "closing the window exits Electron with no orphaned process"
+    },
+    {
+      "detail": "main-process refusals=0 (must be exactly 0)",
+      "id": "no-legacy-rest-reached-main",
+      "status": "PASS",
+      "step": "no legacy REST request is refused at the main-process door"
+    },
+    {
+      "detail": "renderer residual legacy paths=[] (must be []); console capture attached only after the first window was returned — earlier renderer output cannot be proven captured; renderer-console.log=405 chars",
+      "id": "no-legacy-rest-issued-by-renderer",
+      "status": "FAIL",
+      "step": "the renderer issues no legacy REST request, refused or otherwise"
+    },
+    {
+      "detail": "main-process-safe.log=2789 chars; token-shaped material=false; renderer-console.log=405 chars",
+      "id": "logs-token-free",
+      "status": "PASS",
+      "step": "the captured main-process log carries no token material"
+    },
+    {
+      "detail": "arrival-no-service.png, command-center-agentbox.png, command-palette-agentbox.png, profiles-unavailable.png, settings-no-service.png, workspace-sidebar.png",
+      "id": "required-screenshots",
+      "status": "PASS",
+      "step": "every required screenshot was captured"
+    },
+    {
+      "detail": "22 steps, none missing/duplicated/PENDING/SKIP",
+      "id": "required-steps-executed",
+      "status": "PASS",
+      "step": "every required step is present exactly once and executed"
+    }
+  ],
+  "unknownStatuses": []
+}

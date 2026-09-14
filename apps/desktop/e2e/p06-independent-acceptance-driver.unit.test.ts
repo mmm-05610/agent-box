@@ -398,7 +398,7 @@ describe('countMainLegacyRestRefusals', () => {
 
 describe('legacyRestGate', () => {
   it('passes only when both gates hold and the capture is proven to cover renderer boot', () => {
-    expect(legacyRestGate({ captureStartedAtWindow: true, mainRefusals: 0, residualPaths: [] })).toEqual({
+    expect(legacyRestGate({ captureCoversBoot: true, mainRefusals: 0, residualPaths: [] })).toEqual({
       captureOk: true,
       mainOk: true,
       ok: true,
@@ -408,7 +408,7 @@ describe('legacyRestGate', () => {
   })
 
   it('does not let a clean main log excuse a renderer residual (the recorded defect)', () => {
-    const verdict = legacyRestGate({ captureStartedAtWindow: true, mainRefusals: 0, residualPaths: ['/api/config'] })
+    const verdict = legacyRestGate({ captureCoversBoot: true, mainRefusals: 0, residualPaths: ['/api/config'] })
 
     expect(verdict.mainOk).toBe(true)
     expect(verdict.rendererOk).toBe(false)
@@ -416,7 +416,7 @@ describe('legacyRestGate', () => {
   })
 
   it('does not let a clean renderer log excuse main-process refusals', () => {
-    const verdict = legacyRestGate({ captureStartedAtWindow: true, mainRefusals: 3, residualPaths: [] })
+    const verdict = legacyRestGate({ captureCoversBoot: true, mainRefusals: 3, residualPaths: [] })
 
     expect(verdict.mainOk).toBe(false)
     expect(verdict.residualsOk).toBe(true)
@@ -424,7 +424,7 @@ describe('legacyRestGate', () => {
   })
 
   it('fails closed when the console capture cannot be proven to cover renderer boot', () => {
-    const verdict = legacyRestGate({ captureStartedAtWindow: false, mainRefusals: 0, residualPaths: [] })
+    const verdict = legacyRestGate({ captureCoversBoot: false, mainRefusals: 0, residualPaths: [] })
 
     expect(verdict.captureOk).toBe(false)
     expect(verdict.residualsOk).toBe(true)
@@ -433,16 +433,16 @@ describe('legacyRestGate', () => {
   })
 
   it('fails closed on inputs that are not a zero count, an array or a true flag', () => {
-    expect(legacyRestGate({ captureStartedAtWindow: true, mainRefusals: '0', residualPaths: [] }).ok).toBe(false)
-    expect(legacyRestGate({ captureStartedAtWindow: true, mainRefusals: undefined, residualPaths: [] }).ok).toBe(false)
-    expect(legacyRestGate({ captureStartedAtWindow: true, mainRefusals: 0, residualPaths: undefined }).ok).toBe(false)
-    expect(legacyRestGate({ captureStartedAtWindow: true, mainRefusals: 0, residualPaths: [''] }).ok).toBe(false)
-    expect(legacyRestGate({ captureStartedAtWindow: 'yes', mainRefusals: 0, residualPaths: [] }).ok).toBe(false)
+    expect(legacyRestGate({ captureCoversBoot: true, mainRefusals: '0', residualPaths: [] }).ok).toBe(false)
+    expect(legacyRestGate({ captureCoversBoot: true, mainRefusals: undefined, residualPaths: [] }).ok).toBe(false)
+    expect(legacyRestGate({ captureCoversBoot: true, mainRefusals: 0, residualPaths: undefined }).ok).toBe(false)
+    expect(legacyRestGate({ captureCoversBoot: true, mainRefusals: 0, residualPaths: [''] }).ok).toBe(false)
+    expect(legacyRestGate({ captureCoversBoot: 'yes', mainRefusals: 0, residualPaths: [] }).ok).toBe(false)
   })
 
   it('decides the recorded renderer evidence as a failure', () => {
     const verdict = legacyRestGate({
-      captureStartedAtWindow: true,
+      captureCoversBoot: true,
       mainRefusals: countMainLegacyRestRefusals('no refusals in the main log'),
       residualPaths: residualLegacyRestPaths('[warning] [legacy-rest] refused /api/config: LEGACY_RUNTIME_DISABLED_FOR_PRODUCT')
     })

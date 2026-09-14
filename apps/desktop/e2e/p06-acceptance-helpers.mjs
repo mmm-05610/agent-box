@@ -289,16 +289,19 @@ export function residualLegacyRestPaths(consoleText) {
 /** The two legacy-REST gates, decided together so they cannot substitute for
  *  each other. Zero main-process refusals says nothing when the renderer log
  *  still shows a call it issued, and a clean renderer log says nothing when a
- *  refusal was counted. The renderer gate additionally requires proof that the
- *  console capture was attached at window creation: a log that may predate the
- *  renderer's first request cannot establish that there was none, so an
- *  unproven capture fails closed rather than passing on missing evidence. `ok`
- *  is true only when both gates hold; a value that is not exactly the number
- *  zero, not an array, or not the boolean true fails closed. */
-export function legacyRestGate({ captureStartedAtWindow, mainRefusals, residualPaths }) {
+ *  refusal was counted. The renderer gate additionally requires `captureCoversBoot`:
+ *  proof that a whole renderer boot happened with the capture already live. A
+ *  log that may predate the renderer's first request cannot establish that
+ *  there was none, so unproven coverage fails closed rather than passing on
+ *  missing evidence. How that proof is obtained is the driver's business — it
+ *  may attach before the window exists, or re-run the boot under capture — but
+ *  it must be true, and only the exact boolean `true` counts. `ok` is true only
+ *  when both gates hold; a value that is not exactly the number zero, not an
+ *  array, or not the boolean true fails closed. */
+export function legacyRestGate({ captureCoversBoot, mainRefusals, residualPaths }) {
   const mainOk = mainRefusals === 0
   const residualsOk = Array.isArray(residualPaths) && residualPaths.length === 0
-  const captureOk = captureStartedAtWindow === true
+  const captureOk = captureCoversBoot === true
   const rendererOk = residualsOk && captureOk
 
   return { captureOk, mainOk, ok: mainOk && rendererOk, rendererOk, residualsOk }

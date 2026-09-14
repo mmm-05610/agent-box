@@ -293,17 +293,17 @@ async function main() {
     executablePath: bin
   })
 
-  // Console capture must begin the moment a window exists. The renderer emits
-  // its boot-time legacy-REST refusals before `domcontentloaded`, and
-  // `legacy-rest.ts` reports each path once per session, so a line lost before
-  // the listener attaches can never be recovered later — the
-  // "no residual renderer caller" gate would then pass on evidence that was
-  // never collected. Registering on `window` (before `firstWindow()`) catches
-  // the window at creation; `captureStartedAtWindow` records whether that
-  // actually happened, and the gate fails closed when it cannot be proven.
+  // The renderer emits its boot-time legacy-REST refusals before
+  // `domcontentloaded`, and `legacy-rest.ts` reports each path once per session,
+  // so a line lost before the listener attaches can never be recovered later —
+  // the "no residual renderer caller" gate would then pass on evidence that was
+  // never collected. Registering on `window` (before `firstWindow()`) catches a
+  // window at creation; a window that already existed when `_electron.launch()`
+  // resolved never fires that event, and Playwright emits it for those pages
+  // inside the ElectronApplication constructor, before the caller can listen.
   const capturedPages = new WeakSet()
   const captureStartedAt = new WeakMap()
-  let captureStartedAtWindow = false
+  let captureBasis = 'no window was captured'
 
   function attachConsoleCapture(candidate, atWindowCreation) {
     if (!candidate || capturedPages.has(candidate)) {
@@ -321,6 +321,8 @@ async function main() {
 
   let page = null
   let treeRoots = []
+  // Declared outside the try: the renderer gate is decided after teardown.
+  let captureCoversBoot = false
 
   try {
     const mainProcess = app.process()
@@ -336,8 +338,24 @@ async function main() {
     attachConsoleCapture(page, false)
 
     // The coverage claim belongs to THIS window's log: a later window captured
-    // from birth must not retroactively bless a first window attached to late.
-    captureStartedAtWindow = captureStartedAt.get(page) === true
+    // from birth must not retroactively bless a first window attached too late.
+    captureCoversBoot = captureStartedAt.get(page) === true
+
+    if (captureCoversBoot) {
+      captureBasis = 'attached at window creation, before the renderer could log anything'
+    } else {
+      // The race was lost, so the first document's earliest output cannot be
+      // proven captured. EARN the coverage instead of failing or assuming it:
+      // reload now that the listener is live, which re-runs the whole renderer
+      // boot — module import, `applyProductRuntimePolicy()`, the cold-start
+      // effects — strictly after capture began. The gate's requirement is
+      // unchanged ("a whole boot ran under capture"); it is now satisfied by
+      // evidence rather than by luck, and the first document's lines are still
+      // in the log from the moment the listener attached.
+      await page.reload({ waitUntil: 'domcontentloaded' })
+      captureCoversBoot = capturedPages.has(page)
+      captureBasis = 'first window predated the listener; the renderer boot was re-run under capture (reload)'
+    }
 
     await page.waitForLoadState('domcontentloaded')
     await page.waitForTimeout(4000)
@@ -654,10 +672,7 @@ async function main() {
   // residual caller".
   const mainRefusals = countMainLegacyRestRefusals(mainLogText)
   const residualLegacyPaths = residualLegacyRestPaths(consoleText)
-  const restGate = legacyRestGate({ captureStartedAtWindow, mainRefusals, residualPaths: residualLegacyPaths })
-  const captureBasis = captureStartedAtWindow
-    ? 'attached at window creation, before the renderer could log anything'
-    : 'attached only after the first window was returned — earlier renderer output cannot be proven captured'
+  const restGate = legacyRestGate({ captureCoversBoot, mainRefusals, residualPaths: residualLegacyPaths })
 
   record(
     'no-legacy-rest-reached-main',
@@ -670,7 +685,7 @@ async function main() {
     'no-legacy-rest-issued-by-renderer',
     'the renderer issues no legacy REST request, refused or otherwise',
     restGate.rendererOk ? 'PASS' : 'FAIL',
-    `renderer residual legacy paths=${JSON.stringify(residualLegacyPaths)} (must be []); console capture ${captureBasis}; renderer-console.log=${consoleText.length} chars`
+    `renderer residual legacy paths=${JSON.stringify(residualLegacyPaths)} (must be []); console capture: ${captureBasis}; renderer-console.log=${consoleText.length} chars`
   )
 
   record(
