@@ -170,7 +170,7 @@
   src/application/profile/wire-composer-profile.test.ts src/application/session/agentbox-composer.test.ts
   src/features/chat/composer/profile-controls.test.tsx
   src/app/composition/wiring/agentbox-main-chat.test.tsx
-  src/features/chat/composer/hooks/use-composer-profile.test.tsx` → **5 files / 46 tests passed，exit 0**；
+  src/features/chat/composer/hooks/use-composer-profile.test.tsx` → **5 files / 47 tests passed，exit 0**；
   回归面（composer 全目录 + legacy chat view + agentbox chat view）44 files / 264 tests passed；
   `npm run typecheck` 三项目通过；实际改动 18 个 TS/TSX 文件 ESLint 0 error / 0 warning；
   `git diff --check` 干净。认证 resolve→send 顺序、同一 overrides 快照、rejected 全原因零 send、

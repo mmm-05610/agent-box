@@ -231,6 +231,42 @@ describe('useComposerProfile config resolution', () => {
     })
   })
 
+  it('never paints the previous workspace answer onto the newly selected workspace', async () => {
+    const first = deferred<ConfigResolveResult>()
+    const second = deferred<ConfigResolveResult>()
+
+    mocks.resolve.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+
+    const { result, rerender } = renderHook(
+      ({ workspaceId }: { workspaceId: string }) =>
+        useComposerProfile({ draftScope: DRAFT_SCOPE, sessionId: null, workspaceId }),
+      { initialProps: { workspaceId: WORKSPACE } }
+    )
+
+    act(() => selectScope('profile-a', []))
+    await waitFor(() => expect(mocks.resolve).toHaveBeenCalledTimes(1))
+
+    rerender({ workspaceId: 'workspace-b' })
+    await waitFor(() => expect(mocks.resolve).toHaveBeenCalledTimes(2))
+    expect(mocks.resolve.mock.calls[1]?.[1]).toMatchObject({ workspaceId: 'workspace-b' })
+
+    await act(async () => {
+      second.resolve(resolved([{ controlId: 'mode', value: 'beta' }]))
+    })
+    expect(result.current.configResolution).toEqual({
+      effective: [{ controlId: 'mode', value: 'beta' }],
+      status: 'resolved'
+    })
+
+    await act(async () => {
+      first.resolve(resolved([{ controlId: 'mode', value: 'alpha' }]))
+    })
+    expect(result.current.configResolution).toEqual({
+      effective: [{ controlId: 'mode', value: 'beta' }],
+      status: 'resolved'
+    })
+  })
+
   it('does no further work once the surface is gone', async () => {
     const pending = deferred<ConfigResolveResult>()
     const failure = vi.spyOn(console, 'error').mockImplementation(() => undefined)

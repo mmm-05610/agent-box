@@ -152,7 +152,7 @@
 - 验收（已执行）：`npx vitest run --project ui src/application/profile/wire-composer-profile.test.ts
   src/application/session/agentbox-composer.test.ts src/features/chat/composer/profile-controls.test.tsx
   src/app/composition/wiring/agentbox-main-chat.test.tsx
-  src/features/chat/composer/hooks/use-composer-profile.test.tsx` → 5 files / **46 tests passed**（exit 0）。
+  src/features/chat/composer/hooks/use-composer-profile.test.tsx` → 5 files / **47 tests passed**（exit 0）。
 - 仍属外部缺口（不变）：真实配置解析结果只能在 Server lifecycle connection 之后联调验证；本端只
   保证请求语义、失败面与迟到保护。运行实际版本仍由接受回执的 `configVersion` 固定，预览不冒充
   最终配置。
@@ -285,7 +285,7 @@ dynamic connection slot            electron/composition/agentbox-service-composi
 | `sha256sum src/types/wire/wire-v1.ts generated/wire-v1.schema.json` | `11e3b3e7…c10035` / `5d4fa3bf…5e4ed`，与后端登记一致 |
 | `grep -rn "\.call('" src --include=*.ts --include=*.tsx \| grep -v test` | 28 方法调用点全部落在上表 application 入口 |
 | `git diff --check` | 通过（exit 0） |
-| config.resolve 接线定向门（`940c9df4`，5 files / 46 tests） | 通过（exit 0） |
+| config.resolve 接线定向门（`940c9df4`，5 files / 47 tests） | 通过（exit 0） |
 | `git status --short` | 只含本阶段写集（见 §9） |
 
 矩阵完整性核验（一次性只读命令，不新增仓库脚本）：从 `WireMethods` 导出键、从本文件表格抽取

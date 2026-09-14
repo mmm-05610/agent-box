@@ -304,11 +304,13 @@ describe('ComposerProfileControls service config preview', () => {
     return screen.findByText('Temporary settings')
   }
 
-  it('shows the service effective value instead of the descriptor current value, and never claims it is running yet', async () => {
+  it('shows the effective value the service normalized to, not the descriptor or the submitted override', async () => {
     render(
       <ComposerProfileControls
         profile={withMode({
-          configResolution: { effective: [{ controlId: 'mode', value: 'fast' }], status: 'resolved' },
+          // Descriptor says "balanced", the draft asks for "fast", and the
+          // service answers with its own normalization of that request.
+          configResolution: { effective: [{ controlId: 'mode', value: 'fast-normalized' }], status: 'resolved' },
           overrides: [{ controlId: 'mode', value: 'fast' }]
         })}
       />
@@ -317,8 +319,9 @@ describe('ComposerProfileControls service config preview', () => {
     await openPreview()
 
     expect(screen.getByText('The service confirmed these effective values.')).toBeTruthy()
-    expect(screen.getByText('Effective: fast')).toBeTruthy()
+    expect(screen.getByText('Effective: fast-normalized')).toBeTruthy()
     expect(screen.queryByText('Effective: balanced')).toBeNull()
+    expect(screen.queryByText('Effective: fast')).toBeNull()
     expect(screen.getByText('The running configuration is fixed only when the service accepts a send.')).toBeTruthy()
   })
 
