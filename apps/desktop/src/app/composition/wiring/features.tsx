@@ -145,7 +145,17 @@ import {
 import { clearSessionTodos, setSessionTodos, todosForHydration } from '@/store/todos'
 import { isAuxiliaryWindow, isBrowserWindow, isHudWindow } from '@/store/windows'
 
+import { applyProductRuntimePolicy } from '../product-runtime'
+
 import type { WiringActions, WiringApi } from './types'
+
+// This is the AgentBox product composition root, so the product runtime policy
+// is applied here — at import time, before any mounted surface can issue a
+// request — exactly as main.ts derives its own gate from the same runtime.
+// Without it the legacy REST refreshers the product still mounts (profile
+// catalog, config record) would issue `hermes:api` calls the main process
+// refuses: a reachable legacy call, whether or not it succeeds.
+applyProductRuntimePolicy()
 
 // Overlay views the controller mounts over the shell — lazy, load on demand.
 // The workspace-route full-page views (skills/artifacts) are the
@@ -1186,7 +1196,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
         profile={activeGatewayProfile}
       />
       <UpdatesOverlay />
-      <GatewayConnectingOverlay />
+      <GatewayConnectingOverlay authority="agentbox" />
       <BootFailureOverlay onboardingEnabled={gatewayState === 'open'} />
       <CommandPalette />
       <PluginInstallModal />
