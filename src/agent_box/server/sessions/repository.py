@@ -275,6 +275,15 @@ class SessionRecords:
                 "UPDATE server_sessions SET profile_id=?,version=version+1,updated_at=? WHERE id=?",
                 (profile_id, timestamp, session_id),
             )
+            # The Session's effective configuration just changed identity, and
+            # the contract delivers that to clients as `config.changed` with the
+            # window it applies to. It is `next_send` because this backend
+            # freezes a configuration per execution: nothing already running is
+            # rewritten (the refusal above is the running case). A replayed
+            # request returns before this point, so it never emits a second one.
+            self._append_session_event(
+                conn, session_id, None, "config.changed", {"effective_for": "next_send"},
+            )
             body = {"outcome": "confirmed", "session": self._session_view(conn, session_id)}
             self.idempotency.insert(conn, scope, request_id, request_digest, 200, body)
             return "confirmed", body

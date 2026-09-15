@@ -992,7 +992,12 @@ FRAME_COVERAGE = (
                      "summary": "HARNESS_FAILED"}, True),
     ("tool.update", {"state": "running", "tool_call_id": "t1", "tool": "shell",
                      "message_id": "msg-1", "result_excerpt": "ok"}, True),
-    ("config.changed", {"effective_for": "next_send"}, False),
+    ("workspace.connection", {"workspace_id": "ws-placeholder",
+                              "connection": {"state": "connecting"}}, False),
+    # `workspace.connection` is declared by the contract and projected, but no
+    # producer emits it: this backend verifies a workspace synchronously and has
+    # no preparation state machine (registered with the frontend in
+    # docs/server-round1/wire-review.md). It stays listed as unproduced.
 )
 
 
@@ -1091,8 +1096,34 @@ def test_every_projected_frame_matches_the_strict_frontend_event_schema(wire):
     assert expected <= observed, (sorted(expected - observed), sorted(observed))
     assert queued["executionId"] is None, "the second send has to be the queued one"
 
-    # The two kinds no producer emits yet are *recorded* here rather than
-    # asserted as flowing: a contract that declares an event the stream never
-    # carries is a gap to close deliberately, not to discover in the UI phase.
+    # A confirmed role switch changes which configuration the Session will use,
+    # so the contract delivers it as `config.changed`. The running refusal above
+    # is why the switch needs a finished turn first.
+    # The switch is refused while a turn is active, so the turn is sealed the
+    # way a Server restart seals it (the same product path). That leaves the
+    # Session switchable and its history intact.
+    assert runtime.repository.recover_interrupted_turns() >= 1
+    listed = api.ok("sessions.list", {"includeArchived": False})["items"]
+    current = next(item for item in listed if item["id"] == session_id)
+    switched = api.ok("sessions.switchProfile", {
+        "requestId": "frames-switch", "sessionId": session_id,
+        "profileId": profile["profile_id"], "expectedVersion": current["version"],
+    })
+    assert switched["outcome"] == "confirmed"
+    switched_frames = _validate_frames(
+        [frame for frame in api.ok(
+            "history.snapshot",
+            {"sessionId": session_id, "cursor": live[-1]["cursor"]},
+        )["frames"]],
+        context="after a confirmed switch",
+    )
+    assert switched_frames.get("config.changed") == 1, switched_frames
+    changed = api.ok("history.snapshot", {"sessionId": session_id})["frames"][-1]["event"]
+    assert changed == {"kind": "config.changed", "sessionId": session_id,
+                       "effectiveFor": "next_send"}
+
+    # The one kind no producer emits yet is *recorded* here rather than asserted
+    # as flowing: a contract that declares an event the stream never carries is a
+    # gap to close deliberately, not to discover in the UI phase.
     unproduced = sorted(kind for kind, _data, produced in FRAME_COVERAGE if not produced)
-    assert unproduced == ["config.changed"], unproduced
+    assert unproduced == ["workspace.connection"], unproduced

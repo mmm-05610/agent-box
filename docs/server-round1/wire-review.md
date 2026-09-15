@@ -19,7 +19,7 @@
 | 事件 kind | 前端声明 | 后端事实 |
 | --- | --- | --- |
 | `workspace.connection` | `semantics-map.md` “环境准备/浏览…进度走 `workspace.connection` 事件（connecting/preparing[worker\|harness]/failed+reason）” | 后端**没有异步准备阶段**：`workspaces.open` 通过 connector probe 同步验证（`workspaces/service.py:145`），重启把全部工作区标为 `unverified`（`bootstrap/runtime.py:175`）。**没有任何生产者**写这个 kind；记录里只出现 `{state:"connected"\|"connecting"}`（`wire/projection.py:73`），`preparing[*]` 与 `failed+reason` 不可达 |
-| `config.changed` | `wire-v1.ts:468` 声明 `effectiveFor: next_send\|immediate`；`wire-session-projection.ts:155` 用它更新 `configEffectiveFor` | 投影支持（`wire/projection.py:237`），**同样没有生产者**；配置变更当前只体现在方法结果里（`sessions.switchProfile` / `profiles.updateConfig` 的返回） |
+| `config.changed` | `wire-v1.ts:468` 声明 `effectiveFor: next_send\|immediate`；`wire-session-projection.ts:155` 用它更新 `configEffectiveFor` | 投影支持（`wire/projection.py:237`）。**生产者已补（2026-09-15，合同内实现缺口，不改 28 方法）**：`sessions.switchProfile` 确认成功后在同一事务写入 `config.changed{effective_for:"next_send"}`（`sessions/repository.py:273` 起），重放请求在写入前返回、不重复发；正在运行的会话本就拒绝切换，故 `immediate` 在本后端不可达（配置按执行冻结）。`profiles.updateConfig` **仍未发事件**：它改的是 Profile，受影响 Session 在下一次发送时使用新版本；若前端需要该路径也有事件，请反馈（后端可对绑定该 Profile 的未归档 Session 逐条追加）。 |
 
 **一个必须由前端确认的结构事实**：`server_session_events.session_id` 是 `NOT NULL REFERENCES
 server_sessions(id)`（`storage/database.py:116`），而 `EventFrame.sessionId` 必填——所以
