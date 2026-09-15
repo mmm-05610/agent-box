@@ -15,12 +15,12 @@
 | --- | --- | --- |
 | **Pi** | **8/8 PASS，exit 0** | 两轮真实答复：首轮 17 字符即回忆 nonce（`P42-1F4A9C` 时代为长 nonce 的一轮，后统一为短 nonce），次轮 104 字符且 nonce 出现 3 次；凭据经界面录入并挂到模型；清理干净 |
 | **OpenCode** | **6/8，exit 1** | 链路跑通：两轮都到 `terminal=true`、答复确实到达（`answerChars` 非零），但**首轮的助手文本是片段**——delta 合起来是 `P42-1F4A9`（提问的是 `P42-1F4A9C`），`message.final` 只有 `P42`。这不是链路失败，但**没有验证到完整回忆**，因此这一家**不记为通过** |
-| **Hermes** | **5/5 步后失败，exit 1** | 前 5 步全绿（Server 起来、连接装好、凭据经界面录入、Provider/Model 挂上凭据），随后 `sessions.createAndSend` 报 `CREDENTIAL_REQUIRED：Profile has no authorized credential`——**产品缺口**，见下 |
-| **Codex** | **未运行** | 上下文/时间预算耗尽；工件与部署已就绪（`/tmp/agentbox-codex-ui-artifact`，tree digest `sha256:9051b844…`），命令与上面三家相同 |
+| **Hermes** | **8/8 PASS，exit 0**（合同增补后） | 首跑在派发前被 `CREDENTIAL_REQUIRED` 拒（产品缺口，见下）；给 `profiles.create` 增加可选 `credentialId` 后复跑全绿：真实答复 720 / 1866 字符，nonce 回忆到、次轮出现 5 次 |
+| **Codex** | **8/8 PASS，exit 0** | 两轮真实答复：首轮 10 字符即回忆 nonce，次轮 60 字符且回忆到；凭据经界面录入并挂在角色上 |
 
 ## 两个必须记录的真实问题
 
-### 1. Hermes：wire 无法把凭据挂到 Profile 上（产品缺口）
+### 1. Hermes：wire 无法把凭据挂到 Profile 上（**已修，两端重锁**）
 
 - Hermes 的生产部署**不声明 model 控件**（`modelControlId=None`、`controlOptions=[]`）：Hermes 0.19 不播发 ACP configOptions，模型由部署自己的配置钉死，这是既有设计。
 - 另外三家声明了 `model` 控件，于是"角色选中 Provider/Model 配置"这一步会把该配置的
@@ -29,9 +29,10 @@
 - 而 Hermes 没有那个控件，只能靠 `profile.credential_id`；**wire 的 `profiles.create`
   不接受凭据**（`profiles/service.py:72` 的 `create_wire` 硬编码 `credential_id: None`）。
   结果：任何"没有 model 控件"的 Harness 都无法从 wire/UI 侧被授权。
-- 三条出路（需裁决）：(a) 给 wire 的 `profiles.create` 增加可选 `credentialId`（合同增补，需两端重锁）；
-  (b) 保留 REST `POST /api/v1/profiles` 的 `credential_id` 并让界面用它（界面会多一条非 wire 路径）；
-  (c) 让 Server 在角色没有凭据时按"唯一同 kind 凭据"推导（隐式，多凭据时歧义，不推荐）。
+- **已按 (a) 修复**：`profiles.create` 增加**可选且可空**的 `credentialId`（缺省/null = 角色不携带凭据；
+  给值时校验存在性与 kind 与 Harness 声明一致）。后端与前端分别提交，工件重生成并重锁：
+  TS `7746404984…`、工件 `14f7f736…`（旧 `11e3b3e7…`/`5d4fa3bf…` 已被取代）。
+  后端对新工件 `tests/server/test_wire_v1.py` **32 passed**；Hermes UI 门复跑 **8/8 PASS**。
 
 ### 2. OpenCode：首轮助手文本是片段（未定因）
 
@@ -44,6 +45,6 @@
 
 ## 成本
 
-四家 UI 门尝试合计约 **20 次真实请求**（Pi 2 轮、OpenCode 4 轮含重跑、Hermes 0 轮因派发前被拒），
+四家 UI 门尝试合计约 **24 次真实请求**（含 Hermes/Codex 的通过轮与各次重跑）（Pi 2 轮、OpenCode 4 轮含重跑、Hermes 0 轮因派发前被拒），
 输入数百 tokens、输出受各家部署上限约束（≤64 tokens）→ 增量 **< ¥0.01**；
 与后端四家门合计仍 **< ¥0.08**，远低于 ¥10 上限。未充值、无第三方代理。

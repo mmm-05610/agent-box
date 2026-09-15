@@ -1151,3 +1151,14 @@ typecheck 当场暴露；新测试 4 条 ESLint warning 收口为 0。
 - 驱动 `apps/desktop/e2e/p42-ui-model-gate.mjs`；证据写盘前先扫描自身输出，凭据内容命中即拒绝写出。
 - UI 门过程中修掉两个真实缺陷：preload 把 `credentials` 错嵌进 `wire`（界面拿不到），
   以及 main 的导入请求缺 `Idempotency-Key`（Server 直接拒）。
+
+## 合同增补与 UI 门最终结果（2026-09-15 晚）
+
+- **`profiles.create` 增加可选 `credentialId`**（两端分别提交）：Hermes 因不声明 model 控件，
+  凭据只能挂在角色上，而此前 wire 无此字段 → 角色永远拿不到凭据。现：缺省/null = 不携带；
+  给值则校验存在性与 kind 与 Harness 声明一致。工件重生成并重锁：TS `7746404984…`、
+  工件 `14f7f736…`（取代 `11e3b3e7…`/`5d4fa3bf…`）；后端对新工件 32 passed。
+- **UI 真实模型门结果**：**Pi 8/8、Hermes 8/8、Codex 8/8 全绿**（凭据均经界面自己的录入路径加入、
+  挂到模型或角色，两轮真实 DeepSeek 答复并回忆上下文）；**OpenCode 6/8**——链路跑通但首轮助手
+  文本是片段，**未验证完整回忆，不记通过**。
+- 证据 `evidence/p42-ui-model-gate/`；费用：四家 UI 门累计约 24 次请求、增量 < ¥0.02。
