@@ -3,6 +3,35 @@
 维护者：后端执行者（39–42）。用途：在双方锁定单一 wire 前交换事实与约束，
 避免两边各造一套协议。此处只写后端事实与差异请求，不批准前端合同。
 
+## 2026-09-15 19:40 +08:00 · 事件层补齐与两处声明-生产者缺口（只登记事实，不改合同）
+
+后端在不改 28 方法的前提下，把 schema 门扩到**事件帧**层：`tests/server/test_wire_v1.py` 新增
+`test_every_projected_frame_matches_the_strict_frontend_event_schema`，驱动真实生产者（排队发送、
+审批请求与决定、sidecar 桥写入的增量与工具事件），把 `history.snapshot`（走 `olderCursor` 向旧翻页）
+与实时批量两条路径的每一帧都拿前端的 `EventFrame` 校验。前端 `EventFrame` 是
+`additionalProperties: false` 的严格对象、事件联合的 `state`/`role`/`decision` 均为闭枚举，
+所以一个多余字段或一个枚举外取值就会打挂真实客户端，而方法级测试仍然全绿。结论：**后端当前
+产出的帧全部满足该严格 schema**（`AGENT_BOX_WIRE_SCHEMA=<生成工件>` 与不带工件两种跑法各
+**30 passed**）。
+
+同时登记两处“合同已声明、后端无生产者”的缺口，供前端在锁后修订或由后端补生产者时对齐：
+
+| 事件 kind | 前端声明 | 后端事实 |
+| --- | --- | --- |
+| `workspace.connection` | `semantics-map.md` “环境准备/浏览…进度走 `workspace.connection` 事件（connecting/preparing[worker\|harness]/failed+reason）” | 后端**没有异步准备阶段**：`workspaces.open` 通过 connector probe 同步验证（`workspaces/service.py:145`），重启把全部工作区标为 `unverified`（`bootstrap/runtime.py:175`）。**没有任何生产者**写这个 kind；记录里只出现 `{state:"connected"\|"connecting"}`（`wire/projection.py:73`），`preparing[*]` 与 `failed+reason` 不可达 |
+| `config.changed` | `wire-v1.ts:468` 声明 `effectiveFor: next_send\|immediate`；`wire-session-projection.ts:155` 用它更新 `configEffectiveFor` | 投影支持（`wire/projection.py:237`），**同样没有生产者**；配置变更当前只体现在方法结果里（`sessions.switchProfile` / `profiles.updateConfig` 的返回） |
+
+**一个必须由前端确认的结构事实**：`server_session_events.session_id` 是 `NOT NULL REFERENCES
+server_sessions(id)`（`storage/database.py:116`），而 `EventFrame.sessionId` 必填——所以
+`wire.eventStream/1` 的帧**始终属于某个 Session**。于是 `semantics-map.md` 里“浏览/打开阶段的
+连接进度走事件”在无 Session 时无法成立：浏览阶段还没有 Session，也就没有可承载该帧的流。若要让
+连接进度可观察，只能二选一：(a) 前端合同把浏览/打开阶段改为同步结果（后端现状），
+`workspace.connection` 只用于“已有 Session 的链路在运行中变化”；(b) 引入会话无关的第二条通道
+（新合同面，超出当前锁定的 28 方法）。后端不改合同、不猜语义，等前端反馈。
+
+以上两条不影响已锁定的 28 方法摘要（TS `11e3b3e7…` / 工件 `5d4fa3bf…` 就地重算未变），
+也不构成 `WIRE_LOCKED_FOR_IMPLEMENTATION` 的失效。
+
 ## 2026-09-14 12:15 +08:00 · `WIRE_LOCKED_FOR_IMPLEMENTATION`（28 方法 + 队列终态）
 
 前端已在提交 `3aba5c5c8743401b964f80c88bd43e847fa3d5a8` 消费唯一待改项：
