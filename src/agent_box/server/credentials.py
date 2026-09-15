@@ -20,6 +20,19 @@ class CredentialRecords:
             )
         return {"credential_id": credential_id, "kind": kind}
 
+    def exists(self, credential_id: str) -> bool:
+        """Whether this id already resolves; used to make a restart idempotent.
+
+        Registration names an identity, so re-declaring it in a deployment must
+        satisfy it rather than duplicate it (the id is the primary key) or
+        re-read its source.
+        """
+        with self.database.read() as conn:
+            row = conn.execute(
+                "SELECT 1 FROM server_credentials WHERE id=?", (credential_id,),
+            ).fetchone()
+        return row is not None
+
     def get(self, credential_id: str, *, kind: str | None = None) -> dict[str, Any]:
         with self.database.read() as conn:
             row = conn.execute(

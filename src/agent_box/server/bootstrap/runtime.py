@@ -163,6 +163,9 @@ class ServerRuntime:
     approvals: ApprovalRecords | None = None
     queue: QueueRecords | None = None
     model_configs: ProviderModelService | None = None
+    #: Credential declarations from the deployment document, imported on start
+    #: (the store and the records table both exist only once the schema is up).
+    declared_credentials: tuple[dict[str, str], ...] = ()
     started: bool = False
 
     def start(self) -> None:
@@ -172,6 +175,7 @@ class ServerRuntime:
             self.owner.acquire()
         try:
             self.database.initialize()
+            _import_declared_credentials(self, self.declared_credentials)
             self.repository.mark_workspaces_unverified()
             self.repository.recover_interrupted_turns()
             from agent_box.work_core import db as core_db
@@ -517,6 +521,14 @@ def build_runtime_from_sidecar_deployment(
         value.get("pluginRoot") or path.parent, additional_files=additional_bundle,
     )
 
+    # Credential sources are *declared* here and read from their own files: the
+    # deployment document stays a non-secret artifact, and this is the only
+    # place the product server can learn about a credential the operator (or the
+    # Desktop that owns the machine's credential records) has placed. The strict
+    # key set below is what enforces "no secret in the document" - a `value` or
+    # `secret` key is a typed refusal, not an ignored extra.
+    declared_credentials = _deployment_credentials(value)
+
     def factory(records, objects, approvals, notifier, connector, credentials, secret_store):
         if connector is None:
             raise RuntimeError("WSL_CONNECTOR_UNAVAILABLE")
@@ -581,8 +593,91 @@ def build_runtime_from_sidecar_deployment(
             on_event=notifier.notify,
         )
 
-    return build_runtime(data_root, harnesses=registry, execution_factory=factory,
-                        secret_store=secret_store)
+    runtime = build_runtime(data_root, harnesses=registry, execution_factory=factory,
+                            secret_store=secret_store)
+    runtime.declared_credentials = tuple(declared_credentials)
+    return runtime
+
+
+#: The exact keys one credential declaration may use. `sourcePath` is a *path*;
+#: a document that tried to carry the secret itself would have to invent a key,
+#: and an invented key is a refusal here rather than a silently ignored extra.
+_CREDENTIAL_DECLARATION_KEYS = frozenset({"credentialId", "kind", "label", "sourcePath"})
+_CREDENTIAL_ID = re.compile(r"^credential_[0-9a-f]{32}$")
+
+
+def _deployment_credentials(value: Mapping[str, Any]) -> list[dict[str, str]]:
+    """Validate the optional `credentials` section of a deployment document.
+
+    Returns the declarations in order; each is `{credentialId, kind, sourcePath,
+    label}` with the label possibly empty. Nothing is read here - the file is
+    opened by the secret store during import, which is also where the
+    symlink/size/bounds rules live, so a declaration can only point at a real,
+    ordinary file within the store's own limits.
+    """
+    raw = value.get("credentials")
+    if raw is None:
+        return []
+    if not isinstance(raw, list) or len(raw) > 16:
+        raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID: credentials must be at most 16 entries")
+    declarations: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for item in raw:
+        if not isinstance(item, Mapping) or set(item) - _CREDENTIAL_DECLARATION_KEYS:
+            raise RuntimeError(
+                "SIDECAR_DEPLOYMENT_INVALID: a credential declaration takes exactly "
+                "credentialId, kind, sourcePath and optional label"
+            )
+        credential_id = item.get("credentialId")
+        kind = item.get("kind")
+        source = item.get("sourcePath")
+        label = item.get("label", "")
+        if not isinstance(credential_id, str) or _CREDENTIAL_ID.fullmatch(credential_id) is None:
+            raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID: credentialId must be credential_<32 hex>")
+        if credential_id in seen:
+            raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID: duplicate credentialId")
+        if not isinstance(kind, str) or not (1 <= len(kind) <= 32):
+            raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID: credential kind is required")
+        if not isinstance(source, str) or not Path(source).is_absolute():
+            raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID: credential sourcePath must be absolute")
+        if not isinstance(label, str) or len(label) > 64:
+            raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID: credential label is at most 64 characters")
+        seen.add(credential_id)
+        declarations.append({
+            "credentialId": credential_id, "kind": kind, "label": label, "sourcePath": source,
+        })
+    return declarations
+
+
+def _import_declared_credentials(runtime: Any, declarations: list[dict[str, str]]) -> None:
+    """Import each declared source into the Server's own store, once.
+
+    A restart with the same deployment must not duplicate records or re-read the
+    source: the declaration names an identity, and an identity that already
+    resolves is already satisfied. A declaration whose source has since become
+    unreadable fails the start rather than quietly leaving a harness without the
+    credential it was declared with.
+    """
+    records = runtime.repository.credentials
+    for declaration in declarations:
+        if records.exists(declaration["credentialId"]):
+            continue
+        store = runtime.secret_store
+        if store is None:
+            raise RuntimeError(
+                "SIDECAR_DEPLOYMENT_CREDENTIAL_STORE_MISSING: the deployment declares a "
+                "credential but this Server was composed without a secret store"
+            )
+        try:
+            _store_id, locator = store.import_file(
+                Path(declaration["sourcePath"]), declaration["kind"],
+            )
+        except (OSError, ValueError) as exc:
+            raise RuntimeError(
+                f"SIDECAR_DEPLOYMENT_CREDENTIAL_UNREADABLE: {declaration['credentialId']}: "
+                f"{type(exc).__name__}: {exc}"
+            ) from exc
+        records.register(declaration["credentialId"], declaration["kind"], locator)
 
 
 def _home_projection_target(target: Any, *, kind: str) -> str:
