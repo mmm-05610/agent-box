@@ -135,6 +135,34 @@ def test_a_file_beyond_the_observation_budget_marks_the_scan_incomplete(tmp_path
     assert verdict == "CODEX_GATE_STATE_SCAN_INCOMPLETE"
 
 
+def test_finalize_run_drives_the_real_control_flow(tmp_path):
+    """The post-run decision reads the run's own watcher and settled window:
+    a hit found by the real scan outranks a chain failure, the chain failure is
+    kept as structured secondary evidence, and the scan block is recorded."""
+    module = load_gate()
+    root = tmp_path / "worker-root"
+    state = root / "views" / "view-1" / "ready" / "agentbox-sidecar" / "deployment" / "codex" / "native-state"
+    state.mkdir(parents=True)
+    (state / "leak.sh").write_text("export K='" + module.FAKE_TOKEN + "'", encoding="utf-8")
+    watcher = module.StateSymlinkWatcher(root)
+    watcher._scan_for_credential(root / "views")
+    settled = {"harnessExited": True, "settledCycles": 1, "settledScan": "view",
+               "settledIncomplete": None}
+    report: dict = {}
+    verdict, detail = module.finalize_run(report, settled, watcher)
+    assert verdict == "CODEX_GATE_CREDENTIAL_IN_NATIVE_STATE", detail
+    assert report["credentialScan"]["settledScan"] == "view"
+    assert report["credentialScan"]["harnessExited"] is True
+
+    # Clean scan: no verdict, and the chain failure is what ends the run.
+    clean = module.StateSymlinkWatcher(root)
+    clean.stopped_cleanly = True  # the real lifecycle always stops the watcher
+    (state / "leak.sh").write_text("clean", encoding="utf-8")
+    clean._scan_for_credential(root / "views")
+    verdict, _detail = module.finalize_run({}, settled, clean)
+    assert verdict is None
+
+
 def test_a_credential_hit_outranks_a_chain_failure(tmp_path):
     """The merging rule the gate applies after a failed chain: whatever else
     failed, a credential observed in native state is the primary failure and
@@ -250,6 +278,52 @@ def test_the_traversal_and_byte_budgets_are_typed_incomplete(tmp_path):
     assert "byte budget" in (heavy.scan_incomplete or ""), heavy.scan_incomplete
 
 
+def test_the_settled_window_opens_only_after_the_harness_exited(tmp_path):
+    """User decision A: the settled window is a synchronous scan taken after the
+    native processes are gone - never a cycle that merely looked stable while
+    the harness was still writing."""
+    module = load_gate()
+    root = tmp_path / "worker-root"
+    state = root / "views" / "view-1" / "ready" / "agentbox-sidecar" / "deployment" / "codex" / "native-state"
+    state.mkdir(parents=True)
+    (state / "state.db").write_text("clean", encoding="utf-8")
+    watcher = module.StateSymlinkWatcher(root)
+
+    # A live harness: no settled window, and the gate must not pass on the
+    # thread's observations alone.
+    module_harness = module.harness_processes
+    try:
+        module.harness_processes = lambda temporary: ["1234 /artifact/app-server"]
+        evidence = module.settle_after_attempt(watcher, root, timeout_s=0.2, interval_s=0.05)
+        assert evidence["harnessExited"] is False
+        verdict, detail = module.credential_scan_verdict(
+            [], None, True, False, None, 1, [], [], evidence["settledCycles"], None, None,
+            evidence["harnessExited"], evidence.get("settledIncomplete"))
+        assert verdict == "CODEX_GATE_STATE_SCAN_INCOMPLETE", detail
+
+        module.harness_processes = lambda temporary: []
+        evidence = module.settle_after_attempt(watcher, root, timeout_s=0.2, interval_s=0.05)
+        assert evidence["harnessExited"] is True
+        assert evidence["settledScan"] == "view" and evidence["settledCycles"] == 1
+        assert evidence["settledFiles"] >= 1
+        verdict, detail = module.credential_scan_verdict(
+            [], None, True, False, None, 1, [], [], evidence["settledCycles"], None, None,
+            evidence["harnessExited"], evidence.get("settledIncomplete"))
+        assert verdict is None, detail
+
+        # An incomplete settled scan is never a quiet pass.
+        heavy = module.StateSymlinkWatcher(root)
+        (state / "huge.sh").write_bytes(b"x" * (module.CREDENTIAL_SCAN_FILE_BYTES + 1))
+        evidence = module.settle_after_attempt(heavy, root, timeout_s=0.2, interval_s=0.05)
+        assert evidence["settledIncomplete"]
+        verdict, _detail = module.credential_scan_verdict(
+            [], None, True, False, None, 1, [], [], evidence["settledCycles"], None, None,
+            evidence["harnessExited"], evidence.get("settledIncomplete"))
+        assert verdict == "CODEX_GATE_STATE_SCAN_INCOMPLETE"
+    finally:
+        module.harness_processes = module_harness
+
+
 def test_only_the_settled_window_has_to_be_fully_observed():
     """User decision A: churn while the attempts run is an observation; the
     settled window must contain a fully observed cycle, and a race inside it
@@ -260,9 +334,15 @@ def test_only_the_settled_window_has_to_be_fully_observed():
         [], None, True, False, None, 5,
         [{"path": "active.sh"}], [{"reason": "active churn"}], 3, [], [])
     assert verdict is None
-    # No fully observed settled cycle: fails.
+    # A reclaimed view with the harness gone: the capture-boundary scan is the
+    # evidence for the same window (it is fatal on any hit), so the verdict
+    # does not demand a second view scan.
     verdict, _detail = module.credential_scan_verdict(
-        [], None, True, False, None, 5, [], [], 0, [], [])
+        [], None, True, False, None, 5, [], [], 0, [], [], True, None)
+    assert verdict is None
+    # No settled evidence at all and the harness still alive: fails.
+    verdict, _detail = module.credential_scan_verdict(
+        [], None, True, False, None, 5, [], [], 0, [], [], False, None)
     assert verdict == "CODEX_GATE_STATE_SCAN_INCOMPLETE"
     # A race recorded after a settled cycle is an observation, not a failure.
     verdict, _detail = module.credential_scan_verdict(

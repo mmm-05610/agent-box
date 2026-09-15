@@ -239,6 +239,30 @@ fail-closed 判据）；Worker 源自 c8 构建后未变（`git diff -- workers/
 settled 183 轮，且保留根中 `shell_snapshots/` 与 `.tmp/` **目录均不存在**——
 两个问题在源头消失，不再是"靠遮蔽藏起来"。遮蔽机制（§4.5）保留为纵深防御。
 
+## 4.8 第十九轮：settled 窗口按裁决 A 的原文重做 + 官方 flags 差分（含如实结论）
+
+- **settled 窗口重做（Reviewer P0）**：判据不再是"线程里恰好稳定的轮次"，而是
+  **Harness 进程退出后的同步有界扫描**（`settle_after_attempt`：先有界等待
+  `codex-acp`/`app-server`/audit-shim 进程消失，再做一次同步 `scan_once`）；view 已被
+  capture 管线回收时，同一窗口的证据是 **capture 边界扫描**（`scan_state` 读回 checkpoint
+  并对 token 致命失败）。线程轮次降级为观察；真机两轮 `harnessExited=true`、
+  `settledScan=capture-boundary`、零命中、门 exit 0。
+- **官方 feature flag 差分（Reviewer P1）**：新增
+  `scripts/server-round1/codex-feature-flag-differential.py`——同一 0.147.0 工件、同一 Worker、
+  **完全不加 tmpfs 遮蔽**，控制腿用 `--feature-flag-control-leg` 从 loopback 配置中**只删掉
+  `[features]` 表**（其余字节不动、产物必须能被 tomllib 解析、含 sentinel 注释），处理腿用
+  部署原样配置。**如实结论：控制腿连续 6 轮都未复现两个 churner**（峰值恒 112、零命中、
+  无 `.tmp`/`shell_snapshots`），处理腿 2 轮同样干净——即"flags 是这两个行为的原因"在这一轮
+  **未被差分复现**；此前（同配置去掉 flags 的时代）的第一手观测仍然成立（`.tmp/plugins`
+  峰值 5,529 与 `shell_snapshots` token 命中各有多轮记录），但**该差分本身是不确定的**。
+  处置：官方 flags 保留为源头防线，tmpfs 遮蔽保留为纵深防御，capture 边界扫描保持权威
+  fail-closed；把"控制腿未复现"如实入库，作为待补的确定性触发实验（需让假端点驱动一次
+  shell/工具调用，属下一阶段工作）。
+- **P2**：`--official-feature-flags` 后缀开关删除（配置里已有 `[features]`，避免重复表），
+  loopback 配置在 `loopback_config_bytes()` 内强制 `tomllib` 解析；新增
+  `finalize_run()` 作为唯一后置判据入口（token 优先、链路失败结构化保留），并由
+  `test_finalize_run_drives_the_real_control_flow` 直接驱动真实 watcher 与真实异常类型。
+
 ## 5. 全量验证与清理
 
 精确命令（原始输出留在本轮会话日志，不入 Git）：

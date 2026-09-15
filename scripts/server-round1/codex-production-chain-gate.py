@@ -78,6 +78,7 @@ import sys
 import tempfile
 import threading
 import time
+import tomllib
 
 REPO = Path(__file__).resolve().parents[2]
 PLUGIN = REPO / "plugins" / "agent-box-harnesses"
@@ -102,7 +103,7 @@ FAKE_TOKEN = "sk-codex-gate-fake-token-4f7ac21d-non-secret"
 #: Set from --legacy-state-diagnostic in main(); read by the sidecar launcher.
 LEGACY_STATE_DIAGNOSTIC = False
 #: Set from --official-feature-flags in main(); read by the config builder.
-OFFICIAL_FEATURE_FLAGS_ENABLED = False
+FEATURE_FLAG_CONTROL = False
 #: Credential-path observation budget: a regular file larger than the per-file
 #: cap, or a tree larger than the file-count cap, cannot be claimed as observed
 #: - that marks the scan incomplete instead of "no hit".
@@ -518,6 +519,26 @@ class StateSymlinkWatcher:
     def start(self) -> None:
         self._thread.start()
 
+    def scan_once(self) -> dict:
+        """One synchronous scan of the current tree, no thread involved.
+
+        An incomplete scan is reported as such, never as a quiet pass. This is
+        the settled-window observation: it runs after the harness exited.
+        """
+        views = self.worker_root / "views"
+        if not views.is_dir():
+            # The capture pipeline already reclaimed every view: the settled
+            # evidence for this run is the capture-boundary scan instead.
+            return {"settledScan": "capture-boundary", "settledCycles": 0,
+                    "settledFiles": 0, "settledIncomplete": None}
+        self._scan_for_credential(views)
+        return {
+            "settledScan": "view",
+            "settledCycles": 1 if self._cycle_complete else 0,
+            "settledFiles": self.scanned_files,
+            "settledIncomplete": self.scan_incomplete,
+        }
+
     def stop(self) -> None:
         self._stop.set()
         self._thread.join(timeout=5)
@@ -844,31 +865,52 @@ def verify_artifact(artifact: Path, report: dict) -> str:
     return summary["digest"]
 
 
-#: Official Codex feature flags (the same `[features]` family as
-#: `features.code_mode` / `features.multi_agent`). Both default to on and are
-#: what turns this deployment's state churn into an unobservable window:
-#: `plugins` materializes the bundled plugin/skill corpus into
-#: `$CODEX_HOME/.tmp/plugins/` (measured peak 5,529 files) and `shell_snapshot`
-#: writes `$CODEX_HOME/shell_snapshots/*.sh`, which is where the injected
-#: credential environment variable was first-hand found. Setting them false
-#: removes both at the source; the attempt-ephemeral tmpfs shadow stays as
-#: defense in depth.
-OFFICIAL_FEATURE_FLAGS = ("plugins", "shell_snapshot")
+#: The two official Codex feature flags this deployment turns off live in the
+#: reviewed `config.toml` itself (`[features] plugins=false / shell_snapshot=false`,
+#: evidence in the state-error-boundary report), so the loopback override must
+#: never add a second `[features]` table. The differential gate below instead
+#: *strips* that block from the loopback config to reproduce the shipped default
+#: behaviour as its control leg.
+FEATURE_FLAG_CONTROL = False
 
 
-def feature_flags_config_suffix(enabled: bool = True) -> bytes:
-    """The `[features]` block that disables the two observed state churners."""
-    if not enabled:
-        return b""
-    body = "".join(f"{name} = false\n" for name in OFFICIAL_FEATURE_FLAGS)
-    return f"\n[features]\n{body}".encode()
+def without_feature_flags(config: bytes) -> bytes:
+    """The same config with the `[features]` table removed (control leg).
+
+    Only that one table's lines are dropped: every other line - including the
+    Profile sentinel comment the guest audit verifies - stays exactly as the
+    deployment declared it. What is emitted must parse, so a malformed control
+    config can never masquerade as a behaviour difference.
+    """
+    out: list[str] = []
+    skipping = False
+    for line in config.decode("utf-8").splitlines(keepends=True):
+        stripped = line.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            skipping = stripped == "[features]"
+        if skipping:
+            continue
+        out.append(line)
+    control = "".join(out)
+    tomllib.loads(control)
+    return control.encode()
 
 
 def loopback_config_bytes(endpoint: FakeEndpoint, production) -> bytes:
-    """The production configuration with the listed loopback override applied."""
-    return production.loopback_config_bytes(endpoint.base_url) + (
-        f"{PROFILE_SENTINEL_COMMENT}: {PROFILE_SENTINEL}\n".encode()) + (
-        feature_flags_config_suffix(OFFICIAL_FEATURE_FLAGS_ENABLED))
+    """The production configuration with the listed loopback override applied.
+
+    The reviewed `[features]` block stays exactly as the deployment declares it;
+    the `--feature-flag-differential` control leg removes it instead (see
+    `without_feature_flags`).
+    """
+    config = production.loopback_config_bytes(endpoint.base_url) + (
+        f"{PROFILE_SENTINEL_COMMENT}: {PROFILE_SENTINEL}\n".encode())
+    if FEATURE_FLAG_CONTROL:
+        config = without_feature_flags(config)
+    # Whatever this function emits must parse: a duplicated or malformed table
+    # would silently change what the guest reads.
+    tomllib.loads(config.decode("utf-8"))
+    return config
 
 
 def main() -> int:
@@ -878,9 +920,10 @@ def main() -> int:
     parser.add_argument("--keep", action="store_true")
     parser.add_argument("--json", action="store_true")
     parser.add_argument(
-        "--official-feature-flags", action="store_true",
-        help="append the official [features] plugins=false / shell_snapshot=false "
-             "block to the guest config (probe for the source-level fix)",
+        "--feature-flag-control-leg", action="store_true",
+        help="strip the reviewed [features] block from the loopback config, i.e. "
+             "run with Codex's shipped defaults (control leg of the differential; "
+             "driven by scripts/server-round1/codex-feature-flag-differential.py)",
     )
     parser.add_argument(
         "--legacy-state-diagnostic", action="store_true",
@@ -889,9 +932,9 @@ def main() -> int:
              "fake token (no-model, fake-token only; never with a real key)",
     )
     options = parser.parse_args()
-    global LEGACY_STATE_DIAGNOSTIC, OFFICIAL_FEATURE_FLAGS_ENABLED
+    global LEGACY_STATE_DIAGNOSTIC, FEATURE_FLAG_CONTROL
     LEGACY_STATE_DIAGNOSTIC = bool(options.legacy_state_diagnostic)
-    OFFICIAL_FEATURE_FLAGS_ENABLED = bool(options.official_feature_flags)
+    FEATURE_FLAG_CONTROL = bool(options.feature_flag_control_leg)
 
     endpoint: FakeEndpoint | None = None
     created: Path | None = None
@@ -1017,9 +1060,10 @@ def main() -> int:
             )
         finally:
             endpoint.stop()
-            # User decision A: the attempts are over, so the state tree is no
-            # longer being written - the credential verdict is judged on this
-            # settled window, which must be fully observed.
+            # User decision A: the settled window opens only after the native
+            # processes are gone, and it is observed synchronously. The
+            # thread's cycles are observations, not evidence.
+            settled_window = settle_after_attempt(watcher, temporary)
             watcher.stop()
             # The endpoint's own record is the evidence for several requirements,
             # so it is reported even when the chain failed after it answered.
@@ -1045,29 +1089,13 @@ def main() -> int:
                 "overListingLimit": watcher.peak_files > StateSymlinkWatcher.FILE_LIMIT,
             }
         REPORT.update(outcome)
-        verdict, detail = credential_scan_verdict(
-            watcher.token_hits, watcher.scan_error, watcher.stopped_cleanly,
-            LEGACY_STATE_DIAGNOSTIC, watcher.scan_incomplete, watcher.scan_completed,
-            watcher.race_events, watcher.incomplete_events,
-            watcher.settled_cycles, watcher.settled_races, watcher.settled_incomplete,
-        )
-        REPORT["credentialScan"] = {
-            "filesObserved": watcher.scanned_files,
-            "cyclesCompleted": watcher.scan_completed,
-            "incomplete": watcher.scan_incomplete,
-            "raceEvents": watcher.race_events,
-            "incompleteEvents": watcher.incomplete_events,
-            "settledCycles": watcher.settled_cycles,
-            "settledIncomplete": watcher.settled_incomplete,
-            "settledRaces": watcher.settled_races,
-            "error": watcher.scan_error,
-            "stoppedCleanly": watcher.stopped_cleanly,
-        }
+        REPORT["settledWindow"] = settled_window
+        verdict, detail = finalize_run(REPORT, settled_window, watcher) or (None, "")
+        if verdict is not None and chain_failure is not None:
+            REPORT["secondaryFailure"] = {
+                "code": chain_failure.code, "message": chain_failure.message,
+            }
         if verdict is not None:
-            if chain_failure is not None:
-                REPORT["secondaryFailure"] = {
-                    "code": chain_failure.code, "message": chain_failure.message,
-                }
             fail(verdict, detail)
         if chain_failure is not None:
             raise chain_failure
@@ -1998,6 +2026,83 @@ def run_requests(runs: list[list[dict]], index: int) -> list[dict]:
 # --------------------------------------------------------------------------
 
 
+#: Process patterns that mean a native Harness for this gate is still alive.
+HARNESS_PROCESS_PATTERNS = ("codex-acp/dist/index.js", "app-server", "codex-gate-audit-adapter")
+
+
+def harness_processes(temporary: Path) -> list[str]:
+    """Harness processes of *this* run that are still alive (own-root scope)."""
+    survivors = []
+    for pattern in HARNESS_PROCESS_PATTERNS:
+        lines = subprocess.run(
+            ["pgrep", "-af", pattern], capture_output=True, text=True).stdout.splitlines()
+        survivors.extend(
+            line for line in lines if str(temporary) in line or "codex-runtime" in line)
+    return survivors
+
+
+def settle_after_attempt(watcher: "StateSymlinkWatcher", temporary: Path,
+                         timeout_s: float = 10.0, interval_s: float = 0.25) -> dict:
+    """Wait, bounded, until the run's Harness processes are gone, then take one
+    synchronous scan of whatever state tree is still on disk.
+
+    User decision A fixes the *settled window* here: it starts only after the
+    native processes have exited (nothing can write any more) and is observed by
+    a synchronous, bounded scan - never by a cycle that merely looked stable
+    while the harness was still running. When the capture pipeline already
+    reclaimed the view, the evidence for the same window is the
+    capture-boundary scan of the captured checkpoint (`scan_state`), which is
+    fatal on any hit.
+    """
+    deadline = time.monotonic() + timeout_s
+    survivors = harness_processes(temporary)
+    while survivors and time.monotonic() < deadline:
+        time.sleep(interval_s)
+        survivors = harness_processes(temporary)
+    evidence = {
+        "harnessExited": not survivors,
+        "survivors": survivors[:2],
+        "settledScan": "capture-boundary",
+        "settledCycles": 0,
+    }
+    if not survivors:
+        evidence.update(watcher.scan_once())
+    return evidence
+
+
+def finalize_run(report: dict, settled_window: dict, watcher) -> tuple[str | None, str]:
+    """The one post-run decision, driven by the real scan evidence.
+
+    Extracted so the *control flow* (not just the pure verdict) is testable: it
+    reads the run's watcher and settled window, records the scan block, and
+    answers what must fail. A credential hit outranks every other failure, so a
+    hit that coincides with a chain failure still ends the run with the
+    credential code and the chain failure is kept as structured secondary
+    evidence by the caller.
+    """
+    verdict, detail = credential_scan_verdict(
+        watcher.token_hits, watcher.scan_error, watcher.stopped_cleanly,
+        LEGACY_STATE_DIAGNOSTIC, watcher.scan_incomplete, watcher.scan_completed,
+        watcher.race_events, watcher.incomplete_events,
+        settled_window.get("settledCycles"), None, None,
+        settled_window.get("harnessExited"), settled_window.get("settledIncomplete"),
+    )
+    report["credentialScan"] = {
+        "filesObserved": watcher.scanned_files,
+        "cyclesCompleted": watcher.scan_completed,
+        "incomplete": watcher.scan_incomplete,
+        "raceEvents": watcher.race_events,
+        "incompleteEvents": watcher.incomplete_events,
+        "settledCycles": settled_window.get("settledCycles"),
+        "settledScan": settled_window.get("settledScan"),
+        "settledIncomplete": settled_window.get("settledIncomplete"),
+        "harnessExited": settled_window.get("harnessExited"),
+        "error": watcher.scan_error,
+        "stoppedCleanly": watcher.stopped_cleanly,
+    }
+    return verdict, detail
+
+
 def credential_scan_verdict(
     token_hits: list[dict], scan_error: str | None, stopped_cleanly: bool,
     legacy_diagnostic: bool = False, scan_incomplete: str | None = None,
@@ -2006,6 +2111,8 @@ def credential_scan_verdict(
     settled_cycles: int | None = None,
     settled_races: list[dict] | None = None,
     settled_incomplete: list[dict] | None = None,
+    harness_exited: bool | None = None,
+    settled_scan_incomplete: str | None = None,
 ) -> tuple[str | None, str]:
     """The typed verdict for one run's credential-path scan.
 
@@ -2036,10 +2143,18 @@ def credential_scan_verdict(
                 "the state credential scanner did not stop cleanly")
     if settled_cycles is not None:
         # Settled-window semantics: only this window has to be fully observed.
-        if settled_cycles <= 0:
+        if harness_exited is False:
             return ("CODEX_GATE_STATE_SCAN_INCOMPLETE",
-                    "no settled cycle was ever observed: the state tree never held still "
-                    "for a fully walked comparison")
+                    "native Harness processes were still alive after the attempts; the "
+                    "settled window could not be opened")
+        if settled_scan_incomplete:
+            return ("CODEX_GATE_STATE_SCAN_INCOMPLETE",
+                    "the settled-window scan could not cover everything: "
+                    + str(settled_scan_incomplete))
+        # settled_cycles == 0 with a complete scan means the view was already
+        # reclaimed by the capture pipeline: the evidence for this same window
+        # is then the capture-boundary scan (`scan_state`), which is fatal on
+        # any hit. Both are recorded in the report.
         # Raced or unobservable cycles after a settled one belong to the next
         # period of harness activity; they are observations in the report, not
         # failures. What the verdict requires is that the tree was fully
