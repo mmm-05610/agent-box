@@ -1,0 +1,82 @@
+{
+  "buttons": [
+    "Profiles",
+    "Open folder",
+    "Open remote folder",
+    "Settings",
+    "Gatewayoffline",
+    "v0.17.2",
+    "Models",
+    "Skills & MCP",
+    "Identities",
+    "Harnesses",
+    "Data management",
+    "Appearance",
+    "Notifications",
+    "Keyboard Shortcuts",
+    "About",
+    "SearchCtrlK"
+  ],
+  "dialogText": [],
+  "editables": [],
+  "inputs": [
+    {
+      "tag": "input",
+      "type": "checkbox",
+      "label": null,
+      "placeholder": null
+    }
+  ],
+  "labelled": [
+    {
+      "label": "Profiles",
+      "role": "button"
+    },
+    {
+      "label": "Settings",
+      "role": "button"
+    },
+    {
+      "label": "Close",
+      "role": "button"
+    },
+    {
+      "label": "Restore",
+      "role": "button"
+    },
+    {
+      "label": "Close settings",
+      "role": "button"
+    },
+    {
+      "label": "Ctrl K",
+      "role": "span"
+    }
+  ],
+  "settingsEntries": [
+    "Profiles",
+    "Settings",
+    "Models"
+  ],
+  "slots": [
+    "sidebar-wrapper",
+    "sidebar",
+    "sidebar-content",
+    "sidebar-group",
+    "sidebar-group-content",
+    "sidebar-menu",
+    "sidebar-menu-item",
+    "sidebar-menu-button",
+    "button",
+    "context-menu-trigger",
+    "statusbar",
+    "tooltip-trigger",
+    "dropdown-menu-trigger",
+    "badge",
+    "kbd-group",
+    "kbd"
+  ],
+  "testIds": [],
+  "url": "#/settings",
+  "title": "Hermes"
+}

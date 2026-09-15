@@ -1,0 +1,139 @@
+{
+  "buttons": [
+    "Profiles",
+    "Open folder",
+    "Open remote folder",
+    "Settings",
+    "Choose a profile",
+    "Gatewayoffline",
+    "v0.17.2"
+  ],
+  "dialogText": [],
+  "editables": [
+    {
+      "tag": "div",
+      "editable": "false",
+      "role": "textbox",
+      "label": "Message",
+      "placeholder": "Unavailable"
+    },
+    {
+      "tag": "textarea",
+      "editable": null,
+      "role": null,
+      "label": null,
+      "placeholder": null
+    }
+  ],
+  "inputs": [],
+  "labelled": [
+    {
+      "label": "Window controls",
+      "role": "div"
+    },
+    {
+      "label": "Hide sidebar",
+      "role": "button"
+    },
+    {
+      "label": "Swap sidebar sides",
+      "role": "button"
+    },
+    {
+      "label": "App controls",
+      "role": "div"
+    },
+    {
+      "label": "Layout editor",
+      "role": "button"
+    },
+    {
+      "label": "HUD mode",
+      "role": "button"
+    },
+    {
+      "label": "Mute haptics",
+      "role": "button"
+    },
+    {
+      "label": "Open settings",
+      "role": "button"
+    },
+    {
+      "label": "Show right sidebar",
+      "role": "button"
+    },
+    {
+      "label": "Profiles",
+      "role": "button"
+    },
+    {
+      "label": "Settings",
+      "role": "button"
+    },
+    {
+      "label": "Attach",
+      "role": "button"
+    },
+    {
+      "label": "Message",
+      "role": "textbox"
+    },
+    {
+      "label": "Choose a profile",
+      "role": "button"
+    },
+    {
+      "label": "Temporary settings",
+      "role": "button"
+    },
+    {
+      "label": "Send",
+      "role": "button"
+    },
+    {
+      "label": "Close",
+      "role": "button"
+    },
+    {
+      "label": "Restore",
+      "role": "button"
+    }
+  ],
+  "settingsEntries": [
+    "Profiles",
+    "Settings",
+    "Choose a profile"
+  ],
+  "slots": [
+    "sidebar-wrapper",
+    "tooltip-trigger",
+    "sidebar",
+    "sidebar-content",
+    "sidebar-group",
+    "sidebar-group-content",
+    "sidebar-menu",
+    "sidebar-menu-item",
+    "sidebar-menu-button",
+    "button",
+    "composer-bounds",
+    "aui_thread-viewport",
+    "aui_thread-content",
+    "aui_composer-clearance",
+    "composer-dock",
+    "composer-root",
+    "composer-drag-region",
+    "composer-surface",
+    "composer-fade",
+    "composer-rich-input",
+    "composer-profile-controls",
+    "composer-profile-trigger",
+    "composer-temporary-config-trigger",
+    "context-menu-trigger",
+    "statusbar",
+    "dropdown-menu-trigger"
+  ],
+  "testIds": [],
+  "url": "",
+  "title": "Hermes"
+}
