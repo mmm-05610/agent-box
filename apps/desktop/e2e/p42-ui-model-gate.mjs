@@ -167,13 +167,55 @@ async function main() {
   delete serverEnv.AGENTBOX_SERVER_PORT
 
   const logFd = fs.openSync(serverLog, 'a')
+  async function waitForServer() {
+    const deadline = Date.now() + 30000
+
+    while (Date.now() < deadline) {
+      try {
+        if ((await fetch(`http://127.0.0.1:${SERVER_PORT}/live`)).ok) {
+          return true
+        }
+      } catch {
+        await sleep(150)
+      }
+    }
+
+    return false
+  }
+
+  async function stopServer() {
+    server.kill()
+
+    if (server.pid) {
+      try {
+        execFileSync('taskkill', ['/PID', String(server.pid), '/T', '/F'], { stdio: 'ignore' })
+      } catch {
+        // already gone
+      }
+    }
+
+    const deadline = Date.now() + 20000
+
+    while (Date.now() < deadline) {
+      try {
+        await fetch(`http://127.0.0.1:${SERVER_PORT}/live`)
+        await sleep(200)
+      } catch {
+        return true
+      }
+    }
+
+    return false
+  }
+
+  function restartServer() {
+    server = spawn(launcher, serverArgs, { env: serverEnv, stdio: ['ignore', logFd, logFd] })
+  }
+
   const [launcher, ...launcherArgs] = PYTHON_LAUNCHER.split(' ')
-  const server = spawn(
-    launcher,
-    [...launcherArgs, '-m', 'agent_box.server', '--data-root', serverDataRoot,
-     '--port', String(SERVER_PORT), '--sidecar-deployment', DEPLOYMENT],
-    { env: serverEnv, stdio: ['ignore', logFd, logFd] }
-  )
+  const serverArgs = [...launcherArgs, '-m', 'agent_box.server', '--data-root', serverDataRoot,
+    '--port', String(SERVER_PORT), '--sidecar-deployment', DEPLOYMENT]
+  let server = spawn(launcher, serverArgs, { env: serverEnv, stdio: ['ignore', logFd, logFd] })
 
   let live = false
   const deadline = Date.now() + 30000
@@ -392,6 +434,22 @@ async function main() {
       + `deltas=${JSON.stringify(firstDeltas.slice(0, 200))} `
       + `final=${JSON.stringify(firstFinal.slice(0, 200))}`
     )
+
+    if (process.env.AGENTBOX_UI_GATE_RESTART_BETWEEN_TURNS === '1') {
+      // The Server (and with it the Worker) stops between the turns: the second
+      // turn has to reach the same native session through the stored checkpoint
+      // rather than a fresh one.
+      const stopped = await stopServer()
+      restartServer()
+      const restarted = await waitForServer()
+
+      record(
+        'server-restart-between-turns',
+        'the Server comes back on the same data root and answers again',
+        stopped && restarted ? 'PASS' : 'FAIL',
+        `stopped=${stopped} restarted=${restarted}`
+      )
+    }
 
     await wireOk(page, 'sessions.send', {
       message: { attachments: [], text: 'What did I ask you to remember?' },
