@@ -317,6 +317,12 @@ capture 证据**（`stateScan` 存在、无 token、native id 绑定、各轮 ca
   控制腿 2 处凭据命中、处理腿零命中 → 因果归属于该单一变量。
 - 真机两轮（本 HEAD）：`phases=2`、逐阶段 capture 证据（turn-chain 76–78 文件、
   reopen 77 文件 / 2.66 MB，均 `nativeSessionId=true`、零命中）、门 exit 0。
+- **本轮（2026-09-15 19:00）在最终 HEAD 的复跑**：Windows r4
+  `accept-e.ps1 … -Port 18747 -Cleanup` exit 0 → `BACKEND_41_E_WINDOWS_WSL_WIRE_OK`
+  （`worker_digest=sha256:514f48a9…`、有状态 fixture `session/new→session/resume`
+  同 native id `stateful-13`、delta 10 < completed 12、`stop_mode=tree_terminate`、
+  8 秒静默 `elapsed_ms=8770`、7 项清理守卫全部按预期拒绝/接受）+ 独立
+  `-PostCheck -InstanceId <两实例>` exit 0 → `BACKEND_41_E_WINDOWS_POSTCHECK_CLEAN`。
 
 ## 4.11 自审轮（Codex 额度用尽，按用户指示转自审）
 
@@ -366,9 +372,11 @@ powershell.exe -File accept-e.ps1（-SourceRoot \\wsl.localhost\Ubuntu\… -Data
 git diff --check <起点>..<HEAD>
 ```
 
-- 【已被 §4.2/§4.4 的现行计数取代：python 820/4；Rust 27】c7 轮当时：Python 全量
-  812 passed / 4 skipped / 0 failed；Rust fmt 干净、`cargo test --locked --release`
-  22 passed / 0 failed。
+- 【历史值，已被取代：c7 轮当时 Python 812 passed / 4 skipped / 0 failed；
+  其后 820/4、849/6、854/6 亦均被取代——**现行计数唯一定义在
+  [status.md](../../implementation/status.md) 的“Python 计数【现行 …】”一处**，
+  本文件不再复制计数】Rust：本轮返修未改 Worker/Rust 源，`cargo test --locked --release`
+  的 27 passed 沿用（`git diff -- workers/` 为空）。
 - 残留：本轮五个门的临时根无残留；Windows DataRoot/workspace/端口/进程由 `-PostCheck`
   独立复核为 CLEAN；两个 `--keep` 诊断根与 Rust 测试 scratch 目录已按属主核对后删除；
   `git diff --check` 通过。进程表里仅剩 pytest 的 `--delay-seconds 300` 清理助手
