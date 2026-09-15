@@ -262,12 +262,18 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   向旧翻页）与实时批量两条路径的每一帧交给前端 `EventFrame`（`additionalProperties:false`、闭枚举）
   校验；**带工件与不带工件两种跑法各 30 passed**，且帧键集与 kind 为不带工件时的常驻断言。
   同轮机械核对：错误码 12 家族集合与后端 `FAMILIES` **逐项相等**。
+  同轮按合同**语义**（不止形状）核对，另修一处：停止相位——`record_cancel_request` 的事件 `state`
+  是请求到达时的原状态，投影照搬，于是取消 running 执行时客户端收到 `running`，而前端 stop phase
+  正由 `stopping` 帧驱动；现在投影对 `cancel_requested` 发 `stopping`（终态 `stopped` 仍是唯一确认）。
   由此发现两处「合同已声明、后端无生产者」，已按权威层处理并登记到
   [wire 反馈](../server-round1/wire-review.md)：`config.changed` **已补生产者**（`sessions.switchProfile`
   确认后同事务发 `next_send`，重放在写前返回不重发；`profiles.updateConfig` 路径仍未发、已登记待前端反馈）；
   `workspace.connection` **仍无生产者**——后端无异步准备阶段，且事件帧按构造必属某个 Session
   （`server_session_events.session_id NOT NULL` + `EventFrame.sessionId` 必填），浏览阶段没有 Session
   也就没有可承载该帧的流，需前端在合同层裁决（同步结果 or 第二条会话无关通道），后端不猜语义。
+  另有一项**待集成阶段判定**：`tool.update` 目前只有 harness 失败时的一条 `state="failed"`，端口事件
+  词汇里没有工具进度映射，而既有门内审计只记录 client→agent 方向，无法判定四家是否真的播发工具
+  调用；需一次强制工具调用的提示再定论（不臆断）。
 - self_review_round: **执行者自审（2026-09-15，Codex 额度用尽后按用户指示）**——自审第一遍
   发现并修复真实缺陷：`turn_chain_phase()` 二次归一化会丢弃链路阶段的 settled 凭据命中
   （已改幂等归一化 + 附加 capture，加两条端到端回归）；其余对照项（capture 命中按码升格、
