@@ -34,14 +34,27 @@
   TS `7746404984…`、工件 `14f7f736…`（旧 `11e3b3e7…`/`5d4fa3bf…` 已被取代）。
   后端对新工件 `tests/server/test_wire_v1.py` **32 passed**；Hermes UI 门复跑 **8/8 PASS**。
 
-### 2. OpenCode：首轮助手文本是片段（未定因）
+### 2. OpenCode：这条路会丢答复尾部（**已定因**，待修）
 
-- 现象：两轮都完成，但首轮文本 `P42-1F4A9`（差一个字符），`message.final` 仅 `P42`。
-- 已排除：链路失败（`terminal=true`）、部署输出上限（配置为 64 tokens，足够）、我的 delta 组装
-  （改用 `message.final` 后更短，说明是文本本身而非组装）。
-- 未定因：是模型对这条短提示的答复本身被截，还是 OpenCode 这条路在"短答复"上少发最后一个 chunk。
-  后端侧的 OpenCode 真实门（15 字符 nonce）曾拿到完整文本，故不认为链路有系统性问题——
-  但**这一点没有被证明**，故不记通过。
+**诊断跑（让它"从 1 数到 40，每行一个"）给出了决定性证据**：
+
+```
+deltas = "1\n2\n…\n31"      ← 83 字符，停在 31
+final  = "1\n2\n…\n31"      ← 与 deltas 逐字相同
+次轮   = "…You didn't ask me to remember anything. Your only instruction was to count fr…"
+```
+
+- **两轮都到 completed**，所以链路通；**次轮答复语义正确**，所以模型答得对。
+- **delta 与 final 丢失的是同一段尾巴且逐字相同** → 丢失发生在两者共同的上游，
+  即 **OpenCode 这条路**（中立 driver 接缝 / 托管 `opencode serve` 的读取），
+  **不是** Server 的投影、也不是我的组装。
+- 截断位置随答复长度变化（早先 18 字符、9 字符，本次 83 字符），且**总是尾部** →
+  符合"回合结束事件与最后一批流式分片竞态"：回合被判定结束得比最后一片落库早。
+- 官方文档（`opencode.ai/docs/acp`、`/docs/server`）只说明有 SSE 事件流与消息 parts，
+  **没有任何关于 parts 更新时序或截断的说明**，无法据此定论。
+- 结论：**该家不记通过**；根因层级为**后端**（OpenCode 读取路径），下一步是对同一回合比对
+  harness 自身 `GET /session/:id/message` 的 parts——若 harness 侧完整而我们侧不全，则是我们
+  的读取时序问题；若 harness 侧也缺，则在其上游。
 
 ## 成本
 
