@@ -21,6 +21,24 @@
 | `workspace.connection` | `semantics-map.md` “环境准备/浏览…进度走 `workspace.connection` 事件（connecting/preparing[worker\|harness]/failed+reason）” | 后端**没有异步准备阶段**：`workspaces.open` 通过 connector probe 同步验证（`workspaces/service.py:145`），重启把全部工作区标为 `unverified`（`bootstrap/runtime.py:175`）。**没有任何生产者**写这个 kind；记录里只出现 `{state:"connected"\|"connecting"}`（`wire/projection.py:73`），`preparing[*]` 与 `failed+reason` 不可达 |
 | `config.changed` | `wire-v1.ts:468` 声明 `effectiveFor: next_send\|immediate`；`wire-session-projection.ts:155` 用它更新 `configEffectiveFor` | 投影支持（`wire/projection.py:237`）。**生产者已补（2026-09-15，合同内实现缺口，不改 28 方法）**：`sessions.switchProfile` 确认成功后在同一事务写入 `config.changed{effective_for:"next_send"}`（`sessions/repository.py:273` 起），重放请求在写入前返回、不重复发；正在运行的会话本就拒绝切换，故 `immediate` 在本后端不可达（配置按执行冻结）。`profiles.updateConfig` **仍未发事件**：它改的是 Profile，受影响 Session 在下一次发送时使用新版本；若前端需要该路径也有事件，请反馈（后端可对绑定该 Profile 的未归档 Session 逐条追加）。 |
 
+同轮按前端合同的**语义**（不只是形状）逐条核对，另发现并修复一处：`execution.state` 的停止相位。
+core v1 §6 要求 request → stopping → confirmed 三事实分离，前端 `wire-session-control.ts:133` 的
+stop phase **正是**由 `state === "stopping"` 的帧驱动；而后端 `record_cancel_request` 写的事件里
+`state` 是请求到达时的原状态（`sessions/repository.py:667`），投影又只查 `_EXECUTION_STATE_MAP`，
+于是取消一个 running 执行时客户端收到的是 `running`，停止相位直到终态帧才出现。**已修**：投影在
+`cancel_requested` 为真时发 `stopping`（终态 `stopped` 仍是唯一确认，测试断言未确认期间不出现
+`stopped`）。前端无需改动。
+
+仍未闭合、需要前端或集成阶段裁决的两项（后端不猜）：
+① `workspace.connection` 无生产者（本轮上文，含会话作用域的结构性理由）；
+② **`tool.update` 只有失败用例**：全链只有 `sidecar_backend.py:306` 在 harness 失败时写一条
+`state="failed"` 的 tool.update，`sidecar.py` 的端口事件词汇只有 `started/message.delta/failed/
+approval.requested`，**没有任何工具进度（requested/running/completed/denied）映射**。前端
+`tool.update` 的状态枚举与 UI 工具时间线依赖它。ACP 的 `tool_call`/`tool_call_update` 是
+agent→客户端方向的通知，现有门内的审计 shim 只记录 client→agent 方向，**本轮无法从既有证据判定
+四家是否真的播发工具调用**；需要一次"强制工具调用"的提示（例如“列出工作区文件”）并观测是否出现
+原生工具通知，才能判定是后端漏映射还是本来就无工具流——属集成阶段检查项，不在此处臆断。
+
 补充核对（同轮，机械比对合同工件）：错误码家族集合**完全一致**——工件 `WireError.properties.code.enum`
 的 12 个家族与后端 `wire/errors.py` 的 `FAMILIES` 集合逐项相等（无单边项）；后端内部码经
 `family_for()` 收敛到该闭集，精确内部码保留在 `details.internalCode`，因此方法级错误信封不会打挂
