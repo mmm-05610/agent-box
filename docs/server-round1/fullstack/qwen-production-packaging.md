@@ -93,9 +93,16 @@ harness:            Qwen Code `@qwen-code/qwen-code` 0.23.4（npm latest；bin
   - 清理：临时根/worker 投影/adapter 进程/gate token 全清（removed=true）。
 - `--live`：**未执行**（按工单 §5.4 最后统一串行；见 §6）。
 
-## §6 真实模型门（--live，付费，最后统一串行）
+## §6 真实模型门（--live，2026-09-16 执行）
 
-- 状态：**未执行**。执行后在此记：轮数、请求数、tokens 上界、费用、结果码。
+- **结果：exit 0，`QWEN_PRODUCTION_CHAIN_GATE_OK`（mode=live）**——一次尝试即过。
+  官方 base URL（模板原样）、授权 locator 只读注入、不装载 guard。
+- 两轮真实答复：次轮真模型召回 nonce；同 native id；`reopenMethod=session/resume`
+  （记录法）；未知模型发包前拒绝（live 下以拒绝原因为正证）；授权 locator 未被
+  删；凭据/state 零命中；清理干净。
+- **费用分账**：live 尝试 1 次；确认真实请求 4 次（2 主链 + 2 重开）；tokens
+  上界每请求 <1K → 估计费用 **< ¥0.01**。
+- 机制证据（§5）与真实模型证据分账、不互替。
 
 ## §7 阻塞账
 

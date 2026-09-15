@@ -947,3 +947,41 @@ provider 侧账单是唯一权威用量记录，本表是本地产物推算的�
   失败时报告消毒路径以 NameError 崩溃（pi 门有初值）。
 - 全量测试：plugins 161 passed/3 skipped；tests 598 passed/1 skipped。
 - 费用：本轮模型调用 0、累计 ¥0（预算 ≤¥10，真实模型门未开始）。
+
+## 轮 3：qwen-code 0.23.4（官方 `--acp`）
+
+- 六件套全齐；假端点门 **exit 0**（`QWEN_PRODUCTION_CHAIN_GATE_OK`）。
+- 第一手发现：qwen 首启改写 settings.json（EBUSY under 只读投影）→ 本家族不投影
+  原生配置文件，连接事实全走环境（探测验证），settings 由 harness 自持（在 state
+  投影之外）；loopback 覆盖=adapter env 单键差；模型别名指向运行时合成值
+  `$runtime|openai|deepseek-flash(openai)`；守卫拦截 12 次阿里云 RUM 遥测解析
+  （预期观测）。checkpoint `e63a03e`。模型调用 0、费用 ¥0。
+
+## 轮 4：真实模型门（串行，--live，授权 locator 只读注入）
+
+- **dsh：exit 0（live）**——2 次尝试；第 1 次失败是本门重开相位 live 断言缺陷
+  （引用 live 下不存在的假端点），改为模型召回证据后通过。
+- **claude-code：exit 0（live）**——3 次尝试；前 2 次失败同上 + delta 碎片检查
+  缺陷（claude 的 delta 为逐字符碎片，第一手观测），改为拼接全文检查后通过。
+- **qwen：exit 0（live）**——1 次尝试即过。
+- 三家共同证据形态：两轮真实 DeepSeek 答复、次轮真召回、同 native id 续接、
+  未知模型发包前拒绝、凭据零泄漏、授权 locator 未被删、清理干净。
+- **费用账**：确认真实请求 24 次（dsh 8 + claude 12 + qwen 4），另 claude 有每
+  会话 1 次后台 title 调用（live 下未逐次观测）；tokens 上界每请求 <2K → 估计
+  累计 **< ¥0.05**（上限 ¥10，未充值）。机制（假端点）证据与真实模型证据分账。
+
+## 调查后不接 / 未碰
+
+- **Aider（候选 5）：调查后不接**——官方文档（aider.chat/docs/scripting.html、
+  /docs/config/options.html）：headless 为 `--message` 一次性进程退出；stdout 无
+  JSON/结构化输出格式（社区方案是解析 history 文件或屏幕文本）；`--restore-chat-
+  history` 只把历史注入新会话、无 native session id/resume 语义。命中工单排除规则
+  （terminal-screen 解析类 / 无 resume 语义类）。
+- **Goose（候选 4）：已调研、可接、时间盒内未实现**——接入卡齐（v1.50.1
+  Apache-2.0；`goose acp` 一等 stdio ACP；`OPENAI_BASE_URL`/`OPENAI_API_KEY`/
+  `GOOSE_MODEL` 三 env 直连 DeepSeek 兼容端点；`GOOSE_PATH_ROOT` 整目录隔离；
+  sessions SQLite + ACP session/load 可续接；gnu 版二进制 314MB 动态链接 sha256
+  `6cba90db…` / musl 静态版 160MB sha256 `292388ed…`）。设计注意：musl 静态二进制
+  的 LD_PRELOAD 守卫不可用（须用 gnu 版或改 bwrap 网络姿态）。建议后续工单按
+  claude-code 门（LD_PRELOAD 路线）实现。
+- **Crush / OpenHands 及其它**：按工单 §2 顺序（前五家做完才碰），本轮未开始。

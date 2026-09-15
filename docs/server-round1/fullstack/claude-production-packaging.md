@@ -120,10 +120,19 @@ harness:            Claude Code（经官方 ACP 适配器 @agentclientprotocol/
   - 清理：临时根 removed=true、worker 投影/adapter 进程/gate token 全清。
 - `--live`：**未执行**（按工单 §5.4 最后统一串行；见 §6）。
 
-## §6 真实模型门（--live，付费，最后统一串行）
+## §6 真实模型门（--live，2026-09-16 执行）
 
-- 状态：**未执行**。执行后在此记：轮数、请求数、tokens 上界、费用、结果码；
-  未执行则记明理由。
+- **结果：exit 0，`CLAUDE_PRODUCTION_CHAIN_GATE_OK`（mode=live）**。官方
+  anthropic 兼容根（模板原样）、授权 locator 只读注入、不装载 guard。
+- 两轮真实答复：首轮答出 nonce，次轮真模型召回；同 native id；未知模型发包前
+  拒绝；授权 locator 未被删。
+- 重开相位实测 `session/resume`（非重放），live 上下文证据 = 模型召回（第一手
+  观测：claude 的 delta 为逐字符碎片，单条不含完整 nonce，按拼接全文检查）。
+- **费用分账**：live 尝试 3 次（前 2 次失败均为本门重开相位 live 断言缺陷——
+  引用 live 下不存在的假端点 + 单 delta 碎片检查；非 Harness 缺陷，已修）；确认
+  真实请求 12 次（每次尝试 2 主链 + 2 重开），另有假端点门实测的每会话 1 次后台
+  title 调用（live 下未逐次观测）；tokens 上界每请求 <2K → 估计费用 **< ¥0.03**。
+- 机制证据（§5）与真实模型证据分账、不互替。
 
 ## §7 阻塞账
 

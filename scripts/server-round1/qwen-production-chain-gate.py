@@ -680,9 +680,20 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production,
     # endpoint saw exactly two requests, and the second request's messages
     # carry the round-1 nonce - which is only possible if the resumed session
     # still held the stored conversation.
-    round2_request = next((item for item in endpoint.requests if item["index"] == 2), None) if endpoint else None
-    context_carried = bool(round2_request and round2_request["structure"]["messages"] and any(
-        item.get("containsRound1User") for item in round2_request["structure"]["messages"]))
+    if endpoint is not None:
+        round2_request = next((item for item in endpoint.requests if item["index"] == 2), None)
+        context_carried = bool(round2_request and round2_request["structure"]["messages"] and any(
+            item.get("containsRound1User") for item in round2_request["structure"]["messages"]))
+        context_source = "structural on the fake endpoint"
+    else:
+        # Live mode has no endpoint to inspect; the model's real round-2 answer
+        # recalling the stored nonce is the stronger witness.
+        # Deltas arrive fragmented (observed: per-character chunks), so recall
+        # is checked against the concatenated answer, not any single chunk.
+        answer = "".join(item["text"] for item in after_prompt
+                         if item["kind"] == "message.delta")
+        context_carried = NONCE_ROUND_1 in answer
+        context_source = "model recall in the round-2 answer"
     result = {
         "nativeSessionIdStable": reopened == native,
         "stateFiles": len(state), "stateResumable": bool(resumable),
@@ -691,6 +702,7 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production,
         # Recorded, not assumed: which reopen method the adapter actually took.
         "replayedStoredTurn": bool(replayed),
         "round2RequestCarriedRound1Context": context_carried,
+        "contextEvidence": context_source,
         "providerRequests": None if endpoint is None else len(endpoint.requests),
         "note": (
             "The reopen method is recorded, not assumed (qwen documents both "

@@ -136,10 +136,23 @@ harness:            DeepSeek Harness `@deepseek-ai/dsh` 0.1.5-rc.1（npm latest 
   与 `SOURCE.json`（`patched_sha256=00b739b4…`）。
 - `--live`：**未执行**（按工单 §5.4 最后统一串行；见 §6）。
 
-## §6 真实模型门（--live，付费，最后统一串行）
+## §6 真实模型门（--live，2026-09-16 执行）
 
-- 状态：**未执行**（按工单 §5.4 最后统一串行）。执行后在此记：轮数、请求数、
-  tokens 上界、费用、结果码；未执行则记明理由。
+- **结果：exit 0，`DSH_PRODUCTION_CHAIN_GATE_OK`（mode=live）**。官方 base URL
+  （模板原样）、授权 locator 只读注入（SecretStore→Worker secret 帧→沙箱 env，
+  不进 argv/deployment/日志）、不装载 loopback guard。
+- 两轮真实 DeepSeek 答复：首轮答出 `DSH-GATE-NONCE-1F4A9C`，**次轮真模型召回同
+  nonce**（续接上下文为真实召回，非脚本注入）；同 native id 续接；未知模型
+  发包前拒绝（live 下以拒绝原因为正证）；授权 locator 未被删。
+- 凭据零泄漏：events / 可报告状态 / native state 扫描零命中；live 下请求头不可
+  观测，注入结论如实记为 inferred-from-real-answer。
+- live 下重开相位的上下文证据：模型真实回答中召回 nonce（delta 碎片化——按拼接
+  后全文检查，第一手观测：dsh 的 delta 为整段，claude 为逐字符碎片）。
+- **费用分账**：live 尝试 2 次（第 1 次因重开相位 live 断言缺陷失败——该缺陷是
+  断言引用了 live 下不存在的假端点，已改为模型召回证据；非 Harness 缺陷）；确认
+  真实请求 8 次（每次 2 主链 + 2 重开），另 tokens 上界：每请求输入 <1K tokens、
+  输出 ≤64（模板 maxTokens=64）→ 估计费用 **< ¥0.02**。
+- 机制（假端点）证据与真实模型证据分账、不互替：§5 与本节各自成立。
 
 ## §7 阻塞账
 
