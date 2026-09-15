@@ -2326,6 +2326,12 @@ def normalize_phase(name: str, settled_window: dict, watcher=None,
     phase used which path.
     """
     hits: list[dict] = []
+    # Idempotent: an already-normalized phase hands its own hits back in, so a
+    # second pass can never drop what the first one found.
+    for hit in list(settled_window.get("hits") or ()):
+        entry = dict(hit)
+        if entry not in hits:
+            hits.append(entry)
     for hit in list(getattr(watcher, "token_hits", ()) or ()):
         entry = dict(hit, phase=name, source="active")
         if entry not in hits:
@@ -2368,6 +2374,7 @@ def normalize_phase(name: str, settled_window: dict, watcher=None,
         "stoppedCleanly": bool(getattr(watcher, "stopped_cleanly", False)),
         "filesObserved": (getattr(watcher, "scanned_files", 0) or 0)
                          + (settled_window.get("settledFiles") or 0),
+        "settledHits": list(settled_window.get("settledHits") or ()),
         "cyclesCompleted": getattr(watcher, "scan_completed", 0) or 0,
         "settledComplete": bool(settled_window.get("settledComplete")),
         "settledCycles": settled_window.get("settledCycles"),
@@ -2380,20 +2387,34 @@ def normalize_phase(name: str, settled_window: dict, watcher=None,
     }
 
 
-def turn_chain_phase(report: dict, settled_window: dict, watcher) -> dict:
-    """The turn chain's phase evidence; its capture scan lives in the report."""
+def turn_chain_phase(report: dict, chain_evidence: dict, watcher=None) -> dict:
+    """The turn chain's phase evidence, with its capture scan attached.
+
+    The phase was already normalized where it ran; this only adds what the
+    report knows about the capture boundary (its scan and the captured hits), so
+    nothing that phase found can be dropped on the way to the verdict.
+    """
+    phase = dict(chain_evidence)
+    phase["phase"] = "turn-chain"
     scan = report.get("stateScan") if isinstance(report.get("stateScan"), dict) else None
     rounds = report.get("rounds") or {}
-    capture_raw = None
-    if scan is not None and rounds and all(
+    if scan is None or not rounds or not all(
             summary.get("state") == "completed" for summary in rounds.values()):
-        capture_raw = {
-            "files": scan.get("files"),
-            "bytes": scan.get("bytes"),
-            "nativeSessionId": scan.get("nativeSessionId"),
-            "tokenHits": ["<captured>"] if scan.get("tokenInState") else [],
-        }
-    return normalize_phase("turn-chain", settled_window, watcher, capture_raw)
+        return phase
+    capture_hits = ["<captured:tokenInState>"] if scan.get("tokenInState") else []
+    phase["captureEvidence"] = {
+        "files": scan.get("files"),
+        "bytes": scan.get("bytes"),
+        "nativeSessionId": scan.get("nativeSessionId"),
+        "tokenHits": capture_hits,
+    }
+    hits = list(phase.get("hits") or ())
+    for path in capture_hits:
+        entry = {"path": path, "phase": "turn-chain", "source": "capture"}
+        if entry not in hits:
+            hits.append(entry)
+    phase["hits"] = hits
+    return phase
 
 
 def resolve_run_failure(report: dict, phases: list[dict]) -> "GateFailure | None":

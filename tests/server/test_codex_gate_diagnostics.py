@@ -365,7 +365,7 @@ def test_a_credential_hit_outranks_a_chain_failure(tmp_path):
     watcher.token_hits = list(summary["hits"])
     settled = {"harnessExited": True, "settledComplete": True, "settledCycles": 1,
                "settledIncomplete": None, "settledScan": "view"}
-    phase = module.turn_chain_phase({}, settled, watcher)
+    phase = module.normalize_phase("turn-chain", settled, watcher)
     phase["failure"] = module.GateFailure("CODEX_GATE_TURN_FAILED", "the turn failed")
     failure = module.resolve_run_failure({}, [phase])
     assert failure is not None
@@ -412,7 +412,7 @@ def test_a_settled_only_hit_is_a_hit_for_the_turn_chain_too(tmp_path):
     settled = {"harnessExited": True, "settledComplete": True, "settledCycles": 1,
                "settledScan": "view", "settledIncomplete": None,
                "settledHits": ["native-state/shell_snapshots/late.sh"]}
-    phase = module.turn_chain_phase({}, settled, watcher)
+    phase = module.turn_chain_phase({}, module.normalize_phase("turn-chain", settled, watcher))
     assert [hit["source"] for hit in phase["hits"]] == ["settled"]
     failure = module.resolve_run_failure({}, [phase])
     assert failure is not None and failure.code == "CODEX_GATE_CREDENTIAL_IN_NATIVE_STATE"
@@ -532,3 +532,48 @@ def test_both_phase_failures_are_kept_in_order():
     ]
     assert secondaries == [{"phase": "turn-chain", "code": "CODEX_GATE_TURN_FAILED"},
                            {"phase": "reopen", "code": "CODEX_GATE_REOPEN_FAILED"}]
+
+
+def test_a_settled_hit_survives_the_whole_turn_chain_path(tmp_path):
+    """Self-review regression: normalizing a phase twice (once where it ran,
+    once when its capture scan is attached) must not drop what it already found.
+    A settled-only hit ends as the primary credential failure."""
+    module = load_gate()
+    root = tmp_path / "worker-root"
+    root.mkdir(parents=True)
+    watcher = module.StateSymlinkWatcher(root)
+    watcher.stopped_cleanly = True
+    settled = {"harnessExited": True, "settledComplete": False, "settledCycles": 0,
+               "settledScan": "view", "settledIncomplete": None, "settledFiles": 2,
+               "settledHits": ["native-state/shell_snapshots/late.sh"],
+               "settledRaces": []}
+    # Exactly the pipeline: normalize where the phase ran, then attach capture.
+    phase = module.normalize_phase("turn-chain", settled, watcher)
+    report = {"stateScan": {"files": 3, "bytes": 9, "nativeSessionId": True,
+                            "tokenInState": False},
+              "rounds": {"first": {"state": "completed"}}}
+    finalized = module.turn_chain_phase(report, phase)
+    assert [hit["source"] for hit in finalized["hits"]] == ["settled"]
+    assert finalized["captureEvidence"]["files"] == 3
+    failure = module.resolve_run_failure(report, [finalized])
+    assert failure is not None
+    assert failure.code == "CODEX_GATE_CREDENTIAL_IN_NATIVE_STATE", failure
+
+
+def test_a_token_in_state_capture_makes_the_phase_a_credential_failure(tmp_path):
+    """The report's own capture scan (tokenInState) is attached as a hit, so the
+    primary failure is the credential, never an incomplete scan."""
+    module = load_gate()
+    root = tmp_path / "worker-root"
+    root.mkdir(parents=True)
+    watcher = module.StateSymlinkWatcher(root)
+    watcher.stopped_cleanly = True
+    phase = module.normalize_phase("turn-chain", {
+        "harnessExited": True, "settledComplete": True, "settledCycles": 1,
+        "settledScan": "view", "settledIncomplete": None}, watcher)
+    report = {"stateScan": {"files": 3, "bytes": 9, "nativeSessionId": True,
+                            "tokenInState": True},
+              "rounds": {"first": {"state": "completed"}}}
+    finalized = module.turn_chain_phase(report, phase)
+    failure = module.resolve_run_failure(report, [finalized])
+    assert failure is not None and failure.code == "CODEX_GATE_CREDENTIAL_IN_NATIVE_STATE"

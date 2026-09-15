@@ -212,7 +212,7 @@ Reviewer `CHANGES_REQUIRED` 的修复（§2.1/§7.1）落地后重建
 | Codex（遮蔽模式，最终版） | `…/codex-production-chain-gate.py --worker <c8> --json` | exit 0，`CODEX_PRODUCTION_CHAIN_GATE_OK`，view 峰值 112、`tokenInState=false`、`credentialPathHits=0`；观察器判据：`cyclesCompleted≈224`、`filesObserved≈83`、`incomplete=null`（连续 3 轮） |
 | Windows r4 | `accept-e.ps1 … -Port 18746 -Cleanup`（c8，`worker_digest=sha256:514f48a9…`） | exit 0，`BACKEND_41_E_WINDOWS_WSL_WIRE_OK` |
 | 独立 PostCheck | 同参数 `-PostCheck -InstanceId <两实例>` | exit 0，`BACKEND_41_E_WINDOWS_POSTCHECK_CLEAN` |
-| Python 全量 | `PYTHONPATH=src + 全部 plugins/*/src python3 -m pytest -q tests <插件 tests>` | **852 passed / 6 skipped / 0 failed**（现行；本表其余计数均为该表形成时的历史值） |
+| Python 全量 | `PYTHONPATH=src + 全部 plugins/*/src python3 -m pytest -q tests <插件 tests>` | **854 passed / 6 skipped / 0 failed**（现行；本表其余计数均为该表形成时的历史值） |
 | Rust | `cargo fmt --check` + `cargo test --locked --release` | fmt 干净；27 passed |
 
 skip 说明：6 项均为既有平台/环境条件项（不含本轮新增测试）。清理：门临时根与
@@ -313,6 +313,29 @@ capture 证据**（`stateScan` 存在、无 token、native id 绑定、各轮 ca
   控制腿 2 处凭据命中、处理腿零命中 → 因果归属于该单一变量。
 - 真机两轮（本 HEAD）：`phases=2`、逐阶段 capture 证据（turn-chain 76–78 文件、
   reopen 77 文件 / 2.66 MB，均 `nativeSessionId=true`、零命中）、门 exit 0。
+
+## 4.11 自审轮（Codex 额度用尽，按用户指示转自审）
+
+用户告知 Codex 侧额度已用尽，指示自审。自审按 Reviewer 的同一套视角执行（证据合并完整性、
+判据空集、异常逸出、进程树归属、账本唯一性），并**在自审第一遍就发现并修复了一个真实缺陷**：
+
+- **缺陷（自审发现）**：`turn_chain_phase()` 原先对**已归一化**的阶段证据再调用一次
+  `normalize_phase()`，而后者从 `settled_window.get("settledHits")` 取 settled 命中——
+  已归一化的阶段字典没有该键，于是**链路阶段由 settled 扫描发现的凭据命中会在第二次归一化时
+  被丢弃**（reopen 路径不受影响）。这正是第 20–22 轮反复出现的"命中丢失"同一类问题。
+- **修复**：`normalize_phase()` 变为**幂等**（把输入里已有的 `hits` 一并带入，并透传
+  `settledHits`）；`turn_chain_phase()` 不再重建阶段，只把报告里的 capture 扫描（含
+  `tokenInState` 命中）**附加**到该阶段。
+- **回归测试（自审新增）**：①settled-only 命中走完整链路（归一化 → 附加 capture → 判据）
+  仍以 `CODEX_GATE_CREDENTIAL_IN_NATIVE_STATE` 为主码；②`stateScan.tokenInState=true` 时
+  该阶段同样以凭据命中为主码，而不是 `…SCAN_INCOMPLETE`。
+- 其余自审对照项：capture 命中经错误码升格（不按 message）、两阶段失败有序保留、
+  进程归属按 (pid,start,ppid) 树、ledger 单一现行——均已在第 23 轮完成并有测试。
+
+验证：python 全量 **854 passed / 6 skipped / 0 failed**；Codex 门 2 轮 exit 0（`phases=2`、
+`settledCycles=2`、零命中）。本轮的审查者身份是**执行者自审**（非固定 Reviewer），
+按调度要求在此明确标注；`REVIEWER_AUTOMATION_READY` 的登记仍取决于固定 Reviewer 的 ACCEPT，
+Codex 额度恢复后补审。
 
 ## 5. 全量验证与清理
 
