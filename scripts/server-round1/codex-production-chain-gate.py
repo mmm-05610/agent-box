@@ -67,6 +67,7 @@ import argparse
 import base64
 import hashlib
 import http.server
+import errno
 import json
 import os
 from pathlib import Path
@@ -106,7 +107,12 @@ LEGACY_STATE_DIAGNOSTIC = False
 #: The per-file cap matches the deployment's own state-file bound (8 MiB), so
 #: every file a capture could legitimately accept is fully observed here.
 CREDENTIAL_SCAN_FILE_BYTES = 8 * 1024 * 1024
-CREDENTIAL_SCAN_FILES = 4096
+#: Traversal, file-count and total-byte budgets per cycle, mirroring the
+#: deployment's own state bounds. Exhausting any of them means the tree
+#: was not fully observed, so the cycle does not count as complete.
+CREDENTIAL_SCAN_TRAVERSAL = 4096
+CREDENTIAL_SCAN_FILES = 256
+CREDENTIAL_SCAN_TOTAL_BYTES = 8 * 1024 * 1024
 NONCE_ROUND_1 = "CODEX-GATE-NONCE-1F4A9C"
 NONCE_ROUND_2 = "CODEX-GATE-NONCE-2B7D31"
 #: The controlled stand-in for "the user's home": created by this run, carrying
@@ -484,6 +490,9 @@ class StateSymlinkWatcher:
         self.scan_incomplete: str | None = None
         self.scan_completed = 0
         self.scanned_files = 0
+        self.scanned_bytes = 0
+        self.scanned_entries = 0
+        self._cycle_complete = True
         self.stopped_cleanly = False
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, daemon=True)
@@ -536,40 +545,50 @@ class StateSymlinkWatcher:
     def _scan_for_credential(self, views: Path) -> None:
         """Name any native-state file that contains the injected fake token.
 
-        The state subtree is Harness-writable, so this walk is fd-anchored and
-        opens every component with O_NOFOLLOW (the same discipline the Worker
-        applies). Only fd-verified regular files are read, in looped bounded
-        reads within the observation budget, with the fd identity re-checked
-        afterwards (mtime/ctime/size). Anything this walk could not observe
-        marks the scan incomplete - absence of a hit only means something when
-        the scan provably covered what it claims to cover. Only the sanitized
-        relative path is recorded; the token itself is run-generated.
+        fd-anchored and no-follow throughout (the same discipline the Worker
+        applies). A cycle counts as *complete* only when the whole active view
+        tree was walked within every budget and no file was skipped for an
+        unknown reason: a raced file, an exhausted budget or an unexpected
+        OSError leaves the cycle incomplete, and only complete cycles advance
+        the "the scan really ran" counter. Only sanitized relative paths are
+        recorded; the token itself is run-generated.
         """
         token = FAKE_TOKEN.encode()
-        # Per cycle, not cumulative: the file budget and the completeness mark
-        # describe this pass over the tree. A genuinely unobservable file
-        # re-marks every pass (and so still fails the gate); a file that merely
-        # changed under one pass clears on the next.
         self.scanned_files = 0
+        self.scanned_bytes = 0
+        self.scanned_entries = 0
         self.scan_incomplete = None
+        self._cycle_complete = True
         views_fd = _open_dir_fd(views)
         try:
-            for view_name in sorted(os.listdir(f"/proc/self/fd/{views_fd}")):
-                view_fd = None
-                try:
-                    view_fd = _open_beneath_fd(views_fd, (view_name, "ready"), True)
-                    self._scan_directory(
-                        view_fd, "agentbox-sidecar/deployment/codex/native-state", token)
-                    self.scan_completed += 1
-                except (OSError, ValueError):
-                    # A view that is being created or cleaned up is not an
-                    # observed state tree yet; the next cycle retries.
-                    continue
-                finally:
-                    if view_fd is not None:
-                        os.close(view_fd)
+            completed_here = False
+            with os.scandir(f"/proc/self/fd/{views_fd}") as entries:
+                for entry in entries:
+                    view_fd = None
+                    try:
+                        view_fd = _open_beneath_fd(views_fd, (entry.name, "ready"), True)
+                        self._scan_directory(
+                            view_fd, "agentbox-sidecar/deployment/codex/native-state", token)
+                        completed_here = True
+                    except FileNotFoundError:
+                        # A view that appeared or vanished mid-scan is simply
+                        # not part of this cycle.
+                        continue
+                    except OSError as error:
+                        self._mark_incomplete(f"view {entry.name}: {error}")
+                        continue
+                    finally:
+                        if view_fd is not None:
+                            os.close(view_fd)
+            if completed_here and self._cycle_complete:
+                self.scan_completed += 1
         finally:
             os.close(views_fd)
+
+    def _mark_incomplete(self, reason: str) -> None:
+        self._cycle_complete = False
+        if self.scan_incomplete is None:
+            self.scan_incomplete = reason
 
     def _scan_directory(self, ready_fd: int, relative: str, token: bytes) -> None:
         """Open the subdirectory once and hand its fd to the entry walk."""
@@ -580,50 +599,60 @@ class StateSymlinkWatcher:
             os.close(directory)
 
     def _scan_entries(self, directory_fd: int, relative_dir: str, token: bytes) -> None:
-        for name in sorted(os.listdir(f"/proc/self/fd/{directory_fd}")):
-            if self.scanned_files >= CREDENTIAL_SCAN_FILES:
-                self.scan_incomplete = f"file budget exhausted under {relative_dir}"
-                return
-            try:
-                child = _open_beneath_fd(directory_fd, (name,), False)
-            except OSError:
-                # A link (ELOOP) or an entry that vanished under the walk
-                # (ENOENT) is skipped: nothing is followed, and the next cycle
-                # simply sees the new state. Any other refusal is equally a
-                # non-observation and is not fatal to the walk.
-                continue
-            try:
-                status = os.fstat(child)
-                relative = f"{relative_dir}/{name}"
-                if stat.S_ISDIR(status.st_mode):
-                    # Recurse on this still-open fd; it has exactly one owner.
-                    self._scan_entries(child, relative, token)
+        try:
+            entries = os.scandir(f"/proc/self/fd/{directory_fd}")
+        except OSError as error:
+            self._mark_incomplete(f"cannot list {relative_dir}: {error}")
+            return
+        with entries:
+            for entry in entries:
+                self.scanned_entries += 1
+                if self.scanned_entries > CREDENTIAL_SCAN_TRAVERSAL:
+                    self._mark_incomplete("traversal budget exhausted")
+                    return
+                relative = f"{relative_dir}/{entry.name}"
+                if self.scanned_files >= CREDENTIAL_SCAN_FILES:
+                    self._mark_incomplete("file budget exhausted")
+                    return
+                try:
+                    child = _open_beneath_fd(directory_fd, (entry.name,), False)
+                except OSError as error:
+                    # A link is refused by O_NOFOLLOW (ELOOP): a narrow, known
+                    # case that is skipped without claiming anything. Anything
+                    # else (permissions, I/O) means this cycle did not observe
+                    # the entry, so the cycle is incomplete.
+                    if error.errno != errno.ELOOP:
+                        self._mark_incomplete(f"{relative}: {error}")
                     continue
-                if stat.S_ISLNK(status.st_mode) or not stat.S_ISREG(status.st_mode):
-                    continue
-                if status.st_size > CREDENTIAL_SCAN_FILE_BYTES:
-                    # Larger than the observation budget: the walk cannot claim
-                    # to have covered it, so the scan is incomplete.
-                    self.scan_incomplete = f"{relative} exceeds the observation budget"
-                    continue
-                payload = _read_bounded(child, CREDENTIAL_SCAN_FILE_BYTES)
-                after = os.fstat(child)
-                before_identity = (status.st_mtime_ns, status.st_ctime_ns, status.st_size)
-                after_identity = (after.st_mtime_ns, after.st_ctime_ns, after.st_size)
-                if before_identity != after_identity:
-                    # Raced, not unobservable: the file is written while the
-                    # walk reads it, so this cycle did not fully observe it -
-                    # the next cycle retries, and the capture's own fail-closed
-                    # scan reads the settled bytes. Marking the whole scan
-                    # incomplete here would fail live runs forever.
-                    continue
-                self.scanned_files += 1
-                if token in payload:
-                    entry = {"path": relative, "phase": "during-run"}
-                    if entry not in self.token_hits:
-                        self.token_hits.append(entry)
-            finally:
-                os.close(child)
+                try:
+                    status = os.fstat(child)
+                    if stat.S_ISDIR(status.st_mode):
+                        self._scan_entries(child, relative, token)
+                        continue
+                    if stat.S_ISLNK(status.st_mode) or not stat.S_ISREG(status.st_mode):
+                        continue
+                    if status.st_size > CREDENTIAL_SCAN_FILE_BYTES:
+                        self._mark_incomplete(f"{relative} exceeds the per-file budget")
+                        continue
+                    if self.scanned_bytes + status.st_size > CREDENTIAL_SCAN_TOTAL_BYTES:
+                        self._mark_incomplete("total byte budget exhausted")
+                        return
+                    payload = _read_bounded(child, CREDENTIAL_SCAN_FILE_BYTES)
+                    after = os.fstat(child)
+                    before_identity = (status.st_mtime_ns, status.st_ctime_ns, status.st_size)
+                    after_identity = (after.st_mtime_ns, after.st_ctime_ns, after.st_size)
+                    self.scanned_bytes += len(payload)
+                    self.scanned_files += 1
+                    if before_identity != after_identity:
+                        # Raced: this cycle did not observe the final bytes.
+                        self._mark_incomplete(f"{relative} changed while it was read")
+                        continue
+                    if token in payload:
+                        entry_hit = {"path": relative, "phase": "during-run"}
+                        if entry_hit not in self.token_hits:
+                            self.token_hits.append(entry_hit)
+                finally:
+                    os.close(child)
 
     @staticmethod
     def _count(ready: Path) -> tuple[int, int, dict[str, tuple[int, list[str]]]]:
@@ -895,6 +924,7 @@ def main() -> int:
         watcher.start()
         endpoint.start()
         chain_failure = None
+        outcome: dict = {}
         try:
             outcome = run_chain(
                 temporary, workspace, worker, artifact, digest, endpoint, production,
@@ -1881,7 +1911,7 @@ def run_requests(runs: list[list[dict]], index: int) -> list[dict]:
 def credential_scan_verdict(
     token_hits: list[dict], scan_error: str | None, stopped_cleanly: bool,
     legacy_diagnostic: bool = False, scan_incomplete: str | None = None,
-    scan_completed: int = 1,
+    scan_completed: int = 0,
 ) -> tuple[str | None, str]:
     """The typed verdict for one run's credential-path scan.
 
@@ -1891,6 +1921,13 @@ def credential_scan_verdict(
     incomplete scan also fails: absence of evidence is only evidence when the
     scan provably ran to completion.
     """
+    if token_hits:
+        # A direct observation outranks every secondary failure: the credential
+        # material was seen in native state, whatever else also happened.
+        paths = [hit.get("path") for hit in token_hits]
+        return ("CODEX_GATE_CREDENTIAL_IN_NATIVE_STATE",
+                "the injected fake token reached native state; sanitized paths: "
+                + json.dumps(paths))
     if scan_error is not None:
         return "CODEX_GATE_STATE_SCAN_INCOMPLETE", f"the state credential scanner crashed: {scan_error}"
     if not stopped_cleanly:
@@ -1902,11 +1939,6 @@ def credential_scan_verdict(
     if scan_completed <= 0:
         return ("CODEX_GATE_STATE_SCAN_INCOMPLETE",
                 "the state credential scanner never completed a scan cycle")
-    if token_hits:
-        paths = [hit.get("path") for hit in token_hits]
-        return ("CODEX_GATE_CREDENTIAL_IN_NATIVE_STATE",
-                "the injected fake token reached native state; sanitized paths: "
-                + json.dumps(paths))
     return None, ""
 
 

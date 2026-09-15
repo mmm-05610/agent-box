@@ -65,8 +65,11 @@ def test_the_credential_scan_verdict_fails_closed_in_every_mode():
         verdict, _detail = module.credential_scan_verdict([], scan_error, stopped, False)
         assert verdict == "CODEX_GATE_STATE_SCAN_INCOMPLETE"
     # A complete, clean scan passes the verdict (the gate itself stays green).
-    verdict, _detail = module.credential_scan_verdict([], None, True, False)
+    verdict, _detail = module.credential_scan_verdict([], None, True, False, None, 1)
     assert verdict is None
+    # The default completion count is the safe one: no cycle, no pass.
+    verdict, _detail = module.credential_scan_verdict([], None, True, False)
+    assert verdict == "CODEX_GATE_STATE_SCAN_INCOMPLETE"
 
 
 def test_the_scan_walks_nested_directories_and_never_follows_links(tmp_path):
@@ -109,7 +112,8 @@ def test_a_token_beyond_the_first_chunk_is_still_found(tmp_path):
     (state / "big.sh").write_bytes(b"x" * 100_000 + module.FAKE_TOKEN.encode())
     watcher = module.StateSymlinkWatcher(root)
     watcher._scan_for_credential(root / "views")
-    assert watcher.scan_incomplete is None
+    assert watcher.scan_incomplete is None, watcher.scan_incomplete
+    assert watcher.scan_completed == 1
     assert [hit["path"].rsplit("/", 1)[-1] for hit in watcher.token_hits] == ["big.sh"]
 
 
@@ -121,12 +125,33 @@ def test_a_file_beyond_the_observation_budget_marks_the_scan_incomplete(tmp_path
     (state / "huge.sh").write_bytes(b"x" * (module.CREDENTIAL_SCAN_FILE_BYTES + 1))
     watcher = module.StateSymlinkWatcher(root)
     watcher._scan_for_credential(root / "views")
-    assert "observation budget" in (watcher.scan_incomplete or "")
+    assert "per-file budget" in (watcher.scan_incomplete or ""), watcher.scan_incomplete
+    assert watcher.scan_completed == 0, "an incomplete cycle must not count as a scan"
     verdict, _detail = module.credential_scan_verdict(
         watcher.token_hits, watcher.scan_error, True, False,
         watcher.scan_incomplete, watcher.scan_completed,
     )
     assert verdict == "CODEX_GATE_STATE_SCAN_INCOMPLETE"
+
+
+def test_a_credential_hit_outranks_a_chain_failure(tmp_path):
+    """The merging rule the gate applies after a failed chain: whatever else
+    failed, a credential observed in native state is the primary failure and
+    the chain failure is carried as structured secondary evidence."""
+    module = load_gate()
+    root = tmp_path / "worker-root"
+    state = root / "views" / "view-1" / "ready" / "agentbox-sidecar" / "deployment" / "codex" / "native-state"
+    state.mkdir(parents=True)
+    (state / "leak.sh").write_text("export K='" + module.FAKE_TOKEN + "'", encoding="utf-8")
+    watcher = module.StateSymlinkWatcher(root)
+    watcher._scan_for_credential(root / "views")
+    chain_failure = module.GateFailure("CODEX_GATE_TURN_FAILED", "the turn failed")
+    verdict, detail = module.credential_scan_verdict(
+        watcher.token_hits, watcher.scan_error, True, False,
+        watcher.scan_incomplete, watcher.scan_completed,
+    )
+    assert verdict == "CODEX_GATE_CREDENTIAL_IN_NATIVE_STATE", detail
+    assert chain_failure.code == "CODEX_GATE_TURN_FAILED", "kept as secondary evidence"
 
 
 def test_a_green_run_records_neither_blocker_nor_co_observation():
