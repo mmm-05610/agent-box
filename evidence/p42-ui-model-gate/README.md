@@ -52,9 +52,23 @@ final  = "1\n2\n…\n31"      ← 与 deltas 逐字相同
   符合"回合结束事件与最后一批流式分片竞态"：回合被判定结束得比最后一片落库早。
 - 官方文档（`opencode.ai/docs/acp`、`/docs/server`）只说明有 SSE 事件流与消息 parts，
   **没有任何关于 parts 更新时序或截断的说明**，无法据此定论。
-- 结论：**该家不记通过**；根因层级为**后端**（OpenCode 读取路径），下一步是对同一回合比对
-  harness 自身 `GET /session/:id/message` 的 parts——若 harness 侧完整而我们侧不全，则是我们
-  的读取时序问题；若 harness 侧也缺，则在其上游。
+- **harness 侧比对完成（同一回合的原生状态，从 checkpoint 的 `opencode.db` 里读出）**：
+
+```
+harness 自己的 part 文本: 87 字符，结尾 "…29\n30\n31\n32\n"
+我们的帧（deltas 与 final）: 83 字符，结尾 "…29\n30\n31"
+```
+
+**结论（定因到层）**：两个独立的事实，别混：
+
+1. 计数停在 32（而不是 40）**不是缺陷**：部署把该模型的输出上限设为 `limit.output = 64`
+   tokens，"1..32 每行一个"正好用尽，模型是正常停在上限。
+2. 我们比 harness **少最后一片 `"32\n"`（4 字符）**——这是**我们的缺陷**，位于
+   **OpenCode 读取路径**（`plugins/agent-box-harnesses/third_party/harness_remote/bridge/src/`
+   的 parts 累积/完成判定），表现为**回合结束时丢掉最后一批 part 更新**；也解释了此前 nonce 案例
+   总是**少最后一个字符**。
+
+- 该家**不记通过**；修点在上述 bridge（回合完成条件 vs 最后 part 更新），属后端，待修。
 
 ## 成本
 
