@@ -1,6 +1,6 @@
 # Backend Server — status
 
-更新：2026-09-15 18:17 +08:00（执行者：后端 goal 会话，分支 feature/server-harness-extension-v1）。
+更新：2026-09-15 19:00 +08:00（执行者：后端 goal 会话，分支 feature/server-harness-extension-v1）。
 37 的独立验收仍为 PARTIAL；历史证据保留。
 当前授权39→40→41→42。执行进度：39 完成；40 A/B/C/D 完成（四家组件门通过，
 无真实模型）；41 的 28 方法与队列终态已按前端 `3aba5c5c` 新摘要严格 29/29 重锁，Windows r4 平台门
@@ -74,8 +74,13 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   四家真实模型门（Worker 5s 租约缺陷已修：`WORKER_LEASE_KEEPALIVE_FIXED`）已按上一行执行完毕；
   要登记 **BACKEND_IMPLEMENTATION_READY** 还差固定 Reviewer 的阶段闭环，
   任一封装就绪或单家通过都不折算为整门通过）。
-- frontend_handoff: **DESKTOP_HANDOFF_CONSISTENT（按其自述成立；后端仍未接管）**——只读复测
-  2026-09-15 02:51 +08:00：HEAD `8e7c138c96337fc20ed61d3c21100e6449c8ec95`
+- frontend_handoff: **DESKTOP_HANDOFF_CONSISTENT（按其自述成立；后端仍未接管）**——最新只读复测
+  2026-09-15 19:00 +08:00（本轮，未写前端任何文件）：HEAD 仍 `8e7c138c96337fc20ed61d3c21100e6449c8ec95`、
+  `git status --porcelain` 0 行、分支 `feature/agentbox-desktop-product`、lease 行仍为
+  `writer_lease=RELEASED`、`DESKTOP_IMPLEMENTATION_READY`、`REAL_FLOW_VERIFIED=否`；
+  就地重算 TS 摘要 `11e3b3e7…` 与 schema 摘要 `5d4fa3bf…` 仍与锁定值一致；
+  `evidence/P06-assets-r3/results.json` = `{PASS:28, FAIL:0, SKIP:0, PENDING:0}`、`allOk=true`、`executed=28`；
+  进程表无 electron/node/tsc 写入者。上一轮 2026-09-15 02:51 +08:00 复测：HEAD `8e7c138c96337fc20ed61d3c21100e6449c8ec95`
   （00:51:21 release 提交），`git status --porcelain` **0 行**（含 untracked），
   `writer_lease=RELEASED`、`DESKTOP_IMPLEMENTATION_READY`、`REAL_FLOW_VERIFIED=否`、
   r3 证据 `executed 28 → allOk=true，counts={"PASS":28,"FAIL":0,"SKIP":0,"PENDING":0}`，
