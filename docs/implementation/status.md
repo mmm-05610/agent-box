@@ -277,6 +277,17 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   [stage-closure-dossier.md](../server-round1/fullstack/stage-closure-dossier.md)：同一份文件既是额度恢复后
   可直接投递的阶段包，也是用户裁决"以自审代替本轮 closure"的依据；含声称项与逐项命令/退出码/计数、
   本阶段自查发现并修复的 10 处缺陷（非橡皮图章证据）、明确未运行项与三个需前端裁决的合同项。
+- ui_model_gate_blocker: **四家真实 UI 模型门本轮被产品面缺口阻断（非执行者放弃、非 Harness 问题）**——
+  两端逐点核对：wire 28 方法**无凭据面**、Server 凭据记录靠带外写入（CLI / `CredentialRecords.register`）、
+  REST 无凭据端点、**Desktop 的 Provider/Model 设置页恒发 `credentialId: null` 且无凭据控件**
+  （`features/settings/agentbox-model-settings.tsx:126/285`）。因此从 UI 发不出需要凭据的真实模型轮。
+  方案 A（Desktop 拥有凭据记录 + 一处只读列举面，推荐）/ B（wire 增 `credentials.*`，需重锁合同）/
+  C（仅联调期绕过 UI，不得记作 UI 门）见
+  [ui-model-gate-blocker.md](../server-round1/fullstack/ui-model-gate-blocker.md)。**待用户裁决**。
+- final_state: **FULLSTACK_CORE_PARTIAL**——双门成立、两边分别提交、无模型全栈联调在真实 Windows
+  Electron 上 15/15 通过、后端四家真实模型门全绿、Windows r4/PostCheck 干净；**未完成**：四家真实
+  UI 模型门（上条产品面缺口）、Windows 真实用户路径的模型段、以及固定 Reviewer 的最终只读审查
+  （额度 2026-09-20 12:11 恢复后补）。不用核心 PARTIAL 冒充 GREEN，也不用后端门冒充 UI 门。
 - fullstack_no_model_integration: **无模型全栈联调通过（2026-09-15，本执行者为 42 的
   `FULLSTACK_INTEGRATION_OWNER`）**——真实 Windows Electron（构建树，wire 摘要就地核对一致）经
   `workcore` slot 安装的 lifecycle connection（`{endpoint, sessionToken}` 由主进程从 Server 数据根的
