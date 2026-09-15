@@ -978,3 +978,121 @@ def test_wire_event_stream_resumes_from_snapshot_cursor_without_sse(wire):
             "text": "persisted before publish",
         }
         assert frame["seq"] > snapshot["frames"][-1]["seq"]
+
+
+#: Every wire event kind the contract declares, with the payload the producing
+#: server code actually writes (see `wire/projection.py` `_EVENT_KIND_MAP` and
+#: the producer at each call site). Two of them are declared in the contract and
+#: projected, but no producer emits them yet - they are listed as
+#: `producer=False` so the test states that gap instead of hiding it.
+FRAME_COVERAGE = (
+    ("message.delta", {"text": "chunk"}, True),
+    ("message.final", {"text": "answer", "role": "assistant", "display_kind": "visible"}, True),
+    ("tool.update", {"state": "failed", "tool_call_id": "harness", "tool": None,
+                     "summary": "HARNESS_FAILED"}, True),
+    ("tool.update", {"state": "running", "tool_call_id": "t1", "tool": "shell",
+                     "message_id": "msg-1", "result_excerpt": "ok"}, True),
+    ("config.changed", {"effective_for": "next_send"}, False),
+)
+
+
+def _frontend_schema(relative: str):
+    """The frontend's own generated wire schema, when this run was given it."""
+    path = os.environ.get("AGENT_BOX_WIRE_SCHEMA")
+    if not path:
+        pytest.skip("AGENT_BOX_WIRE_SCHEMA is not set for this run")
+    import jsonschema
+    schema = json.loads(Path(path).read_text(encoding="utf-8"))
+    return jsonschema, schema[relative]
+
+
+def _validate_frames(frames, *, context: str) -> dict[str, int]:
+    """Each frame must be exactly the declared shape, and say which kinds we saw.
+
+    The desktop client validates frames with a *strict* schema (`z.strictObject`,
+    `additionalProperties: false`, closed state enums), so a projection that adds
+    a key or emits a state outside its enum breaks the real client while every
+    method-level test still passes. The keys are asserted here directly - so the
+    invariant holds even in a run without the generated artifact - and the
+    artifact, when present, is the authority via `jsonschema`.
+    """
+    kind_counts: dict[str, int] = {}
+    checker = schema = None
+    if os.environ.get("AGENT_BOX_WIRE_SCHEMA"):
+        checker, schema = _frontend_schema("EventFrame")
+    for frame in frames:
+        assert set(frame) == {"eventId", "sessionId", "seq", "cursor", "emittedAt", "event"}, \
+            (context, sorted(frame))
+        assert set(frame["event"]) & {"kind"} == {"kind"}, (context, frame["event"])
+        kind_counts[frame["event"]["kind"]] = kind_counts.get(frame["event"]["kind"], 0) + 1
+        if checker is not None:
+            try:
+                checker.validate(frame, schema)
+            except checker.ValidationError as error:  # pragma: no cover - failure path
+                raise AssertionError(
+                    f"{context}: frame for {frame['event']['kind']} violates the "
+                    f"frontend EventFrame schema: {error.message}"
+                ) from error
+    return kind_counts
+
+
+def test_every_projected_frame_matches_the_strict_frontend_event_schema(wire):
+    runtime, api, execution = wire
+    workspace = open_workspace(api, "/home/tester/frames")["workspace"]
+    profile = make_profile(api, name="frames")
+    accepted = api.ok("sessions.createAndSend", {
+        "requestId": "frames-one", "workspaceId": workspace["id"],
+        "profileId": profile["profile_id"], "message": MESSAGE, "overrides": [],
+    })
+    session_id = accepted["session"]["id"]
+    execution_id = accepted["executionId"]
+
+    # Producers, in the order the product reaches them: a queued send
+    # (`queue.updated`), a permission request and its decision
+    # (`approval.requested` / `approval.settled`), and the internal events the
+    # sidecar bridge writes for streaming and tool progress.
+    queued = api.ok("sessions.send", {
+        "requestId": "frames-two", "sessionId": session_id,
+        "message": {"text": "second", "attachments": []}, "overrides": [],
+    })
+    assert queued["queueItemId"]
+    with runtime.database.transaction() as conn:
+        approval = runtime.approvals.request_in_transaction(
+            conn, session_id=session_id, execution_id=execution_id,
+            request={"tool": "shell", "command": "ls"},
+        )
+    api.ok("approvals.decide", {
+        "requestId": "frames-decide", "approvalId": approval["approvalId"],
+        "decision": "allow", "scope": {"kind": "once"},
+        "expectedVersion": approval["version"],
+    })
+    for internal, data, _produced in FRAME_COVERAGE:
+        runtime.repository.append_turn_event(execution_id, internal, data)
+
+    # Forward (live) pages and backward pages are separate signing domains, so
+    # the whole history is collected by walking `olderCursor` backwards.
+    frames = []
+    page = {"limit": 200}
+    while True:
+        snapshot = api.ok("history.snapshot", {"sessionId": session_id, "page": page})
+        frames = snapshot["frames"] + frames
+        if snapshot["olderCursor"] is None:
+            break
+        page = {"cursor": snapshot["olderCursor"], "limit": 200}
+    snapshot_counts = _validate_frames(frames, context="history.snapshot")
+
+    live, _resume = runtime.wire.event_stream_batch(session_id, None)
+    live_counts = _validate_frames(live, context="event-stream batch")
+
+    observed = set(snapshot_counts) | set(live_counts)
+    expected = {kind for kind, _data, produced in FRAME_COVERAGE if produced} | {
+        "execution.state", "approval.requested", "approval.settled", "queue.updated",
+    }
+    assert expected <= observed, (sorted(expected - observed), sorted(observed))
+    assert queued["executionId"] is None, "the second send has to be the queued one"
+
+    # The two kinds no producer emits yet are *recorded* here rather than
+    # asserted as flowing: a contract that declares an event the stream never
+    # carries is a gap to close deliberately, not to discover in the UI phase.
+    unproduced = sorted(kind for kind, _data, produced in FRAME_COVERAGE if not produced)
+    assert unproduced == ["config.changed"], unproduced
