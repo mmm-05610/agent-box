@@ -69,6 +69,10 @@
   该间歇目前为 **1 失败 / 7 次 Pi live 运行**，未复现；诊断已修，下次失败可直接读出层级。
 - **其余三家按最终代码复跑**：Hermes/OpenCode/Codex 各一次 `--live`（含新加的
   `*_UNKNOWN_MODEL_REASON_UNEXPECTED` 正向断言与保留内层错误码的诊断），产物与最终代码一致。
+- **残留核对**：`/tmp/agentbox-worker-r1` 是 r4 门在 WSL 侧固定的 Worker 投影**根**，
+  其下每个 `server_*` 均为带属主标记（`.agentbox-worker-root`）的空投影目录、
+  `results/` 为空；`-PostCheck` 的 `worker_view_residue=[]` 已独立确认其中**无 view/secret 残留**
+  （与上一轮一致，未删除该复用根以免影响后续运行）。
 - **本 HEAD 全套刷新**：`pytest tests` **575 passed / 3 skipped / 0 failed**（与上一轮同计数，
   即 gate 改动只影响门报告本身）；Codex 无模型门在最终代码上复跑 exit 0
   （`CODEX_PRODUCTION_CHAIN_GATE_OK`、view 峰值 112、`tokenInState=false`、
