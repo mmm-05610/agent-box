@@ -63,6 +63,39 @@ export const AGENTBOX_HARNESS_PROFILES = {
     journalPageWhileOwned: false,
     reloadOnHistoryRefresh: false,
   },
+  // Work Order 43. DeepSeek's official Harness launcher: `dsh --profile acp`
+  // is the vendor's own ACP v1 stdio server, so this entry is the same
+  // registration glue Hermes needed - no upstream profile exists, and the
+  // upstream registry is deliberately not patched. The managed deployment
+  // always injects the absolute artifact entry (`launch`), so the command
+  // below is only the no-adapter fallback shape. dsh refuses `session/load`
+  // and resumes through `session/resume` (which does not replay history), so
+  // like Hermes the transcript is the live ACP stream and resume is the only
+  // reopen path.
+  dsh: {
+    id: "dsh",
+    label: "DeepSeek dsh",
+    command: process.platform === "win32" ? "dsh.cmd" : "dsh",
+    args: ["--profile", "acp"],
+    permissionMode: "deny",
+    modelVariantConfigIDs: [],
+    capabilities: {
+      ...COMMON_ACP_CAPABILITIES,
+      // The ACP surface advertises a `model` config option over the
+      // `deepseek-official` route (vendor protocol contract); nothing beyond
+      // it (todos/commands/actions/rename/delete) is documented, so it stays
+      // false until the running adapter advertises it.
+      models: true,
+      todos: false,
+      commands: false,
+      actions: false,
+      sessionRename: false,
+      sessionDelete: false,
+    },
+    historyLoader: undefined,
+    journalPageWhileOwned: false,
+    reloadOnHistoryRefresh: false,
+  },
 }
 
 const REGISTERED = { ...HARNESS_PROFILES, ...AGENTBOX_HARNESS_PROFILES }
@@ -84,6 +117,12 @@ const REGISTERED = { ...HARNESS_PROFILES, ...AGENTBOX_HARNESS_PROFILES }
 export const AGENTBOX_MODEL_ALIASES = {
   pi: { "deepseek-flash": "deepseek/deepseek-flash" },
   opencode: { "deepseek-flash": "deepseek/deepseek-flash" },
+  // dsh's ACP `model` config option carries opaque values, and its shipped
+  // picker spells the product model's entry as a JSON-array string (observed
+  // first-hand over session/new: `["deepseek-official","deepseek-flash"]`,
+  // displayed as "DeepSeek-V41-Flash"). The production template owns the same
+  // pair and is test-locked to it.
+  dsh: { "deepseek-flash": '["deepseek-official","deepseek-flash"]' },
 }
 
 export function resolveNativeModel(profileID, model) {

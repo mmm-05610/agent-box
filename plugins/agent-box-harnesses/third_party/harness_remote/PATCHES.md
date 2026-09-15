@@ -42,6 +42,26 @@ Adopted as allowed by the Work Order 38 reuse boundary ("a production
 extraction may move that block into an exported upstream-owned factory as a
 mechanical patch").
 
+## 3. `bridge/src/acp-service.js` — grouped config options in model selection
+
+An ACP `select` config option may arrive grouped: each top-level entry carries
+a `group`/`name` header plus its own nested `options` array of the real
+candidates. DeepSeek dsh 0.1.5-rc.1 ships its `model` picker in exactly this
+shape (observed first-hand over `session/new`; see
+`docs/server-round1/fullstack/dsh-production-packaging.md`). Upstream
+`setModel()` matched only the top level, where group headers carry no `value`,
+so every model selection against a grouped picker failed with "Harness model
+is not available" - the harness could never be driven to the model the product
+selected.
+
+The patch flattens exactly one level of nested `options` before the existing
+match chain (exact value, value after the synthesized provider separator,
+then the Claude `[1m]` selectable-value rule). Nothing else changes: the
+selection is still sent as `session/set_config_option` with the harness's own
+opaque value, non-grouped pickers flatten to themselves, and no harness name
+appears in the patch. Provenance is recorded in `SOURCE.json`
+(`patched_sha256`).
+
 ## Not adopted
 
 `machine-daemon.js`, `daemon-cli.js`, `machine-registry.js`, `task-*`,

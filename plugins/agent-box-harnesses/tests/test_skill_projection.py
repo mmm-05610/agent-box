@@ -1,3 +1,4 @@
+import pytest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from shutil import copytree
@@ -22,6 +23,13 @@ def test_all_five_registry_targets_are_lossless_and_read_only():
                 ResolvedExecutionInput(WorkspaceV1.contract_id, Ref(RefType.WORKSPACE, "w", "w"), workspace),
                 ResolvedExecutionInput(skill.contract_id, Ref(RefType.ARTIFACT, "agent-skills", "review", metadata={"revision": "1", "digest": skill.digest, "format": "agent-skills"}), resolved),
             ))
+            if not definition.profile.skill_target:
+                # A family that declares no skill input (Work Order 43's dsh:
+                # no observed skill system) must not silently accept one: the
+                # adapter refuses instead of dropping the input.
+                with pytest.raises(ValueError, match="SKILL_TARGET_UNDECLARED"):
+                    ADAPTERS[definition.driver].build_command(definition, request, {})
+                continue
             command = ADAPTERS[definition.driver].build_command(definition, request, {})
             source = command.runtime_sources[-1]
             assert source.kind == "skill-tree" and source.access == "ro"

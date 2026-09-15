@@ -32,6 +32,7 @@ import pytest
 
 from agent_box.resource_contracts import harness_capabilities as caps
 from agent_box_harnesses.codex import production as codex_production
+from agent_box_harnesses.dsh import production as dsh_production
 from agent_box_harnesses.hermes import production as hermes_production
 from agent_box_harnesses.opencode import production as opencode_production
 from agent_box_harnesses.pi import production as pi_production
@@ -43,14 +44,16 @@ DEFINITIONS = PLUGIN_ROOT / "src" / "agent_box_harnesses" / "harnesses.toml"
 JS_PROJECTION = PLUGIN_ROOT / "runtime" / "capability_declarations.json"
 RUNTIME = PLUGIN_ROOT / "runtime"
 
-#: 四家封装（顺序固定，便于报告与参数化 golden 对齐）。
-FAMILIES = ("codex", "pi", "hermes", "opencode")
+#: 已封装家族（顺序固定，便于报告与参数化 golden 对齐）；Work Order 43 起
+#: 扩容家族按接入顺序追加在尾部。
+FAMILIES = ("codex", "pi", "hermes", "opencode", "dsh")
 
 #: 证据文档（只读引用，不在本测试里重新解释它们的内容）。
 PI_PACKAGING = "docs/server-round1/fullstack/pi-production-packaging.md"
 HERMES_PACKAGING = "docs/server-round1/fullstack/hermes-production-packaging.md"
 OPENCODE_PACKAGING = "docs/server-round1/fullstack/opencode-production-packaging.md"
 ACCEPTANCE = "docs/server-round1/harness-integration/stage-c.md"
+DSH_PACKAGING = "docs/server-round1/fullstack/dsh-production-packaging.md"
 
 #: 观测结论的两个取值。刻意用字符串常量而不是 True/False：`False` 会被误读成
 #: "已观测到不支持"，而这里是"没有证据"。
@@ -162,6 +165,36 @@ FAMILY_MATRIX: dict[str, dict[str, tuple[bool, str, str]]] = {
         "steer": (False, NOT_OBSERVED, "未声明；driver 的 abort 是取消，不是 steer"),
         "permissions": (False, NOT_OBSERVED, "未声明；门里没有任何权限裁决请求被观测到"),
     },
+    # Work Order 43。dsh 0.1.5-rc.1（DeepSeek 官方 Harness，`dsh --profile acp`）：
+    # observed 列来自 2026-09-16 dsh 假端点全链门的真实运行（exit 0，门报告见
+    # dsh-production-packaging.md §5）。`attach`/`permissions` 与四家同规矩：
+    # 无运行时证据 ⇒ 不声明、不观测。
+    "dsh": {
+        "start": (True, OBSERVED,
+                  f"{DSH_PACKAGING} §5：真实 @deepseek-ai/dsh 0.1.5-rc.1（`dsh --profile acp`）"
+                  " + 假端点，create+prompt → completed，两轮恰 2 次 provider 请求"),
+        "observe": (True, OBSERVED,
+                    f"{DSH_PACKAGING} §5：sidecar 接缝真实调用；首轮拿到原生 session id"
+                    "（checkpoint nativeSessionId，schema v2，resumable=true）"),
+        "finish": (True, OBSERVED,
+                   f"{DSH_PACKAGING} §5：两轮均交付 completed（deltaSeq [4] < completedSeq 7、"
+                   "[11] < 14），非超时/中断"),
+        "attach": (False, NOT_OBSERVED,
+                   "未声明；官方文档没有任何附件投递面，门的两轮 attachments 均空，"
+                   "无运行时证据"),
+        "stream": (True, OBSERVED,
+                   f"{DSH_PACKAGING} §5：delta 先于 completed（deltaSeq [4] < completedSeq 7、"
+                   "[11] < 14），deltaAttribution.unattributed=0"),
+        "native_continuation": (True, OBSERVED,
+                                f"{DSH_PACKAGING} §5：同一 native id（checkpointNativeIdStable=true）"
+                                " + 重开相位 replayedStoredTurn=false（dsh 只支持不重放的 "
+                                "session/resume）+ 第二轮请求体带首轮上下文"
+                                "（round2RequestCarriedRound1Context=true）"),
+        "steer": (False, NOT_OBSERVED, "未声明；sidecar 的 abort op 是 cancel，不是 steer"),
+        "permissions": (False, NOT_OBSERVED,
+                        "未声明；官方 ACP 面有 request_permission，但门里没有任何运行时"
+                        "权限裁决被观测到，按诚实规则保持未声明"),
+    },
 }
 
 
@@ -208,13 +241,17 @@ def _production_claims(family: str) -> dict:
     if family == "codex":
         assert codex_production.HAS_PRODUCTION_DEPLOYMENT is True
         return codex_production.capability_claims()
-    module = {"pi": pi_production, "hermes": hermes_production, "opencode": opencode_production}[family]
+    module = {"pi": pi_production, "hermes": hermes_production, "opencode": opencode_production,
+              "dsh": dsh_production}[family]
     if family == "pi":
         document = module.deployment_document(
             artifact_source="/srv/agentbox/artifacts/pi-runtime", tree_digest="sha256:" + "a" * 64)
     elif family == "hermes":
         document = module.deployment_document(
             artifact_source="/srv/agentbox/artifacts/hermes-runtime", tree_digest="sha256:" + "a" * 64)
+    elif family == "dsh":
+        document = module.deployment_document(
+            artifact_source="/srv/agentbox/artifacts/dsh-runtime", tree_digest="sha256:" + "a" * 64)
     else:
         document = module.deployment_document(
             binary_source="/reviewed/bin/opencode", binary_digest="sha256:" + "a" * 64)
@@ -434,6 +471,9 @@ def test_the_four_families_matrix_summary_is_the_one_reported():
                    "observed": ["finish", "native_continuation", "observe", "start", "stream"]},
         "opencode": {"declared": ["finish", "native_continuation", "observe", "start", "stream"],
                      "observed": ["finish", "native_continuation", "observe", "start", "stream"]},
+        # Work Order 43：dsh 的 observed 来自 2026-09-16 假端点全链门（exit 0）。
+        "dsh": {"declared": ["finish", "native_continuation", "observe", "start", "stream"],
+                "observed": ["finish", "native_continuation", "observe", "start", "stream"]},
     }
 
 
@@ -453,7 +493,7 @@ def test_native_continuation_is_declared_exactly_where_reopen_was_observed():
 def test_the_audited_families_continuation_kind_is_native_session():
     """审计结论落在注册表上：她的重开方式就是 native session，而不是 transcript 交接。"""
     registry = load_builtin_registry()
-    for harness_type in ("codex", "hermes", "opencode", "pi"):
+    for harness_type in ("codex", "hermes", "opencode", "pi", "dsh"):
         assert registry.get(harness_type).continuation.kind == "native_session", harness_type
 
 
