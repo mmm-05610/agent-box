@@ -21,6 +21,11 @@
 | `workspace.connection` | `semantics-map.md` “环境准备/浏览…进度走 `workspace.connection` 事件（connecting/preparing[worker\|harness]/failed+reason）” | 后端**没有异步准备阶段**：`workspaces.open` 通过 connector probe 同步验证（`workspaces/service.py:145`），重启把全部工作区标为 `unverified`（`bootstrap/runtime.py:175`）。**没有任何生产者**写这个 kind；记录里只出现 `{state:"connected"\|"connecting"}`（`wire/projection.py:73`），`preparing[*]` 与 `failed+reason` 不可达 |
 | `config.changed` | `wire-v1.ts:468` 声明 `effectiveFor: next_send\|immediate`；`wire-session-projection.ts:155` 用它更新 `configEffectiveFor` | 投影支持（`wire/projection.py:237`）。**生产者已补（2026-09-15，合同内实现缺口，不改 28 方法）**：`sessions.switchProfile` 确认成功后在同一事务写入 `config.changed{effective_for:"next_send"}`（`sessions/repository.py:273` 起），重放请求在写入前返回、不重复发；正在运行的会话本就拒绝切换，故 `immediate` 在本后端不可达（配置按执行冻结）。`profiles.updateConfig` **仍未发事件**：它改的是 Profile，受影响 Session 在下一次发送时使用新版本；若前端需要该路径也有事件，请反馈（后端可对绑定该 Profile 的未归档 Session 逐条追加）。 |
 
+补充核对（同轮，机械比对合同工件）：错误码家族集合**完全一致**——工件 `WireError.properties.code.enum`
+的 12 个家族与后端 `wire/errors.py` 的 `FAMILIES` 集合逐项相等（无单边项）；后端内部码经
+`family_for()` 收敛到该闭集，精确内部码保留在 `details.internalCode`，因此方法级错误信封不会打挂
+前端。事件帧层已如上一段所述逐帧校验通过。
+
 **一个必须由前端确认的结构事实**：`server_session_events.session_id` 是 `NOT NULL REFERENCES
 server_sessions(id)`（`storage/database.py:116`），而 `EventFrame.sessionId` 必填——所以
 `wire.eventStream/1` 的帧**始终属于某个 Session**。于是 `semantics-map.md` 里“浏览/打开阶段的
