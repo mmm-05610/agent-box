@@ -1089,3 +1089,23 @@ typecheck 当场暴露；新测试 4 条 ESLint warning 收口为 0。
   然后无模型联调 28 方法 + 生产 WS 事件流（幂等回查、双游标语义、队列终态、审批失效族、
   发送拒绝保留草稿），再按单独授权的凭据与预算做真实 UI 模型闭环。
 - 本行之后：前端工作树由 `FULLSTACK_INTEGRATION_OWNER` 写入；原前端 goal 不恢复写入。
+
+## 全栈联调（2026-09-15，后端集成人接管后）：无模型路径通过
+
+- updated_at: 2026-09-15 21:00 (+08:00)
+- **lifecycle connection 已安装**（`workcore` slot 的唯一生产安装点）：主进程从 Server 自己的
+  数据根读 `secrets/http-token`，把 `{endpoint, sessionToken}` 装进 wire transports 读取的
+  composition slot；未配置/令牌不可读/端口非法一律"无服务"并给稳定原因，绝不伪造连接。
+  代码 `apps/desktop/electron/workcore/agentbox-server-connection.ts`（+6 项单测，Windows 上
+  `tsc --noEmit` exit 0、eslint exit 0、vitest 6/6）。
+- **无模型全栈联调 15/15 PASS、exit 0**（`evidence/p42-integration/integration-results.json`）：
+  真实 Windows Electron → 本机 Server → `wsl.exe` release Worker → bwrap → 显式 no-model ACP
+  fixture。覆盖 `server.hello`、Workspace 开/列、Profile/Provider-Model 创建与版本、config
+  describe/resolve、**真实一轮（delta 先于 completed 持久化）**、同 requestId 幂等回放只产生一个
+  执行、排队项可见且可撤回、停止发布 `queued → running → stopping → stopped`、双游标域（混用被
+  拒）、归档保留历史、干净关闭（端口释放）。
+- 驱动：`apps/desktop/e2e/p42-fullstack-integration-driver.mjs`（检查点 `b1136759`）。
+  **不读任何凭据、不调任何模型**；fixture Harness 只回固定 nonce。
+- **未做**：四家真实 UI 模型门（需单独授权的凭据与预算；后端侧四家真实模型门已分别通过）；
+  跨端 bug 修复如有，将在真实 UI 门中记录。
+- `REAL_FLOW_VERIFIED`：**部分**——无模型全链路已验证；真实模型链路仍未验（与后端模型门分账）。
