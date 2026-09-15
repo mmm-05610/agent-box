@@ -1162,3 +1162,13 @@ typecheck 当场暴露；新测试 4 条 ESLint warning 收口为 0。
   挂到模型或角色，两轮真实 DeepSeek 答复并回忆上下文）；**OpenCode 6/8**——链路跑通但首轮助手
   文本是片段，**未验证完整回忆，不记通过**。
 - 证据 `evidence/p42-ui-model-gate/`；费用：四家 UI 门累计约 24 次请求、增量 < ¥0.02。
+
+## 四家 UI 模型门全部通过（2026-09-15）
+
+- **Pi 8/8、Hermes 8/8、OpenCode 8/8、Codex 8/8**：每家都从界面自己的录入路径加凭据，两轮真实
+  DeepSeek 答复并回忆上下文，清理干净。证据 `evidence/p42-ui-model-gate/`。
+- OpenCode 的尾巴丢失已定位并修复（后端 `5a8b6fc`）：驱动的兜底此前只在"零增量"时生效，
+  导致"响应早于最后一个增量"时永久少一片（原生记录 87 字符 / 产品 83 字符的实测对比即为此）；
+  现以 prompt 返回值为权威补后缀，规则 `tailSuffix` 有单测，复跑 OpenCode 门通过。
+- 合同增补（`profiles.create` 可选 `credentialId`）与本次修复共同构成两家通过的前提；
+  新旧 wire 摘要见 `docs/desktop-product-delivery/contracts/wire-v1/backend-response.md`。

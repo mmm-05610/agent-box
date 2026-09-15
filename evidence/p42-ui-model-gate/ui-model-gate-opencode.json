@@ -1,8 +1,8 @@
 {
-  "allOk": false,
+  "allOk": true,
   "counts": {
-    "PASS": 6,
-    "FAIL": 2,
+    "PASS": 8,
+    "FAIL": 0,
     "SKIP": 0,
     "PENDING": 0
   },
@@ -22,33 +22,33 @@
       "step": "the Server is live with the family-s production deployment"
     },
     {
-      "detail": "serverId=server_df77a1d5f6c64aa1875cfb17026b5d35",
+      "detail": "serverId=server_ec6677920b884c2e9e0c74ac48a5d0b0",
       "id": "lifecycle-connection-installed",
       "status": "PASS",
       "step": "the product reached the Server through its own lifecycle connection"
     },
     {
-      "detail": "credentialId=credential_442165406233451cba8a2165e69f490b",
+      "detail": "credentialId=credential_b5e1f22ad7684579b1cd84f4fb40da6f",
       "id": "credential-added-through-the-app",
       "status": "PASS",
       "step": "the interface-s own entry path imported the credential and recorded its id"
     },
     {
-      "detail": "providerModel=provider_505705536332499abcb80881fec2349a credentialAttached=true",
+      "detail": "providerModel=provider_96e5bdc314b243ee8ff9949081403e20 credentialAttached=true",
       "id": "provider-model-and-role-created",
       "status": "PASS",
       "step": "the model configuration carries the credential and the role selects it"
     },
     {
-      "detail": "answerChars=3 nonceRecalled=false terminal=true answer=\"P42\"",
+      "detail": "answerChars=10 nonceRecalled=true terminal=true deltas=\"P42-1F4A9C\" final=\"P42-1F4A9C\"",
       "id": "first-turn-answered-by-the-real-model",
-      "status": "FAIL",
+      "status": "PASS",
       "step": "the first turn was answered by the real model and streamed before it finished"
     },
     {
-      "detail": "answerChars=12 nonceOccurrences=0 answer=\"P42P42-1F4A9\"",
+      "detail": "answerChars=20 nonceOccurrences=2 answer=\"P42-1F4A9CP42-1F4A9C\"",
       "id": "second-turn-carries-the-first",
-      "status": "FAIL",
+      "status": "PASS",
       "step": "the second turn-s answer recalls the first turn-s content"
     },
     {
