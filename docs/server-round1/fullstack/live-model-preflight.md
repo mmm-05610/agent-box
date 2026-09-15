@@ -122,9 +122,58 @@ live 模式下**显式记为"未观测"而非静默跳过**的项（均为假端
 live 下显式记为"未观测"的项：driverObservation/driverNegatives/guestProbeResult
 （均需假端点与守卫）、`requestStructure`、重试上界观测（声明值保留）、出口守卫审计。
 
+### Codex（2026-09-15，`--live` 通过；接入后第二次运行）
+
+`codex-production-chain-gate.py --worker .acceptance-bundle-c8/agent-box-worker --live
+--authorized-secret <locator> --json` → **exit 0 / `CODEX_PRODUCTION_CHAIN_GATE_OK`**（mode=live）。
+
+- 首轮：真实答复 `completed`，14 个 delta 流式输出并逐条持久化到 Server（终止前 delta 先于
+  completed），2.25 s，答复内容正是第一轮要求记忆的 nonce。
+- 第二轮：`completed`，15 个 delta，答复回忆出第一轮 nonce——**同 native id
+  `01a0a48d-d7f8-7460-a8ac-733c272eec93` 的真实上下文续接**（`checkpointNativeIdStable=true`，
+  checkpoint 含 `sessions/…/rollout-*.jsonl`，78 文件 / 3.3 MB 完整 state 被捕获）。
+- 重开相位（gate 自带的机制审计）：真实 `session/load` 重开方法、两轮各 77 文件且
+  `resumable=true`、捕获 154 文件 / 5.7 MB 零命中；该相位的 provider 流量走它自己的 loopback
+  审计端点（报告显式标注 `providerEndpoint=loopback-mechanism-audit`、
+  `providerRequestsAreModelCalls=false`），**live 下的续接证据是链路的第二轮**，不是该端点。
+- 取消（live 语义）：真实答复已流式输出后从 Server 取消 → `202` → `cancelled`（0.08 s、
+  `cleanupState=cleaned`）；live 无被挂起的假请求，故取消窗口由 Server 自身记录界定
+  （`deltasBeforeCancel`），请求计数显式记为不可观测。
+- 未知模型：`Harness model is not available: deepseek-unknown`，在派发前拒绝
+  （live 无端点可计数，`refusalCounted=false` 明确记录）。
+- 凭据：`tokenInEvents/tokenInReportableState/tokenInDeployment/tokenInWorkspace=false`、
+  `noCredentialMaterialInProductionConfig=true`、state 扫描 78 文件零命中、独立观察器
+  `credentialPathHits=[]`、`authorizedLocatorDeleted=false`（gate 只删自建临时 token）。
+- 进程/投影证据：`CODEX_HOME=/runtime/home/.codex`、`HOME=/runtime/home`、
+  `codexHomeMatchesDerivedDefault=true`、`app-server` 子进程继承同一环境；config/models 投影
+  写入得 `EROFS`、state 可写；宿主 HOME 不可见（哨兵不可见）。
+- 官方配置**原样投影**：`configProjection.unchangedFromDeployment=true`（2650 字节、
+  `sha256:b0189c81…`），live 不覆盖 base_url、不装载 loopback guard。
+- 清理：`adapterProcessesRemoved/workerProjectionsRemoved/workspaceRemoved/fakeTokenRemoved/
+  removed` 全为 true。
+- 成本（实测）：本家共 6 次运行（含 4 次在缺口上失败的运行，其中 1 次为笔误路径、1 次为报告
+  序列化缺陷，均在发包前结束与修复后重跑）× 每轮 1–2 请求，输入数百 tokens、输出 ≤64 tokens
+  → **< ¥0.01**；四家累计仍 **< ¥0.05**，远低于 ¥10 上限。
+
+live 下**显式记为"未观测"而非静默跳过**的项（均为假端点专有）：`silenceObservation`
+（8 s 静默首答需要假端点）、`providerRequestShape`（请求体不可见，改以真实答复回忆 nonce 为证）、
+`unknownModel.providerRequestsAfterRefusal`（无端点可计数，改为"派发前拒绝"的失败原因正证）、
+`cancel.providerRequestsBeforeCancel`（同上）。
+
+修复的接入缺陷（都发生在 live 接入过程中，均有回归测试）：
+①链路上仍有 4 处只在假端点模式成立的断言（静默窗口、请求体形状、未知模型请求计数、取消挂起），
+live 下会抛 `AttributeError` 并被相位证据收进报告；
+②报告因此**无法序列化**，整个失败运行只剩 traceback。现由 `phase_evidence_for_report`
+（异常按码/文本入报告、对象仍留给判据）+ `unserializable_value` 兜底 + `report_text()` 修复；
+③凭据事实此前只记录不断言，现对 `tokenIn*` 为真即 `CODEX_GATE_CREDENTIAL_EXPOSED` 硬失败；
+④live 下新增"授权 locator 未被删除"的断言与字段。
+
 ## 7. 当前状态
 
 - 已就绪：四家生产封装、c8 release Worker、五门无模型证据、官方价格核对、本 preflight。
-- 待做：`--live` 通道实现（四家）→ 串行跑门 → 记账 → 更新 status → 登记
-  `BACKEND_IMPLEMENTATION_READY`（仍需 Codex 额度恢复后的 Reviewer closure）。
+- **四家真实模型门全部取得证据（2026-09-15）**：Pi / Hermes / OpenCode / Codex 均
+  `--live` exit 0（Codex `CODEX_PRODUCTION_CHAIN_GATE_OK`，其余见各节），累计费用 **< ¥0.05**，
+  机制（loopback）与真实模型证据分别记账、未互相替代。
+- 待做：更新 status 与检查点提交 → 固定 Reviewer 恢复额度后补 §4.2 闭环与
+  `REVIEWER_AUTOMATION_READY` → 登记 `BACKEND_IMPLEMENTATION_READY` → 双门接管。
 - 阻塞：无（唯一外部约束是固定 Reviewer 额度，仅影响审查登记，不影响执行本身）。

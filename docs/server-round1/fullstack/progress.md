@@ -4,6 +4,50 @@
 已发生的1次可达性请求由后端受控进程读取仓库外 locator，未把内容写入仓库或输出。
 授权真实 credential 的 SecretStore→Worker 投影尚未执行，不以测试值路径冒充付费验收事实。
 
+## 2026-09-15 — 四家真实模型门（`--live`）全部执行并通过
+
+详细证据：[live-model-preflight.md](live-model-preflight.md) §6。
+
+- **四家逐一串行**（主执行者唯一串行调度，子代理未接触 secret 或付费请求）：
+  Pi `PI_PRODUCTION_CHAIN_GATE_OK`、Hermes `HERMES_PRODUCTION_CHAIN_GATE_OK`、
+  OpenCode `OPENCODE_PRODUCTION_CHAIN_PREPARED`、Codex `CODEX_PRODUCTION_CHAIN_GATE_OK`，
+  四门均 **exit 0**。live 语义：官方 base URL、**不覆盖配置、不装载 loopback guard**，
+  授权 locator 只读复制进 gate 自建 0600 临时 token 文件（用户文件绝不写、绝不删；
+  Codex 门新增 `authorizedLocatorDeleted=false` 断言）。
+- **每家都验到**：两轮真实 DeepSeek 答复（`deepseek-flash`，模型线上值精确）、终止前 delta 已持久化、
+  第二轮上下文/同 native id 续接、取消与清理、未知模型发包前拒绝、凭据不进
+  deployment/argv/日志/事件/state/checkpoint/workspace/Git、进程与 Worker 投影清理干净。
+  Codex 另验 Responses API、`codex-acp`→`app-server`、隔离 `CODEX_HOME`（
+  `codexHomeMatchesDerivedDefault=true`）、`ephemeral` 下无 `auth.json`、真实 `session/load` 重开。
+- **分账**：假端点/守卫专有的观测（静默窗口、请求体形状、请求计数、出口守卫审计、重试上界）
+  在 live 下**显式记为"未观测"并给出理由**，不静默跳过、不冒充通过；机制证据与真实模型证据
+  分别记账，不互相替代。
+- **Codex 门接入时修复的真实缺陷**（都有回归测试）：
+  ① 链路里仍有 4 处只在假端点模式成立的断言（静默窗口、请求体形状、未知模型请求计数、
+  取消挂起），live 下抛 `AttributeError`；
+  ② 该异常被相位证据收进报告后**报告无法序列化**，整个失败运行只剩 traceback——现由
+  `phase_evidence_for_report`（码/文本入报告、异常对象仍留给判据）+ `unserializable_value`
+  兜底 + `report_text()` 修复；
+  ③ 凭据事实此前只记录不断言，现 `tokenIn*` 为真即 `CODEX_GATE_CREDENTIAL_EXPOSED` 硬失败。
+- **本轮复跑（提交前最终代码）**：Codex 无模型门 exit 0（3 请求、`unauthorized=0`、静默 8.0 s、
+  view 峰值 112、`tokenInState=false`、未知模型 0 请求）+ Codex `--live` exit 0。
+  Python：`tests` **575 passed / 3 skipped / 0 failed**；插件 `artifacts 2 / git 4 /
+  harnesses 127+3 skipped / runtime-local 6 / runtime-wsl 36 / sandbox-bwrap 112 / skills 8 /
+  terminal-session 3 / web 14` 全绿，另 `agent-box-web` 的 2 个 Playwright 浏览器用例在本机
+  **环境不可用**（`~/.cache/ms-playwright` 无 chromium headless shell 二进制，属环境缺失、
+  与本轮改动无关，如实记录不计作通过）。本轮未改 Worker/Rust 与任何插件源码
+  （`git diff --stat` 为空），故 Rust 套件与 c8 Worker 摘要不变
+  （`_PRODUCTION_CHAIN_GATE_OK` 运行的 Worker `sha256:514f48a9…`，与本轮前一致）。
+  **修复一处自己引入的回归**：OpenCode gate 的 `--live` 接入把 `live` 关键字传给 `run_chain`，
+  而 `tests/server/test_opencode_gate_cleanup.py` 的 stub 未接受该关键字 → 该文件 11 项失败
+  （此前只在真机跑门、未跑该文件，故未被发现）；stub 已按 Pi 的同一方式接受该关键字，
+  修复后该文件 **20 passed**、`tests` 全绿。
+- **费用**：本轮增量 **< ¥0.05**（四家各 2–6 次运行 × 每轮 1–2 请求、输出 ≤64 tokens/次；
+  可见的失败运行都在发包前结束）。累计仍远低于 ¥10 上限，未充值、无第三方代理。
+- **未做**：固定 Reviewer 的 §4.2 阶段闭环（额度恢复后补），因此
+  `REVIEWER_AUTOMATION_READY` 与 `BACKEND_IMPLEMENTATION_READY` 均**未登记**；
+  双门未判定、未接管前端工作树、未联调。
+
 ## 2026-09-15 — state capture 类型化错误边界（c7 起步 → 现行 c8）+ 前端最终交接收口（返修轮）
 
 【历史轮次注：本节的错误码语义（"文件/目录消失、文件被缩短"=`VIEW_CHANGED`）与
@@ -763,7 +807,7 @@ powershell.exe -File accept-e.ps1 … -Port 18744 -PostCheck -InstanceId <两实
 
 未进入（依赖 B 的双门）。
 
-## D — 真实模型授权与逐家验收（**进行中，四家待验**）
+## D — 真实模型授权与逐家验收（**四家已验通过，见本文件顶部 2026-09-15 轮；以下为过程记录**）
 
 授权：仅 DeepSeek 官方 API，全轮累计 ≤ ¥10；凭据 locator 见工单 §D。
 
@@ -806,7 +850,14 @@ powershell.exe -File accept-e.ps1 … -Port 18744 -PostCheck -InstanceId <两实
 | --- | --- | --- | --- |
 | DeepSeek 官方 API 可达性检查 | 1 | 12 tokens（11 in / 1 out） | < ¥0.01 |
 | Codex 错误 chat 配置尝试 | 0 次模型调用 | 0（在 `session/new` 阶段即失败，未发起模型请求） | ¥0 |
-| **合计** | **1** | 12 tokens | **< ¥0.01 / 上限 ¥10** |
+| Pi 全链门（`--live`，含 2 次缺口失败后重跑） | ~10 | 每轮数百 in / ≤64 out | < ¥0.01 |
+| Hermes 全链门（`--live`） | ~6 | 同上 | < ¥0.01 |
+| OpenCode 全链门（`--live`，含 1 次缺口失败） | ~8 | 同上 | < ¥0.01 |
+| Codex 全链门（`--live`，含 4 次缺口失败，其中 1 次为 locator 路径笔误、1 次为报告序列化缺陷） | ~12 | 同上 | < ¥0.01 |
+| **合计** | ~37 | 12 tokens + 四家两轮 | **< ¥0.05 / 上限 ¥10** |
+
+（四家每轮输出上限 64 tokens 由受审配置固定；上界换算见 [live-model-preflight.md](live-model-preflight.md) §2，
+最坏情形 < ¥0.4，实测远低于此。缺口失败的运行都在发包前结束，不计模型调用。）
 
 未预留、未充值。若后续继续，建议按 8 元停止新增测试留结算余量（工单建议）。
 
