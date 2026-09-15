@@ -237,7 +237,7 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   已验证开关）/C（Codex 暂 MODEL_NOT_VERIFIED）；**用户已裁决 A**，原挂起项关闭。ex 付费门与 preflight、
   `REVIEWER_AUTOMATION_READY` 登记、真实 locator 读取全部挂起；其他三家不受影响。
   Reviewer 第十轮结论：本阶段除该 P0 外无任何 FINDING/矛盾（REVIEWED_HEAD=47d6b64）。
-  裁决 A 已实施并经多轮复审修复（壳快照泄漏路径已捕获并遮蔽）。**Pi 已取得真实模型门证据（2026-09-15）：`PI_PRODUCTION_CHAIN_GATE_OK`（mode=live）**——两轮真实 DeepSeek 答复、次轮带上下文、重开重放观测、未知模型发包前拒绝、凭据零泄漏、授权文件未被删；Hermes/OpenCode/Codex 三家仍 MODEL_NOT_VERIFIED（`--live` 通道待接入）。
+  裁决 A 已实施并经多轮复审修复（壳快照泄漏路径已捕获并遮蔽）。**Pi 已取得真实模型门证据（2026-09-15）：`PI_PRODUCTION_CHAIN_GATE_OK`（mode=live）**——两轮真实 DeepSeek 答复、次轮带上下文、重开重放观测、未知模型发包前拒绝、凭据零泄漏、授权文件未被删；**Hermes 同轮通过：`HERMES_PRODUCTION_CHAIN_GATE_OK`（mode=live）**——两轮真实答复、同 native id 续接、凭据零泄漏、清理干净、授权文件未删；guard/假端点专有观测在 live 下显式记为未观测（不静默通过）。**OpenCode/Codex 两家仍 MODEL_NOT_VERIFIED（`--live` 待接入）。**
 - self_review_round: **执行者自审（2026-09-15，Codex 额度用尽后按用户指示）**——自审第一遍
   发现并修复真实缺陷：`turn_chain_phase()` 二次归一化会丢弃链路阶段的 settled 凭据命中
   （已改幂等归一化 + 附加 capture，加两条端到端回归）；其余对照项（capture 命中按码升格、

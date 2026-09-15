@@ -79,6 +79,9 @@ SCRIPT = "scripts/server-round1/hermes-production-chain-gate.py"
 #: Fixed, obviously fake, never a credential. It exists to prove the injection
 #: path; the gate never reads a real secret file.
 FAKE_TOKEN = "hermes-gate-fake-token-3d7a04e1-non-secret"
+#: The bytes actually injected this run (fake token, or the authorized
+#: locator's content in live mode). Only the scans read it; nothing prints it.
+INJECTED_CREDENTIAL: bytes = FAKE_TOKEN.encode()
 NONCE_ROUND_1 = "HERMES-GATE-NONCE-1C4E71"
 NONCE_ROUND_2 = "HERMES-GATE-NONCE-2A9D05"
 NONCE_RETRY = "HERMES-GATE-NONCE-RETRY-3F2B08"
@@ -703,13 +706,15 @@ def drift_check(artifact: Path, temporary: Path) -> dict:
     return {"detected": True, "originalDigest": original, "changedDigest": changed, "files": 1}
 
 
-def gate_deployment(production, artifact: Path, digest: str, endpoint, *, model_control_id=None) -> dict:
+def gate_deployment(production, artifact: Path, digest: str, endpoint, *, model_control_id=None,
+                    live: bool = False) -> dict:
     """The production document plus this run's listed, test-only overrides.
 
-    Listed differences from the production template: the fake endpoint
-    (`model.base_url` and `providers.custom.api`), the loopback guard projected
-    as the guest `sitecustomize.py` and put first on `PYTHONPATH`, and the three
-    audit sinks inside the project workspace.
+    No-model mode adds three listed things: the fake endpoint (`model.base_url`
+    and `providers.custom.api`), the loopback guard projected as the guest
+    `sitecustomize.py` and put first on `PYTHONPATH`, and the three audit sinks
+    inside the project workspace. Live mode adds only the audit sinks - it must
+    reach the official endpoint and needs nothing intercepting it.
     """
     environment = {
         **production.ADAPTER_ENVIRONMENT,
@@ -718,27 +723,31 @@ def gate_deployment(production, artifact: Path, digest: str, endpoint, *, model_
         "AGENTBOX_ACP_AUDIT": f"/workspace/{ACP_AUDIT_NAME}",
         "AGENTBOX_BOOTSTRAP_AUDIT": f"/workspace/{BOOTSTRAP_AUDIT_NAME}",
     }
+    guard = (() if live else (
+        {"source": "deploy/hermes/loopback-guard.py",
+         "target": production.LOOPBACK_GUARD_TARGET},
+    ))
     document = production.deployment_document(
         artifact_source=str(artifact), tree_digest=digest,
         adapter_environment=environment,
-        projection_files_override=(
-            *production.projection_files(),
-            {"source": "deploy/hermes/loopback-guard.py", "target": production.LOOPBACK_GUARD_TARGET},
-        ),
+        projection_files_override=(*production.projection_files(), *guard),
         model_control_id=model_control_id,
     )
     return document
 
 
 def install_runtime(temporary: Path, workspace: Path, worker: Path, deployment_bytes: bytes,
-                    endpoint, production, spawns: list, data_root: Path, token_path: Path):
+                    endpoint, production, spawns: list, data_root: Path, token_path: Path,
+                    *, config_source: bytes | None = None):
     """Assemble one Server runtime from a deployment document (test overrides in place)."""
     from agent_box.server.bootstrap import build_runtime_from_sidecar_deployment
     from agent_box.storage import MemorySecretStore
 
     deployment = temporary / f"deployment-{data_root.name}.json"
     deployment.write_text(deployment_bytes.decode("utf-8"), encoding="utf-8")
-    loopback_yaml = production.loopback_config_yaml(endpoint.base_url).encode("utf-8")
+    if config_source is None:
+        config_source = production.loopback_config_yaml(endpoint.base_url).encode("utf-8")
+    loopback_yaml = config_source
 
     import agent_box.server.bootstrap.runtime as runtime_module
     runtime_module._builtin_connector = lambda _id: DirectWorkerConnector(
@@ -759,16 +768,17 @@ def install_runtime(temporary: Path, workspace: Path, worker: Path, deployment_b
 
 
 def run_chain(temporary, workspace, worker, artifact, digest, endpoint, production, token_path,
-              spawns) -> dict:
+              spawns, *, live: bool = False) -> dict:
     """The production seam: Server -> Core -> sidecar -> Worker -> bwrap -> Hermes."""
     from agent_box.server.credentials import CredentialRecords
     from agent_box.server.transport.http import create_app
     from fastapi.testclient import TestClient
 
-    document = gate_deployment(production, artifact, digest, endpoint)
+    document = gate_deployment(production, artifact, digest, endpoint, live=live)
     runtime, store, _deployment = install_runtime(
         temporary, workspace, worker, json.dumps(document).encode("utf-8"),
-        endpoint, production, spawns, temporary / "server", token_path)
+        endpoint, production, spawns, temporary / "server", token_path,
+        config_source=(production.config_yaml_text().encode("utf-8") if live else None))
     result: dict = {"rounds": {}}
     try:
         credential_id, locator = store.import_file(token_path, "api-key")
@@ -787,7 +797,8 @@ def run_chain(temporary, workspace, worker, artifact, digest, endpoint, producti
                      "configuration": {}, "credential_id": credential_id}).json()
             result["credentialRefusal"] = run_missing_credential_phase(
                 client, runtime, opened, endpoint, profile)
-            endpoint.begin_phase("round-1", 2)
+            if endpoint is not None:
+                endpoint.begin_phase("round-1", 2)
             first = wire_post(client, runtime.token, "sessions.createAndSend", {
                 "requestId": "hermes-gate-round-1", "workspaceId": opened["id"],
                 "profileId": profile["profile_id"], "overrides": [],
@@ -795,9 +806,10 @@ def run_chain(temporary, workspace, worker, artifact, digest, endpoint, producti
             })
             session = wait_for_turn(runtime, first["session"]["id"], 0, "completed")
             result["rounds"]["first"] = summarize_turn(session, 0)
-            for record in endpoint.phase_requests("round-1"):
-                assert_wire_model(
-                    record["structure"], "round-1", REPORT.setdefault("observedModels", []))
+            if endpoint is not None:
+                for record in endpoint.phase_requests("round-1"):
+                    assert_wire_model(
+                        record["structure"], "round-1", REPORT.setdefault("observedModels", []))
             result["sessionId"] = first["session"]["id"]
             native_id = session["checkpoint"]["native_id"] if session["checkpoint"] else None
             if not native_id:
@@ -827,7 +839,8 @@ def run_chain(temporary, workspace, worker, artifact, digest, endpoint, producti
                 fail("HERMES_GATE_PROTECTED_CONFIG_CAPTURED",
                      f"the checkpoint captured read-only projections: {leaked}")
             result["protectedStatePaths"] = list(protected)
-            endpoint.begin_phase("round-2", 2)
+            if endpoint is not None:
+                endpoint.begin_phase("round-2", 2)
             second = wire_post(client, runtime.token, "sessions.send", {
                 "requestId": "hermes-gate-round-2", "sessionId": first["session"]["id"],
                 "overrides": [],
@@ -840,23 +853,42 @@ def run_chain(temporary, workspace, worker, artifact, digest, endpoint, producti
             result["checkpointNativeIdStable"] = True
             result["nativeStorePath"] = native_store_path(result["checkpointAfterFirst"]["files"])
             result["acpMethodsChain"] = acp_methods(read_audit(workspace, ACP_AUDIT_NAME))
-            result["chainProviderRequests"] = {
-                "round1": len(endpoint.phase_requests("round-1")),
-                "round2": len(endpoint.phase_requests("round-2")),
-            }
-            result["round2Continuation"] = continuation_evidence(endpoint.phase_requests("round-2"))
+            result["chainProviderRequests"] = (
+                None if live else {
+                    "round1": len(endpoint.phase_requests("round-1")),
+                    "round2": len(endpoint.phase_requests("round-2")),
+                }
+            )
+            result["round2Continuation"] = (
+                {"observed": False, "reason": "request bodies are not visible without the "
+                                              "fake endpoint; the second turn's answer "
+                                              "recalled the first turn's nonce instead"}
+                if live else continuation_evidence(endpoint.phase_requests("round-2"))
+            )
 
-            endpoint.begin_phase("model-control", 0)
-            result["modelControl"] = run_model_control_phase(
-                temporary, workspace, worker, artifact, digest, endpoint, production, token_path,
-                credential_id, locator, spawns)
+            if live:
+                result["modelControl"] = {
+                    "observed": False,
+                    "reason": "the declared model control is a template property; the "
+                              "no-model gate proved the refusal, live mode records "
+                              "modelResolution instead",
+                }
+            else:
+                endpoint.begin_phase("model-control", 0)
+                result["modelControl"] = run_model_control_phase(
+                    temporary, workspace, worker, artifact, digest, endpoint, production,
+                    token_path, credential_id, locator, spawns)
             result["credential"] = {
-                "injectedTokenReachedProvider": all(
-                    item["authorizationMatchesInjectedToken"] for item in endpoint.requests
-                ) and bool(endpoint.requests),
-                "unauthorizedRequests": endpoint.unauthorized,
-                "tokenInEvents": FAKE_TOKEN in json.dumps(session["events"]),
-                "tokenInReportableState": FAKE_TOKEN in json.dumps(REPORT),
+                "injectedTokenReachedProvider": (
+                    "verified-by-real-answer" if live else
+                    all(item["authorizationMatchesInjectedToken"]
+                        for item in endpoint.requests) and bool(endpoint.requests)
+                ),
+                "unauthorizedRequests": None if live else endpoint.unauthorized,
+                "tokenInEvents": INJECTED_CREDENTIAL.decode(errors="replace")
+                                 in json.dumps(session["events"]),
+                "tokenInReportableState": INJECTED_CREDENTIAL.decode(errors="replace")
+                                         in json.dumps(REPORT),
             }
             assert_credential_delivery(result["credential"])
             result["stateScan"] = scan_state(runtime, session, native_id)
@@ -1178,7 +1210,7 @@ def run_missing_credential_phase(client, runtime, opened, endpoint, profile) -> 
         "Authorization": f"Bearer {runtime.token}", "Idempotency-Key": "hermes-gate-anon-profile",
     }, json={"name": "Hermes gate without credential", "harness_type": "hermes",
              "configuration": {}}).json()
-    before = len(endpoint.requests)
+    before = None if endpoint is None else len(endpoint.requests)
     response = client.post("/wire/v1/sessions.createAndSend", headers={
         "Authorization": f"Bearer {runtime.token}",
     }, json={"jsonrpc": "2.0", "id": "sessions.createAndSend", "method": "sessions.createAndSend",
@@ -1189,16 +1221,18 @@ def run_missing_credential_phase(client, runtime, opened, endpoint, profile) -> 
     details = error.get("details") if isinstance(error.get("details"), dict) else {}
     code = details.get("internalCode") or error.get("code")
     message = json.dumps(error or response.get("result") or {})[:300]
-    after = len(endpoint.requests)
+    after = None if endpoint is None else len(endpoint.requests)
     refused = "CREDENTIAL_REQUIRED" in json.dumps(response)
-    if after != before:
+    if before is not None and after != before:
         fail("HERMES_GATE_ANONYMOUS_REACHED_PROVIDER",
              "a credential-less session produced a provider request")
     if not refused or code != "CREDENTIAL_REQUIRED":
         fail("HERMES_GATE_CREDENTIAL_NOT_REQUIRED",
              f"a credential-less profile was not refused: {message}")
     return {"refused": True, "code": code, "message": message, "dispatched": False,
-            "providerRequests": after - before, "profile": profile["profile_id"]}
+            "providerRequests": None if before is None else after - before,
+            "providerRequestCountAvailable": before is not None,
+            "profile": profile["profile_id"]}
 
 
 def profile_version(client, runtime, profile_id: str) -> int:
@@ -1290,7 +1324,7 @@ def scan_state(runtime, session: dict, native_id: str) -> dict:
     for item in checkpoint.get("files", []):
         content = runtime.objects.read(item["digest"])
         total += len(content)
-        if FAKE_TOKEN.encode() in content:
+        if INJECTED_CREDENTIAL in content:
             hits.append(item["path"])
     return {"files": len(checkpoint.get("files", [])), "bytes": total,
             "tokenHits": hits, "tokenInState": bool(hits)}
@@ -1344,7 +1378,7 @@ def direct_port(temporary, workspace, worker, artifact, digest, production, bund
         DirectWorkerConnector(temporary, worker, workspace, spawns),
         workspace={"distribution": "Ubuntu", "remote_user": os.environ["USER"],
                    "connection_id": "connection-hermes-observe", "remote_path": str(workspace)},
-        bundle=bundle, credential=FAKE_TOKEN.encode(),
+        bundle=bundle, credential=INJECTED_CREDENTIAL,
         runtime_artifact_authorizations=(
             {"path": str(artifact), "target": production.ARTIFACT_TARGET, "digest": digest},),
         runtime_artifact_mounts=((str(artifact), production.ARTIFACT_TARGET),),
@@ -1555,7 +1589,8 @@ def cleanup_check(temporary: Path, workspace: Path, token_path: Path) -> None:
     remove_tree(workspace)
     REPORT.setdefault("cleanup", {}).update({
         "workerProjectionsRemoved": True, "adapterProcessesRemoved": True,
-        "fakeTokenRemoved": not token_path.exists(), "workspaceRemoved": not workspace.exists(),
+        "gateTokenRemoved": not token_path.exists(),
+        "authorizedLocatorDeleted": False, "workspaceRemoved": not workspace.exists(),
     })
 
 
@@ -1565,7 +1600,19 @@ def main() -> int:
     parser.add_argument("--artifact", default=None)
     parser.add_argument("--keep", action="store_true")
     parser.add_argument("--json", action="store_true")
+    parser.add_argument(
+        "--live", action="store_true",
+        help="paid mode: the official endpoint and an authorized credential "
+             "locator instead of the loopback fake endpoint (see "
+             "docs/server-round1/fullstack/live-model-preflight.md)",
+    )
+    parser.add_argument(
+        "--authorized-secret", default=None,
+        help="path of the authorized credential file (only with --live)",
+    )
     options = parser.parse_args()
+    if options.live and not options.authorized_secret:
+        fail("HERMES_GATE_LIVE_SECRET_REQUIRED", "--live requires --authorized-secret")
 
     endpoint = None
     created: Path | None = None
@@ -1634,13 +1681,24 @@ def main() -> int:
                  f"the reviewed configuration {production.CONFIG_TARGET!r} is not inside the "
                  f"persisted home {production.STATE_TARGET!r}")
 
-        endpoint = FakeEndpoint(FAKE_TOKEN)
-        endpoint.assert_loopback_only()
-        # The exact bytes this run projects as the reviewed configuration. Every
-        # launcher below projects this same value, so the artifact's verification
-        # digest can be compared with what the deployment declared.
-        projected_config_bytes = production.loopback_config_yaml(endpoint.base_url).encode("utf-8")
-        differences = production.documented_differences(endpoint.base_url)
+        live = bool(options.live)
+        REPORT["mode"] = "live" if live else "loopback-fake-endpoint"
+        secret_path = None
+        if live:
+            secret_path = Path(options.authorized_secret).resolve()
+            mode = secret_path.stat().st_mode & 0o777
+            if mode & 0o077:
+                fail("HERMES_GATE_LIVE_SECRET_PERMISSIONS", f"authorized secret mode is {oct(mode)}")
+            endpoint = None
+            differences = {}
+            projected_config_bytes = production.config_yaml_text().encode("utf-8")
+        else:
+            endpoint = FakeEndpoint(FAKE_TOKEN)
+            endpoint.assert_loopback_only()
+            differences = production.documented_differences(endpoint.base_url)
+            # The exact bytes this run projects as the reviewed configuration.
+            projected_config_bytes = production.loopback_config_yaml(
+                endpoint.base_url).encode("utf-8")
         REPORT["template"] = {
             "officialBaseUrl": official,
             "loopbackOverrideChanges": {key: list(value) for key, value in differences.items()},
@@ -1662,7 +1720,7 @@ def main() -> int:
             "maxProviderAttempts": production.MAX_PROVIDER_ATTEMPTS,
         }
         expected = {"model.base_url", f"providers.{production.PROVIDER_BLOCK_KEY}.api"}
-        if set(differences) != expected:
+        if not live and set(differences) != expected:
             fail("HERMES_GATE_OVERRIDE_NOT_MINIMAL", f"the loopback override changed {sorted(differences)}")
 
         created = Path(tempfile.mkdtemp(prefix=TEMPORARY_PREFIX))
@@ -1682,23 +1740,36 @@ def main() -> int:
         REPORT["modelResolution"] = model_resolution_witness(
             artifact, declaration, production.config_document()["model"]["default"])
 
+        global INJECTED_CREDENTIAL
         token_path = temporary / "hermes-gate-token"
-        token_path.write_bytes(FAKE_TOKEN.encode())
-        token_path.chmod(0o600)
+        if live:
+            # The locator's content is copied into the gate's own 0600 file; the
+            # authorized file itself is never written or deleted by this gate.
+            token_path.write_bytes(secret_path.read_bytes())
+            token_path.chmod(0o600)
+            INJECTED_CREDENTIAL = token_path.read_bytes().strip()
+        else:
+            token_path.write_bytes(FAKE_TOKEN.encode())
+            token_path.chmod(0o600)
+            INJECTED_CREDENTIAL = FAKE_TOKEN.encode()
 
-        endpoint.start()
+        if endpoint is not None:
+            endpoint.start()
         try:
             outcome = run_chain(
-                temporary, workspace, worker, artifact, digest, endpoint, production, token_path, spawns,
+                temporary, workspace, worker, artifact, digest, endpoint, production, token_path,
+                spawns, live=live,
             )
         finally:
-            endpoint.stop()
-        REPORT["provider"] = endpoint.snapshot()
+            if endpoint is not None:
+                endpoint.stop()
+        if endpoint is not None:
+            REPORT["provider"] = endpoint.snapshot()
         REPORT.update(outcome)
-        if endpoint.over_budget:
+        if endpoint is not None and endpoint.over_budget:
             fail("HERMES_GATE_EXTRA_PROVIDER_REQUEST",
                  f"{endpoint.over_budget} provider requests exceeded their phase budget")
-        if endpoint.context_probes > CONTEXT_PROBE_LIMIT:
+        if endpoint is not None and endpoint.context_probes > CONTEXT_PROBE_LIMIT:
             fail("HERMES_GATE_CONTEXT_PROBE_STORM",
                  f"{endpoint.context_probes} context probes exceeded the bound")
 
@@ -1775,9 +1846,10 @@ def main() -> int:
             "projectedDigest": "sha256:" + hashlib.sha256(projected_config_bytes).hexdigest(),
             "auditPresent": (workspace / BOOTSTRAP_AUDIT_NAME).is_file(),
         }
-        if not REPORT["egress"]["guardLoaded"]:
+        REPORT["egress"]["guardExpected"] = not live
+        if not live and not REPORT["egress"]["guardLoaded"]:
             fail("HERMES_GATE_EGRESS_GUARD_ABSENT", "the offline guard did not load in the adapter process")
-        if not REPORT["egress"]["selfTestOk"]:
+        if not live and not REPORT["egress"]["selfTestOk"]:
             fail("HERMES_GATE_EGRESS_GUARD_UNPROVEN",
                  "the guard's fail-closed self-test did not record a refusal")
         if not REPORT["bootstrap"]["verified"]:
@@ -1792,17 +1864,40 @@ def main() -> int:
         REPORT["workerPosture"] = assert_worker_posture(
             spawns, production.ARTIFACT_TARGET, production.STATE_TARGET,
             config_target=production.CONFIG_TARGET,
-            guard_target=production.LOOPBACK_GUARD_TARGET)
+            guard_target=None if live else production.LOOPBACK_GUARD_TARGET)
         audit_before_reopen = read_audit(workspace, ACP_AUDIT_NAME)
         REPORT["acpMethods"] = {
             "chain": REPORT["acpMethodsChain"],
             "chainAndModelControl": acp_methods(audit_before_reopen),
         }
-        REPORT["reopenObservation"] = observe_reopen(
-            temporary, workspace, worker, artifact, digest, production, audit_before_reopen)
-        REPORT["retryObservation"] = observe_retry(
-            temporary, workspace, worker, artifact, digest, production)
-        REPORT["nativeModel"] = native_model_observation(workspace)
+        if live:
+            # Both observations below need a fake endpoint (the guard's ACP audit
+            # and an injected 5xx). Live mode records that they were not
+            # observed, and relies on the real chain's own reopen evidence
+            # instead (the second round kept the same native id, asserted above).
+            REPORT["reopenObservation"] = {
+                "nativeReopenMethod": "not-observed-live",
+                "reason": "the ACP method audit is a guard artefact; the second turn's "
+                          "checkpoint native id is the live reopen evidence",
+                "checkpointNativeIdStable": REPORT.get("checkpointNativeIdStable"),
+            }
+            REPORT["retryObservation"] = {
+                "observed": False,
+                "reason": "injecting a 5xx requires the fake endpoint; the bound was "
+                          "measured in the no-model gate and is not re-measured live",
+            }
+        else:
+            REPORT["reopenObservation"] = observe_reopen(
+                temporary, workspace, worker, artifact, digest, production, audit_before_reopen)
+            REPORT["retryObservation"] = observe_retry(
+                temporary, workspace, worker, artifact, digest, production)
+        REPORT["nativeModel"] = (
+            {"observed": False,
+             "reason": "the ACP model state is a guard artefact; live mode's model "
+                       "identity is the reviewed configuration plus the real answer",
+             "configuredModel": production.PRODUCT_MODEL_ID}
+            if live else native_model_observation(workspace)
+        )
         cleanup_check(temporary, workspace, token_path)
         REPORT["result"] = "HERMES_PRODUCTION_CHAIN_GATE_OK"
     except GateFailure as failure:

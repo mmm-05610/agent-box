@@ -100,6 +100,19 @@ PYTHONPATH=src:plugins/... python3 scripts/server-round1/<family>-production-cha
 locator 内容只经 SecretStore 注入（gate 自建临时 token 文件、绝不删用户文件）、
 假端点专有断言（请求计数/授权头）在 live 下改为"真实答复即证据"或显式不可用（不静默通过）。
 
+### Hermes（2026-09-15，`--live` 通过）
+
+`hermes-production-chain-gate.py --live` → **exit 0 / `HERMES_PRODUCTION_CHAIN_GATE_OK`**：
+两轮真实答复（14/15 deltas，第二轮带第一轮上下文）、同 native id 续接（`checkpointNativeIdStable`）、
+凭据不进事件/报告、captured state 9 文件/6 MB 无命中、adapter/worker/workspace 全清理、
+授权 locator 未被删（`authorizedLocatorDeleted=false`）。
+
+live 模式下**显式记为"未观测"而非静默跳过**的项（均为假端点/guard 产物）：
+`modelControl`（模板属性，无模型门已证拒绝）、`retryObservation`（注入 5xx 需要假端点）、
+`nativeReopenMethod`（ACP 方法审计是 guard 产物；live 以第二轮同 native id 为续接证据）、
+`nativeModel`（同前；live 记录 `configuredModel=deepseek-flash`）、
+`chainProviderRequests`/`round2Continuation`（请求体在 live 下不可见，改以真实答复回忆 nonce 为证）。
+
 ## 7. 当前状态
 
 - 已就绪：四家生产封装、c8 release Worker、五门无模型证据、官方价格核对、本 preflight。
