@@ -222,8 +222,9 @@ fail-closed 判据）；Worker 源自 c8 构建后未变（`git diff -- workers/
 
 ## 4.7 源头修复：官方 Codex feature flags（用户提示调研后第一手验证）
 
-用户指出 Codex 官方已公开 app-server 接入面、值得查资料；据此离线检查了本机
-`@openai/codex` 0.154 平台二进制的配置 schema 字符串，发现**官方 feature flag 家族**
+用户指出 Codex 官方已公开 app-server 接入面、值得查资料；据此离线检查了生产工件内
+**Harness 二进制 Codex 0.147.0**（`@openai/codex` 的配置 schema 字符串；本机另有 Reviewer CLI
+`codex-cli` 0.154.0，属**不同层**，不是本项证据来源），发现**官方 feature flag 家族**
 （与 `features.code_mode`、`features.multi_agent` 同族）里有本次观测到的两个行为开关：
 
 - **`features.plugins`**（默认开）→ 会把内置 plugin/skill 语料物化进
@@ -306,10 +307,13 @@ capture 证据**（`stateScan` 存在、无 token、native id 绑定、各轮 ca
   **凭据命中优先**，链路/reopen 异常随后作为 `secondaryFailure` 结构化保留。
 - `merge_phase_evidence()` 逐阶段判定完整性：每阶段要么有完整 settled view 扫描，要么有
   **它自己的** capture 证据；任一阶段两者皆无即 `CODEX_GATE_STATE_SCAN_INCOMPLETE`。
-- 进程身份：`process_table()` 读 `ps -eo pid=,lstart=,args=`，身份 = **(pid, 启动时间) + 本轮根**；
-  改名后代仍被匹配（根字符串），无关 Codex 实例既不被匹配也不会阻塞；watcher 记录
-  `harness_identities`，退出判定要求这些身份**全部消失**。
-- 差分支持**逐变量**（`--strip shell_snapshot`）：只关 `shell_snapshot`（`plugins` 保持默认）
+- 进程身份：`process_table()` 读 `ps -eo pid=,ppid=,lstart=,args=`，身份 = **(pid, 启动时间)**，
+  归属 = 本轮根出现在 argv **或** 其祖先链上存在这样的进程（`matching_processes()` 的
+  `descends_from_run()`）；`ps` 失败按"未退出"fail-closed；watcher 记录 `harness_identities`，
+  存活判定取"曾见身份 ∩ 当前表" **并上** 当前表（空的 seen 不构成退出证据）。
+  反例测试：无关 Codex 实例与改名后代（argv 不含本轮根）被区分。
+- 差分支持**逐变量**（`--strip shell_snapshot`）：只把 `shell_snapshot` 还原成官方默认开启，
+  **`plugins=false` 保持不变**（`without_feature_flags(strip=...)` 只剥该键，未知键拒绝）；
   控制腿 2 处凭据命中、处理腿零命中 → 因果归属于该单一变量。
 - 真机两轮（本 HEAD）：`phases=2`、逐阶段 capture 证据（turn-chain 76–78 文件、
   reopen 77 文件 / 2.66 MB，均 `nativeSessionId=true`、零命中）、门 exit 0。
