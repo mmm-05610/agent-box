@@ -34,6 +34,24 @@
 | 后端：让 Server 知道"声明过的凭据在哪" | `14cdc55` | 部署文档新增可选 `credentials: [{credentialId, kind, sourcePath, label}]`：**文档结构性不含秘密**（允许键就是那四个，写 `value`/`secret` 一律类型化拒绝）；来源由 Server 自己的 secret store 读取（symlink/文件类型/大小规则在那里）；声明的 id 由 records 解析；同一部署重启复用既有记录、不重读来源、不重复身份；来源不可读则启动即带类型码失败。11 项测试（含内联 `value` 的拒绝）；全套 **588 passed / 3 skipped / 0 failed**。 |
 | 前端：凭据记录归 Desktop | `30de1ffd` | 主进程持有记录（`{credentialId, label, kind}`，来自本侧文件，`AGENTBOX_CREDENTIALS` 指定）；renderer 的全部可见面就是这个三元组——id 用来挂到 Provider/Model，label 用来显示；秘密与路径是 main-only 事实。坏条目丢弃不修补、同 id 只列一次、文件缺失/不可读=空列表而非报错。6 项测试（Windows 上 vitest 6/6）。 |
 
+### 2c. 用户裁决补充：需要界面录入 → 运行中的 Server 导入面（`75ce4a9`）
+
+用户要求"需要录入"。查文档后发现一条硬约束：**数据根锁是非阻塞排他的**
+（`bootstrap/runtime.py:63` 的 `msvcrt.LK_NBLCK` / `fcntl.LOCK_NB`，冲突即 `DATA_ROOT_IN_USE`），
+所以已批准的 CLI 导入（`credential_cli`）**在 Server 运行期间必然失败**——界面录入不能走 CLI，
+只能由运行中的 Server 自己接。已实现：
+
+- `POST /api/v1/credentials`：请求体只带**路径**（`kind`、`source_path`、`confirm_source_path`），
+  秘密由 Server 自己的 secret store 读取（symlink/类型/大小规则在那里），返回**不透明 id**；
+  必须重复路径（与 CLI 同一纪律），同幂等键重放只导入一次，来源被拒不留记录。
+- `GET /api/v1/credentials`：只列 id/kind/createdAt，**不含 locator**（秘密地址属 Server 内部）。
+- 7 项测试；全量 **595 passed / 3 skipped**。首轮全量有 1 例既存间歇失败
+  （`test_harness_sidecar.py` 的 unusable-checkpoint 用例），单跑该文件 95 passed、复跑全量干净，按间歇记录。
+
+**由此确定的录入形态**：与 legacy gateway 同形的"renderer 表单 → main → Server"。用户选择"需要录入"
+即接受密钥会在 renderer 的输入框里短暂存在（不进持久状态、不进日志、不进事件）；若以后要改成
+main 侧原生输入，那是另一次裁决。
+
 **仍未落地的部分（A 的最后一段 + 门本身）**：
 1. 设置页的凭据选择控件（把上表两条接起来：UI 选 id → 创建/更新 Provider/Model 带上它）；
 2. 四家真实 UI 模型门（依赖 1）；
