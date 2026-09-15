@@ -199,6 +199,27 @@ Reviewer `CHANGES_REQUIRED` 的修复（§2.1/§7.1）落地后重建
 - 无遮蔽诊断分账（历史）：诊断模式 9 轮全绿（含 1 轮 --keep），secret 与突发未复现——
   与写入时机相关；遮蔽模式早期 3 轮绿 + 最终 4 轮绿。以上均按日期入库本节。
 
+## 4.6 最终 HEAD 的逐门结果（Reviewer 第十二轮 P2 要求）
+
+以下每一项都在同一实现树（HEAD 见本节末的提交号）上执行，命令与退出码逐条记录：
+
+| 门/套件 | 命令 | 结果 |
+| --- | --- | --- |
+| runtime-artifact | `python3 scripts/server-round1/runtime-artifact-gate.py --worker <c8> --json` | exit 0，`RUNTIME_ARTIFACT_PROJECTION_GATE_OK` |
+| Pi | `…/pi-production-chain-gate.py --worker <c8> --json` | exit 0，`PI_PRODUCTION_CHAIN_GATE_OK` |
+| Hermes | `…/hermes-production-chain-gate.py --worker <c8> --json` | exit 0，`HERMES_PRODUCTION_CHAIN_GATE_OK` |
+| OpenCode | `…/opencode-production-chain-gate.py --worker <c8> --json` | exit 0，`OPENCODE_PRODUCTION_CHAIN_PREPARED` |
+| Codex（遮蔽模式，最终版） | `…/codex-production-chain-gate.py --worker <c8> --json` | exit 0，`CODEX_PRODUCTION_CHAIN_GATE_OK`，view 峰值 112、`tokenInState=false`、`credentialPathHits=0` |
+| Windows r4 | `accept-e.ps1 … -Port 18746 -Cleanup`（c8，`worker_digest=sha256:514f48a9…`） | exit 0，`BACKEND_41_E_WINDOWS_WSL_WIRE_OK` |
+| 独立 PostCheck | 同参数 `-PostCheck -InstanceId <两实例>` | exit 0，`BACKEND_41_E_WINDOWS_POSTCHECK_CLEAN` |
+| Python 全量 | `PYTHONPATH=src + 全部 plugins/*/src python3 -m pytest -q tests <插件 tests>` | **829 passed / 6 skipped / 0 failed** |
+| Rust | `cargo fmt --check` + `cargo test --locked --release` | fmt 干净；27 passed |
+
+skip 说明：6 项均为既有平台/环境条件项（不含本轮新增测试）。清理：门临时根与
+`--keep` 诊断根已按属主核对删除；Windows DataRoot/workspace/端口/进程由 PostCheck 独立复核。
+对应实现：`b0820d4`（壳快照遮蔽）+ 本文件所在提交的 `fix:` 提交（fd 锚定观察器与
+fail-closed 判据）；Worker 源自 c8 构建后未变（`git diff -- workers/` 为空），故 c8 摘要仍为现行 bundle。
+
 ## 5. 全量验证与清理
 
 精确命令（原始输出留在本轮会话日志，不入 Git）：

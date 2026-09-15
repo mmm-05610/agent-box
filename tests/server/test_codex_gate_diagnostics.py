@@ -52,6 +52,22 @@ def test_no_failure_ever_becomes_an_alias_blocker():
         assert "co-observation" in co_observation["note"]
 
 
+def test_the_credential_scan_verdict_fails_closed_in_every_mode():
+    module = load_gate()
+    # A hit fails the gate in both modes: the credential reached native state.
+    for legacy in (False, True):
+        verdict, _detail = module.credential_scan_verdict(
+            [{"path": "native-state/leak.sh"}], None, True, legacy)
+        assert verdict == "CODEX_GATE_CREDENTIAL_IN_NATIVE_STATE"
+    # An incomplete or crashed scan fails closed: no evidence is not a pass.
+    for scan_error, stopped in ((None, False), ("OSError: boom", True)):
+        verdict, _detail = module.credential_scan_verdict([], scan_error, stopped, False)
+        assert verdict == "CODEX_GATE_STATE_SCAN_INCOMPLETE"
+    # A complete, clean scan passes the verdict (the gate itself stays green).
+    verdict, _detail = module.credential_scan_verdict([], None, True, False)
+    assert verdict is None
+
+
 def test_a_green_run_records_neither_blocker_nor_co_observation():
     module = load_gate()
     report = {"stateSymlinksObserved": SYMLINKS, "diagnostics": {"turn": {}}}

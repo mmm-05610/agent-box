@@ -398,6 +398,33 @@ class FakeEndpoint:
 # worker connector (same ABW1 frames the WSL connector speaks)
 # --------------------------------------------------------------------------
 
+def _open_fd(path: Path) -> int:
+    return os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY)
+
+
+def _open_beneath_fd(
+    base_fd: int, components: tuple[str, ...], final_is_directory: bool,
+) -> int:
+    """Open `components` under a pinned directory fd, one openat at a time,
+    every component O_NOFOLLOW, so a swapped entry or parent cannot redirect
+    the walk. Returns the final fd; the caller owns and closes it."""
+    opened: list[int] = []
+    current = base_fd
+    try:
+        for index, name in enumerate(components):
+            flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW | os.O_NONBLOCK
+            if final_is_directory or index + 1 < len(components):
+                flags |= os.O_DIRECTORY
+            fd = os.open(name, flags, dir_fd=current)
+            opened.append(fd)
+            current = fd
+        return opened[-1]
+    except BaseException:
+        for fd in opened:
+            os.close(fd)
+        raise
+
+
 class StateSymlinkWatcher:
     """Watch the Worker's own view while an attempt runs.
 
@@ -431,6 +458,8 @@ class StateSymlinkWatcher:
         self.peak_directory_counts: list[tuple[str, int]] = []
         self.peak_special = 0
         self.token_hits: list[dict] = []
+        self.scan_error: str | None = None
+        self.stopped_cleanly = False
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, daemon=True)
 
@@ -440,8 +469,15 @@ class StateSymlinkWatcher:
     def stop(self) -> None:
         self._stop.set()
         self._thread.join(timeout=5)
+        self.stopped_cleanly = not self._thread.is_alive()
 
     def _run(self) -> None:
+        try:
+            self._run_bounded()
+        except BaseException as error:  # noqa: BLE001 - recorded, then surfaced
+            self.scan_error = f"{type(error).__name__}: {error}"
+
+    def _run_bounded(self) -> None:
         views = self.worker_root / "views"
         while not self._stop.is_set():
             if views.is_dir():
@@ -475,25 +511,54 @@ class StateSymlinkWatcher:
     def _scan_for_credential(self, views: Path) -> None:
         """Name any native-state file that contains the injected fake token.
 
-        This is the diagnostic the credential decision requires: the token is a
-        run-generated non-secret, the scan reads at most the first 4 KiB of a
-        regular file, and only the sanitized relative path is recorded - never
-        any credential material (there is none to leak: the token is fake).
+        The state subtree is Harness-writable, so this walk is fd-anchored and
+        opens every component with O_NOFOLLOW (the same discipline the Worker
+        applies): only fd-verified regular files are read, in one bounded read,
+        and the fd identity is re-checked afterwards. Only the sanitized
+        relative path is recorded; the token itself is run-generated.
         """
         token = FAKE_TOKEN.encode()
-        for location in sorted(views.glob("*/ready/**/native-state/**/*")):
-            if len(self.token_hits) >= self.limit:
-                return
+        for view_dir in sorted(views.glob("*")):
+            view_fd = None
             try:
-                if not location.is_file() or location.stat().st_size > 65536:
-                    continue
-                if token in location.read_bytes()[:65536]:
-                    relative = location.relative_to(self.worker_root)
-                    entry = {"path": str(relative), "phase": "during-run"}
-                    if entry not in self.token_hits:
-                        self.token_hits.append(entry)
-            except OSError:
+                view_fd = _open_beneath_fd(_open_fd(view_dir), ("ready",), True)
+                self._scan_tree(view_fd, ("agentbox-sidecar", "deployment", "codex",
+                                          "native-state"), token)
+            except (OSError, AssertionError, ValueError):
                 continue
+            finally:
+                if view_fd is not None:
+                    os.close(view_fd)
+
+    def _scan_tree(self, ready_fd: int, components: tuple[str, ...], token: bytes) -> None:
+        directory = _open_beneath_fd(ready_fd, components, True)
+        try:
+            for name in sorted(os.listdir(f"/proc/self/fd/{directory}")):
+                if len(self.token_hits) >= self.limit:
+                    return
+                child = _open_beneath_fd(directory, (name,), False)
+                try:
+                    status = os.fstat(child)
+                    if stat.S_ISDIR(status.st_mode):
+                        os.close(child)
+                        self._scan_tree(directory, (*components, name), token)
+                        continue
+                    if not stat.S_ISREG(status.st_mode) or status.st_size > 65536:
+                        continue
+                    payload = os.read(child, 65536)
+                    after = os.fstat(child)
+                    identity = (lambda meta: (meta.st_dev, meta.st_ino, meta.st_size))
+                    if identity(after) != identity(status):
+                        continue
+                    if token in payload:
+                        entry = {"path": "/".join([*components, name]),
+                                 "phase": "during-run"}
+                        if entry not in self.token_hits:
+                            self.token_hits.append(entry)
+                finally:
+                    os.close(child)
+        finally:
+            os.close(directory)
 
     @staticmethod
     def _count(ready: Path) -> tuple[int, int, dict[str, tuple[int, list[str]]]]:
@@ -796,6 +861,12 @@ def main() -> int:
                 "overListingLimit": watcher.peak_files > StateSymlinkWatcher.FILE_LIMIT,
             }
         REPORT.update(outcome)
+        verdict, detail = credential_scan_verdict(
+            watcher.token_hits, watcher.scan_error, watcher.stopped_cleanly,
+            LEGACY_STATE_DIAGNOSTIC,
+        )
+        if verdict is not None:
+            fail(verdict, detail)
         if endpoint.over_budget:
             fail("CODEX_GATE_EXTRA_PROVIDER_REQUEST",
                  f"{endpoint.over_budget} provider requests exceeded the phase budget")
@@ -1721,6 +1792,31 @@ def run_requests(runs: list[list[dict]], index: int) -> list[dict]:
 # --------------------------------------------------------------------------
 # cleanup
 # --------------------------------------------------------------------------
+
+
+def credential_scan_verdict(
+    token_hits: list[dict], scan_error: str | None, stopped_cleanly: bool,
+    legacy_diagnostic: bool = False,
+) -> tuple[str | None, str]:
+    """The typed verdict for one run's credential-path scan.
+
+    A hit means the injected (fake) credential material reached native state -
+    the exact risk the paid preflight must not carry - so it fails in every
+    mode; the legacy diagnostic mode only additionally names the file. An
+    incomplete scan also fails: absence of evidence is only evidence when the
+    scan provably ran to completion.
+    """
+    if scan_error is not None:
+        return "CODEX_GATE_STATE_SCAN_INCOMPLETE", f"the state credential scanner crashed: {scan_error}"
+    if not stopped_cleanly:
+        return ("CODEX_GATE_STATE_SCAN_INCOMPLETE",
+                "the state credential scanner did not stop cleanly")
+    if token_hits:
+        paths = [hit.get("path") for hit in token_hits]
+        return ("CODEX_GATE_CREDENTIAL_IN_NATIVE_STATE",
+                "the injected fake token reached native state; sanitized paths: "
+                + json.dumps(paths))
+    return None, ""
 
 
 def annotate_known_blocker(report: dict | None = None) -> None:
