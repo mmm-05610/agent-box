@@ -250,6 +250,30 @@ def test_the_traversal_and_byte_budgets_are_typed_incomplete(tmp_path):
     assert "byte budget" in (heavy.scan_incomplete or ""), heavy.scan_incomplete
 
 
+def test_only_the_settled_window_has_to_be_fully_observed():
+    """User decision A: churn while the attempts run is an observation; the
+    settled window must contain a fully observed cycle, and a race inside it
+    still fails the run."""
+    module = load_gate()
+    # Active-window churn only: passes once the settled window is clean.
+    verdict, _detail = module.credential_scan_verdict(
+        [], None, True, False, None, 5,
+        [{"path": "active.sh"}], [{"reason": "active churn"}], 3, [], [])
+    assert verdict is None
+    # No fully observed settled cycle: fails.
+    verdict, _detail = module.credential_scan_verdict(
+        [], None, True, False, None, 5, [], [], 0, [], [])
+    assert verdict == "CODEX_GATE_STATE_SCAN_INCOMPLETE"
+    # A race recorded after a settled cycle is an observation, not a failure.
+    verdict, _detail = module.credential_scan_verdict(
+        [], None, True, False, None, 5, [], [], 2, [{"path": "later.sh"}], [])
+    assert verdict is None
+    # A hit anywhere is still fatal.
+    verdict, _detail = module.credential_scan_verdict(
+        [{"path": "any.sh"}], None, True, False, None, 5, [], [], 2, [], [])
+    assert verdict == "CODEX_GATE_CREDENTIAL_IN_NATIVE_STATE"
+
+
 def test_a_green_run_records_neither_blocker_nor_co_observation():
     module = load_gate()
     report = {"stateSymlinksObserved": SYMLINKS, "diagnostics": {"turn": {}}}

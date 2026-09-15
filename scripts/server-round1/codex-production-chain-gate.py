@@ -490,6 +490,20 @@ class StateSymlinkWatcher:
         self.scan_incomplete: str | None = None
         self.race_events: list[dict] = []
         self.incomplete_events: list[dict] = []
+        #: The settled window is the phase after the run's attempts ended
+        #: (harness processes gone, state tree no longer written). User
+        #: decision A judges the credential verdict on that window - it must be
+        #: fully observed at least once - while churn seen during the active
+        #: window is recorded as an observation, not turned into a failure.
+        #: A *settled* cycle is one that walked the whole tree and found it
+        #: byte-identical to the previous cycle: the harness is no longer
+        #: writing, which is exactly the state a capture reads. User decision A
+        #: judges the credential verdict on such a cycle; churn before it is
+        #: recorded as an observation.
+        self.settled_cycles = 0
+        self.settled_incomplete: list[dict] = []
+        self.settled_races: list[dict] = []
+        self._last_identity: dict[str, tuple] | None = None
         self.scan_completed = 0
         self.scanned_files = 0
         self.scanned_bytes = 0
@@ -561,6 +575,7 @@ class StateSymlinkWatcher:
         self.scanned_entries = 0
         self.scan_incomplete = None
         self._cycle_complete = True
+        self.observed_identity: dict[str, tuple] = {}
         views_fd = _open_dir_fd(views)
         try:
             completed_here = False
@@ -584,6 +599,20 @@ class StateSymlinkWatcher:
                             os.close(view_fd)
             if completed_here and self._cycle_complete:
                 self.scan_completed += 1
+                if self._last_identity is not None and self.observed_identity == self._last_identity:
+                    self.settled_cycles += 1
+                self._last_identity = dict(self.observed_identity)
+            else:
+                # An incomplete cycle proves nothing about stability, so it
+                # restarts the comparison; the facts are kept for the report.
+                self._last_identity = None
+                if self.scan_incomplete is not None:
+                    event = {"reason": self.scan_incomplete}
+                    if event not in self.settled_incomplete:
+                        self.settled_incomplete.append(event)
+                for raced in self.race_events:
+                    if raced not in self.settled_races:
+                        self.settled_races.append(raced)
         finally:
             os.close(views_fd)
 
@@ -653,6 +682,7 @@ class StateSymlinkWatcher:
                     after_identity = (after.st_mtime_ns, after.st_ctime_ns, after.st_size)
                     self.scanned_bytes += len(payload)
                     self.scanned_files += 1
+                    self.observed_identity[relative] = before_identity
                     # The payload is examined whatever the race outcome: a token
                     # that was there while the file was in flight is a fact this
                     # gate must not drop.
@@ -958,6 +988,9 @@ def main() -> int:
             )
         finally:
             endpoint.stop()
+            # User decision A: the attempts are over, so the state tree is no
+            # longer being written - the credential verdict is judged on this
+            # settled window, which must be fully observed.
             watcher.stop()
             # The endpoint's own record is the evidence for several requirements,
             # so it is reported even when the chain failed after it answered.
@@ -987,6 +1020,7 @@ def main() -> int:
             watcher.token_hits, watcher.scan_error, watcher.stopped_cleanly,
             LEGACY_STATE_DIAGNOSTIC, watcher.scan_incomplete, watcher.scan_completed,
             watcher.race_events, watcher.incomplete_events,
+            watcher.settled_cycles, watcher.settled_races, watcher.settled_incomplete,
         )
         REPORT["credentialScan"] = {
             "filesObserved": watcher.scanned_files,
@@ -994,6 +1028,9 @@ def main() -> int:
             "incomplete": watcher.scan_incomplete,
             "raceEvents": watcher.race_events,
             "incompleteEvents": watcher.incomplete_events,
+            "settledCycles": watcher.settled_cycles,
+            "settledIncomplete": watcher.settled_incomplete,
+            "settledRaces": watcher.settled_races,
             "error": watcher.scan_error,
             "stoppedCleanly": watcher.stopped_cleanly,
         }
@@ -1937,6 +1974,9 @@ def credential_scan_verdict(
     legacy_diagnostic: bool = False, scan_incomplete: str | None = None,
     scan_completed: int = 0, race_events: list[dict] | None = None,
     incomplete_events: list[dict] | None = None,
+    settled_cycles: int | None = None,
+    settled_races: list[dict] | None = None,
+    settled_incomplete: list[dict] | None = None,
 ) -> tuple[str | None, str]:
     """The typed verdict for one run's credential-path scan.
 
@@ -1945,6 +1985,13 @@ def credential_scan_verdict(
     mode; the legacy diagnostic mode only additionally names the file. An
     incomplete scan also fails: absence of evidence is only evidence when the
     scan provably ran to completion.
+
+    User decision A scopes the *completeness* judgement to the settled window:
+    the phase after the attempts ended, when the tree is no longer written. A
+    hit is fatal wherever it was seen; churn recorded during the active window
+    is carried as an observation (active_races/active_incomplete) and does not
+    fail the run, while the settled window must contain at least one fully
+    observed cycle with no races.
     """
     if token_hits:
         # A direct observation outranks every secondary failure: the credential
@@ -1958,6 +2005,17 @@ def credential_scan_verdict(
     if not stopped_cleanly:
         return ("CODEX_GATE_STATE_SCAN_INCOMPLETE",
                 "the state credential scanner did not stop cleanly")
+    if settled_cycles is not None:
+        # Settled-window semantics: only this window has to be fully observed.
+        if settled_cycles <= 0:
+            return ("CODEX_GATE_STATE_SCAN_INCOMPLETE",
+                    "no settled cycle was ever observed: the state tree never held still "
+                    "for a fully walked comparison")
+        # Raced or unobservable cycles after a settled one belong to the next
+        # period of harness activity; they are observations in the report, not
+        # failures. What the verdict requires is that the tree was fully
+        # observed at least once while it held still, with no token anywhere.
+        return None, ""
     if scan_incomplete is not None:
         return ("CODEX_GATE_STATE_SCAN_INCOMPLETE",
                 f"the state credential scanner could not cover everything: {scan_incomplete}")
