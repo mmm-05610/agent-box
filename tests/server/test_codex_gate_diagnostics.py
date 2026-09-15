@@ -398,3 +398,64 @@ def test_process_identity_binds_this_run_only(tmp_path):
     assert module._surviving_identities.__module__ == module.__name__
     # No process carries this root any more: nothing survives.
     assert module._surviving_identities(root, []) == []
+
+
+def test_a_settled_only_hit_is_a_hit_for_the_turn_chain_too(tmp_path):
+    """The merge is shared: a credential only the settled scan saw counts for the
+    turn chain exactly as it does for the reopen phase."""
+    module = load_gate()
+    root = tmp_path / "worker-root"
+    root.mkdir(parents=True)
+    watcher = module.StateSymlinkWatcher(root)
+    watcher.stopped_cleanly = True
+    settled = {"harnessExited": True, "settledComplete": True, "settledCycles": 1,
+               "settledScan": "view", "settledIncomplete": None,
+               "settledHits": ["native-state/shell_snapshots/late.sh"]}
+    phase = module.turn_chain_phase({}, settled, watcher)
+    assert [hit["source"] for hit in phase["hits"]] == ["settled"]
+    failure = module.resolve_run_failure({}, [phase])
+    assert failure is not None and failure.code == "CODEX_GATE_CREDENTIAL_IN_NATIVE_STATE"
+
+
+def test_a_capture_hit_is_a_credential_hit_not_an_incomplete_scan(tmp_path):
+    """A token found in the captured bytes is the primary failure; completeness
+    is a separate question."""
+    module = load_gate()
+    root = tmp_path / "worker-root"
+    root.mkdir(parents=True)
+    watcher = module.StateSymlinkWatcher(root)
+    watcher.stopped_cleanly = True
+    settled = {"harnessExited": True, "settledComplete": False, "settledCycles": 0,
+               "settledScan": "capture-boundary", "settledIncomplete": None}
+    capture = {"files": 3, "bytes": 10, "nativeSessionId": True,
+               "tokenHits": ["state.db"]}
+    phase = module.normalize_phase("turn-chain", settled, watcher, capture)
+    assert [hit["source"] for hit in phase["hits"]] == ["capture"]
+    failure = module.resolve_run_failure({}, [phase])
+    assert failure is not None and failure.code == "CODEX_GATE_CREDENTIAL_IN_NATIVE_STATE"
+
+
+def test_an_unrelated_process_and_a_renamed_descendant_are_distinguished(tmp_path):
+    """The exit poll is the union of what was seen and what is in the table now:
+    an empty 'seen' list never looks like an exit, an unrelated instance never
+    blocks, and a renamed descendant of this run still does."""
+    module = load_gate()
+    root = tmp_path / "worker-root"
+    root.mkdir(parents=True)
+    unrelated = {"pid": 7, "started": "t0", "args": "/tmp/other-run/app-server"}
+    mine = {"pid": 8, "started": "t1", "args": f"renamed-binary --root {root}"}
+    table = [unrelated, mine]
+    module_original = module.process_table
+    try:
+        module.process_table = lambda: list(table)
+        # Nothing seen yet, but this run's process is in the table: not exited.
+        assert module._surviving_identities(root, []) == ["8@t1"]
+        # Only the unrelated instance is left: nothing of this run survives, and
+        # the unrelated pid is never counted even though it was passed in.
+        table = [unrelated]
+        assert module._surviving_identities(root, [(7, "t0")]) == []
+        # A renamed descendant of this run still blocks even after being seen.
+        table = [unrelated, mine]
+        assert module._surviving_identities(root, [(8, "t1")]) == ["8@t1"]
+    finally:
+        module.process_table = module_original

@@ -14,18 +14,22 @@ The reviewed config turns both off. This script proves it the only way that
 counts: it runs the same gate, on the same pinned artifact (0.147.0) and the
 same worker, with **no attempt-ephemeral tmpfs shadow at all**, twice:
 
-  * control leg  - `--feature-flag-control-leg` strips the `[features]` table, so
-    Codex behaves as shipped. The churners are expected to appear here (that is
-    what makes the treatment leg meaningful), and a credential hit is recorded
-    as the strongest form of that appearance.
+  * control leg  - `--feature-flag-control-leg` removes `[features]` (or, with
+    `--strip`, only the named keys) from the loopback config, so Codex behaves as
+    shipped for exactly those flags. What was demonstrated first-hand is the
+    `shell_snapshot` leak: with `--strip shell_snapshot` the control leg writes
+    the injected token into `$CODEX_HOME/shell_snapshots/*.sh` (`plugins` stays
+    off, so the two variables are separated). The `.tmp/plugins` materialization
+    has *not* been reproduced in these legs - it remains a historical
+    observation.
   * treatment leg - the config exactly as deployed. Neither churner may appear,
     in any run, and no credential may be observed anywhere.
 
 The control leg is repeated up to `--control-runs` times because the churners
-are timing-dependent; the treatment leg is repeated `--treatment-runs` times
-because it is the leg that must never show them. Exit code 0 means the
-differential held: every treatment run clean, and the control leg either
-demonstrated an appearance or is reported honestly as not observed in its runs.
+are timing-dependent; the treatment leg is repeated `--treatment-runs` times.
+Only "the control demonstrated the churn and every treatment run was clean" is
+`..._OK` (exit 0); a clean treatment without a demonstrated control is
+`..._INCONCLUSIVE` with a non-zero exit, because nothing was actually compared.
 """
 from __future__ import annotations
 

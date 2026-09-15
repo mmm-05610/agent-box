@@ -934,7 +934,17 @@ def without_feature_flags(config: bytes, strip: str | None = None) -> bytes:
                     continue
         out.append(line)
     control = "".join(out)
-    tomllib.loads(control)
+    document = tomllib.loads(control)
+    if keys:
+        remaining = set(document.get("features", {}) or {})
+        unknown = keys - set(
+            tomllib.loads(config.decode("utf-8")).get("features", {}) or {})
+        if unknown:
+            raise ValueError(f"unknown feature flag to strip: {sorted(unknown)}")
+        # A single-flag strip leaves every other reviewed flag in place.
+        for name in ("plugins", "shell_snapshot"):
+            if name not in keys and name not in remaining:
+                raise ValueError(f"stripping {sorted(keys)} removed {name} as well")
     return control.encode()
 
 
@@ -1933,6 +1943,10 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production, t
                 during_reopen = list(events)
                 second.prompt("reopen-round-2", "What did I ask you to remember? Reply with the nonce.")
                 after_prompt = list(events)
+                # The resumed execution gets its own capture: a credential written
+                # while it ran must have evidence of its own, never the first
+                # execution's.
+                reopened_state, reopened_resumable = second.capture_execution("reopen-round-2")
             finally:
                 second.stop()
         finally:
@@ -1972,16 +1986,21 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production, t
     # reopened. It is what lets the reopen phase be judged on the same footing
     # as the turn chain even after its view is reclaimed.
     token = FAKE_TOKEN.encode()
-    captured_hits = [relative for relative, content in state.items() if token in content]
+    captured = {**state, **{f"round2/{key}": value for key, value in reopened_state.items()}}
+    captured_hits = [relative for relative, content in captured.items() if token in content]
     capture_evidence = {
-        "files": len(state),
-        "bytes": sum(len(content) for content in state.values()),
+        "files": len(captured),
+        "bytes": sum(len(content) for content in captured.values()),
         "tokenHits": captured_hits,
-        "nativeSessionId": bool(state) and reopened == native,
+        # Both executions must be binds to the same native session: the first
+        # captured it, the second resumed it.
+        "nativeSessionId": bool(state) and bool(reopened_state) and reopened == native,
+        "capturedRounds": 2,
     }
     result = {
         "nativeSessionIdStable": reopened == native,
         "stateFiles": len(state), "stateResumable": bool(resumable),
+        "reopenedStateFiles": len(reopened_state), "reopenedStateResumable": bool(reopened_resumable),
         "captureEvidence": capture_evidence,
         "acpMethodsFirstRun": methods_first,
         "acpMethodsSecondRun": methods_second,
@@ -2114,6 +2133,10 @@ def process_table() -> list[dict]:
     """
     done = subprocess.run(
         ["ps", "-eo", "pid=,lstart=,args="], capture_output=True, text=True)
+    if done.returncode != 0 or not done.stdout.strip():
+        # No process table means no evidence that the harness exited; the caller
+        # treats this as "not exited" rather than as a quiet machine.
+        raise RuntimeError(f"ps failed: {done.returncode} {done.stderr.strip()[:120]}")
     rows = []
     for line in done.stdout.splitlines():
         fields = line.strip().split(None, 6)
@@ -2151,14 +2174,19 @@ def harness_processes(temporary: Path) -> list[str]:
 
 
 def _surviving_identities(temporary: Path, seen: list[tuple[int, str]]) -> list[str]:
-    """The identities this run was seen running that are *still* alive.
+    """The identities of this run that are still alive after this poll.
 
     Identity is (pid, start time) plus this run's root in the command line, so a
     renamed descendant is still matched and an unrelated Codex process - a
-    different root - is never counted as surviving.
+    different root - is never counted as surviving. The poll is the *union* of
+    what was seen earlier and what is in the table right now: an empty "seen"
+    list is not evidence of an exit, so a process that appeared after the last
+    sample still counts.
     """
     live = {(row["pid"], row["started"]) for row in matching_processes(temporary)}
-    return [f"{pid}@{started}" for pid, started in seen if (pid, started) in live]
+    survivors = {f"{pid}@{started}" for pid, started in seen if (pid, started) in live}
+    survivors.update(f"{row['pid']}@{row['started']}" for row in matching_processes(temporary))
+    return sorted(survivors)
 
 
 def settle_after_attempt(watcher: "StateSymlinkWatcher", temporary: Path,
@@ -2176,11 +2204,22 @@ def settle_after_attempt(watcher: "StateSymlinkWatcher", temporary: Path,
     """
     deadline = time.monotonic() + timeout_s
     seen: list[tuple[int, str]] = list(watcher.harness_identities)
-    survivors = _surviving_identities(temporary, seen)
+
+    def poll() -> list[str]:
+        return _surviving_identities(temporary, seen)
+
+    try:
+        survivors = poll()
+    except RuntimeError as error:
+        survivors = [f"process table unavailable: {error}"]
     while survivors and time.monotonic() < deadline:
         time.sleep(interval_s)
-        survivors = _surviving_identities(temporary, seen)
-        seen = list(watcher.harness_identities) or seen
+        if watcher.harness_identities:
+            seen = list(watcher.harness_identities)
+        try:
+            survivors = poll()
+        except RuntimeError as error:
+            survivors = [f"process table unavailable: {error}"]
     evidence: dict = {
         "harnessExited": not survivors,
         "harnessSeenAlive": bool(watcher.harness_seen or survivors),
@@ -2237,31 +2276,78 @@ def capture_boundary_evidence(report: dict) -> tuple[bool, str]:
     return True, ""
 
 
+def normalize_phase(name: str, settled_window: dict, watcher=None,
+                    capture_raw: dict | None = None, failure=None) -> dict:
+    """The one place a phase's evidence is assembled - identical for both phases.
+
+    Active observations, the phase's own settled scan and its capture-boundary
+    scan are all reduced to one fact set here, so a credential found by *any* of
+    the three is a hit of that phase. Nothing downstream has to remember which
+    phase used which path.
+    """
+    hits: list[dict] = []
+    for hit in list(getattr(watcher, "token_hits", ()) or ()):
+        entry = dict(hit, phase=name, source="active")
+        if entry not in hits:
+            hits.append(entry)
+    for path in settled_window.get("settledHits") or ():
+        entry = {"path": path, "phase": name, "source": "settled"}
+        if entry not in hits:
+            hits.append(entry)
+    capture_evidence = None
+    if capture_raw is not None:
+        capture_hits = list(capture_raw.get("tokenHits") or ())
+        capture_evidence = {
+            "files": capture_raw.get("files"),
+            "bytes": capture_raw.get("bytes"),
+            "nativeSessionId": capture_raw.get("nativeSessionId"),
+            "tokenHits": capture_hits,
+        }
+        for path in capture_hits:
+            entry = {"path": path, "phase": name, "source": "capture"}
+            if entry not in hits:
+                hits.append(entry)
+    races = list(getattr(watcher, "race_events", ()) or ())
+    for path in settled_window.get("settledRaces") or ():
+        raced = {"path": path, "phase": name, "source": "settled"}
+        if raced not in races:
+            races.append(raced)
+    incomplete = list(getattr(watcher, "incomplete_events", ()) or ())
+    return {
+        "phase": name,
+        "hits": hits,
+        "races": races,
+        "incompleteEvents": incomplete,
+        "scanError": getattr(watcher, "scan_error", None) or settled_window.get("settleError"),
+        "stoppedCleanly": bool(getattr(watcher, "stopped_cleanly", False)),
+        "filesObserved": (getattr(watcher, "scanned_files", 0) or 0)
+                         + (settled_window.get("settledFiles") or 0),
+        "cyclesCompleted": getattr(watcher, "scan_completed", 0) or 0,
+        "settledComplete": bool(settled_window.get("settledComplete")),
+        "settledCycles": settled_window.get("settledCycles"),
+        "settledScan": settled_window.get("settledScan"),
+        "settledIncomplete": settled_window.get("settledIncomplete"),
+        "harnessExited": settled_window.get("harnessExited"),
+        "harnessSeenAlive": settled_window.get("harnessSeenAlive"),
+        "captureEvidence": capture_evidence,
+        "failure": failure,
+    }
+
+
 def turn_chain_phase(report: dict, settled_window: dict, watcher) -> dict:
-    """The turn chain's own phase evidence (its capture scan lives in the report)."""
+    """The turn chain's phase evidence; its capture scan lives in the report."""
     scan = report.get("stateScan") if isinstance(report.get("stateScan"), dict) else None
-    capture = None
     rounds = report.get("rounds") or {}
+    capture_raw = None
     if scan is not None and rounds and all(
             summary.get("state") == "completed" for summary in rounds.values()):
-        capture = {
+        capture_raw = {
             "files": scan.get("files"),
+            "bytes": scan.get("bytes"),
             "nativeSessionId": scan.get("nativeSessionId"),
-            "tokenHits": [] if not scan.get("tokenInState") else ["<captured>"],
+            "tokenHits": ["<captured>"] if scan.get("tokenInState") else [],
         }
-    phase = dict(settled_window)
-    phase.update({
-        "phase": "turn-chain",
-        "hits": list(watcher.token_hits),
-        "races": list(watcher.race_events),
-        "incompleteEvents": list(watcher.incomplete_events),
-        "scanError": watcher.scan_error,
-        "stoppedCleanly": watcher.stopped_cleanly,
-        "filesObserved": watcher.scanned_files,
-        "cyclesCompleted": watcher.scan_completed,
-        "captureEvidence": capture,
-    })
-    return phase
+    return normalize_phase("turn-chain", settled_window, watcher, capture_raw)
 
 
 def resolve_run_failure(report: dict, phases: list[dict]) -> "GateFailure | None":
@@ -2334,30 +2420,23 @@ def observe_phase(worker_root: Path, temporary: Path, work, *, name: str) -> dic
     except BaseException as error:  # noqa: BLE001 - handed back to the caller
         failure = error
     finally:
-        evidence = settle_after_attempt(phase_watcher, temporary)
-        phase_watcher.stop()
-    # Active evidence and settled evidence are merged: a credential that only
-    # the settled pass saw is still a credential in native state.
-    hits = list(phase_watcher.token_hits)
-    for path in evidence.get("settledHits") or ():
-        hit = {"path": path, "phase": "settled"}
-        if hit not in hits:
-            hits.append(hit)
-    if isinstance(result, dict) and isinstance(result.get("captureEvidence"), dict):
-        evidence["captureEvidence"] = result["captureEvidence"]
-    evidence.update({
-        "phase": name,
-        "hits": hits,
-        "races": list(phase_watcher.race_events) + list(evidence.get("settledRaces") or ()),
-        "incompleteEvents": list(phase_watcher.incomplete_events),
-        "scanError": phase_watcher.scan_error,
-        "stoppedCleanly": phase_watcher.stopped_cleanly,
-        "filesObserved": phase_watcher.scanned_files + (evidence.get("settledFiles") or 0),
-        "cyclesCompleted": phase_watcher.scan_completed,
-        "peakFiles": phase_watcher.peak_files,
-        "result": result,
-        "failure": failure,
-    })
+        try:
+            settled = settle_after_attempt(phase_watcher, temporary)
+            evidence = settled
+        except BaseException as error:  # noqa: BLE001 - collected, judged later
+            settled = {"harnessExited": False, "settledComplete": False,
+                       "settledCycles": 0, "settleError": f"{type(error).__name__}: {error}"}
+            evidence = settled
+        try:
+            phase_watcher.stop()
+        except BaseException as error:  # noqa: BLE001 - collected, judged later
+            settled["settleError"] = settled.get("settleError") or (
+                f"stop failed: {type(error).__name__}: {error}")
+    capture_raw = (result.get("captureEvidence")
+                   if isinstance(result, dict) and isinstance(result.get("captureEvidence"), dict)
+                   else None)
+    evidence = normalize_phase(name, settled, phase_watcher, capture_raw, failure)
+    evidence["result"] = result
     return evidence
 
 

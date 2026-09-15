@@ -80,3 +80,24 @@ def test_the_control_transform_drops_only_the_features_table():
                  if line.strip() and not any(marker in line for marker in table_lines)]
     assert all(line in control for line in preserved), (
         "the control leg must keep every other line")
+
+
+def test_a_single_flag_strip_keeps_the_other_flag_and_rejects_unknown_keys():
+    """The per-variable leg must change exactly one variable: the other reviewed
+    flag stays in the config, and a key that is not declared is refused."""
+    import importlib.util as util
+    import tomllib
+
+    spec = util.spec_from_file_location(
+        "gate", REPO_ROOT / "scripts" / "server-round1" / "codex-production-chain-gate.py")
+    gate = util.module_from_spec(spec)
+    spec.loader.exec_module(gate)
+    original = (REPO_ROOT / "plugins" / "agent-box-harnesses" / "deploy" / "codex"
+                / "config.toml").read_bytes()
+
+    single = tomllib.loads(gate.without_feature_flags(original, "shell_snapshot").decode("utf-8"))
+    assert single["features"] == {"plugins": False}, single["features"]
+    whole = tomllib.loads(gate.without_feature_flags(original).decode("utf-8"))
+    assert "features" not in whole
+    with pytest.raises(ValueError, match="unknown feature flag"):
+        gate.without_feature_flags(original, "not_a_flag")
