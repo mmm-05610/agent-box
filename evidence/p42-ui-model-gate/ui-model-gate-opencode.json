@@ -1,0 +1,66 @@
+{
+  "allOk": false,
+  "counts": {
+    "PASS": 6,
+    "FAIL": 2,
+    "SKIP": 0,
+    "PENDING": 0
+  },
+  "executed": 8,
+  "unknownStatuses": [],
+  "detail": [
+    {
+      "detail": "family=opencode; sandbox=C:\\Users\\maoqh\\agentbox-ui-gate-opencode-sandbox; model=deepseek-flash",
+      "id": "driver-target",
+      "status": "PASS",
+      "step": "driver target"
+    },
+    {
+      "detail": "harnesses=[\"opencode\"]",
+      "id": "server-started-with-real-harness",
+      "status": "PASS",
+      "step": "the Server is live with the family-s production deployment"
+    },
+    {
+      "detail": "serverId=server_df77a1d5f6c64aa1875cfb17026b5d35",
+      "id": "lifecycle-connection-installed",
+      "status": "PASS",
+      "step": "the product reached the Server through its own lifecycle connection"
+    },
+    {
+      "detail": "credentialId=credential_442165406233451cba8a2165e69f490b",
+      "id": "credential-added-through-the-app",
+      "status": "PASS",
+      "step": "the interface-s own entry path imported the credential and recorded its id"
+    },
+    {
+      "detail": "providerModel=provider_505705536332499abcb80881fec2349a credentialAttached=true",
+      "id": "provider-model-and-role-created",
+      "status": "PASS",
+      "step": "the model configuration carries the credential and the role selects it"
+    },
+    {
+      "detail": "answerChars=3 nonceRecalled=false terminal=true answer=\"P42\"",
+      "id": "first-turn-answered-by-the-real-model",
+      "status": "FAIL",
+      "step": "the first turn was answered by the real model and streamed before it finished"
+    },
+    {
+      "detail": "answerChars=12 nonceOccurrences=0 answer=\"P42P42-1F4A9\"",
+      "id": "second-turn-carries-the-first",
+      "status": "FAIL",
+      "step": "the second turn-s answer recalls the first turn-s content"
+    },
+    {
+      "detail": "portFree=true recordsFile=present (records only)",
+      "id": "clean-shutdown",
+      "status": "PASS",
+      "step": "the app and the Server stop, and no credential material was written to the evidence"
+    }
+  ],
+  "family": "opencode",
+  "model": "deepseek-flash",
+  "notes": [],
+  "sandbox": "C:\\Users\\maoqh\\agentbox-ui-gate-opencode-sandbox",
+  "serverPort": 18763
+}

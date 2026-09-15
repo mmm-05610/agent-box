@@ -23,6 +23,8 @@
  * `/api/v1/credentials` is ever addressed with it: a credential request must not
  * become a general-purpose fetch to whatever the connection happens to name.
  */
+import { randomUUID } from 'node:crypto'
+
 import { app, ipcMain } from 'electron'
 
 import { resolveAgentBoxWireEndpoint } from '../security/agentbox-wire-endpoint-policy'
@@ -120,7 +122,11 @@ export function registerAgentBoxCredentialsIpc(deps: RegisterAgentBoxCredentials
           }),
           headers: {
             Authorization: `Bearer ${connection.sessionToken}`,
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            // One click is one import: the key is fresh per attempt, so a user
+            // who retries after a refusal imports again rather than replaying
+            // the refusal's empty answer.
+            'Idempotency-Key': randomUUID()
           },
           method: 'POST'
         }

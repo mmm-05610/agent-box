@@ -15,14 +15,18 @@ const hudNativeDrag = hudWindowing?.nativeDrag === true
 const launchFlags = ipcRenderer.sendSync('hermes:launch-flags')
 
 contextBridge.exposeInMainWorld('agentBoxDesktop', {
+  // A sibling of `wire`, not a member of it: these two answer different
+  // questions, and the credentials one must stay reachable when the wire is not
+  // (the surface that adds a credential is the same surface that shows why a
+  // service is unavailable).
+  credentials: {
+    // The secret the user types passes through to the main process and is not
+    // kept here; what comes back is the record (id, label, kind).
+    add: request => ipcRenderer.invoke('agentbox:credentials:add', request),
+    list: () => ipcRenderer.invoke('agentbox:credentials:list')
+  },
   wire: {
     request: request => ipcRenderer.invoke('agentbox:wire:request', request),
-    credentials: {
-      // The secret the user types passes through to the main process and is not
-      // kept here; what comes back is the record (id, label, kind).
-      add: request => ipcRenderer.invoke('agentbox:credentials:add', request),
-      list: () => ipcRenderer.invoke('agentbox:credentials:list')
-    },
     subscribeEvents: ({ sessionId, cursor }, callback) => {
       const subscriptionId = `renderer-${++nextWireSubscriptionId}`
 

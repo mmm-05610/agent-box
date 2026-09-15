@@ -1,0 +1,50 @@
+{
+  "allOk": true,
+  "counts": {
+    "PASS": 5,
+    "FAIL": 0,
+    "SKIP": 0,
+    "PENDING": 0
+  },
+  "executed": 5,
+  "unknownStatuses": [],
+  "detail": [
+    {
+      "detail": "family=hermes; sandbox=C:\\Users\\maoqh\\agentbox-ui-gate-hermes-sandbox; model=deepseek-flash",
+      "id": "driver-target",
+      "status": "PASS",
+      "step": "driver target"
+    },
+    {
+      "detail": "harnesses=[\"hermes\"]",
+      "id": "server-started-with-real-harness",
+      "status": "PASS",
+      "step": "the Server is live with the family-s production deployment"
+    },
+    {
+      "detail": "serverId=server_8f352796048b4577b002001b7ce3b115",
+      "id": "lifecycle-connection-installed",
+      "status": "PASS",
+      "step": "the product reached the Server through its own lifecycle connection"
+    },
+    {
+      "detail": "credentialId=credential_5a91253115e3425980d93c71a0f5caab",
+      "id": "credential-added-through-the-app",
+      "status": "PASS",
+      "step": "the interface-s own entry path imported the credential and recorded its id"
+    },
+    {
+      "detail": "providerModel=provider_230e4c12aab84224a9761ccd805c3cfd credentialAttached=true",
+      "id": "provider-model-and-role-created",
+      "status": "PASS",
+      "step": "the model configuration carries the credential and the role selects it"
+    }
+  ],
+  "family": "hermes",
+  "model": "deepseek-flash",
+  "notes": [
+    "driver error: Error: sessions.createAndSend failed: UNAVAILABLE: Profile has no authorized credential\n    at wireResult (file:///C:/Users/maoqh/agentbox-wsl-round1/apps/desktop/e2e/p42-ui-model-gate.mjs:116:11)\n    at wireOk (file:///C:/Users/maoqh/agentbox-wsl-round1/apps/desktop/e2e/p42-ui-model-gate.mjs:123:10)\n    at async main (file:///C:/Users/maoqh/agentbox-wsl-round1/apps/desktop/e2e/p42-ui-model-gate.mjs:311:18)"
+  ],
+  "sandbox": "C:\\Users\\maoqh\\agentbox-ui-gate-hermes-sandbox",
+  "serverPort": 18762
+}

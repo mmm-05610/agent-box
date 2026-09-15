@@ -1136,3 +1136,18 @@ typecheck 当场暴露；新测试 4 条 ESLint warning 收口为 0。
   exit 0、eslint exit 0、`npm run build` exit 0；重建后的应用复跑无模型全栈联调 **15/15 PASS**。
 - 期间修掉一个自己引入的缺陷：凭据 port 对象未 memo 化 → 渲染循环（既有页面测试当场抓住）。
 - 下一步：四家真实 UI 模型门（凭据与预算已授权，累计 <¥0.07/≤¥10）。
+
+## 四家真实 UI 模型门（2026-09-15，逐家结果）
+
+- **Pi：8/8 PASS、exit 0**——凭据经界面自己的录入路径加入并挂到模型，两轮真实 DeepSeek 答复，
+  首轮即回忆 nonce、次轮带首轮上下文，清理干净。证据 `evidence/p42-ui-model-gate/`。
+- **OpenCode：6/8**——链路跑通（两轮都到 terminal、答复到达），但首轮助手文本是片段
+  （`P42-1F4A9` vs 提问的 `P42-1F4A9C`），**未验证到完整回忆，不记通过**。
+- **Hermes：派发前被拒**——`CREDENTIAL_REQUIRED: Profile has no authorized credential`；
+  根因是**产品缺口**：wire 的 `profiles.create` 不接受凭据（`create_wire` 硬编码
+  `credential_id: None`），而 Hermes 部署按既有设计不声明 model 控件，于是角色拿不到凭据。
+  三条出路与完整分析见 `evidence/p42-ui-model-gate/README.md`。
+- **Codex：未运行**（预算耗尽）；工件与部署已就绪，命令同其余三家。
+- 驱动 `apps/desktop/e2e/p42-ui-model-gate.mjs`；证据写盘前先扫描自身输出，凭据内容命中即拒绝写出。
+- UI 门过程中修掉两个真实缺陷：preload 把 `credentials` 错嵌进 `wire`（界面拿不到），
+  以及 main 的导入请求缺 `Idempotency-Key`（Server 直接拒）。
