@@ -1109,3 +1109,16 @@ typecheck 当场暴露；新测试 4 条 ESLint warning 收口为 0。
 - **未做**：四家真实 UI 模型门（需单独授权的凭据与预算；后端侧四家真实模型门已分别通过）；
   跨端 bug 修复如有，将在真实 UI 门中记录。
 - `REAL_FLOW_VERIFIED`：**部分**——无模型全链路已验证；真实模型链路仍未验（与后端模型门分账）。
+
+## 四家真实 UI 模型门：被产品面缺口阻断（2026-09-15）
+
+- 结论：**未执行**，原因两端都缺同一小段面——Desktop 的 Provider/Model 设置页恒发
+  `credentialId: null`（`apps/desktop/src/features/settings/agentbox-model-settings.tsx:126/285`），
+  wire 的 28 方法里没有任何凭据方法，Server 的凭据存储只由带外方式（CLI / 调用方 register）写入。
+  因此从 UI 创建的角色没法挂凭据，真实模型轮发不出去。
+- 链路本身已分别证明：后端四家真实模型门全绿；无模型全栈联调（本文件上一节）15/15 通过。
+  **两者都不得冒充 UI 模型门。**
+- 待用户裁决的方案见后端 `docs/server-round1/fullstack/ui-model-gate-blocker.md`：
+  A（Desktop 拥有凭据记录 + 一处只读列举面，推荐、与"Windows 是凭据记录权威"一致）；
+  B（wire 增 `credentials.*`，需重锁合同）；C（联调期绕过 UI，不得记作 UI 门）。
+- 现状登记：`REAL_FLOW_VERIFIED = 否`（真实模型路径未验）——无模型全链路已验证不代表它成立。
