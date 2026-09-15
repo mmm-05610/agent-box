@@ -296,10 +296,15 @@ def harness_deployment(
             if projection_files_override is not None else projection_files()
         )],
         # 用户裁决 A（2026-09-15）：`.tmp` 声明为 attempt-ephemeral——Codex 运行时把
-        # 内置 plugin/skill 语料解包进 `$CODEX_HOME/.tmp/plugins/`（实测峰值 5,529 文件），
-        # bwrap 以 tmpfs 遮蔽该子路径：Harness 可写，但不进 view/state/checkpoint，
+        # 内置 plugin/skill 语料解包进 `$CODEX_HOME/.tmp/plugins/`（实测峰值 5,529 文件）。
+        # 同日门内凭据路径诊断第一手定位：Codex 还会把 shell 快照（含全部环境导出，
+        # 即注入的凭据环境变量原文）写进 `$CODEX_HOME/shell_snapshots/*.sh`。
+        # bwrap 以 tmpfs 遮蔽这两个子路径：Harness 可写，但不进 view/state/checkpoint，
         # 尝试结束即消失。1024 列表上限与 fail-closed 凭据扫描保持不变。
-        "stateProjection": {"target": STATE_TARGET, "ephemeralPaths": [".tmp"]},
+        "stateProjection": {
+            "target": STATE_TARGET,
+            "ephemeralPaths": [".tmp", "shell_snapshots"],
+        },
         "adapter": {
             "command": "/usr/bin/node",
             "args": [ADAPTER_ARTIFACT_ENTRY],

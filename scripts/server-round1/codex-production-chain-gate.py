@@ -430,6 +430,7 @@ class StateSymlinkWatcher:
         self.peak_sample: list[str] = []
         self.peak_directory_counts: list[tuple[str, int]] = []
         self.peak_special = 0
+        self.token_hits: list[dict] = []
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, daemon=True)
 
@@ -467,7 +468,32 @@ class StateSymlinkWatcher:
                             })
                     except OSError:
                         continue
+                if not self._stop.is_set():
+                    self._scan_for_credential(views)
             self._stop.wait(self.interval)
+
+    def _scan_for_credential(self, views: Path) -> None:
+        """Name any native-state file that contains the injected fake token.
+
+        This is the diagnostic the credential decision requires: the token is a
+        run-generated non-secret, the scan reads at most the first 4 KiB of a
+        regular file, and only the sanitized relative path is recorded - never
+        any credential material (there is none to leak: the token is fake).
+        """
+        token = FAKE_TOKEN.encode()
+        for location in sorted(views.glob("*/ready/**/native-state/**/*")):
+            if len(self.token_hits) >= self.limit:
+                return
+            try:
+                if not location.is_file() or location.stat().st_size > 65536:
+                    continue
+                if token in location.read_bytes()[:65536]:
+                    relative = location.relative_to(self.worker_root)
+                    entry = {"path": str(relative), "phase": "during-run"}
+                    if entry not in self.token_hits:
+                        self.token_hits.append(entry)
+            except OSError:
+                continue
 
     @staticmethod
     def _count(ready: Path) -> tuple[int, int, dict[str, tuple[int, list[str]]]]:
@@ -756,6 +782,7 @@ def main() -> int:
                 "silentFirstAnswerObservedSeconds": round(endpoint.silent_observed, 3),
             }
             REPORT["stateSymlinksObserved"] = watcher.observed
+            REPORT["credentialPathHits"] = watcher.token_hits
             REPORT["stateProjectionObservation"] = {
                 "peakRegularFiles": watcher.peak_files,
                 "peakRegularFilesSubtree": watcher.peak_files_at,
@@ -1504,7 +1531,9 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production, t
                 ),
                 state_bundle_prefix="agentbox-sidecar/deployment/codex/native-state",
                 state_target=production.STATE_TARGET,
-                state_ephemeral_paths=() if LEGACY_STATE_DIAGNOSTIC else (".tmp",),
+                state_ephemeral_paths=(
+                    () if LEGACY_STATE_DIAGNOSTIC else (".tmp", "shell_snapshots")
+                ),
                 protected_state_paths=protected_state_paths(production),
                 restored_state=restored_state,
                 timeout_ms=120_000,

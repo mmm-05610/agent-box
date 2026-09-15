@@ -189,11 +189,15 @@ Reviewer `CHANGES_REQUIRED` 的修复（§2.1/§7.1）落地后重建
   扫描全部通过。
 - Python 全量 **822 passed / 6 skipped / 0 failed**；Rust fmt 干净 + 27 passed；
   Worker 源未变（`git diff` 为空，c8 摘要仍为现行 bundle）；`git diff --check` 通过。
-- 泄漏路径定位（如实记录）：门新增 `--legacy-state-diagnostic`（无遮蔽、仅假 token、无模型）
-  专用于定位；在该模式 + 遮蔽模式下合计 **14 轮**（8 遮蔽/6 遮蔽+诊断……准确分账：
-  遮蔽模式 6 轮全绿峰值 113；无遮蔽诊断 9 轮全绿）中，secret 命中与 5529 突发**均未复现**
-  ——两类现象都与"捕获与写入突发重叠"的时机相关，本机负载相关。fail-closed 扫描保持，
-  付费 preflight 前继续定位；若泄漏路径在 `.tmp` 内，方案 A 已同时隔离它。
+- **泄漏路径已捕获（watcher 诊断，第一手）**：门内凭据路径观察器（只记脱敏相对路径，
+  每文件只读前 64 KiB，token 为运行期生成假值）在 `--legacy-state-diagnostic` 轮命中：
+  `native-state/shell_snapshots/<uuid>.<ns>.sh`——Codex 0.147.0 把 shell 快照（含全部
+  环境导出，即注入的凭据环境变量原文）写进该目录。因此方案 A 扩展为
+  `ephemeralPaths: [".tmp", "shell_snapshots"]`（同一 tmpfs 机制）。
+  **遮蔽后最终复跑（4 轮，本 HEAD）**：全部 exit 0（`…_GATE_OK`）、view 峰值 **112**、
+  `tokenInState=false`、credentialPathHits=0、state 78 文件。
+- 无遮蔽诊断分账（历史）：诊断模式 9 轮全绿（含 1 轮 --keep），secret 与突发未复现——
+  与写入时机相关；遮蔽模式早期 3 轮绿 + 最终 4 轮绿。以上均按日期入库本节。
 
 ## 5. 全量验证与清理
 
