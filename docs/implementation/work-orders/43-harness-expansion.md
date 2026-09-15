@@ -10,6 +10,25 @@
 Harness；每接一家先收官方文档再动手，任何一家卡住就记账跳过、不阻塞其它家；能用真实模型验证的
 就真跑，费用仍受 42 §D 的累计上限约束。
 
+## 0b. 工作位置（动手前先做这一步）
+
+本工单的执行会话可能被打开在**任何**工作树里。正确位置由 manifest 记录：
+
+1. 在**当前树**里读 `docs/implementation/manifest.json`，取 `orders` 中 `id == "43"` 的
+   `worktree` 与 `branch`（预期 `/home/maoqh/projects/agent-box-harness-expansion` /
+   `feature/harness-expansion-v1`）；
+2. 切过去并自校验：分支名正确、`git status --porcelain` 为空、
+   `docs/implementation/work-orders/43-harness-expansion.md` 在场；
+3. 三条不齐 → **停下报告实际路径/分支/错误**，不得在参考树里实现或提交。
+   目录不存在时重建：`git -C /home/maoqh/projects/agent-box-server-round1 worktree add
+   /home/maoqh/projects/agent-box-harness-expansion -b feature/harness-expansion-v1 966c314`。
+
+**参考对象（只读）**：
+- `/home/maoqh/projects/agent-box-server-round1` —— 已接入四家的实现、四个生产门脚本、
+  工件构建脚本、两份证据文档（`docs/server-round1/fullstack/`）。
+- `/home/maoqh/projects/agent-box-desktop-next-wsl-round1` —— 前端仓：接入完成后**运行**
+  `apps/desktop/e2e/p42-ui-model-gate.mjs`（已参数化，换部署即可），**不写任何前端文件**。
+
 ## 1. 权威与边界
 
 每阶段开始/结束、最终回复前读：`AGENTS.md`、`docs/implementation/master-plan.md`、
