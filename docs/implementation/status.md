@@ -277,6 +277,17 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   [stage-closure-dossier.md](../server-round1/fullstack/stage-closure-dossier.md)：同一份文件既是额度恢复后
   可直接投递的阶段包，也是用户裁决"以自审代替本轮 closure"的依据；含声称项与逐项命令/退出码/计数、
   本阶段自查发现并修复的 10 处缺陷（非橡皮图章证据）、明确未运行项与三个需前端裁决的合同项。
+- fullstack_no_model_integration: **无模型全栈联调通过（2026-09-15，本执行者为 42 的
+  `FULLSTACK_INTEGRATION_OWNER`）**——真实 Windows Electron（构建树，wire 摘要就地核对一致）经
+  `workcore` slot 安装的 lifecycle connection（`{endpoint, sessionToken}` 由主进程从 Server 数据根的
+  `secrets/http-token` 读入，未配置即"无服务"且给稳定原因）→ 本机 Server → `wsl.exe` c8 release
+  Worker → bwrap → 显式 no-model ACP fixture：**15/15 PASS、exit 0**
+  （`server.hello`、Workspace 开/列、Profile/Provider-Model 创建与版本、config describe/resolve、
+  真实一轮且 delta 先于 completed、同 requestId 幂等回放只产生一个执行、排队项可见且可撤回、
+  停止发布 `queued→running→stopping→stopped`、双游标域混用被拒、归档保留历史、干净关闭）。
+  前端检查点 `ed1ccd85`（连接安装）+`b1136759`（驱动与证据）+`957211df`（status）；
+  证据 `apps/desktop/evidence/p42-integration/integration-results.json`。
+  **未读任何凭据、未调任何模型**；四家真实 UI 模型门仍待单独授权的凭据与预算（与后端侧四家门分账）。
 - integration_coverage_map: **§10 联调覆盖对照（2026-09-15）**——
   [integration-coverage-map.md](../server-round1/fullstack/integration-coverage-map.md)：把 §10 每一项标注为
   **B**（后端侧已有可复跑证据）/ **U**（只能由真实 Electron 在环产生）/ **B+U**（两侧分别记账），
