@@ -314,8 +314,16 @@ async function main() {
     // tokens would otherwise truncate the nonce and the assertion would read as
     // "the model did not answer" when the answer is simply cut off.
     const nonce = 'P42-1F4A9C'
+    // A diagnostic override: the same two turns with a different first prompt,
+    // used to tell a short-answer truncation apart from a systematic one. The
+    // recall assertion then compares against the expected substring instead.
+    const promptOverride = process.env.AGENTBOX_UI_GATE_PROMPT ?? null
+    const expected = process.env.AGENTBOX_UI_GATE_EXPECT ?? nonce
     const sent = await wireOk(page, 'sessions.createAndSend', {
-      message: { attachments: [], text: `Remember ${nonce} and reply with it.` },
+      message: {
+        attachments: [],
+        text: promptOverride ?? `Remember ${nonce} and reply with it.`
+      },
       overrides: [],
       profileId: configured.id,
       requestId: 'p42g-send-1',
@@ -363,14 +371,26 @@ async function main() {
     const firstTerminal = (history?.frames ?? []).find(
       frame => frame.event.kind === 'execution.state' && frame.event.state === 'completed'
     )
-    const firstTold = firstAnswer.includes(nonce)
+    const firstTold = firstAnswer.includes(expected)
+    // The two views are recorded apart on purpose: when they disagree, the
+    // product's own reporting of the assistant's text is the suspect, not the
+    // model.
+    const firstDeltas = (history?.frames ?? [])
+      .filter(frame => frame.event.kind === 'message.delta')
+      .map(frame => frame.event.text)
+      .join('')
+    const firstFinal = (history?.frames ?? [])
+      .filter(frame => frame.event.kind === 'message.final' && frame.event.role === 'assistant')
+      .map(frame => frame.event.text)
+      .join('')
 
     record(
       'first-turn-answered-by-the-real-model',
       'the first turn was answered by the real model and streamed before it finished',
       firstTold && Boolean(firstTerminal) ? 'PASS' : 'FAIL',
       `answerChars=${firstAnswer.length} nonceRecalled=${firstTold} terminal=${Boolean(firstTerminal)} `
-      + `answer=${JSON.stringify(firstAnswer.slice(0, 160))}`
+      + `deltas=${JSON.stringify(firstDeltas.slice(0, 200))} `
+      + `final=${JSON.stringify(firstFinal.slice(0, 200))}`
     )
 
     await wireOk(page, 'sessions.send', {
