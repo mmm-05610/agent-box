@@ -1,0 +1,17 @@
+{
+  "name": "agent-box-harness-runtime-claude",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Offline-locked runtime closure for the Claude Code ACP adapter (Work Order 43). Separate from runtime/ for the same SDK-pin reason as runtime-dsh; embeds the Anthropic proprietary SDK+platform binary under its own license terms recorded in the family packaging doc.",
+  "license": "Apache-2.0",
+  "overrides": {
+    "@agentclientprotocol/claude-agent-acp": "0.77.0"
+  },
+  "dependencies": {
+    "@agentclientprotocol/claude-agent-acp": "0.77.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

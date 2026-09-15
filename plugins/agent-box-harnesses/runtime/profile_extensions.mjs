@@ -96,6 +96,35 @@ export const AGENTBOX_HARNESS_PROFILES = {
     journalPageWhileOwned: false,
     reloadOnHistoryRefresh: false,
   },
+  // Work Order 43. Claude Code through its official ACP adapter: the upstream
+  // registry's `claude` entry launches via `npx`, which a managed offline
+  // chain must never do, so this AgentBox-owned profile registers the same
+  // harness under the product's `claude-code` id; the deployment always
+  // injects the absolute artifact entry (`launch`). Permission mode is
+  // AgentBox-owned `deny` (an injected resolver decides; no static allow).
+  // The adapter refused `session/set_model` in the probe and exposes model +
+  // permission-mode through config options instead, so `models: true`.
+  "claude-code": {
+    id: "claude-code",
+    label: "Claude Code",
+    command: process.platform === "win32" ? "claude-agent-acp.cmd" : "claude-agent-acp",
+    args: [],
+    adapterCommand: process.platform === "win32" ? "claude-agent-acp.cmd" : "claude-agent-acp",
+    permissionMode: "deny",
+    modelVariantConfigIDs: [],
+    capabilities: {
+      ...COMMON_ACP_CAPABILITIES,
+      models: true,
+      todos: false,
+      commands: false,
+      actions: false,
+      sessionRename: false,
+      sessionDelete: false,
+    },
+    historyLoader: undefined,
+    journalPageWhileOwned: false,
+    reloadOnHistoryRefresh: false,
+  },
 }
 
 const REGISTERED = { ...HARNESS_PROFILES, ...AGENTBOX_HARNESS_PROFILES }

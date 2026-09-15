@@ -11,11 +11,11 @@
       "stream"
     ],
     "claude-code": [
-      "attach",
       "finish",
       "native_continuation",
       "observe",
-      "start"
+      "start",
+      "stream"
     ],
     "opencode": [
       "finish",
