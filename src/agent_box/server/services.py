@@ -31,6 +31,16 @@ class ProductService:
         self.execution = execution
         self.notifier = notifier
 
+    # -- credentials --------------------------------------------------------
+
+    def import_credential(self, *, kind: str, source: str, key: str):
+        """The running Server's credential import (see SessionService)."""
+        return self.sessions.import_credential(kind=kind, source=source, key=key)
+
+    def list_credentials(self) -> list[dict[str, Any]]:
+        """Ids and kinds this Server can resolve; never the locator."""
+        return self.sessions.list_credentials()
+
     # -- capability discovery ---------------------------------------------
 
     def readiness(self) -> dict[str, Any]:

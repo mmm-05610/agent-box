@@ -28,6 +28,12 @@ class ProbeRequest(StrictModel):
     user: str | None = Field(default=None, min_length=1, max_length=128)
 
 
+class CredentialImportRequest(StrictModel):
+    kind: str = Field(min_length=1, max_length=32)
+    source_path: str = Field(min_length=1, max_length=4096)
+    confirm_source_path: str = Field(min_length=1, max_length=4096)
+
+
 class BrowseRequest(StrictModel):
     probe_id: str = Field(min_length=1, max_length=160)
     path: str = Field(min_length=1, max_length=4096)
@@ -171,6 +177,37 @@ def create_app(runtime: ServerRuntime) -> FastAPI:
     @app.get("/api/v1/wsl/distributions", dependencies=protected)
     def distributions():
         return {"items": runtime.service.distributions()}
+
+    @app.get("/api/v1/credentials", dependencies=protected)
+    def credentials():
+        """Which credentials this Server can resolve (ids and kinds only)."""
+        return {"items": runtime.service.list_credentials()}
+
+    @app.post("/api/v1/credentials", dependencies=protected)
+    def import_credential(
+        body: CredentialImportRequest, response: Response,
+        key: str = Depends(idempotency_key),
+    ):
+        """Import one credential from a *path*, never from a payload.
+
+        The body names where the secret is; this Server's own secret store reads
+        it (with the store's symlink, type and size rules), so credential
+        material never travels in a request. The caller must repeat the source
+        path, the same discipline the one-shot CLI applies, because a mistyped
+        path would silently import the wrong file. The answer carries the opaque
+        id the product will reference and nothing else.
+        """
+        if body.source_path != body.confirm_source_path:
+            raise ServerError(
+                "CREDENTIAL_SOURCE_UNCONFIRMED",
+                "confirm_source_path must repeat source_path exactly",
+                status=422,
+            )
+        status, result = runtime.service.import_credential(
+            kind=body.kind, source=body.source_path, key=key,
+        )
+        response.status_code = status
+        return result
 
     @app.post("/api/v1/connections/probe", dependencies=protected)
     def probe(body: ProbeRequest, response: Response, key: str = Depends(idempotency_key)):

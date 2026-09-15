@@ -20,6 +20,21 @@ class CredentialRecords:
             )
         return {"credential_id": credential_id, "kind": kind}
 
+    def list(self) -> list[dict[str, Any]]:
+        """Every registered credential, without its locator.
+
+        The locator is where the secret lives, so it stays inside the Server: a
+        client that offers a choice needs the id and the kind, not the address.
+        """
+        with self.database.read() as conn:
+            rows = conn.execute(
+                "SELECT id,kind,created_at FROM server_credentials ORDER BY created_at,id",
+            ).fetchall()
+        return [
+            {"credentialId": row["id"], "kind": row["kind"], "createdAt": row["created_at"]}
+            for row in rows
+        ]
+
     def exists(self, credential_id: str) -> bool:
         """Whether this id already resolves; used to make a restart idempotent.
 

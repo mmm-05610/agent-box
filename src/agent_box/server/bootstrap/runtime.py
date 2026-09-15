@@ -285,7 +285,8 @@ def build_runtime(
     session_service = SessionService(session_records, idempotency, objects,
                                      harnesses=registry, profiles=profile_records,
                                      credentials=credentials, queue=queue_records,
-                                     execution=execution, on_event=notifier.notify)
+                                     execution=execution, on_event=notifier.notify,
+                                     secret_store=secrets_store)
     session_service.bind_model_configs(provider_model_service)
     service = ProductService(
         workspace_service, profile_service, session_service,

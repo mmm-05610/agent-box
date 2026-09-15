@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any, Mapping
 
 from agent_box.server.errors import ServerError, unavailable
@@ -15,7 +16,7 @@ class SessionService:
                  harnesses: HarnessRegistry, profiles, credentials,
                  queue=None,
                  execution: TurnExecutionPort | None = None,
-                 on_event=None) -> None:
+                 on_event=None, secret_store=None) -> None:
         self.records = records
         self.idempotency = idempotency
         self.objects = objects
@@ -24,6 +25,7 @@ class SessionService:
         self.credentials = credentials
         self.queue = queue
         self.execution = execution
+        self.secret_store = secret_store
         self.on_event = on_event or (lambda: None)
         self.model_configs = None
 
@@ -171,6 +173,51 @@ class SessionService:
                 # idempotent product answer.
                 pass
         return status, result
+
+    def import_credential(self, *, kind: str, source: str, key: str):
+        """Import one credential from a source file into this Server's own store.
+
+        The caller names a *path*: the secret is read by this Server's own secret
+        store (symlink, file-type and size rules live there), so a request body
+        never carries credential material, and the answer carries only the opaque
+        id the product will reference. This is the running Server's counterpart
+        to the one-shot CLI - the CLI cannot do it while this process holds the
+        data-root lock, which is exactly the case the interface needs.
+
+        The same key replays the same answer: an import that a client retries
+        must not leave a second credential behind.
+        """
+        scope = "POST:/credentials"
+        request_digest = digest({"kind": kind, "source": source})
+        prior = self.idempotency.get(scope, key, request_digest)
+        if prior:
+            return prior
+        if self.secret_store is None:
+            raise unavailable("CREDENTIAL_STORE_UNAVAILABLE",
+                              "This Server was composed without a secret store")
+        try:
+            credential_id, locator = self.secret_store.import_file(Path(source), kind)
+        except (OSError, ValueError) as exc:
+            raise ServerError(
+                "CREDENTIAL_SOURCE_UNREADABLE",
+                f"the credential source could not be imported: {type(exc).__name__}",
+                status=422,
+            ) from exc
+        try:
+            self.credentials.register(credential_id, kind, locator)
+        except BaseException:
+            self.secret_store.delete(locator)
+            raise
+        result = {"credentialId": credential_id, "kind": kind}
+        return self.idempotency.save(scope, key, request_digest, 201, result)
+
+    def list_credentials(self) -> list[dict[str, Any]]:
+        """Every credential this Server can resolve, without its locator.
+
+        Ids and kinds only: what a client needs to offer a choice, and nothing
+        that says where the secret lives.
+        """
+        return self.credentials.list()
 
     def cancel_turn(self, turn_id: str, key: str):
         scope = f"POST:/turns/{turn_id}/cancel"
