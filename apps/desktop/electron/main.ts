@@ -112,6 +112,7 @@ import {
   initMediaProtocolBridge
 } from './host-capabilities/preview/media-bridge'
 import { registerMediaProtocol as registerMediaProtocolImpl } from './host-capabilities/preview/media-registration'
+import { registerAgentBoxCredentialsIpc } from './ipc/agentbox-credentials-ipc'
 import { registerApiProxyIpc } from './ipc/api-proxy-ipc'
 import { registerBackendIpc } from './ipc/backend-ipc'
 import { registerConnectionIpc } from './ipc/connection-ipc'
@@ -816,6 +817,15 @@ const disposeWorkCoreWireIpc = registerWorkCoreWireIpc({
 })
 
 app.on('will-quit', disposeWorkCoreWireIpc)
+
+// Credential records and the entry path: the main process owns both the records
+// file and the import, so the renderer only ever sends a value to store and
+// receives a record back.
+const disposeAgentBoxCredentialsIpc = registerAgentBoxCredentialsIpc({
+  connection: agentBoxServiceComposition.connectionSlot.current
+})
+
+app.on('will-quit', disposeAgentBoxCredentialsIpc)
 
 // The Work Core lifecycle connection, installed before any window exists so the
 // renderer's first wire call already sees the real service or a typed

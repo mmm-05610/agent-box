@@ -27,10 +27,18 @@ const record = (overrides: Partial<ProviderModelConfigRecord> = {}): ProviderMod
   ...overrides
 })
 
-function renderPage(port: ProviderModelMaintenancePort) {
+const CREDENTIAL_ID = 'credential_' + 'a'.repeat(32)
+
+function renderPage(
+  port: ProviderModelMaintenancePort,
+  credentials?: {
+    add: (request: { kind: string; label: string; secret: string }) => Promise<never | object>
+    list: () => Promise<{ credentialId: string; kind: string; label: string }[]>
+  }
+) {
   return render(
     <I18nProvider localePreference={null}>
-      <AgentBoxModelSettings maintenance={port} />
+      <AgentBoxModelSettings credentials={credentials as never} maintenance={port} />
     </I18nProvider>
   )
 }
@@ -257,5 +265,78 @@ describe('AgentBoxModelSettings', () => {
     expect(screen.getAllByRole('textbox').every(input => (input as HTMLInputElement).disabled)).toBe(true)
     resolveCreate?.(record({ id: asWireId('pm-2') }))
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Cancel' })).toBeNull())
+  })
+})
+
+describe('AgentBoxModelSettings credentials', () => {
+  it('offers the records the Desktop holds and sends the chosen reference', async () => {
+    const update = vi.fn(async () => record({ credentialId: asWireId(CREDENTIAL_ID) }))
+
+    const port = {
+      list: vi.fn(async () => ({ items: [record({ credentialId: null })], nextCursor: null })),
+      create: vi.fn(),
+      update,
+      archive: vi.fn()
+    } as unknown as ProviderModelMaintenancePort
+
+    const credentials = {
+      add: vi.fn(),
+      list: vi.fn(async () => [{ credentialId: CREDENTIAL_ID, kind: 'api-key', label: 'DeepSeek official' }])
+    }
+
+    renderPage(port, credentials)
+    await screen.findByText('Model A (model-a)')
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+
+    const picker = await screen.findByRole('combobox', { name: 'Credential reference' })
+
+    // The Desktop's label is what the user chooses by, and the id is what
+    // travels: the picker never shows a secret.
+    expect(screen.getByRole('option', { name: 'DeepSeek official' })).toBeTruthy()
+    fireEvent.change(picker, { target: { value: CREDENTIAL_ID } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(1))
+    expect((update.mock.calls[0][0] as { credentialId: string }).credentialId).toBe(CREDENTIAL_ID)
+  })
+
+  it('adds a credential, shows the Server code on refusal, and lists what it added', async () => {
+    const port = {
+      list: vi.fn(async () => ({ items: [], nextCursor: null })),
+      create: vi.fn(),
+      update: vi.fn(),
+      archive: vi.fn()
+    } as unknown as ProviderModelMaintenancePort
+
+    const add = vi
+      .fn()
+      .mockResolvedValueOnce({ code: 'CREDENTIAL_SOURCE_UNREADABLE', message: 'nope', ok: false })
+      .mockResolvedValueOnce({
+        ok: true,
+        record: { credentialId: CREDENTIAL_ID, kind: 'api-key', label: 'Work key' }
+      })
+
+    const credentials = {
+      add,
+      list: vi
+        .fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValue([{ credentialId: CREDENTIAL_ID, kind: 'api-key', label: 'Work key' }])
+    }
+
+    renderPage(port, credentials)
+    await screen.findByText('No model configurations')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add credential' }))
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Work key' } })
+    fireEvent.change(screen.getByLabelText('API key'), { target: { value: 'typed-secret' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    // The refusal is reported with the Server's own code, not a generic message.
+    await screen.findByText(/CREDENTIAL_SOURCE_UNREADABLE/)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(add).toHaveBeenCalledTimes(2))
+    expect(add.mock.calls[1][0]).toEqual({ kind: 'api-key', label: 'Work key', secret: 'typed-secret' })
   })
 })

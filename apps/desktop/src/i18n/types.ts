@@ -415,6 +415,13 @@ export interface Translations {
         loading: string
         empty: string
         emptyDescription: string
+        credentialNone: string
+        credentialAdd: string
+        credentialLabel: string
+        credentialSecret: string
+        credentialSave: string
+        credentialCancel: string
+        credentialFailed: string
         error: string
         retry: string
         displayName: string

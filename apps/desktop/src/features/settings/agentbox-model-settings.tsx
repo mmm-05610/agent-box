@@ -3,12 +3,18 @@ import { type ChangeEvent, useCallback, useEffect, useMemo, useState } from 'rea
 
 import { agentBoxRuntimeClient } from '@/api/agentbox-runtime-client'
 import {
+  addDesktopCredential,
+  type DesktopCredentialRecord,
+  listDesktopCredentials
+} from '@/application/provider-model/desktop-credentials'
+import {
   type ProviderModelMaintenancePort,
   wireProviderModelMaintenancePort
 } from '@/application/provider-model/provider-model-maintenance-port'
 import { ListRow, Pill, SettingsContent, SettingsSection } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { controlVariants } from '@/components/ui/control'
 import { Input } from '@/components/ui/input'
 import { type Translations, useI18n } from '@/i18n'
 import { Check, Cpu, Loader2, Pencil, Plus, Trash2, X } from '@/lib/icons'
@@ -23,8 +29,53 @@ import type { ProviderModelConfigRecord } from '@/types/wire/wire-v1'
 
 type ModelsCopy = Translations['settings']['product']['models']
 
+export interface DesktopCredentialsPort {
+  add: typeof addDesktopCredential
+  list: typeof listDesktopCredentials
+}
+
 interface AgentBoxModelSettingsProps {
+  credentials?: DesktopCredentialsPort
   maintenance?: ProviderModelMaintenancePort
+}
+
+/** The sentinel a `Select` needs: Radix refuses an empty item value, so "no
+ *  credential" travels as a value that cannot collide with an id. */
+const NO_CREDENTIAL = '__none__'
+
+function credentialChoice(value: string): string | null {
+  return value === NO_CREDENTIAL ? null : value
+}
+
+function CredentialPicker({
+  copy,
+  disabled,
+  onChange,
+  records,
+  value
+}: {
+  copy: ModelsCopy
+  disabled: boolean
+  onChange: (next: string | null) => void
+  records: DesktopCredentialRecord[]
+  value: string | null
+}) {
+  return (
+    <select
+      aria-label={copy.credential}
+      className={controlVariants({ size: 'sm' })}
+      disabled={disabled}
+      onChange={event => onChange(credentialChoice(event.target.value))}
+      value={value ?? NO_CREDENTIAL}
+    >
+      <option value={NO_CREDENTIAL}>{copy.credentialNone}</option>
+      {records.map(record => (
+        <option key={record.credentialId} value={record.credentialId}>
+          {record.label || record.credentialId}
+        </option>
+      ))}
+    </select>
+  )
 }
 
 const REQUIRED_CAPABILITIES = [
@@ -38,7 +89,7 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-export function AgentBoxModelSettings({ maintenance }: AgentBoxModelSettingsProps) {
+export function AgentBoxModelSettings({ credentials, maintenance }: AgentBoxModelSettingsProps) {
   const productCopy = useI18n().t.settings.product
   const copy = productCopy.models
   const service = useStore($agentBoxService)
@@ -59,6 +110,19 @@ export function AgentBoxModelSettings({ maintenance }: AgentBoxModelSettingsProp
   const [creating, setCreating] = useState(false)
   const [archiveTarget, setArchiveTarget] = useState<ProviderModelConfigRecord | null>(null)
 
+  // Memoised: a fresh object here would make `loadCredentials` a new function on
+  // every render, and the effect that calls it would then loop.
+  const credentialPort: DesktopCredentialsPort = useMemo(
+    () => credentials ?? { add: addDesktopCredential, list: listDesktopCredentials },
+    [credentials]
+  )
+
+  const [credentialRecords, setCredentialRecords] = useState<DesktopCredentialRecord[]>([])
+  const [adding, setAdding] = useState(false)
+  const [addingLabel, setAddingLabel] = useState('')
+  const [addingSecret, setAddingSecret] = useState('')
+  const [addingBusy, setAddingBusy] = useState(false)
+
   const load = useCallback(async () => {
     if (!port) {
       return
@@ -78,9 +142,44 @@ export function AgentBoxModelSettings({ maintenance }: AgentBoxModelSettingsProp
     }
   }, [port])
 
+  const loadCredentials = useCallback(async () => {
+    setCredentialRecords(await credentialPort.list())
+  }, [credentialPort])
+
   useEffect(() => {
     void load()
-  }, [load])
+    void loadCredentials()
+  }, [load, loadCredentials])
+
+  const addCredential = async () => {
+    if (addingBusy) {
+      return
+    }
+
+    setAddingBusy(true)
+    setError(null)
+
+    try {
+      const outcome = await credentialPort.add({
+        kind: 'api-key',
+        label: addingLabel.trim(),
+        secret: addingSecret
+      })
+
+      if (outcome.ok) {
+        setAddingSecret('')
+        setAddingLabel('')
+        setAdding(false)
+        await loadCredentials()
+      } else {
+        // The Server's own code is what explains a refusal; the interface shows
+        // it rather than a generic failure.
+        setError(`${copy.credentialFailed}: ${outcome.code}`)
+      }
+    } finally {
+      setAddingBusy(false)
+    }
+  }
 
   if (!port) {
     return (
@@ -118,12 +217,18 @@ export function AgentBoxModelSettings({ maintenance }: AgentBoxModelSettingsProp
     }
   }
 
-  const create = async (displayName: string, harness: string, provider: string, models: ProviderModelConfigRecord['models']) => {
+  const create = async (
+    displayName: string,
+    harness: string,
+    provider: string,
+    models: ProviderModelConfigRecord['models'],
+    credentialId: string | null
+  ) => {
     const created = await port.create({
       displayName,
       harness,
       provider,
-      credentialId: null,
+      credentialId,
       configuration: [],
       models: models.map(model => ({ ...model, modelId: model.modelId.trim(), displayName: model.displayName.trim() }))
     })
@@ -138,10 +243,20 @@ export function AgentBoxModelSettings({ maintenance }: AgentBoxModelSettingsProp
     <SettingsContent>
       <SettingsSection
         aside={
-          <Button disabled={creating} onClick={() => setCreating(true)} size="sm">
-            <Plus />
-            {copy.add}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              disabled={adding || addingBusy}
+              onClick={() => setAdding(true)}
+              size="sm"
+              variant="outline"
+            >
+              {copy.credentialAdd}
+            </Button>
+            <Button disabled={creating} onClick={() => setCreating(true)} size="sm">
+              <Plus />
+              {copy.add}
+            </Button>
+          </div>
         }
         icon={Cpu}
         title={copy.title}
@@ -168,6 +283,7 @@ export function AgentBoxModelSettings({ maintenance }: AgentBoxModelSettingsProp
         {records.map(record => (
           <ModelRow
             copy={copy}
+            credentials={credentialRecords}
             editing={editing === record.id}
             key={`${record.id}:${record.version}`}
             onArchive={() => setArchiveTarget(record)}
@@ -188,9 +304,49 @@ export function AgentBoxModelSettings({ maintenance }: AgentBoxModelSettingsProp
           />
         ))}
       </SettingsSection>
+      {adding && (
+        <SettingsSection icon={Plus} title={copy.credentialAdd}>
+          <div className="grid gap-2">
+            <Input
+              aria-label={copy.credentialLabel}
+              disabled={addingBusy}
+              onChange={event => setAddingLabel(event.target.value)}
+              placeholder={copy.credentialLabel}
+              value={addingLabel}
+            />
+            <Input
+              aria-label={copy.credentialSecret}
+              disabled={addingBusy}
+              onChange={event => setAddingSecret(event.target.value)}
+              placeholder={copy.credentialSecret}
+              type="password"
+              value={addingSecret}
+            />
+            <div className="flex gap-2">
+              <Button
+                disabled={addingBusy || !addingLabel.trim() || !addingSecret}
+                onClick={() => void addCredential()}
+              >
+                {copy.credentialSave}
+              </Button>
+              <Button
+                disabled={addingBusy}
+                onClick={() => {
+                  setAdding(false)
+                  setAddingSecret('')
+                }}
+                variant="ghost"
+              >
+                {copy.credentialCancel}
+              </Button>
+            </div>
+          </div>
+        </SettingsSection>
+      )}
       {creating && (
         <CreateForm
           copy={copy}
+          credentials={credentialRecords}
           onCancel={() => setCreating(false)}
           onCreate={async (...args) => {
             try {
@@ -227,6 +383,7 @@ export function AgentBoxModelSettings({ maintenance }: AgentBoxModelSettingsProp
 function ModelRow({
   record,
   copy,
+  credentials,
   editing,
   onEdit,
   onCancel,
@@ -237,6 +394,7 @@ function ModelRow({
 }: {
   record: ProviderModelConfigRecord
   copy: ModelsCopy
+  credentials: DesktopCredentialRecord[]
   editing: boolean
   onEdit: () => void
   onCancel: () => void
@@ -247,6 +405,7 @@ function ModelRow({
 }) {
   const [name, setName] = useState(record.displayName)
   const [models, setModels] = useState(record.models.length > 0 ? record.models : [newModel()])
+  const [credentialId, setCredentialId] = useState<string | null>(record.credentialId)
   const [saving, setSaving] = useState(false)
 
   const valid = Boolean(
@@ -282,7 +441,7 @@ function ModelRow({
           providerModelId: record.id,
           expectedVersion: record.version,
           displayName,
-          credentialId: record.credentialId,
+          credentialId,
           configuration: record.configuration,
           models: nextModels
         })
@@ -382,6 +541,15 @@ function ModelRow({
             </div>
           ))}
           {editing && (
+            <CredentialPicker
+              copy={copy}
+              disabled={saving}
+              onChange={setCredentialId}
+              records={credentials}
+              value={credentialId}
+            />
+          )}
+          {editing && (
             <Button
               aria-label={copy.addModel}
               disabled={saving}
@@ -409,15 +577,24 @@ function ModelRow({
 
 function CreateForm({
   copy,
+  credentials,
   onCancel,
   onCreate
 }: {
   copy: ModelsCopy
+  credentials: DesktopCredentialRecord[]
   onCancel: () => void
-  onCreate: (displayName: string, harness: string, provider: string, models: ProviderModelConfigRecord['models']) => Promise<void>
+  onCreate: (
+    displayName: string,
+    harness: string,
+    provider: string,
+    models: ProviderModelConfigRecord['models'],
+    credentialId: string | null
+  ) => Promise<void>
 }) {
   const [values, setValues] = useState(['', '', '', ''])
   const [models, setModels] = useState([newModel()])
+  const [credentialId, setCredentialId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
   const valid = Boolean(
@@ -435,6 +612,13 @@ function CreateForm({
         <Input aria-label={copy.displayName} disabled={saving} onChange={set(0)} placeholder={copy.displayName} value={values[0]} />
         <Input aria-label={copy.harness} disabled={saving} onChange={set(1)} placeholder={copy.harness} value={values[1]} />
         <Input aria-label={copy.provider} disabled={saving} onChange={set(2)} placeholder={copy.provider} value={values[2]} />
+        <CredentialPicker
+          copy={copy}
+          disabled={saving}
+          onChange={setCredentialId}
+          records={credentials}
+          value={credentialId}
+        />
         {models.map((model, index) => (
           <div className="flex items-center gap-2" key={index}>
             <Input
@@ -497,7 +681,7 @@ function CreateForm({
               setSaving(true)
 
               try {
-                await onCreate(values[0].trim(), values[1].trim(), values[2].trim(), models)
+                await onCreate(values[0].trim(), values[1].trim(), values[2].trim(), models, credentialId)
               } finally {
                 setSaving(false)
               }

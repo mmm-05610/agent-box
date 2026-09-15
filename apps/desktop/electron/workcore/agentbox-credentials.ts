@@ -31,7 +31,10 @@
  * ```
  */
 
+import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 
 export interface AgentBoxCredentialRecord {
   credentialId: string
@@ -122,4 +125,84 @@ export function listAgentBoxCredentials(
  *  from the renderer: the UI can only choose what this Desktop recorded. */
 export function agentBoxCredentialIds(records: AgentBoxCredentialRecord[]): Set<string> {
   return new Set(records.map(record => record.credentialId))
+}
+
+/** Write a secret to a 0600 file this process owns, for the Server to read.
+ *
+ * The import route takes a *path*, never the material, so the secret has to
+ * exist as a file for as long as the import takes. It goes in the OS temp
+ * directory with a random name, is created 0600 before anything is written, and
+ * the caller deletes it in a `finally` - a failure path that leaves a readable
+ * secret file behind would be worse than the failure itself.
+ */
+export function writeAgentBoxCredentialSource(
+  secret: string,
+  io: SourceIo = defaultSourceIo
+): string {
+  const path = io.tempPath()
+
+  io.writeFile(path, secret, 0o600)
+
+  return path
+}
+
+interface SourceIo {
+  removeFile: (filePath: string) => void
+  tempPath: () => string
+  writeFile: (filePath: string, content: string, mode: number) => void
+}
+
+const defaultSourceIo: SourceIo = {
+  removeFile: filePath => fs.rmSync(filePath, { force: true }),
+  tempPath: () => path.join(os.tmpdir(), `agentbox-credential-${randomUUID()}`),
+  writeFile: (filePath, content, mode) => {
+    fs.writeFileSync(filePath, content, { encoding: 'utf8', mode })
+  }
+}
+
+/** Remove a source written by `writeAgentBoxCredentialSource`, never throwing:
+ *  it runs on the way out of a failure too, and must not replace it. */
+export function removeAgentBoxCredentialSource(
+  filePath: string,
+  io: SourceIo = defaultSourceIo
+): void {
+  try {
+    io.removeFile(filePath)
+  } catch {
+    // the caller's outcome is what matters; a temp file it could not remove is
+    // reported by whatever it does next, not by masking the real result
+  }
+}
+
+/** Append one record to the Desktop's records file, keeping the rest intact.
+ *  A file that does not parse is treated as empty: the alternative - refusing to
+ *  record a credential the Server just accepted - would be worse. */
+export function appendAgentBoxCredentialRecord(
+  filePath: string,
+  record: AgentBoxCredentialRecord,
+  io: RecordsIo = defaultRecordsIo
+): void {
+  const existing = (() => {
+    try {
+      return parseAgentBoxCredentials(io.readFile(filePath))
+    } catch {
+      return []
+    }
+  })()
+
+  const records = [...existing.filter(item => item.credentialId !== record.credentialId), record]
+
+  io.writeFile(filePath, `${JSON.stringify({ credentials: records }, null, 2)}\n`)
+}
+
+interface RecordsIo {
+  readFile: (filePath: string) => string
+  writeFile: (filePath: string, content: string) => void
+}
+
+const defaultRecordsIo: RecordsIo = {
+  readFile: filePath => fs.readFileSync(filePath, 'utf8'),
+  writeFile: (filePath, content) => {
+    fs.writeFileSync(filePath, content, { encoding: 'utf8', mode: 0o600 })
+  }
 }
