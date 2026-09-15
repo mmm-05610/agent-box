@@ -456,6 +456,163 @@ def _open_beneath_fd(
         raise
 
 
+class CredentialStateScanner:
+    """One scanner instance, one owner: nothing here is shared between a
+    background observer and a synchronous settled-window scan.
+
+    The state subtree is Harness-writable, so every walk is fd-anchored and
+    opens each component with O_NOFOLLOW (the Worker's own discipline). A scan
+    is *complete* only when the whole active tree was walked within every budget
+    and no file was skipped for an unknown reason; a raced file is recorded and
+    makes the scan incomplete, and an unobservable file (past a budget) always
+    makes it incomplete. Only sanitized relative paths are recorded.
+    """
+
+    def __init__(self, worker_root: Path, token: bytes) -> None:
+        self.worker_root = worker_root
+        self.token = token
+        self.observed_identity: dict[str, tuple] = {}
+        self.scanned_entries = 0
+        self.scanned_files = 0
+        self.scanned_bytes = 0
+        self.cycle_complete = True
+        self.incomplete: str | None = None
+        self.races: list[dict] = []
+        self.hits: list[dict] = []
+        self.cycles_completed = 0
+        self.peak_files = 0
+        self.peak_directory_counts: list[tuple[str, int]] = []
+        self.peak_sample: list[str] = []
+        self.peak_special = 0
+
+    # -- public -----------------------------------------------------------
+
+    def scan(self, *, sample_peak: bool = False) -> dict:
+        """Walk the tree once and report exactly what this pass observed."""
+        self.observed_identity = {}
+        self.scanned_entries = 0
+        self.scanned_files = 0
+        self.scanned_bytes = 0
+        self.cycle_complete = True
+        self.incomplete = None
+        self.races = []
+        self.hits = []
+        views = self.worker_root / "views"
+        if not views.is_dir():
+            # No view is *not* an unobserved tree: the capture pipeline already
+            # reclaimed it, and the caller judges that window on the
+            # capture-boundary evidence instead. `viewsOnDisk` says which it was.
+            self.incomplete = None
+            return self._summary(views_exist=False)
+        views_fd = _open_dir_fd(views)
+        try:
+            completed_here = False
+            with os.scandir(f"/proc/self/fd/{views_fd}") as entries:
+                for entry in entries:
+                    view_fd = None
+                    try:
+                        view_fd = _open_beneath_fd(views_fd, (entry.name, "ready"), True)
+                        self._scan_directory(
+                            view_fd, "agentbox-sidecar/deployment/codex/native-state")
+                        completed_here = True
+                    except FileNotFoundError:
+                        continue
+                    except OSError as error:
+                        self._mark_incomplete(f"view {entry.name}: {error}")
+                        continue
+                    finally:
+                        if view_fd is not None:
+                            os.close(view_fd)
+            if completed_here and self.cycle_complete:
+                self.cycles_completed += 1
+        finally:
+            os.close(views_fd)
+        return self._summary(views_exist=True, sample_peak=sample_peak)
+
+    # -- internals --------------------------------------------------------
+
+    def _summary(self, *, views_exist: bool, sample_peak: bool = False) -> dict:
+        return {
+            "viewsOnDisk": views_exist,
+            "complete": self.cycle_complete and views_exist,
+            "cyclesCompleted": self.cycles_completed,
+            "files": self.scanned_files,
+            "bytes": self.scanned_bytes,
+            "entries": self.scanned_entries,
+            "incomplete": self.incomplete,
+            "races": list(self.races),
+            "hits": list(self.hits),
+            "identity": dict(self.observed_identity),
+        }
+
+    def _mark_incomplete(self, reason: str) -> None:
+        self.cycle_complete = False
+        if self.incomplete is None:
+            self.incomplete = reason
+
+    def _scan_directory(self, ready_fd: int, relative: str) -> None:
+        directory = _open_beneath_fd(ready_fd, tuple(relative.split("/")), True)
+        try:
+            self._scan_entries(directory, relative)
+        finally:
+            os.close(directory)
+
+    def _scan_entries(self, directory_fd: int, relative_dir: str) -> None:
+        try:
+            entries = os.scandir(f"/proc/self/fd/{directory_fd}")
+        except OSError as error:
+            self._mark_incomplete(f"cannot list {relative_dir}: {error}")
+            return
+        with entries:
+            for entry in entries:
+                self.scanned_entries += 1
+                if self.scanned_entries > CREDENTIAL_SCAN_TRAVERSAL:
+                    self._mark_incomplete("traversal budget exhausted")
+                    return
+                relative = f"{relative_dir}/{entry.name}"
+                try:
+                    child = _open_beneath_fd(directory_fd, (entry.name,), False)
+                except OSError as error:
+                    if error.errno != errno.ELOOP:
+                        self._mark_incomplete(f"{relative}: {error}")
+                    continue
+                try:
+                    status = os.fstat(child)
+                    if stat.S_ISDIR(status.st_mode):
+                        self._scan_entries(child, relative)
+                        continue
+                    if stat.S_ISLNK(status.st_mode) or not stat.S_ISREG(status.st_mode):
+                        continue
+                    if self.scanned_files >= CREDENTIAL_SCAN_FILES:
+                        self._mark_incomplete("file budget exhausted")
+                        return
+                    if status.st_size > CREDENTIAL_SCAN_FILE_BYTES:
+                        self._mark_incomplete(f"{relative} exceeds the per-file budget")
+                        continue
+                    if self.scanned_bytes + status.st_size > CREDENTIAL_SCAN_TOTAL_BYTES:
+                        self._mark_incomplete("total byte budget exhausted")
+                        return
+                    payload = _read_bounded(child, CREDENTIAL_SCAN_FILE_BYTES)
+                    after = os.fstat(child)
+                    before_identity = (status.st_mtime_ns, status.st_ctime_ns, status.st_size)
+                    after_identity = (after.st_mtime_ns, after.st_ctime_ns, after.st_size)
+                    self.scanned_bytes += len(payload)
+                    self.scanned_files += 1
+                    self.observed_identity[relative] = before_identity
+                    if self.token in payload:
+                        hit = {"path": relative, "phase": "during-run"}
+                        if hit not in self.hits:
+                            self.hits.append(hit)
+                    if before_identity != after_identity:
+                        raced = {"path": relative, "phase": "racing"}
+                        if raced not in self.races:
+                            self.races.append(raced)
+                        self._mark_incomplete(f"{relative} changed while it was read")
+                        continue
+                finally:
+                    os.close(child)
+
+
 class StateSymlinkWatcher:
     """Watch the Worker's own view while an attempt runs.
 
@@ -493,56 +650,40 @@ class StateSymlinkWatcher:
         self.scan_incomplete: str | None = None
         self.race_events: list[dict] = []
         self.incomplete_events: list[dict] = []
-        #: The settled window is the phase after the run's attempts ended
-        #: (harness processes gone, state tree no longer written). User
-        #: decision A judges the credential verdict on that window - it must be
-        #: fully observed at least once - while churn seen during the active
-        #: window is recorded as an observation, not turned into a failure.
-        #: A *settled* cycle is one that walked the whole tree and found it
-        #: byte-identical to the previous cycle: the harness is no longer
-        #: writing, which is exactly the state a capture reads. User decision A
-        #: judges the credential verdict on such a cycle; churn before it is
-        #: recorded as an observation.
-        self.settled_cycles = 0
-        self.settled_incomplete: list[dict] = []
-        self.settled_races: list[dict] = []
-        self._last_identity: dict[str, tuple] | None = None
+        #: Churn the observer saw while the attempts were running is recorded
+        #: as an observation; the *settled* window (after the harness exited) is
+        #: scanned by a separate, synchronous scanner - never by this thread.
         self.scan_completed = 0
-        self.scanned_files = 0
-        self.scanned_bytes = 0
-        self.scanned_entries = 0
-        self._cycle_complete = True
         self.stopped_cleanly = False
+        #: This thread owns one scanner and nothing else owns it. The settled
+        #: window uses a *fresh* scanner, so no mutable scan state is ever
+        #: shared between the observer and the synchronous pass.
+        self._scanner = CredentialStateScanner(worker_root, FAKE_TOKEN.encode())
+        self.harness_seen = False
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, daemon=True)
 
     def start(self) -> None:
         self._thread.start()
 
-    def scan_once(self) -> dict:
-        """One synchronous scan of the current tree, no thread involved.
-
-        An incomplete scan is reported as such, never as a quiet pass. This is
-        the settled-window observation: it runs after the harness exited.
-        """
-        views = self.worker_root / "views"
-        if not views.is_dir():
-            # The capture pipeline already reclaimed every view: the settled
-            # evidence for this run is the capture-boundary scan instead.
-            return {"settledScan": "capture-boundary", "settledCycles": 0,
-                    "settledFiles": 0, "settledIncomplete": None}
-        self._scan_for_credential(views)
-        return {
-            "settledScan": "view",
-            "settledCycles": 1 if self._cycle_complete else 0,
-            "settledFiles": self.scanned_files,
-            "settledIncomplete": self.scan_incomplete,
-        }
+    #: The observer's own scanner owns these; exposed so the report reads the
+    #: same numbers whether they came from the thread or the settled pass.
+    @property
+    def scanned_files(self) -> int:
+        return self._scanner.scanned_files
 
     def stop(self) -> None:
+        """Stop the observer and answer whether it really stopped.
+
+        Joining a thread that was never started raises, and a caller may settle a
+        watcher whose start failed; in that case nothing was observing, which is
+        reported honestly as "not stopped cleanly" rather than crashing.
+        """
         self._stop.set()
-        self._thread.join(timeout=5)
-        self.stopped_cleanly = not self._thread.is_alive()
+        started = self._thread.ident is not None
+        if started:
+            self._thread.join(timeout=5)
+        self.stopped_cleanly = started and not self._thread.is_alive()
 
     def _run(self) -> None:
         try:
@@ -578,152 +719,28 @@ class StateSymlinkWatcher:
                     except OSError:
                         continue
                 if not self._stop.is_set():
-                    self._scan_for_credential(views)
+                    self._observe_once(views)
+                if harness_processes(self.worker_root.parent):
+                    self.harness_seen = True
             self._stop.wait(self.interval)
 
-    def _scan_for_credential(self, views: Path) -> None:
-        """Name any native-state file that contains the injected fake token.
-
-        fd-anchored and no-follow throughout (the same discipline the Worker
-        applies). A cycle counts as *complete* only when the whole active view
-        tree was walked within every budget and no file was skipped for an
-        unknown reason: a raced file, an exhausted budget or an unexpected
-        OSError leaves the cycle incomplete, and only complete cycles advance
-        the "the scan really ran" counter. Only sanitized relative paths are
-        recorded; the token itself is run-generated.
-        """
-        token = FAKE_TOKEN.encode()
-        self.scanned_files = 0
-        self.scanned_bytes = 0
-        self.scanned_entries = 0
-        self.scan_incomplete = None
-        self._cycle_complete = True
-        self.observed_identity: dict[str, tuple] = {}
-        views_fd = _open_dir_fd(views)
-        try:
-            completed_here = False
-            with os.scandir(f"/proc/self/fd/{views_fd}") as entries:
-                for entry in entries:
-                    view_fd = None
-                    try:
-                        view_fd = _open_beneath_fd(views_fd, (entry.name, "ready"), True)
-                        self._scan_directory(
-                            view_fd, "agentbox-sidecar/deployment/codex/native-state", token)
-                        completed_here = True
-                    except FileNotFoundError:
-                        # A view that appeared or vanished mid-scan is simply
-                        # not part of this cycle.
-                        continue
-                    except OSError as error:
-                        self._mark_incomplete(f"view {entry.name}: {error}")
-                        continue
-                    finally:
-                        if view_fd is not None:
-                            os.close(view_fd)
-            if completed_here and self._cycle_complete:
-                self.scan_completed += 1
-                if self._last_identity is not None and self.observed_identity == self._last_identity:
-                    self.settled_cycles += 1
-                self._last_identity = dict(self.observed_identity)
-            else:
-                # An incomplete cycle proves nothing about stability, so it
-                # restarts the comparison; the facts are kept for the report.
-                self._last_identity = None
-                if self.scan_incomplete is not None:
-                    event = {"reason": self.scan_incomplete}
-                    if event not in self.settled_incomplete:
-                        self.settled_incomplete.append(event)
-                for raced in self.race_events:
-                    if raced not in self.settled_races:
-                        self.settled_races.append(raced)
-        finally:
-            os.close(views_fd)
-
-    def _mark_incomplete(self, reason: str) -> None:
-        """Record an incompleteness that this *run* must not forget.
-
-        The per-cycle message is cheap to overwrite, so every event is also
-        kept in a persistent list: a later quiet cycle cannot wash away a tree
-        that was once not fully observed."""
-        self._cycle_complete = False
-        if self.scan_incomplete is None:
-            self.scan_incomplete = reason
-        event = {"reason": reason}
-        if event not in self.incomplete_events:
-            self.incomplete_events.append(event)
-
-    def _scan_directory(self, ready_fd: int, relative: str, token: bytes) -> None:
-        """Open the subdirectory once and hand its fd to the entry walk."""
-        directory = _open_beneath_fd(ready_fd, tuple(relative.split("/")), True)
-        try:
-            self._scan_entries(directory, relative, token)
-        finally:
-            os.close(directory)
-
-    def _scan_entries(self, directory_fd: int, relative_dir: str, token: bytes) -> None:
-        try:
-            entries = os.scandir(f"/proc/self/fd/{directory_fd}")
-        except OSError as error:
-            self._mark_incomplete(f"cannot list {relative_dir}: {error}")
+    def _observe_once(self, views: Path) -> None:
+        """One background observation: the scan plus the peak sampler."""
+        if not views.is_dir():
             return
-        with entries:
-            for entry in entries:
-                self.scanned_entries += 1
-                if self.scanned_entries > CREDENTIAL_SCAN_TRAVERSAL:
-                    self._mark_incomplete("traversal budget exhausted")
-                    return
-                relative = f"{relative_dir}/{entry.name}"
-                try:
-                    child = _open_beneath_fd(directory_fd, (entry.name,), False)
-                except OSError as error:
-                    # A link is refused by O_NOFOLLOW (ELOOP): a narrow, known
-                    # case that is skipped without claiming anything. Anything
-                    # else (permissions, I/O) means this cycle did not observe
-                    # the entry, so the cycle is incomplete.
-                    if error.errno != errno.ELOOP:
-                        self._mark_incomplete(f"{relative}: {error}")
-                    continue
-                try:
-                    status = os.fstat(child)
-                    if stat.S_ISDIR(status.st_mode):
-                        self._scan_entries(child, relative, token)
-                        continue
-                    if stat.S_ISLNK(status.st_mode) or not stat.S_ISREG(status.st_mode):
-                        continue
-                    if self.scanned_files >= CREDENTIAL_SCAN_FILES:
-                        self._mark_incomplete("file budget exhausted")
-                        return
-                    if status.st_size > CREDENTIAL_SCAN_FILE_BYTES:
-                        self._mark_incomplete(f"{relative} exceeds the per-file budget")
-                        continue
-                    if self.scanned_bytes + status.st_size > CREDENTIAL_SCAN_TOTAL_BYTES:
-                        self._mark_incomplete("total byte budget exhausted")
-                        return
-                    payload = _read_bounded(child, CREDENTIAL_SCAN_FILE_BYTES)
-                    after = os.fstat(child)
-                    before_identity = (status.st_mtime_ns, status.st_ctime_ns, status.st_size)
-                    after_identity = (after.st_mtime_ns, after.st_ctime_ns, after.st_size)
-                    self.scanned_bytes += len(payload)
-                    self.scanned_files += 1
-                    self.observed_identity[relative] = before_identity
-                    # The payload is examined whatever the race outcome: a token
-                    # that was there while the file was in flight is a fact this
-                    # gate must not drop.
-                    if token in payload:
-                        entry_hit = {"path": relative, "phase": "during-run"}
-                        if entry_hit not in self.token_hits:
-                            self.token_hits.append(entry_hit)
-                    if before_identity != after_identity:
-                        # Persisted, never cleared: a state file this run could
-                        # not fully observe is a safety fact of *this* run, and
-                        # a later quiet cycle does not undo it.
-                        observation = {"path": relative, "phase": "racing"}
-                        if observation not in self.race_events:
-                            self.race_events.append(observation)
-                        self._mark_incomplete(f"{relative} changed while it was read")
-                        continue
-                finally:
-                    os.close(child)
+        summary = self._scanner.scan()
+        for hit in summary.get("hits", ()):
+            if hit not in self.token_hits:
+                self.token_hits.append(hit)
+        for raced in summary.get("races", ()):
+            if raced not in self.race_events:
+                self.race_events.append(raced)
+        if summary.get("incomplete"):
+            event = {"reason": summary["incomplete"]}
+            if event not in self.incomplete_events:
+                self.incomplete_events.append(event)
+        self.scan_completed = self._scanner.cycles_completed
+        self.scan_incomplete = summary.get("incomplete")
 
     @staticmethod
     def _count(ready: Path) -> tuple[int, int, dict[str, tuple[int, list[str]]]]:
@@ -1090,13 +1107,6 @@ def main() -> int:
             }
         REPORT.update(outcome)
         REPORT["settledWindow"] = settled_window
-        verdict, detail = finalize_run(REPORT, settled_window, watcher) or (None, "")
-        if verdict is not None and chain_failure is not None:
-            REPORT["secondaryFailure"] = {
-                "code": chain_failure.code, "message": chain_failure.message,
-            }
-        if verdict is not None:
-            fail(verdict, detail)
         if chain_failure is not None:
             raise chain_failure
         if endpoint.over_budget:
@@ -1106,8 +1116,18 @@ def main() -> int:
             fail("CODEX_GATE_UNAUTHORIZED_PROVIDER_REQUEST",
                  f"{endpoint.unauthorized} provider requests did not carry the injected token")
 
-        REPORT["reopenObservation"] = observe_reopen(
-            temporary, workspace, worker, artifact, digest, production, token_path, host_home)
+        # The reopen observation starts the adapter twice more with the same
+        # injected token, so it is observed as its own phase: a credential it
+        # writes to native state is judged by the same final verdict.
+        reopen_result, reopen_evidence = observe_phase(
+            temporary / "worker-root", temporary,
+            lambda: observe_reopen(temporary, workspace, worker, artifact, digest,
+                                   production, token_path, host_home),
+        )
+        REPORT["reopenObservation"] = reopen_result
+        failure = resolve_run_failure(REPORT, settled_window, watcher, reopen_evidence)
+        if failure is not None:
+            raise failure
         cleanup_check(temporary, workspace, token_path)
         REPORT["result"] = "CODEX_PRODUCTION_CHAIN_GATE_OK"
     except GateFailure as failure:
@@ -2031,13 +2051,20 @@ HARNESS_PROCESS_PATTERNS = ("codex-acp/dist/index.js", "app-server", "codex-gate
 
 
 def harness_processes(temporary: Path) -> list[str]:
-    """Harness processes of *this* run that are still alive (own-root scope)."""
+    """Harness processes that belong to *this* run and are still alive.
+
+    Identity is bound to this run's own temporary root, which every bwrap
+    wrapper for it carries in its argv; a concurrent Codex instance elsewhere on
+    the machine is neither matched nor able to block the window. Descendants are
+    covered by the sandbox template itself: the Worker runs bwrap with
+    `--die-with-parent`, so a surviving wrapper is the only thing that can keep
+    the attempt's process tree alive - and that wrapper names this root.
+    """
     survivors = []
     for pattern in HARNESS_PROCESS_PATTERNS:
         lines = subprocess.run(
             ["pgrep", "-af", pattern], capture_output=True, text=True).stdout.splitlines()
-        survivors.extend(
-            line for line in lines if str(temporary) in line or "codex-runtime" in line)
+        survivors.extend(line for line in lines if str(temporary) in line)
     return survivors
 
 
@@ -2059,48 +2086,182 @@ def settle_after_attempt(watcher: "StateSymlinkWatcher", temporary: Path,
     while survivors and time.monotonic() < deadline:
         time.sleep(interval_s)
         survivors = harness_processes(temporary)
-    evidence = {
+    evidence: dict = {
         "harnessExited": not survivors,
+        "harnessSeenAlive": bool(watcher.harness_seen or survivors),
         "survivors": survivors[:2],
         "settledScan": "capture-boundary",
         "settledCycles": 0,
     }
-    if not survivors:
-        evidence.update(watcher.scan_once())
+    if survivors:
+        return evidence
+    # Strict order: the harness is gone, so the observer is stopped and joined
+    # *before* the settled scan - and that scan is a fresh scanner, so no state
+    # is shared with the thread.
+    watcher.stop()
+    scanner = CredentialStateScanner(watcher.worker_root, FAKE_TOKEN.encode())
+    summary = scanner.scan()
+    reclaimed = not summary.get("viewsOnDisk")
+    evidence.update({
+        "settledScan": "capture-boundary" if reclaimed else "view",
+        "settledComplete": bool(summary.get("complete")),
+        "settledCycles": 1 if summary.get("complete") else 0,
+        "settledFiles": summary.get("files"),
+        "settledIncomplete": summary.get("incomplete"),
+        "settledHits": [hit.get("path") for hit in summary.get("hits", ())],
+        "settledRaces": [raced.get("path") for raced in summary.get("races", ())],
+        "settledViewsReclaimed": reclaimed,
+    })
     return evidence
 
 
-def finalize_run(report: dict, settled_window: dict, watcher) -> tuple[str | None, str]:
-    """The one post-run decision, driven by the real scan evidence.
+def capture_boundary_evidence(report: dict) -> tuple[bool, str]:
+    """Whether this run's *captured state* is usable evidence.
 
-    Extracted so the *control flow* (not just the pure verdict) is testable: it
-    reads the run's watcher and settled window, records the scan block, and
-    answers what must fail. A credential hit outranks every other failure, so a
-    hit that coincides with a chain failure still ends the run with the
-    credential code and the chain failure is kept as structured secondary
-    evidence by the caller.
+    The settled fallback may only pass on structured capture evidence: the
+    capture-boundary scan must have run on a checkpoint whose stored native id
+    matches the run's, whose captured bytes carry no token, and whose rounds all
+    reported a captured state. Anything missing or inconsistent is an
+    incomplete observation, never a quiet pass.
     """
-    verdict, detail = credential_scan_verdict(
-        watcher.token_hits, watcher.scan_error, watcher.stopped_cleanly,
-        LEGACY_STATE_DIAGNOSTIC, watcher.scan_incomplete, watcher.scan_completed,
-        watcher.race_events, watcher.incomplete_events,
-        settled_window.get("settledCycles"), None, None,
-        settled_window.get("harnessExited"), settled_window.get("settledIncomplete"),
-    )
+    scan = report.get("stateScan")
+    if not isinstance(scan, dict):
+        return False, "no captured-state scan was recorded for this run"
+    if scan.get("tokenInState"):
+        return False, "the captured state carried the credential"
+    if scan.get("nativeSessionId") is not True:
+        return False, "the captured checkpoint is not bound to this run's native id"
+    if not scan.get("files"):
+        return False, "the captured state held no files to observe"
+    rounds = report.get("rounds") or {}
+    if not rounds:
+        return False, "no round recorded a completed capture"
+    for name, summary in rounds.items():
+        if summary.get("state") != "completed":
+            return False, f"round {name} did not complete its capture"
+    return True, ""
+
+
+def resolve_run_failure(report: dict, settled_window: dict, watcher,
+                        reopen_evidence: dict | None = None) -> "GateFailure | None":
+    """The one place that decides what ends the run, over every phase.
+
+    A credential observed anywhere - during the turn chain or during the reopen
+    observation - outranks everything else; the phase aggregate is the evidence,
+    so a hit written in a later phase cannot fall outside the judgement. When
+    the credential verdict passes, the remaining checks fail the run with their
+    own typed codes.
+    """
+    phases = [dict(settled_window, **{
+        "hits": list(watcher.token_hits), "races": list(watcher.race_events),
+        "incompleteEvents": list(watcher.incomplete_events),
+        "scanError": watcher.scan_error, "stoppedCleanly": watcher.stopped_cleanly,
+        "filesObserved": watcher.scanned_files, "cyclesCompleted": watcher.scan_completed,
+    })]
+    if reopen_evidence is not None:
+        phases.append(reopen_evidence)
+    aggregate = merge_phase_evidence(phases)
     report["credentialScan"] = {
-        "filesObserved": watcher.scanned_files,
-        "cyclesCompleted": watcher.scan_completed,
-        "incomplete": watcher.scan_incomplete,
-        "raceEvents": watcher.race_events,
-        "incompleteEvents": watcher.incomplete_events,
-        "settledCycles": settled_window.get("settledCycles"),
-        "settledScan": settled_window.get("settledScan"),
-        "settledIncomplete": settled_window.get("settledIncomplete"),
-        "harnessExited": settled_window.get("harnessExited"),
-        "error": watcher.scan_error,
-        "stoppedCleanly": watcher.stopped_cleanly,
+        "phases": len(phases),
+        "filesObserved": aggregate["files"],
+        "cyclesCompleted": aggregate["cycles"],
+        "settledCycles": aggregate["settledCycles"],
+        "settledIncomplete": aggregate["settledIncomplete"],
+        "harnessExited": aggregate["harnessExited"],
+        "raceEvents": aggregate["races"],
+        "incompleteEvents": aggregate["incomplete"],
+        "error": aggregate["scanError"],
+        "stoppedCleanly": aggregate["stoppedCleanly"],
     }
-    return verdict, detail
+    report["credentialPathHits"] = aggregate["hits"]
+    verdict, detail = credential_scan_verdict(
+        aggregate["hits"], aggregate["scanError"], aggregate["stoppedCleanly"],
+        LEGACY_STATE_DIAGNOSTIC, None, aggregate["cycles"],
+        aggregate["races"], aggregate["incomplete"],
+        aggregate["settledCycles"], None, None,
+        aggregate["harnessExited"], aggregate["settledIncomplete"],
+        report,
+    )
+    if verdict is None:
+        return None
+    return GateFailure(verdict, detail)
+
+
+def observe_phase(worker_root: Path, temporary: Path, work) -> tuple[object, dict]:
+    """Run one phase of the gate with its own observer, then settle it.
+
+    Used for every phase that starts a native Harness with the injected token:
+    the run's turn chain and the reopen observation. Each phase gets its own
+    watcher (its own scanner) and its own post-exit settled scan, and the final
+    verdict is computed once, over all phases - a credential written during a
+    later phase can never fall outside the judgement.
+    """
+    phase_watcher = StateSymlinkWatcher(worker_root)
+    phase_watcher.start()
+    result = None
+    failure: BaseException | None = None
+    try:
+        result = work()
+    except BaseException as error:  # noqa: BLE001 - handed back to the caller
+        failure = error
+    finally:
+        evidence = settle_after_attempt(phase_watcher, temporary)
+        phase_watcher.stop()
+    evidence["hits"] = list(phase_watcher.token_hits)
+    evidence["races"] = list(phase_watcher.race_events)
+    evidence["incompleteEvents"] = list(phase_watcher.incomplete_events)
+    evidence["scanError"] = phase_watcher.scan_error
+    evidence["stoppedCleanly"] = phase_watcher.stopped_cleanly
+    evidence["filesObserved"] = phase_watcher.scanned_files
+    evidence["cyclesCompleted"] = phase_watcher.scan_completed
+    evidence["peakFiles"] = phase_watcher.peak_files
+    if failure is not None:
+        raise failure
+    return result, evidence
+
+
+def merge_phase_evidence(phases: list[dict]) -> dict:
+    """One aggregate over every phase that ran a Harness."""
+    hits: list[dict] = []
+    races: list[dict] = []
+    incomplete: list[dict] = []
+    scan_error: str | None = None
+    stopped_cleanly = True
+    cycles = 0
+    files = 0
+    settled_cycles = 0
+    settled_incomplete: str | None = None
+    for phase in phases:
+        for hit in phase.get("hits", ()):
+            if hit not in hits:
+                hits.append(hit)
+        for raced in phase.get("races", ()):
+            if raced not in races:
+                races.append(raced)
+        for event in phase.get("incompleteEvents", ()):
+            if event not in incomplete:
+                incomplete.append(event)
+        scan_error = scan_error or phase.get("scanError")
+        stopped_cleanly = stopped_cleanly and bool(phase.get("stoppedCleanly"))
+        cycles += phase.get("cyclesCompleted") or 0
+        files += phase.get("filesObserved") or 0
+        if phase.get("settledComplete"):
+            settled_cycles += 1
+        elif phase.get("settledIncomplete") and settled_incomplete is None:
+            settled_incomplete = phase["settledIncomplete"]
+        if phase.get("harnessExited") is False:
+            return {
+                "hits": hits, "races": races, "incomplete": incomplete,
+                "scanError": scan_error, "stoppedCleanly": stopped_cleanly,
+                "cycles": cycles, "files": files, "settledCycles": settled_cycles,
+                "settledIncomplete": settled_incomplete, "harnessExited": False,
+            }
+    return {
+        "hits": hits, "races": races, "incomplete": incomplete,
+        "scanError": scan_error, "stoppedCleanly": stopped_cleanly,
+        "cycles": cycles, "files": files, "settledCycles": settled_cycles,
+        "settledIncomplete": settled_incomplete, "harnessExited": True,
+    }
 
 
 def credential_scan_verdict(
@@ -2113,6 +2274,7 @@ def credential_scan_verdict(
     settled_incomplete: list[dict] | None = None,
     harness_exited: bool | None = None,
     settled_scan_incomplete: str | None = None,
+    report: dict | None = None,
 ) -> tuple[str | None, str]:
     """The typed verdict for one run's credential-path scan.
 
@@ -2151,14 +2313,13 @@ def credential_scan_verdict(
             return ("CODEX_GATE_STATE_SCAN_INCOMPLETE",
                     "the settled-window scan could not cover everything: "
                     + str(settled_scan_incomplete))
-        # settled_cycles == 0 with a complete scan means the view was already
-        # reclaimed by the capture pipeline: the evidence for this same window
-        # is then the capture-boundary scan (`scan_state`), which is fatal on
-        # any hit. Both are recorded in the report.
-        # Raced or unobservable cycles after a settled one belong to the next
-        # period of harness activity; they are observations in the report, not
-        # failures. What the verdict requires is that the tree was fully
-        # observed at least once while it held still, with no token anywhere.
+        if settled_cycles > 0:
+            return None, ""
+        # No view was left to scan: the evidence for the same window is the
+        # capture-boundary scan, and it must be structurally usable.
+        ok, reason = capture_boundary_evidence(report)
+        if not ok:
+            return "CODEX_GATE_STATE_SCAN_INCOMPLETE", reason
         return None, ""
     if scan_incomplete is not None:
         return ("CODEX_GATE_STATE_SCAN_INCOMPLETE",

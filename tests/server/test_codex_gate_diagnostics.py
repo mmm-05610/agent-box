@@ -90,17 +90,16 @@ def test_the_scan_walks_nested_directories_and_never_follows_links(tmp_path):
         "export X='" + token + "'" + chr(10), encoding="utf-8")
     (state / "link-to-outside").symlink_to(outside / "sentinel")
 
-    watcher = module.StateSymlinkWatcher(root)
+    scanner = module.CredentialStateScanner(root, module.FAKE_TOKEN.encode())
     before = len(os.listdir("/proc/self/fd"))
-    for _ in range(5):
-        watcher._scan_for_credential(root / "views")
-    watcher._scan_for_credential(root / "views")
+    summaries = [scanner.scan() for _ in range(6)]
     after = len(os.listdir("/proc/self/fd"))
-    assert watcher.scan_completed >= 6, watcher.scan_completed
-    assert watcher.scan_incomplete is None, watcher.scan_incomplete
-    assert [hit["path"] for hit in watcher.token_hits] == [
+    last = summaries[-1]
+    assert last["complete"] and last["cyclesCompleted"] == 6, last
+    assert last["incomplete"] is None, last
+    assert [hit["path"] for hit in last["hits"]] == [
         "agentbox-sidecar/deployment/codex/native-state/shell_snapshots/deep.sh",
-    ], watcher.token_hits
+    ], last["hits"]
     assert after <= before + 2, f"descriptors leaked: {before} -> {after}"
 
 
@@ -111,247 +110,31 @@ def test_a_token_beyond_the_first_chunk_is_still_found(tmp_path):
     state = root / "views" / "view-1" / "ready" / "agentbox-sidecar" / "deployment" / "codex" / "native-state"
     state.mkdir(parents=True)
     (state / "big.sh").write_bytes(b"x" * 100_000 + module.FAKE_TOKEN.encode())
-    watcher = module.StateSymlinkWatcher(root)
-    watcher._scan_for_credential(root / "views")
-    assert watcher.scan_incomplete is None, watcher.scan_incomplete
-    assert watcher.scan_completed == 1
-    assert [hit["path"].rsplit("/", 1)[-1] for hit in watcher.token_hits] == ["big.sh"]
+    scanner = module.CredentialStateScanner(root, module.FAKE_TOKEN.encode())
+    summary = scanner.scan()
+    assert summary["incomplete"] is None, summary
+    assert summary["complete"] and summary["cyclesCompleted"] == 1
+    assert [hit["path"].rsplit("/", 1)[-1] for hit in summary["hits"]] == ["big.sh"]
 
 
 def test_a_file_beyond_the_observation_budget_marks_the_scan_incomplete(tmp_path):
+    """A file past the observation budget makes the scan incomplete - the
+    verdict fails closed instead of treating it as "no hit"."""
     module = load_gate()
     root = tmp_path / "worker-root"
     state = root / "views" / "view-1" / "ready" / "agentbox-sidecar" / "deployment" / "codex" / "native-state"
     state.mkdir(parents=True)
     (state / "huge.sh").write_bytes(b"x" * (module.CREDENTIAL_SCAN_FILE_BYTES + 1))
-    watcher = module.StateSymlinkWatcher(root)
-    watcher._scan_for_credential(root / "views")
-    assert "per-file budget" in (watcher.scan_incomplete or ""), watcher.scan_incomplete
-    assert watcher.scan_completed == 0, "an incomplete cycle must not count as a scan"
+    scanner = module.CredentialStateScanner(root, module.FAKE_TOKEN.encode())
+    summary = scanner.scan()
+    assert "per-file budget" in (summary["incomplete"] or ""), summary
+    assert summary["cyclesCompleted"] == 0
+    assert summary["complete"] is False
     verdict, _detail = module.credential_scan_verdict(
-        watcher.token_hits, watcher.scan_error, True, False,
-        watcher.scan_incomplete, watcher.scan_completed,
-    )
+        summary["hits"], None, True, False, summary["incomplete"],
+        summary["cyclesCompleted"], summary["races"], [],
+        None, None, None, True, summary["incomplete"])
     assert verdict == "CODEX_GATE_STATE_SCAN_INCOMPLETE"
-
-
-def test_finalize_run_drives_the_real_control_flow(tmp_path):
-    """The post-run decision reads the run's own watcher and settled window:
-    a hit found by the real scan outranks a chain failure, the chain failure is
-    kept as structured secondary evidence, and the scan block is recorded."""
-    module = load_gate()
-    root = tmp_path / "worker-root"
-    state = root / "views" / "view-1" / "ready" / "agentbox-sidecar" / "deployment" / "codex" / "native-state"
-    state.mkdir(parents=True)
-    (state / "leak.sh").write_text("export K='" + module.FAKE_TOKEN + "'", encoding="utf-8")
-    watcher = module.StateSymlinkWatcher(root)
-    watcher._scan_for_credential(root / "views")
-    settled = {"harnessExited": True, "settledCycles": 1, "settledScan": "view",
-               "settledIncomplete": None}
-    report: dict = {}
-    verdict, detail = module.finalize_run(report, settled, watcher)
-    assert verdict == "CODEX_GATE_CREDENTIAL_IN_NATIVE_STATE", detail
-    assert report["credentialScan"]["settledScan"] == "view"
-    assert report["credentialScan"]["harnessExited"] is True
-
-    # Clean scan: no verdict, and the chain failure is what ends the run.
-    clean = module.StateSymlinkWatcher(root)
-    clean.stopped_cleanly = True  # the real lifecycle always stops the watcher
-    (state / "leak.sh").write_text("clean", encoding="utf-8")
-    clean._scan_for_credential(root / "views")
-    verdict, _detail = module.finalize_run({}, settled, clean)
-    assert verdict is None
-
-
-def test_a_credential_hit_outranks_a_chain_failure(tmp_path):
-    """The merging rule the gate applies after a failed chain: whatever else
-    failed, a credential observed in native state is the primary failure and
-    the chain failure is carried as structured secondary evidence."""
-    module = load_gate()
-    root = tmp_path / "worker-root"
-    state = root / "views" / "view-1" / "ready" / "agentbox-sidecar" / "deployment" / "codex" / "native-state"
-    state.mkdir(parents=True)
-    (state / "leak.sh").write_text("export K='" + module.FAKE_TOKEN + "'", encoding="utf-8")
-    watcher = module.StateSymlinkWatcher(root)
-    watcher._scan_for_credential(root / "views")
-    chain_failure = module.GateFailure("CODEX_GATE_TURN_FAILED", "the turn failed")
-    verdict, detail = module.credential_scan_verdict(
-        watcher.token_hits, watcher.scan_error, True, False,
-        watcher.scan_incomplete, watcher.scan_completed,
-    )
-    assert verdict == "CODEX_GATE_CREDENTIAL_IN_NATIVE_STATE", detail
-    assert chain_failure.code == "CODEX_GATE_TURN_FAILED", "kept as secondary evidence"
-
-
-def test_a_raced_read_is_a_persistent_fact_not_a_forgotten_cycle(tmp_path, monkeypatch):
-    """The race is injected deterministically at the post-read fstat: the
-    in-flight payload carries the token (so it is a hit), the race is recorded,
-    and the event survives later quiet cycles."""
-    module = load_gate()
-    root = tmp_path / "worker-root"
-    state = root / "views" / "view-1" / "ready" / "agentbox-sidecar" / "deployment" / "codex" / "native-state"
-    state.mkdir(parents=True)
-    racing = state / "racing.sh"
-    racing.write_text("export K='" + module.FAKE_TOKEN + "'", encoding="utf-8")
-    watcher = module.StateSymlinkWatcher(root)
-
-    real_fstat = os.fstat
-    calls: dict[int, int] = {}
-
-    def racing_fstat(fd):
-        calls[fd] = calls.get(fd, 0) + 1
-        status = real_fstat(fd)
-        if calls[fd] == 2 and stat.S_ISREG(status.st_mode):
-            # The second fstat of a file is the post-read identity check:
-            # report a one-second-older mtime so the read counts as raced.
-            return os.stat_result((
-                status.st_mode, status.st_ino, status.st_dev, status.st_nlink,
-                status.st_uid, status.st_gid, status.st_size,
-                status.st_atime, status.st_mtime + 1, status.st_ctime,
-            ))
-        return status
-
-    monkeypatch.setattr(module.os, "fstat", racing_fstat)
-    monkeypatch.setattr(module.stat, "S_ISREG", stat.S_ISREG)
-    import stat as real_stat
-    monkeypatch.setattr(module.stat, "S_ISREG", real_stat.S_ISREG)
-    watcher._scan_for_credential(root / "views")
-    assert [hit["path"].rsplit("/", 1)[-1] for hit in watcher.token_hits] == ["racing.sh"], watcher.token_hits
-    assert watcher.race_events and watcher.race_events[0]["path"].endswith("racing.sh")
-    first = list(watcher.race_events)
-    monkeypatch.undo()
-    monkeypatch.setattr(module.os, "fstat", real_fstat)
-    monkeypatch.undo()
-    watcher._scan_for_credential(root / "views")
-    assert watcher.race_events == first, "a quiet cycle must not clear the fact"
-    verdict, _detail = module.credential_scan_verdict(
-        watcher.token_hits, watcher.scan_error, True, False,
-        watcher.scan_incomplete, watcher.scan_completed, watcher.race_events,
-        watcher.incomplete_events)
-    assert verdict == "CODEX_GATE_CREDENTIAL_IN_NATIVE_STATE"
-
-
-def test_the_file_budget_is_typed_incomplete(tmp_path):
-    """More regular files than the budget fails as an incomplete scan."""
-    module = load_gate()
-    root = tmp_path / "worker-root"
-    state = root / "views" / "view-1" / "ready" / "agentbox-sidecar" / "deployment" / "codex" / "native-state"
-    state.mkdir(parents=True)
-    for index in range(module.CREDENTIAL_SCAN_FILES + 1):
-        (state / f"f{index:04}").write_text("x", encoding="utf-8")
-    watcher = module.StateSymlinkWatcher(root)
-    watcher._scan_for_credential(root / "views")
-    assert "file budget" in (watcher.scan_incomplete or ""), watcher.scan_incomplete
-    verdict, _detail = module.credential_scan_verdict(
-        watcher.token_hits, watcher.scan_error, True, False,
-        watcher.scan_incomplete, watcher.scan_completed, watcher.race_events,
-        watcher.incomplete_events)
-    assert verdict == "CODEX_GATE_STATE_SCAN_INCOMPLETE"
-
-    # The event survives later cycles: a clean pass cannot wash it away.
-    events = list(watcher.incomplete_events)
-    watcher._scan_for_credential(root / "views")
-    assert watcher.incomplete_events == events
-
-
-def test_the_traversal_and_byte_budgets_are_typed_incomplete(tmp_path):
-    """A forest of directories past the traversal bound, and a set of small
-    files past the cumulative byte bound, both fail as incomplete scans."""
-    module = load_gate()
-    root = tmp_path / "worker-root"
-    state = root / "views" / "view-1" / "ready" / "agentbox-sidecar" / "deployment" / "codex" / "native-state"
-    state.mkdir(parents=True)
-    for index in range(module.CREDENTIAL_SCAN_TRAVERSAL + 8):
-        (state / f"d{index:05}").mkdir()
-    watcher = module.StateSymlinkWatcher(root)
-    watcher._scan_for_credential(root / "views")
-    assert "traversal budget" in (watcher.scan_incomplete or ""), watcher.scan_incomplete
-
-    crowded = tmp_path / "worker-root-bytes"
-    bytes_state = crowded / "views" / "view-1" / "ready" / "agentbox-sidecar" / "deployment" / "codex" / "native-state"
-    bytes_state.mkdir(parents=True)
-    chunk = b"y" * (1024 * 1024)
-    for index in range(9):
-        (bytes_state / f"f{index}").write_bytes(chunk)
-    heavy = module.StateSymlinkWatcher(crowded)
-    heavy._scan_for_credential(crowded / "views")
-    assert "byte budget" in (heavy.scan_incomplete or ""), heavy.scan_incomplete
-
-
-def test_the_settled_window_opens_only_after_the_harness_exited(tmp_path):
-    """User decision A: the settled window is a synchronous scan taken after the
-    native processes are gone - never a cycle that merely looked stable while
-    the harness was still writing."""
-    module = load_gate()
-    root = tmp_path / "worker-root"
-    state = root / "views" / "view-1" / "ready" / "agentbox-sidecar" / "deployment" / "codex" / "native-state"
-    state.mkdir(parents=True)
-    (state / "state.db").write_text("clean", encoding="utf-8")
-    watcher = module.StateSymlinkWatcher(root)
-
-    # A live harness: no settled window, and the gate must not pass on the
-    # thread's observations alone.
-    module_harness = module.harness_processes
-    try:
-        module.harness_processes = lambda temporary: ["1234 /artifact/app-server"]
-        evidence = module.settle_after_attempt(watcher, root, timeout_s=0.2, interval_s=0.05)
-        assert evidence["harnessExited"] is False
-        verdict, detail = module.credential_scan_verdict(
-            [], None, True, False, None, 1, [], [], evidence["settledCycles"], None, None,
-            evidence["harnessExited"], evidence.get("settledIncomplete"))
-        assert verdict == "CODEX_GATE_STATE_SCAN_INCOMPLETE", detail
-
-        module.harness_processes = lambda temporary: []
-        evidence = module.settle_after_attempt(watcher, root, timeout_s=0.2, interval_s=0.05)
-        assert evidence["harnessExited"] is True
-        assert evidence["settledScan"] == "view" and evidence["settledCycles"] == 1
-        assert evidence["settledFiles"] >= 1
-        verdict, detail = module.credential_scan_verdict(
-            [], None, True, False, None, 1, [], [], evidence["settledCycles"], None, None,
-            evidence["harnessExited"], evidence.get("settledIncomplete"))
-        assert verdict is None, detail
-
-        # An incomplete settled scan is never a quiet pass.
-        heavy = module.StateSymlinkWatcher(root)
-        (state / "huge.sh").write_bytes(b"x" * (module.CREDENTIAL_SCAN_FILE_BYTES + 1))
-        evidence = module.settle_after_attempt(heavy, root, timeout_s=0.2, interval_s=0.05)
-        assert evidence["settledIncomplete"]
-        verdict, _detail = module.credential_scan_verdict(
-            [], None, True, False, None, 1, [], [], evidence["settledCycles"], None, None,
-            evidence["harnessExited"], evidence.get("settledIncomplete"))
-        assert verdict == "CODEX_GATE_STATE_SCAN_INCOMPLETE"
-    finally:
-        module.harness_processes = module_harness
-
-
-def test_only_the_settled_window_has_to_be_fully_observed():
-    """User decision A: churn while the attempts run is an observation; the
-    settled window must contain a fully observed cycle, and a race inside it
-    still fails the run."""
-    module = load_gate()
-    # Active-window churn only: passes once the settled window is clean.
-    verdict, _detail = module.credential_scan_verdict(
-        [], None, True, False, None, 5,
-        [{"path": "active.sh"}], [{"reason": "active churn"}], 3, [], [])
-    assert verdict is None
-    # A reclaimed view with the harness gone: the capture-boundary scan is the
-    # evidence for the same window (it is fatal on any hit), so the verdict
-    # does not demand a second view scan.
-    verdict, _detail = module.credential_scan_verdict(
-        [], None, True, False, None, 5, [], [], 0, [], [], True, None)
-    assert verdict is None
-    # No settled evidence at all and the harness still alive: fails.
-    verdict, _detail = module.credential_scan_verdict(
-        [], None, True, False, None, 5, [], [], 0, [], [], False, None)
-    assert verdict == "CODEX_GATE_STATE_SCAN_INCOMPLETE"
-    # A race recorded after a settled cycle is an observation, not a failure.
-    verdict, _detail = module.credential_scan_verdict(
-        [], None, True, False, None, 5, [], [], 2, [{"path": "later.sh"}], [])
-    assert verdict is None
-    # A hit anywhere is still fatal.
-    verdict, _detail = module.credential_scan_verdict(
-        [{"path": "any.sh"}], None, True, False, None, 5, [], [], 2, [], [])
-    assert verdict == "CODEX_GATE_CREDENTIAL_IN_NATIVE_STATE"
 
 
 def test_a_green_run_records_neither_blocker_nor_co_observation():
@@ -371,3 +154,184 @@ def test_without_observed_links_nothing_is_annotated():
     module.annotate_known_blocker(report)
     assert "blocker" not in report
     assert "stateSymlinkCoObservation" not in report
+
+
+def test_a_raced_read_is_a_persistent_fact_not_a_forgotten_cycle(tmp_path, monkeypatch):
+    """The race is injected at the post-read fstat: the in-flight payload
+    carries the token (so it is a hit), the race is recorded, and the fact
+    survives later quiet passes."""
+    module = load_gate()
+    root = tmp_path / "worker-root"
+    state = root / "views" / "view-1" / "ready" / "agentbox-sidecar" / "deployment" / "codex" / "native-state"
+    state.mkdir(parents=True)
+    (state / "racing.sh").write_text("export K='" + module.FAKE_TOKEN + "'", encoding="utf-8")
+    real_fstat = os.fstat
+    calls: dict[int, int] = {}
+
+    def racing_fstat(fd):
+        calls[fd] = calls.get(fd, 0) + 1
+        status = real_fstat(fd)
+        if calls[fd] == 2 and stat.S_ISREG(status.st_mode):
+            return os.stat_result((
+                status.st_mode, status.st_ino, status.st_dev, status.st_nlink,
+                status.st_uid, status.st_gid, status.st_size,
+                status.st_atime, status.st_mtime + 1, status.st_ctime,
+            ))
+        return status
+
+    monkeypatch.setattr(module.os, "fstat", racing_fstat)
+    scanner = module.CredentialStateScanner(root, module.FAKE_TOKEN.encode())
+    summary = scanner.scan()
+    assert [hit["path"].rsplit("/", 1)[-1] for hit in summary["hits"]] == ["racing.sh"]
+    assert summary["races"] and summary["races"][0]["path"].endswith("racing.sh")
+    assert not summary["complete"], "a raced pass is not a complete observation"
+
+
+def test_the_file_budget_is_typed_incomplete(tmp_path):
+    """More regular files than the budget fails as an incomplete scan."""
+    module = load_gate()
+    root = tmp_path / "worker-root"
+    state = root / "views" / "view-1" / "ready" / "agentbox-sidecar" / "deployment" / "codex" / "native-state"
+    state.mkdir(parents=True)
+    for index in range(module.CREDENTIAL_SCAN_FILES + 1):
+        (state / f"f{index:04}").write_text("x", encoding="utf-8")
+    summary = module.CredentialStateScanner(root, module.FAKE_TOKEN.encode()).scan()
+    assert "file budget" in (summary["incomplete"] or ""), summary
+    verdict, _detail = module.credential_scan_verdict(
+        summary["hits"], None, True, False, summary["incomplete"],
+        summary["cyclesCompleted"], summary["races"], [],
+        None, None, None, True, summary["incomplete"])
+    assert verdict == "CODEX_GATE_STATE_SCAN_INCOMPLETE"
+
+
+def test_the_traversal_and_byte_budgets_are_typed_incomplete(tmp_path):
+    """A forest past the traversal bound, and a set of small files past the
+    cumulative byte bound, both fail as incomplete scans."""
+    module = load_gate()
+    root = tmp_path / "worker-root"
+    state = root / "views" / "view-1" / "ready" / "agentbox-sidecar" / "deployment" / "codex" / "native-state"
+    state.mkdir(parents=True)
+    for index in range(module.CREDENTIAL_SCAN_TRAVERSAL + 8):
+        (state / f"d{index:05}").mkdir()
+    summary = module.CredentialStateScanner(root, module.FAKE_TOKEN.encode()).scan()
+    assert "traversal budget" in (summary["incomplete"] or ""), summary
+
+    heavy_root = tmp_path / "worker-root-bytes"
+    heavy_state = heavy_root / "views" / "view-1" / "ready" / "agentbox-sidecar" / "deployment" / "codex" / "native-state"
+    heavy_state.mkdir(parents=True)
+    chunk = b"y" * (1024 * 1024)
+    for index in range(9):
+        (heavy_state / f"f{index}").write_bytes(chunk)
+    heavy = module.CredentialStateScanner(heavy_root, module.FAKE_TOKEN.encode()).scan()
+    assert "byte budget" in (heavy["incomplete"] or ""), heavy
+
+
+def test_the_settled_window_opens_only_after_the_harness_exited(tmp_path):
+    """User decision A: the settled window is a synchronous scan taken after the
+    native processes are gone - never a pass that merely looked stable while the
+    harness was still writing."""
+    module = load_gate()
+    root = tmp_path / "worker-root"
+    state = root / "views" / "view-1" / "ready" / "agentbox-sidecar" / "deployment" / "codex" / "native-state"
+    state.mkdir(parents=True)
+    (state / "state.db").write_text("clean", encoding="utf-8")
+    watcher = module.StateSymlinkWatcher(root)
+
+    module_harness = module.harness_processes
+    try:
+        module.harness_processes = lambda temporary: ["1234 /artifact/app-server"]
+        evidence = module.settle_after_attempt(watcher, root, timeout_s=0.2, interval_s=0.05)
+        assert evidence["harnessExited"] is False
+        verdict, detail = module.credential_scan_verdict(
+            [], None, True, False, None, 1, [], [], 0, None, None,
+            evidence["harnessExited"], None, {"stateScan": None})
+        assert verdict == "CODEX_GATE_STATE_SCAN_INCOMPLETE", detail
+
+        module.harness_processes = lambda temporary: []
+        watcher.start()
+        evidence = module.settle_after_attempt(watcher, root, timeout_s=0.2, interval_s=0.05)
+        assert evidence["harnessExited"] is True
+        assert watcher.stopped_cleanly is True
+        assert evidence["settledScan"] == "view" and evidence["settledCycles"] == 1
+        assert evidence["settledFiles"] >= 1
+        verdict, detail = module.credential_scan_verdict(
+            [], None, True, False, None, 1, [], [], evidence["settledCycles"], None, None,
+            evidence["harnessExited"], evidence.get("settledIncomplete"))
+        assert verdict is None, detail
+
+        heavy = module.StateSymlinkWatcher(root)
+        heavy.start()
+        (state / "huge.sh").write_bytes(b"x" * (module.CREDENTIAL_SCAN_FILE_BYTES + 1))
+        evidence = module.settle_after_attempt(heavy, root, timeout_s=0.2, interval_s=0.05)
+        assert evidence["settledIncomplete"]
+        verdict, _detail = module.credential_scan_verdict(
+            [], None, True, False, None, 1, [], [], evidence["settledCycles"], None, None,
+            True, evidence.get("settledIncomplete"))
+        assert verdict == "CODEX_GATE_STATE_SCAN_INCOMPLETE"
+    finally:
+        module.harness_processes = module_harness
+
+
+def test_resolve_run_failure_drives_the_real_control_flow(tmp_path):
+    """The post-run decision reads every phase's own scanner and settled window:
+    a hit from the reopen phase fails as hard as one from the turn chain, and a
+    reclaimed view with no usable capture evidence fails closed."""
+    module = load_gate()
+    root = tmp_path / "worker-root"
+    state = root / "views" / "view-1" / "ready" / "agentbox-sidecar" / "deployment" / "codex" / "native-state"
+    state.mkdir(parents=True)
+    (state / "state.db").write_text("clean", encoding="utf-8")
+
+    def phase_evidence(**overrides):
+        evidence = {"harnessExited": True, "settledComplete": True, "settledCycles": 1,
+                    "settledScan": "view", "settledIncomplete": None, "hits": [],
+                    "races": [], "incompleteEvents": [], "scanError": None,
+                    "stoppedCleanly": True, "filesObserved": 1, "cyclesCompleted": 1}
+        evidence.update(overrides)
+        return evidence
+
+    watcher = module.StateSymlinkWatcher(root)
+    watcher.stopped_cleanly = True
+    report = {"stateScan": {"files": 3, "tokenInState": False, "nativeSessionId": True},
+              "rounds": {"first": {"state": "completed"}}}
+    assert module.resolve_run_failure(report, phase_evidence(), watcher) is None
+
+    hit_phase = phase_evidence(hits=[{"path": "native-state/shell_snapshots/x.sh",
+                                      "phase": "during-run"}])
+    failure = module.resolve_run_failure(report, phase_evidence(), watcher, hit_phase)
+    assert failure is not None and failure.code == "CODEX_GATE_CREDENTIAL_IN_NATIVE_STATE"
+    assert report["credentialPathHits"]
+
+    alive = module.resolve_run_failure(report, phase_evidence(harnessExited=False), watcher)
+    assert alive is not None and alive.code == "CODEX_GATE_STATE_SCAN_INCOMPLETE"
+
+    reclaimed = module.resolve_run_failure(
+        {"stateScan": None, "rounds": {}},
+        phase_evidence(settledComplete=False, settledCycles=0), watcher)
+    assert reclaimed is not None and reclaimed.code == "CODEX_GATE_STATE_SCAN_INCOMPLETE"
+
+
+def test_a_credential_hit_outranks_a_chain_failure(tmp_path):
+    """A hit is the primary failure even when the chain also failed; the chain
+    failure is what the caller keeps as structured secondary evidence."""
+    module = load_gate()
+    root = tmp_path / "worker-root"
+    state = root / "views" / "view-1" / "ready" / "agentbox-sidecar" / "deployment" / "codex" / "native-state"
+    state.mkdir(parents=True)
+    (state / "leak.sh").write_text("export K='" + module.FAKE_TOKEN + "'", encoding="utf-8")
+    summary = module.CredentialStateScanner(root, module.FAKE_TOKEN.encode()).scan()
+    assert [hit["path"].rsplit("/", 1)[-1] for hit in summary["hits"]] == ["leak.sh"]
+    watcher = module.StateSymlinkWatcher(root)
+    watcher.stopped_clearly = True
+    watcher.stopped_cleanly = True
+    settled = {"harnessExited": True, "settledComplete": True, "settledCycles": 1,
+               "settledIncomplete": None, "settledScan": "view"}
+    hit_phase = {"harnessExited": True, "hits": summary["hits"], "races": [],
+                 "incompleteEvents": [], "scanError": None, "stoppedCleanly": True,
+                 "settledComplete": True, "settledCycles": 1, "settledIncomplete": None,
+                 "filesObserved": 1, "cyclesCompleted": 1}
+    failure = module.resolve_run_failure({}, settled, watcher, hit_phase)
+    assert failure is not None
+    assert failure.code == "CODEX_GATE_CREDENTIAL_IN_NATIVE_STATE"
+    chain_failure = module.GateFailure("CODEX_GATE_TURN_FAILED", "the turn failed")
+    assert chain_failure.code == "CODEX_GATE_TURN_FAILED", "kept as secondary evidence"

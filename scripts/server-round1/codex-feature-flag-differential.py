@@ -75,6 +75,24 @@ def churn_appeared(report: dict) -> dict:
     }
 
 
+#: The differential has three possible answers, and only one of them is a
+#: pass: the control leg must have *demonstrated* the churn (otherwise nothing
+#: is being compared) and every treatment run must be clean. A clean treatment
+#: without a demonstrated control is INCONCLUSIVE, never OK - the machine
+#: interface must not encode an unproven causal claim as green.
+def classify(control_runs: list[dict], treatment_runs: list[dict]) -> tuple[str, int]:
+    treatment_clean = all(
+        not run["appeared"] and run["result"] == "CODEX_PRODUCTION_CHAIN_GATE_OK"
+        for run in treatment_runs
+    )
+    control_demonstrated = any(run["appeared"] for run in control_runs)
+    if not treatment_clean:
+        return "CODEX_FEATURE_FLAG_DIFFERENTIAL_FAILED", 1
+    if not control_demonstrated:
+        return "CODEX_FEATURE_FLAG_DIFFERENTIAL_INCONCLUSIVE", 2
+    return "CODEX_FEATURE_FLAG_DIFFERENTIAL_OK", 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--worker", required=True)
@@ -96,22 +114,20 @@ def main() -> int:
         treatment_runs.append({"result": report.get("result"), "exit": report["_exit"],
                                **churn_appeared(report)})
 
-    control_demonstrated = any(run["appeared"] for run in control_runs)
-    treatment_clean = all(
-        not run["appeared"] and run["result"] == "CODEX_PRODUCTION_CHAIN_GATE_OK"
-        for run in treatment_runs
-    )
+    result, exit_code = classify(control_runs, treatment_runs)
     verdict = {
-        "result": ("CODEX_FEATURE_FLAG_DIFFERENTIAL_OK"
-                   if treatment_clean else "CODEX_FEATURE_FLAG_DIFFERENTIAL_FAILED"),
+        "result": result,
         "controlRuns": control_runs,
         "treatmentRuns": treatment_runs,
-        "controlDemonstratedChurn": control_demonstrated,
-        "treatmentClean": treatment_clean,
-        "controlNotObservedInRuns": None if control_demonstrated else len(control_runs),
+        "controlDemonstratedChurn": any(run["appeared"] for run in control_runs),
+        "treatmentClean": all(
+            not run["appeared"] and run["result"] == "CODEX_PRODUCTION_CHAIN_GATE_OK"
+            for run in treatment_runs),
+        "controlNotObservedInRuns": (None if any(run["appeared"] for run in control_runs)
+                                     else len(control_runs)),
     }
     print(json.dumps(verdict, indent=1, sort_keys=True))
-    return 0 if treatment_clean else 1
+    return exit_code
 
 
 if __name__ == "__main__":

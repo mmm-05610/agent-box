@@ -212,7 +212,7 @@ Reviewer `CHANGES_REQUIRED` 的修复（§2.1/§7.1）落地后重建
 | Codex（遮蔽模式，最终版） | `…/codex-production-chain-gate.py --worker <c8> --json` | exit 0，`CODEX_PRODUCTION_CHAIN_GATE_OK`，view 峰值 112、`tokenInState=false`、`credentialPathHits=0`；观察器判据：`cyclesCompleted≈224`、`filesObserved≈83`、`incomplete=null`（连续 3 轮） |
 | Windows r4 | `accept-e.ps1 … -Port 18746 -Cleanup`（c8，`worker_digest=sha256:514f48a9…`） | exit 0，`BACKEND_41_E_WINDOWS_WSL_WIRE_OK` |
 | 独立 PostCheck | 同参数 `-PostCheck -InstanceId <两实例>` | exit 0，`BACKEND_41_E_WINDOWS_POSTCHECK_CLEAN` |
-| Python 全量 | `PYTHONPATH=src + 全部 plugins/*/src python3 -m pytest -q tests <插件 tests>` | **833 passed / 6 skipped / 0 failed** |
+| Python 全量 | `PYTHONPATH=src + 全部 plugins/*/src python3 -m pytest -q tests <插件 tests>` | **843 passed / 6 skipped / 0 failed**（现行；旧计数已被取代） |
 | Rust | `cargo fmt --check` + `cargo test --locked --release` | fmt 干净；27 passed |
 
 skip 说明：6 项均为既有平台/环境条件项（不含本轮新增测试）。清理：门临时根与
@@ -262,6 +262,37 @@ settled 183 轮，且保留根中 `shell_snapshots/` 与 `.tmp/` **目录均不�
   loopback 配置在 `loopback_config_bytes()` 内强制 `tomllib` 解析；新增
   `finalize_run()` 作为唯一后置判据入口（token 优先、链路失败结构化保留），并由
   `test_finalize_run_drives_the_real_control_flow` 直接驱动真实 watcher 与真实异常类型。
+
+## 4.9 配对差分证明因果（生产 0.147.0、同 HEAD、无 tmpfs 遮蔽）
+
+第 19 轮的差分只是"处理干净、控制未复现"（不确定）。第 20 轮把扫描器重构（独立实例、
+严格排序、两阶段合并）并修好 reclaimed-view 语义后重跑差分，控制腿第一轮即复现：
+
+```text
+control[0]  CODEX_PRODUCTION_CHAIN_GATE_FAILED  peak=112
+            credentialPathHits = [
+              "native-state/shell_snapshots/<session>.sh",
+              "native-state/shell_snapshots/<session>.tmp-<ns>",
+              "native-state/shell_snapshots/<session>.<ns>.sh"]
+treatment[0] CODEX_PRODUCTION_CHAIN_GATE_OK  peak=112  hits=[]
+treatment[1] CODEX_PRODUCTION_CHAIN_GATE_OK  peak=112  hits=[]
+result: CODEX_FEATURE_FLAG_DIFFERENTIAL_OK（controlDemonstratedChurn=true，treatmentClean=true）
+```
+
+即：**官方 `features.shell_snapshot` 默认开启就是"注入凭据被写进原生 state"的成因**，
+关掉它该路径消失；`.tmp/plugins` 突发在本轮控制腿未复现（间歇），仍以历史第一手观测
+（峰值 5,529、确定性 `VIEW_FILE_LIMIT`）为准并保留 tmpfs 遮蔽作纵深防御。
+差分脚本为三态：只有"控制出现 + 处理全净"才 `…_OK`/exit 0；控制未复现为 `…_INCONCLUSIVE`
+且非零退出（`tests/server/test_codex_feature_flag_differential.py` 锁定）。
+
+同轮的结构修正（对应第 19 轮 7 项发现）：`CredentialStateScanner` 成为独立类（观察线程与
+settled 扫描各持一个实例，零共享可变状态）；`settle_after_attempt` 严格排序
+（等进程退出 → 停并 join → 独立同步扫描）；`harness_processes` 只按**本轮临时根**匹配
+（并发 Codex 实例既不误伤也不误判，后代由 bwrap `--die-with-parent` 覆盖）；
+`resolve_run_failure` 把 **turn 链 + reopen 两阶段**合并后统一判定（reopen 会再起两次
+adapter 并注入同一 token，之前不在判据内）；reclaimed view 的 fallback 必须消费**结构化
+capture 证据**（`stateScan` 存在、无 token、native id 绑定、各轮 capture completed），
+否则 `CODEX_GATE_STATE_SCAN_INCOMPLETE`。
 
 ## 5. 全量验证与清理
 
