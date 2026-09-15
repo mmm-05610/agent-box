@@ -1172,3 +1172,17 @@ typecheck 当场暴露；新测试 4 条 ESLint warning 收口为 0。
   现以 prompt 返回值为权威补后缀，规则 `tailSuffix` 有单测，复跑 OpenCode 门通过。
 - 合同增补（`profiles.create` 可选 `credentialId`）与本次修复共同构成两家通过的前提；
   新旧 wire 摘要见 `docs/desktop-product-delivery/contracts/wire-v1/backend-response.md`。
+
+## 联调收口（2026-09-15，自审替代 Reviewer 终审）
+
+- **无模型全栈 22/22 PASS、exit 0**（`evidence/p42-integration/integration-results.json`）：在原有 15 步之上补齐
+  §10 剩下的方法——workspace browse/archive、Provider/Model 与角色维护（更新/改名/归档）、
+  session 元数据与**确认的角色切换**、`sendOutcome.query`（已知 + unknown）、**附件授权/投递**
+  （正文不进转录）、**审批往返**（权限 fixture → 决策 recorded）、**事件流 resync**（不可寻址游标被拒）。
+- **四家真实 UI 模型门各 8/8 PASS**：Pi / Hermes / OpenCode / Codex，凭据均经界面自己的录入路径加入。
+- **重启门（真实模型，Pi）9/9 PASS**：两轮之间**停掉并重启 Server**，第二轮仍经 checkpoint 找回同一 native session。
+- **自审一轮**（后端 `docs/server-round1/fullstack/self-review-2026-09-15.md`）：逐条核对声称与产物，
+  记录四处缺口（步数清单校验只覆盖集成驱动、重启报告需改名区分、附件断言止于"接受+不外泄"、
+  拒绝保留草稿的 UI 路径未验）与**最大未覆盖：真实 UI 控件路径**（发送走产品 renderer 传输，
+  未驱动输入框/发送按钮/审批弹窗）。
+- 最终状态：**`FULLSTACK_CORE_PARTIAL`**（不用无模型全绿冒充真实模型门，也不把后端门当 UI 门）。
