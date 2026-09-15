@@ -4,5 +4,6 @@ from .opencode import OpenCodeAdapter
 from .hermes import HermesAdapter
 from .pi import PiAdapter
 from .dsh import DshAdapter
+from .qwen import QwenAdapter
 from .generic_cli import GenericCliAdapter
-ADAPTERS={"codex":CodexAdapter("codex"),"claude":ClaudeAdapter("claude"),"opencode":OpenCodeAdapter("opencode"),"hermes":HermesAdapter("hermes"),"pi":PiAdapter("pi"),"dsh":DshAdapter("dsh")}
+ADAPTERS={"codex":CodexAdapter("codex"),"claude":ClaudeAdapter("claude"),"opencode":OpenCodeAdapter("opencode"),"hermes":HermesAdapter("hermes"),"pi":PiAdapter("pi"),"dsh":DshAdapter("dsh"),"qwen":QwenAdapter("qwen")}

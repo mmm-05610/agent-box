@@ -45,6 +45,13 @@
       "observe",
       "start",
       "stream"
+    ],
+    "qwen": [
+      "finish",
+      "native_continuation",
+      "observe",
+      "start",
+      "stream"
     ]
   }
 }

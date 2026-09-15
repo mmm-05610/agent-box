@@ -33,6 +33,7 @@ import pytest
 from agent_box.resource_contracts import harness_capabilities as caps
 from agent_box_harnesses.codex import production as codex_production
 from agent_box_harnesses.claude import production as claude_code_production
+from agent_box_harnesses.qwen import production as qwen_production
 from agent_box_harnesses.dsh import production as dsh_production
 from agent_box_harnesses.hermes import production as hermes_production
 from agent_box_harnesses.opencode import production as opencode_production
@@ -47,7 +48,7 @@ RUNTIME = PLUGIN_ROOT / "runtime"
 
 #: 已封装家族（顺序固定，便于报告与参数化 golden 对齐）；Work Order 43 起
 #: 扩容家族按接入顺序追加在尾部。
-FAMILIES = ("codex", "pi", "hermes", "opencode", "dsh", "claude-code")
+FAMILIES = ("codex", "pi", "hermes", "opencode", "dsh", "claude-code", "qwen")
 
 #: 证据文档（只读引用，不在本测试里重新解释它们的内容）。
 PI_PACKAGING = "docs/server-round1/fullstack/pi-production-packaging.md"
@@ -56,6 +57,7 @@ OPENCODE_PACKAGING = "docs/server-round1/fullstack/opencode-production-packaging
 ACCEPTANCE = "docs/server-round1/harness-integration/stage-c.md"
 DSH_PACKAGING = "docs/server-round1/fullstack/dsh-production-packaging.md"
 CLAUDE_PACKAGING = "docs/server-round1/fullstack/claude-production-packaging.md"
+QWEN_PACKAGING = "docs/server-round1/fullstack/qwen-production-packaging.md"
 
 #: 观测结论的两个取值。刻意用字符串常量而不是 True/False：`False` 会被误读成
 #: "已观测到不支持"，而这里是"没有证据"。
@@ -225,6 +227,31 @@ FAMILY_MATRIX: dict[str, dict[str, tuple[bool, str, str]]] = {
                         "未声明；适配器有 permission mode 配置面（探测记录），但门里没有任何"
                         "运行时权限裁决被观测到，按诚实规则保持未声明"),
     },
+    # Work Order 43。qwen 0.23.4（官方 `--acp` 模式）：observed 来自 2026-09-16
+    # 的 qwen 假端点全链门真实运行（exit 0，门报告见 qwen-production-packaging.md §5）。
+    "qwen": {
+        "start": (True, OBSERVED,
+                  f"{QWEN_PACKAGING} §5：真实 qwen-code 0.23.4（`qwen --acp`）+ 假端点，"
+                  "create+prompt → completed，两轮恰 2 次 provider 请求"),
+        "observe": (True, OBSERVED,
+                    f"{QWEN_PACKAGING} §5：sidecar 接缝真实调用；首轮拿到原生 session id"
+                    "（checkpoint nativeSessionId，resumable）"),
+        "finish": (True, OBSERVED,
+                   f"{QWEN_PACKAGING} §5：两轮均交付 completed（deltaSeq [4] < completedSeq 7、"
+                   "[11] < 14），非超时/中断"),
+        "attach": (False, NOT_OBSERVED, "未声明；无任何附件投递面与运行时证据"),
+        "stream": (True, OBSERVED,
+                   f"{QWEN_PACKAGING} §5：delta 先于 completed（deltaSeq [4] < completedSeq 7、"
+                   "[11] < 14），deltaAttribution.unattributed=0"),
+        "native_continuation": (True, OBSERVED,
+                                f"{QWEN_PACKAGING} §5：同一 native id（checkpointNativeIdStable=true）"
+                                " + 重开相位按门记录方法重开 + 第二轮请求体带首轮上下文"
+                                "（round2RequestCarriedRound1Context=true）"),
+        "steer": (False, NOT_OBSERVED, "未声明；sidecar 的 abort op 是 cancel，不是 steer"),
+        "permissions": (False, NOT_OBSERVED,
+                        "未声明；ACP 面有 request_permission/set_mode，但门里没有任何"
+                        "运行时权限裁决被观测到，按诚实规则保持未声明"),
+    },
 }
 
 
@@ -272,7 +299,8 @@ def _production_claims(family: str) -> dict:
         assert codex_production.HAS_PRODUCTION_DEPLOYMENT is True
         return codex_production.capability_claims()
     module = {"pi": pi_production, "hermes": hermes_production, "opencode": opencode_production,
-              "dsh": dsh_production, "claude-code": claude_code_production}[family]
+              "dsh": dsh_production, "claude-code": claude_code_production,
+              "qwen": qwen_production}[family]
     if family == "pi":
         document = module.deployment_document(
             artifact_source="/srv/agentbox/artifacts/pi-runtime", tree_digest="sha256:" + "a" * 64)
@@ -285,6 +313,9 @@ def _production_claims(family: str) -> dict:
     elif family == "claude-code":
         document = module.deployment_document(
             artifact_source="/srv/agentbox/artifacts/claude-runtime", tree_digest="sha256:" + "a" * 64)
+    elif family == "qwen":
+        document = module.deployment_document(
+            artifact_source="/srv/agentbox/artifacts/qwen-runtime", tree_digest="sha256:" + "a" * 64)
     else:
         document = module.deployment_document(
             binary_source="/reviewed/bin/opencode", binary_digest="sha256:" + "a" * 64)
@@ -510,6 +541,9 @@ def test_the_four_families_matrix_summary_is_the_one_reported():
         # Work Order 43：claude-code 的 observed 来自 2026-09-16 假端点全链门（exit 0）。
         "claude-code": {"declared": ["finish", "native_continuation", "observe", "start", "stream"],
                         "observed": ["finish", "native_continuation", "observe", "start", "stream"]},
+        # Work Order 43：qwen 的 observed 来自 2026-09-16 假端点全链门（exit 0）。
+        "qwen": {"declared": ["finish", "native_continuation", "observe", "start", "stream"],
+                 "observed": ["finish", "native_continuation", "observe", "start", "stream"]},
     }
 
 
@@ -529,7 +563,7 @@ def test_native_continuation_is_declared_exactly_where_reopen_was_observed():
 def test_the_audited_families_continuation_kind_is_native_session():
     """审计结论落在注册表上：她的重开方式就是 native session，而不是 transcript 交接。"""
     registry = load_builtin_registry()
-    for harness_type in ("codex", "hermes", "opencode", "pi", "dsh", "claude-code"):
+    for harness_type in ("codex", "hermes", "opencode", "pi", "dsh", "claude-code", "qwen"):
         assert registry.get(harness_type).continuation.kind == "native_session", harness_type
 
 

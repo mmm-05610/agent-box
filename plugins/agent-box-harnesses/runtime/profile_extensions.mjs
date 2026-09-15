@@ -125,6 +125,32 @@ export const AGENTBOX_HARNESS_PROFILES = {
     journalPageWhileOwned: false,
     reloadOnHistoryRefresh: false,
   },
+  // Work Order 43. Qwen Code's built-in, stable `--acp` mode; like dsh this is
+  // AgentBox registration glue (no upstream profile). The deployment injects
+  // the absolute artifact entry. First-hand probe: the adapter advertises the
+  // model as a runtime-composed select value and streams standard
+  // session/update chunks.
+  qwen: {
+    id: "qwen",
+    label: "Qwen Code",
+    command: process.platform === "win32" ? "qwen.cmd" : "qwen",
+    args: ["--acp"],
+    adapterCommand: process.platform === "win32" ? "qwen.cmd" : "qwen",
+    permissionMode: "deny",
+    modelVariantConfigIDs: [],
+    capabilities: {
+      ...COMMON_ACP_CAPABILITIES,
+      models: true,
+      todos: false,
+      commands: false,
+      actions: false,
+      sessionRename: false,
+      sessionDelete: false,
+    },
+    historyLoader: undefined,
+    journalPageWhileOwned: false,
+    reloadOnHistoryRefresh: false,
+  },
 }
 
 const REGISTERED = { ...HARNESS_PROFILES, ...AGENTBOX_HARNESS_PROFILES }
@@ -152,6 +178,9 @@ export const AGENTBOX_MODEL_ALIASES = {
   // displayed as "DeepSeek-V41-Flash"). The production template owns the same
   // pair and is test-locked to it.
   dsh: { "deepseek-flash": '["deepseek-official","deepseek-flash"]' },
+  // qwen's ACP model option composes a runtime value from auth type + model
+  // id (observed first-hand; the production template owns the same pair).
+  qwen: { "deepseek-flash": "$runtime|openai|deepseek-flash(openai)" },
 }
 
 export function resolveNativeModel(profileID, model) {
