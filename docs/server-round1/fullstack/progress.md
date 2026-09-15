@@ -985,3 +985,18 @@ provider 侧账单是唯一权威用量记录，本表是本地产物推算的�
   的 LD_PRELOAD 守卫不可用（须用 gnu 版或改 bwrap 网络姿态）。建议后续工单按
   claude-code 门（LD_PRELOAD 路线）实现。
 - **Crush / OpenHands 及其它**：按工单 §2 顺序（前五家做完才碰），本轮未开始。
+
+## 轮 5（用户追加）：kilo CLI 7.7.2（OpenCode fork，官方 `kilo acp`）
+
+- 调研卡：OpenCode fork 实证（官方文档原文 + 日志前缀 + kilo.json 兼容 + 捆绑
+  bwrap）；MIT（双版权 Kilo Code/opencode）；平台二进制包 optionalDependencies
+  模式（postinstall 下载脚本 --ignore-scripts 永不执行）。
+- 六件套全齐；**假端点门 exit 0 + 真实模型门 exit 0（live，一次尝试即过）**。
+- 关键事实：`kilo acp` 原生二进制即 ACP 服务器（适配器直连二进制，无 node
+  launcher）；配置经 KILO_CONFIG_CONTENT env 交付（探测验证），免文件投影；
+  凭据 `{env:OPENAI_API_KEY}` 替换 → 线上 Bearer 精确匹配；session/load 与
+  session/resume 双通道实测可用（桥实测走 resume，reopenMethod 记录法）；
+  守卫拦截 models.dev/posthog/api.kilo.ai 厂商解析 15 次（预期观测，零接触）；
+  未知模型发包前被桥拒绝。顺带修复 claude 构建器 main() usage 行的 dsh 残留名。
+- 证据：`docs/server-round1/fullstack/kilo-production-packaging.md`。
+- checkpoint `8adebe2`（假端点）+ 收尾提交（live）。费用 +4 次请求，估计 < ¥0.01。
