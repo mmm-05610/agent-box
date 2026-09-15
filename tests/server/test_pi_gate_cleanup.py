@@ -99,7 +99,8 @@ def stub_chain(gate, monkeypatch, *, failure=None, audit=True):
 
     monkeypatch.setattr(gate, "build_artifact", build_artifact)
     monkeypatch.setattr(gate, "run_chain", run_chain)
-    monkeypatch.setattr(gate, "observe_reopen", lambda *arguments: {"replayedStoredTurn": True})
+    monkeypatch.setattr(gate, "observe_reopen",
+                        lambda *arguments, **_keywords: {"replayedStoredTurn": True})
 
 
 def run_gate(gate, monkeypatch, capsys, *arguments):
