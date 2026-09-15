@@ -725,6 +725,48 @@ def scan_state(runtime, session: dict) -> dict:
             "paths": sorted(item["path"] for item in checkpoint.get("files", []))}
 
 
+
+def assert_no_credential_exposure(credential: dict, *, prefix: str) -> None:
+    """The credential facts are assertions, not decoration.
+
+    Every gate records whether the injected token reached the durable event
+    stream or this run's report. Recording it and moving on would make the
+    headline safety claim - the credential reaches nothing but the provider -
+    something the report *shows* rather than something the run *enforces*: a
+    leak would print `tokenIn*=true` and still exit 0. A true value fails here,
+    under a typed code, with the field names only (never the token).
+    """
+    exposed = sorted(
+        key for key, value in credential.items()
+        if key.startswith("tokenIn") and value is True
+    )
+    if exposed:
+        fail(f"{prefix}_GATE_CREDENTIAL_EXPOSED",
+             f"the injected credential reached: {exposed}")
+
+def report_text(report: dict) -> str:
+    """The report as text, for the "did the credential reach it" checks.
+
+    An unrenderable value becomes a placeholder rather than an exception: this
+    call must never be the thing that ends a run, or a credential question would
+    be replaced by a crash.
+    """
+    return json.dumps(report, sort_keys=True,
+                      default=lambda value: f"<unserializable {type(value).__name__}>")
+
+
+def assert_report_is_credential_free(report: dict, *, prefix: str) -> None:
+    """The whole report, once it exists, carries no credential material.
+
+    The in-chain check sees a partial report (the outcome is merged after the
+    chain returns), so this is the one that covers what the run actually
+    publishes: the outcome, the diagnostics and the phase evidence.
+    """
+    if INJECTED_CREDENTIAL.decode(errors="replace") in report_text(report):
+        fail(f"{prefix}_GATE_CREDENTIAL_IN_REPORT",
+             "the injected credential appears in this run's report")
+
+
 def assert_main_requests(endpoint: FakeEndpoint, production) -> dict:
     """主链两轮请求体的形状断言：模型、上限、thinking、续接上下文。"""
     if len(endpoint.requests) < 2:
@@ -933,15 +975,23 @@ def run_chain(temporary: Path, workspace: Path, worker: Path, authorization: dic
 
             result["credential"] = {
                 "injectedTokenReachedProvider": (
-                    "verified-by-real-answer" if live else
+                    None if live else
                     bool(endpoint.requests) and all(
                         item["authorizationMatchesInjectedToken"]
                         for item in endpoint.requests)
                 ),
+                "credentialObservation": (
+                    "inferred-from-real-answer; request headers are not observable live"
+                    if live else "observed on the fake endpoint"
+                ),
                 "unauthorizedRequests": None if live else endpoint.unauthorized,
                 "tokenInEvents": current_token().value() in json.dumps(session["events"]),
-                "tokenInReportableState": current_token().value() in json.dumps(REPORT),
+                # The chain runs before the outcome is merged, so this covers what the
+        # report holds *so far*; the complete report is checked once it is
+        # assembled (see `assert_report_is_credential_free`).
+        "tokenInReportableState": current_token().value() in json.dumps(REPORT),
             }
+            assert_no_credential_exposure(result["credential"], prefix="OPENCODE")
             result["stateScan"] = scan_state(runtime, session)
             server_audit = read_driver_audit(workspace, DRIVER_AUDIT_NAME)
             result["driverAuditServerPath"] = {
@@ -2084,6 +2134,11 @@ def main() -> int:
 
     if primary is None and cleanup_failure is not None:
         primary, cleanup_failure = cleanup_failure, None
+    try:
+        assert_report_is_credential_free(REPORT, prefix="OPENCODE")
+    except GateFailure as exposure:
+        if primary is None:
+            primary = exposure
 
     if primary is not None:
         REPORT["result"] = "OPENCODE_PRODUCTION_CHAIN_GATE_FAILED"

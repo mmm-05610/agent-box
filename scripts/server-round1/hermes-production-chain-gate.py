@@ -880,22 +880,72 @@ def run_chain(temporary, workspace, worker, artifact, digest, endpoint, producti
                     token_path, credential_id, locator, spawns)
             result["credential"] = {
                 "injectedTokenReachedProvider": (
-                    "verified-by-real-answer" if live else
+                    None if live else
                     all(item["authorizationMatchesInjectedToken"]
                         for item in endpoint.requests) and bool(endpoint.requests)
+                ),
+                "credentialObservation": (
+                    "inferred-from-real-answer; request headers are not observable live"
+                    if live else "observed on the fake endpoint"
                 ),
                 "unauthorizedRequests": None if live else endpoint.unauthorized,
                 "tokenInEvents": INJECTED_CREDENTIAL.decode(errors="replace")
                                  in json.dumps(session["events"]),
-                "tokenInReportableState": INJECTED_CREDENTIAL.decode(errors="replace")
+                # The chain runs before the outcome is merged, so this covers what the
+        # report holds *so far*; the complete report is checked once it is
+        # assembled (see `assert_report_is_credential_free`).
+        "tokenInReportableState": INJECTED_CREDENTIAL.decode(errors="replace")
                                          in json.dumps(REPORT),
             }
             assert_credential_delivery(result["credential"])
+            assert_no_credential_exposure(result["credential"], prefix="HERMES")
             result["stateScan"] = scan_state(runtime, session, native_id)
             result["deltaAttribution"] = delta_attribution(session)
             return result
     finally:
         runtime.stop()
+
+
+
+def assert_no_credential_exposure(credential: dict, *, prefix: str) -> None:
+    """The credential facts are assertions, not decoration.
+
+    Every gate records whether the injected token reached the durable event
+    stream or this run's report. Recording it and moving on would make the
+    headline safety claim - the credential reaches nothing but the provider -
+    something the report *shows* rather than something the run *enforces*: a
+    leak would print `tokenIn*=true` and still exit 0. A true value fails here,
+    under a typed code, with the field names only (never the token).
+    """
+    exposed = sorted(
+        key for key, value in credential.items()
+        if key.startswith("tokenIn") and value is True
+    )
+    if exposed:
+        fail(f"{prefix}_GATE_CREDENTIAL_EXPOSED",
+             f"the injected credential reached: {exposed}")
+
+def report_text(report: dict) -> str:
+    """The report as text, for the "did the credential reach it" checks.
+
+    An unrenderable value becomes a placeholder rather than an exception: this
+    call must never be the thing that ends a run, or a credential question would
+    be replaced by a crash.
+    """
+    return json.dumps(report, sort_keys=True,
+                      default=lambda value: f"<unserializable {type(value).__name__}>")
+
+
+def assert_report_is_credential_free(report: dict, *, prefix: str) -> None:
+    """The whole report, once it exists, carries no credential material.
+
+    The in-chain check sees a partial report (the outcome is merged after the
+    chain returns), so this is the one that covers what the run actually
+    publishes: the outcome, the diagnostics and the phase evidence.
+    """
+    if INJECTED_CREDENTIAL.decode(errors="replace") in report_text(report):
+        fail(f"{prefix}_GATE_CREDENTIAL_IN_REPORT",
+             "the injected credential appears in this run's report")
 
 
 def assert_credential_delivery(credential: dict) -> None:
@@ -907,10 +957,21 @@ def assert_credential_delivery(credential: dict) -> None:
     placeholder key (which a real endpoint answers with 401). The measurement
     exists either way; this makes it a gate failure instead of a reported number.
     """
-    if credential.get("injectedTokenReachedProvider") and not credential.get("unauthorizedRequests"):
+    if credential.get("injectedTokenReachedProvider") is False or credential.get("unauthorizedRequests"):
+        fail("HERMES_GATE_CREDENTIAL_NOT_DELIVERED",
+             f"a provider request did not carry the injected credential: {json.dumps(credential)}")
+    if credential.get("injectedTokenReachedProvider") is None:
+        # Live: the headers were never observable, so the witness is the answer
+        # itself. This is an inference and the report says so; it is not allowed
+        # to *replace* an observation the run could have made.
+        if not credential.get("credentialObservation", "").startswith("inferred-from-real-answer"):
+            fail("HERMES_GATE_CREDENTIAL_OBSERVATION_UNLABELLED",
+                 f"live mode must label its inference: {json.dumps(credential)}")
+        return
+    if credential.get("injectedTokenReachedProvider"):
         return
     fail("HERMES_GATE_CREDENTIAL_NOT_DELIVERED",
-         f"a provider request did not carry the injected credential: {json.dumps(credential)}")
+         f"the credential delivery fact is neither observed nor inferred: {json.dumps(credential)}")
 
 
 def assert_wire_model(structure: dict, phase: str, observed: list) -> None:
@@ -1571,7 +1632,8 @@ def observe_retry(temporary, workspace, worker, artifact, digest, production) ->
 
 # --------------------------------------------------------------------------
 
-def cleanup_check(temporary: Path, workspace: Path, token_path: Path) -> None:
+def cleanup_check(temporary: Path, workspace: Path, token_path: Path,
+                  authorized_secret: Path | None = None) -> None:
     """Nothing this gate projected may survive the run."""
     worker_root = temporary / "worker-root"
     leftovers = [name for name in ("views", "secrets") if (worker_root / name).exists()]
@@ -1599,7 +1661,10 @@ def cleanup_check(temporary: Path, workspace: Path, token_path: Path) -> None:
     REPORT.setdefault("cleanup", {}).update({
         "workerProjectionsRemoved": True, "adapterProcessesRemoved": True,
         "gateTokenRemoved": not token_path.exists(),
-        "authorizedLocatorDeleted": False, "workspaceRemoved": not workspace.exists(),
+        "authorizedLocatorDeleted": (
+            None if authorized_secret is None else not Path(authorized_secret).exists()
+        ),
+        "workspaceRemoved": not workspace.exists(),
     })
 
 
@@ -1907,7 +1972,7 @@ def main() -> int:
              "configuredModel": production.PRODUCT_MODEL_ID}
             if live else native_model_observation(workspace)
         )
-        cleanup_check(temporary, workspace, token_path)
+        cleanup_check(temporary, workspace, token_path, secret_path)
         REPORT["result"] = "HERMES_PRODUCTION_CHAIN_GATE_OK"
     except GateFailure as failure:
         primary = failure
@@ -1943,6 +2008,11 @@ def main() -> int:
 
     if primary is None and cleanup_failure is not None:
         primary, cleanup_failure = cleanup_failure, None
+    try:
+        assert_report_is_credential_free(REPORT, prefix="HERMES")
+    except GateFailure as exposure:
+        if primary is None:
+            primary = exposure
 
     if primary is not None:
         REPORT["result"] = "HERMES_PRODUCTION_CHAIN_GATE_FAILED"

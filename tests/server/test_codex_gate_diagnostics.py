@@ -511,8 +511,12 @@ def test_the_capture_scan_reports_hits_instead_of_escaping(tmp_path):
 
 
 def test_both_phase_failures_are_kept_in_order():
-    """When both phases fail, every independent failure is preserved in order -
-    the credential (if any) stays the primary one."""
+    """When both phases fail, every independent failure is preserved in order.
+
+    The list is produced by the gate's own collector, not rebuilt inside the
+    test: an earlier version of this test compared its own literal to itself and
+    could never fail, which is precisely the kind of test that certifies nothing.
+    """
     module = load_gate()
     phases = [
         {"phase": "turn-chain", "hits": [], "races": [], "incompleteEvents": [],
@@ -526,12 +530,22 @@ def test_both_phase_failures_are_kept_in_order():
     ]
     failure = module.resolve_run_failure({}, phases)
     assert failure is not None and failure.code == "CODEX_GATE_STATE_SCAN_INCOMPLETE"
-    secondaries = [
-        {"phase": phase["phase"], "code": phase["failure"].code}
-        for phase in phases if phase.get("failure") is not None
-    ]
-    assert secondaries == [{"phase": "turn-chain", "code": "CODEX_GATE_TURN_FAILED"},
-                           {"phase": "reopen", "code": "CODEX_GATE_REOPEN_FAILED"}]
+
+    secondaries = module.collect_secondary_failures(phases)
+    assert [(item["phase"], item["code"]) for item in secondaries] == [
+        ("turn-chain", "CODEX_GATE_TURN_FAILED"),
+        ("reopen", "CODEX_GATE_REOPEN_FAILED"),
+        ("reopen", "CODEX_GATE_STATE_SCAN_INCOMPLETE"),
+    ], secondaries
+    assert secondaries[0]["message"] == "turn", secondaries
+    assert secondaries[2]["message"] == "ps failed", secondaries
+
+    # A phase that failed without an exception still contributes its scanner
+    # incompleteness, and a clean pair contributes nothing at all.
+    assert module.collect_secondary_failures([
+        {"phase": "reopen", "scanError": None, "settleError": None},
+        {"phase": "turn-chain", "hits": []},
+    ]) == []
 
 
 def test_a_settled_hit_survives_the_whole_turn_chain_path(tmp_path):

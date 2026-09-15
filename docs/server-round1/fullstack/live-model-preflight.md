@@ -93,11 +93,14 @@ PYTHONPATH=src:plugins/... python3 scripts/server-round1/<family>-production-cha
   `tokenHits=[]`；授权 locator **未被删除**（`authorizedLocatorDeleted=null`，gate 只删自己的
   临时 token：`gateTokenRemoved=true`）。
 - 清理：`adapterProcessesRemoved/workerProjectionsRemoved/workspaceRemoved/removed` 全为 true。
-- 运行账（按产物逐次核对）：本家 `--live` 共 **10 次**运行——6 次通过（`pi-live4/6/7/8/9/10`）、
-  4 次失败：`pi-live`（live 接入缺口：`AttributeError: requests`）、`pi-live2`（`AttributeError: stop`）、
-  `pi-live3`（凭据未注入 → `SIDECAR_OP_FAILED: Authentication required`）、
-  `pi-live5`（**state capture 失败**，见下）。失败的运行只有 `pi-live3/5` 可能到达模型；
-  输入数百 tokens、输出 ≤64 tokens/次 → 本家 **< ¥0.01**，四家累计仍远低于 ¥10。
+- 运行账（按产物逐次核对）：本家 `--live` 共 **10 次**运行——6 次通过（`pi-live4/6/7/8/9/10`，
+  各两轮）、4 次失败：`pi-live`（live 接入缺口 `AttributeError: requests`；报告无 `rounds` 键，
+  是否已发包无法判定）、`pi-live2`（`AttributeError: stop`，**两轮均已完成**）、
+  `pi-live3`（凭据未注入 → `SIDECAR_OP_FAILED: Authentication required`，**两轮均已完成**）、
+  `pi-live5`（**state capture 失败**，首轮已流式）。
+  **失败运行里有 3 次已实际产生付费轮次**（live2/live3 各两轮、live5 一轮）——
+  早先"失败运行都在发包前结束"的说法与产物不符，已更正。
+  每轮输入数百 tokens、输出 ≤64 tokens → 本家仍 **< ¥0.01**，四家累计远低于 ¥10。
   **capture 间歇统计：1 失败 / 10 次 Pi live**（失败即 `pi-live5`，其后 5 次复跑全绿，未复现）。
 - **一次未能归因的 capture 间歇（pi-live5，18:37）**：首轮 delta（nonce）已流式产出，随后
   `turn.capture failed` → `turn.state failed`，外层码 `SIDECAR_OP_FAILED`。当时 gate 的
@@ -123,10 +126,11 @@ locator 内容只经 SecretStore 注入（gate 自建临时 token 文件、绝�
 
 ### Hermes（2026-09-15，`--live` 通过）
 
-运行账：本家 `--live` 共 **5 次**（`hermes-live1` 缺口 `AttributeError: requests`、
+运行账：本家 `--live` 共 **5 次**（`hermes-live1` 缺口 `AttributeError: requests`，未发包；
 `hermes-live2` `HERMES_GATE_EGRESS_GUARD_ABSENT`、`hermes-live3`
-`HERMES_GATE_NATIVE_MODEL_UNOBSERVED`；`hermes-live4` 通过，`hermes-live5` 为**最终代码上的复跑**，
-同样 exit 0——两轮 43 / 64 deltas、state 9 文件零命中、`authorizedLocatorDeleted=false`、清理全 true）。
+`HERMES_GATE_NATIVE_MODEL_UNOBSERVED`，**二者均已完成两轮**；`hermes-live4` 通过，
+`hermes-live5` 为**最终代码上的复跑**，同样 exit 0——两轮 43 / 64 deltas、state 9 文件零命中、
+`authorizedLocatorDeleted=false`、清理全 true）。
 
 `hermes-production-chain-gate.py --live` → **exit 0 / `HERMES_PRODUCTION_CHAIN_GATE_OK`**：
 两轮真实答复（14/15 deltas，第二轮带第一轮上下文）、同 native id 续接（`checkpointNativeIdStable`）、
@@ -141,9 +145,9 @@ live 模式下**显式记为"未观测"而非静默跳过**的项（均为假端
 
 ### OpenCode（2026-09-15，`--live` 通过）
 
-运行账：本家 `--live` 共 **7 次**（`opencode-live1/2/3/4` 为 live 接入缺口：
-`AttributeError: requests` ×2、`worker_digest_refusal` 解析、`AttributeError: over_budget`；
-`opencode-live5` `OPENCODE_GATE_EGRESS_GUARD_ABSENT`；`opencode-live6` 通过，
+运行账：本家 `--live` 共 **7 次**（`opencode-live1/2` 接入缺口未发包；`opencode-live3/4` 报告
+`rounds` 显示**两轮均已完成**后才被后续缺口打挂；`opencode-live5`
+`OPENCODE_GATE_EGRESS_GUARD_ABSENT`，同样**两轮均已完成**；`opencode-live6` 通过，
 `opencode-live7` 为**最终代码上的复跑**：同样 exit 0、两轮 12 / 8 deltas、state 4 文件零命中、
 未知模型以 `OPENCODE_MODEL_NOT_AVAILABLE` 在 driver 内拒绝、清理全 true）。
 
@@ -183,8 +187,9 @@ live 下显式记为"未观测"的项：driverObservation/driverNegatives/guestP
   `sha256:b0189c81…`），live 不覆盖 base_url、不装载 loopback guard。
 - 清理：`adapterProcessesRemoved/workerProjectionsRemoved/workspaceRemoved/fakeTokenRemoved/
   removed` 全为 true。
-- 运行账：本家 `--live` 共 **7 次**——4 次失败（`codex-live1/2` live 接入缺口
-  `AttributeError`、`codex-live3` 报告序列化缺陷、`codex-live4` locator 路径笔误，均在发包前结束）、
+- 运行账：本家 `--live` 共 **7 次**——4 次失败（`codex-live4` locator 路径笔误，未发包；
+  `codex-live1/2/3` 的产物不是 JSON（当时的失败只留下 traceback），**是否已发包无法从产物判定**，
+  不写成"未发包"）、
   3 次通过（`codex-live5/6`，以及**最终代码上的复跑 `codex-live7`**：两轮 14 / 15 deltas、
   同 native id 续接、取消与凭据断言、`tokenIn*` 全 false、state 78 文件零命中、清理全 true）；
   另有 1 次无模型复跑（`codex-nomodel-c8-final`）exit 0。

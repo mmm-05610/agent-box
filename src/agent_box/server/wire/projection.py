@@ -42,6 +42,11 @@ _EVENT_KIND_MAP = {
     "workspace.connection": "workspace.connection",
 }
 
+#: The states a stop request can interrupt. A terminal execution that receives a
+#: late cancel keeps its terminal state: "stopping" is a fact about an execution
+#: that is still running.
+_LIVE_EXECUTION_STATES = frozenset({"queued", "dispatched", "running"})
+
 _EXECUTION_STATE_MAP = {
     "accepted": "queued",
     "dispatching": "dispatched",
@@ -161,12 +166,12 @@ def _event_body(kind: str, row: Mapping[str, Any], data: Mapping[str, Any]) -> d
     session_id = row["session_id"]
     if kind == "execution.state":
         state = _EXECUTION_STATE_MAP.get(str(data.get("state")), "unknown")
-        if data.get("cancel_requested") and state != "stopped":
+        if data.get("cancel_requested") and state in _LIVE_EXECUTION_STATES:
             # core v1 §6 keeps three facts apart: a stop was *requested*, it is
-            # *being stopped*, and it *stopped*. The client's stop phase starts
-            # on exactly this frame (`wire-session-control.ts`), so a recorded
-            # cancel request must not be published as the state the execution
-            # happened to be in when the request arrived.
+            # *being stopped*, and it *stopped*. Only a live execution can be
+            # "being stopped": a terminal one keeps its terminal state, because
+            # republishing `completed` as `stopping` would tell the client an
+            # execution is still in flight when it has already finished.
             state = "stopping"
         body: dict[str, Any] = {
             "kind": kind,

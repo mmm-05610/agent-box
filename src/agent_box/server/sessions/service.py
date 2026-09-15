@@ -180,12 +180,18 @@ class SessionService:
             return prior
         if self.execution is None:
             raise unavailable("EXECUTION_CAPABILITY_UNAVAILABLE", "Turn cancellation is not configured")
+        # A finished Turn has nothing to stop, and the answer says so instead of
+        # recording a request that never described it: the same rule the wire's
+        # `runs.stop` applies, so both entry points agree on what a late cancel
+        # means. `record_cancel_request` returns the Turn untouched in that case.
         self.records.record_cancel_request(turn_id)
-        accepted = self.execution.cancel(turn_id)
+        requested = self.records.get_turn_context(turn_id)
+        stopped = requested["state"] in self.records.TERMINAL_TURN_STATES
+        accepted = False if stopped else self.execution.cancel(turn_id)
         self.on_event()
         return self.idempotency.save(
             scope, key, request_digest, 202,
-            {"turn_id": turn_id, "cancel_requested": True, "accepted": accepted},
+            {"turn_id": turn_id, "cancel_requested": not stopped, "accepted": accepted},
         )
 
     def get_session(self, session_id: str):

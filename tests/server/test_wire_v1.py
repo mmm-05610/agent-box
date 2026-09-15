@@ -673,7 +673,53 @@ def test_stop_reports_requested_then_already_finished(wire):
     assert not any(
         frame["event"].get("state") == "stopped"
         for frame in frames if frame["event"]["kind"] == "execution.state"
-    ), "a stop request is not the stop itself" 
+    ), "a stop request is not the stop itself"
+
+
+def test_a_cancel_on_a_finished_execution_never_republishes_it_as_stopping(wire):
+    """A late cancel must not turn a finished execution back into a live one.
+
+    The REST cancel route and the wire method share the store, so both must
+    agree that a terminal Turn has nothing to stop. The bug this locks: the
+    `stopping` projection keyed on `cancel_requested` alone, so a cancel on an
+    already-completed Turn republished it as `stopping` - telling the client an
+    execution was in flight when it had already finished, with no terminal frame
+    to follow.
+    """
+    runtime, api, _execution = wire
+    workspace = open_workspace(api, "/home/tester/late-cancel")["workspace"]
+    profile = make_profile(api, name="late-cancel")
+    accepted = api.ok("sessions.createAndSend", {
+        "requestId": "late-cancel-send", "workspaceId": workspace["id"],
+        "profileId": profile["profile_id"], "message": MESSAGE, "overrides": [],
+    })
+    session_id = accepted["session"]["id"]
+    execution_id = accepted["executionId"]
+    # The fixture's execution backend has no worker, so the turn is driven to a
+    # terminal state the way a Server restart drives it: sealed as `unknown`.
+    assert runtime.repository.recover_interrupted_turns() >= 1
+
+    response = api.client.post(
+        f"/api/v1/turns/{execution_id}/cancel",
+        headers={**api.headers, "Idempotency-Key": "late-cancel"},
+    )
+    assert response.status_code == 202, response.json()
+    assert response.json()["cancel_requested"] is False, response.json()
+
+    states = [
+        frame["event"]["state"]
+        for frame in api.ok("history.snapshot", {"sessionId": session_id})["frames"]
+        if frame["event"]["kind"] == "execution.state"
+    ]
+    assert "stopping" not in states, states
+    assert states[-1] == "unknown", states
+    # The finished Turn keeps the record it earned: no invented stop request.
+    with runtime.database.read() as conn:
+        row = conn.execute(
+            "SELECT state,stop_requested_at FROM server_turns WHERE id=?", (execution_id,),
+        ).fetchone()
+    assert row["state"] == "unknown", dict(row)
+    assert row["stop_requested_at"] is None, dict(row)
 
     _runtime2, api2, execution2 = wire
     del _runtime2, execution2
@@ -995,11 +1041,17 @@ def test_wire_event_stream_resumes_from_snapshot_cursor_without_sse(wire):
         assert frame["seq"] > snapshot["frames"][-1]["seq"]
 
 
-#: Every wire event kind the contract declares, with the payload the producing
-#: server code actually writes (see `wire/projection.py` `_EVENT_KIND_MAP` and
-#: the producer at each call site). Two of them are declared in the contract and
-#: projected, but no producer emits them yet - they are listed as
-#: `producer=False` so the test states that gap instead of hiding it.
+#: The event kinds this test drives, with the payload the producing server code
+#: writes (see `wire/projection.py` `_EVENT_KIND_MAP` and the producer at each
+#: call site), plus the kinds that are declared and projected but have no
+#: producer yet - listed as `producer=False` so the test states that gap instead
+#: of hiding it. `config.changed` is produced by a real flow (a confirmed role
+#: switch), so it is not in this table; `workspace.connection` has no producer
+#: anywhere and is.
+#:
+#: The table is *checked against the artifact* when one is supplied: every kind
+#: the contract declares must be either exercised here or listed as unproduced,
+#: so a newly declared kind cannot slip past unnoticed.
 FRAME_COVERAGE = (
     ("message.delta", {"text": "chunk"}, True),
     ("message.final", {"text": "answer", "role": "assistant", "display_kind": "visible"}, True),
@@ -1120,9 +1172,12 @@ def test_every_projected_frame_matches_the_strict_frontend_event_schema(wire):
     assert runtime.repository.recover_interrupted_turns() >= 1
     listed = api.ok("sessions.list", {"includeArchived": False})["items"]
     current = next(item for item in listed if item["id"] == session_id)
+    # A *different* role: switching to the one the Session already uses changes
+    # nothing, and the no-op case is asserted separately below.
+    other_profile = make_profile(api, name="frames-other")
     switched = api.ok("sessions.switchProfile", {
         "requestId": "frames-switch", "sessionId": session_id,
-        "profileId": profile["profile_id"], "expectedVersion": current["version"],
+        "profileId": other_profile["profile_id"], "expectedVersion": current["version"],
     })
     assert switched["outcome"] == "confirmed"
     switched_frames = _validate_frames(
@@ -1137,8 +1192,41 @@ def test_every_projected_frame_matches_the_strict_frontend_event_schema(wire):
     assert changed == {"kind": "config.changed", "sessionId": session_id,
                        "effectiveFor": "next_send"}
 
+    # A switch to the role the Session already has changes nothing, so nothing is
+    # published: `config.changed` means the effective configuration moved.
+    current = next(
+        item for item in api.ok("sessions.list", {"includeArchived": False})["items"]
+        if item["id"] == session_id
+    )
+    before_no_op = api.ok("history.snapshot", {"sessionId": session_id})["frames"]
+    no_op = api.ok("sessions.switchProfile", {
+        "requestId": "frames-switch-noop", "sessionId": session_id,
+        "profileId": other_profile["profile_id"],
+        "expectedVersion": switched["session"]["version"],
+    })
+    assert no_op["outcome"] == "confirmed"
+    after_no_op = api.ok("history.snapshot", {"sessionId": session_id})["frames"]
+    assert len(after_no_op) == len(before_no_op), (
+        "a switch that changes nothing must not publish an event: "
+        f"{after_no_op[len(before_no_op):]}"
+    )
+
     # The one kind no producer emits yet is *recorded* here rather than asserted
     # as flowing: a contract that declares an event the stream never carries is a
     # gap to close deliberately, not to discover in the UI phase.
     unproduced = sorted(kind for kind, _data, produced in FRAME_COVERAGE if not produced)
     assert unproduced == ["workspace.connection"], unproduced
+
+    # The contract's own declared set, read from the artifact when one is
+    # supplied: every kind it declares is either observed in a real frame above
+    # or explicitly recorded as unproduced here, and nothing accounted for is
+    # undeclared. A tenth kind added to the frontend's union can therefore not
+    # slip past this test unnoticed.
+    if os.environ.get("AGENT_BOX_WIRE_SCHEMA"):
+        declared = {
+            member["properties"]["kind"]["const"]
+            for member in _frontend_schema("WireEvent")[1]["oneOf"]
+        }
+        accounted = observed | set(unproduced) | {"config.changed"} - set()
+        assert declared - accounted == set(), sorted(declared - accounted)
+        assert accounted - declared == set(), sorted(accounted - declared)

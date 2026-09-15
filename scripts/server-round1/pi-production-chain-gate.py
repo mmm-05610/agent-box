@@ -425,6 +425,9 @@ def main() -> int:
 
         live = bool(options.live)
         REPORT["mode"] = "live" if live else "loopback-fake-endpoint"
+        # None outside live mode: there is no authorized locator to check then,
+        # and the cleanup report says exactly that rather than a bare `false`.
+        secret_path = None
         if live:
             # Paid mode: the official template is used exactly as declared, so
             # there is no override to audit - and no fake endpoint to count
@@ -532,7 +535,7 @@ def main() -> int:
             fail("PI_GATE_EGRESS_BLOCKED", f"the adapter tried to reach {REPORT['egress']['denied']}")
         REPORT["reopenObservation"] = observe_reopen(
             temporary, workspace, worker, artifact, digest, production, live=live)
-        cleanup_check(temporary, workspace, token_path)
+        cleanup_check(temporary, workspace, token_path, secret_path)
         REPORT["result"] = "PI_PRODUCTION_CHAIN_GATE_OK"
     except GateFailure as failure:
         primary = failure
@@ -572,6 +575,14 @@ def main() -> int:
     if primary is None and cleanup_failure is not None:
         # A cleanup failure with no other cause is itself the failure.
         primary, cleanup_failure = cleanup_failure, None
+    # The complete report - outcome, diagnostics, phase evidence - is what a
+    # failing run publishes, so the credential question is asked once more
+    # here, after everything that could carry it has been merged in.
+    try:
+        assert_report_is_credential_free(REPORT, prefix="PI")
+    except GateFailure as exposure:
+        if primary is None:
+            primary = exposure
 
     if primary is not None:
         REPORT["result"] = "PI_PRODUCTION_CHAIN_GATE_FAILED"
@@ -823,22 +834,77 @@ def run_chain(temporary, workspace, worker, artifact, digest, endpoint, producti
                 # The fake endpoint can see the bearer token; a real endpoint
                 # cannot be asked, so live mode records that the answer itself
                 # (rounds completed with the model's reply) is the evidence.
+                # In live mode the request headers are not observable, so the
+                # field stays boolean-or-null and the *inference* is recorded
+                # separately: only an authenticated request can produce a real
+                # answer. Naming the inference where a reader looks for the
+                # observation is what "verified-by-real-answer" used to hide.
                 "injectedTokenReachedProvider": (
-                    "verified-by-real-answer" if live else
+                    None if live else
                     all(item["authorizationMatchesInjectedToken"]
                         for item in endpoint.requests) and bool(endpoint.requests)
+                ),
+                "credentialObservation": (
+                    "inferred-from-real-answer; request headers are not observable live"
+                    if live else "observed on the fake endpoint"
                 ),
                 "unauthorizedRequests": None if live else endpoint.unauthorized,
                 "tokenInEvents": INJECTED_CREDENTIAL.decode(errors="replace") in json.dumps(
                     session["events"]),
-                "tokenInReportableState": INJECTED_CREDENTIAL.decode(errors="replace")
+                # The chain runs before the outcome is merged, so this covers what the
+        # report holds *so far*; the complete report is checked once it is
+        # assembled (see `assert_report_is_credential_free`).
+        "tokenInReportableState": INJECTED_CREDENTIAL.decode(errors="replace")
                                          in json.dumps(REPORT),
             }
+            assert_no_credential_exposure(result["credential"], prefix="PI")
             result["stateScan"] = scan_state(runtime, session, native_id)
             result["deltaAttribution"] = delta_attribution(session)
             return result
     finally:
         runtime.stop()
+
+
+
+def assert_no_credential_exposure(credential: dict, *, prefix: str) -> None:
+    """The credential facts are assertions, not decoration.
+
+    Every gate records whether the injected token reached the durable event
+    stream or this run's report. Recording it and moving on would make the
+    headline safety claim - the credential reaches nothing but the provider -
+    something the report *shows* rather than something the run *enforces*: a
+    leak would print `tokenIn*=true` and still exit 0. A true value fails here,
+    under a typed code, with the field names only (never the token).
+    """
+    exposed = sorted(
+        key for key, value in credential.items()
+        if key.startswith("tokenIn") and value is True
+    )
+    if exposed:
+        fail(f"{prefix}_GATE_CREDENTIAL_EXPOSED",
+             f"the injected credential reached: {exposed}")
+
+def report_text(report: dict) -> str:
+    """The report as text, for the "did the credential reach it" checks.
+
+    An unrenderable value becomes a placeholder rather than an exception: this
+    call must never be the thing that ends a run, or a credential question would
+    be replaced by a crash.
+    """
+    return json.dumps(report, sort_keys=True,
+                      default=lambda value: f"<unserializable {type(value).__name__}>")
+
+
+def assert_report_is_credential_free(report: dict, *, prefix: str) -> None:
+    """The whole report, once it exists, carries no credential material.
+
+    The in-chain check sees a partial report (the outcome is merged after the
+    chain returns), so this is the one that covers what the run actually
+    publishes: the outcome, the diagnostics and the phase evidence.
+    """
+    if INJECTED_CREDENTIAL.decode(errors="replace") in report_text(report):
+        fail(f"{prefix}_GATE_CREDENTIAL_IN_REPORT",
+             "the injected credential appears in this run's report")
 
 
 def profile_version(client, runtime, profile_id: str) -> int:
@@ -1008,11 +1074,13 @@ def scan_state(runtime, session: dict, native_id: str) -> dict:
             "tokenHits": hits, "tokenInState": bool(hits)}
 
 
-def cleanup_check(temporary: Path, workspace: Path, token_path: Path | None) -> None:
+def cleanup_check(temporary: Path, workspace: Path, token_path: Path | None,
+                  authorized_secret: Path | None = None) -> None:
     """Nothing this gate projected may survive the run.
 
-    `token_path` is the gate's own temporary token, or None in live mode: the
-    authorized locator is the user's file, and this gate never deletes it.
+    `token_path` is the gate's own temporary token. `authorized_secret` is the
+    user's locator in live mode, and the run proves it is still there rather than
+    asserting it in prose: this gate reads it and never writes or deletes it.
     """
     worker_root = temporary / "worker-root"
     leftovers = [name for name in ("views", "secrets") if (worker_root / name).exists()]
@@ -1034,7 +1102,11 @@ def cleanup_check(temporary: Path, workspace: Path, token_path: Path | None) -> 
     REPORT.setdefault("cleanup", {}).update({
         "workerProjectionsRemoved": True, "adapterProcessesRemoved": True,
         "gateTokenRemoved": token_removed,
-        "authorizedLocatorDeleted": False if token_path is None else None,
+        # A real check, not a literal: the authorized locator is the user's file
+        # and this run must leave it exactly where it found it.
+        "authorizedLocatorDeleted": (
+            None if authorized_secret is None else not Path(authorized_secret).exists()
+        ),
         "workspaceRemoved": not workspace.exists(),
     })
 

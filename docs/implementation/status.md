@@ -1,6 +1,6 @@
 # Backend Server — status
 
-更新：2026-09-15 20:20 +08:00（执行者：后端 goal 会话，分支 feature/server-harness-extension-v1）。
+更新：2026-09-15 20:33 +08:00（执行者：后端 goal 会话，分支 feature/server-harness-extension-v1）。
 37 的独立验收仍为 PARTIAL；历史证据保留。
 当前授权39→40→41→42。执行进度：39 完成；40 A/B/C/D 完成（四家组件门通过，
 无真实模型）；41 的 28 方法与队列终态已按前端 `3aba5c5c` 新摘要严格 29/29 重锁，Windows r4 平台门

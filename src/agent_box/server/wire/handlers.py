@@ -802,7 +802,7 @@ class WireService:
         context = self.sessions.records.get_turn_context(execution_id)
         if context["session_id"] != session_id:
             raise WireError("NOT_FOUND", "Execution does not belong to this Session")
-        terminal = ("completed", "failed", "cancelled", "unknown")
+        terminal = self.sessions.records.TERMINAL_TURN_STATES
         if context["state"] in terminal:
             return {
                 "outcome": "already_finished", "executionId": execution_id,

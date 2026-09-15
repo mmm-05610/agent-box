@@ -15,6 +15,15 @@ from agent_box.server.ids import now, opaque_id
 from agent_box.storage import Database
 
 
+#: A Turn is active while it can still be stopped or dispatched. Terminal states
+#: (`completed`, `failed`, `cancelled`, `unknown`) are history: nothing that arrives
+#: afterwards changes what happened.
+ACTIVE_TURN_STATES = ("accepted", "dispatching", "running", "capturing")
+
+#: The complement: a Turn that already happened. Exposed so both cancel entry
+#: points (the wire method and the retained REST route) answer the same thing.
+TERMINAL_TURN_STATES = ("completed", "failed", "cancelled", "unknown")
+
 WIRE_VISIBLE_EVENT_KINDS = frozenset({
     "turn.accepted", "turn.state", "message.delta", "message.final", "tool.update",
     "approval.requested", "approval.settled", "config.changed", "queue.updated",
@@ -29,6 +38,12 @@ def _version_error(message: str, current: dict[str, Any]) -> ServerError:
 
 
 class SessionRecords:
+    #: Re-exported on the class so callers holding a records object (the wire
+    #: handlers, the session service) can ask the same question without importing
+    #: this module's module-level names.
+    ACTIVE_TURN_STATES = ACTIVE_TURN_STATES
+    TERMINAL_TURN_STATES = TERMINAL_TURN_STATES
+
     def __init__(self, database: Database, idempotency: IdempotentRecords) -> None:
         self.database = database
         self.idempotency = idempotency
@@ -271,19 +286,26 @@ class SessionRecords:
                 self.idempotency.insert(conn, scope, request_id, request_digest, 200, body)
                 return "rejected", body
             timestamp = now()
+            # Switching to the role the Session already uses changes nothing, so
+            # the record is written (the version still moves, as any accepted
+            # write does) but no `config.changed` is published: that event means
+            # "the effective configuration changed", and reporting it here would
+            # tell the client to re-read a configuration that did not move.
+            configuration_changed = str(session["profile_id"] or "") != profile_id
             conn.execute(
                 "UPDATE server_sessions SET profile_id=?,version=version+1,updated_at=? WHERE id=?",
                 (profile_id, timestamp, session_id),
             )
-            # The Session's effective configuration just changed identity, and
-            # the contract delivers that to clients as `config.changed` with the
-            # window it applies to. It is `next_send` because this backend
-            # freezes a configuration per execution: nothing already running is
-            # rewritten (the refusal above is the running case). A replayed
-            # request returns before this point, so it never emits a second one.
-            self._append_session_event(
-                conn, session_id, None, "config.changed", {"effective_for": "next_send"},
-            )
+            if configuration_changed:
+                # The Session's effective configuration just changed identity, and
+                # the contract delivers that to clients as `config.changed` with the
+                # window it applies to. It is `next_send` because this backend
+                # freezes a configuration per execution: nothing already running is
+                # rewritten (the refusal above is the running case). A replayed
+                # request returns before this point, so it never emits a second one.
+                self._append_session_event(
+                    conn, session_id, None, "config.changed", {"effective_for": "next_send"},
+                )
             body = {"outcome": "confirmed", "session": self._session_view(conn, session_id)}
             self.idempotency.insert(conn, scope, request_id, request_digest, 200, body)
             return "confirmed", body
@@ -504,7 +526,7 @@ class SessionRecords:
 
     def seal_interrupted_turns(self) -> int:
         """Seal pre-restart active Turns as unknown; never redispatch them."""
-        active_states = ("accepted", "dispatching", "running", "capturing")
+        active_states = ACTIVE_TURN_STATES
         with self.database.transaction() as conn:
             rows = conn.execute(
                 "SELECT * FROM server_turns WHERE state IN (?,?,?,?) ORDER BY created_at,id",
@@ -654,10 +676,20 @@ class SessionRecords:
             )
 
     def record_cancel_request(self, turn_id: str) -> dict[str, Any]:
+        """Record that a stop was asked for, if there is anything to stop.
+
+        A turn that already reached a terminal state is returned untouched: the
+        request is not a fact about it, and recording one would both write a
+        `stop_requested_at` the turn never had and publish a stop frame for an
+        execution that has already finished. The caller decides what to tell the
+        client; the store only refuses to invent the request.
+        """
         with self.database.transaction() as conn:
             row = conn.execute("SELECT * FROM server_turns WHERE id=?", (turn_id,)).fetchone()
             if row is None:
                 raise ServerError("TURN_NOT_FOUND", "Turn was not found", status=404)
+            if row["state"] not in ACTIVE_TURN_STATES:
+                return dict(row)
             timestamp = now()
             conn.execute(
                 "UPDATE server_turns SET stop_requested_at=COALESCE(stop_requested_at,?),updated_at=? "

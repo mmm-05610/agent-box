@@ -1215,19 +1215,7 @@ def main() -> int:
         REPORT["reopenObservation"] = reopen_evidence.get("result")
         chain_phase = turn_chain_phase(REPORT, chain_evidence, watcher)
         failure = resolve_run_failure(REPORT, [chain_phase, reopen_evidence])
-        secondaries = []
-        for phase in (chain_phase, reopen_evidence):
-            if phase.get("failure") is not None:
-                secondaries.append({
-                    "phase": phase.get("phase"),
-                    "code": getattr(phase["failure"], "code", None) or "CODEX_GATE_UNEXPECTED",
-                    "message": getattr(phase["failure"], "message", None) or str(phase["failure"]),
-                })
-            if phase.get("scanError") or phase.get("settleError"):
-                secondaries.append({
-                    "phase": phase.get("phase"), "code": "CODEX_GATE_STATE_SCAN_INCOMPLETE",
-                    "message": phase.get("scanError") or phase.get("settleError"),
-                })
+        secondaries = collect_secondary_failures([chain_phase, reopen_evidence])
         if secondaries:
             REPORT["secondaryFailures"] = secondaries
             REPORT["secondaryFailure"] = secondaries[0]
@@ -2671,6 +2659,31 @@ def turn_chain_phase(report: dict, chain_evidence: dict, watcher=None) -> dict:
             hits.append(entry)
     phase["hits"] = hits
     return phase
+
+
+def collect_secondary_failures(phases: list[dict]) -> list[dict]:
+    """Every independent failure a phase carries, in phase order.
+
+    A run that ends must not lose the *other* thing that also went wrong: the
+    primary failure is chosen by the credential-first rule, and whatever else
+    failed is preserved here so a later reader sees both. Each phase contributes
+    its own failure (by typed code, with the exception's own message) and its
+    own scanner incompleteness - two different facts that can both be true.
+    """
+    collected: list[dict] = []
+    for phase in phases:
+        if phase.get("failure") is not None:
+            collected.append({
+                "phase": phase.get("phase"),
+                "code": getattr(phase["failure"], "code", None) or "CODEX_GATE_UNEXPECTED",
+                "message": getattr(phase["failure"], "message", None) or str(phase["failure"]),
+            })
+        if phase.get("scanError") or phase.get("settleError"):
+            collected.append({
+                "phase": phase.get("phase"), "code": "CODEX_GATE_STATE_SCAN_INCOMPLETE",
+                "message": phase.get("scanError") or phase.get("settleError"),
+            })
+    return collected
 
 
 def resolve_run_failure(report: dict, phases: list[dict]) -> "GateFailure | None":
