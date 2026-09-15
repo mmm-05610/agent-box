@@ -241,6 +241,7 @@ import {
   setQuickEntryLastState,
   setQuickEntryWindow,
 } from './windows/windows-composition'
+import { installAgentBoxServerConnection } from './workcore/agentbox-server-connection'
 
 
 
@@ -815,6 +816,30 @@ const disposeWorkCoreWireIpc = registerWorkCoreWireIpc({
 })
 
 app.on('will-quit', disposeWorkCoreWireIpc)
+
+// The Work Core lifecycle connection, installed before any window exists so the
+// renderer's first wire call already sees the real service or a typed
+// `UNAVAILABLE` — never a race between "the window loaded" and "the connection
+// arrived". The AgentBox runtime is the only product runtime that speaks the
+// Work Core wire, so nothing is installed for the legacy runtime.
+//
+// It is installed from data the Desktop can legitimately read (its own data
+// root's token file, written by the Server) rather than minted here, and the
+// reason for an absent connection is logged as a stable category: the endpoint
+// and the token are main-only facts and never reach a log line.
+if (DESKTOP_PRODUCT_RUNTIME === 'agentbox') {
+  const installed = installAgentBoxServerConnection({ slot: agentBoxServiceComposition.connectionSlot })
+
+  if (installed.endpoint) {
+    rememberLog('[agentbox-wire] lifecycle connection installed')
+  } else {
+    rememberLog(`[agentbox-wire] lifecycle connection unavailable: ${installed.reason}`)
+  }
+
+  app.on('will-quit', () => {
+    agentBoxServiceComposition.connectionSlot.install(null)
+  })
+}
 
 registerFilesIpc({
   IS_WINDOWS,
