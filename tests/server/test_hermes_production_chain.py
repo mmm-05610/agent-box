@@ -192,9 +192,18 @@ def test_the_wire_model_is_the_product_id_and_is_asserted(gate):
 
 
 def test_the_credential_must_reach_the_provider_on_every_round(gate):
-    """A provider request without the injected bearer is a gate failure."""
+    """A provider request without the injected bearer is a gate failure.
+
+    In live mode the request headers are not observable at all, so the field is
+    `None` and the witness is the real answer - and that inference has to be
+    *labelled* as one, or a constant would be passed off as an observation.
+    """
     gate.assert_credential_delivery({
         "injectedTokenReachedProvider": True, "unauthorizedRequests": 0})
+    gate.assert_credential_delivery({
+        "injectedTokenReachedProvider": None, "unauthorizedRequests": None,
+        "credentialObservation": "inferred-from-real-answer; request headers are not observable live",
+    })
     for credential in (
         {"injectedTokenReachedProvider": False, "unauthorizedRequests": 1},
         {"injectedTokenReachedProvider": True, "unauthorizedRequests": 1},
@@ -204,6 +213,13 @@ def test_the_credential_must_reach_the_provider_on_every_round(gate):
         with pytest.raises(gate.GateFailure) as refused:
             gate.assert_credential_delivery(credential)
         assert refused.value.code == "HERMES_GATE_CREDENTIAL_NOT_DELIVERED"
+
+    # Live mode without the label is its own failure: an unlabelled `None` would
+    # be indistinguishable from "nothing was checked".
+    with pytest.raises(gate.GateFailure) as unlabelled:
+        gate.assert_credential_delivery({
+            "injectedTokenReachedProvider": None, "unauthorizedRequests": None})
+    assert unlabelled.value.code == "HERMES_GATE_CREDENTIAL_OBSERVATION_UNLABELLED"
 
 
 def test_the_native_model_state_is_read_back_from_the_guard(gate, tmp_path):

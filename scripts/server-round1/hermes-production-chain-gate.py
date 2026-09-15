@@ -957,6 +957,9 @@ def assert_credential_delivery(credential: dict) -> None:
     placeholder key (which a real endpoint answers with 401). The measurement
     exists either way; this makes it a gate failure instead of a reported number.
     """
+    if "injectedTokenReachedProvider" not in credential:
+        fail("HERMES_GATE_CREDENTIAL_NOT_DELIVERED",
+             f"the run recorded no credential fact at all: {json.dumps(credential)}")
     if credential.get("injectedTokenReachedProvider") is False or credential.get("unauthorizedRequests"):
         fail("HERMES_GATE_CREDENTIAL_NOT_DELIVERED",
              f"a provider request did not carry the injected credential: {json.dumps(credential)}")

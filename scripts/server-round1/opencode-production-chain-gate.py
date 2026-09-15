@@ -1119,8 +1119,9 @@ def unknown_model_refusal(client, runtime, workspace, opened, production, endpoi
     if before is not None and requests_after != before:
         fail("OPENCODE_GATE_UNKNOWN_MODEL_REACHED_PROVIDER",
              f"the refused model produced {requests_after - before} provider requests")
-    mentioned = any("Harness model is not available" in reason
-                    and "deepseek-unknown" in reason for reason in reasons)
+    # Classify by the driver's own typed code where there is one; the message is
+    # only the secondary witness, because a message is a rendering of a code.
+    mentioned = any("OPENCODE_MODEL_NOT_AVAILABLE" in reason for reason in reasons)
     if before is None and not mentioned:
         # Live cannot count requests, so this reason is the phase's positive
         # witness: without it the turn could have failed for any unrelated

@@ -1033,6 +1033,10 @@ def run_unknown_model(client, runtime, workspace, opened, production, endpoint,
     if requests_after is not None and requests_after != 2:
         fail("PI_GATE_UNKNOWN_MODEL_REACHED_PROVIDER",
              f"the refused model produced {requests_after - 2} provider requests")
+    # The sidecar reports both cases under the same generic code
+    # (`SIDECAR_OP_FAILED`), so the model-availability distinction has no code to
+    # classify by; the matched text is this product's own message, not a
+    # third-party string, and the failed turn state above is the code-level half.
     mentioned = any("Harness model is not available" in reason for reason in reasons)
     if requests_after is None and not mentioned:
         # Live has no endpoint to count on, so the refusal *reason* is the only
