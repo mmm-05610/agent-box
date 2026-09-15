@@ -380,21 +380,22 @@ def test_process_identity_binds_this_run_only(tmp_path):
     module = load_gate()
     root = tmp_path / "worker-root"
     root.mkdir(parents=True)
-    mine = {"pid": 4242, "started": "Mon Sep 15 10:00:00 2026",
+    mine = {"pid": 4242, "ppid": 1, "started": "Mon Sep 15 10:00:00 2026",
             "args": f"/usr/bin/bwrap --die-with-parent /runtime/entry.mjs {root}/views/view-1"}
-    renamed = {"pid": 4243, "started": "Mon Sep 15 10:00:01 2026",
-               "args": f"/usr/bin/bwrap renamed-binary --root {root}"}
-    elsewhere = {"pid": 99, "started": "Mon Sep 15 09:00:00 2026",
+    # A real descendant: its own argv never names this run's root.
+    descendant = {"pid": 4243, "ppid": 4242, "started": "Mon Sep 15 10:00:01 2026",
+                  "args": "/runtime/artifacts/codex-runtime/bin/codex app-server"}
+    elsewhere = {"pid": 99, "ppid": 1, "started": "Mon Sep 15 09:00:00 2026",
                  "args": "/usr/bin/bwrap /other/tmp/agentbox-codex-gate-other/app-server"}
 
-    matched = module.matching_processes(root, [mine, renamed, elsewhere])
+    matched = module.matching_processes(root, [mine, descendant, elsewhere])
     assert {row["pid"] for row in matched} == {4242, 4243}, matched
     assert 99 not in {row["pid"] for row in matched}, "an unrelated instance must not block"
 
     # Seen alive and still in the table: a survivor (and the pid-reuse case is
     # a different start time, so it is not counted as the old process).
-    monkey_ok = module.matching_processes(root, [mine])
-    assert [row["pid"] for row in monkey_ok] == [4242]
+    monkey_ok = module.matching_processes(root, [mine, descendant])
+    assert sorted(row["pid"] for row in monkey_ok) == [4242, 4243], "the descendant belongs to this run"
     assert module._surviving_identities.__module__ == module.__name__
     # No process carries this root any more: nothing survives.
     assert module._surviving_identities(root, []) == []
@@ -442,8 +443,8 @@ def test_an_unrelated_process_and_a_renamed_descendant_are_distinguished(tmp_pat
     module = load_gate()
     root = tmp_path / "worker-root"
     root.mkdir(parents=True)
-    unrelated = {"pid": 7, "started": "t0", "args": "/tmp/other-run/app-server"}
-    mine = {"pid": 8, "started": "t1", "args": f"renamed-binary --root {root}"}
+    unrelated = {"pid": 7, "ppid": 1, "started": "t0", "args": "/tmp/other-run/app-server"}
+    mine = {"pid": 8, "ppid": 1, "started": "t1", "args": f"renamed-binary --root {root}"}
     table = [unrelated, mine]
     module_original = module.process_table
     try:
@@ -459,3 +460,75 @@ def test_an_unrelated_process_and_a_renamed_descendant_are_distinguished(tmp_pat
         assert module._surviving_identities(root, [(8, "t1")]) == ["8@t1"]
     finally:
         module.process_table = module_original
+
+
+def test_a_capture_credential_failure_is_promoted_to_a_hit(tmp_path):
+    """A phase whose *failure* is a credential rejection (by code, never by
+    message) is a credential hit, so the primary failure is the credential and
+    not an incomplete scan."""
+    module = load_gate()
+    root = tmp_path / "worker-root"
+    root.mkdir(parents=True)
+    watcher = module.StateSymlinkWatcher(root)
+    watcher.stopped_cleanly = True
+    settled = {"harnessExited": True, "settledComplete": True, "settledCycles": 1,
+               "settledScan": "view", "settledIncomplete": None}
+    for code in ("CODEX_GATE_TOKEN_IN_STATE", "SIDECAR_STATE_CONTAINS_SECRET"):
+        phase = module.normalize_phase(
+            "turn-chain", settled, watcher, None, module.GateFailure(code, "captured state"))
+        assert [hit["source"] for hit in phase["hits"]] == [f"failure:{code}"]
+        failure = module.resolve_run_failure({}, [phase])
+        assert failure is not None
+        assert failure.code == "CODEX_GATE_CREDENTIAL_IN_NATIVE_STATE", code
+
+
+def test_the_capture_scan_reports_hits_instead_of_escaping(tmp_path):
+    """scan_state returns structured token hits; the single verdict entry point
+    turns them into the credential failure."""
+    module = load_gate()
+    root = tmp_path / "worker-root"
+    (root / "views").mkdir(parents=True)
+
+    class Objects:
+        def __init__(self, payloads):
+            self.payloads = payloads
+
+        def read(self, digest):
+            return self.payloads[digest]
+
+    class Runtime:
+        def __init__(self, payloads):
+            self.objects = Objects(payloads)
+
+    checkpoint = {"nativeSessionId": "native-1",
+                  "files": [{"path": "state.db", "digest": "d1"},
+                            {"path": "leak.sh", "digest": "d2"}]}
+    payloads = {"c1": __import__("json").dumps(checkpoint).encode(),
+                "d1": b"clean", "d2": b"export K='" + module.FAKE_TOKEN.encode() + b"'"}
+    scan = module.scan_state(Runtime(payloads), {"checkpoint": {"object_digest": "c1"}}, "native-1")
+    assert scan["tokenHits"] == ["leak.sh"] and scan["tokenInState"] is True
+    assert scan["nativeSessionId"] is True
+
+
+def test_both_phase_failures_are_kept_in_order():
+    """When both phases fail, every independent failure is preserved in order -
+    the credential (if any) stays the primary one."""
+    module = load_gate()
+    phases = [
+        {"phase": "turn-chain", "hits": [], "races": [], "incompleteEvents": [],
+         "scanError": None, "stoppedCleanly": True, "settledComplete": True,
+         "settledCycles": 1, "harnessExited": True, "captureEvidence": None,
+         "failure": module.GateFailure("CODEX_GATE_TURN_FAILED", "turn")},
+        {"phase": "reopen", "hits": [], "races": [], "incompleteEvents": [],
+         "scanError": "ps failed", "stoppedCleanly": True, "settledComplete": False,
+         "settledCycles": 0, "harnessExited": True, "captureEvidence": None,
+         "failure": module.GateFailure("CODEX_GATE_REOPEN_FAILED", "reopen")},
+    ]
+    failure = module.resolve_run_failure({}, phases)
+    assert failure is not None and failure.code == "CODEX_GATE_STATE_SCAN_INCOMPLETE"
+    secondaries = [
+        {"phase": phase["phase"], "code": phase["failure"].code}
+        for phase in phases if phase.get("failure") is not None
+    ]
+    assert secondaries == [{"phase": "turn-chain", "code": "CODEX_GATE_TURN_FAILED"},
+                           {"phase": "reopen", "code": "CODEX_GATE_REOPEN_FAILED"}]

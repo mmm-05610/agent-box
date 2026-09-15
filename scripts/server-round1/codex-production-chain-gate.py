@@ -1104,25 +1104,29 @@ def main() -> int:
         chain_failure = None
         outcome: dict = {}
         try:
-            outcome = run_chain(
-                temporary, workspace, worker, artifact, digest, endpoint, production,
-                token_path, host_home,
+            # The turn chain runs as a phase exactly like the reopen: its own
+            # observer, its own post-exit settled scan, and settle/stop failures
+            # collected into the phase instead of escaping the verdict.
+            chain_evidence = observe_phase(
+                temporary / "worker-root", temporary,
+                lambda: run_chain(
+                    temporary, workspace, worker, artifact, digest, endpoint, production,
+                    token_path, host_home,
+                ),
+                name="turn-chain",
+                existing_watcher=watcher,
             )
-        except BaseException as failure:  # noqa: BLE001 - held for the verdict
-            # Held, not propagated: the credential verdict must be computed on
-            # every path, so a concurrent credential hit can never be masked by
-            # an unrelated chain failure.
-            chain_failure = GateFailure(
-                getattr(failure, "code", None) or "CODEX_GATE_UNEXPECTED",
-                getattr(failure, "message", None) or f"{type(failure).__name__}: {failure}",
-            )
+            outcome = chain_evidence.get("result") or {}
+            chain_failure = chain_evidence.get("failure")
+            if chain_failure is not None:
+                chain_failure = GateFailure(
+                    getattr(chain_failure, "code", None) or "CODEX_GATE_UNEXPECTED",
+                    getattr(chain_failure, "message", None)
+                    or f"{type(chain_failure).__name__}: {chain_failure}",
+                )
+            settled_window = chain_evidence
         finally:
             endpoint.stop()
-            # User decision A: the settled window opens only after the native
-            # processes are gone, and it is observed synchronously. The
-            # thread's cycles are observations, not evidence.
-            settled_window = settle_after_attempt(watcher, temporary)
-            watcher.stop()
             # The endpoint's own record is the evidence for several requirements,
             # so it is reported even when the chain failed after it answered.
             REPORT["provider"] = {
@@ -1159,16 +1163,25 @@ def main() -> int:
             name="reopen",
         )
         REPORT["reopenObservation"] = reopen_evidence.get("result")
-        chain_phase = turn_chain_phase(REPORT, settled_window, watcher)
-        chain_phase["failure"] = chain_failure
+        chain_phase = turn_chain_phase(REPORT, chain_evidence, watcher)
         failure = resolve_run_failure(REPORT, [chain_phase, reopen_evidence])
+        secondaries = []
+        for phase in (chain_phase, reopen_evidence):
+            if phase.get("failure") is not None:
+                secondaries.append({
+                    "phase": phase.get("phase"),
+                    "code": getattr(phase["failure"], "code", None) or "CODEX_GATE_UNEXPECTED",
+                    "message": getattr(phase["failure"], "message", None) or str(phase["failure"]),
+                })
+            if phase.get("scanError") or phase.get("settleError"):
+                secondaries.append({
+                    "phase": phase.get("phase"), "code": "CODEX_GATE_STATE_SCAN_INCOMPLETE",
+                    "message": phase.get("scanError") or phase.get("settleError"),
+                })
+        if secondaries:
+            REPORT["secondaryFailures"] = secondaries
+            REPORT["secondaryFailure"] = secondaries[0]
         if failure is not None:
-            secondary = chain_failure or reopen_evidence.get("failure")
-            if secondary is not None:
-                REPORT["secondaryFailure"] = {
-                    "code": getattr(secondary, "code", None) or "CODEX_GATE_UNEXPECTED",
-                    "message": getattr(secondary, "message", None) or str(secondary),
-                }
             raise failure
         if chain_failure is not None:
             raise chain_failure
@@ -1664,10 +1677,11 @@ def scan_state(runtime, session: dict, native_id: str) -> dict:
         total += len(content)
         if FAKE_TOKEN.encode() in content:
             hits.append(item["path"])
-    if hits:
-        fail("CODEX_GATE_TOKEN_IN_STATE", f"the credential appears in captured state: {hits[:3]}")
+    # Structured, never a bare escape: the credential fact is recorded here and
+    # the one verdict entry point turns it into CODEX_GATE_CREDENTIAL_IN_NATIVE_STATE,
+    # so it can never be demoted to a secondary failure by an unrelated error.
     return {"files": len(checkpoint.get("files", [])), "bytes": total,
-            "tokenHits": [], "tokenInState": False,
+            "tokenHits": hits, "tokenInState": bool(hits),
             "nativeSessionId": checkpoint.get("nativeSessionId") == native_id}
 
 
@@ -2123,29 +2137,39 @@ def run_requests(runs: list[list[dict]], index: int) -> list[dict]:
 #: Process patterns that mean a native Harness for this gate is still alive.
 HARNESS_PROCESS_PATTERNS = ("codex-acp/dist/index.js", "app-server", "codex-gate-audit-adapter")
 
+#: Failure codes that *are* a credential observation: a capture whose bytes (or
+#: the sidecar's own capture-time scan) found the injected token. They are
+#: promoted to credential hits by code - never by matching an English message.
+CREDENTIAL_FAILURE_CODES = frozenset({
+    "CODEX_GATE_TOKEN_IN_STATE", "SIDECAR_STATE_CONTAINS_SECRET",
+})
+
 
 def process_table() -> list[dict]:
-    """The live process table as (pid, start time, command line) rows.
+    """The live process table as (pid, ppid, start time, command line) rows.
 
     Read once per poll from `ps`, which gives a stable start-time identity per
     pid: a process that dies and whose pid is reused is a *different* process,
-    so "the ones we saw are gone" cannot be faked by pid reuse.
+    so "the ones we saw are gone" cannot be faked by pid reuse. The parent pid
+    is what lets a descendant be attributed to this run even when its own argv
+    does not carry the run's root.
     """
     done = subprocess.run(
-        ["ps", "-eo", "pid=,lstart=,args="], capture_output=True, text=True)
+        ["ps", "-eo", "pid=,ppid=,lstart=,args="], capture_output=True, text=True)
     if done.returncode != 0 or not done.stdout.strip():
         # No process table means no evidence that the harness exited; the caller
         # treats this as "not exited" rather than as a quiet machine.
         raise RuntimeError(f"ps failed: {done.returncode} {done.stderr.strip()[:120]}")
     rows = []
     for line in done.stdout.splitlines():
-        fields = line.strip().split(None, 6)
-        if len(fields) < 7 or not fields[0].isdigit():
+        fields = line.strip().split(None, 7)
+        if len(fields) < 8 or not fields[0].isdigit() or not fields[1].isdigit():
             continue
         rows.append({
             "pid": int(fields[0]),
-            "started": " ".join(fields[1:6]),
-            "args": fields[6],
+            "ppid": int(fields[1]),
+            "started": " ".join(fields[2:7]),
+            "args": fields[7],
         })
     return rows
 
@@ -2163,9 +2187,25 @@ def matching_processes(temporary: Path, rows: list[dict] | None = None) -> list[
     """
     table = process_table() if rows is None else rows
     root = str(temporary)
-    # This run's root is what binds identity: a renamed binary, a helper shell
-    # or a wrapper of this run all carry it, and no other run does.
-    return [row for row in table if root in row["args"]]
+    # Identity is bound two ways: a process of this run carries this run's root
+    # in its argv (the bwrap wrapper always does), or it descends from one that
+    # does - a descendant may have rewritten its own argv, and it is still this
+    # run's process for as long as its ancestor is alive.
+    by_pid = {row["pid"]: row for row in table}
+    attributed = {row["pid"] for row in table if root in row["args"]}
+
+    def descends_from_run(pid: int) -> bool:
+        seen = set()
+        current = by_pid.get(pid)
+        while current is not None and current["pid"] not in seen:
+            seen.add(current["pid"])
+            if current["pid"] in attributed:
+                return True
+            current = by_pid.get(current["ppid"])
+        return False
+
+    return [row for row in table
+            if row["pid"] in attributed or descends_from_run(row["pid"])]
 
 
 def harness_processes(temporary: Path) -> list[str]:
@@ -2294,6 +2334,12 @@ def normalize_phase(name: str, settled_window: dict, watcher=None,
         entry = {"path": path, "phase": name, "source": "settled"}
         if entry not in hits:
             hits.append(entry)
+    if failure is not None:
+        code = getattr(failure, "code", None)
+        if code in CREDENTIAL_FAILURE_CODES:
+            entry = {"path": f"<{code}>", "phase": name, "source": f"failure:{code}"}
+            if entry not in hits:
+                hits.append(entry)
     capture_evidence = None
     if capture_raw is not None:
         capture_hits = list(capture_raw.get("tokenHits") or ())
@@ -2402,7 +2448,8 @@ def resolve_run_failure(report: dict, phases: list[dict]) -> "GateFailure | None
     return GateFailure(verdict, detail)
 
 
-def observe_phase(worker_root: Path, temporary: Path, work, *, name: str) -> dict:
+def observe_phase(worker_root: Path, temporary: Path, work, *, name: str,
+                  existing_watcher: "StateSymlinkWatcher | None" = None) -> dict:
     """Run one phase of the gate with its own observer, then settle it.
 
     Every phase that starts a native Harness with the injected token gets its
@@ -2411,8 +2458,9 @@ def observe_phase(worker_root: Path, temporary: Path, work, *, name: str) -> dic
     caller can compute the credential verdict over *all* phases before letting
     any chain failure end the run.
     """
-    phase_watcher = StateSymlinkWatcher(worker_root)
-    phase_watcher.start()
+    phase_watcher = existing_watcher or StateSymlinkWatcher(worker_root)
+    if existing_watcher is None:
+        phase_watcher.start()
     result = None
     failure: BaseException | None = None
     try:

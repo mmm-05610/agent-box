@@ -163,7 +163,7 @@ Reviewer `CHANGES_REQUIRED` 的修复（§2.1/§7.1）落地后重建
 （c8）**exit 0** + 独立 `-PostCheck…CLEAN`（本次 fresh 实例核对）；Python 全量
 **820 passed / 4 skipped / 0 failed**【历史值，已被 843/6 取代】（更早 812/22 亦已取代）；Rust fmt 干净 +
 `cargo test --locked --release` **27 passed**；`git diff --check` 通过。
-**Codex 门现行状态：未解决的红绿间歇**——`.tmp/plugins` 突发间歇性重叠捕获：2026-09-15
+【历史快照：未解决的红绿间歇（已被现行检查点取代）】**——`.tmp/plugins` 突发间歇性重叠捕获：2026-09-15
 晚间连续 5 轮红（峰值恰 5529 → 确定性 `VIEW_FILE_LIMIT`）；alias 诊断非因果化修复提交后
 **最近 3 轮绿**（`…_GATE_OK`，报告无 blocker 键、绿跑无任何注记键）。两种状态都如实记录，
 按 §4.3 待用户裁决。
@@ -212,7 +212,7 @@ Reviewer `CHANGES_REQUIRED` 的修复（§2.1/§7.1）落地后重建
 | Codex（遮蔽模式，最终版） | `…/codex-production-chain-gate.py --worker <c8> --json` | exit 0，`CODEX_PRODUCTION_CHAIN_GATE_OK`，view 峰值 112、`tokenInState=false`、`credentialPathHits=0`；观察器判据：`cyclesCompleted≈224`、`filesObserved≈83`、`incomplete=null`（连续 3 轮） |
 | Windows r4 | `accept-e.ps1 … -Port 18746 -Cleanup`（c8，`worker_digest=sha256:514f48a9…`） | exit 0，`BACKEND_41_E_WINDOWS_WSL_WIRE_OK` |
 | 独立 PostCheck | 同参数 `-PostCheck -InstanceId <两实例>` | exit 0，`BACKEND_41_E_WINDOWS_POSTCHECK_CLEAN` |
-| Python 全量 | `PYTHONPATH=src + 全部 plugins/*/src python3 -m pytest -q tests <插件 tests>` | **849 passed / 6 skipped / 0 failed**（现行；本表其余计数均为该表形成时的历史值） |
+| Python 全量 | `PYTHONPATH=src + 全部 plugins/*/src python3 -m pytest -q tests <插件 tests>` | **852 passed / 6 skipped / 0 failed**（现行；本表其余计数均为该表形成时的历史值） |
 | Rust | `cargo fmt --check` + `cargo test --locked --release` | fmt 干净；27 passed |
 
 skip 说明：6 项均为既有平台/环境条件项（不含本轮新增测试）。清理：门临时根与
