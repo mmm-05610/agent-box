@@ -113,6 +113,15 @@ live 模式下**显式记为"未观测"而非静默跳过**的项（均为假端
 `nativeModel`（同前；live 记录 `configuredModel=deepseek-flash`）、
 `chainProviderRequests`/`round2Continuation`（请求体在 live 下不可见，改以真实答复回忆 nonce 为证）。
 
+### OpenCode（2026-09-15，`--live` 通过）
+
+`opencode-production-chain-gate.py --live` → **exit 0 / `OPENCODE_PRODUCTION_CHAIN_PREPARED`**：
+两轮真实答复（各 8 deltas）、同 native id 且 checkpoint `resumable=true`（含 opencode.db/WAL）、
+缺凭据在派发前被拒（`CREDENTIAL_REQUIRED`、`sessionsCreated=0`）、
+凭据不进事件/报告、tracked Git 零命中、进程/worker 投影/workspace 全清理。
+live 下显式记为"未观测"的项：driverObservation/driverNegatives/guestProbeResult
+（均需假端点与守卫）、`requestStructure`、重试上界观测（声明值保留）、出口守卫审计。
+
 ## 7. 当前状态
 
 - 已就绪：四家生产封装、c8 release Worker、五门无模型证据、官方价格核对、本 preflight。

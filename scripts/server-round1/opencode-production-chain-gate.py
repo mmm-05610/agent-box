@@ -750,7 +750,8 @@ def assert_main_requests(endpoint: FakeEndpoint, production) -> dict:
 
 
 def run_chain(temporary: Path, workspace: Path, worker: Path, authorization: dict,
-              endpoint: FakeEndpoint, production, token_path: Path, guard: Path) -> dict:
+              endpoint: FakeEndpoint, production, token_path: Path, guard: Path,
+              *, live: bool = False) -> dict:
     """生产接缝：Server → Core → sidecar → Worker → bwrap → opencode。"""
     from agent_box.server.bootstrap import build_runtime_from_sidecar_deployment
     from agent_box.server.credentials import CredentialRecords
@@ -758,28 +759,39 @@ def run_chain(temporary: Path, workspace: Path, worker: Path, authorization: dic
     from agent_box.storage import MemorySecretStore
     from fastapi.testclient import TestClient
 
-    loopback_bytes = json.dumps(
-        production.loopback_config_document(endpoint.base_url), sort_keys=True).encode()
+    # 无模型门覆盖 baseURL 并装载守卫；live 模式两者都不用：配置即部署原样。
+    config_bytes = json.dumps(
+        production.config_document() if live
+        else production.loopback_config_document(endpoint.base_url), sort_keys=True).encode()
     guard_bytes = guard.read_bytes()
     document = production.deployment_document(
         binary_source=authorization["source"], binary_digest=authorization["digest"],
-        adapter_environment={
-            **production.ADAPTER_ENVIRONMENT,
-            # 测试期附加项（已在报告里列明）：loopback 守卫、出口审计、驱动审计。
-            "LD_PRELOAD": GUARD_TARGET,
-            "AGENTBOX_EGRESS_AUDIT": f"/workspace/{AUDIT_NAME}",
-            "AGENTBOX_DRIVER_AUDIT": f"/workspace/{DRIVER_AUDIT_NAME}",
-        },
+        adapter_environment=(
+            {
+                **production.ADAPTER_ENVIRONMENT,
+                "AGENTBOX_EGRESS_AUDIT": f"/workspace/{AUDIT_NAME}",
+                "AGENTBOX_DRIVER_AUDIT": f"/workspace/{DRIVER_AUDIT_NAME}",
+            } if live else {
+                **production.ADAPTER_ENVIRONMENT,
+                # 测试期附加项（已在报告里列明）：loopback 守卫、出口审计、驱动审计。
+                "LD_PRELOAD": GUARD_TARGET,
+                "AGENTBOX_EGRESS_AUDIT": f"/workspace/{AUDIT_NAME}",
+                "AGENTBOX_DRIVER_AUDIT": f"/workspace/{DRIVER_AUDIT_NAME}",
+            }
+        ),
         projection_files_override=(
             *production.projection_files(),
-            {"source": GUARD_SOURCE, "target": GUARD_TARGET},
+            *(() if live else ({"source": GUARD_SOURCE, "target": GUARD_TARGET},)),
         ),
     )
     deployment = temporary / "deployment.json"
     deployment.write_text(json.dumps(document), encoding="utf-8")
     REPORT["providerProjection"] = {
         "configSource": production.CONFIG_SOURCE,
-        "loopbackOverrideChanges": sorted(production.documented_differences(endpoint.base_url)),
+        "loopbackOverrideChanges": (
+            [] if live else sorted(production.documented_differences(endpoint.base_url))
+        ),
+        "mode": "live" if live else "loopback-fake-endpoint",
     }
 
     import agent_box.server.bootstrap.runtime as runtime_module
@@ -789,7 +801,7 @@ def run_chain(temporary: Path, workspace: Path, worker: Path, authorization: dic
 
     def deployment_file(root, value, relative):
         if relative == production.CONFIG_SOURCE:
-            return loopback_bytes
+            return config_bytes
         if relative == GUARD_SOURCE:
             return guard_bytes
         return original_file(root, value, relative)
@@ -887,7 +899,12 @@ def run_chain(temporary: Path, workspace: Path, worker: Path, authorization: dic
             if session["checkpoint"]["native_id"] != native_id:
                 fail("OPENCODE_GATE_NATIVE_ID_CHANGED", "the second round did not keep the native session id")
             result["checkpointNativeIdStable"] = True
-            result["requestStructure"] = assert_main_requests(endpoint, production)
+            result["requestStructure"] = (
+                {"observed": False, "reason": "request bodies and counts need the fake "
+                                              "endpoint; live mode's evidence is the two "
+                                              "real answers and the native id continuity"}
+                if live else assert_main_requests(endpoint, production)
+            )
             for label in ("first", "second"):
                 if len(result["rounds"][label]["deltaSeq"]) < 2:
                     fail("OPENCODE_GATE_NOT_INCREMENTAL",
@@ -906,9 +923,13 @@ def run_chain(temporary: Path, workspace: Path, worker: Path, authorization: dic
             stage = "state-scan"
 
             result["credential"] = {
-                "injectedTokenReachedProvider": bool(endpoint.requests) and all(
-                    item["authorizationMatchesInjectedToken"] for item in endpoint.requests),
-                "unauthorizedRequests": endpoint.unauthorized,
+                "injectedTokenReachedProvider": (
+                    "verified-by-real-answer" if live else
+                    bool(endpoint.requests) and all(
+                        item["authorizationMatchesInjectedToken"]
+                        for item in endpoint.requests)
+                ),
+                "unauthorizedRequests": None if live else endpoint.unauthorized,
                 "tokenInEvents": current_token().value() in json.dumps(session["events"]),
                 "tokenInReportableState": current_token().value() in json.dumps(REPORT),
             }
@@ -1002,7 +1023,7 @@ def missing_credential_refusal(client, runtime, opened, production) -> dict:
 
 def unknown_model_refusal(client, runtime, workspace, opened, production, endpoint, credential_id) -> dict:
     """未知产品模型必须在发出任何 provider 请求之前被拒绝，理由里要看得到模型。"""
-    before = len(endpoint.requests)
+    before = None if endpoint is None else len(endpoint.requests)
     provider = wire_post(client, runtime.token, "providerModels.create", {
         "requestId": "opencode-gate-unknown-provider", "displayName": "DeepSeek unknown",
         "harness": "opencode", "provider": production.OPENCODE_PROVIDER, "credentialId": credential_id,
@@ -1035,15 +1056,18 @@ def unknown_model_refusal(client, runtime, workspace, opened, production, endpoi
         for row in conn.execute("SELECT data_json FROM core_events WHERE type=?",
                                 ("ExecutionDispatchAmbiguous",)):
             reasons.append(json.loads(row["data_json"]).get("error", ""))
-    requests_after = len(endpoint.requests)
-    if requests_after != before:
+    requests_after = None if endpoint is None else len(endpoint.requests)
+    if before is not None and requests_after != before:
         fail("OPENCODE_GATE_UNKNOWN_MODEL_REACHED_PROVIDER",
              f"the refused model produced {requests_after - before} provider requests")
     return {
         "state": turn["state"],
         "refusedAt": "the OpenCode driver, before POST /session/<id>/message",
-        "providerRequestsAfterRefusal": requests_after - before,
-        "refusedBeforeProviderRequest": requests_after == before,
+        "providerRequestsAfterRefusal": (
+            None if before is None else requests_after - before),
+        "refusedBeforeProviderRequest": (
+            None if before is None else requests_after == before),
+        "providerRequestCountAvailable": before is not None,
         "reasonMentionsModel": any("Harness model is not available" in reason
                                    and "deepseek-unknown" in reason for reason in reasons),
         "reasons": [reason[:220] for reason in reasons],
@@ -1528,7 +1552,7 @@ def worker_digest_refusal(temporary: Path, workspace: Path, worker: Path, author
     content[0x1000] ^= 0xFF  # 翻转 1 字节
     drifted.write_bytes(bytes(content))
     drifted.chmod(0o755)
-    requests_before = len(endpoint.requests)
+    requests_before = None if endpoint is None else len(endpoint.requests)
     connector = DirectWorkerConnector(temporary, worker, workspace)
     client = connector.client_for_workspace(
         distribution="Ubuntu", user=os.environ["USER"], connection_id="connection-opencode-drifted",
@@ -1545,7 +1569,7 @@ def worker_digest_refusal(temporary: Path, workspace: Path, worker: Path, author
         message = str(error)[:300]
     if code is None:
         fail("OPENCODE_GATE_DRIFTED_BINARY_ACCEPTED", "the Worker accepted a drifted executable digest")
-    if len(endpoint.requests) != requests_before:
+    if requests_before is not None and len(endpoint.requests) != requests_before:
         fail("OPENCODE_GATE_DRIFTED_BINARY_REACHED_PROVIDER", "a drifted binary produced provider requests")
     return {"refused": True, "code": code, "message": message,
             "verifiedBy": "Worker bootstrap executable digest authorization"}
@@ -1804,7 +1828,19 @@ def main() -> int:
                         help="an external single-file OpenCode binary to authorize read-only")
     parser.add_argument("--keep", action="store_true")
     parser.add_argument("--json", action="store_true")
+    parser.add_argument(
+        "--live", action="store_true",
+        help="paid mode: the official endpoint and an authorized credential locator "
+             "instead of the loopback fake endpoint (see "
+             "docs/server-round1/fullstack/live-model-preflight.md)",
+    )
+    parser.add_argument(
+        "--authorized-secret", default=None,
+        help="path of the authorized credential file (only with --live)",
+    )
     options = parser.parse_args()
+    if options.live and not options.authorized_secret:
+        fail("OPENCODE_GATE_LIVE_SECRET_REQUIRED", "--live requires --authorized-secret")
 
     endpoint = None
     created: Path | None = None
@@ -1860,11 +1896,22 @@ def main() -> int:
                 for key in production.ADAPTER_ENVIRONMENT),
         }
 
-        endpoint = FakeEndpoint(current_token().value())
-        endpoint.assert_loopback_only()
-        if len(production.documented_differences(endpoint.base_url)) != 1:
-            fail("OPENCODE_GATE_OVERRIDE_NOT_MINIMAL",
-                 f"the loopback override changed {production.documented_differences(endpoint.base_url)}")
+        live = bool(options.live)
+        REPORT["mode"] = "live" if live else "loopback-fake-endpoint"
+        secret_path = None
+        if live:
+            secret_path = Path(options.authorized_secret).resolve()
+            mode = secret_path.stat().st_mode & 0o777
+            if mode & 0o077:
+                fail("OPENCODE_GATE_LIVE_SECRET_PERMISSIONS", f"authorized secret mode is {oct(mode)}")
+            endpoint = None
+        else:
+            endpoint = FakeEndpoint(current_token().value())
+            endpoint.assert_loopback_only()
+            if len(production.documented_differences(endpoint.base_url)) != 1:
+                fail("OPENCODE_GATE_OVERRIDE_NOT_MINIMAL",
+                     f"the loopback override changed "
+                     f"{production.documented_differences(endpoint.base_url)}")
 
         created = Path(tempfile.mkdtemp(prefix=TEMPORARY_PREFIX))
         temporary = created
@@ -1882,40 +1929,68 @@ def main() -> int:
 
         guard = compile_guard(temporary, REPORT)
         token_path = temporary / "opencode-gate-token"
-        token_path.write_bytes(current_token().bytes())
+        if live:
+            # 授权 locator 的内容只经 SecretStore 注入；门只删自己的临时 token 文件。
+            token_path.write_bytes(secret_path.read_bytes())
+        else:
+            token_path.write_bytes(current_token().bytes())
         token_path.chmod(0o600)
+        global INJECTED_CREDENTIAL
+        INJECTED_CREDENTIAL = token_path.read_bytes().strip()
 
-        endpoint.start()
+        if endpoint is not None:
+            endpoint.start()
         try:
             outcome = run_chain(temporary, workspace, worker, authorization, endpoint,
-                                production, token_path, guard)
+                                production, token_path, guard, live=live)
             REPORT.update(outcome)
-            # 主链只花两轮预算；观测阶段前显式提高并记录（观测阶段两轮 prompt）。
-            endpoint.raise_budget(endpoint.budget + 2, reason="driver observe + reopen rounds")
-            REPORT["driverObservation"] = observe_driver(
-                temporary, workspace, worker, authorization, endpoint, production, guard)
-            REPORT["driverNegatives"] = driver_negatives(
-                temporary, workspace, worker, authorization, endpoint, production, guard)
-            REPORT["guestProbeResult"] = guest_probes(
-                temporary, workspace, worker, authorization, guard, REPORT, production,
-                json.dumps(
-                    production.loopback_config_document(endpoint.base_url), sort_keys=True,
-                ).encode("utf-8"),
-                endpoint.base_url)
-            REPORT["authorizationNegatives"] = authorization_negatives(
-                temporary, authorization, REPORT)
-            REPORT["workerDigestNegative"] = worker_digest_refusal(
-                temporary, workspace, worker, authorization, endpoint)
+            if live:
+                # 下列观测都依赖假端点/守卫（请求体计数、注入 5xx、出口审计）。
+                # live 下显式记为"未观测"并给出理由，不静默跳过、也不冒充通过。
+                not_observed = "requires the loopback fake endpoint and its guard"
+                REPORT["driverObservation"] = {"observed": False, "reason": not_observed}
+                REPORT["driverNegatives"] = {"observed": False, "reason": not_observed}
+                REPORT["guestProbeResult"] = {"observed": False, "reason": not_observed}
+                REPORT["authorizationNegatives"] = authorization_negatives(
+                    temporary, authorization, REPORT)
+                REPORT["workerDigestNegative"] = worker_digest_refusal(
+                    temporary, workspace, worker, authorization, endpoint)
+            else:
+                # 主链只花两轮预算；观测阶段前显式提高并记录（观测阶段两轮 prompt）。
+                endpoint.raise_budget(endpoint.budget + 2, reason="driver observe + reopen rounds")
+                REPORT["driverObservation"] = observe_driver(
+                    temporary, workspace, worker, authorization, endpoint, production, guard)
+                REPORT["driverNegatives"] = driver_negatives(
+                    temporary, workspace, worker, authorization, endpoint, production, guard)
+                REPORT["guestProbeResult"] = guest_probes(
+                    temporary, workspace, worker, authorization, guard, REPORT, production,
+                    json.dumps(
+                        production.loopback_config_document(endpoint.base_url), sort_keys=True,
+                    ).encode("utf-8"),
+                    endpoint.base_url)
+                REPORT["authorizationNegatives"] = authorization_negatives(
+                    temporary, authorization, REPORT)
+                REPORT["workerDigestNegative"] = worker_digest_refusal(
+                    temporary, workspace, worker, authorization, endpoint)
         finally:
-            endpoint.stop()
-        REPORT["provider"] = {
+            if endpoint is not None:
+                endpoint.stop()
+        if endpoint is None:
+            REPORT["provider"] = {
+                "requests": None, "paths": [], "unauthorizedRequests": None,
+                "requestsBeyondBudget": None, "retryAttempts": None,
+                "baseUrl": production.OFFICIAL_BASE_URL,
+                "mode": "live",
+            }
+        else:
+            REPORT["provider"] = {
             "requests": endpoint.requests, "paths": endpoint.paths,
             "unauthorizedRequests": endpoint.unauthorized,
             "requestsBeyondBudget": endpoint.over_budget,
             "retryAttempts": endpoint.retry_attempts,
             "baseUrl": endpoint.base_url,
         }
-        if endpoint.over_budget:
+        if endpoint is not None and endpoint.over_budget:
             fail("OPENCODE_GATE_EXTRA_PROVIDER_REQUEST",
                  f"{endpoint.over_budget} provider requests exceeded the declared budget")
         observation = REPORT.get("driverObservation", {}) or {}
@@ -1924,13 +1999,15 @@ def main() -> int:
             evidence = observation.get(label) or {}
             attempts = int(evidence.get("providerAttempts") or 0)
             measured[label] = attempts
-            if not 2 <= attempts <= production.MEASURED_RETRY_ATTEMPTS:
+            if not live and not 2 <= attempts <= production.MEASURED_RETRY_ATTEMPTS:
                 fail("OPENCODE_GATE_RETRY_BOUND_VIOLATED",
                      f"the {label} observed {attempts} attempts, outside "
                      f"[2, {production.MEASURED_RETRY_ATTEMPTS}]")
         REPORT["providerAttemptBound"] = {
-            "observed": measured, "declared": production.MEASURED_RETRY_ATTEMPTS,
+            "observed": measured if not live else None,
+            "declared": production.MEASURED_RETRY_ATTEMPTS,
             "requestsPerPrompt": production.PROVIDER_REQUESTS_PER_PROMPT,
+            "observedLive": not live,
         }
 
         audit = workspace / AUDIT_NAME
@@ -1943,9 +2020,10 @@ def main() -> int:
             "auditPresent": audit.is_file(),
             "officialRootDenied": [line for line in denied if "api.deepseek.com" in line],
         }
-        if not REPORT["egress"]["guardLoaded"]:
+        REPORT["egress"]["guardExpected"] = not live
+        if not live and not REPORT["egress"]["guardLoaded"]:
             fail("OPENCODE_GATE_EGRESS_GUARD_ABSENT", "the loopback guard did not load in the guest")
-        if REPORT["egress"]["officialRootDenied"]:
+        if not live and REPORT["egress"]["officialRootDenied"]:
             fail("OPENCODE_GATE_OFFICIAL_ROOT_ATTEMPTED",
                  "something tried to reach the official provider root")
         cleanup_check(temporary, workspace, token_path, REPORT)
