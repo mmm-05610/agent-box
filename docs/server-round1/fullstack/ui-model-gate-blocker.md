@@ -25,6 +25,20 @@
 | B | wire 增加 `credentials.*`（list/import/archive） | 合同变更：需要两端重锁 `WIRE_LOCKED_FOR_IMPLEMENTATION`，超出本轮 28 方法范围 |
 | C | 仅联调期变通：由集成驱动把凭据注册进 Server 存储，再**绕过 UI** 把该 id 写进 Provider/Model | **不算 UI 模型门**：UI 仍无凭据路径，只能记为"后端链路已验证、UI 面缺失"，不能记作通过 |
 
+## 2b. 用户裁决：选 A，已落地的部分
+
+用户 2026-09-15 裁决 **A**（Desktop 拥有凭据记录）。A 的前半已实现并分别提交：
+
+| 半 | 检查点 | 内容 |
+| --- | --- | --- |
+| 后端：让 Server 知道"声明过的凭据在哪" | `14cdc55` | 部署文档新增可选 `credentials: [{credentialId, kind, sourcePath, label}]`：**文档结构性不含秘密**（允许键就是那四个，写 `value`/`secret` 一律类型化拒绝）；来源由 Server 自己的 secret store 读取（symlink/文件类型/大小规则在那里）；声明的 id 由 records 解析；同一部署重启复用既有记录、不重读来源、不重复身份；来源不可读则启动即带类型码失败。11 项测试（含内联 `value` 的拒绝）；全套 **588 passed / 3 skipped / 0 failed**。 |
+| 前端：凭据记录归 Desktop | `30de1ffd` | 主进程持有记录（`{credentialId, label, kind}`，来自本侧文件，`AGENTBOX_CREDENTIALS` 指定）；renderer 的全部可见面就是这个三元组——id 用来挂到 Provider/Model，label 用来显示；秘密与路径是 main-only 事实。坏条目丢弃不修补、同 id 只列一次、文件缺失/不可读=空列表而非报错。6 项测试（Windows 上 vitest 6/6）。 |
+
+**仍未落地的部分（A 的最后一段 + 门本身）**：
+1. 设置页的凭据选择控件（把上表两条接起来：UI 选 id → 创建/更新 Provider/Model 带上它）；
+2. 四家真实 UI 模型门（依赖 1）；
+3. 首次录入凭据的入口：秘密若由用户在界面输入，值会经过 renderer 的输入框——这与"秘密不进 renderer"的严格读法冲突，需要决定是接受与 legacy gateway 同形的"renderer 表单 → main 存储"，还是走 main 侧的原生输入。**这一条仍待裁决**，不得由执行者默认。
+
 ## 3. 本轮实际交付与分账
 
 - **后端四家真实模型门**：已分别通过（`live-model-preflight.md` §6），与本缺口无关。
