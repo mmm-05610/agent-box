@@ -294,6 +294,12 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   `14f7f736…`（取代 `11e3b3e7…`/`5d4fa3bf…`），后端对新工件 32 passed，Hermes UI 门复跑通过。
   过程中修掉两个真实缺陷（preload 把凭据 API 错嵌进 `wire`、导入请求缺 `Idempotency-Key`）。
   费用：本轮 ≈20 次真实请求、增量 **< ¥0.01**，四家累计 **< ¥0.08**（上限 ¥10）。
+- integration_results_2026-09-15: **无模型全栈 22 步 + 四家真实 UI 模型门 + 重启门全部通过**——
+  集成驱动 22 PASS/0 FAIL（§10 方法补齐：browse/archive、provider/role 维护、session 元数据与角色切换、
+  `sendOutcome.query`、附件、审批往返、事件流 resync）；四家 UI 门各 8 PASS；Pi 带"两轮之间停并重启
+  Server"9 PASS。**自审一轮见** [self-review-2026-09-15.md](../server-round1/fullstack/self-review-2026-09-15.md)
+  （用户指示以自审替代 Reviewer 终审）。**最大未覆盖：真实 UI 控件路径**（发送走产品 renderer 传输，
+  未驱动输入框/发送按钮/审批弹窗）。
 - final_state: **FULLSTACK_CORE_PARTIAL**——双门成立、两边分别提交、无模型全栈联调在真实 Windows
   Electron 上 15/15 通过、后端四家真实模型门全绿、Windows r4/PostCheck 干净；**未完成**：四家真实
   UI 模型门（上条产品面缺口）、Windows 真实用户路径的模型段、以及固定 Reviewer 的最终只读审查
