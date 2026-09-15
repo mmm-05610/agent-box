@@ -2470,6 +2470,17 @@
       "harness": {
         "type": "string",
         "minLength": 1
+      },
+      "credentialId": {
+        "anyOf": [
+          {
+            "type": "string",
+            "minLength": 1
+          },
+          {
+            "type": "null"
+          }
+        ]
       }
     },
     "required": [

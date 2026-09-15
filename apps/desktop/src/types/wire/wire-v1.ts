@@ -569,7 +569,12 @@ export type ProfilesListResult = z.infer<typeof ProfilesListResultSchema>
 export const ProfilesCreateParamsSchema = z.strictObject({
   requestId: RequestIdSchema,
   displayName: z.string().min(1),
-  harness: z.string().min(1)
+  harness: z.string().min(1),
+  /** The credential this role runs with, when the Harness cannot express it
+   *  through a model control (Hermes declares none). Absent or null means the
+   *  role carries none, which is what every Harness without a credential kind
+   *  requires. The value is a reference; the material stays where it lives. */
+  credentialId: WireIdSchema.nullable().optional()
 })
 export type ProfilesCreateParams = z.infer<typeof ProfilesCreateParamsSchema>
 export const ProfilesCreateResultSchema = z.strictObject({ profile: ProfileRecordSchema })

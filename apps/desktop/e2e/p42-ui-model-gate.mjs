@@ -287,7 +287,10 @@ async function main() {
     }, 'providerModels.create')).providerModel
 
     const profile = (await wireOk(page, 'profiles.create', {
-      displayName: `${FAMILY} role`, harness: FAMILY, requestId: 'p42g-profile'
+      credentialId,
+      displayName: `${FAMILY} role`,
+      harness: FAMILY,
+      requestId: 'p42g-profile'
     }, 'profiles.create')).profile
 
     const configured = (await wireOk(page, 'profiles.updateConfig', {

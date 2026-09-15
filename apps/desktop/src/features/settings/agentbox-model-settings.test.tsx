@@ -270,7 +270,13 @@ describe('AgentBoxModelSettings', () => {
 
 describe('AgentBoxModelSettings credentials', () => {
   it('offers the records the Desktop holds and sends the chosen reference', async () => {
-    const update = vi.fn(async () => record({ credentialId: asWireId(CREDENTIAL_ID) }))
+    // Typed so the call's argument is checkable: an untyped `vi.fn()` records
+    // calls as `[]` and the assertion below would not compile.
+    const update = vi.fn(async (intent: { credentialId: string | null }) => {
+      void intent
+
+      return record({ credentialId: asWireId(CREDENTIAL_ID) })
+    })
 
     const port = {
       list: vi.fn(async () => ({ items: [record({ credentialId: null })], nextCursor: null })),
@@ -297,7 +303,7 @@ describe('AgentBoxModelSettings credentials', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => expect(update).toHaveBeenCalledTimes(1))
-    expect((update.mock.calls[0][0] as { credentialId: string }).credentialId).toBe(CREDENTIAL_ID)
+    expect(update.mock.calls[0][0].credentialId).toBe(CREDENTIAL_ID)
   })
 
   it('adds a credential, shows the Server code on refusal, and lists what it added', async () => {

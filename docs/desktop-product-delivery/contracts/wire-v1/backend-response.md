@@ -113,3 +113,21 @@ cursor 与向前分页位置混成一个字段。若直接接 UI，只能拿 ren
 
 这些差异不阻止前端继续 P02/P03/P04 独立实现和隔离 fixture 验收；它们是最终全栈接管前的
 明确联调项，测试不得改接旧 SSE 或放宽审批/游标断言来凑绿。
+
+## 2026-09-15 · `profiles.create` 增加可选 `credentialId`（后端集成人，联调发现）
+
+真实 UI 模型门暴露一处合同缺口：**Hermes 无法从产品路径被授权**。Hermes 0.19 不播发 ACP
+configOptions，其生产部署按既有设计**不声明 model 控件**，因此凭据只能挂在角色上；而
+`profiles.create` 此前没有这个字段（后端 `create_wire` 硬编码 `credential_id: None`），
+角色于是永远拿不到凭据，派发被 `CREDENTIAL_REQUIRED` 拒绝。另外三家有 model 控件，凭据随所选
+Provider/Model 配置进入执行上下文，所以掩盖了这个缺口。
+
+改动：`ProfilesCreateParamsSchema` 增加 **可选** `credentialId: WireIdSchema.nullable().optional()`。
+语义与后端一致：缺省或 `null` 都表示"该角色不携带凭据"（无凭据 kind 的 Harness 要求如此）；
+给了 id 时后端会校验它存在**且** kind 与角色 Harness 声明的一致，否则类型化拒绝。材料仍在
+Server 侧，wire 只传引用。
+
+新摘要：TS `774640498429ca9f501dcddd3c7f434e58af3c60a7360578e0387e8aca356276`、
+生成工件 `14f7f73605bb6f048a09a8e7faa93f15ca77d4d66a0b38439a9e9cf2bc6428c7`；
+后端对该工件跑 `tests/server/test_wire_v1.py` **32 passed**（含新增用例），两端需重锁此摘要。
+
