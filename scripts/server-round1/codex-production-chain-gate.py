@@ -489,6 +489,7 @@ class StateSymlinkWatcher:
         self.scan_error: str | None = None
         self.scan_incomplete: str | None = None
         self.race_events: list[dict] = []
+        self.incomplete_events: list[dict] = []
         self.scan_completed = 0
         self.scanned_files = 0
         self.scanned_bytes = 0
@@ -587,9 +588,17 @@ class StateSymlinkWatcher:
             os.close(views_fd)
 
     def _mark_incomplete(self, reason: str) -> None:
+        """Record an incompleteness that this *run* must not forget.
+
+        The per-cycle message is cheap to overwrite, so every event is also
+        kept in a persistent list: a later quiet cycle cannot wash away a tree
+        that was once not fully observed."""
         self._cycle_complete = False
         if self.scan_incomplete is None:
             self.scan_incomplete = reason
+        event = {"reason": reason}
+        if event not in self.incomplete_events:
+            self.incomplete_events.append(event)
 
     def _scan_directory(self, ready_fd: int, relative: str, token: bytes) -> None:
         """Open the subdirectory once and hand its fd to the entry walk."""
@@ -977,13 +986,14 @@ def main() -> int:
         verdict, detail = credential_scan_verdict(
             watcher.token_hits, watcher.scan_error, watcher.stopped_cleanly,
             LEGACY_STATE_DIAGNOSTIC, watcher.scan_incomplete, watcher.scan_completed,
-            watcher.race_events,
+            watcher.race_events, watcher.incomplete_events,
         )
         REPORT["credentialScan"] = {
             "filesObserved": watcher.scanned_files,
             "cyclesCompleted": watcher.scan_completed,
             "incomplete": watcher.scan_incomplete,
             "raceEvents": watcher.race_events,
+            "incompleteEvents": watcher.incomplete_events,
             "error": watcher.scan_error,
             "stoppedCleanly": watcher.stopped_cleanly,
         }
@@ -1926,6 +1936,7 @@ def credential_scan_verdict(
     token_hits: list[dict], scan_error: str | None, stopped_cleanly: bool,
     legacy_diagnostic: bool = False, scan_incomplete: str | None = None,
     scan_completed: int = 0, race_events: list[dict] | None = None,
+    incomplete_events: list[dict] | None = None,
 ) -> tuple[str | None, str]:
     """The typed verdict for one run's credential-path scan.
 
@@ -1954,6 +1965,10 @@ def credential_scan_verdict(
         return ("CODEX_GATE_STATE_SCAN_INCOMPLETE",
                 "state files changed while they were read; sanitized paths: "
                 + json.dumps([event.get("path") for event in race_events]))
+    if incomplete_events:
+        return ("CODEX_GATE_STATE_SCAN_INCOMPLETE",
+                "the state credential scanner recorded incomplete observations: "
+                + json.dumps([event.get("reason") for event in incomplete_events]))
     if scan_completed <= 0:
         return ("CODEX_GATE_STATE_SCAN_INCOMPLETE",
                 "the state credential scanner never completed a scan cycle")

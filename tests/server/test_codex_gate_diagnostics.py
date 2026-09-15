@@ -12,6 +12,7 @@ from __future__ import annotations
 import importlib.util
 import os
 from pathlib import Path
+import stat
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 GATE = REPO_ROOT / "scripts" / "server-round1" / "codex-production-chain-gate.py"
@@ -154,44 +155,56 @@ def test_a_credential_hit_outranks_a_chain_failure(tmp_path):
     assert chain_failure.code == "CODEX_GATE_TURN_FAILED", "kept as secondary evidence"
 
 
-def test_a_raced_read_is_a_persistent_fact_not_a_forgotten_cycle(tmp_path):
-    """A token seen in a file that was in flight is recorded; a race without a
-    token still means this run never observed that file, so it cannot be
-    green even after later quiet cycles."""
+def test_a_raced_read_is_a_persistent_fact_not_a_forgotten_cycle(tmp_path, monkeypatch):
+    """The race is injected deterministically at the post-read fstat: the
+    in-flight payload carries the token (so it is a hit), the race is recorded,
+    and the event survives later quiet cycles."""
     module = load_gate()
     root = tmp_path / "worker-root"
     state = root / "views" / "view-1" / "ready" / "agentbox-sidecar" / "deployment" / "codex" / "native-state"
     state.mkdir(parents=True)
     racing = state / "racing.sh"
-    racing.write_text("clean", encoding="utf-8")
+    racing.write_text("export K='" + module.FAKE_TOKEN + "'", encoding="utf-8")
     watcher = module.StateSymlinkWatcher(root)
 
-    original_read = module._read_bounded
+    real_fstat = os.fstat
+    calls: dict[int, int] = {}
 
-    def racy_read(fd, limit):
-        payload = original_read(fd, limit)
-        return payload
+    def racing_fstat(fd):
+        calls[fd] = calls.get(fd, 0) + 1
+        status = real_fstat(fd)
+        if calls[fd] == 2 and stat.S_ISREG(status.st_mode):
+            # The second fstat of a file is the post-read identity check:
+            # report a one-second-older mtime so the read counts as raced.
+            return os.stat_result((
+                status.st_mode, status.st_ino, status.st_dev, status.st_nlink,
+                status.st_uid, status.st_gid, status.st_size,
+                status.st_atime, status.st_mtime + 1, status.st_ctime,
+            ))
+        return status
 
-    module._read_bounded = racy_read
-    try:
-        # Simulate the race by touching the file between the two fstats.
-        watcher._scan_for_credential(root / "views")
-        racing.write_text("clean-again", encoding="utf-8")
-        watcher._scan_for_credential(root / "views")
-    finally:
-        module._read_bounded = original_read
-    assert watcher.race_events == [] or all(
-        event["path"].endswith("racing.sh") for event in watcher.race_events)
-    if watcher.race_events:
-        verdict, _detail = module.credential_scan_verdict(
-            watcher.token_hits, watcher.scan_error, True, False,
-            watcher.scan_incomplete, watcher.scan_completed, watcher.race_events)
-        assert verdict == "CODEX_GATE_STATE_SCAN_INCOMPLETE"
+    monkeypatch.setattr(module.os, "fstat", racing_fstat)
+    monkeypatch.setattr(module.stat, "S_ISREG", stat.S_ISREG)
+    import stat as real_stat
+    monkeypatch.setattr(module.stat, "S_ISREG", real_stat.S_ISREG)
+    watcher._scan_for_credential(root / "views")
+    assert [hit["path"].rsplit("/", 1)[-1] for hit in watcher.token_hits] == ["racing.sh"], watcher.token_hits
+    assert watcher.race_events and watcher.race_events[0]["path"].endswith("racing.sh")
+    first = list(watcher.race_events)
+    monkeypatch.undo()
+    monkeypatch.setattr(module.os, "fstat", real_fstat)
+    monkeypatch.undo()
+    watcher._scan_for_credential(root / "views")
+    assert watcher.race_events == first, "a quiet cycle must not clear the fact"
+    verdict, _detail = module.credential_scan_verdict(
+        watcher.token_hits, watcher.scan_error, True, False,
+        watcher.scan_incomplete, watcher.scan_completed, watcher.race_events,
+        watcher.incomplete_events)
+    assert verdict == "CODEX_GATE_CREDENTIAL_IN_NATIVE_STATE"
 
 
-def test_budget_failures_are_typed_incomplete(tmp_path):
-    """257 files, a 4097-entry traversal and an oversized total all fail the
-    verdict as an incomplete scan, not as a pass."""
+def test_the_file_budget_is_typed_incomplete(tmp_path):
+    """More regular files than the budget fails as an incomplete scan."""
     module = load_gate()
     root = tmp_path / "worker-root"
     state = root / "views" / "view-1" / "ready" / "agentbox-sidecar" / "deployment" / "codex" / "native-state"
@@ -203,8 +216,38 @@ def test_budget_failures_are_typed_incomplete(tmp_path):
     assert "file budget" in (watcher.scan_incomplete or ""), watcher.scan_incomplete
     verdict, _detail = module.credential_scan_verdict(
         watcher.token_hits, watcher.scan_error, True, False,
-        watcher.scan_incomplete, watcher.scan_completed, watcher.race_events)
+        watcher.scan_incomplete, watcher.scan_completed, watcher.race_events,
+        watcher.incomplete_events)
     assert verdict == "CODEX_GATE_STATE_SCAN_INCOMPLETE"
+
+    # The event survives later cycles: a clean pass cannot wash it away.
+    events = list(watcher.incomplete_events)
+    watcher._scan_for_credential(root / "views")
+    assert watcher.incomplete_events == events
+
+
+def test_the_traversal_and_byte_budgets_are_typed_incomplete(tmp_path):
+    """A forest of directories past the traversal bound, and a set of small
+    files past the cumulative byte bound, both fail as incomplete scans."""
+    module = load_gate()
+    root = tmp_path / "worker-root"
+    state = root / "views" / "view-1" / "ready" / "agentbox-sidecar" / "deployment" / "codex" / "native-state"
+    state.mkdir(parents=True)
+    for index in range(module.CREDENTIAL_SCAN_TRAVERSAL + 8):
+        (state / f"d{index:05}").mkdir()
+    watcher = module.StateSymlinkWatcher(root)
+    watcher._scan_for_credential(root / "views")
+    assert "traversal budget" in (watcher.scan_incomplete or ""), watcher.scan_incomplete
+
+    crowded = tmp_path / "worker-root-bytes"
+    bytes_state = crowded / "views" / "view-1" / "ready" / "agentbox-sidecar" / "deployment" / "codex" / "native-state"
+    bytes_state.mkdir(parents=True)
+    chunk = b"y" * (1024 * 1024)
+    for index in range(9):
+        (bytes_state / f"f{index}").write_bytes(chunk)
+    heavy = module.StateSymlinkWatcher(crowded)
+    heavy._scan_for_credential(crowded / "views")
+    assert "byte budget" in (heavy.scan_incomplete or ""), heavy.scan_incomplete
 
 
 def test_a_green_run_records_neither_blocker_nor_co_observation():
