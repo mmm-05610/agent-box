@@ -62,7 +62,7 @@ _PARAM_SHAPES = {
     "workspaces.browse": ({"requestId", "environment", "path"}, set()),
     "workspaces.archive": ({"requestId", "workspaceId", "expectedVersion"}, set()),
     "profiles.list": ({"includeArchived"}, set()),
-    "profiles.create": ({"requestId", "displayName", "harness"}, set()),
+    "profiles.create": ({"requestId", "displayName", "harness"}, {"credentialId"}),
     "profiles.update": ({"requestId", "profileId", "expectedVersion", "displayName"}, set()),
     "profiles.updateConfig": ({"requestId", "profileId", "expectedVersion", "values"}, set()),
     "profiles.archive": ({"requestId", "profileId", "expectedVersion"}, set()),
@@ -363,10 +363,17 @@ class WireService:
         return item
 
     def profiles_create(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        # `credentialId` is optional and nullable: a Harness whose credential
+        # cannot ride a model control (Hermes declares none) needs the role
+        # itself to carry one, and a role without one stays expressible.
+        credential_id = params.get("credentialId")
+        if credential_id is not None:
+            credential_id = _bounded(credential_id, "credentialId")
         row = self.profiles.create_wire(
             _request_id(params["requestId"]),
             display_name=_bounded(params["displayName"], "displayName", 128),
             harness=_bounded(params["harness"], "harness", 64),
+            credential_id=credential_id,
         )
         return {"profile": self._profile(row)}
 

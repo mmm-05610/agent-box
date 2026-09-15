@@ -3,6 +3,26 @@
 维护者：后端执行者（39–42）。用途：在双方锁定单一 wire 前交换事实与约束，
 避免两边各造一套协议。此处只写后端事实与差异请求，不批准前端合同。
 
+## 2026-09-15 22:1x +08:00 · `profiles.create` 增加可选 `credentialId`（合同增补，两端重锁）
+
+真实 UI 模型门发现：**Hermes 无法从产品路径被授权**。Hermes 的部署按既有设计不声明 model 控件
+（0.19 不播发 configOptions），凭据只能挂在角色上；而 `profiles.create` 没有这个字段
+（`profiles/service.py` 的 `create_wire` 硬编码 `credential_id: None`），角色永远拿不到凭据，
+派发被 `CREDENTIAL_REQUIRED` 拒绝。另外三家有 model 控件，凭据随所选 Provider/Model 配置进入
+执行上下文，故掩盖了它。（历史四道后端门建角色走的是保留 REST `POST /api/v1/profiles`，
+那条路接受 `credential_id`，所以门的结论"带真实凭据时链路可跑通"为真，但未覆盖产品自己的路径。）
+
+后端已实现：`profiles.create` 的 `credentialId` **可选且可空**（缺省/`null` = 角色不携带凭据；
+给值时校验存在性与 kind 与 Harness 声明一致，否则类型化拒绝）。前端新增同形可选字段并重生成工件：
+
+| 工件 | 新摘要 |
+| --- | --- |
+| TS 权威 `apps/desktop/src/types/wire/wire-v1.ts` | `774640498429ca9f501dcddd3c7f434e58af3c60a7360578e0387e8aca356276` |
+| 生成工件 `generated/wire-v1.schema.json` | `14f7f73605bb6f048a09a8e7faa93f15ca77d4d66a0b38439a9e9cf2bc6428c7` |
+
+后端对**新工件**跑 `tests/server/test_wire_v1.py`：**32 passed**（含本次新增用例）。
+旧摘要（`11e3b3e7…` / `5d4fa3bf…`）标记为**已被本次增补取代**，不再作为锁定值。
+
 ## 2026-09-15 19:40 +08:00 · 事件层补齐与两处声明-生产者缺口（只登记事实，不改合同）
 
 后端在不改 28 方法的前提下，把 schema 门扩到**事件帧**层：`tests/server/test_wire_v1.py` 新增

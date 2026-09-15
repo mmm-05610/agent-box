@@ -69,10 +69,11 @@ class ProfileService:
             })
         return items
 
-    def create_wire(self, key: str, *, display_name: str, harness: str) -> dict[str, Any]:
+    def create_wire(self, key: str, *, display_name: str, harness: str,
+                    credential_id: str | None = None) -> dict[str, Any]:
         _status, body = self.create(key, {
             "name": display_name, "harness_type": harness,
-            "configuration": {}, "credential_id": None,
+            "configuration": {}, "credential_id": credential_id,
         })
         return self.records.get(body["profile_id"])
 

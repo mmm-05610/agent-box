@@ -1230,3 +1230,40 @@ def test_every_projected_frame_matches_the_strict_frontend_event_schema(wire):
         accounted = observed | set(unproduced) | {"config.changed"} - set()
         assert declared - accounted == set(), sorted(declared - accounted)
         assert accounted - declared == set(), sorted(accounted - declared)
+
+
+def test_a_role_may_carry_a_credential_for_a_harness_without_a_model_control(wire):
+    """A role can name the credential it runs with.
+
+    A Harness whose credential cannot ride a model control - Hermes declares no
+    ACP configOptions, so its deployment declares no model control - can only be
+    authorised through the role itself. Before this, the wire's `profiles.create`
+    had no way to say so, and such a role could not be dispatched at all
+    (`CREDENTIAL_REQUIRED`), which the interface cannot work around.
+    """
+    _runtime, api, _execution = wire
+    # The fixture Harness declares no credential kind, so a credential-bearing
+    # role is refused for it: the pairing is validated rather than assumed, and
+    # the refusal happens before any credential lookup.
+    refused = api.err("profiles.create", {
+        "requestId": "profile-with-credential", "displayName": "With credential",
+        "harness": "alpha", "credentialId": "credential_" + "b" * 32,
+    })
+    assert refused["code"] == "CAPABILITY_UNSUPPORTED", refused
+    assert refused["details"]["internalCode"] == "HARNESS_UNAVAILABLE", refused
+
+    # Without a credential the same call succeeds, and the role records none.
+    created = api.ok("profiles.create", {
+        "requestId": "profile-without-credential", "displayName": "Without credential",
+        "harness": "alpha",
+    })["profile"]
+    assert created["displayName"] == "Without credential"
+    assert "credentialId" not in created
+
+    # An explicit null is the same as omitting it, so a client that always sends
+    # the field is not rejected.
+    nulled = api.ok("profiles.create", {
+        "requestId": "profile-null-credential", "displayName": "Null credential",
+        "harness": "alpha", "credentialId": None,
+    })["profile"]
+    assert nulled["displayName"] == "Null credential"
