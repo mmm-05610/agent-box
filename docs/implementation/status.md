@@ -225,9 +225,11 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   1024 列表上限与 fail-closed 凭据扫描不变。Codex 生产模板声明 `ephemeralPaths: [".tmp"]`。
   反例与证明：真实 bwrap 遮蔽测试（burst 文件不落宿主 state、普通兄弟文件正常落盘）、
   argv 顺序断言（tmpfs 在 state bind 之后）、越界/RO 冲突拒绝、deployment 解析缺省兼容。
-  **c8 有界复跑（3 轮）**：全部 exit 0、view 峰值 113、`tokenInState=false`、state 78 文件；
-  遮蔽模式 6 轮全绿 + 无遮蔽诊断 9 轮全绿（secret/突发均未复现，时机相关，fail-closed 保持）；
-  Python 全量 **822 passed/6 skipped**；Rust 27 passed；Worker 源未变（c8 摘要不变）。
+  **泄漏路径第一手捕获**：`native-state/shell_snapshots/*.sh`（Codex 环境快照含注入的
+  凭据环境变量原文）→ 方案 A 扩展为 `ephemeralPaths: [".tmp", "shell_snapshots"]`。
+  **c8 最终复跑（4 轮，含快照遮蔽）**：全部 exit 0、view 峰值 **112**、`tokenInState=false`、
+  credentialPathHits=0、state 78 文件。Python 全量 **828 passed/6 skipped**；Rust 27 passed；
+  Worker 源未变（c8 摘要不变）；四门 + Windows r4/PostCheck 已在最终 HEAD 复跑全绿。
 - codex_decision_pending: **已由用户裁决 A 并实施（原 USER_DECISION_REQUIRED 已关闭）**——
   Codex `.tmp/plugins` 突发（VIEW_FILE_LIMIT）与凭据瞬时入 state（SIDECAR_STATE_CONTAINS_SECRET）
   的处置方案 A（部署层 attempt-ephemeral 投影 `.tmp`，Reviewer 推荐）/B（官方配置关闭，未找到
