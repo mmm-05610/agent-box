@@ -286,11 +286,11 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   [ui-model-gate-blocker.md](../server-round1/fullstack/ui-model-gate-blocker.md)。**待用户裁决**。
 - ui_model_gates_2026-09-15: **逐家结果（真实 UI 模型门）**——驱动
   前端 `apps/desktop/e2e/p42-ui-model-gate.mjs`，证据 `apps/desktop/evidence/p42-ui-model-gate/`。
-  **Pi 8/8 PASS**（凭据经界面录入并挂到模型、两轮真实 DeepSeek 答复、首轮回忆 nonce、次轮带上下文）；
-  **OpenCode 6/8**（链路跑通但首轮助手文本是片段，未验证完整回忆 → **不记通过**）；
-  **Hermes 派发前被拒**（`CREDENTIAL_REQUIRED`，根因是产品缺口：wire 的 `profiles.create` 不接受凭据
-  ——`profiles/service.py:72` 硬编码 `credential_id: None`——而 Hermes 部署按既有设计不声明 model 控件，
-  故角色拿不到凭据；三条出路待裁决）；**Codex 未运行**（预算耗尽，工件与部署就绪）。
+  **Pi 8/8、Hermes 8/8、Codex 8/8 全绿**（凭据均经界面自己的录入路径加入；两轮真实 DeepSeek 答复、
+  首轮回忆 nonce、次轮带上下文）；**OpenCode 6/8**（链路跑通但首轮助手文本是片段，未验证完整回忆
+  → **不记通过**）。**Hermes 的缺口已修并两端重锁**：`profiles.create` 增加可选 `credentialId`
+  （缺省/null = 角色不携带凭据；给值校验存在性与 kind），工件新摘要 TS `7746404984…` /
+  `14f7f736…`（取代 `11e3b3e7…`/`5d4fa3bf…`），后端对新工件 32 passed，Hermes UI 门复跑通过。
   过程中修掉两个真实缺陷（preload 把凭据 API 错嵌进 `wire`、导入请求缺 `Idempotency-Key`）。
   费用：本轮 ≈20 次真实请求、增量 **< ¥0.01**，四家累计 **< ¥0.08**（上限 ¥10）。
 - final_state: **FULLSTACK_CORE_PARTIAL**——双门成立、两边分别提交、无模型全栈联调在真实 Windows
