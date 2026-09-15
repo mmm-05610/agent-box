@@ -910,3 +910,40 @@ provider 侧账单是唯一权威用量记录，本表是本地产物推算的�
 `b84dc87`(39) → `38b28d6`(40-A) → `05053f9`(40-B) → `340fcad`(40-C) → `b70cd3f`(40-D)
 → `7e9ffd8`(41) → `8eeb422`(42-A 观察) → `978918d`(sidecar 桥)。
 未 push、未 merge、未 force、未改动发布源或用户真实数据。
+
+---
+
+# Work Order 43 — Harness 扩容（2026-09-16，独立工作树 feature/harness-expansion-v1）
+
+## 轮 1：dsh（DeepSeek 官方 Harness 0.1.5-rc.1）
+
+- 六件套全齐；假端点全链门 **exit 0**（`DSH_PRODUCTION_CHAIN_GATE_OK`）。
+- 关键事实与修复：桥的 `setModel` 不支持 ACP 分组配置选项（dsh 的 model 选择器是
+  组结构）→ 打 harness 中立补丁（展平一层，PATCHES.md §3）；模型别名指向第一手
+  观测的 opaque 值 `["deepseek-official","deepseek-flash"]`；settings.yaml 的
+  `off` 必须加引号（YAML 1.1 会解析成布尔）。
+- 证据：`docs/server-round1/fullstack/dsh-production-packaging.md`。
+- checkpoint `d9d36b0`。模型调用 0、费用 ¥0。
+
+## 轮 2：claude-code（官方 ACP 适配器 0.77.0 + Anthropic 专有 SDK/二进制）
+
+- 许可证核查先行（适配器 Apache-2.0；SDK/二进制专有；义务记账：不修改二进制、
+  用户自带凭据）。六件套全齐；假端点全链门 **exit 0**
+  （`CLAUDE_PRODUCTION_CHAIN_GATE_OK`）。
+- 关键事实与修复：原生二进制需要 0555 执行位（builder `EXECUTABLE_FILES`）；
+  glibc/musl 同平台包按构建机 libc 择一；出网守卫必须走 LD_PRELOAD（NODE_OPTIONS
+  到不了原生二进制），实测拦截 4 次 `api.anthropic.com` 解析（厂商遥测，零接触，
+  记为预期观测）；每会话 1 次后台 title 模型调用，单列记录不混入主线断言；未知
+  模型在发包前被桥拒绝（实测后钉死断言）；重开实测非重放 `session/resume`。
+- 证据：`docs/server-round1/fullstack/claude-production-packaging.md`。
+- checkpoint `2c0735c`。模型调用 0、费用 ¥0。
+
+## 环境与共用
+
+- 本工作树缺 42 轮 gitignored 的 Worker 二进制：已从母树复制 `.acceptance-bundle-c4`
+  与 target/debug 二进制（只读复制），并以本树源码重建 release bundle
+  （`sha256:b4b58db1…`，与 c8 记录摘要的差异来自构建工具链，非源码——如实分账）。
+- 修复 opencode 门一处既有缺陷：`INJECTED_CREDENTIAL` 缺模块级初值，门在注入前
+  失败时报告消毒路径以 NameError 崩溃（pi 门有初值）。
+- 全量测试：plugins 161 passed/3 skipped；tests 598 passed/1 skipped。
+- 费用：本轮模型调用 0、累计 ¥0（预算 ≤¥10，真实模型门未开始）。
