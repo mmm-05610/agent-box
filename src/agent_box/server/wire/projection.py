@@ -160,11 +160,19 @@ def event_frame(row: Mapping[str, Any], codec: Any) -> dict[str, Any] | None:
 def _event_body(kind: str, row: Mapping[str, Any], data: Mapping[str, Any]) -> dict[str, Any]:
     session_id = row["session_id"]
     if kind == "execution.state":
+        state = _EXECUTION_STATE_MAP.get(str(data.get("state")), "unknown")
+        if data.get("cancel_requested") and state != "stopped":
+            # core v1 §6 keeps three facts apart: a stop was *requested*, it is
+            # *being stopped*, and it *stopped*. The client's stop phase starts
+            # on exactly this frame (`wire-session-control.ts`), so a recorded
+            # cancel request must not be published as the state the execution
+            # happened to be in when the request arrived.
+            state = "stopping"
         body: dict[str, Any] = {
             "kind": kind,
             "sessionId": session_id,
             "executionId": row.get("turn_id"),
-            "state": _EXECUTION_STATE_MAP.get(str(data.get("state")), "unknown"),
+            "state": state,
         }
         reason = data.get("error_code")
         if reason:

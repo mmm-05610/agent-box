@@ -660,6 +660,21 @@ def test_stop_reports_requested_then_already_finished(wire):
     assert stopped["outcome"] == "stop_requested"
     assert execution.cancelled == [accepted["executionId"]]
 
+    # core v1 §6: request → stopping → confirmed stop. The desktop client's stop
+    # phase starts on the `stopping` frame, so the request must not be published
+    # as the state the execution was in when it arrived, and the terminal frame
+    # is the only confirmation.
+    frames = api.ok("history.snapshot", {"sessionId": accepted["session"]["id"]})["frames"]
+    request_frame = frames[-1]["event"]
+    assert request_frame == {
+        "kind": "execution.state", "sessionId": accepted["session"]["id"],
+        "executionId": accepted["executionId"], "state": "stopping",
+    }
+    assert not any(
+        frame["event"].get("state") == "stopped"
+        for frame in frames if frame["event"]["kind"] == "execution.state"
+    ), "a stop request is not the stop itself" 
+
     _runtime2, api2, execution2 = wire
     del _runtime2, execution2
 
