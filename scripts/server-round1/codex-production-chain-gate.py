@@ -1716,6 +1716,16 @@ def run_unknown_model(client, runtime, workspace, opened, production, endpoint, 
     if requests_after is not None and requests_after != 2:
         fail("CODEX_GATE_UNKNOWN_MODEL_REACHED_PROVIDER",
              f"the refused model produced {requests_after - 2} provider requests")
+    mentioned = any("Harness model is not available" in reason for reason in reasons)
+    if requests_after is None and not mentioned:
+        # Live has no endpoint to count on, so this reason *is* the positive
+        # witness of the phase: without it the turn could have failed for any
+        # unrelated cause and the phase would still look passed. The string is
+        # the sidecar's own model-availability message, and the failed turn
+        # state above is the code-level half of the same claim.
+        fail("CODEX_GATE_UNKNOWN_MODEL_REASON_UNEXPECTED",
+             "the live unknown-model turn did not fail for the model-availability reason: "
+             + json.dumps([reason[:200] for reason in reasons[-2:]]))
     return {
         "state": turn["state"],
         # Live there is no endpoint to count on, so the positive witness is the
@@ -1726,7 +1736,7 @@ def run_unknown_model(client, runtime, workspace, opened, production, endpoint, 
         "refusedBeforeProviderRequest": (
             None if requests_after is None else requests_after == 2),
         "refusalCounted": requests_after is not None,
-        "reasonMentionsModel": any("Harness model is not available" in reason for reason in reasons),
+        "reasonMentionsModel": mentioned,
         "reasons": [reason[:200] for reason in reasons[-2:]],
     }
 

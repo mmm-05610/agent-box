@@ -1069,6 +1069,17 @@ def unknown_model_refusal(client, runtime, workspace, opened, production, endpoi
     if before is not None and requests_after != before:
         fail("OPENCODE_GATE_UNKNOWN_MODEL_REACHED_PROVIDER",
              f"the refused model produced {requests_after - before} provider requests")
+    mentioned = any("Harness model is not available" in reason
+                    and "deepseek-unknown" in reason for reason in reasons)
+    if before is None and not mentioned:
+        # Live cannot count requests, so this reason is the phase's positive
+        # witness: without it the turn could have failed for any unrelated
+        # cause and the phase would still look passed. It is the sidecar's own
+        # model-availability message, and the failed turn state is the
+        # code-level half of the claim.
+        fail("OPENCODE_GATE_UNKNOWN_MODEL_REASON_UNEXPECTED",
+             "the live unknown-model turn did not fail for the model-availability reason: "
+             + json.dumps([reason[:200] for reason in reasons[-2:]]))
     return {
         "state": turn["state"],
         "refusedAt": "the OpenCode driver, before POST /session/<id>/message",
@@ -1077,8 +1088,7 @@ def unknown_model_refusal(client, runtime, workspace, opened, production, endpoi
         "refusedBeforeProviderRequest": (
             None if before is None else requests_after == before),
         "providerRequestCountAvailable": before is not None,
-        "reasonMentionsModel": any("Harness model is not available" in reason
-                                   and "deepseek-unknown" in reason for reason in reasons),
+        "reasonMentionsModel": mentioned,
         "reasons": [reason[:220] for reason in reasons],
     }
 

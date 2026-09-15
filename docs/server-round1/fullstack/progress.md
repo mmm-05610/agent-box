@@ -63,6 +63,20 @@
   修复后下次可直接读出层级。
 - **修复后复跑**：Pi `--live` live6/7/8 三次 exit 0（报告字段已是 null + 断言生效）。
 
+### 自审轮 2 的补充验证（同日）
+
+- **Pi live 间歇统计**：`pi-live5` 失败后追加 live6/7/8/9/10 五次全部 exit 0 →
+  该间歇目前为 **1 失败 / 7 次 Pi live 运行**，未复现；诊断已修，下次失败可直接读出层级。
+- **其余三家按最终代码复跑**：Hermes/OpenCode/Codex 各一次 `--live`（含新加的
+  `*_UNKNOWN_MODEL_REASON_UNEXPECTED` 正向断言与保留内层错误码的诊断），产物与最终代码一致。
+- **Windows r4 在本 HEAD 重跑**（`accept-e.ps1 … -Port 18747 -Cleanup`）exit 0：
+  `BACKEND_41_E_WINDOWS_WSL_WIRE_OK`、`worker_digest=sha256:514f48a9…`（c8 未重建）、
+  有状态 fixture 走 `session/new → session/resume`（同 native id `stateful-13`）、
+  delta 10 < completed 12、`stop_mode=tree_terminate`、8 秒静默默认租约 `elapsed_ms=8770`、
+  7 项清理守卫全部按预期拒绝/接受；随后独立 `-PostCheck -InstanceId <两实例>` exit 0 →
+  `BACKEND_41_E_WINDOWS_POSTCHECK_CLEAN`（DataRoot 不存在、端口未监听、workspace 不存在、
+  无残留进程、Worker view 无残留）。
+
 ## 2026-09-15 — state capture 类型化错误边界（c7 起步 → 现行 c8）+ 前端最终交接收口（返修轮）
 
 【历史轮次注：本节的错误码语义（"文件/目录消失、文件被缩短"=`VIEW_CHANGED`）与
@@ -865,11 +879,11 @@ powershell.exe -File accept-e.ps1 … -Port 18744 -PostCheck -InstanceId <两实
 | --- | --- | --- | --- |
 | DeepSeek 官方 API 可达性检查 | 1 | 12 tokens（11 in / 1 out） | < ¥0.01 |
 | Codex 错误 chat 配置尝试 | 0 次模型调用 | 0（在 `session/new` 阶段即失败） | ¥0 |
-| Pi 全链门 `--live` | 8（4 通过：live4/6/7/8；4 失败：live/live2 接入缺口、live3 凭据未注入、live5 capture 间歇） | 每轮数百 in / ≤64 out | < ¥0.01 |
-| Hermes 全链门 `--live` | 4（1 通过 live4；3 失败均为缺口/守卫项） | 同上 | < ¥0.01 |
-| OpenCode 全链门 `--live` | 6（1 通过 live6；5 失败均为接入缺口或守卫项） | 同上 | < ¥0.01 |
-| Codex 全链门 `--live` | 6（2 通过 live5/6；4 失败：接入缺口 ×2、报告序列化、locator 路径笔误） | 同上 | < ¥0.01 |
-| **合计** | **24 次 `--live` 运行 / 8 次通过**（+ 无模型复跑若干，零费用） | 12 tokens + 四家各两轮 | **< ¥0.06 / 上限 ¥10** |
+| Pi 全链门 `--live` | 10（6 通过：live4/6/7/8/9/10；4 失败：live/live2 接入缺口、live3 凭据未注入、live5 capture 间歇） | 每轮数百 in / ≤64 out | < ¥0.01 |
+| Hermes 全链门 `--live` | 5（2 通过 live4/5；3 失败均为缺口/守卫项） | 同上 | < ¥0.01 |
+| OpenCode 全链门 `--live` | 7（2 通过 live6/7；5 失败均为接入缺口或守卫项） | 同上 | < ¥0.01 |
+| Codex 全链门 `--live` | 7（3 通过 live5/6/7；4 失败：接入缺口 ×2、报告序列化、locator 路径笔误） | 同上 | < ¥0.01 |
+| **合计** | **29 次 `--live` 运行 / 13 次通过**（+ 无模型复跑若干，零费用） | 12 tokens + 四家各两轮 | **< ¥0.07 / 上限 ¥10** |
 
 （四家每轮输出上限 64 tokens 由受审配置固定；上界换算见 [live-model-preflight.md](live-model-preflight.md) §2，
 最坏情形 < ¥0.4，实测远低于此。失败运行除 `pi-live3/5` 外都在发包前结束；未充值、无第三方代理。
