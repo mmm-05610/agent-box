@@ -69,6 +69,10 @@
   该间歇目前为 **1 失败 / 7 次 Pi live 运行**，未复现；诊断已修，下次失败可直接读出层级。
 - **其余三家按最终代码复跑**：Hermes/OpenCode/Codex 各一次 `--live`（含新加的
   `*_UNKNOWN_MODEL_REASON_UNEXPECTED` 正向断言与保留内层错误码的诊断），产物与最终代码一致。
+- **本 HEAD 全套刷新**：`pytest tests` **575 passed / 3 skipped / 0 failed**（与上一轮同计数，
+  即 gate 改动只影响门报告本身）；Codex 无模型门在最终代码上复跑 exit 0
+  （`CODEX_PRODUCTION_CHAIN_GATE_OK`、view 峰值 112、`tokenInState=false`、
+  `credentialPathHits=[]`、未知模型 0 请求）。
 - **Windows r4 在本 HEAD 重跑**（`accept-e.ps1 … -Port 18747 -Cleanup`）exit 0：
   `BACKEND_41_E_WINDOWS_WSL_WIRE_OK`、`worker_digest=sha256:514f48a9…`（c8 未重建）、
   有状态 fixture 走 `session/new → session/resume`（同 native id `stateful-13`）、
