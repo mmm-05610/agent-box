@@ -100,6 +100,13 @@ SCRIPT = "scripts/server-round1/codex-production-chain-gate.py"
 #: path; the gate never reads a real secret file. The shape matches what the
 #: native Codex `env_key` lookup accepts (`sk-` prefixed), nothing more.
 FAKE_TOKEN = "sk-codex-gate-fake-token-4f7ac21d-non-secret"
+#: The bytes actually injected this run (the fake token, or the authorized
+#: locator's content in live mode). Only the scans read it; nothing prints it.
+INJECTED_CREDENTIAL: bytes = FAKE_TOKEN.encode()
+#: Set from --live in main(). The phases that keep their own loopback audit
+#: endpoint read it so the report says which endpoint their request counts
+#: belong to, instead of letting a mechanism-audit count look like a model call.
+LIVE_MODE = False
 #: Set from --legacy-state-diagnostic in main(); read by the sidecar launcher.
 LEGACY_STATE_DIAGNOSTIC = False
 #: Set from --official-feature-flags in main(); read by the config builder.
@@ -139,6 +146,13 @@ SILENT_SECONDS = 8.0
 #: How long the cancel round's provider request is held open before the turn is
 #: cancelled from the Server.
 CANCEL_HOLD_SECONDS = 60.0
+#: Live cancel bounds: how long to wait for the real answer's first streamed
+#: delta (that is what a live in-flight window is measured by), how long the
+#: cancel itself may take to end the turn, and the hard wait for that terminal
+#: state. These are observations of the Server's own state, not of the endpoint.
+LIVE_CANCEL_STREAM_SECONDS = 120.0
+LIVE_CANCEL_SECONDS = 30.0
+LIVE_CANCEL_TERMINAL_SECONDS = 60.0
 REPORT: dict = {"result": "CODEX_PRODUCTION_CHAIN_GATE_FAILED", "script": SCRIPT}
 
 
@@ -972,6 +986,16 @@ def main() -> int:
     parser.add_argument("--keep", action="store_true")
     parser.add_argument("--json", action="store_true")
     parser.add_argument(
+        "--live", action="store_true",
+        help="paid mode: the official endpoint and an authorized credential locator "
+             "instead of the loopback fake endpoint (see "
+             "docs/server-round1/fullstack/live-model-preflight.md)",
+    )
+    parser.add_argument(
+        "--authorized-secret", default=None,
+        help="path of the authorized credential file (only with --live)",
+    )
+    parser.add_argument(
         "--strip-flags", default=None,
         help="with --feature-flag-control-leg: strip only these feature keys "
              "(comma-separated) instead of the whole [features] table",
@@ -1025,10 +1049,24 @@ def main() -> int:
 
         # Three provider requests are expected: round one (answered silently),
         # round two (answered) and the cancel round (held open, never answered).
-        endpoint = FakeEndpoint(
-            FAKE_TOKEN, budget=3, silent_first=SILENT_SECONDS, hold_index=3)
-        endpoint.assert_loopback_only()
-        differences = production.documented_differences(endpoint.base_url)
+        live = bool(options.live)
+        global LIVE_MODE
+        LIVE_MODE = live
+        REPORT["mode"] = "live" if live else "loopback-fake-endpoint"
+        secret_path = None
+        if live:
+            global INJECTED_CREDENTIAL
+            secret_path = Path(options.authorized_secret).resolve()
+            mode = secret_path.stat().st_mode & 0o777
+            if mode & 0o077:
+                fail("CODEX_GATE_LIVE_SECRET_PERMISSIONS", f"authorized secret mode is {oct(mode)}")
+            endpoint = None
+            differences = {}
+        else:
+            endpoint = FakeEndpoint(
+                FAKE_TOKEN, budget=3, silent_first=SILENT_SECONDS, hold_index=3)
+            endpoint.assert_loopback_only()
+            differences = production.documented_differences(endpoint.base_url)
         REPORT["template"] = {
             "officialBaseUrl": official,
             "loopbackOverrideChanges": {key: list(value) for key, value in differences.items()},
@@ -1046,7 +1084,7 @@ def main() -> int:
             "modelCatalogBytes": len(production.models_bytes()),
             "modelCatalogSha256": "sha256:" + hashlib.sha256(production.models_bytes()).hexdigest(),
         }
-        if set(differences) != {f"model_providers.{production.PROVIDER_ID}.base_url"}:
+        if not live and set(differences) != {f"model_providers.{production.PROVIDER_ID}.base_url"}:
             fail("CODEX_GATE_OVERRIDE_NOT_MINIMAL",
                  f"the loopback override changed {sorted(differences)}")
 
@@ -1094,13 +1132,19 @@ def main() -> int:
                 "identical": True, "entries": second["entries"], "bytes": second["bytes"],
             }
 
+        global INJECTED_CREDENTIAL
         token_path = temporary / "codex-gate-token"
-        token_path.write_bytes(FAKE_TOKEN.encode())
+        if live:
+            token_path.write_bytes(secret_path.read_bytes())
+        else:
+            token_path.write_bytes(FAKE_TOKEN.encode())
         token_path.chmod(0o600)
+        INJECTED_CREDENTIAL = token_path.read_bytes().strip()
 
         watcher = StateSymlinkWatcher(temporary / "worker-root")
         watcher.start()
-        endpoint.start()
+        if endpoint is not None:
+            endpoint.start()
         chain_failure = None
         outcome: dict = {}
         try:
@@ -1111,7 +1155,7 @@ def main() -> int:
                 temporary / "worker-root", temporary,
                 lambda: run_chain(
                     temporary, workspace, worker, artifact, digest, endpoint, production,
-                    token_path, host_home,
+                    token_path, host_home, live=live,
                 ),
                 name="turn-chain",
                 existing_watcher=watcher,
@@ -1126,16 +1170,22 @@ def main() -> int:
                 )
             settled_window = chain_evidence
         finally:
-            endpoint.stop()
+            if endpoint is not None:
+                endpoint.stop()
             # The endpoint's own record is the evidence for several requirements,
             # so it is reported even when the chain failed after it answered.
-            REPORT["provider"] = {
-                "requests": endpoint.requests, "paths": endpoint.paths,
-                "unauthorizedRequests": endpoint.unauthorized,
-                "requestsBeyondBudget": endpoint.over_budget,
-                "baseUrl": endpoint.base_url,
-                "silentFirstAnswerObservedSeconds": round(endpoint.silent_observed, 3),
-            }
+            REPORT["provider"] = (
+                {"requests": None, "paths": [], "unauthorizedRequests": None,
+                 "requestsBeyondBudget": None, "baseUrl": production.OFFICIAL_BASE_URL,
+                 "silentFirstAnswerObservedSeconds": None, "mode": "live"}
+                if endpoint is None else {
+                    "requests": endpoint.requests, "paths": endpoint.paths,
+                    "unauthorizedRequests": endpoint.unauthorized,
+                    "requestsBeyondBudget": endpoint.over_budget,
+                    "baseUrl": endpoint.base_url,
+                    "silentFirstAnswerObservedSeconds": round(endpoint.silent_observed, 3),
+                }
+            )
             REPORT["stateSymlinksObserved"] = watcher.observed
             REPORT["credentialPathHits"] = watcher.token_hits
             REPORT["stateProjectionObservation"] = {
@@ -1151,7 +1201,7 @@ def main() -> int:
                 "overListingLimit": watcher.peak_files > StateSymlinkWatcher.FILE_LIMIT,
             }
         REPORT.update(outcome)
-        REPORT["settledWindow"] = settled_window
+        REPORT["settledWindow"] = phase_evidence_for_report(settled_window)
         # The reopen observation starts the adapter twice more with the same
         # injected token, so it runs as its own phase with its own observer and
         # its own settled scan; its failure is held, not raised, because the
@@ -1187,13 +1237,22 @@ def main() -> int:
             raise chain_failure
         if reopen_evidence.get("failure") is not None:
             raise reopen_evidence["failure"]
-        if endpoint.over_budget:
+        if endpoint is not None and endpoint.over_budget:
             fail("CODEX_GATE_EXTRA_PROVIDER_REQUEST",
                  f"{endpoint.over_budget} provider requests exceeded the phase budget")
-        if endpoint.unauthorized:
+        if endpoint is not None and endpoint.unauthorized:
             fail("CODEX_GATE_UNAUTHORIZED_PROVIDER_REQUEST",
                  f"{endpoint.unauthorized} provider requests did not carry the injected token")
         cleanup_check(temporary, workspace, token_path)
+        if secret_path is not None:
+            # The authorized locator is the user's file, not this gate's output:
+            # the run reads it into its own 0600 token file and never writes to
+            # or removes it. A run that removed it would be a defect, so the
+            # fact is asserted here rather than assumed from the code.
+            REPORT["authorizedLocatorDeleted"] = not secret_path.exists()
+            if REPORT["authorizedLocatorDeleted"]:
+                fail("CODEX_GATE_AUTHORIZED_LOCATOR_DELETED",
+                     "the authorized credential locator no longer exists after the run")
         REPORT["result"] = "CODEX_PRODUCTION_CHAIN_GATE_OK"
     except GateFailure as failure:
         primary = failure
@@ -1201,7 +1260,8 @@ def main() -> int:
         primary = GateFailure("CODEX_GATE_UNEXPECTED", f"{type(error).__name__}: {error}")
     finally:
         if endpoint is not None:
-            endpoint.stop()
+            if endpoint is not None:
+                endpoint.stop()
         if temporary is not None:
             run = REPORT.setdefault("run", {})
             if options.keep:
@@ -1244,9 +1304,11 @@ def main() -> int:
             REPORT["cleanupFailure"] = {
                 "code": cleanup_failure.code, "error": cleanup_failure.message[:300],
             }
-        print(json.dumps(REPORT, indent=2 if options.json else None, sort_keys=True))
+        print(json.dumps(REPORT, indent=2 if options.json else None, sort_keys=True,
+                         default=unserializable_value))
         return 1
-    print(json.dumps(REPORT, indent=2 if options.json else None, sort_keys=True))
+    print(json.dumps(REPORT, indent=2 if options.json else None, sort_keys=True,
+                     default=unserializable_value))
     return 0
 
 
@@ -1255,7 +1317,7 @@ def main() -> int:
 # --------------------------------------------------------------------------
 
 def run_chain(temporary, workspace, worker, artifact, digest, endpoint, production,
-              token_path, host_home) -> dict:
+              token_path, host_home, *, live: bool = False) -> dict:
     """The production seam: Server -> Core -> sidecar -> Worker -> bwrap -> codex-acp."""
     from agent_box.server.bootstrap import build_runtime_from_sidecar_deployment
     from agent_box.server.credentials import CredentialRecords
@@ -1269,10 +1331,16 @@ def run_chain(temporary, workspace, worker, artifact, digest, endpoint, producti
     )
     deployment = temporary / "deployment.json"
     deployment.write_text(json.dumps(document), encoding="utf-8")
-    if FAKE_TOKEN in deployment.read_text(encoding="utf-8"):
-        fail("CODEX_GATE_TOKEN_IN_DEPLOYMENT", "the fake token reached the deployment document")
+    if INJECTED_CREDENTIAL.decode(errors="replace") in deployment.read_text(encoding="utf-8"):
+        fail("CODEX_GATE_TOKEN_IN_DEPLOYMENT", "the credential reached the deployment document")
 
-    loopback_bytes = loopback_config_bytes(endpoint, production)
+    # The no-model gate overrides base_url and carries a sentinel comment so the
+    # guest audit can prove *which* config it read. Live mode projects the
+    # deployed bytes unchanged: there is no override to make, and the sentinel's
+    # job (proving the projected copy is the one the Harness read) is done by the
+    # real answer instead.
+    config_bytes = (
+        production.config_bytes() if live else loopback_config_bytes(endpoint, production))
 
     import agent_box.server.bootstrap.runtime as runtime_module
     runtime_module._builtin_connector = lambda _id: DirectWorkerConnector(
@@ -1281,7 +1349,7 @@ def run_chain(temporary, workspace, worker, artifact, digest, endpoint, producti
 
     def deployment_file(root, value, relative):
         if relative == production.CONFIG_SOURCE:
-            return loopback_bytes
+            return config_bytes
         return original_file(root, value, relative)
 
     runtime_module._sidecar_deployment_file = deployment_file
@@ -1293,6 +1361,13 @@ def run_chain(temporary, workspace, worker, artifact, digest, endpoint, producti
     # failed step already produced (an answered request, a streamed delta, a
     # checkpoint) survives into the failure report instead of being dropped.
     result: dict = {"rounds": {}}
+    result["configProjection"] = {
+        "mode": "live" if live else "loopback-fake-endpoint",
+        "projectedBytes": len(config_bytes),
+        "projectedSha256": "sha256:" + hashlib.sha256(config_bytes).hexdigest(),
+        "deployedBytes": len(production.config_bytes()),
+        "unchangedFromDeployment": config_bytes == production.config_bytes(),
+    }
     REPORT["rounds"] = result["rounds"]
     REPORT["sessionId"] = None
     try:
@@ -1335,13 +1410,27 @@ def run_chain(temporary, workspace, worker, artifact, digest, endpoint, producti
             elapsed = time.monotonic() - started
             result["rounds"]["first"] = summarize_turn(session, 0)
             result["rounds"]["first"]["elapsedSeconds"] = round(elapsed, 3)
-            # The endpoint held its first answer back; the turn must still finish.
-            if endpoint.silent_observed < SILENT_SECONDS:
-                fail("CODEX_GATE_SILENCE_NOT_OBSERVED",
-                     "the fake endpoint never applied the silent first answer")
-            if elapsed < SILENT_SECONDS:
-                fail("CODEX_GATE_TURN_FASTER_THAN_SILENCE",
-                     "the first turn completed before the endpoint's silent window ended")
+            if live:
+                # The silent window is a property of the fake endpoint, so it is
+                # not observed live; what the real round shows instead is that
+                # the answer the user asked for actually came back.
+                answer = "".join(result["rounds"]["first"]["deltaText"])
+                if NONCE_ROUND_1 not in answer:
+                    fail("CODEX_GATE_FIRST_ROUND_ANSWER_MISSING",
+                         f"the live first answer did not recall the nonce: {answer[:200]!r}")
+                result["silenceObservation"] = {
+                    "observed": False, "mode": "live",
+                    "reason": "holding an answer back is a property of the fake endpoint",
+                    "nonceRecalledLive": True, "answerChars": len(answer),
+                }
+            else:
+                # The endpoint held its first answer back; the turn must still finish.
+                if endpoint.silent_observed < SILENT_SECONDS:
+                    fail("CODEX_GATE_SILENCE_NOT_OBSERVED",
+                         "the fake endpoint never applied the silent first answer")
+                if elapsed < SILENT_SECONDS:
+                    fail("CODEX_GATE_TURN_FASTER_THAN_SILENCE",
+                         "the first turn completed before the endpoint's silent window ended")
             result["sessionId"] = session_id
             native_id = session["checkpoint"]["native_id"] if session["checkpoint"] else None
             if not native_id:
@@ -1374,27 +1463,64 @@ def run_chain(temporary, workspace, worker, artifact, digest, endpoint, producti
                 fail("CODEX_GATE_NATIVE_ID_CHANGED", "the second round did not keep the native session id")
             result["checkpointNativeIdStable"] = True
 
-            result["providerRequestShape"] = provider_request_shape(endpoint, result["rounds"])
+            if live:
+                # The live witness for "the second round carries the first
+                # round's context" is the answer itself: only a request that
+                # carried round one's nonce can have recalled it.
+                recalled = "".join(result["rounds"]["second"]["deltaText"])
+                if NONCE_ROUND_1 not in recalled:
+                    fail("CODEX_GATE_SECOND_ROUND_CONTEXT_MISSING",
+                         "the live second answer did not recall the round-one nonce: "
+                         f"{recalled[:200]!r}")
+                result["providerRequestShape"] = {
+                    "observed": False, "mode": "live",
+                    "reason": "request bodies are not visible without the fake endpoint",
+                    "secondRoundContextEvidence": "the live second answer recalled the "
+                                                  "round-one nonce",
+                    "secondRoundNonceRecalled": True,
+                }
+            else:
+                result["providerRequestShape"] = provider_request_shape(endpoint, result["rounds"])
             REPORT["providerRequestShape"] = result["providerRequestShape"]
             result["unknownModel"] = run_unknown_model(
                 client, runtime, workspace, opened, production, endpoint, credential_id)
             REPORT["unknownModel"] = result["unknownModel"]
-            result["cancel"] = run_cancel_round(
-                client, runtime, opened, endpoint, credential_id, production)
+            result["cancel"] = (
+                run_cancel_round_live(client, runtime, opened, credential_id, production)
+                if live else
+                run_cancel_round(client, runtime, opened, endpoint, credential_id, production)
+            )
             REPORT["cancel"] = result["cancel"]
 
             result["credential"] = {
-                "injectedTokenReachedProvider": all(
-                    item["authorizationMatchesInjectedToken"] for item in endpoint.requests
-                ) and bool(endpoint.requests),
-                "unauthorizedRequests": endpoint.unauthorized,
-                "tokenInEvents": FAKE_TOKEN in json.dumps(session["events"]),
-                "tokenInReportableState": FAKE_TOKEN in json.dumps(REPORT),
-                "tokenInDeployment": FAKE_TOKEN in deployment.read_text(encoding="utf-8"),
+                "injectedTokenReachedProvider": (
+                    "verified-by-real-answer" if live else
+                    all(item["authorizationMatchesInjectedToken"] for item in endpoint.requests)
+                    and bool(endpoint.requests)
+                ),
+                "unauthorizedRequests": None if live else endpoint.unauthorized,
+                "tokenInEvents": INJECTED_CREDENTIAL.decode(errors="replace")
+                                 in json.dumps(session["events"]),
+                "tokenInReportableState": INJECTED_CREDENTIAL.decode(errors="replace")
+                                         in report_text(),
+                "tokenInDeployment": INJECTED_CREDENTIAL.decode(errors="replace")
+                                     in deployment.read_text(encoding="utf-8"),
                 "tokenInWorkspace": token_in_workspace(workspace),
                 "noCredentialMaterialInProductionConfig": (
-                    FAKE_TOKEN not in production.config_bytes().decode("utf-8")),
+                    INJECTED_CREDENTIAL.decode(errors="replace")
+                    not in production.config_bytes().decode("utf-8")),
             }
+            # The four claims above are assertions, not decoration: a credential
+            # that reached the durable event stream, the deployment document, the
+            # workspace or this report is a failure of the run that produced it.
+            exposed = sorted(key for key, value in result["credential"].items()
+                             if key.startswith("tokenIn") and value is True)
+            if exposed:
+                fail("CODEX_GATE_CREDENTIAL_EXPOSED",
+                     f"the injected credential reached: {exposed}")
+            if not result["credential"]["noCredentialMaterialInProductionConfig"]:
+                fail("CODEX_GATE_TOKEN_IN_PRODUCTION_CONFIG",
+                     "the deployed production configuration carries credential material")
             result["stateScan"] = scan_state(runtime, session, native_id)
             result["deltaAttribution"] = delta_attribution(session)
             return result
@@ -1414,7 +1540,7 @@ def token_in_workspace(workspace: Path) -> bool:
         if not location.is_file():
             continue
         try:
-            if FAKE_TOKEN.encode() in location.read_bytes():
+            if INJECTED_CREDENTIAL in location.read_bytes():
                 return True
         except OSError:
             continue
@@ -1577,14 +1703,20 @@ def run_unknown_model(client, runtime, workspace, opened, production, endpoint, 
         for row in conn.execute("SELECT data_json FROM core_events WHERE type=?",
                                 ("ExecutionDispatchAmbiguous",)):
             reasons.append(json.loads(row["data_json"]).get("error", ""))
-    requests_after = len(endpoint.requests)
-    if requests_after != 2:
+    requests_after = None if endpoint is None else len(endpoint.requests)
+    if requests_after is not None and requests_after != 2:
         fail("CODEX_GATE_UNKNOWN_MODEL_REACHED_PROVIDER",
              f"the refused model produced {requests_after - 2} provider requests")
     return {
         "state": turn["state"],
-        "providerRequestsAfterRefusal": requests_after - 2,
-        "refusedBeforeProviderRequest": requests_after == 2,
+        # Live there is no endpoint to count on, so the positive witness is the
+        # refusal itself: the turn failed with the model-availability reason,
+        # which the bridge raises before it creates any provider request.
+        "providerRequestsAfterRefusal": (
+            None if requests_after is None else requests_after - 2),
+        "refusedBeforeProviderRequest": (
+            None if requests_after is None else requests_after == 2),
+        "refusalCounted": requests_after is not None,
         "reasonMentionsModel": any("Harness model is not available" in reason for reason in reasons),
         "reasons": [reason[:200] for reason in reasons[-2:]],
     }
@@ -1667,6 +1799,102 @@ def run_cancel_round(client, runtime, opened, endpoint, credential_id, productio
     }
 
 
+def run_cancel_round_live(client, runtime, opened, credential_id, production) -> dict:
+    """Cancel a live turn while its answer is still streaming.
+
+    The no-model gate holds provider request three open, which is what makes
+    "the cancel, and nothing else, ended this turn" exact. Live there is no held
+    request to point at, so the in-flight window is established from the
+    Server's own records instead: the turn must already have streamed at least
+    one delta (the real provider is answering) and must not be terminal, and the
+    cancel must then end it as `cancelled` within the bound below. The prompt
+    asks for a long answer precisely so that the streamed window is wide enough
+    for the cancel to land inside it.
+    """
+    profile = client.post("/api/v1/profiles", headers={
+        "Authorization": f"Bearer {runtime.token}",
+        "Idempotency-Key": "codex-gate-cancel-profile",
+    }, json={"name": "Codex cancel gate", "harness_type": "codex",
+             "configuration": {}, "credential_id": credential_id}).json()
+    provider = wire_post(client, runtime.token, "providerModels.create", {
+        "requestId": "codex-gate-cancel-provider", "displayName": "DeepSeek official",
+        "harness": "codex", "provider": production.PROVIDER_ID, "credentialId": credential_id,
+        "configuration": [], "models": [{
+            "modelId": production.PRODUCT_MODEL_ID, "displayName": "DeepSeek Flash",
+            "availability": "available", "unavailableReason": None,
+        }],
+    })["providerModel"]
+    configured = wire_post(client, runtime.token, "profiles.updateConfig", {
+        "requestId": "codex-gate-cancel-config", "profileId": profile["profile_id"],
+        "expectedVersion": profile_version(client, runtime, profile["profile_id"]),
+        "values": [{"controlId": "model", "value": {
+            "providerId": provider["id"], "modelId": production.PRODUCT_MODEL_ID,
+        }}],
+    })["profile"]
+    configured_version = int(configured["version"])
+    sent = wire_post(client, runtime.token, "sessions.createAndSend", {
+        "requestId": "codex-gate-cancel-session", "workspaceId": opened["id"],
+        "profileId": configured["id"], "overrides": [],
+        "message": {"text": "Count from one to four hundred, one number per line.",
+                    "attachments": []},
+    })
+    session_id = sent["session"]["id"]
+
+    def streamed_deltas() -> int:
+        current = runtime.repository.get_session(session_id)
+        if not current["turns"]:
+            return 0
+        turn_id = current["turns"][0]["id"]
+        return sum(1 for event in current["events"]
+                   if event["kind"] == "message.delta" and event.get("turn_id") == turn_id)
+
+    deadline = time.monotonic() + LIVE_CANCEL_STREAM_SECONDS
+    deltas = 0
+    while time.monotonic() < deadline:
+        session = runtime.repository.get_session(session_id)
+        if session["turns"] and session["turns"][0]["state"] in {"failed", "cancelled", "completed"}:
+            REPORT["diagnostics"] = turn_diagnostics(runtime, session, 0)
+            fail("CODEX_GATE_CANCEL_ROUND_EARLY_FAILURE",
+                 f"the live cancel round ended as {session['turns'][0]['state']!r} "
+                 "before the cancel was issued")
+        deltas = streamed_deltas()
+        if deltas:
+            break
+        time.sleep(0.05)
+    if not deltas:
+        fail("CODEX_GATE_CANCEL_STREAM_NOT_OBSERVED",
+             "the live turn never streamed a delta, so no in-flight cancel window was reached")
+    session = runtime.repository.get_session(session_id)
+    turn_id = session["turns"][0]["id"]
+    started = time.monotonic()
+    response = client.post(f"/api/v1/turns/{turn_id}/cancel", headers={
+        "Authorization": f"Bearer {runtime.token}", "Idempotency-Key": "codex-gate-cancel",
+    }, json={})
+    requested = response.status_code
+    session = wait_for_terminal(runtime, session_id, 0, timeout=LIVE_CANCEL_TERMINAL_SECONDS)
+    elapsed = time.monotonic() - started
+    turn = session["turns"][0]
+    if turn["state"] != "cancelled":
+        REPORT["diagnostics"] = turn_diagnostics(runtime, session, 0)
+        fail("CODEX_GATE_CANCEL_NOT_HONOURED",
+             f"the live cancelled turn ended as {turn['state']!r}")
+    if elapsed > LIVE_CANCEL_SECONDS:
+        fail("CODEX_GATE_CANCEL_TOO_SLOW",
+             f"the live cancel took {elapsed:.1f}s, past the {LIVE_CANCEL_SECONDS:.0f}s bound")
+    return {
+        "cancelStatus": requested,
+        "turnState": turn["state"],
+        "elapsedSeconds": round(elapsed, 3),
+        "deltasBeforeCancel": deltas,
+        "providerRequestsBeforeCancel": None,
+        "providerRequestCountObserved": False,
+        "cancelWindow": "the turn was already streaming its real answer when the cancel was sent",
+        "profileVersionUsed": configured_version,
+        "cleanupState": turn.get("cleanup_state"),
+        "captureState": turn.get("capture_state"),
+    }
+
+
 def scan_state(runtime, session: dict, native_id: str) -> dict:
     """The credential must not appear in any captured native state."""
     checkpoint = json.loads(runtime.objects.read(session["checkpoint"]["object_digest"]))
@@ -1675,7 +1903,7 @@ def scan_state(runtime, session: dict, native_id: str) -> dict:
     for item in checkpoint.get("files", []):
         content = runtime.objects.read(item["digest"])
         total += len(content)
-        if FAKE_TOKEN.encode() in content:
+        if INJECTED_CREDENTIAL in content:
             hits.append(item["path"])
     # Structured, never a bare escape: the credential fact is recorded here and
     # the one verdict entry point turns it into CODEX_GATE_CREDENTIAL_IN_NATIVE_STATE,
@@ -1907,7 +2135,7 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production, t
                 workspace={"distribution": "Ubuntu", "remote_user": os.environ["USER"],
                            "connection_id": "connection-codex-reopen",
                            "remote_path": str(workspace)},
-                bundle=bundle, credential=FAKE_TOKEN.encode(),
+                bundle=bundle, credential=INJECTED_CREDENTIAL,
                 runtime_artifact_authorizations=({
                     "path": str(artifact), "target": production.ARTIFACT_TARGET,
                     "digest": digest},),
@@ -1964,7 +2192,8 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production, t
             finally:
                 second.stop()
         finally:
-            endpoint.stop()
+            if endpoint is not None:
+                endpoint.stop()
     finally:
         endpoint.stop()
 
@@ -1999,7 +2228,7 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production, t
     # returned, scanned for the injected token, bound to the native id it
     # reopened. It is what lets the reopen phase be judged on the same footing
     # as the turn chain even after its view is reclaimed.
-    token = FAKE_TOKEN.encode()
+    token = INJECTED_CREDENTIAL
     captured = {**state, **{f"round2/{key}": value for key, value in reopened_state.items()}}
     captured_hits = [relative for relative, content in captured.items() if token in content]
     capture_evidence = {
@@ -2021,7 +2250,15 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production, t
         "nativeReopenMethod": reopen_method,
         "chunksDuringReopen": during_reopen[:8],
         "chunksAfterReopenPrompt": after_prompt[:8],
+        # This phase always drives its own loopback endpoint: it is a mechanism
+        # audit (which ACP method reopens, what the child processes inherit),
+        # not a model call. In live mode the run's real continuation evidence is
+        # the turn chain's second round, which kept this native id and recalled
+        # round one's nonce.
         "providerRequests": len(answered),
+        "providerEndpoint": "loopback-mechanism-audit",
+        "providerEndpointMode": "live" if LIVE_MODE else "loopback-fake-endpoint",
+        "providerRequestsAreModelCalls": False,
         "secondRunCarriesRoundOneContext": context_in_second,
         "processEvidence": {
             "adapterEnvironment": start.get("environment"),
@@ -2084,7 +2321,7 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production, t
                for item in result["processEvidence"]["appServerChildren"]):
         fail("CODEX_GATE_APPSERVER_ENVIRONMENT_MISMATCH",
              "the app-server child did not inherit the adapter's CODEX_HOME")
-    if FAKE_TOKEN in json.dumps(result):
+    if INJECTED_CREDENTIAL.decode(errors="replace") in json.dumps(result):
         fail("CODEX_GATE_TOKEN_IN_AUDIT", "the credential reached the guest-side audit")
     return result
 
@@ -2273,7 +2510,7 @@ def settle_after_attempt(watcher: "StateSymlinkWatcher", temporary: Path,
     # *before* the settled scan - and that scan is a fresh scanner, so no state
     # is shared with the thread.
     watcher.stop()
-    scanner = CredentialStateScanner(watcher.worker_root, FAKE_TOKEN.encode())
+    scanner = CredentialStateScanner(watcher.worker_root, INJECTED_CREDENTIAL)
     summary = scanner.scan()
     reclaimed = not summary.get("viewsOnDisk")
     evidence.update({
@@ -2507,6 +2744,50 @@ def observe_phase(worker_root: Path, temporary: Path, work, *, name: str,
     evidence = normalize_phase(name, settled, phase_watcher, capture_raw, failure)
     evidence["result"] = result
     return evidence
+
+
+def phase_evidence_for_report(evidence: dict) -> dict:
+    """A phase's evidence with its live exception rendered as text.
+
+    The evidence dict carries the exception *object* for the verdict logic; a
+    report is JSON, so the same facts are recorded there as a code/message pair.
+    Without this the report cannot be serialized at all, which would turn any
+    failing phase into a bare traceback and lose the evidence it collected.
+    """
+    recorded = dict(evidence)
+    failure = recorded.get("failure")
+    if failure is not None:
+        recorded["failure"] = {
+            "code": getattr(failure, "code", None) or "CODEX_GATE_UNEXPECTED",
+            "message": getattr(failure, "message", None)
+                       or f"{type(failure).__name__}: {failure}",
+        }
+        recorded["failed"] = True
+    return recorded
+
+
+def unserializable_value(value):
+    """The last resort for a report value that is not JSON.
+
+    Every evidence field is meant to be JSON already and a phase failure is
+    converted where it is stored, so reaching this hook is itself a defect. It
+    still exits as a labelled entry plus a note on stderr rather than a
+    traceback, because the report *is* the evidence of a failing run.
+    """
+    print(f"warning: non-JSON report value {type(value).__name__}: {value!r}"[:400],
+          file=sys.stderr)
+    return {"unserializable": type(value).__name__, "text": str(value)[:300]}
+
+
+def report_text() -> str:
+    """The report so far as text, for the "did the credential reach it" check.
+
+    Mid-run the report holds no exception objects, but this must never be the
+    call that ends a run: an unrenderable value becomes a placeholder string, so
+    the credential question is still answered rather than replaced by a crash.
+    """
+    return json.dumps(REPORT, sort_keys=True,
+                      default=lambda value: f"<unserializable {type(value).__name__}>")
 
 
 def merge_phase_evidence(phases: list[dict]) -> dict:

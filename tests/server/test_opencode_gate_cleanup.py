@@ -66,7 +66,12 @@ def stub_gate(gate, monkeypatch, *, failure=None, chain_audit=True, retry_attemp
         report["egressGuard"] = {"compiledAt": str(guard), "sha256": "sha256:stub"}
         return guard
 
-    def run_chain(temporary, workspace, worker, authorization, endpoint, production, token_path, guard):
+    def run_chain(temporary, workspace, worker, authorization, endpoint, production, token_path,
+                  guard, *, live=False):
+        # The gate passes its live/no-model switch to the chain. The stub answers
+        # the same evidence either way; live mode itself is covered by the real
+        # gate runs, not by this cleanup contract.
+        del live
         if failure is not None:
             raise gate.GateFailure(*failure)
         if chain_audit:

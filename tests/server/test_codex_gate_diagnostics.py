@@ -577,3 +577,54 @@ def test_a_token_in_state_capture_makes_the_phase_a_credential_failure(tmp_path)
     finalized = module.turn_chain_phase(report, phase)
     failure = module.resolve_run_failure(report, [finalized])
     assert failure is not None and failure.code == "CODEX_GATE_CREDENTIAL_IN_NATIVE_STATE"
+
+
+def test_a_failed_phase_is_serializable_where_the_report_needs_it(tmp_path):
+    """A phase carries its live exception for the verdict; the report needs text.
+
+    The first live Codex run died while printing its own report - an
+    `AttributeError` from a phase had been stored under `settledWindow` - which
+    replaced every fact the run had collected with a traceback. The exception is
+    still kept for the verdict, and the same facts are recorded as code/message.
+    """
+    import json
+
+    module = load_gate()
+    phase = module.normalize_phase("turn-chain", {
+        "harnessExited": True, "settledComplete": True, "settledCycles": 1,
+        "settledScan": "view", "settledIncomplete": None}, _watcher(tmp_path))
+    phase["failure"] = AttributeError("'NoneType' object has no attribute 'requests'")
+    recorded = module.phase_evidence_for_report(phase)
+    text = json.dumps(recorded, sort_keys=True)
+    assert "'NoneType' object has no attribute" in text
+    assert recorded["failure"]["code"] == "CODEX_GATE_UNEXPECTED"
+    assert recorded["failed"] is True
+    # The verdict still sees the object itself, never its rendering.
+    assert isinstance(phase["failure"], AttributeError)
+
+    typed = dict(phase, failure=module.GateFailure("CODEX_GATE_TURN_FAILED", "the turn failed"))
+    assert module.phase_evidence_for_report(typed)["failure"] == {
+        "code": "CODEX_GATE_TURN_FAILED", "message": "the turn failed"}
+
+
+def test_the_credential_check_never_ends_a_run_by_itself():
+    """`tokenInReportableState` dumps the report; an unrenderable value there
+    would turn the credential question into a crash, so it renders a placeholder."""
+    import json
+
+    module = load_gate()
+    module.REPORT.clear()
+    module.REPORT["rounds"] = {"first": {"state": "completed"}}
+    module.REPORT["leakedObject"] = object()
+    text = module.report_text()
+    assert "unserializable object" in text
+    assert json.loads(text)["rounds"]["first"]["state"] == "completed"
+
+
+def _watcher(tmp_path):
+    root = tmp_path / "worker-root"
+    root.mkdir(parents=True, exist_ok=True)
+    module = load_gate()
+    watcher = module.StateSymlinkWatcher(root)
+    watcher.stopped_cleanly = True
+    return watcher
