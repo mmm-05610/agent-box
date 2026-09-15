@@ -124,7 +124,7 @@ Reviewer `CHANGES_REQUIRED` 的修复（§2.1/§7.1）落地后重建
 | Codex（c8，默认模式）【历史快照：现行状态见 §4.4 的红绿间歇】 | 当轮 10 轮 exit 0（`…_GATE_OK`）+ 2 轮失败（见下，均已第一手定位） |
 | Windows r4（c8） | exit 0，`BACKEND_41_E_WINDOWS_WSL_WIRE_OK`，`worker_digest=sha256:514f48a9…`，`tree_terminate`、`session/new→session/resume`、delta 9 < completed 12、8 秒静默默认租约 `elapsed_ms=8817` 完成 |
 | 独立 PostCheck（c8 实例） | exit 0，`…_POSTCHECK_CLEAN`（DataRoot/workspace/端口 18746/进程/view 全空） |
-| Python 全量 | **820 passed / 4 skipped / 0 failed**（gate 诊断当时 5 例、并例后现行 3 例；+8：边界改约 6、既有微调；4 项既有 skip 未扩大） |
+| Python 全量【历史值，已被 843/6 取代】 | **820 passed / 4 skipped / 0 failed**（gate 诊断当时 5 例；+8：边界改约 6、既有微调；4 项既有 skip 未扩大） |
 | Rust | fmt 干净；`cargo test --locked --release` **27 passed** |
 
 ### 4.3 两个第一手定位的 Codex 原生行为发现（待用户裁决，未擅自处置）
@@ -161,7 +161,7 @@ Reviewer `CHANGES_REQUIRED` 的修复（§2.1/§7.1）落地后重建
 最终复跑（Worker 源自 c8 构建后未再变，`git diff <fix-commit> -- workers/` 为空，c8 摘要
 仍为现行 bundle；c4–c7 未覆盖）：runtime-artifact/Pi/Hermes/OpenCode **exit 0**；Windows r4
 （c8）**exit 0** + 独立 `-PostCheck…CLEAN`（本次 fresh 实例核对）；Python 全量
-**820 passed / 4 skipped / 0 failed**（现行；中间计数 822 与更早 812/22 均已日期化取代）；Rust fmt 干净 +
+**820 passed / 4 skipped / 0 failed**【历史值，已被 843/6 取代】（更早 812/22 亦已取代）；Rust fmt 干净 +
 `cargo test --locked --release` **27 passed**；`git diff --check` 通过。
 **Codex 门现行状态：未解决的红绿间歇**——`.tmp/plugins` 突发间歇性重叠捕获：2026-09-15
 晚间连续 5 轮红（峰值恰 5529 → 确定性 `VIEW_FILE_LIMIT`）；alias 诊断非因果化修复提交后
@@ -212,7 +212,7 @@ Reviewer `CHANGES_REQUIRED` 的修复（§2.1/§7.1）落地后重建
 | Codex（遮蔽模式，最终版） | `…/codex-production-chain-gate.py --worker <c8> --json` | exit 0，`CODEX_PRODUCTION_CHAIN_GATE_OK`，view 峰值 112、`tokenInState=false`、`credentialPathHits=0`；观察器判据：`cyclesCompleted≈224`、`filesObserved≈83`、`incomplete=null`（连续 3 轮） |
 | Windows r4 | `accept-e.ps1 … -Port 18746 -Cleanup`（c8，`worker_digest=sha256:514f48a9…`） | exit 0，`BACKEND_41_E_WINDOWS_WSL_WIRE_OK` |
 | 独立 PostCheck | 同参数 `-PostCheck -InstanceId <两实例>` | exit 0，`BACKEND_41_E_WINDOWS_POSTCHECK_CLEAN` |
-| Python 全量 | `PYTHONPATH=src + 全部 plugins/*/src python3 -m pytest -q tests <插件 tests>` | **843 passed / 6 skipped / 0 failed**（现行；旧计数已被取代） |
+| Python 全量 | `PYTHONPATH=src + 全部 plugins/*/src python3 -m pytest -q tests <插件 tests>` | **845 passed / 6 skipped / 0 failed**（现行；本表其余计数均为该表形成时的历史值） |
 | Rust | `cargo fmt --check` + `cargo test --locked --release` | fmt 干净；27 passed |
 
 skip 说明：6 项均为既有平台/环境条件项（不含本轮新增测试）。清理：门临时根与
@@ -234,10 +234,11 @@ fail-closed 判据）；Worker 源自 c8 构建后未变（`git diff -- workers/
 两者已加入受审配置 `deploy/codex/config.toml`（`[features]` 置于顶层键之后、
 `[model_providers.deepseek]` 之前；`OFFICIAL_FEATURE_FLAGS_OFF` 常量 + 模板测试锁定）。
 
-**验证（决定性对照）**：在 **完全关闭 tmpfs 遮蔽** 的 `--legacy-state-diagnostic` 轮内，
-`codex-production-chain-gate.py` exit 0、view 峰值 112、`credentialPathHits=[]`、
-settled 183 轮，且保留根中 `shell_snapshots/` 与 `.tmp/` **目录均不存在**——
-两个问题在源头消失，不再是"靠遮蔽藏起来"。遮蔽机制（§4.5）保留为纵深防御。
+**验证（无遮蔽对照，历史记录）**：在 **完全关闭 tmpfs 遮蔽** 的 `--legacy-state-diagnostic`
+轮内，`codex-production-chain-gate.py` exit 0、view 峰值 112、`credentialPathHits=[]`，且保留根中
+`shell_snapshots/` 与 `.tmp/` 目录均不存在。**该轮的准确含义**：这两个目录在该轮没有出现；
+`shell_snapshot` 的因果此后由 §4.9 的逐变量差分证明，`plugins` 的因果仍未复现
+（见 §4.8 的"控制腿六轮未复现"与 §4.9 的逐变量结论）。遮蔽机制（§4.5）保留为纵深防御。
 
 ## 4.8 第十九轮：settled 窗口按裁决 A 的原文重做 + 官方 flags 差分（含如实结论）
 
@@ -293,6 +294,25 @@ settled 扫描各持一个实例，零共享可变状态）；`settle_after_atte
 adapter 并注入同一 token，之前不在判据内）；reclaimed view 的 fallback 必须消费**结构化
 capture 证据**（`stateScan` 存在、无 token、native id 绑定、各轮 capture completed），
 否则 `CODEX_GATE_STATE_SCAN_INCOMPLETE`。
+
+## 4.10 第二轮合并修复（第 20 轮 8 项）与两阶段独立证据
+
+- `CredentialStateScanner.scan()` 的完整性现在要求**至少扫描到一个目标 view**：空 `views/`、
+  候选 view 全部消失都不得冒充完整 settled 扫描，必须回落到 capture 证据。
+- 阶段化：`observe_phase()` 每阶段独立（自己的 watcher/scanner + 退出后 settled 扫描），
+  **不再抛异常**，而是返回 `{result, evidence, failure}`；`observe_reopen()` 现在把
+  `capture_execution` 返回的字节做**本阶段自己的** token 扫描与 native id 绑定
+  （`captureEvidence`）；`resolve_run_failure()` 先聚合**两阶段**再算一次判据，
+  **凭据命中优先**，链路/reopen 异常随后作为 `secondaryFailure` 结构化保留。
+- `merge_phase_evidence()` 逐阶段判定完整性：每阶段要么有完整 settled view 扫描，要么有
+  **它自己的** capture 证据；任一阶段两者皆无即 `CODEX_GATE_STATE_SCAN_INCOMPLETE`。
+- 进程身份：`process_table()` 读 `ps -eo pid=,lstart=,args=`，身份 = **(pid, 启动时间) + 本轮根**；
+  改名后代仍被匹配（根字符串），无关 Codex 实例既不被匹配也不会阻塞；watcher 记录
+  `harness_identities`，退出判定要求这些身份**全部消失**。
+- 差分支持**逐变量**（`--strip shell_snapshot`）：只关 `shell_snapshot`（`plugins` 保持默认）
+  控制腿 2 处凭据命中、处理腿零命中 → 因果归属于该单一变量。
+- 真机两轮（本 HEAD）：`phases=2`、逐阶段 capture 证据（turn-chain 76–78 文件、
+  reopen 77 文件 / 2.66 MB，均 `nativeSessionId=true`、零命中）、门 exit 0。
 
 ## 5. 全量验证与清理
 

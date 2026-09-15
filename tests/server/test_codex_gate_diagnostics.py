@@ -237,9 +237,12 @@ def test_the_settled_window_opens_only_after_the_harness_exited(tmp_path):
     (state / "state.db").write_text("clean", encoding="utf-8")
     watcher = module.StateSymlinkWatcher(root)
 
-    module_harness = module.harness_processes
+    module_harness = module.matching_processes
     try:
-        module.harness_processes = lambda temporary: ["1234 /artifact/app-server"]
+        module.matching_processes = lambda temporary, rows=None: [
+            {"pid": 4242, "started": "Mon Sep 15 10:00:00 2026",
+             "args": f"/usr/bin/bwrap {root}/app-server"}]
+        watcher.harness_identities = [(4242, "Mon Sep 15 10:00:00 2026")]
         evidence = module.settle_after_attempt(watcher, root, timeout_s=0.2, interval_s=0.05)
         assert evidence["harnessExited"] is False
         verdict, detail = module.credential_scan_verdict(
@@ -247,7 +250,7 @@ def test_the_settled_window_opens_only_after_the_harness_exited(tmp_path):
             evidence["harnessExited"], None, {"stateScan": None})
         assert verdict == "CODEX_GATE_STATE_SCAN_INCOMPLETE", detail
 
-        module.harness_processes = lambda temporary: []
+        module.matching_processes = lambda temporary, rows=None: []
         watcher.start()
         evidence = module.settle_after_attempt(watcher, root, timeout_s=0.2, interval_s=0.05)
         assert evidence["harnessExited"] is True
@@ -269,46 +272,81 @@ def test_the_settled_window_opens_only_after_the_harness_exited(tmp_path):
             True, evidence.get("settledIncomplete"))
         assert verdict == "CODEX_GATE_STATE_SCAN_INCOMPLETE"
     finally:
-        module.harness_processes = module_harness
+        module.matching_processes = module_harness
 
 
 def test_resolve_run_failure_drives_the_real_control_flow(tmp_path):
-    """The post-run decision reads every phase's own scanner and settled window:
-    a hit from the reopen phase fails as hard as one from the turn chain, and a
-    reclaimed view with no usable capture evidence fails closed."""
+    """The post-run decision reads every phase's own scanner, settled scan and
+    capture evidence: a hit from the reopen phase fails as hard as one from the
+    turn chain, and a phase with neither a settled view nor capture evidence
+    fails closed - whatever the other phase did."""
     module = load_gate()
     root = tmp_path / "worker-root"
     state = root / "views" / "view-1" / "ready" / "agentbox-sidecar" / "deployment" / "codex" / "native-state"
     state.mkdir(parents=True)
     (state / "state.db").write_text("clean", encoding="utf-8")
 
-    def phase_evidence(**overrides):
-        evidence = {"harnessExited": True, "settledComplete": True, "settledCycles": 1,
-                    "settledScan": "view", "settledIncomplete": None, "hits": [],
-                    "races": [], "incompleteEvents": [], "scanError": None,
-                    "stoppedCleanly": True, "filesObserved": 1, "cyclesCompleted": 1}
+    def phase(name: str, **overrides) -> dict:
+        evidence = {"phase": name, "harnessExited": True, "settledComplete": True,
+                    "settledCycles": 1, "settledScan": "view", "settledIncomplete": None,
+                    "hits": [], "races": [], "incompleteEvents": [], "scanError": None,
+                    "stoppedCleanly": True, "filesObserved": 1, "cyclesCompleted": 1,
+                    "captureEvidence": None}
         evidence.update(overrides)
         return evidence
 
-    watcher = module.StateSymlinkWatcher(root)
-    watcher.stopped_cleanly = True
-    report = {"stateScan": {"files": 3, "tokenInState": False, "nativeSessionId": True},
-              "rounds": {"first": {"state": "completed"}}}
-    assert module.resolve_run_failure(report, phase_evidence(), watcher) is None
+    # Both phases settled in a view: clean.
+    assert module.resolve_run_failure({}, [phase("turn-chain"), phase("reopen")]) is None
 
-    hit_phase = phase_evidence(hits=[{"path": "native-state/shell_snapshots/x.sh",
-                                      "phase": "during-run"}])
-    failure = module.resolve_run_failure(report, phase_evidence(), watcher, hit_phase)
+    # A phase with no settled view but its own capture evidence: clean.
+    capture = {"files": 3, "bytes": 10, "tokenHits": [], "nativeSessionId": True}
+    assert module.resolve_run_failure(
+        {}, [phase("turn-chain", settledComplete=False, settledCycles=0,
+                   captureEvidence=capture), phase("reopen")]) is None
+
+    # A phase with neither: incomplete, even though the other phase settled.
+    failure = module.resolve_run_failure(
+        {}, [phase("turn-chain", settledComplete=False, settledCycles=0),
+             phase("reopen")])
+    assert failure is not None and failure.code == "CODEX_GATE_STATE_SCAN_INCOMPLETE"
+
+    # A hit from the reopen phase (active or settled) is the primary failure.
+    hit_phase = phase("reopen", hits=[{"path": "native-state/shell_snapshots/x.sh",
+                                       "phase": "settled"}])
+    report: dict = {}
+    failure = module.resolve_run_failure(report, [phase("turn-chain"), hit_phase])
     assert failure is not None and failure.code == "CODEX_GATE_CREDENTIAL_IN_NATIVE_STATE"
     assert report["credentialPathHits"]
 
-    alive = module.resolve_run_failure(report, phase_evidence(harnessExited=False), watcher)
+    # The harness still alive in any phase fails closed.
+    alive = module.resolve_run_failure({}, [phase("turn-chain", harnessExited=False)])
     assert alive is not None and alive.code == "CODEX_GATE_STATE_SCAN_INCOMPLETE"
 
-    reclaimed = module.resolve_run_failure(
-        {"stateScan": None, "rounds": {}},
-        phase_evidence(settledComplete=False, settledCycles=0), watcher)
-    assert reclaimed is not None and reclaimed.code == "CODEX_GATE_STATE_SCAN_INCOMPLETE"
+
+def test_the_reopen_capture_evidence_is_bound_and_scanned():
+    """The reopen phase's evidence is its own captured bytes, scanned for the
+    injected token and bound to the native id it reopened."""
+    module = load_gate()
+    ok, reason = module.capture_evidence_for_phase({
+        "phase": "reopen",
+        "captureEvidence": {"files": 2, "bytes": 4, "tokenHits": [],
+                            "nativeSessionId": True},
+    })
+    assert ok and not reason
+    bad, reason = module.capture_evidence_for_phase({
+        "phase": "reopen",
+        "captureEvidence": {"files": 2, "bytes": 4, "tokenHits": ["state.db"],
+                            "nativeSessionId": True},
+    })
+    assert not bad and "credential" in reason
+    unbound, reason = module.capture_evidence_for_phase({
+        "phase": "reopen",
+        "captureEvidence": {"files": 2, "bytes": 4, "tokenHits": [],
+                            "nativeSessionId": False},
+    })
+    assert not unbound and "bound" in reason
+    missing, reason = module.capture_evidence_for_phase({"phase": "reopen"})
+    assert not missing and "capture evidence" in reason
 
 
 def test_a_credential_hit_outranks_a_chain_failure(tmp_path):
@@ -322,16 +360,41 @@ def test_a_credential_hit_outranks_a_chain_failure(tmp_path):
     summary = module.CredentialStateScanner(root, module.FAKE_TOKEN.encode()).scan()
     assert [hit["path"].rsplit("/", 1)[-1] for hit in summary["hits"]] == ["leak.sh"]
     watcher = module.StateSymlinkWatcher(root)
-    watcher.stopped_clearly = True
     watcher.stopped_cleanly = True
+    # What the observer would have accumulated from its own scanner:
+    watcher.token_hits = list(summary["hits"])
     settled = {"harnessExited": True, "settledComplete": True, "settledCycles": 1,
                "settledIncomplete": None, "settledScan": "view"}
-    hit_phase = {"harnessExited": True, "hits": summary["hits"], "races": [],
-                 "incompleteEvents": [], "scanError": None, "stoppedCleanly": True,
-                 "settledComplete": True, "settledCycles": 1, "settledIncomplete": None,
-                 "filesObserved": 1, "cyclesCompleted": 1}
-    failure = module.resolve_run_failure({}, settled, watcher, hit_phase)
+    phase = module.turn_chain_phase({}, settled, watcher)
+    phase["failure"] = module.GateFailure("CODEX_GATE_TURN_FAILED", "the turn failed")
+    failure = module.resolve_run_failure({}, [phase])
     assert failure is not None
     assert failure.code == "CODEX_GATE_CREDENTIAL_IN_NATIVE_STATE"
-    chain_failure = module.GateFailure("CODEX_GATE_TURN_FAILED", "the turn failed")
-    assert chain_failure.code == "CODEX_GATE_TURN_FAILED", "kept as secondary evidence"
+    assert phase["failure"].code == "CODEX_GATE_TURN_FAILED", "kept as secondary evidence"
+
+
+def test_process_identity_binds_this_run_only(tmp_path):
+    """The window waits for *this run's* processes by (pid, start time) and root:
+    an unrelated Codex instance never blocks it, a renamed descendant of this
+    run still does, and a reused pid with a new start time is not the old one."""
+    module = load_gate()
+    root = tmp_path / "worker-root"
+    root.mkdir(parents=True)
+    mine = {"pid": 4242, "started": "Mon Sep 15 10:00:00 2026",
+            "args": f"/usr/bin/bwrap --die-with-parent /runtime/entry.mjs {root}/views/view-1"}
+    renamed = {"pid": 4243, "started": "Mon Sep 15 10:00:01 2026",
+               "args": f"/usr/bin/bwrap renamed-binary --root {root}"}
+    elsewhere = {"pid": 99, "started": "Mon Sep 15 09:00:00 2026",
+                 "args": "/usr/bin/bwrap /other/tmp/agentbox-codex-gate-other/app-server"}
+
+    matched = module.matching_processes(root, [mine, renamed, elsewhere])
+    assert {row["pid"] for row in matched} == {4242, 4243}, matched
+    assert 99 not in {row["pid"] for row in matched}, "an unrelated instance must not block"
+
+    # Seen alive and still in the table: a survivor (and the pid-reuse case is
+    # a different start time, so it is not counted as the old process).
+    monkey_ok = module.matching_processes(root, [mine])
+    assert [row["pid"] for row in monkey_ok] == [4242]
+    assert module._surviving_identities.__module__ == module.__name__
+    # No process carries this root any more: nothing survives.
+    assert module._surviving_identities(root, []) == []

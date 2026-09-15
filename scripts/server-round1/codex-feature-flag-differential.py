@@ -39,11 +39,14 @@ import sys
 GATE = Path(__file__).resolve().parent / "codex-production-chain-gate.py"
 
 
-def run_gate(worker: str, *, control: bool, extra: list[str]) -> dict:
+def run_gate(worker: str, *, control: bool, extra: list[str],
+             strip: str | None = None) -> dict:
     command = [sys.executable, str(GATE), "--worker", worker,
                "--legacy-state-diagnostic", "--json"]
     if control:
         command.append("--feature-flag-control-leg")
+    if strip:
+        command += ["--strip-flags", strip]
     command += extra
     done = subprocess.run(command, capture_output=True, text=True, timeout=1800)
     try:
@@ -97,12 +100,18 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--worker", required=True)
     parser.add_argument("--control-runs", type=int, default=5)
+    parser.add_argument(
+        "--strip", default=None,
+        help="comma-separated feature flags the control leg removes from the "
+             "reviewed config; default is the whole [features] table. Passing one "
+             "flag at a time is the per-variable differential.",
+    )
     parser.add_argument("--treatment-runs", type=int, default=2)
     options = parser.parse_args()
 
     control_runs = []
     for _ in range(max(1, options.control_runs)):
-        report = run_gate(options.worker, control=True, extra=[])
+        report = run_gate(options.worker, control=True, extra=[], strip=options.strip)
         control_runs.append({"result": report.get("result"), "exit": report["_exit"],
                              **churn_appeared(report)})
         if control_runs[-1]["appeared"]:
@@ -117,6 +126,7 @@ def main() -> int:
     result, exit_code = classify(control_runs, treatment_runs)
     verdict = {
         "result": result,
+        "strippedFlags": options.strip or "all ([features] table)",
         "controlRuns": control_runs,
         "treatmentRuns": treatment_runs,
         "controlDemonstratedChurn": any(run["appeared"] for run in control_runs),

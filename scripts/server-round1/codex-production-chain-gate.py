@@ -104,6 +104,8 @@ FAKE_TOKEN = "sk-codex-gate-fake-token-4f7ac21d-non-secret"
 LEGACY_STATE_DIAGNOSTIC = False
 #: Set from --official-feature-flags in main(); read by the config builder.
 FEATURE_FLAG_CONTROL = False
+#: Set from --strip-flags: None means the whole [features] table.
+FEATURE_FLAG_STRIP: str | None = None
 #: Credential-path observation budget: a regular file larger than the per-file
 #: cap, or a tree larger than the file-count cap, cannot be claimed as observed
 #: - that marks the scan incomplete instead of "no hit".
@@ -480,6 +482,7 @@ class CredentialStateScanner:
         self.races: list[dict] = []
         self.hits: list[dict] = []
         self.cycles_completed = 0
+        self.targets_scanned = 0
         self.peak_files = 0
         self.peak_directory_counts: list[tuple[str, int]] = []
         self.peak_sample: list[str] = []
@@ -505,8 +508,8 @@ class CredentialStateScanner:
             self.incomplete = None
             return self._summary(views_exist=False)
         views_fd = _open_dir_fd(views)
+        completed_here = 0
         try:
-            completed_here = False
             with os.scandir(f"/proc/self/fd/{views_fd}") as entries:
                 for entry in entries:
                     view_fd = None
@@ -514,7 +517,7 @@ class CredentialStateScanner:
                         view_fd = _open_beneath_fd(views_fd, (entry.name, "ready"), True)
                         self._scan_directory(
                             view_fd, "agentbox-sidecar/deployment/codex/native-state")
-                        completed_here = True
+                        completed_here += 1
                     except FileNotFoundError:
                         continue
                     except OSError as error:
@@ -523,6 +526,7 @@ class CredentialStateScanner:
                     finally:
                         if view_fd is not None:
                             os.close(view_fd)
+            self.targets_scanned = completed_here
             if completed_here and self.cycle_complete:
                 self.cycles_completed += 1
         finally:
@@ -534,7 +538,11 @@ class CredentialStateScanner:
     def _summary(self, *, views_exist: bool, sample_peak: bool = False) -> dict:
         return {
             "viewsOnDisk": views_exist,
-            "complete": self.cycle_complete and views_exist,
+            "targetsScanned": self.targets_scanned,
+            # A pass that scanned no target view proves nothing: an empty
+            # views/ directory (or one whose views all vanished) must fall back
+            # to the capture-boundary evidence instead of counting as complete.
+            "complete": self.cycle_complete and views_exist and self.targets_scanned > 0,
             "cyclesCompleted": self.cycles_completed,
             "files": self.scanned_files,
             "bytes": self.scanned_bytes,
@@ -660,6 +668,8 @@ class StateSymlinkWatcher:
         #: shared between the observer and the synchronous pass.
         self._scanner = CredentialStateScanner(worker_root, FAKE_TOKEN.encode())
         self.harness_seen = False
+        #: (pid, start time) of the Harness processes this run was seen running.
+        self.harness_identities: list[tuple[int, str]] = []
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, daemon=True)
 
@@ -720,8 +730,11 @@ class StateSymlinkWatcher:
                         continue
                 if not self._stop.is_set():
                     self._observe_once(views)
-                if harness_processes(self.worker_root.parent):
+                for row in matching_processes(self.worker_root.parent):
                     self.harness_seen = True
+                    identity = (row["pid"], row["started"])
+                    if identity not in self.harness_identities:
+                        self.harness_identities.append(identity)
             self._stop.wait(self.interval)
 
     def _observe_once(self, views: Path) -> None:
@@ -891,22 +904,34 @@ def verify_artifact(artifact: Path, report: dict) -> str:
 FEATURE_FLAG_CONTROL = False
 
 
-def without_feature_flags(config: bytes) -> bytes:
-    """The same config with the `[features]` table removed (control leg).
+def without_feature_flags(config: bytes, strip: str | None = None) -> bytes:
+    """The same config with `[features]` (or only some of its keys) removed.
+
+    The control leg of the differential. `strip` selects individual flags
+    (`--strip shell_snapshot`), which is how the causal influence of each one is
+    separated; without it the whole table goes.
 
     Only that one table's lines are dropped: every other line - including the
     Profile sentinel comment the guest audit verifies - stays exactly as the
     deployment declared it. What is emitted must parse, so a malformed control
     config can never masquerade as a behaviour difference.
     """
+    keys = {name.strip() for name in (strip or "").split(",") if name.strip()}
     out: list[str] = []
-    skipping = False
+    skipping_table = False
     for line in config.decode("utf-8").splitlines(keepends=True):
         stripped = line.strip()
         if stripped.startswith("[") and stripped.endswith("]"):
-            skipping = stripped == "[features]"
-        if skipping:
-            continue
+            skipping_table = stripped == "[features]"
+            if skipping_table and keys:
+                out.append(line)          # keep the header for a per-key strip
+                continue
+            if skipping_table:
+                continue
+        if skipping_table:
+            if keys and stripped and not stripped.startswith("#"):
+                if stripped.split("=")[0].strip() in keys:
+                    continue
         out.append(line)
     control = "".join(out)
     tomllib.loads(control)
@@ -923,7 +948,7 @@ def loopback_config_bytes(endpoint: FakeEndpoint, production) -> bytes:
     config = production.loopback_config_bytes(endpoint.base_url) + (
         f"{PROFILE_SENTINEL_COMMENT}: {PROFILE_SENTINEL}\n".encode())
     if FEATURE_FLAG_CONTROL:
-        config = without_feature_flags(config)
+        config = without_feature_flags(config, FEATURE_FLAG_STRIP)
     # Whatever this function emits must parse: a duplicated or malformed table
     # would silently change what the guest reads.
     tomllib.loads(config.decode("utf-8"))
@@ -937,6 +962,11 @@ def main() -> int:
     parser.add_argument("--keep", action="store_true")
     parser.add_argument("--json", action="store_true")
     parser.add_argument(
+        "--strip-flags", default=None,
+        help="with --feature-flag-control-leg: strip only these feature keys "
+             "(comma-separated) instead of the whole [features] table",
+    )
+    parser.add_argument(
         "--feature-flag-control-leg", action="store_true",
         help="strip the reviewed [features] block from the loopback config, i.e. "
              "run with Codex's shipped defaults (control leg of the differential; "
@@ -949,9 +979,10 @@ def main() -> int:
              "fake token (no-model, fake-token only; never with a real key)",
     )
     options = parser.parse_args()
-    global LEGACY_STATE_DIAGNOSTIC, FEATURE_FLAG_CONTROL
+    global LEGACY_STATE_DIAGNOSTIC, FEATURE_FLAG_CONTROL, FEATURE_FLAG_STRIP
     LEGACY_STATE_DIAGNOSTIC = bool(options.legacy_state_diagnostic)
     FEATURE_FLAG_CONTROL = bool(options.feature_flag_control_leg)
+    FEATURE_FLAG_STRIP = options.strip_flags
 
     endpoint: FakeEndpoint | None = None
     created: Path | None = None
@@ -1107,27 +1138,38 @@ def main() -> int:
             }
         REPORT.update(outcome)
         REPORT["settledWindow"] = settled_window
+        # The reopen observation starts the adapter twice more with the same
+        # injected token, so it runs as its own phase with its own observer and
+        # its own settled scan; its failure is held, not raised, because the
+        # credential verdict must be computed over every phase first.
+        reopen_evidence = observe_phase(
+            temporary / "worker-root", temporary,
+            lambda: observe_reopen(temporary, workspace, worker, artifact, digest,
+                                   production, token_path, host_home),
+            name="reopen",
+        )
+        REPORT["reopenObservation"] = reopen_evidence.get("result")
+        chain_phase = turn_chain_phase(REPORT, settled_window, watcher)
+        chain_phase["failure"] = chain_failure
+        failure = resolve_run_failure(REPORT, [chain_phase, reopen_evidence])
+        if failure is not None:
+            secondary = chain_failure or reopen_evidence.get("failure")
+            if secondary is not None:
+                REPORT["secondaryFailure"] = {
+                    "code": getattr(secondary, "code", None) or "CODEX_GATE_UNEXPECTED",
+                    "message": getattr(secondary, "message", None) or str(secondary),
+                }
+            raise failure
         if chain_failure is not None:
             raise chain_failure
+        if reopen_evidence.get("failure") is not None:
+            raise reopen_evidence["failure"]
         if endpoint.over_budget:
             fail("CODEX_GATE_EXTRA_PROVIDER_REQUEST",
                  f"{endpoint.over_budget} provider requests exceeded the phase budget")
         if endpoint.unauthorized:
             fail("CODEX_GATE_UNAUTHORIZED_PROVIDER_REQUEST",
                  f"{endpoint.unauthorized} provider requests did not carry the injected token")
-
-        # The reopen observation starts the adapter twice more with the same
-        # injected token, so it is observed as its own phase: a credential it
-        # writes to native state is judged by the same final verdict.
-        reopen_result, reopen_evidence = observe_phase(
-            temporary / "worker-root", temporary,
-            lambda: observe_reopen(temporary, workspace, worker, artifact, digest,
-                                   production, token_path, host_home),
-        )
-        REPORT["reopenObservation"] = reopen_result
-        failure = resolve_run_failure(REPORT, settled_window, watcher, reopen_evidence)
-        if failure is not None:
-            raise failure
         cleanup_check(temporary, workspace, token_path)
         REPORT["result"] = "CODEX_PRODUCTION_CHAIN_GATE_OK"
     except GateFailure as failure:
@@ -1925,9 +1967,22 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production, t
             for entry in item["structure"]["input"])
         for item in answered[-1:])
 
+    # This phase's own capture-boundary evidence: the bytes capture_execution
+    # returned, scanned for the injected token, bound to the native id it
+    # reopened. It is what lets the reopen phase be judged on the same footing
+    # as the turn chain even after its view is reclaimed.
+    token = FAKE_TOKEN.encode()
+    captured_hits = [relative for relative, content in state.items() if token in content]
+    capture_evidence = {
+        "files": len(state),
+        "bytes": sum(len(content) for content in state.values()),
+        "tokenHits": captured_hits,
+        "nativeSessionId": bool(state) and reopened == native,
+    }
     result = {
         "nativeSessionIdStable": reopened == native,
         "stateFiles": len(state), "stateResumable": bool(resumable),
+        "captureEvidence": capture_evidence,
         "acpMethodsFirstRun": methods_first,
         "acpMethodsSecondRun": methods_second,
         "nativeReopenMethod": reopen_method,
@@ -2050,22 +2105,60 @@ def run_requests(runs: list[list[dict]], index: int) -> list[dict]:
 HARNESS_PROCESS_PATTERNS = ("codex-acp/dist/index.js", "app-server", "codex-gate-audit-adapter")
 
 
-def harness_processes(temporary: Path) -> list[str]:
-    """Harness processes that belong to *this* run and are still alive.
+def process_table() -> list[dict]:
+    """The live process table as (pid, start time, command line) rows.
 
-    Identity is bound to this run's own temporary root, which every bwrap
-    wrapper for it carries in its argv; a concurrent Codex instance elsewhere on
-    the machine is neither matched nor able to block the window. Descendants are
-    covered by the sandbox template itself: the Worker runs bwrap with
-    `--die-with-parent`, so a surviving wrapper is the only thing that can keep
-    the attempt's process tree alive - and that wrapper names this root.
+    Read once per poll from `ps`, which gives a stable start-time identity per
+    pid: a process that dies and whose pid is reused is a *different* process,
+    so "the ones we saw are gone" cannot be faked by pid reuse.
     """
-    survivors = []
-    for pattern in HARNESS_PROCESS_PATTERNS:
-        lines = subprocess.run(
-            ["pgrep", "-af", pattern], capture_output=True, text=True).stdout.splitlines()
-        survivors.extend(line for line in lines if str(temporary) in line)
-    return survivors
+    done = subprocess.run(
+        ["ps", "-eo", "pid=,lstart=,args="], capture_output=True, text=True)
+    rows = []
+    for line in done.stdout.splitlines():
+        fields = line.strip().split(None, 6)
+        if len(fields) < 7 or not fields[0].isdigit():
+            continue
+        rows.append({
+            "pid": int(fields[0]),
+            "started": " ".join(fields[1:6]),
+            "args": fields[6],
+        })
+    return rows
+
+
+def matching_processes(temporary: Path, rows: list[dict] | None = None) -> list[dict]:
+    """This run's Harness processes, bound to this run's own temporary root.
+
+    The root is what every wrapper of this run carries in its argv whatever the
+    binary inside is called, so a renamed descendant is still matched; another
+    Codex instance elsewhere on the machine carries a different root and is
+    neither matched nor able to block the window. Descendants are additionally
+    covered by the sandbox template: the Worker runs bwrap with
+    `--die-with-parent`, so a surviving wrapper is the only thing that can keep
+    this run's process tree alive.
+    """
+    table = process_table() if rows is None else rows
+    root = str(temporary)
+    # This run's root is what binds identity: a renamed binary, a helper shell
+    # or a wrapper of this run all carry it, and no other run does.
+    return [row for row in table if root in row["args"]]
+
+
+def harness_processes(temporary: Path) -> list[str]:
+    """Command lines of this run's live Harness processes (compatibility view)."""
+    return [row["args"] for row in matching_processes(temporary)]
+
+
+def _surviving_identities(temporary: Path, seen: list[tuple[int, str]]) -> list[str]:
+    """The identities this run was seen running that are *still* alive.
+
+    Identity is (pid, start time) plus this run's root in the command line, so a
+    renamed descendant is still matched and an unrelated Codex process - a
+    different root - is never counted as surviving.
+    """
+    live = {(row["pid"], row["started"]) for row in matching_processes(temporary)}
+    return [f"{pid}@{started}" for pid, started in seen if (pid, started) in live]
 
 
 def settle_after_attempt(watcher: "StateSymlinkWatcher", temporary: Path,
@@ -2082,10 +2175,12 @@ def settle_after_attempt(watcher: "StateSymlinkWatcher", temporary: Path,
     fatal on any hit.
     """
     deadline = time.monotonic() + timeout_s
-    survivors = harness_processes(temporary)
+    seen: list[tuple[int, str]] = list(watcher.harness_identities)
+    survivors = _surviving_identities(temporary, seen)
     while survivors and time.monotonic() < deadline:
         time.sleep(interval_s)
-        survivors = harness_processes(temporary)
+        survivors = _surviving_identities(temporary, seen)
+        seen = list(watcher.harness_identities) or seen
     evidence: dict = {
         "harnessExited": not survivors,
         "harnessSeenAlive": bool(watcher.harness_seen or survivors),
@@ -2142,27 +2237,61 @@ def capture_boundary_evidence(report: dict) -> tuple[bool, str]:
     return True, ""
 
 
-def resolve_run_failure(report: dict, settled_window: dict, watcher,
-                        reopen_evidence: dict | None = None) -> "GateFailure | None":
+def turn_chain_phase(report: dict, settled_window: dict, watcher) -> dict:
+    """The turn chain's own phase evidence (its capture scan lives in the report)."""
+    scan = report.get("stateScan") if isinstance(report.get("stateScan"), dict) else None
+    capture = None
+    rounds = report.get("rounds") or {}
+    if scan is not None and rounds and all(
+            summary.get("state") == "completed" for summary in rounds.values()):
+        capture = {
+            "files": scan.get("files"),
+            "nativeSessionId": scan.get("nativeSessionId"),
+            "tokenHits": [] if not scan.get("tokenInState") else ["<captured>"],
+        }
+    phase = dict(settled_window)
+    phase.update({
+        "phase": "turn-chain",
+        "hits": list(watcher.token_hits),
+        "races": list(watcher.race_events),
+        "incompleteEvents": list(watcher.incomplete_events),
+        "scanError": watcher.scan_error,
+        "stoppedCleanly": watcher.stopped_cleanly,
+        "filesObserved": watcher.scanned_files,
+        "cyclesCompleted": watcher.scan_completed,
+        "captureEvidence": capture,
+    })
+    return phase
+
+
+def resolve_run_failure(report: dict, phases: list[dict]) -> "GateFailure | None":
     """The one place that decides what ends the run, over every phase.
 
-    A credential observed anywhere - during the turn chain or during the reopen
-    observation - outranks everything else; the phase aggregate is the evidence,
-    so a hit written in a later phase cannot fall outside the judgement. When
-    the credential verdict passes, the remaining checks fail the run with their
-    own typed codes.
+    Each phase contributes its own evidence: the observer's hits *and* the hits
+    its independent settled scan found, its races and incompleteness, whether
+    its harness exited, and whether *that phase* left either a fully walked
+    settled view or its own capture-boundary scan. A credential observed in any
+    phase - active or settled, turn chain or reopen - is the primary failure.
     """
-    phases = [dict(settled_window, **{
-        "hits": list(watcher.token_hits), "races": list(watcher.race_events),
-        "incompleteEvents": list(watcher.incomplete_events),
-        "scanError": watcher.scan_error, "stoppedCleanly": watcher.stopped_cleanly,
-        "filesObserved": watcher.scanned_files, "cyclesCompleted": watcher.scan_completed,
-    })]
-    if reopen_evidence is not None:
-        phases.append(reopen_evidence)
     aggregate = merge_phase_evidence(phases)
     report["credentialScan"] = {
         "phases": len(phases),
+        "perPhase": [
+            {
+                "phase": phase.get("phase"),
+                "settledComplete": bool(phase.get("settledComplete")),
+                "settledScan": phase.get("settledScan"),
+                "captureEvidence": phase.get("captureEvidence"),
+                "harnessExited": phase.get("harnessExited"),
+                "hits": [hit.get("path") for hit in phase.get("hits", ())],
+                "settledHits": list(phase.get("settledHits") or ()),
+                "races": len(phase.get("races") or ()),
+                "incompleteEvents": len(phase.get("incompleteEvents") or ()),
+                "scanError": phase.get("scanError"),
+                "stoppedCleanly": phase.get("stoppedCleanly"),
+            }
+            for phase in phases
+        ],
         "filesObserved": aggregate["files"],
         "cyclesCompleted": aggregate["cycles"],
         "settledCycles": aggregate["settledCycles"],
@@ -2187,14 +2316,14 @@ def resolve_run_failure(report: dict, settled_window: dict, watcher,
     return GateFailure(verdict, detail)
 
 
-def observe_phase(worker_root: Path, temporary: Path, work) -> tuple[object, dict]:
+def observe_phase(worker_root: Path, temporary: Path, work, *, name: str) -> dict:
     """Run one phase of the gate with its own observer, then settle it.
 
-    Used for every phase that starts a native Harness with the injected token:
-    the run's turn chain and the reopen observation. Each phase gets its own
-    watcher (its own scanner) and its own post-exit settled scan, and the final
-    verdict is computed once, over all phases - a credential written during a
-    later phase can never fall outside the judgement.
+    Every phase that starts a native Harness with the injected token gets its
+    own watcher (its own scanner) and its own post-exit settled scan. The phase
+    never raises: it returns what it produced plus the failure it hit, so the
+    caller can compute the credential verdict over *all* phases before letting
+    any chain failure end the run.
     """
     phase_watcher = StateSymlinkWatcher(worker_root)
     phase_watcher.start()
@@ -2207,21 +2336,39 @@ def observe_phase(worker_root: Path, temporary: Path, work) -> tuple[object, dic
     finally:
         evidence = settle_after_attempt(phase_watcher, temporary)
         phase_watcher.stop()
-    evidence["hits"] = list(phase_watcher.token_hits)
-    evidence["races"] = list(phase_watcher.race_events)
-    evidence["incompleteEvents"] = list(phase_watcher.incomplete_events)
-    evidence["scanError"] = phase_watcher.scan_error
-    evidence["stoppedCleanly"] = phase_watcher.stopped_cleanly
-    evidence["filesObserved"] = phase_watcher.scanned_files
-    evidence["cyclesCompleted"] = phase_watcher.scan_completed
-    evidence["peakFiles"] = phase_watcher.peak_files
-    if failure is not None:
-        raise failure
-    return result, evidence
+    # Active evidence and settled evidence are merged: a credential that only
+    # the settled pass saw is still a credential in native state.
+    hits = list(phase_watcher.token_hits)
+    for path in evidence.get("settledHits") or ():
+        hit = {"path": path, "phase": "settled"}
+        if hit not in hits:
+            hits.append(hit)
+    if isinstance(result, dict) and isinstance(result.get("captureEvidence"), dict):
+        evidence["captureEvidence"] = result["captureEvidence"]
+    evidence.update({
+        "phase": name,
+        "hits": hits,
+        "races": list(phase_watcher.race_events) + list(evidence.get("settledRaces") or ()),
+        "incompleteEvents": list(phase_watcher.incomplete_events),
+        "scanError": phase_watcher.scan_error,
+        "stoppedCleanly": phase_watcher.stopped_cleanly,
+        "filesObserved": phase_watcher.scanned_files + (evidence.get("settledFiles") or 0),
+        "cyclesCompleted": phase_watcher.scan_completed,
+        "peakFiles": phase_watcher.peak_files,
+        "result": result,
+        "failure": failure,
+    })
+    return evidence
 
 
 def merge_phase_evidence(phases: list[dict]) -> dict:
-    """One aggregate over every phase that ran a Harness."""
+    """One aggregate over every phase that ran a Harness.
+
+    Completeness is judged *per phase*: each phase must either have fully walked
+    a settled view or carry its own capture-boundary evidence. A phase that had
+    neither is incomplete no matter how well the other phases did, because a
+    credential written in it would never have been observed.
+    """
     hits: list[dict] = []
     races: list[dict] = []
     incomplete: list[dict] = []
@@ -2231,6 +2378,7 @@ def merge_phase_evidence(phases: list[dict]) -> dict:
     files = 0
     settled_cycles = 0
     settled_incomplete: str | None = None
+    harness_exited = True
     for phase in phases:
         for hit in phase.get("hits", ()):
             if hit not in hits:
@@ -2245,23 +2393,43 @@ def merge_phase_evidence(phases: list[dict]) -> dict:
         stopped_cleanly = stopped_cleanly and bool(phase.get("stoppedCleanly"))
         cycles += phase.get("cyclesCompleted") or 0
         files += phase.get("filesObserved") or 0
+        if phase.get("harnessExited") is False:
+            harness_exited = False
         if phase.get("settledComplete"):
             settled_cycles += 1
-        elif phase.get("settledIncomplete") and settled_incomplete is None:
-            settled_incomplete = phase["settledIncomplete"]
-        if phase.get("harnessExited") is False:
-            return {
-                "hits": hits, "races": races, "incomplete": incomplete,
-                "scanError": scan_error, "stoppedCleanly": stopped_cleanly,
-                "cycles": cycles, "files": files, "settledCycles": settled_cycles,
-                "settledIncomplete": settled_incomplete, "harnessExited": False,
-            }
+            continue
+        # This phase left no settled view: it must carry its own capture scan.
+        capture_ok, capture_reason = capture_evidence_for_phase(phase)
+        if capture_ok:
+            settled_cycles += 1
+            continue
+        if settled_incomplete is None:
+            settled_incomplete = f"{phase.get('phase')}: {capture_reason or 'no settled view'}"
     return {
         "hits": hits, "races": races, "incomplete": incomplete,
         "scanError": scan_error, "stoppedCleanly": stopped_cleanly,
         "cycles": cycles, "files": files, "settledCycles": settled_cycles,
-        "settledIncomplete": settled_incomplete, "harnessExited": True,
+        "settledIncomplete": settled_incomplete, "harnessExited": harness_exited,
     }
+
+
+def capture_evidence_for_phase(phase: dict) -> tuple[bool, str]:
+    """That phase's own capture-boundary evidence, if any.
+
+    The turn chain records it in the report (`stateScan`); the reopen phase
+    records the same facts next to its own captured bytes (`captureEvidence`).
+    Both are native-id bound, token-free and non-empty, or they do not count.
+    """
+    evidence = phase.get("captureEvidence")
+    if evidence is None:
+        return False, "the phase left no settled view and no capture evidence"
+    if evidence.get("tokenHits"):
+        return False, "the captured state carried the credential"
+    if evidence.get("nativeSessionId") is not True:
+        return False, "the captured state is not bound to this phase's native id"
+    if not evidence.get("files"):
+        return False, "the captured state held no files to observe"
+    return True, ""
 
 
 def credential_scan_verdict(

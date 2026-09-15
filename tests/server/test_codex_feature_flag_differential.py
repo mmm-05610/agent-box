@@ -78,4 +78,5 @@ def test_the_control_transform_drops_only_the_features_table():
     table_lines = (b"[features]", b"plugins = false", b"shell_snapshot = false")
     preserved = [line for line in original.splitlines()
                  if line.strip() and not any(marker in line for marker in table_lines)]
-    assert all(line in control for line in preserved), "the control leg must keep every other line" 
+    assert all(line in control for line in preserved), (
+        "the control leg must keep every other line")
