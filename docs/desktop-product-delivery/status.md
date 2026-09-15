@@ -1064,3 +1064,28 @@ typecheck 当场暴露；新测试 4 条 ESLint warning 收口为 0。
   `evidence/DESKTOP_IMPLEMENTATION_HANDOFF.md`，核对分支/HEAD/摘要/可运行性，确认无新前端 writer、
   无子代理、无未交接修改后，在正式派单指定的工作树记录 `FULLSTACK_INTEGRATION_OWNER` 并安装
   lifecycle connection。**本轮未开始后端全栈联调，未改后端。**
+
+## 更正（2026-09-15，后端接管）：`FULLSTACK_INTEGRATION_OWNER` 已记录
+
+- updated_at: 2026-09-15 20:50 (+08:00)
+- **`FULLSTACK_INTEGRATION_OWNER` = 后端执行者（Zcode 后端 goal 会话，
+  `/home/maoqh/projects/agent-box-server-round1` @ `feature/server-harness-extension-v1`）**
+- 接管依据：42 §9 双门 + 用户 2026-09-15 明确指示（"前端已经完成了…如果你完成了就可以开始联调"）；
+  范围限 42 `conditional_cross_repo_write.write_paths`，发布源 `main` 仍只读，不 push/不 merge。
+- 接管时只读复核（本轮，`git rev-parse`/`git status`/就地重算摘要）：
+  - HEAD `8e7c138c96337fc20ed61d3c21100e6449c8ec95`、分支 `feature/agentbox-desktop-product`
+  - `git status --porcelain` **0 行**（含 untracked）、`writer_lease=RELEASED` 保持
+  - `DESKTOP_IMPLEMENTATION_READY`、`P06_GREEN`（r3 `28 PASS/0 FAIL/0 SKIP/0 PENDING`、`allOk=true`）
+  - wire 摘要就地重算与锁定值一致：TS `11e3b3e7…`、生成工件 `5d4fa3bf…`
+  - 无 electron/node/tsc 写入者进程
+- 后端侧对应证据（同一时刻）：四家真实模型门 `--live` 全部 exit 0（累计 <¥0.07）、
+  Windows r4 + 独立 `-PostCheck` CLEAN、`tests` 576 passed/3 skipped/0 failed、
+  事件帧严格 schema 门与错误家族 12 项机械核对通过。
+- **`BACKEND_IMPLEMENTATION_READY` 的 closure 来源如实标注**：用户授权 + 执行者自审；
+  固定 Reviewer 因额度硬限制（`try again at Sep 20th, 2026 12:11 PM`）未提供本阶段
+  `ACCEPT`，阶段包固化于后端 `docs/server-round1/fullstack/stage-closure-dossier.md`，
+  额度恢复后补一次只读复审。**这一点不被本次接管掩盖。**
+- 下一步（§10）：安装 lifecycle connection（`workcore` slot 的唯一生产安装点），
+  然后无模型联调 28 方法 + 生产 WS 事件流（幂等回查、双游标语义、队列终态、审批失效族、
+  发送拒绝保留草稿），再按单独授权的凭据与预算做真实 UI 模型闭环。
+- 本行之后：前端工作树由 `FULLSTACK_INTEGRATION_OWNER` 写入；原前端 goal 不恢复写入。
