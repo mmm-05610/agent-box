@@ -1,12 +1,12 @@
 {
   "allOk": true,
   "counts": {
-    "PASS": 15,
+    "PASS": 22,
     "FAIL": 0,
     "SKIP": 0,
     "PENDING": 0
   },
-  "executed": 15,
+  "executed": 22,
   "unknownStatuses": [],
   "detail": [
     {
@@ -16,7 +16,7 @@
       "step": "driver target"
     },
     {
-      "detail": "workspace=/tmp/agentbox-integration-1789476102140; fixture=/tmp/agentbox-integration-1789476102140/stateful_acp_peer.mjs",
+      "detail": "workspace=/tmp/agentbox-integration-1789486110902; fixture=/tmp/agentbox-integration-1789486110902/stateful_acp_peer.mjs",
       "id": "sandbox-isolated",
       "status": "PASS",
       "step": "sandbox is isolated and the fixture is projected"
@@ -28,7 +28,7 @@
       "step": "the AgentBox Server is live on loopback with its own token"
     },
     {
-      "detail": "hello.serverId=server_1531325951aa471faa61b862b4632d1c protocol=wire/1",
+      "detail": "hello.serverId=server_0c4488f516c24771b33da57ef75941e6 protocol=wire/1",
       "id": "lifecycle-connection-installed",
       "status": "PASS",
       "step": "the lifecycle connection is installed and reachable from the renderer"
@@ -40,13 +40,13 @@
       "step": "server.hello answers over the product transport"
     },
     {
-      "detail": "workspaceId=ws_410065c0ecd440a69b2717c8e067f47a accessibility={\"readable\":true,\"writable\":true,\"executableForRole\":null,\"reasons\":[]}",
+      "detail": "workspaceId=ws_a7369e99e62547fa9cd695a1e2d73bdc accessibility={\"readable\":true,\"writable\":true,\"executableForRole\":null,\"reasons\":[]}",
       "id": "workspace-open-and-list",
       "status": "PASS",
       "step": "the WSL workspace opens and lists back with the same identity"
     },
     {
-      "detail": "profile=profile_df7de3ec5cc444e5bb4815187159b1f4 v2; providerModel=provider_e0a3c3afb7d9422ca7ecd68d16c86e77",
+      "detail": "profile=profile_7ec412fdffb0482d90aca8302f6446a7 v2; providerModel=provider_e9b6ee76a1094a038ed0bd91edc358fc",
       "id": "profile-and-provider-created",
       "status": "PASS",
       "step": "profile and provider-model records are created and versioned"
@@ -64,13 +64,13 @@
       "step": "a real turn through the managed chain persists deltas before the terminal frame"
     },
     {
-      "detail": "first=execution_6d2495baedec43a5b5a395def2ce4945 replay=execution_6d2495baedec43a5b5a395def2ce4945",
+      "detail": "first=execution_752bf05c31774e44a6fe58e6a0552582 replay=execution_752bf05c31774e44a6fe58e6a0552582",
       "id": "idempotent-replay-is-one-execution",
       "status": "PASS",
       "step": "replaying the same requestId returns the same execution"
     },
     {
-      "detail": "queueItemId=queue_e63bd09ffa5640afab4314e76d5f1b57 state=pending withdraw=withdrawn",
+      "detail": "queueItemId=queue_64368c0e4a424643b6c0e1eaf7375867 state=pending withdraw=withdrawn",
       "id": "queue-visible-and-withdrawable",
       "status": "PASS",
       "step": "a queued send is visible and can be withdrawn"
@@ -88,7 +88,49 @@
       "step": "backward pages and the live resume cursor stay separate domains"
     },
     {
-      "detail": "archivedAt=2026-09-15T12:41:48.707373+00:00 frames=6",
+      "detail": "entries=1 canOpen=undefined archivedAt=2026-09-15T15:28:39.063823+00:00",
+      "id": "workspace-browse-and-archive",
+      "status": "PASS",
+      "step": "a directory browses with real entries, and a workspace archives without losing its record"
+    },
+    {
+      "detail": "providerModels=2 providerArchived=true roleRenamed=P42 maintenance role (renamed) roleArchived=true",
+      "id": "profile-and-provider-maintenance",
+      "status": "PASS",
+      "step": "a provider model updates and archives, and a role renames and archives, all with versions"
+    },
+    {
+      "detail": "displayName=P42 renamed session pinned=true switched=confirmed profileId=true",
+      "id": "session-metadata-and-role-switch",
+      "status": "PASS",
+      "step": "a session renames and pins, then switches role with the old link returned"
+    },
+    {
+      "detail": "accepted=accepted sameExecution=true unknown=unknown",
+      "id": "send-outcome-query",
+      "status": "PASS",
+      "step": "a sent requestId resolves to its execution, and an unknown one answers unknown"
+    },
+    {
+      "detail": "outcome=accepted executionId=execution_13e73602775d44dba51d2da6f8ee6d0e bodyInTranscript=false",
+      "id": "attachment-authorized-and-delivered",
+      "status": "PASS",
+      "step": "an attachment is accepted, delivered to the run, and its body never enters the transcript"
+    },
+    {
+      "detail": "requested=true decision=recorded scope=once",
+      "id": "approval-round-trip",
+      "status": "PASS",
+      "step": "the harness asks, the product answers, and the decision is recorded once"
+    },
+    {
+      "detail": "staleCursorError=INVALID_REQUEST resubscribedFrames=0",
+      "id": "event-stream-resync",
+      "status": "PASS",
+      "step": "an unusable cursor asks for a new snapshot, and a re-subscription answers empty rather than replaying"
+    },
+    {
+      "detail": "archivedAt=2026-09-15T15:28:37.997591+00:00 frames=6",
       "id": "session-archive-keeps-history",
       "status": "PASS",
       "step": "archiving a session keeps its history readable"

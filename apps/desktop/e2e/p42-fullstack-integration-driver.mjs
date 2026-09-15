@@ -69,6 +69,13 @@ const STEP_IDS = [
   'queue-visible-and-withdrawable',
   'stop-reaches-terminal',
   'history-cursor-pagination',
+  'workspace-browse-and-archive',
+  'profile-and-provider-maintenance',
+  'session-metadata-and-role-switch',
+  'send-outcome-query',
+  'attachment-authorized-and-delivered',
+  'approval-round-trip',
+  'event-stream-resync',
   'session-archive-keeps-history',
   'clean-shutdown'
 ]
@@ -159,6 +166,21 @@ function wireResult(answer, label) {
   return answer?.result
 }
 
+/** The session record's version, or a failure that names what was seen.
+ *
+ * The archive and rename steps both need it, and "undefined is not an object"
+ * from a failed lookup told the next reader nothing about why.
+ */
+function sessionVersion(listed, sessionId) {
+  const found = (listed?.items ?? []).find(item => item.id === sessionId)
+
+  if (!found) {
+    throw new Error(`the run's session is not in the catalogue (${(listed?.items ?? []).length} listed)`)
+  }
+
+  return found.version
+}
+
 async function wireOk(page, method, params, label) {
   return wireResult(await wire(page, method, params), label ?? method)
 }
@@ -207,6 +229,9 @@ async function main() {
   // Desktop reads that token back. Creating the directory here would either be
   // refused or, worse, forge an ownership marker.
   wsl(['/usr/bin/mkdir', '-p', workspaceLinux])
+  // A second, disposable location: the archive step needs something it can
+  // retire without disturbing the workspace the rest of the run uses.
+  wsl(['/usr/bin/mkdir', '-p', workspaceLinux + '/nested'])
   wsl(['/usr/bin/cp', fixtureLinux, `${workspaceLinux}/stateful_acp_peer.mjs`])
   wsl(['/usr/bin/cp', slowFixtureLinux, `${workspaceLinux}/fake_acp_peer.mjs`])
   const projected = wsl(['/usr/bin/ls', `${workspaceLinux}/stateful_acp_peer.mjs`]).trim()
@@ -222,6 +247,16 @@ async function main() {
     schemaVersion: 1,
     pluginRoot: path.join(BACKEND_WINDOWS_ROOT, 'plugins/agent-box-harnesses'),
     harnesses: [
+      {
+        // A third Harness whose fixture asks for permission when the prompt
+        // says `needs-permission`: the approval round-trip is a product path
+        // and needs a real `session/request_permission` to answer.
+        id: 'omp',
+        capabilityClaims: { permissions: true, stream: true },
+        controlOptions: { model: ['fixture-model'] },
+        adapter: { args: ['/workspace/fake_acp_peer.mjs'], command: '/usr/bin/node' },
+        timeoutMs: 30000
+      },
       {
         // A second Harness that holds its answer back long enough for the
         // queue and stop cases to have a running turn to act on. Same fixture,
@@ -699,15 +734,283 @@ async function main() {
       page,
       'sessions.archive',
       {
-        expectedVersion: (
-          await wireOk(page, 'sessions.list', { includeArchived: false }, 'sessions.list')
-        ).items.find(item => item.id === sessionId).version,
+        expectedVersion: sessionVersion(await wireOk(
+          page, 'sessions.list', { includeArchived: false, page: { limit: 200 } }, 'sessions.list'
+        ), sessionId),
         requestId: 'p42-archive',
         sessionId
       },
       'sessions.archive'
     )
     const afterArchive = await wireOk(page, 'history.snapshot', { sessionId }, 'history.snapshot after archive')
+
+    // --- the methods the first pass did not drive --------------------------
+    // Everything below runs on the product's own transport, like the steps
+    // above: these are the §10 items the earlier pass left uncovered.
+
+    const browse = await wireOk(page, 'workspaces.browse', {
+      environment: { host: 'Ubuntu', kind: 'wsl', user: process.env.USERNAME ?? 'maoqh' },
+      path: workspaceLinux,
+      requestId: 'p42-browse'
+    }, 'workspaces.browse')
+    const secondOpen = await wireOk(page, 'workspaces.open', {
+      environment: { host: 'Ubuntu', kind: 'wsl', user: process.env.USERNAME ?? 'maoqh' },
+      path: `${workspaceLinux}/nested`,
+      requestId: 'p42-open-nested'
+    }, 'workspaces.open (nested)')
+    const archivedWorkspace = await wireOk(page, 'workspaces.archive', {
+      expectedVersion: secondOpen.workspace.version,
+      requestId: 'p42-archive-workspace',
+      workspaceId: secondOpen.workspace.id
+    }, 'workspaces.archive')
+
+    record(
+      'workspace-browse-and-archive',
+      'a directory browses with real entries, and a workspace archives without losing its record',
+      Array.isArray(browse.entries) && browse.entries.length > 0 && archivedWorkspace?.workspace?.archivedAt
+        ? 'PASS'
+        : 'FAIL',
+      `entries=${Array.isArray(browse.entries) ? browse.entries.length : 'none'} `
+      + `canOpen=${browse.canOpen} archivedAt=${archivedWorkspace?.workspace?.archivedAt ?? 'missing'}`
+    )
+
+    const maintenanceProvider = (await wireOk(page, 'providerModels.create', {
+      configuration: [],
+      credentialId: null,
+      displayName: 'P42 maintenance provider',
+      harness: 'hermes',
+      models: [{ availability: 'available', displayName: 'Fixture model', modelId: 'fixture-model', unavailableReason: null }],
+      provider: 'fixture',
+      requestId: 'p42-maintenance-provider'
+    }, 'providerModels.create (maintenance)')).providerModel
+    const updatedProvider = (await wireOk(page, 'providerModels.update', {
+      configuration: [],
+      credentialId: null,
+      displayName: 'P42 maintenance provider (renamed)',
+      expectedVersion: maintenanceProvider.version,
+      models: [
+        ...maintenanceProvider.models,
+        { availability: 'available', displayName: 'Second', modelId: 'second-model', unavailableReason: null }
+      ],
+      providerModelId: maintenanceProvider.id,
+      requestId: 'p42-maintenance-provider-update'
+    }, 'providerModels.update')).providerModel
+    const archivedProvider = (await wireOk(page, 'providerModels.archive', {
+      expectedVersion: updatedProvider.version,
+      providerModelId: updatedProvider.id,
+      requestId: 'p42-maintenance-provider-archive'
+    }, 'providerModels.archive')).providerModel
+    const maintenanceProfile = (await wireOk(page, 'profiles.create', {
+      displayName: 'P42 maintenance role',
+      harness: 'hermes',
+      requestId: 'p42-maintenance-role'
+    }, 'profiles.create (maintenance)')).profile
+    const renamedProfile = (await wireOk(page, 'profiles.update', {
+      displayName: 'P42 maintenance role (renamed)',
+      expectedVersion: maintenanceProfile.version,
+      profileId: maintenanceProfile.id,
+      requestId: 'p42-maintenance-role-update'
+    }, 'profiles.update')).profile
+    const archivedProfile = (await wireOk(page, 'profiles.archive', {
+      expectedVersion: renamedProfile.version,
+      profileId: renamedProfile.id,
+      requestId: 'p42-maintenance-role-archive'
+    }, 'profiles.archive')).profile
+
+    record(
+      'profile-and-provider-maintenance',
+      'a provider model updates and archives, and a role renames and archives, all with versions',
+      updatedProvider.models.length === 2 && archivedProvider.archivedAt &&
+        renamedProfile.displayName.endsWith('(renamed)') && archivedProfile.archivedAt ? 'PASS' : 'FAIL',
+      `providerModels=${updatedProvider.models.length} providerArchived=${Boolean(archivedProvider.archivedAt)} `
+      + `roleRenamed=${renamedProfile.displayName} roleArchived=${Boolean(archivedProfile.archivedAt)}`
+    )
+
+    const maintenanceSend = await wireOk(page, 'sessions.createAndSend', {
+      message: { attachments: [], text: 'A session for the maintenance steps.' },
+      overrides: [],
+      profileId: profile.id,
+      requestId: 'p42-maintenance-send',
+      workspaceId: workspace.id
+    }, 'sessions.createAndSend (maintenance)')
+    const maintenanceSessionId = maintenanceSend.session.id
+    const maintenanceDeadline = Date.now() + 60000
+
+    while (Date.now() < maintenanceDeadline) {
+      const history = await wireOk(page, 'history.snapshot', {
+        sessionId: maintenanceSessionId
+      }, 'history.snapshot (maintenance)')
+
+      if (history.frames.some(
+        frame => frame.event.kind === 'execution.state' && frame.event.state === 'completed'
+      )) {
+        break
+      }
+
+      await sleep(300)
+    }
+
+    const renamedSession = (await wireOk(page, 'sessions.update', {
+      displayName: 'P42 renamed session',
+      expectedVersion: sessionVersion(await wireOk(
+        page, 'sessions.list', { includeArchived: false, page: { limit: 200 } }, 'sessions.list'
+      ), maintenanceSessionId),
+      pinned: true,
+      requestId: 'p42-session-update',
+      sessionId: maintenanceSessionId
+    }, 'sessions.update')).session
+    const secondProfile = (await wireOk(page, 'profiles.create', {
+      displayName: 'P42 alternate role',
+      harness: 'hermes',
+      requestId: 'p42-alternate-role'
+    }, 'profiles.create (alternate)')).profile
+    const switched = await wireOk(page, 'sessions.switchProfile', {
+      expectedVersion: renamedSession.version,
+      profileId: secondProfile.id,
+      requestId: 'p42-switch-role',
+      sessionId: maintenanceSessionId
+    }, 'sessions.switchProfile')
+
+    record(
+      'session-metadata-and-role-switch',
+      'a session renames and pins, then switches role with the old link returned',
+      renamedSession.displayName === 'P42 renamed session' && renamedSession.pinned === true &&
+        switched.outcome === 'confirmed' && switched.session.profileId === secondProfile.id ? 'PASS' : 'FAIL',
+      `displayName=${renamedSession.displayName} pinned=${renamedSession.pinned} `
+      + `switched=${switched.outcome} profileId=${switched.session.profileId === secondProfile.id}`
+    )
+
+    const acceptedOutcome = await wireOk(page, 'sendOutcome.query', {
+      requestId: 'p42-send-1'
+    }, 'sendOutcome.query (accepted)')
+    const unknownOutcome = await wireOk(page, 'sendOutcome.query', {
+      requestId: 'p42-never-sent'
+    }, 'sendOutcome.query (unknown)')
+
+    record(
+      'send-outcome-query',
+      'a sent requestId resolves to its execution, and an unknown one answers unknown',
+      acceptedOutcome.outcome === 'accepted' && acceptedOutcome.executionId === sent.executionId &&
+        unknownOutcome.outcome === 'unknown' ? 'PASS' : 'FAIL',
+      `accepted=${acceptedOutcome.outcome} sameExecution=${acceptedOutcome.executionId === sent.executionId} `
+      + `unknown=${unknownOutcome.outcome}`
+    )
+
+    // An attachment is authorised, copied to the guest, and its bytes never
+    // travel back: the run projects a materialised path, not the content.
+    wsl(['/usr/bin/bash', '-lc',
+      `printf 'p42 attachment body\\n' > '${workspaceLinux}/attachment-note.txt'`])
+    const withAttachment = await wireOk(page, 'sessions.createAndSend', {
+      message: {
+        attachments: [{ displayName: 'attachment-note.txt', mediaKind: 'file', ref: 'attachment-note.txt' }],
+        text: 'This turn carries one attachment.'
+      },
+      overrides: [],
+      profileId: secondProfile.id,
+      requestId: 'p42-send-attachment',
+      workspaceId: workspace.id
+    }, 'sessions.createAndSend (attachment)')
+    const attachmentHistory = await wireOk(page, 'history.snapshot', {
+      sessionId: withAttachment.session.id
+    }, 'history.snapshot (attachment)')
+    const attachmentFrame = attachmentHistory.frames.find(
+      frame => frame.event.kind === 'message.final' && frame.event.role === 'user'
+    )
+
+    record(
+      'attachment-authorized-and-delivered',
+      'an attachment is accepted, delivered to the run, and its body never enters the transcript',
+      withAttachment.outcome === 'accepted' && Boolean(attachmentFrame) &&
+        !JSON.stringify(attachmentFrame ?? {}).includes('p42 attachment body') ? 'PASS' : 'FAIL',
+      `outcome=${withAttachment.outcome} executionId=${withAttachment.executionId ?? 'missing'} `
+      + `bodyInTranscript=${JSON.stringify(attachmentFrame ?? {}).includes('p42 attachment body')}`
+    )
+
+    // The approval round-trip: the fixture asks for permission when the prompt
+    // says so, and the decision has to come back through the product.
+    const approvalProfile = (await wireOk(page, 'profiles.create', {
+      displayName: 'P42 approval role',
+      harness: 'omp',
+      requestId: 'p42-approval-role'
+    }, 'profiles.create (approval)')).profile
+    const configuredApproval = (await wireOk(page, 'profiles.updateConfig', {
+      expectedVersion: approvalProfile.version,
+      profileId: approvalProfile.id,
+      requestId: 'p42-approval-config',
+      values: [{ controlId: 'model', value: 'fixture-model' }]
+    }, 'profiles.updateConfig (approval)')).profile
+    const approvalSend = await wireOk(page, 'sessions.createAndSend', {
+      message: { attachments: [], text: 'needs-permission please' },
+      overrides: [],
+      profileId: configuredApproval.id,
+      requestId: 'p42-approval-send',
+      workspaceId: workspace.id
+    }, 'sessions.createAndSend (approval)')
+    let approvalFrame = null
+    const approvalDeadline = Date.now() + 60000
+
+    while (Date.now() < approvalDeadline && !approvalFrame) {
+      const history = await wireOk(page, 'history.snapshot', {
+        sessionId: approvalSend.session.id
+      }, 'history.snapshot (approval)')
+      approvalFrame = history.frames.find(frame => frame.event.kind === 'approval.requested') ?? null
+
+      if (!approvalFrame) {
+        await sleep(400)
+      }
+    }
+
+    const decided = approvalFrame
+      ? await wireOk(page, 'approvals.decide', {
+          approvalId: approvalFrame.event.approval.approvalId,
+          decision: 'allow',
+          expectedVersion: approvalFrame.event.approval.version,
+          requestId: 'p42-approval-decide',
+          scope: { kind: 'once' }
+        }, 'approvals.decide')
+      : null
+
+    record(
+      'approval-round-trip',
+      'the harness asks, the product answers, and the decision is recorded once',
+      Boolean(approvalFrame) && decided?.outcome === 'recorded' && decided?.decision === 'allow' ? 'PASS' : 'FAIL',
+      `requested=${Boolean(approvalFrame)} decision=${decided?.outcome ?? 'missing'} `
+      + `scope=once`
+    )
+
+    // A cursor the Server cannot address must ask for a fresh snapshot rather
+    // than silently dropping events.
+    const staleCursor = await wire(page, 'history.snapshot', {
+      cursor: 'not-a-real-cursor',
+      sessionId: maintenanceSessionId
+    })
+
+    const resubscribed = await new Promise(resolve => {
+      const unsubscribe = page.evaluate(
+        async ([targetSession, cursor]) => {
+          const frames = []
+          const stop = window.agentBoxDesktop.wire.subscribeEvents(
+            { cursor, sessionId: targetSession },
+            frame => frames.push(frame)
+          )
+          await new Promise(done => setTimeout(done, 1500))
+          stop()
+
+          return frames
+        },
+        [maintenanceSessionId, maintenanceSend.session.resumeCursor ?? page1.resumeCursor]
+      )
+
+      Promise.resolve(unsubscribe).then(resolve)
+    })
+
+    record(
+      'event-stream-resync',
+      'an unusable cursor asks for a new snapshot, and a re-subscription answers empty rather than replaying',
+      staleCursor?.error?.code === 'INVALID_REQUEST' && Array.isArray(resubscribed) &&
+        resubscribed.every(frame => frame.sessionId === maintenanceSessionId) ? 'PASS' : 'FAIL',
+      `staleCursorError=${staleCursor?.error?.code ?? 'none'} resubscribedFrames=${Array.isArray(resubscribed) ? resubscribed.length : 'none'}`
+    )
 
     record(
       'session-archive-keeps-history',
