@@ -1122,3 +1122,17 @@ typecheck 当场暴露；新测试 4 条 ESLint warning 收口为 0。
   A（Desktop 拥有凭据记录 + 一处只读列举面，推荐、与"Windows 是凭据记录权威"一致）；
   B（wire 增 `credentials.*`，需重锁合同）；C（联调期绕过 UI，不得记作 UI 门）。
 - 现状登记：`REAL_FLOW_VERIFIED = 否`（真实模型路径未验）——无模型全链路已验证不代表它成立。
+
+## 凭据录入接线（2026-09-15，`3d0929a1`）
+
+- **界面现在可以录入凭据**：设置页的 Provider/Model 区域有"新增凭据"表单；提交后 renderer →
+  main → 运行中的 Server（`POST /api/v1/credentials`，body 只带路径）→ 得到不透明 id → 记入本机
+  记录 → 临时来源文件在 `finally` 删除。
+- 同区域的选择控件列出本机记录（label 供选择、id 用于挂载，**不含任何材料**），创建/更新
+  Provider/Model 会带上所选 `credentialId`——此前恒为 `null`，因而 UI 永远发不出需要凭据的模型轮。
+- 安全边界：秘密不进日志；来源路径不出 main；endpoint 先过 wire 同一套 loopback 判据；
+  Server 的拒绝以它自己的错误码呈现。
+- 验证：main 侧 11 项测试、设置页 2 项新测试、既有设置页 8 项全过；Windows 上 `tsc --noEmit`
+  exit 0、eslint exit 0、`npm run build` exit 0；重建后的应用复跑无模型全栈联调 **15/15 PASS**。
+- 期间修掉一个自己引入的缺陷：凭据 port 对象未 memo 化 → 渲染循环（既有页面测试当场抓住）。
+- 下一步：四家真实 UI 模型门（凭据与预算已授权，累计 <¥0.07/≤¥10）。
