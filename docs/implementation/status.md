@@ -287,7 +287,7 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 - ui_model_gates_2026-09-15: **逐家结果（真实 UI 模型门）**——驱动
   前端 `apps/desktop/e2e/p42-ui-model-gate.mjs`，证据 `apps/desktop/evidence/p42-ui-model-gate/`。
   **Pi 8/8、Hermes 8/8、Codex 8/8 全绿**（凭据均经界面自己的录入路径加入；两轮真实 DeepSeek 答复、
-  首轮回忆 nonce、次轮带上下文）；**OpenCode 6/8**（链路跑通但首轮助手文本是片段，未验证完整回忆
+  首轮回忆 nonce、次轮带上下文）；**OpenCode 6/8（已定因，不记通过）**：长答复诊断显示**流式 delta 与持久 final 丢失同一段尾部且逐字相同**（"数到 40"只到 31），而链路 completed、次轮语义正确 → 丢失在两者共同的上游，即 **OpenCode 读取路径**（中立 driver 接缝 / 托管 `opencode serve`），不是模型、不是 Server 投影、不是组装；截断点随答复长度变化且总在尾部，符合"回合结束事件与最后分片竞态"。**原表述为**（链路跑通但首轮助手文本是片段，未验证完整回忆
   → **不记通过**）。**Hermes 的缺口已修并两端重锁**：`profiles.create` 增加可选 `credentialId`
   （缺省/null = 角色不携带凭据；给值校验存在性与 kind），工件新摘要 TS `7746404984…` /
   `14f7f736…`（取代 `11e3b3e7…`/`5d4fa3bf…`），后端对新工件 32 passed，Hermes UI 门复跑通过。
