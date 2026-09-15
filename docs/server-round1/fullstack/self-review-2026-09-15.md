@@ -35,9 +35,16 @@ OpenCode 尾巴修复）在**两仓实际提交**上的自审。**这不是 Revi
 
 ## 3. 明确未完成（不得由本自审折算为通过）
 
-- **真实 UI 控件路径**：所有发送都走**产品自己的 renderer 传输**（renderer bridge → IPC → main →
-  Server），**没有**驱动"在输入框打字 → 点发送 → 看答案流出"这条人手路径；工作区选择、审批弹窗、
-  附件选择等控件同样未被驱动。这是本阶段最大的一处未覆盖。
+- **真实 UI 控件路径：本轮尝试过，未走通，如实记录**。已用 `apps/desktop/e2e/p42-ui-recon.mjs`
+  对构建产物做控件探查（证据 `apps/desktop/evidence/p42-ui-controls/`）：
+  - 顶层控件确证：`Open folder` / `Choose a profile` / `Settings` / `Open remote folder` / `Profiles`；
+    输入区是 `div[role=textbox][aria-label="Message"]`，未选工作区或角色时 **placeholder 为
+    `Unavailable`**——产品把"没有工作区/角色不能发消息"表达在界面上；
+  - `Settings` 可进入，页签为 `Models` / `Skills & MCP` / `Identities` / `Harnesses` / `Data management` /
+    `Appearance` / `Notifications` / `Keyboard Shortcuts` / `About`；
+  - **脚本点击 `Open folder` 未出现对话框、`Models` 页签未切换**，原因未诊断（可能点到了容器而非触发器，
+    或这些控件需要别的交互语义）。**这既不是产品缺陷的证据，也不是产品可用的证据**。
+  - 结论：人手路径**未验证**；已验证的是产品传输路径（renderer bridge → IPC → main → Server），两者不可互替。
 - **固定 Reviewer 的最终只读审查**：额度限制，未做；`REVIEWER_AUTOMATION_READY` 与
   `BACKEND_IMPLEMENTATION_READY` 的登记来源为**用户授权 + 自审**，已在两仓 status 如实标注。
 - 合同增补后的**前端侧**未跑全量 typecheck/lint 之外的 UI 测试套件（只跑了受影响的设置页 10 项与
