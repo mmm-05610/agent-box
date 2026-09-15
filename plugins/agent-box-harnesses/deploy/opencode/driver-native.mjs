@@ -91,6 +91,16 @@ export function catalogHasModel(catalog, providerID, modelID) {
   return Object.prototype.hasOwnProperty.call(provider.models, modelID)
 }
 
+/** 记录里比流多出来的那段后缀，或 null（流已完整 / 两者不一致时不给猜测）。
+ *
+ * 单独成函数是为了能被测：`prompt` 的尾部校准就靠它决定"补什么"。
+ * 只有记录以流为前缀时才返回后缀；不一致时返回 null，交由调用方只记事实。 */
+export function tailSuffix(streamed, recorded) {
+  if (typeof recorded !== "string" || typeof streamed !== "string") return null
+  if (!recorded.startsWith(streamed)) return null
+  return recorded.length > streamed.length ? recorded.slice(streamed.length) : null
+}
+
 /** 从 OpenCode 的 parts 里取出助手文本（仅在增量缺失时作为兜底）。 */
 export function textOfParts(parts) {
   if (!Array.isArray(parts)) return ""
@@ -279,6 +289,7 @@ export async function createDriver(context) {
                 const text = typeof properties.delta === "string" ? properties.delta : ""
                 if (text && properties.field === "text" && active && active.sessionId === properties.sessionID) {
                   active.deltas += 1
+                  active.text += text
                   emit({ event: DELTA_EVENT, data: { text } })
                 }
               }
@@ -418,7 +429,7 @@ export async function createDriver(context) {
       if (!stored) fail("OPENCODE_SESSION_NOT_FOUND", `the native session is not stored: ${redact(sessionId, 120)}`)
       sessions.set(sessionId, { title: stored.title ?? null, model: String(model) })
     }
-    const current = { sessionId, deltas: 0 }
+    const current = { sessionId, deltas: 0, text: "" }
     active = current
     let response = null
     try {
@@ -435,11 +446,21 @@ export async function createDriver(context) {
     } finally {
       active = null
     }
+    const authoritative = textOfParts(response?.parts)
     if (current.deltas === 0) {
       // 兜底：SSE 未送达任何增量时，把这一轮的最终文本作为一次增量上报，
       // 保证产品的转写不会丢掉真实答案。
-      const finalText = textOfParts(response?.parts)
-      if (finalText) emit({ event: DELTA_EVENT, data: { text: finalText } })
+      if (authoritative) emit({ event: DELTA_EVENT, data: { text: authoritative } })
+    } else if (tailSuffix(current.text, authoritative)) {
+      // 尾部校准：`message.part.delta` 可能比 prompt 的返回晚到，最后一个增量就永远
+      // 丢了（实测比原生记录少一片）。以返回值为权威，只补缺失的后缀，已流出的部分
+      // 一字不改。
+      const suffix = tailSuffix(current.text, authoritative)
+      emit({ event: DELTA_EVENT, data: { text: suffix } })
+      audit({ event: "tail-completed", sessionId, missing: suffix.length })
+    } else if (authoritative && !authoritative.startsWith(current.text)) {
+      // 流与记录不一致时只记录事实，不猜顺序、不重写已发出的增量。
+      audit({ event: "tail-mismatch", sessionId, streamed: current.text.length, recorded: authoritative.length })
     }
     audit({
       event: "prompt", sessionId, model: String(model),

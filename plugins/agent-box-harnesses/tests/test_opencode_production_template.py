@@ -219,7 +219,7 @@ def test_the_driver_module_keeps_the_generic_contract(tmp_path):
     """
     probe = tmp_path / "opencode_driver_probe.mjs"
     probe.write_text(
-        "import { createDriver, splitNativeModel, catalogHasModel, auditPathFor, withPure, textOfParts }\n"
+        "import { createDriver, splitNativeModel, catalogHasModel, auditPathFor, withPure, textOfParts, tailSuffix }\n"
         f"  from {json.dumps(DRIVER.as_uri())}\n"
         "const calls = []\n"
         "globalThis.fetch = async (url, options = {}) => {\n"
@@ -256,6 +256,8 @@ def test_the_driver_module_keeps_the_generic_contract(tmp_path):
         "  auditRelative: auditPathFor({ AGENTBOX_DRIVER_AUDIT: 'a' }, '/workspace'),\n"
         "  pure: withPure(['serve', '--hostname', 'h', '--port', '1']),\n"
         "  text: textOfParts([{ type: 'text', text: 'a' }, { type: 'reasoning', text: 'b' }]),\n"
+        "  tail: [tailSuffix('ab', 'abcd'), tailSuffix('abcd', 'abcd'),\n"
+        "    tailSuffix('ab', 'axcd'), tailSuffix('ab', null)],\n"
         "} }\n"
         "const created = await driver.create({ title: 'execution-1', model: 'deepseek/deepseek-flash' })\n"
         "report.created = created\n"
@@ -298,6 +300,8 @@ def test_the_driver_module_keeps_the_generic_contract(tmp_path):
     assert report["helpers"]["auditRelative"] is None
     assert report["helpers"]["pure"][:2] == ["serve", "--pure"]
     assert report["helpers"]["text"] == "a"
+    # 尾部校准规则：记录里可能多出流没送达的后缀（补），其余一律不猜。
+    assert report["helpers"]["tail"] == ["cd", None, None, None]
     assert report["created"]["sessionId"] == "ses_new"
     assert report["missing"]["code"] == "OPENCODE_SESSION_NOT_FOUND"
     # 不存在的会话绝不能被静默新建：探针里没有任何 POST /session 发生在这之后。
