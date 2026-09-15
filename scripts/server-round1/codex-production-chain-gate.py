@@ -488,6 +488,7 @@ class StateSymlinkWatcher:
         self.token_hits: list[dict] = []
         self.scan_error: str | None = None
         self.scan_incomplete: str | None = None
+        self.race_events: list[dict] = []
         self.scan_completed = 0
         self.scanned_files = 0
         self.scanned_bytes = 0
@@ -611,9 +612,6 @@ class StateSymlinkWatcher:
                     self._mark_incomplete("traversal budget exhausted")
                     return
                 relative = f"{relative_dir}/{entry.name}"
-                if self.scanned_files >= CREDENTIAL_SCAN_FILES:
-                    self._mark_incomplete("file budget exhausted")
-                    return
                 try:
                     child = _open_beneath_fd(directory_fd, (entry.name,), False)
                 except OSError as error:
@@ -631,6 +629,9 @@ class StateSymlinkWatcher:
                         continue
                     if stat.S_ISLNK(status.st_mode) or not stat.S_ISREG(status.st_mode):
                         continue
+                    if self.scanned_files >= CREDENTIAL_SCAN_FILES:
+                        self._mark_incomplete("file budget exhausted")
+                        return
                     if status.st_size > CREDENTIAL_SCAN_FILE_BYTES:
                         self._mark_incomplete(f"{relative} exceeds the per-file budget")
                         continue
@@ -643,14 +644,22 @@ class StateSymlinkWatcher:
                     after_identity = (after.st_mtime_ns, after.st_ctime_ns, after.st_size)
                     self.scanned_bytes += len(payload)
                     self.scanned_files += 1
-                    if before_identity != after_identity:
-                        # Raced: this cycle did not observe the final bytes.
-                        self._mark_incomplete(f"{relative} changed while it was read")
-                        continue
+                    # The payload is examined whatever the race outcome: a token
+                    # that was there while the file was in flight is a fact this
+                    # gate must not drop.
                     if token in payload:
                         entry_hit = {"path": relative, "phase": "during-run"}
                         if entry_hit not in self.token_hits:
                             self.token_hits.append(entry_hit)
+                    if before_identity != after_identity:
+                        # Persisted, never cleared: a state file this run could
+                        # not fully observe is a safety fact of *this* run, and
+                        # a later quiet cycle does not undo it.
+                        observation = {"path": relative, "phase": "racing"}
+                        if observation not in self.race_events:
+                            self.race_events.append(observation)
+                        self._mark_incomplete(f"{relative} changed while it was read")
+                        continue
                 finally:
                     os.close(child)
 
@@ -930,11 +939,14 @@ def main() -> int:
                 temporary, workspace, worker, artifact, digest, endpoint, production,
                 token_path, host_home,
             )
-        except GateFailure as failure:
+        except BaseException as failure:  # noqa: BLE001 - held for the verdict
             # Held, not propagated: the credential verdict must be computed on
             # every path, so a concurrent credential hit can never be masked by
             # an unrelated chain failure.
-            chain_failure = failure
+            chain_failure = GateFailure(
+                getattr(failure, "code", None) or "CODEX_GATE_UNEXPECTED",
+                getattr(failure, "message", None) or f"{type(failure).__name__}: {failure}",
+            )
         finally:
             endpoint.stop()
             watcher.stop()
@@ -965,11 +977,13 @@ def main() -> int:
         verdict, detail = credential_scan_verdict(
             watcher.token_hits, watcher.scan_error, watcher.stopped_cleanly,
             LEGACY_STATE_DIAGNOSTIC, watcher.scan_incomplete, watcher.scan_completed,
+            watcher.race_events,
         )
         REPORT["credentialScan"] = {
             "filesObserved": watcher.scanned_files,
             "cyclesCompleted": watcher.scan_completed,
             "incomplete": watcher.scan_incomplete,
+            "raceEvents": watcher.race_events,
             "error": watcher.scan_error,
             "stoppedCleanly": watcher.stopped_cleanly,
         }
@@ -1911,7 +1925,7 @@ def run_requests(runs: list[list[dict]], index: int) -> list[dict]:
 def credential_scan_verdict(
     token_hits: list[dict], scan_error: str | None, stopped_cleanly: bool,
     legacy_diagnostic: bool = False, scan_incomplete: str | None = None,
-    scan_completed: int = 0,
+    scan_completed: int = 0, race_events: list[dict] | None = None,
 ) -> tuple[str | None, str]:
     """The typed verdict for one run's credential-path scan.
 
@@ -1936,6 +1950,10 @@ def credential_scan_verdict(
     if scan_incomplete is not None:
         return ("CODEX_GATE_STATE_SCAN_INCOMPLETE",
                 f"the state credential scanner could not cover everything: {scan_incomplete}")
+    if race_events:
+        return ("CODEX_GATE_STATE_SCAN_INCOMPLETE",
+                "state files changed while they were read; sanitized paths: "
+                + json.dumps([event.get("path") for event in race_events]))
     if scan_completed <= 0:
         return ("CODEX_GATE_STATE_SCAN_INCOMPLETE",
                 "the state credential scanner never completed a scan cycle")

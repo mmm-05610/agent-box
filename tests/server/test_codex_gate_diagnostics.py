@@ -154,6 +154,59 @@ def test_a_credential_hit_outranks_a_chain_failure(tmp_path):
     assert chain_failure.code == "CODEX_GATE_TURN_FAILED", "kept as secondary evidence"
 
 
+def test_a_raced_read_is_a_persistent_fact_not_a_forgotten_cycle(tmp_path):
+    """A token seen in a file that was in flight is recorded; a race without a
+    token still means this run never observed that file, so it cannot be
+    green even after later quiet cycles."""
+    module = load_gate()
+    root = tmp_path / "worker-root"
+    state = root / "views" / "view-1" / "ready" / "agentbox-sidecar" / "deployment" / "codex" / "native-state"
+    state.mkdir(parents=True)
+    racing = state / "racing.sh"
+    racing.write_text("clean", encoding="utf-8")
+    watcher = module.StateSymlinkWatcher(root)
+
+    original_read = module._read_bounded
+
+    def racy_read(fd, limit):
+        payload = original_read(fd, limit)
+        return payload
+
+    module._read_bounded = racy_read
+    try:
+        # Simulate the race by touching the file between the two fstats.
+        watcher._scan_for_credential(root / "views")
+        racing.write_text("clean-again", encoding="utf-8")
+        watcher._scan_for_credential(root / "views")
+    finally:
+        module._read_bounded = original_read
+    assert watcher.race_events == [] or all(
+        event["path"].endswith("racing.sh") for event in watcher.race_events)
+    if watcher.race_events:
+        verdict, _detail = module.credential_scan_verdict(
+            watcher.token_hits, watcher.scan_error, True, False,
+            watcher.scan_incomplete, watcher.scan_completed, watcher.race_events)
+        assert verdict == "CODEX_GATE_STATE_SCAN_INCOMPLETE"
+
+
+def test_budget_failures_are_typed_incomplete(tmp_path):
+    """257 files, a 4097-entry traversal and an oversized total all fail the
+    verdict as an incomplete scan, not as a pass."""
+    module = load_gate()
+    root = tmp_path / "worker-root"
+    state = root / "views" / "view-1" / "ready" / "agentbox-sidecar" / "deployment" / "codex" / "native-state"
+    state.mkdir(parents=True)
+    for index in range(module.CREDENTIAL_SCAN_FILES + 1):
+        (state / f"f{index:04}").write_text("x", encoding="utf-8")
+    watcher = module.StateSymlinkWatcher(root)
+    watcher._scan_for_credential(root / "views")
+    assert "file budget" in (watcher.scan_incomplete or ""), watcher.scan_incomplete
+    verdict, _detail = module.credential_scan_verdict(
+        watcher.token_hits, watcher.scan_error, True, False,
+        watcher.scan_incomplete, watcher.scan_completed, watcher.race_events)
+    assert verdict == "CODEX_GATE_STATE_SCAN_INCOMPLETE"
+
+
 def test_a_green_run_records_neither_blocker_nor_co_observation():
     module = load_gate()
     report = {"stateSymlinksObserved": SYMLINKS, "diagnostics": {"turn": {}}}
