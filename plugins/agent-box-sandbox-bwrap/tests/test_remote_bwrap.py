@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import shutil
 import subprocess
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -20,6 +19,7 @@ import pytest
 from agent_box.extensions.runtime_composition import ProjectionRejected
 from agent_box_sandbox_bwrap import (
     GUEST_HOME, compile_remote_bwrap_argv, compile_remote_sidecar_bwrap_argv,
+    provider as bwrap_provider,
 )
 from agent_box_sandbox_bwrap.home_projection import (
     HomeProjectionRejected, home_projection_target, protected_state_paths,
@@ -502,10 +502,42 @@ def test_ephemeral_state_path_is_a_tmpfs_over_the_writable_state():
     subtree out of the view."""
     argv = sidecar_argv(ephemeral_state_mounts=("/runtime/home/.hermes/.tmp",))
     marker = argv.index("/runtime/home/.hermes/.tmp")
-    assert argv[marker - 1:marker + 1] == ["--tmpfs", "/runtime/home/.hermes/.tmp"]
+    assert argv[marker - 3:marker + 1] == [
+        "--size", str(bwrap_provider.EPHEMERAL_TMPFS_BYTES), "--tmpfs",
+        "/runtime/home/.hermes/.tmp",
+    ]
     state_index = argv.index("/worker/views/view-1/agentbox-sidecar/deployment/hermes/native-state")
     assert marker > state_index, "the tmpfs must shadow the state bind"
     assert argv.count("--tmpfs") == 2, "the fixed /tmp plus the one declared path"
+
+
+def test_ephemeral_state_paths_are_bounded_in_count():
+    with pytest.raises(ProjectionRejected) as refused:
+        sidecar_argv(ephemeral_state_mounts=[
+            f"/runtime/home/.hermes/.tmp{n}" for n in range(bwrap_provider.MAX_EPHEMERAL_MOUNTS + 1)
+        ])
+    assert "too many ephemeral state paths" in str(refused.value)
+
+
+def test_ephemeral_state_paths_may_not_nest_or_duplicate():
+    with pytest.raises(ProjectionRejected) as duplicated:
+        sidecar_argv(ephemeral_state_mounts=[
+            "/runtime/home/.hermes/.tmp", "/runtime/home/.hermes/.tmp",
+        ])
+    assert "duplicate" in str(duplicated.value)
+    with pytest.raises(ProjectionRejected) as nested:
+        sidecar_argv(ephemeral_state_mounts=[
+            "/runtime/home/.hermes/.tmp", "/runtime/home/.hermes/.tmp/plugins",
+        ])
+    assert "may not nest" in str(nested.value)
+
+
+def test_an_ephemeral_path_inside_a_readonly_projection_is_refused():
+    with pytest.raises(ProjectionRejected) as refused:
+        sidecar_argv(
+            ephemeral_state_mounts=("/runtime/home/.hermes/config.yaml/scratch",),
+        )
+    assert "cannot live inside a projected read-only file" in str(refused.value)
 
 
 def test_ephemeral_state_path_outside_a_writable_state_directory_is_refused():
@@ -525,13 +557,13 @@ def test_a_readonly_projection_inside_an_ephemeral_path_is_refused():
 
 
 @pytest.mark.skipif(BWRAP is None, reason="bubblewrap is required for the shadowing proof")
-def test_a_real_tmpfs_never_reaches_the_host_state_directory():
+def test_a_real_tmpfs_never_reaches_the_host_state_directory(tmp_path):
     """The end-to-end property decision A buys: what the Harness writes under
     the ephemeral path is visible inside the sandbox, never on the host view
     side, and a normal sibling write still lands on the host."""
     import subprocess
 
-    base = Path(tempfile.mkdtemp(prefix="agentbox-ephemeral-"))
+    base = Path(tmp_path)
     view = base / "views" / "view-1"
     host = view / "agentbox-sidecar" / "deployment" / "hermes" / "native-state"
     host.mkdir(parents=True)
@@ -576,4 +608,4 @@ def test_a_real_tmpfs_never_reaches_the_host_state_directory():
         assert not (host / ".tmp" / "plugins").exists()
         assert (host / "keep.txt").read_text().strip() == "kept"
     finally:
-        shutil.rmtree(base, ignore_errors=True)
+        pass

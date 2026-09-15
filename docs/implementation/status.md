@@ -219,13 +219,14 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   给出方案 A（部署层 attempt-ephemeral 投影 `.tmp` + fail-closed 扫描；不提高通用上限、
   无品牌分支）/B（官方配置关闭解包与凭据持久化）/C（Codex 暂 MODEL_NOT_VERIFIED），
   推荐 A——**待用户裁决**。
-- codex_decision_a_implemented: **用户已裁决 A（2026-09-15）并已实施**——`stateProjection`
+- codex_decision_a_implemented: **用户已裁决 A（2026-09-15）并已实施、已验证**——`stateProjection`
   新增可选 `ephemeralPaths`（部署声明、沙箱语法验证），bwrap 在全部 bind 之后对该子路径
   追加 `--tmpfs`：Harness 可写，但**不进 view/state/checkpoint，尝试结束即消失**；
   1024 列表上限与 fail-closed 凭据扫描不变。Codex 生产模板声明 `ephemeralPaths: [".tmp"]`。
   反例与证明：真实 bwrap 遮蔽测试（burst 文件不落宿主 state、普通兄弟文件正常落盘）、
   argv 顺序断言（tmpfs 在 state bind 之后）、越界/RO 冲突拒绝、deployment 解析缺省兼容。
   **c8 有界复跑（3 轮）**：全部 exit 0、view 峰值 113、`tokenInState=false`、state 78 文件；
+  遮蔽模式 6 轮全绿 + 无遮蔽诊断 9 轮全绿（secret/突发均未复现，时机相关，fail-closed 保持）；
   Python 全量 **822 passed/6 skipped**；Rust 27 passed；Worker 源未变（c8 摘要不变）。
 - codex_decision_pending: **已由用户裁决 A 并实施（原 USER_DECISION_REQUIRED 已关闭）**——
   Codex `.tmp/plugins` 突发（VIEW_FILE_LIMIT）与凭据瞬时入 state（SIDECAR_STATE_CONTAINS_SECRET）

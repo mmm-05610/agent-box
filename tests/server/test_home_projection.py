@@ -517,6 +517,108 @@ def test_a_protected_path_is_refused_when_a_checkpoint_restores_it():
     )
 
 
+def test_the_loader_bounds_and_validates_ephemeral_paths(tmp_path, monkeypatch):
+    (tmp_path / "config.json").write_text("{}\n", encoding="utf-8")
+    """The deployment layer refuses an oversized, illegal or duplicated
+    ephemeral declaration with the same typed error as every other field."""
+    import agent_box.server.bootstrap.runtime as runtime_module
+    import agent_box.server.execution.sidecar as sidecar_module
+
+    monkeypatch.setattr(runtime_module, "_builtin_connector", lambda _instance_id: object())
+    monkeypatch.setattr(
+        sidecar_module, "sidecar_bundle_files",
+        lambda root, additional_files=None: dict(additional_files or {}),
+    )
+
+    def load(ephemeral):
+        deployment = write_deployment(tmp_path, fixture_harness(
+            stateProjection={"target": AGENT_DIRECTORY, "ephemeralPaths": ephemeral},
+        ))
+        runtime = build_deployment(tmp_path, deployment)
+        try:
+            return runtime
+        except BaseException:
+            runtime.stop()
+            raise
+
+    with pytest.raises(RuntimeError, match="SIDECAR_DEPLOYMENT_INVALID"):
+        load([f"d{index}" for index in range(9)])
+    with pytest.raises(RuntimeError, match="SIDECAR_DEPLOYMENT_INVALID"):
+        load(["../escape"])
+    # 重复/嵌套/与只读投影的重叠由 bwrap 编译器在其校验层拒绝（见
+    # plugins/agent-box-sandbox-bwrap/tests/test_remote_bwrap.py）。
+    runtime = load([".tmp"])
+    try:
+        pass
+    finally:
+        runtime.stop()
+
+
+def test_an_ephemeral_checkpoint_entry_is_dropped_on_restore():
+    """Decision A: attempt-ephemeral scratch is not authoritative state, so an
+    old checkpoint entry under the ephemeral prefix is dropped instead of being
+    written back into the view (where the tmpfs would shadow it anyway, but the
+    host view must not grow it either)."""
+    recorded = {}
+
+    class BundleRecordingConnector(_RecordingConnector):
+        class client(object):
+            pass
+
+    state_file = b"native-state"
+    ephemeral_file = b"plugin-skill-blob"
+    launcher = WslSidecarLauncher(
+        _RecordingConnector(_RecordingWorkerClient()),
+        workspace={"distribution": "Ubuntu", "remote_user": "tester",
+                   "connection_id": "connection", "remote_path": "/workspace"},
+        bundle={},
+        state_bundle_prefix=STATE_BUNDLE_PREFIX, state_target=STATE_TARGET,
+        state_ephemeral_paths=(".tmp",),
+        restored_state={"state.db": state_file, ".tmp/plugins/blob": ephemeral_file},
+        timeout_ms=5000,
+    )
+    bundle = launcher.bundle
+    assert bundle[f"{STATE_BUNDLE_PREFIX}/state.db"] == state_file
+    assert not any(name.startswith(f"{STATE_BUNDLE_PREFIX}/.tmp")
+                   for name in bundle), sorted(bundle)
+
+
+def test_an_ephemeral_path_is_never_captured_by_name():
+    """The capture excludes the ephemeral prefix by name, exactly like the
+    protected set - not because an overlay happens to hide it."""
+    state_file = b"native-state"
+    ephemeral_file = b"plugin-skill-blob"
+    files = [
+        {"path": f"{STATE_BUNDLE_PREFIX}/.agentbox-state", "size": 10},
+        {"path": f"{STATE_BUNDLE_PREFIX}/state.db", "size": len(state_file)},
+        {"path": f"{STATE_BUNDLE_PREFIX}/.tmp/plugins/blob", "size": len(ephemeral_file)},
+    ]
+    payloads = {
+        f"{STATE_BUNDLE_PREFIX}/state.db": state_file,
+        f"{STATE_BUNDLE_PREFIX}/.tmp/plugins/blob": ephemeral_file,
+    }
+
+    class Client(_RecordingWorkerClient):
+        def request(self, op, arguments=None, **_identity):
+            if op == "view.list":
+                return {"files": files}
+            if op == "view.get":
+                value = payloads[arguments["path"]]
+                offset = arguments["offset"]
+                chunk = value[offset:offset + arguments["maxLength"]]
+                return {"data": base64.b64encode(chunk).decode(), "offset": offset,
+                        "digest": "sha256:" + hashlib.sha256(value).hexdigest(),
+                        "nextOffset": offset + len(chunk),
+                        "eof": offset + len(chunk) == len(value)}
+            return super().request(op, arguments, **_identity)
+
+    channels = _WorkerChannels(
+        Client(), "attempt", 1, "view", state_bundle_prefix=STATE_BUNDLE_PREFIX,
+        state_ephemeral_paths=(".tmp",),
+    )
+    assert channels.capture_state() == {"state.db": state_file}
+
+
 def test_a_protected_path_is_never_captured_by_name():
     """The exclusion is by name, not by "the overlay happens to hide it"."""
     state_file = b"native-state"

@@ -189,9 +189,11 @@ Reviewer `CHANGES_REQUIRED` 的修复（§2.1/§7.1）落地后重建
   扫描全部通过。
 - Python 全量 **822 passed / 6 skipped / 0 failed**；Rust fmt 干净 + 27 passed；
   Worker 源未变（`git diff` 为空，c8 摘要仍为现行 bundle）；`git diff --check` 通过。
-- 如实记录：假 token 泄漏的准确相对路径仍未捕获到（本轮 3 轮未复现该 1/15 现象）。
-  若泄漏路径在 `.tmp` 内，方案 A 已同时隔离它；若在别处，fail-closed 扫描仍会拒绝该轮，
-  付费 preflight 前继续用假 token 定位。
+- 泄漏路径定位（如实记录）：门新增 `--legacy-state-diagnostic`（无遮蔽、仅假 token、无模型）
+  专用于定位；在该模式 + 遮蔽模式下合计 **14 轮**（8 遮蔽/6 遮蔽+诊断……准确分账：
+  遮蔽模式 6 轮全绿峰值 113；无遮蔽诊断 9 轮全绿）中，secret 命中与 5529 突发**均未复现**
+  ——两类现象都与"捕获与写入突发重叠"的时机相关，本机负载相关。fail-closed 扫描保持，
+  付费 preflight 前继续定位；若泄漏路径在 `.tmp` 内，方案 A 已同时隔离它。
 
 ## 5. 全量验证与清理
 

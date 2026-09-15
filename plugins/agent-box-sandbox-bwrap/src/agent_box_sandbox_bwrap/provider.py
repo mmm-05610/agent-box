@@ -182,6 +182,13 @@ def _reject_colliding_targets(targets: Sequence[str]) -> None:
         raise ProjectionRejected("sidecar mount targets collide")
 
 
+#: Attempt-ephemeral state paths are RAM-backed tmpfs mounts, so both the
+#: mount count and each mount's size are bounded - a Harness scratch area
+#: can never consume unbounded WSL memory, and the declaration can never
+#: grow past what the Server reviewed.
+MAX_EPHEMERAL_MOUNTS = 8
+EPHEMERAL_TMPFS_BYTES = 256 * 1024 * 1024
+
 def compile_remote_sidecar_bwrap_argv(
     *, workspace: str, runtime_view: str, environment: Mapping[str, str],
     secret: str | None = None,
@@ -250,12 +257,23 @@ def compile_remote_sidecar_bwrap_argv(
             raise ProjectionRejected(
                 "ephemeral state path is not inside a declared writable state directory"
             )
-        if any(ro == validated or ro.startswith(validated + "/")
-               for ro in projection_targets):
-            raise ProjectionRejected(
-                "a projected read-only file cannot live inside an ephemeral state path"
-            )
+        for ro in projection_targets:
+            if ro == validated or ro.startswith(validated + "/"):
+                raise ProjectionRejected(
+                    "a projected read-only file cannot live inside an ephemeral state path"
+                )
+            if validated == ro or validated.startswith(ro + "/"):
+                raise ProjectionRejected(
+                    "an ephemeral state path cannot live inside a projected read-only file"
+                )
+        if validated in ephemeral_targets:
+            raise ProjectionRejected("duplicate ephemeral state path")
+        if any(previous.startswith(validated + "/") or validated.startswith(previous + "/")
+               for previous in ephemeral_targets):
+            raise ProjectionRejected("ephemeral state paths may not nest")
         ephemeral_targets.append(validated)
+    if len(ephemeral_targets) > MAX_EPHEMERAL_MOUNTS:
+        raise ProjectionRejected("too many ephemeral state paths")
     for state_target in writable_targets:
         # The relations the Server derived `protected_state_paths` from are
         # re-checked here, on the exact argv this function is about to emit: a
@@ -314,9 +332,11 @@ def compile_remote_sidecar_bwrap_argv(
     # Attempt-ephemeral state paths come last on purpose: a fresh tmpfs laid
     # over its writable state directory shadows that subtree out of the view,
     # so a Harness may write its scratch there without any of it ever being
-    # listed, captured into a checkpoint, or surviving the attempt.
+    # listed, captured into a checkpoint, or surviving the attempt. Every
+    # mount is size-bounded - a tmpfs is RAM-backed, and the Worker only ever
+    # runs bounded projections.
     for target in sorted(ephemeral_targets):
-        argv += ["--tmpfs", target]
+        argv += ["--size", str(EPHEMERAL_TMPFS_BYTES), "--tmpfs", target]
     argv += ["--chdir", "/workspace", "--clearenv"]
     for key, value in sorted(environment.items()):
         argv += ["--setenv", key, value]

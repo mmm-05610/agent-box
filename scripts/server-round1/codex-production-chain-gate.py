@@ -98,6 +98,8 @@ SCRIPT = "scripts/server-round1/codex-production-chain-gate.py"
 #: path; the gate never reads a real secret file. The shape matches what the
 #: native Codex `env_key` lookup accepts (`sk-` prefixed), nothing more.
 FAKE_TOKEN = "sk-codex-gate-fake-token-4f7ac21d-non-secret"
+#: Set from --legacy-state-diagnostic in main(); read by the sidecar launcher.
+LEGACY_STATE_DIAGNOSTIC = False
 NONCE_ROUND_1 = "CODEX-GATE-NONCE-1F4A9C"
 NONCE_ROUND_2 = "CODEX-GATE-NONCE-2B7D31"
 #: The controlled stand-in for "the user's home": created by this run, carrying
@@ -619,7 +621,15 @@ def main() -> int:
     parser.add_argument("--artifact", default=None)
     parser.add_argument("--keep", action="store_true")
     parser.add_argument("--json", action="store_true")
+    parser.add_argument(
+        "--legacy-state-diagnostic", action="store_true",
+        help="run without the attempt-ephemeral .tmp shadow so the credential "
+             "scan can name the native-state file that receives the injected "
+             "fake token (no-model, fake-token only; never with a real key)",
+    )
     options = parser.parse_args()
+    global LEGACY_STATE_DIAGNOSTIC
+    LEGACY_STATE_DIAGNOSTIC = bool(options.legacy_state_diagnostic)
 
     endpoint: FakeEndpoint | None = None
     created: Path | None = None
@@ -1494,7 +1504,7 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production, t
                 ),
                 state_bundle_prefix="agentbox-sidecar/deployment/codex/native-state",
                 state_target=production.STATE_TARGET,
-                state_ephemeral_paths=(".tmp",),
+                state_ephemeral_paths=() if LEGACY_STATE_DIAGNOSTIC else (".tmp",),
                 protected_state_paths=protected_state_paths(production),
                 restored_state=restored_state,
                 timeout_ms=120_000,

@@ -59,6 +59,16 @@ _STATE_TRANSIENT_CODES = frozenset({
 })
 
 
+def _matches_ephemeral_prefix(relative: str, prefixes: Sequence[str]) -> bool:
+    """Whether a state-relative path is (under) a declared attempt-ephemeral
+    directory. Shared by the capture exclusion and the restore drop: decision A
+    keeps this scratch out of the view/state/checkpoint on every path."""
+    for prefix in prefixes:
+        if relative == prefix or relative.startswith(prefix.rstrip("/") + "/"):
+            return True
+    return False
+
+
 def _state_error_is_transient(error: BaseException) -> bool:
     """Whether a capture may wait for this failure to go away.
 
@@ -303,6 +313,12 @@ class WslSidecarLauncher:
                 _safe_relative_state_path(relative)
                 if relative in self.protected_state_paths:
                     raise ValueError("SIDECAR_STATE_PROTECTED_PATH")
+                if _matches_ephemeral_prefix(relative, self.state_ephemeral_paths):
+                    # An old checkpoint may contain attempt-ephemeral scratch
+                    # (decision A). It is not authoritative state: restoring it
+                    # would put it back into the view, so it is dropped here,
+                    # exactly as the capture drops live files under the prefix.
+                    continue
                 bundle_path = f"{state_bundle_prefix}/{relative}"
                 if bundle_path in self.bundle:
                     raise ValueError("SIDECAR_STATE_PATH_CONFLICT")
@@ -397,6 +413,7 @@ class WslSidecarLauncher:
                 secret_frame_id if secret is not None else None,
                 state_bundle_prefix=self.state_bundle_prefix,
                 protected_state_paths=self.protected_state_paths,
+                state_ephemeral_paths=self.state_ephemeral_paths,
                 forbidden_content=(credential_material or b"").strip(),
             )
             channels.subscribe()
@@ -428,6 +445,7 @@ class _WorkerChannels:
         secret_frame_id: str | None = None,
         state_bundle_prefix: str | None = None,
         protected_state_paths: Sequence[str] = (),
+        state_ephemeral_paths: Sequence[str] = (),
         forbidden_content: bytes = b"",
     ) -> None:
         self.client = client
@@ -439,6 +457,7 @@ class _WorkerChannels:
         #: Read-only configuration that lives *inside* the writable state
         #: subtree. It is not state: it must not be captured into a checkpoint.
         self.protected_state_paths = frozenset(protected_state_paths)
+        self.state_ephemeral_paths = tuple(state_ephemeral_paths)
         self._forbidden_content = forbidden_content
         self._chunks: queue.Queue = queue.Queue()
         self._unsubscribe = None
@@ -583,6 +602,11 @@ class _WorkerChannels:
             if relative in self.protected_state_paths:
                 # Declared read-only configuration, not captured state.
                 continue
+            if self._under_ephemeral_prefix(relative):
+                # Attempt-ephemeral scratch is shadowed by a tmpfs inside the
+                # sandbox; should a file ever appear here on the view side
+                # (e.g. restored by an older generation), it is not state.
+                continue
             if not isinstance(size, int) or size < 0 or size > 8 * 1024 * 1024:
                 raise SidecarError("SIDECAR_STATE_OUTSIDE_BOUNDS", "state file exceeds bound")
             total += size
@@ -658,6 +682,14 @@ class _WorkerChannels:
         self._settled_state(
             deadline_seconds=deadline_seconds, interval_seconds=interval_seconds,
         )
+
+    def _under_ephemeral_prefix(self, relative: str) -> bool:
+        """Whether a state-relative path is (under) an attempt-ephemeral dir.
+
+        Decision A: these paths are shadowed by a tmpfs inside the sandbox, so
+        neither the capture nor a restore may treat them as durable state.
+        """
+        return _matches_ephemeral_prefix(relative, self.state_ephemeral_paths)
 
     def _view_bytes(self, path: str) -> tuple[bytes, str]:
         chunks = bytearray()
