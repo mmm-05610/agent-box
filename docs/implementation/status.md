@@ -58,7 +58,7 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 
 ## 当前长期goal状态字段（执行者每阶段维护）
 
-- backend_implementation: **LIVE_MODEL_GATES_PASSED**（39/40组件门完成；41的28方法+队列终态已按
+- backend_implementation: **BACKEND_IMPLEMENTATION_READY**（2026-09-15，用户显式授权开始联调后登记）（39/40组件门完成；41的28方法+队列终态已按
   锁定摘要29/29；Windows r4 平台门通过，**BACKEND_WINDOWS_R4_READY**。42-D 已补
   **RUNTIME_ARTIFACT_PROJECTION_READY**（工件投影底座）与 **四家生产封装全部完成**
   （Pi/Hermes/OpenCode/Codex \*_PRODUCTION_CHAIN_PREPARED，真实 adapter/agent + c5/c6/c7/c8 Worker +
@@ -74,6 +74,18 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   四家真实模型门（Worker 5s 租约缺陷已修：`WORKER_LEASE_KEEPALIVE_FIXED`）已按上一行执行完毕；
   要登记 **BACKEND_IMPLEMENTATION_READY** 还差固定 Reviewer 的阶段闭环，
   任一封装就绪或单家通过都不折算为整门通过）。
+- backend_ready_closure_source: **用户授权（2026-09-15）**——用户确认"前端已经完成、后端收尾完成后即可开始联调"，
+  据此登记 `BACKEND_IMPLEMENTATION_READY` 并进入双门接管。**closure 来源如实标注为「用户授权 + 执行者自审」**：
+  固定 Reviewer 因额度硬限制（`try again at Sep 20th, 2026 12:11 PM`，三次投递阶段包均无 verdict）未提供本阶段
+  `ACCEPT`；阶段包与全部证据已固化为
+  [stage-closure-dossier.md](../server-round1/fullstack/stage-closure-dossier.md)，额度恢复后补一次只读复审。
+- fullstack_integration_owner: **后端执行者（Zcode 后端 goal 会话）**，接管时间 2026-09-15 20:4x +08:00。
+  接管时只读复核：前端 HEAD `8e7c138c96337fc20ed61d3c21100e6449c8ec95`、分支
+  `feature/agentbox-desktop-product`、`git status --porcelain` 0 行、`writer_lease=RELEASED`、
+  `DESKTOP_IMPLEMENTATION_READY`、r3 `28 PASS / 0 FAIL / 0 SKIP / 0 PENDING`（`allOk=true`）、
+  wire 两摘要就地重算一致（TS `11e3b3e7…` / 工件 `5d4fa3bf…`）、无 electron/node/tsc 写入者。
+  后端侧对应证据：四家 `--live` 门、Windows r4 + `-PostCheck`、`tests` 576/3/0。**发布源 main 仍只读**；
+  接管范围限 42 `conditional_cross_repo_write.write_paths`。
 - frontend_handoff: **DESKTOP_HANDOFF_CONSISTENT（按其自述成立；后端仍未接管）**——最新只读复测
   2026-09-15 19:00 +08:00（本轮，未写前端任何文件）：HEAD 仍 `8e7c138c96337fc20ed61d3c21100e6449c8ec95`、
   `git status --porcelain` 0 行、分支 `feature/agentbox-desktop-product`、lease 行仍为
