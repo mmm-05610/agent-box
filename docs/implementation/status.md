@@ -1,6 +1,6 @@
 # Backend Server — status
 
-更新：2026-09-15 19:00 +08:00（执行者：后端 goal 会话，分支 feature/server-harness-extension-v1）。
+更新：2026-09-15 20:05 +08:00（执行者：后端 goal 会话，分支 feature/server-harness-extension-v1）。
 37 的独立验收仍为 PARTIAL；历史证据保留。
 当前授权39→40→41→42。执行进度：39 完成；40 A/B/C/D 完成（四家组件门通过，
 无真实模型）；41 的 28 方法与队列终态已按前端 `3aba5c5c` 新摘要严格 29/29 重锁，Windows r4 平台门
@@ -247,7 +247,7 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   **泄漏路径第一手捕获**：`native-state/shell_snapshots/*.sh`（Codex 环境快照含注入的
   凭据环境变量原文）→ 方案 A 扩展为 `ephemeralPaths: [".tmp", "shell_snapshots"]`。
   **c8 最终复跑（4 轮，含快照遮蔽）**：全部 exit 0、view 峰值 **112**、`tokenInState=false`、
-  credentialPathHits=0、state 78 文件。Python 计数【现行 2026-09-15 18:22，HEAD b7b3bb4（本轮截图提交后为 51d541b/b7b3bb4）：`tests` **575 passed/3 skipped/0 failed**，插件 artifacts 2 / git 4 / harnesses 127+3 skipped / runtime-local 6 / runtime-wsl 36 / sandbox-bwrap 112 / skills 8 / terminal-session 3 / web 14，另 web 的 2 个 Playwright 浏览器用例因本机缺 chromium headless shell 二进制而环境不可用；历史计数 820/833/838/840/843/845/849/852/854 均为更早 HEAD 且已被取代】；Rust 计数沿用 27 passed（本轮未改 Worker/Rust 源，`git diff -- workers/` 为空，故未重跑）；**现行（2026-09-15）：Codex 已按官方 feature flags 从源头修复；`shell_snapshot` 的因果已由逐变量差分证明。Harness 工件 = Codex 0.147.0（生产固定）；Reviewer CLI = codex-cli 0.154.0（两者不同层）。**：`features.plugins=false` 与 `features.shell_snapshot=false` 已入受审配置，无遮蔽对照轮实测 `.tmp/` 与 `shell_snapshots/` 目录均不存在、零凭据命中、门 exit 0（Python 全量 **843 passed/6 skipped/0 failed**）。**差分（同 0.147.0、同 HEAD、无 tmpfs 遮蔽）**：控制腿（去掉官方 `[features]`）第一轮即在 `native-state/shell_snapshots/*.sh` 命中注入假 token（门 exit 1），处理腿（部门原样配置）2 轮全绿零命中 → `CODEX_FEATURE_FLAG_DIFFERENTIAL_OK`；**逐变量差分**（`--strip shell_snapshot`：`plugins` 保持 false 不变，仅 `shell_snapshot` 回到官方默认开启）：控制腿 2 处凭据命中、处理腿零命中 → **`features.shell_snapshot` 单独即凭据写入原生 state 的成因**；`plugins` 的 `.tmp/plugins` 突发本轮控制腿未复现，**其因果本轮未被复现**（历史第一手观测与 tmpfs 纵深防御保留）。settled 判据现为**两阶段（turn 链 + reopen）合并**、Harness 退出后由独立扫描器同步完成。此前的“口径”说明如下（历史）：**Codex 门口径已按用户裁决 A 收口（判据=“全树走完且与上一轮字节身份完全一致”的稳定轮次至少被观测一次；活动写入竞态只入报告），真机 3 轮 2 绿 1 红，红的 1 轮是另一条既存间歇（capture 报 VIEW_INCOMPLETE，与凭据扫描无关，待定位）。原“当前红（口径待裁决）”说明如下（历史）：凭据观察器按 Reviewer 要求把“读取中变化的 state 文件”记为持久事实，而活动 Codex 的 `state_*.sqlite-wal` 运行期持续写入，故判 `CODEX_GATE_STATE_SCAN_INCOMPLETE`（files 83、cycles>200、零凭据命中、零 hit）；capture 期 sidecar 扫描仍是权威且 fail-closed；
+  credentialPathHits=0、state 78 文件。Python 计数【现行 2026-09-15 20:05，HEAD 92c53ce：`tests` **576 passed/3 skipped/0 failed**，插件 artifacts 2 / git 4 / harnesses 127+3 skipped / runtime-local 6 / runtime-wsl 36 / sandbox-bwrap 112 / skills 8 / terminal-session 3 / web 14，另 web 的 2 个 Playwright 浏览器用例因本机缺 chromium headless shell 二进制而环境不可用；历史计数 820/833/838/840/843/845/849/852/854 均为更早 HEAD 且已被取代】；Rust 计数沿用 27 passed（本轮未改 Worker/Rust 源，`git diff -- workers/` 为空，故未重跑）；**现行（2026-09-15）：Codex 已按官方 feature flags 从源头修复；`shell_snapshot` 的因果已由逐变量差分证明。Harness 工件 = Codex 0.147.0（生产固定）；Reviewer CLI = codex-cli 0.154.0（两者不同层）。**：`features.plugins=false` 与 `features.shell_snapshot=false` 已入受审配置，无遮蔽对照轮实测 `.tmp/` 与 `shell_snapshots/` 目录均不存在、零凭据命中、门 exit 0（Python 全量 **843 passed/6 skipped/0 failed**）。**差分（同 0.147.0、同 HEAD、无 tmpfs 遮蔽）**：控制腿（去掉官方 `[features]`）第一轮即在 `native-state/shell_snapshots/*.sh` 命中注入假 token（门 exit 1），处理腿（部门原样配置）2 轮全绿零命中 → `CODEX_FEATURE_FLAG_DIFFERENTIAL_OK`；**逐变量差分**（`--strip shell_snapshot`：`plugins` 保持 false 不变，仅 `shell_snapshot` 回到官方默认开启）：控制腿 2 处凭据命中、处理腿零命中 → **`features.shell_snapshot` 单独即凭据写入原生 state 的成因**；`plugins` 的 `.tmp/plugins` 突发本轮控制腿未复现，**其因果本轮未被复现**（历史第一手观测与 tmpfs 纵深防御保留）。settled 判据现为**两阶段（turn 链 + reopen）合并**、Harness 退出后由独立扫描器同步完成。此前的“口径”说明如下（历史）：**Codex 门口径已按用户裁决 A 收口（判据=“全树走完且与上一轮字节身份完全一致”的稳定轮次至少被观测一次；活动写入竞态只入报告），真机 3 轮 2 绿 1 红，红的 1 轮是另一条既存间歇（capture 报 VIEW_INCOMPLETE，与凭据扫描无关，待定位）。原“当前红（口径待裁决）”说明如下（历史）：凭据观察器按 Reviewer 要求把“读取中变化的 state 文件”记为持久事实，而活动 Codex 的 `state_*.sqlite-wal` 运行期持续写入，故判 `CODEX_GATE_STATE_SCAN_INCOMPLETE`（files 83、cycles>200、零凭据命中、零 hit）；capture 期 sidecar 扫描仍是权威且 fail-closed；
   Worker 源未变（c8 摘要不变）；四门 + Windows r4/PostCheck 已在最终 HEAD 复跑全绿。
 - codex_decision_pending: **已由用户裁决 A（历史条目）**——
   Codex `.tmp/plugins` 突发（VIEW_FILE_LIMIT）与凭据瞬时入 state（SIDECAR_STATE_CONTAINS_SECRET）
@@ -256,6 +256,18 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   `REVIEWER_AUTOMATION_READY` 登记、真实 locator 读取全部挂起；其他三家不受影响。
   Reviewer 第十轮结论：本阶段除该 P0 外无任何 FINDING/矛盾（REVIEWED_HEAD=47d6b64）。
   裁决 A 已实施并经多轮复审修复（壳快照泄漏路径已捕获并遮蔽）。**Pi 已取得真实模型门证据（2026-09-15）：`PI_PRODUCTION_CHAIN_GATE_OK`（mode=live）**——两轮真实 DeepSeek 答复、次轮带上下文、重开重放观测、未知模型发包前拒绝、凭据零泄漏、授权文件未被删；**Hermes 同轮通过：`HERMES_PRODUCTION_CHAIN_GATE_OK`（mode=live）**——两轮真实答复、同 native id 续接、凭据零泄漏、清理干净、授权文件未删；guard/假端点专有观测在 live 下显式记为未观测（不静默通过）。**OpenCode 同轮通过：`OPENCODE_PRODUCTION_CHAIN_PREPARED`（mode=live）**——两轮真实答复、checkpoint resumable、缺凭据派发前拒绝、凭据零泄漏、清理干净。**Codex 同轮接入 `--live` 并通过：`CODEX_PRODUCTION_CHAIN_GATE_OK`（mode=live）**——首轮 14 deltas、次轮 15 deltas 且回忆首轮 nonce、同 native id 续接、真实 `session/load` 重开（该相位 provider 流量标注为 loopback 机制审计）、真实流式答复中途取消 `202 → cancelled`（0.08 s）、未知模型派发前拒绝、`tokenIn*` 全 false、78 文件 state 零命中、`authorizedLocatorDeleted=false`、清理全 true；**四家真实模型门至此全部取得证据**，累计 <¥0.05。接入时修掉三个真实缺陷：live 下 4 处假端点专有断言、失败相位报告无法序列化（只剩 traceback）、凭据事实只记录不断言。
+- wire_frame_contract_check: **事件帧层跨仓合同门（2026-09-15）**——`tests/server/test_wire_v1.py`
+  新增 `test_every_projected_frame_matches_the_strict_frontend_event_schema`：驱动真实生产者
+  （排队发送、审批请求/决定、sidecar 桥写入、角色切换），把 `history.snapshot`（沿 `olderCursor`
+  向旧翻页）与实时批量两条路径的每一帧交给前端 `EventFrame`（`additionalProperties:false`、闭枚举）
+  校验；**带工件与不带工件两种跑法各 30 passed**，且帧键集与 kind 为不带工件时的常驻断言。
+  同轮机械核对：错误码 12 家族集合与后端 `FAMILIES` **逐项相等**。
+  由此发现两处「合同已声明、后端无生产者」，已按权威层处理并登记到
+  [wire 反馈](../server-round1/wire-review.md)：`config.changed` **已补生产者**（`sessions.switchProfile`
+  确认后同事务发 `next_send`，重放在写前返回不重发；`profiles.updateConfig` 路径仍未发、已登记待前端反馈）；
+  `workspace.connection` **仍无生产者**——后端无异步准备阶段，且事件帧按构造必属某个 Session
+  （`server_session_events.session_id NOT NULL` + `EventFrame.sessionId` 必填），浏览阶段没有 Session
+  也就没有可承载该帧的流，需前端在合同层裁决（同步结果 or 第二条会话无关通道），后端不猜语义。
 - self_review_round: **执行者自审（2026-09-15，Codex 额度用尽后按用户指示）**——自审第一遍
   发现并修复真实缺陷：`turn_chain_phase()` 二次归一化会丢弃链路阶段的 settled 凭据命中
   （已改幂等归一化 + 附加 capture，加两条端到端回归）；其余对照项（capture 命中按码升格、
