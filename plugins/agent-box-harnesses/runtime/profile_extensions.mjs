@@ -151,6 +151,33 @@ export const AGENTBOX_HARNESS_PROFILES = {
     journalPageWhileOwned: false,
     reloadOnHistoryRefresh: false,
   },
+  // Work Order 43 follow-up. Kilo CLI (an OpenCode fork) ships a first-party
+  // ACP stdio server (`kilo acp`); AgentBox registration glue, upstream has no
+  // entry. The deployment injects the absolute artifact binary. First-hand
+  // probe: the model option carries the configured `provider/model` value and
+  // streams standard session/update chunks; sessionCapabilities arrive empty
+  // even though session/load and session/resume both answer.
+  kilo: {
+    id: "kilo",
+    label: "Kilo",
+    command: process.platform === "win32" ? "kilo.exe" : "kilo",
+    args: ["acp"],
+    adapterCommand: process.platform === "win32" ? "kilo.exe" : "kilo",
+    permissionMode: "deny",
+    modelVariantConfigIDs: [],
+    capabilities: {
+      ...COMMON_ACP_CAPABILITIES,
+      models: true,
+      todos: false,
+      commands: false,
+      actions: false,
+      sessionRename: false,
+      sessionDelete: false,
+    },
+    historyLoader: undefined,
+    journalPageWhileOwned: false,
+    reloadOnHistoryRefresh: false,
+  },
 }
 
 const REGISTERED = { ...HARNESS_PROFILES, ...AGENTBOX_HARNESS_PROFILES }
@@ -181,6 +208,9 @@ export const AGENTBOX_MODEL_ALIASES = {
   // qwen's ACP model option composes a runtime value from auth type + model
   // id (observed first-hand; the production template owns the same pair).
   qwen: { "deepseek-flash": "$runtime|openai|deepseek-flash(openai)" },
+  // kilo addresses models as `provider/model` over the configured provider
+  // (observed first-hand; the production template owns the same pair).
+  kilo: { "deepseek-flash": "deepseek/deepseek-flash" },
 }
 
 export function resolveNativeModel(profileID, model) {

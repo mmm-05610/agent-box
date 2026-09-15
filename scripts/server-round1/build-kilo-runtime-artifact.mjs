@@ -1,34 +1,23 @@
 #!/usr/bin/env node
 /**
- * Build the claude runtime artifact: the Claude Code ACP adapter and exactly
- * the native dependency closure Node resolves for it - including Anthropic's
- * platform CLI binary package for this platform - with no network access at
- * build or run time.
+ * Build the kilo runtime artifact: the Kilo CLI launcher plus its platform
+ * binary package, with no network access at build or run time.
  *
- * Work Order 43 clone of the reviewed dsh/Pi builders with two claude-specific
- * additions, both structural facts about the closure rather than shortcuts:
+ * Work Order 43 clone of the claude builder (the same two structural facts
+ * apply): the platform package ships native executables (`kilo`, its bundled
+ * `bwrap`/sandbox helpers), so those files are published 0555; and the
+ * launcher declares same-os/cpu variants for glibc and musl plus an AVX2
+ * baseline split, of which npm installs exactly the matching one - the build
+ * asserts the non-baseline glibc variant is absent rather than shipping both.
  *
- *   1. `EXECUTABLE_FILES`: the SDK's platform package ships a native CLI
- *      binary (`claude`), which the SDK spawns directly. The tree is published
- *      read-only, so those files are published 0555 instead of 0644 - without
- *      the execute bit the artifact would be a complete but unrunnable tree.
- *   2. `libcMatches()`: the SDK declares same-os/cpu packages for both glibc
- *      and musl; os/cpu matching alone would copy both ~224 MB binaries. The
- *      build machine's libc (from `process.report`) selects one, exactly the
- *      rule npm itself applies.
+ * The launcher package's postinstall (which downloads a binary) is never run:
+ * `npm --ignore-scripts` installs the platform package, whose binary is the
+ * payload, and the launcher's own `findBinary` resolves it from node_modules.
  *
- * The source root is `runtime-claude/`, deliberately separate from the shared
- * `runtime/`: the adapter needs `@agentclientprotocol/sdk` 1.4.x and the shared
- * root pins 1.3.0 for the four integrated families.
+ * The source root is `runtime-kilo/`, separate per the family convention.
  *
- * License boundary (recorded in the family packaging doc): the adapter is
- * Apache-2.0; `@anthropic-ai/claude-agent-sdk` and its platform binaries are
- * Anthropic proprietary ("All rights reserved", Commercial ToS). This build
- * installs and runs them unmodified for internal use; it does not redistribute
- * them.
- *
- * usage: build-claude-runtime-artifact.mjs --output ABSOLUTE_DIR [--source RUNTIME_DIR]
- *                                       [--replace] [--json]
+ * usage: build-kilo-runtime-artifact.mjs --output ABSOLUTE_DIR [--source RUNTIME_DIR]
+ *                                      [--replace] [--json]
  */
 import { createHash } from "node:crypto"
 import { spawnSync } from "node:child_process"
@@ -41,24 +30,31 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..")
-const DEFAULT_SOURCE = path.join(REPO, "plugins", "agent-box-harnesses", "runtime-claude")
+const DEFAULT_SOURCE = path.join(REPO, "plugins", "agent-box-harnesses", "runtime-kilo")
 const DIGEST_PLUGIN = path.join(REPO, "plugins", "agent-box-sandbox-bwrap", "src")
 
-export const MARKER_NAME = ".agentbox-claude-runtime-artifact"
-export const MARKER_CONTENT = "agentbox-claude-runtime-artifact-r1\n"
-export const ADAPTER_PACKAGE = "@agentclientprotocol/claude-agent-acp"
-export const ADAPTER_VERSION = "0.77.0"
+export const MARKER_NAME = ".agentbox-kilo-runtime-artifact"
+export const MARKER_CONTENT = "agentbox-kilo-runtime-artifact-r1\n"
+export const ADAPTER_PACKAGE = "@kilocode/cli"
+export const ADAPTER_VERSION = "7.7.2"
 export const EXCLUDED_ADAPTERS = [
   "@automatalabs/pi-acp",
   "@agentclientprotocol/codex-acp",
   "@deepseek-ai/dsh",
+  "@agentclientprotocol/claude-agent-acp",
+  "@qwen-code/qwen-code",
   "opencode",
   "@openai/codex",
 ]
 export const EXECUTABLE_FILES = new Set([
-  "node_modules/@anthropic-ai/claude-agent-sdk-linux-x64/claude",
+  "node_modules/@kilocode/cli-linux-x64-baseline/bin/kilo",
+  "node_modules/@kilocode/cli-linux-x64-baseline/bin/bwrap",
+  "node_modules/@kilocode/cli-linux-x64-baseline/bin/kilo-sandbox-seccomp",
+  "node_modules/@kilocode/cli-linux-x64-baseline/bin/console",
 ])
-export const ENTRY = "node_modules/@agentclientprotocol/claude-agent-acp/dist/index.js"
+/** The AVX2 variant duplicates ~200MB; the launcher falls back to baseline. */
+export const EXCLUDED_VARIANTS = ["@kilocode/cli-linux-x64"]
+export const ENTRY = "node_modules/@kilocode/cli/bin/kilo"
 export const EXCLUDED_PACKAGES = EXCLUDED_ADAPTERS
 //: Entries (directories included) and bytes the runtime artifact contract allows.
 export const MAX_ENTRIES = 32768
@@ -120,7 +116,7 @@ function platformMatches(manifest) {
  */
 export function resolveClosure({ sourceRoot, entry = ADAPTER_PACKAGE, fail }) {
   const start = resolvePackage(entry, sourceRoot, sourceRoot)
-  if (!start) fail("CLAUDE_CLOSURE_ENTRY_MISSING", `${entry} is not installed under ${sourceRoot}`)
+  if (!start) fail("KILO_CLOSURE_ENTRY_MISSING", `${entry} is not installed under ${sourceRoot}`)
   const selected = new Map()
   const optional = []
   const queue = []
@@ -130,7 +126,7 @@ export function resolveClosure({ sourceRoot, entry = ADAPTER_PACKAGE, fail }) {
     try {
       manifest = manifestOf(directory)
     } catch {
-      fail("CLAUDE_CLOSURE_MANIFEST_INVALID", `${directory} has no readable package.json`)
+      fail("KILO_CLOSURE_MANIFEST_INVALID", `${directory} has no readable package.json`)
     }
     selected.set(directory, manifest)
     queue.push({ directory, manifest, requiredBy })
@@ -140,10 +136,14 @@ export function resolveClosure({ sourceRoot, entry = ADAPTER_PACKAGE, fail }) {
     const { directory, manifest } = queue.shift()
     for (const name of Object.keys(manifest.dependencies ?? {})) {
       const resolved = resolvePackage(name, directory, sourceRoot)
-      if (!resolved) fail("CLAUDE_CLOSURE_DEPENDENCY_MISSING", `${manifest.name} requires ${name}, which is not installed`)
+      if (!resolved) fail("KILO_CLOSURE_DEPENDENCY_MISSING", `${manifest.name} requires ${name}, which is not installed`)
       add(resolved, manifest.name)
     }
     for (const name of Object.keys(manifest.optionalDependencies ?? {})) {
+      if (EXCLUDED_VARIANTS.includes(name)) {
+        optional.push({ by: manifest.name, name, reason: "excluded-variant" })
+        continue
+      }
       const resolved = resolvePackage(name, directory, sourceRoot)
       if (!resolved) {
         optional.push({ by: manifest.name, name, reason: "not-installed" })
@@ -159,7 +159,7 @@ export function resolveClosure({ sourceRoot, entry = ADAPTER_PACKAGE, fail }) {
       const resolved = resolvePackage(name, directory, sourceRoot)
       const isOptional = manifest.peerDependenciesMeta?.[name]?.optional === true
       if (!resolved) {
-        if (!isOptional) fail("CLAUDE_CLOSURE_PEER_MISSING", `${manifest.name} requires peer ${name}, which is not installed`)
+        if (!isOptional) fail("KILO_CLOSURE_PEER_MISSING", `${manifest.name} requires peer ${name}, which is not installed`)
         optional.push({ by: manifest.name, name, reason: "optional-peer" })
         continue
       }
@@ -172,7 +172,7 @@ export function resolveClosure({ sourceRoot, entry = ADAPTER_PACKAGE, fail }) {
 function versionsFromLock(sourceRoot) {
   const lock = JSON.parse(readFileSync(path.join(sourceRoot, "package-lock.json"), "utf8"))
   if (!lock || typeof lock.packages !== "object") {
-    throw new BuildError("CLAUDE_LOCK_INVALID", "package-lock.json has no package map")
+    throw new BuildError("KILO_LOCK_INVALID", "package-lock.json has no package map")
   }
   return lock.packages
 }
@@ -211,7 +211,7 @@ function assertPlainTree(root) {
   }
   walk(root)
   if (problems.length) {
-    throw new BuildError("CLAUDE_ARTIFACT_SHAPE_INVALID", `the tree is not a plain file tree: ${problems.slice(0, 5).join(", ")}`)
+    throw new BuildError("KILO_ARTIFACT_SHAPE_INVALID", `the tree is not a plain file tree: ${problems.slice(0, 5).join(", ")}`)
   }
 }
 
@@ -236,9 +236,9 @@ export function treeSummary(directory) {
     // The reviewed implementation owns the bounds; report its refusal as the
     // bound it is, and only fall back to "unavailable" for anything else.
     if (diagnostic.includes("RUNTIME_ARTIFACT_OUTSIDE_BOUNDS")) {
-      throw new BuildError("CLAUDE_ARTIFACT_OUTSIDE_BOUNDS", diagnostic.slice(-300))
+      throw new BuildError("KILO_ARTIFACT_OUTSIDE_BOUNDS", diagnostic.slice(-300))
     }
-    throw new BuildError("CLAUDE_ARTIFACT_DIGEST_UNAVAILABLE",
+    throw new BuildError("KILO_ARTIFACT_DIGEST_UNAVAILABLE",
       `the reviewed digest implementation refused the tree: ${diagnostic.slice(-400)}`)
   }
   return JSON.parse(result.stdout)
@@ -249,26 +249,26 @@ export function treeSummary(directory) {
 const RESERVED_ROOTS = [".config", ".local", ".pi", ".agentbox", ".ssh", ".gnupg"]
 
 export function assertOutputPolicy(output, { repo = REPO } = {}) {
-  if (!path.isAbsolute(output)) throw new BuildError("CLAUDE_OUTPUT_NOT_ABSOLUTE", "--output must be an absolute path")
+  if (!path.isAbsolute(output)) throw new BuildError("KILO_OUTPUT_NOT_ABSOLUTE", "--output must be an absolute path")
   const resolved = path.resolve(output)
   if (resolved === repo || resolved.startsWith(repo + path.sep)) {
-    throw new BuildError("CLAUDE_OUTPUT_INSIDE_REPOSITORY", "--output must be outside the repository")
+    throw new BuildError("KILO_OUTPUT_INSIDE_REPOSITORY", "--output must be outside the repository")
   }
   if (resolved === "/" || resolved === path.parse(resolved).root) {
-    throw new BuildError("CLAUDE_OUTPUT_UNSAFE", "--output must not be a filesystem root")
+    throw new BuildError("KILO_OUTPUT_UNSAFE", "--output must not be a filesystem root")
   }
   const home = process.env.HOME
   if (home) {
     for (const reserved of RESERVED_ROOTS) {
       const forbidden = path.join(home, reserved)
       if (resolved === forbidden || resolved.startsWith(forbidden + path.sep)) {
-        throw new BuildError("CLAUDE_OUTPUT_RESERVED", "--output must not be a user configuration directory")
+        throw new BuildError("KILO_OUTPUT_RESERVED", "--output must not be a user configuration directory")
       }
     }
   }
   const relative = path.relative(repo, resolved)
   if (relative.split(path.sep).includes("node_modules")) {
-    throw new BuildError("CLAUDE_OUTPUT_INSIDE_REPOSITORY", "--output must not be a package directory")
+    throw new BuildError("KILO_OUTPUT_INSIDE_REPOSITORY", "--output must not be a package directory")
   }
   return resolved
 }
@@ -314,14 +314,14 @@ export function clearTarget(output, { replace }) {
   if (!existsSync(output)) return
   const stats = lstatSync(output)
   if (stats.isSymbolicLink()) {
-    throw new BuildError("CLAUDE_OUTPUT_NOT_OWNED", `${output} is a symlink; refusing to touch it`)
+    throw new BuildError("KILO_OUTPUT_NOT_OWNED", `${output} is a symlink; refusing to touch it`)
   }
   if (!stats.isDirectory()) {
-    throw new BuildError("CLAUDE_OUTPUT_NOT_OWNED", `${output} is not a directory; refusing to touch it`)
+    throw new BuildError("KILO_OUTPUT_NOT_OWNED", `${output} is not a directory; refusing to touch it`)
   }
   if (isOwnedArtifact(output)) {
     if (!replace) {
-      throw new BuildError("CLAUDE_OUTPUT_EXISTS", `${output} is an existing artifact; pass --replace to rebuild it`)
+      throw new BuildError("KILO_OUTPUT_EXISTS", `${output} is an existing artifact; pass --replace to rebuild it`)
     }
     makeWritable(output)
     rmSync(output, { recursive: true, force: true })
@@ -332,7 +332,7 @@ export function clearTarget(output, { replace }) {
     rmdirSync(output)
     return
   }
-  throw new BuildError("CLAUDE_OUTPUT_NOT_OWNED", `${output} is non-empty and carries no builder marker; refusing to overwrite it`)
+  throw new BuildError("KILO_OUTPUT_NOT_OWNED", `${output} is non-empty and carries no builder marker; refusing to overwrite it`)
 }
 
 // -- build -------------------------------------------------------------------
@@ -349,7 +349,7 @@ function copyTree(root, selected, sourceRoot, counters) {
         const target = path.join(to, entry.name)
         const relativePath = path.relative(root, target)
         if (stats.isSymbolicLink()) {
-          throw new BuildError("CLAUDE_ARTIFACT_SHAPE_INVALID", `${relativePath} is a symlink in the source closure`)
+          throw new BuildError("KILO_ARTIFACT_SHAPE_INVALID", `${relativePath} is a symlink in the source closure`)
         }
         if (stats.isDirectory()) {
           if (EXCLUDED_DIRECTORIES.has(entry.name)) {
@@ -360,7 +360,7 @@ function copyTree(root, selected, sourceRoot, counters) {
           continue
         }
         if (!stats.isFile()) {
-          throw new BuildError("CLAUDE_ARTIFACT_SHAPE_INVALID", `${relativePath} is not a regular file`)
+          throw new BuildError("KILO_ARTIFACT_SHAPE_INVALID", `${relativePath} is not a regular file`)
         }
         if (!isRuntimeFile(relativePath)) {
           counters.skippedFiles += 1
@@ -385,7 +385,7 @@ function copyTree(root, selected, sourceRoot, counters) {
 function assertNoForeignAdapters(sourceRoot) {
   for (const name of EXCLUDED_ADAPTERS) {
     if (resolvePackage(name, sourceRoot, sourceRoot)) {
-      throw new BuildError("CLAUDE_ARTIFACT_UNRELATED_PACKAGE",
+      throw new BuildError("KILO_ARTIFACT_UNRELATED_PACKAGE",
         `${name} must not be installed in the dsh runtime root`)
     }
   }
@@ -395,7 +395,7 @@ export function build({ output, source = DEFAULT_SOURCE, replace = false }) {
   const resolved = assertOutputPolicy(output)
   const sourceRoot = path.resolve(source)
   if (!existsSync(path.join(sourceRoot, "package-lock.json"))) {
-    throw new BuildError("CLAUDE_SOURCE_INVALID", `${sourceRoot} has no package-lock.json`)
+    throw new BuildError("KILO_SOURCE_INVALID", `${sourceRoot} has no package-lock.json`)
   }
   const lock = versionsFromLock(sourceRoot)
   const fail = (code, message) => { throw new BuildError(code, message) }
@@ -407,10 +407,10 @@ export function build({ output, source = DEFAULT_SOURCE, replace = false }) {
     const relative = path.relative(sourceRoot, directory).split(path.sep).join("/")
     const recorded = lock[relative]
     if (!recorded) {
-      throw new BuildError("CLAUDE_LOCK_ENTRY_MISSING", `${relative} is not recorded in package-lock.json`)
+      throw new BuildError("KILO_LOCK_ENTRY_MISSING", `${relative} is not recorded in package-lock.json`)
     }
     if (recorded.version !== manifest.version) {
-      throw new BuildError("CLAUDE_LOCK_VERSION_MISMATCH",
+      throw new BuildError("KILO_LOCK_VERSION_MISMATCH",
         `${relative} is ${manifest.version} on disk but ${recorded.version} in package-lock.json`)
     }
     packages.push({ path: relative, name: manifest.name, version: manifest.version })
@@ -418,13 +418,13 @@ export function build({ output, source = DEFAULT_SOURCE, replace = false }) {
   packages.sort((left, right) => left.path.localeCompare(right.path))
   const adapter = packages.find((item) => item.name === ADAPTER_PACKAGE)
   if (!adapter || adapter.version !== ADAPTER_VERSION) {
-    throw new BuildError("CLAUDE_ADAPTER_VERSION_MISMATCH",
+    throw new BuildError("KILO_ADAPTER_VERSION_MISMATCH",
       `${ADAPTER_PACKAGE} must be ${ADAPTER_VERSION}, found ${adapter ? adapter.version : "nothing"}`)
   }
   const sdk = packages.filter((item) => item.name === "@agentclientprotocol/sdk")
   for (const entry of sdk) {
     if (lock[entry.path].version !== entry.version) {
-      throw new BuildError("CLAUDE_ACP_SDK_VERSION_MISMATCH", `${entry.path} does not match the lock`)
+      throw new BuildError("KILO_ACP_SDK_VERSION_MISMATCH", `${entry.path} does not match the lock`)
     }
   }
 
@@ -433,7 +433,7 @@ export function build({ output, source = DEFAULT_SOURCE, replace = false }) {
   const unrelated = []
   for (const excluded of EXCLUDED_PACKAGES) {
     if (packages.some((item) => item.name === excluded)) {
-      throw new BuildError("CLAUDE_ARTIFACT_UNRELATED_PACKAGE", `${excluded} must not be in the Pi artifact`)
+      throw new BuildError("KILO_ARTIFACT_UNRELATED_PACKAGE", `${excluded} must not be in the Pi artifact`)
     }
   }
 
@@ -448,18 +448,18 @@ export function build({ output, source = DEFAULT_SOURCE, replace = false }) {
     const seen = new Set(packages.map((item) => item.path))
     for (const relative of unrelated) {
       if (seen.has(relative)) {
-        throw new BuildError("CLAUDE_ARTIFACT_UNRELATED_PACKAGE", `${relative} is reachable only from codex`)
+        throw new BuildError("KILO_ARTIFACT_UNRELATED_PACKAGE", `${relative} is reachable only from codex`)
       }
     }
     const summary = treeSummary(staging)
     if (Number(summary.entries) > MAX_ENTRIES || Number(summary.bytes) > MAX_BYTES) {
-      throw new BuildError("CLAUDE_ARTIFACT_OUTSIDE_BOUNDS",
+      throw new BuildError("KILO_ARTIFACT_OUTSIDE_BOUNDS",
         `${summary.entries} entries / ${summary.bytes} bytes exceed the runtime artifact bounds`)
     }
     makeReadOnly(staging)
     const manifest = {
       schemaVersion: 1,
-      kind: "agentbox-claude-runtime-artifact",
+      kind: "agentbox-kilo-runtime-artifact",
       adapter: { package: ADAPTER_PACKAGE, version: ADAPTER_VERSION, entry: ENTRY },
       packages: packages.map((item) => ({
         path: item.path,
@@ -513,15 +513,15 @@ function main() {
   const json = process.argv.includes("--json")
   if (!output) {
     process.stdout.write(JSON.stringify({
-      result: "CLAUDE_RUNTIME_BUILD_FAILED", code: "CLAUDE_USAGE",
-      error: "usage: build-claude-runtime-artifact.mjs --output ABSOLUTE_DIR [--source RUNTIME_DIR] [--replace] [--json]",
+      result: "KILO_RUNTIME_BUILD_FAILED", code: "KILO_USAGE",
+      error: "usage: build-kilo-runtime-artifact.mjs --output ABSOLUTE_DIR [--source RUNTIME_DIR] [--replace] [--json]",
     }) + "\n")
     return 2
   }
   try {
     const result = build({ output, source, replace: process.argv.includes("--replace") })
     process.stdout.write(JSON.stringify({
-      result: "CLAUDE_RUNTIME_ARTIFACT_BUILT",
+      result: "KILO_RUNTIME_ARTIFACT_BUILT",
       output: result.output, treeDigest: result.treeDigest,
       entries: result.entries, bytes: result.bytes,
       adapter: result.adapter, packages: result.packages.length,
@@ -531,8 +531,8 @@ function main() {
     return 0
   } catch (error) {
     process.stdout.write(JSON.stringify({
-      result: "CLAUDE_RUNTIME_BUILD_FAILED",
-      code: error.code ?? "CLAUDE_RUNTIME_BUILD_ERROR",
+      result: "KILO_RUNTIME_BUILD_FAILED",
+      code: error.code ?? "KILO_RUNTIME_BUILD_ERROR",
       error: String(error.message ?? error).slice(0, 500),
       ...(json ? { stack: String(error.stack ?? "").split("\n").slice(0, 4).join(" | ") } : {}),
     }) + "\n")

@@ -5,5 +5,6 @@ from .hermes import HermesAdapter
 from .pi import PiAdapter
 from .dsh import DshAdapter
 from .qwen import QwenAdapter
+from .kilo import KiloAdapter
 from .generic_cli import GenericCliAdapter
-ADAPTERS={"codex":CodexAdapter("codex"),"claude":ClaudeAdapter("claude"),"opencode":OpenCodeAdapter("opencode"),"hermes":HermesAdapter("hermes"),"pi":PiAdapter("pi"),"dsh":DshAdapter("dsh"),"qwen":QwenAdapter("qwen")}
+ADAPTERS={"codex":CodexAdapter("codex"),"claude":ClaudeAdapter("claude"),"opencode":OpenCodeAdapter("opencode"),"hermes":HermesAdapter("hermes"),"pi":PiAdapter("pi"),"dsh":DshAdapter("dsh"),"qwen":QwenAdapter("qwen"),"kilo":KiloAdapter("kilo")}
