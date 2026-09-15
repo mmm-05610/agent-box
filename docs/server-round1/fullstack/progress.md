@@ -48,6 +48,21 @@
   `REVIEWER_AUTOMATION_READY` 与 `BACKEND_IMPLEMENTATION_READY` 均**未登记**；
   双门未判定、未接管前端工作树、未联调。
 
+### 自审轮 2（同日，Reviewer 额度用尽后按用户指示）
+
+- **Reviewer 现状（如实记录）**：固定 Reviewer session 可用，但 `codex exec resume` 在
+  high effort 审查调用上返回 **usage limit**：`You've hit your usage limit. ... try again at
+  Sep 20th, 2026 12:11 PM.`（退出码 1，prompt 已投递、审阅中途被截断）。故本轮无法取得
+  `ACCEPT`，按用户指示转自审；**未登记**任何 READY。
+- **自审发现并修复 3 处**（提交见下）：① Pi 报告 `refusedBeforeProviderRequest` 在 live 下由
+  `None == 2` 求值成 false（语义反向）→ 改 null + `refusalObservedAs`；② Pi live 未知模型相位
+  无任何正向断言 → 加 `PI_GATE_UNKNOWN_MODEL_REASON_UNEXPECTED`；③ 四家 gate 的
+  `turn_diagnostics()` 丢掉 `turn.capture` 的内层 `error_code` → 保留结构化码。
+- **未归因间歇**：`pi-live5` 首轮 delta 后 `turn.capture failed`（外层 `SIDECAR_OP_FAILED`），
+  因当时诊断丢码无法归因；其后 3 次复跑全绿（1 失败 / 5 次 Pi live）。已按未解决间歇记录，
+  修复后下次可直接读出层级。
+- **修复后复跑**：Pi `--live` live6/7/8 三次 exit 0（报告字段已是 null + 断言生效）。
+
 ## 2026-09-15 — state capture 类型化错误边界（c7 起步 → 现行 c8）+ 前端最终交接收口（返修轮）
 
 【历史轮次注：本节的错误码语义（"文件/目录消失、文件被缩短"=`VIEW_CHANGED`）与
@@ -846,18 +861,19 @@ powershell.exe -File accept-e.ps1 … -Port 18744 -PostCheck -InstanceId <两实
 
 ### 费用账（累计）
 
-| 项 | 调用数 | 用量 | 估算费用 |
+| 项 | 运行数（按产物逐次核对） | 用量 | 估算费用 |
 | --- | --- | --- | --- |
 | DeepSeek 官方 API 可达性检查 | 1 | 12 tokens（11 in / 1 out） | < ¥0.01 |
-| Codex 错误 chat 配置尝试 | 0 次模型调用 | 0（在 `session/new` 阶段即失败，未发起模型请求） | ¥0 |
-| Pi 全链门（`--live`，含 2 次缺口失败后重跑） | ~10 | 每轮数百 in / ≤64 out | < ¥0.01 |
-| Hermes 全链门（`--live`） | ~6 | 同上 | < ¥0.01 |
-| OpenCode 全链门（`--live`，含 1 次缺口失败） | ~8 | 同上 | < ¥0.01 |
-| Codex 全链门（`--live`，含 4 次缺口失败，其中 1 次为 locator 路径笔误、1 次为报告序列化缺陷） | ~12 | 同上 | < ¥0.01 |
-| **合计** | ~37 | 12 tokens + 四家两轮 | **< ¥0.05 / 上限 ¥10** |
+| Codex 错误 chat 配置尝试 | 0 次模型调用 | 0（在 `session/new` 阶段即失败） | ¥0 |
+| Pi 全链门 `--live` | 8（4 通过：live4/6/7/8；4 失败：live/live2 接入缺口、live3 凭据未注入、live5 capture 间歇） | 每轮数百 in / ≤64 out | < ¥0.01 |
+| Hermes 全链门 `--live` | 4（1 通过 live4；3 失败均为缺口/守卫项） | 同上 | < ¥0.01 |
+| OpenCode 全链门 `--live` | 6（1 通过 live6；5 失败均为接入缺口或守卫项） | 同上 | < ¥0.01 |
+| Codex 全链门 `--live` | 6（2 通过 live5/6；4 失败：接入缺口 ×2、报告序列化、locator 路径笔误） | 同上 | < ¥0.01 |
+| **合计** | **24 次 `--live` 运行 / 8 次通过**（+ 无模型复跑若干，零费用） | 12 tokens + 四家各两轮 | **< ¥0.06 / 上限 ¥10** |
 
 （四家每轮输出上限 64 tokens 由受审配置固定；上界换算见 [live-model-preflight.md](live-model-preflight.md) §2，
-最坏情形 < ¥0.4，实测远低于此。缺口失败的运行都在发包前结束，不计模型调用。）
+最坏情形 < ¥0.4，实测远低于此。失败运行除 `pi-live3/5` 外都在发包前结束；未充值、无第三方代理。
+provider 侧账单是唯一权威用量记录，本表是本地产物推算的估算。）
 
 未预留、未充值。若后续继续，建议按 8 元停止新增测试留结算余量（工单建议）。
 

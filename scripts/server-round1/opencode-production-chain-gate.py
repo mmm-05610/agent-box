@@ -672,8 +672,17 @@ def turn_diagnostics(runtime, session: dict, index: int) -> dict:
         if event.get("turn_id") != session["turns"][index]["id"]:
             continue
         data = event.get("data") or {}
-        events.append({"kind": event["kind"],
-                       "text": str(data.get("text") or data.get("state") or data.get("code") or "")[:200]})
+        # A terminal turn records its *inner* failure in the event payload:
+        # `turn.capture` carries the capture layer's typed code and
+        # `turn.state` the outer one. Keeping only the state text threw
+        # that away, so a failed capture could not be attributed to the
+        # layer that refused it.
+        entry = {"kind": event["kind"],
+                 "text": str(data.get("text") or data.get("state") or "")[:200]}
+        for key in ("error_code", "code", "state", "retryable"):
+            if key in data and str(data[key]) != entry["text"]:
+                entry[key] = str(data[key])[:200]
+        events.append(entry)
     return {"reasons": reasons, "events": events[-12:],
             "turn": {key: session["turns"][index].get(key)
                      for key in ("state", "error_code", "capture_state", "cleanup_state")}}

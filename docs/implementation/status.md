@@ -259,8 +259,14 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 - reviewer_automation: §4.1 通道门**已通过**（2026-09-15）：固定 session 机械比对一致、真实
   `codex exec resume`（read-only sandbox、flock、无 bypass）exit 0、verdict `VERDICT: ACCEPT`
   含 `REVIEWER_CHANNEL_OK`、`REVIEWED_HEAD` 与调用前 HEAD 一致、调用前后 `git status --porcelain`
-  零变化。§4.2 的当前阶段真实审查闭环在阶段提交后执行；两者都通过才登记
-  `REVIEWER_AUTOMATION_READY`。
+  零变化。**§4.2 阶段闭环当前被固定 Reviewer 的额度阻断（2026-09-15 18:2x）**：提交
+  `a7b8917..2c0ee16` 的阶段包投递成功、审阅进行中，但 session 返回
+  `ERROR: You've hit your usage limit. ... try again at Sep 20th, 2026 12:11 PM.`（退出码 1），
+  故**未取得本阶段 ACCEPT**。按用户指示（额度用尽时自审）执行**自审轮 2**：
+  修掉 Pi 报告的 `refusedBeforeProviderRequest` 反向取值、Pi live 未知模型相位无正向断言、
+  四家 gate 丢失 `turn.capture` 内层 `error_code`；`pi-live5` 的 capture 间歇按未解决记录
+  （其后 3 次 Pi live 全绿）。**`REVIEWER_AUTOMATION_READY` 与 `BACKEND_IMPLEMENTATION_READY`
+  均未登记**，双门未判定。
 - codex_config_boundary: Codex 生产配置边界**只读复核**（未改产品值）：`model=deepseek-flash`、
   `base_url=https://api.deepseek.com/`、`wire_api=responses`、`CODEX_HOME=/runtime/home/.codex`、
   `env_key=CODEX_API_KEY`、`cli_auth_credentials_store=ephemeral`。`CODEX_API_KEY` 只是 deployment 声明的

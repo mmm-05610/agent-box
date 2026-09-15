@@ -895,8 +895,17 @@ def turn_diagnostics(runtime, session: dict, index: int) -> dict:
         if event.get("turn_id") != session["turns"][index]["id"]:
             continue
         data = event.get("data") or {}
-        events.append({"kind": event["kind"],
-                       "text": str(data.get("text") or data.get("state") or data.get("code") or "")[:200]})
+        # A terminal turn records its *inner* failure in the event payload:
+        # `turn.capture` carries the capture layer's typed code and
+        # `turn.state` the outer one. Keeping only the state text threw
+        # that away, so a failed capture could not be attributed to the
+        # layer that refused it.
+        entry = {"kind": event["kind"],
+                 "text": str(data.get("text") or data.get("state") or "")[:200]}
+        for key in ("error_code", "code", "state", "retryable"):
+            if key in data and str(data[key]) != entry["text"]:
+                entry[key] = str(data[key])[:200]
+        events.append(entry)
     return {"reasons": reasons, "events": events[-12:],
             "turn": {key: session["turns"][index].get(key)
                      for key in ("state", "error_code", "capture_state", "cleanup_state")}}
@@ -958,13 +967,28 @@ def run_unknown_model(client, runtime, workspace, opened, production, endpoint,
     if requests_after is not None and requests_after != 2:
         fail("PI_GATE_UNKNOWN_MODEL_REACHED_PROVIDER",
              f"the refused model produced {requests_after - 2} provider requests")
+    mentioned = any("Harness model is not available" in reason for reason in reasons)
+    if requests_after is None and not mentioned:
+        # Live has no endpoint to count on, so the refusal *reason* is the only
+        # positive witness that this phase proved what it claims: without it the
+        # turn could have failed for any unrelated cause and still pass. The
+        # string is the sidecar's own model-availability message (our product
+        # text), and the turn state above is the code-level half of the claim.
+        fail("PI_GATE_UNKNOWN_MODEL_REASON_UNEXPECTED",
+             "the live unknown-model turn did not fail for the model-availability reason: "
+             + json.dumps([reason[:200] for reason in reasons[-2:]]))
     return {
         "state": turn["state"],
         "providerRequestsAfterRefusal": (
             None if requests_after is None else requests_after - 2),
         "providerRequestCountAvailable": requests_after is not None,
-        "refusedBeforeProviderRequest": requests_after == 2,
-        "reasonMentionsModel": any("Harness model is not available" in reason for reason in reasons),
+        # Live has no endpoint to count on, so this is *unknown*, never `false`:
+        # a bare `false` here would read as "the refused model did reach the
+        # provider", which is the opposite of what the run observed.
+        "refusedBeforeProviderRequest": (
+            None if requests_after is None else requests_after == 2),
+        "refusalObservedAs": "the turn failed with the sidecar's model-availability reason",
+        "reasonMentionsModel": mentioned,
         "reasons": [reason[:200] for reason in reasons],
         "deltas": deltas,
     }
