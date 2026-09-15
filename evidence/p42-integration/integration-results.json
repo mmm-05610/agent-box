@@ -1,0 +1,106 @@
+{
+  "allOk": true,
+  "counts": {
+    "PASS": 15,
+    "FAIL": 0,
+    "SKIP": 0,
+    "PENDING": 0
+  },
+  "executed": 15,
+  "unknownStatuses": [],
+  "detail": [
+    {
+      "detail": "sandbox=C:\\Users\\maoqh\\agentbox-p42-sandbox",
+      "id": "driver-target",
+      "status": "PASS",
+      "step": "driver target"
+    },
+    {
+      "detail": "workspace=/tmp/agentbox-integration-1789476102140; fixture=/tmp/agentbox-integration-1789476102140/stateful_acp_peer.mjs",
+      "id": "sandbox-isolated",
+      "status": "PASS",
+      "step": "sandbox is isolated and the fixture is projected"
+    },
+    {
+      "detail": "dataRoot=C:\\Users\\maoqh\\agentbox-p42-sandbox\\server-data; tokenFile=present",
+      "id": "server-started",
+      "status": "PASS",
+      "step": "the AgentBox Server is live on loopback with its own token"
+    },
+    {
+      "detail": "hello.serverId=server_1531325951aa471faa61b862b4632d1c protocol=wire/1",
+      "id": "lifecycle-connection-installed",
+      "status": "PASS",
+      "step": "the lifecycle connection is installed and reachable from the renderer"
+    },
+    {
+      "detail": "protocolVersion=wire/1; capabilities=27",
+      "id": "server-hello",
+      "status": "PASS",
+      "step": "server.hello answers over the product transport"
+    },
+    {
+      "detail": "workspaceId=ws_410065c0ecd440a69b2717c8e067f47a accessibility={\"readable\":true,\"writable\":true,\"executableForRole\":null,\"reasons\":[]}",
+      "id": "workspace-open-and-list",
+      "status": "PASS",
+      "step": "the WSL workspace opens and lists back with the same identity"
+    },
+    {
+      "detail": "profile=profile_df7de3ec5cc444e5bb4815187159b1f4 v2; providerModel=provider_e0a3c3afb7d9422ca7ecd68d16c86e77",
+      "id": "profile-and-provider-created",
+      "status": "PASS",
+      "step": "profile and provider-model records are created and versioned"
+    },
+    {
+      "detail": "controls=1 effectTiming=next_send outcome=resolved effective=[{\"controlId\":\"model\",\"value\":\"fixture-model\"}]",
+      "id": "config-describe-and-resolve",
+      "status": "PASS",
+      "step": "config.describe declares the controls and config.resolve computes effective values"
+    },
+    {
+      "detail": "deltas=1 firstDeltaSeq=4 completedSeq=6 assistantFinals=1",
+      "id": "turn-completes-with-persisted-deltas",
+      "status": "PASS",
+      "step": "a real turn through the managed chain persists deltas before the terminal frame"
+    },
+    {
+      "detail": "first=execution_6d2495baedec43a5b5a395def2ce4945 replay=execution_6d2495baedec43a5b5a395def2ce4945",
+      "id": "idempotent-replay-is-one-execution",
+      "status": "PASS",
+      "step": "replaying the same requestId returns the same execution"
+    },
+    {
+      "detail": "queueItemId=queue_e63bd09ffa5640afab4314e76d5f1b57 state=pending withdraw=withdrawn",
+      "id": "queue-visible-and-withdrawable",
+      "status": "PASS",
+      "step": "a queued send is visible and can be withdrawn"
+    },
+    {
+      "detail": "observed=[\"queued\",\"running\",\"stopping\",\"stopped\"] outcome=stop_requested",
+      "id": "stop-reaches-terminal",
+      "status": "PASS",
+      "step": "a stop request is published as stopping and reaches a terminal state"
+    },
+    {
+      "detail": "page=2 older=3 mixedCursorError=INVALID_REQUEST",
+      "id": "history-cursor-pagination",
+      "status": "PASS",
+      "step": "backward pages and the live resume cursor stay separate domains"
+    },
+    {
+      "detail": "archivedAt=2026-09-15T12:41:48.707373+00:00 frames=6",
+      "id": "session-archive-keeps-history",
+      "status": "PASS",
+      "step": "archiving a session keeps its history readable"
+    },
+    {
+      "detail": "portFree=true tokenFile=present launcherExitCode=not observed after taskkill /T",
+      "id": "clean-shutdown",
+      "status": "PASS",
+      "step": "the app and the Server both stop, and the isolated data root survives for the next run"
+    }
+  ],
+  "notes": [],
+  "sandbox": "C:\\Users\\maoqh\\agentbox-p42-sandbox",
+  "serverPort": 18751
+}
