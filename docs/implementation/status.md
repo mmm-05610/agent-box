@@ -219,13 +219,21 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   给出方案 A（部署层 attempt-ephemeral 投影 `.tmp` + fail-closed 扫描；不提高通用上限、
   无品牌分支）/B（官方配置关闭解包与凭据持久化）/C（Codex 暂 MODEL_NOT_VERIFIED），
   推荐 A——**待用户裁决**。
-- codex_decision_pending: **USER_DECISION_REQUIRED（已向用户提问，2026-09-15 04:4x）**——
+- codex_decision_a_implemented: **用户已裁决 A（2026-09-15）并已实施**——`stateProjection`
+  新增可选 `ephemeralPaths`（部署声明、沙箱语法验证），bwrap 在全部 bind 之后对该子路径
+  追加 `--tmpfs`：Harness 可写，但**不进 view/state/checkpoint，尝试结束即消失**；
+  1024 列表上限与 fail-closed 凭据扫描不变。Codex 生产模板声明 `ephemeralPaths: [".tmp"]`。
+  反例与证明：真实 bwrap 遮蔽测试（burst 文件不落宿主 state、普通兄弟文件正常落盘）、
+  argv 顺序断言（tmpfs 在 state bind 之后）、越界/RO 冲突拒绝、deployment 解析缺省兼容。
+  **c8 有界复跑（3 轮）**：全部 exit 0、view 峰值 113、`tokenInState=false`、state 78 文件；
+  Python 全量 **822 passed/6 skipped**；Rust 27 passed；Worker 源未变（c8 摘要不变）。
+- codex_decision_pending: **已由用户裁决 A 并实施（原 USER_DECISION_REQUIRED 已关闭）**——
   Codex `.tmp/plugins` 突发（VIEW_FILE_LIMIT）与凭据瞬时入 state（SIDECAR_STATE_CONTAINS_SECRET）
   的处置方案 A（部署层 attempt-ephemeral 投影 `.tmp`，Reviewer 推荐）/B（官方配置关闭，未找到
   已验证开关）/C（Codex 暂 MODEL_NOT_VERIFIED）等待裁决。裁决前：Codex 付费门与 preflight、
   `REVIEWER_AUTOMATION_READY` 登记、真实 locator 读取全部挂起；其他三家不受影响。
-  Reviewer 第十轮结论：本阶段除该 P0 外无任何 FINDING/矛盾（USER_DECISION_REQUIRED，
-  REVIEWED_HEAD=47d6b64）。四家均仍 MODEL_NOT_VERIFIED。
+  Reviewer 第十轮结论：本阶段除该 P0 外无任何 FINDING/矛盾（REVIEWED_HEAD=47d6b64）。
+  裁决 A 实施后交 Reviewer 复审（第十一轮）。四家均仍 MODEL_NOT_VERIFIED。
 - reviewer_automation: §4.1 通道门**已通过**（2026-09-15）：固定 session 机械比对一致、真实
   `codex exec resume`（read-only sandbox、flock、无 bypass）exit 0、verdict `VERDICT: ACCEPT`
   含 `REVIEWER_CHANNEL_OK`、`REVIEWED_HEAD` 与调用前 HEAD 一致、调用前后 `git status --porcelain`

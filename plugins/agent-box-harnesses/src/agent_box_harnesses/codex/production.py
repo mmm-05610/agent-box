@@ -295,7 +295,11 @@ def harness_deployment(
             projection_files_override
             if projection_files_override is not None else projection_files()
         )],
-        "stateProjection": {"target": STATE_TARGET},
+        # 用户裁决 A（2026-09-15）：`.tmp` 声明为 attempt-ephemeral——Codex 运行时把
+        # 内置 plugin/skill 语料解包进 `$CODEX_HOME/.tmp/plugins/`（实测峰值 5,529 文件），
+        # bwrap 以 tmpfs 遮蔽该子路径：Harness 可写，但不进 view/state/checkpoint，
+        # 尝试结束即消失。1024 列表上限与 fail-closed 凭据扫描保持不变。
+        "stateProjection": {"target": STATE_TARGET, "ephemeralPaths": [".tmp"]},
         "adapter": {
             "command": "/usr/bin/node",
             "args": [ADAPTER_ARTIFACT_ENTRY],

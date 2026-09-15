@@ -1494,6 +1494,7 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production, t
                 ),
                 state_bundle_prefix="agentbox-sidecar/deployment/codex/native-state",
                 state_target=production.STATE_TARGET,
+                state_ephemeral_paths=(".tmp",),
                 protected_state_paths=protected_state_paths(production),
                 restored_state=restored_state,
                 timeout_ms=120_000,

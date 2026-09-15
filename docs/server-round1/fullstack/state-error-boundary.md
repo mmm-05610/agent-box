@@ -168,6 +168,31 @@ Reviewer `CHANGES_REQUIRED` 的修复（§2.1/§7.1）落地后重建
 **最近 3 轮绿**（`…_GATE_OK`，报告无 blocker 键、绿跑无任何注记键）。两种状态都如实记录，
 按 §4.3 待用户裁决。
 
+## 4.5 用户裁决 A 的实施（2026-09-15，决策：方案 A）
+
+用户裁决：方案 A——`.tmp` 声明为 attempt-ephemeral 投影，1024 上限与 fail-closed 扫描不变。
+
+实施（通用机制，无品牌分支）：
+- `stateProjection` 新增可选 `ephemeralPaths`（相对 state 目标的子路径，≤8 项，逐项过
+  `home_projection` 目录语法）；部署加载器缺省兼容（无该键 = 无临时路径）。
+- bwrap 编译器新增 `ephemeral_state_mounts`：校验必须落在已声明可写 state 目录内、
+  且不得包含任何只读投影文件；在**全部 bind 之后**按序追加 `--tmpfs <target>`（遮蔽语义）。
+- `WslSidecarLauncher` 透传 `state_ephemeral_paths`；Codex 生产模板声明
+  `ephemeralPaths: [".tmp"]`；Codex 门 launcher 同步。
+
+证明与测试：
+- 真实 bwrap 遮蔽测试：沙箱内写 `.tmp/plugins/blob` 成功可见，但宿主 state 目录只有
+  空挂载点 `.tmp` 与普通兄弟文件——burst 文件永不落盘；argv 顺序断言 tmpfs 在 state bind
+  之后；越界路径/含 RO 文件两类拒绝；部署缺省兼容。
+- **c8 有界复跑 3 轮**：全部 exit 0（`…_GATE_OK`），view 峰值 **113**（不再出现 5529 突发）、
+  `tokenInState=false`、captured state 78 文件；`state/checkpoint/workspace/Git` 的假 token
+  扫描全部通过。
+- Python 全量 **822 passed / 6 skipped / 0 failed**；Rust fmt 干净 + 27 passed；
+  Worker 源未变（`git diff` 为空，c8 摘要仍为现行 bundle）；`git diff --check` 通过。
+- 如实记录：假 token 泄漏的准确相对路径仍未捕获到（本轮 3 轮未复现该 1/15 现象）。
+  若泄漏路径在 `.tmp` 内，方案 A 已同时隔离它；若在别处，fail-closed 扫描仍会拒绝该轮，
+  付费 preflight 前继续用假 token 定位。
+
 ## 5. 全量验证与清理
 
 精确命令（原始输出留在本轮会话日志，不入 Git）：

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -493,3 +494,86 @@ def test_the_guest_home_root_never_contains_a_host_home(tmp_path):
     assert sorted(name for name in listing.split() if name not in {".", ".."}) == [".hermes"]
     assert "host-home-visible" not in tail
     assert "host-ssh-visible" not in tail
+
+
+def test_ephemeral_state_path_is_a_tmpfs_over_the_writable_state():
+    """Decision A: an attempt-ephemeral path is a tmpfs laid over its declared
+    writable state directory, emitted after every bind so it shadows the state
+    subtree out of the view."""
+    argv = sidecar_argv(ephemeral_state_mounts=("/runtime/home/.hermes/.tmp",))
+    marker = argv.index("/runtime/home/.hermes/.tmp")
+    assert argv[marker - 1:marker + 1] == ["--tmpfs", "/runtime/home/.hermes/.tmp"]
+    state_index = argv.index("/worker/views/view-1/agentbox-sidecar/deployment/hermes/native-state")
+    assert marker > state_index, "the tmpfs must shadow the state bind"
+    assert argv.count("--tmpfs") == 2, "the fixed /tmp plus the one declared path"
+
+
+def test_ephemeral_state_path_outside_a_writable_state_directory_is_refused():
+    with pytest.raises(ProjectionRejected) as refused:
+        sidecar_argv(ephemeral_state_mounts=("/runtime/home/.nowhere/.tmp",))
+    assert "not inside a declared writable state directory" in str(refused.value)
+
+
+def test_a_readonly_projection_inside_an_ephemeral_path_is_refused():
+    with pytest.raises(ProjectionRejected) as refused:
+        sidecar_argv(ephemeral_state_mounts=("/runtime/home/.hermes/.tmp",),
+                     projection_mounts=(
+                         ("/worker/views/view-1/agentbox-sidecar/deployment/hermes/projection-0-config.yaml",
+                          "/runtime/home/.hermes/.tmp/config.yaml"),
+                     ))
+    assert "ephemeral state path" in str(refused.value)
+
+
+@pytest.mark.skipif(BWRAP is None, reason="bubblewrap is required for the shadowing proof")
+def test_a_real_tmpfs_never_reaches_the_host_state_directory():
+    """The end-to-end property decision A buys: what the Harness writes under
+    the ephemeral path is visible inside the sandbox, never on the host view
+    side, and a normal sibling write still lands on the host."""
+    import subprocess
+
+    base = Path(tempfile.mkdtemp(prefix="agentbox-ephemeral-"))
+    view = base / "views" / "view-1"
+    host = view / "agentbox-sidecar" / "deployment" / "hermes" / "native-state"
+    host.mkdir(parents=True)
+    config = view / "agentbox-sidecar" / "deployment" / "hermes" / "projection-0-config.yaml"
+    config.write_text("cfg")
+    workspace = base / "workspace"
+    workspace.mkdir()
+    try:
+        argv = sidecar_argv(
+            workspace=str(workspace),
+            runtime_view=str(view),
+            projection_mounts=((str(config), "/runtime/home/.hermes/config.yaml"),),
+            writable_projection_mounts=(
+                (str(host), "/runtime/home/.hermes"),
+            ),
+            ephemeral_state_mounts=("/runtime/home/.hermes/.tmp",),
+        )
+        script = (
+            "mkdir -p /runtime/home/.hermes/.tmp/plugins && "
+            "echo burst > /runtime/home/.hermes/.tmp/plugins/blob && "
+            "echo kept > /runtime/home/.hermes/keep.txt && "
+            "cat /runtime/home/.hermes/.tmp/plugins/blob"
+        )
+        # The mounts are what this proof is about, so the compiled argv keeps
+        # everything up to the "--" separator; only the payload is swapped for
+        # the probe script (the real entrypoint needs the sidecar closure).
+        separator = argv.index("--")
+        done = subprocess.run(
+            [*argv[:separator], "--", "/usr/bin/sh", "-c", script],
+            capture_output=True, text=True, timeout=60,
+        )
+        assert done.returncode == 0, done.stderr
+        assert done.stdout.strip() == "burst", "the sandbox must see its own writes"
+        # The tmpfs mountpoint itself may exist on the host as an empty
+        # directory (bwrap creates it), but nothing written inside the sandbox
+        # may cross it: the host state directory holds only the reviewed
+        # read-only file and the sibling write.
+        assert sorted(p.name for p in host.iterdir()) == [".tmp", "config.yaml", "keep.txt"], (
+            "the ephemeral subtree's files must never reach the host state directory"
+        )
+        assert (host / ".tmp").is_dir() and not any((host / ".tmp").iterdir())
+        assert not (host / ".tmp" / "plugins").exists()
+        assert (host / "keep.txt").read_text().strip() == "kept"
+    finally:
+        shutil.rmtree(base, ignore_errors=True)

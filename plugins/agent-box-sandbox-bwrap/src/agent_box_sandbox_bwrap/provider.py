@@ -190,6 +190,7 @@ def compile_remote_sidecar_bwrap_argv(
     projection_mounts: Sequence[tuple[str, str]] = (),
     writable_projection_mounts: Sequence[tuple[str, str]] = (),
     runtime_artifact_mounts: Sequence[tuple[str, str]] = (),
+    ephemeral_state_mounts: Sequence[str] = (),
     entrypoint: str = "/runtime/view/agentbox-sidecar/runtime/worker-entry.mjs",
 ) -> list[str]:
     """Compile the fixed Worker-hosted Harness sidecar template.
@@ -238,6 +239,23 @@ def compile_remote_sidecar_bwrap_argv(
         if not source.startswith(runtime_view + "/"):
             raise ProjectionRejected("sidecar writable projection source is outside the reviewed view")
         writable_targets.append(home_projection_target(target, kind=PROJECTION_DIRECTORY))
+    ephemeral_targets: list[str] = []
+    for target in ephemeral_state_mounts:
+        validated = home_projection_target(target, kind=PROJECTION_DIRECTORY)
+        inside = [
+            writable for writable in writable_targets
+            if validated.startswith(writable + "/")
+        ]
+        if not inside:
+            raise ProjectionRejected(
+                "ephemeral state path is not inside a declared writable state directory"
+            )
+        if any(ro == validated or ro.startswith(validated + "/")
+               for ro in projection_targets):
+            raise ProjectionRejected(
+                "a projected read-only file cannot live inside an ephemeral state path"
+            )
+        ephemeral_targets.append(validated)
     for state_target in writable_targets:
         # The relations the Server derived `protected_state_paths` from are
         # re-checked here, on the exact argv this function is about to emit: a
@@ -293,6 +311,12 @@ def compile_remote_sidecar_bwrap_argv(
         entries.append((5, len(PurePosixPath(secret_target).parts), "--ro-bind", secret, secret_target))
     for flag, source, target in _ordered_binds(entries):
         argv += [flag, source, target]
+    # Attempt-ephemeral state paths come last on purpose: a fresh tmpfs laid
+    # over its writable state directory shadows that subtree out of the view,
+    # so a Harness may write its scratch there without any of it ever being
+    # listed, captured into a checkpoint, or surviving the attempt.
+    for target in sorted(ephemeral_targets):
+        argv += ["--tmpfs", target]
     argv += ["--chdir", "/workspace", "--clearenv"]
     for key, value in sorted(environment.items()):
         argv += ["--setenv", key, value]

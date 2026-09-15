@@ -455,14 +455,29 @@ def build_runtime_from_sidecar_deployment(
             raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
         state_projection = item.get("stateProjection")
         state_target: str | None = None
+        state_ephemeral_paths: tuple[str, ...] = ()
         if state_projection is not None:
             if (not isinstance(state_projection, dict)
-                    or set(state_projection) != {"target"}
+                    or not set(state_projection) <= {"target", "ephemeralPaths"}
                     or not isinstance(state_projection.get("target"), str)):
                 raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
             state_target = _home_projection_target(
                 state_projection["target"], kind="directory",
             )
+            declared = state_projection.get("ephemeralPaths")
+            if declared is None:
+                declared = []
+            if not isinstance(declared, list) or len(declared) > 8:
+                raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
+            for relative in declared:
+                if not isinstance(relative, str):
+                    raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
+                # 与 target 同一套沙箱语法验证“可写 state 内的临时子路径”，
+                # 由 bwrap 以 tmpfs 遮蔽：可写但不进 view/state/checkpoint。
+                _home_projection_target(
+                    f"{state_target}/{relative}", kind="directory",
+                )
+            state_ephemeral_paths = tuple(declared)
         # 受保护集合**派生**自这份声明本身：落在可写 state 子树里的只读投影文件
         # （按 state 目标的相对路径记名）。它既不按家硬编码，也不依赖"overlay 恰好
         # 遮住"——checkpoint 捕获按名字排除，恢复遇到同名相对路径直接类型化拒绝。
@@ -477,6 +492,7 @@ def build_runtime_from_sidecar_deployment(
         else:
             deployment["_state_bundle_prefix"] = None
             deployment["_state_target"] = None
+        deployment["_state_ephemeral_paths"] = state_ephemeral_paths
         deployments[harness_id] = deployment
         # 能力声明是部署座位上的唯一入口：canonical id + 真 bool，其它一律类型化拒绝。
         # 任何生产模板都只能经过这里，不能再各自手写一套不受校验的字典。
@@ -540,6 +556,7 @@ def build_runtime_from_sidecar_deployment(
                 projection_mounts=deployment["_projection_mounts"],
                 state_bundle_prefix=deployment["_state_bundle_prefix"],
                 state_target=deployment["_state_target"],
+                state_ephemeral_paths=deployment["_state_ephemeral_paths"],
                 protected_state_paths=deployment["_protected_state_paths"],
                 restored_state=restored_state,
                 timeout_ms=deployment["_timeout_ms"],

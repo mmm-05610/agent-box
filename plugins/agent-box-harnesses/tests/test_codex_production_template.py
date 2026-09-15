@@ -172,7 +172,9 @@ def test_the_deployment_document_declares_the_managed_chain():
         "target": "/runtime/artifacts/codex-runtime",
         "treeDigest": "sha256:" + "a" * 64,
     }]
-    assert harness["stateProjection"] == {"target": "/runtime/home/.codex"}
+    assert harness["stateProjection"] == {
+        "target": "/runtime/home/.codex", "ephemeralPaths": [".tmp"],
+    }
     assert harness["projectionFiles"] == [
         {"source": "deploy/codex/config.toml", "target": "/runtime/home/.codex/config.toml"},
         {"source": "deploy/codex/models.json", "target": "/runtime/home/.codex/models.json"},

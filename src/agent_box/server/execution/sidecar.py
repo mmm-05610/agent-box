@@ -257,6 +257,7 @@ class WslSidecarLauncher:
         projection_mounts: Sequence[tuple[str, str]] = (),
         state_bundle_prefix: str | None = None,
         state_target: str | None = None,
+        state_ephemeral_paths: Sequence[str] = (),
         protected_state_paths: Sequence[str] = (),
         restored_state: Mapping[str, bytes] | None = None,
         timeout_ms: int = 120_000,
@@ -285,6 +286,9 @@ class WslSidecarLauncher:
         #: one, rather than relying on the read-only overlay happening to hide
         #: them.
         self.protected_state_paths = tuple(_safe_relative_state_path(path) for path in protected_state_paths)
+        self.state_ephemeral_paths = tuple(state_ephemeral_paths)
+        if self.state_ephemeral_paths and state_target is None:
+            raise ValueError('SIDECAR_STATE_EPHEMERAL_WITHOUT_STATE')
         if (state_bundle_prefix is None) != (state_target is None):
             raise ValueError("SIDECAR_STATE_PROJECTION_INVALID")
         if self.protected_state_paths and state_bundle_prefix is None:
@@ -383,6 +387,10 @@ class WslSidecarLauncher:
                 ),
                 runtime_artifact_mounts=self.runtime_artifact_mounts,
                 writable_projection_mounts=writable_projection_mounts,
+                ephemeral_state_mounts=tuple(
+                    f'{self.state_target.rstrip(chr(47))}/{relative}'
+                    for relative in self.state_ephemeral_paths
+                ),
             )
             channels = _WorkerChannels(
                 client, attempt_id, 1, view_id,
