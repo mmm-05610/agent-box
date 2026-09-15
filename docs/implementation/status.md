@@ -288,6 +288,7 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   前端 `apps/desktop/e2e/p42-ui-model-gate.mjs`，证据 `apps/desktop/evidence/p42-ui-model-gate/`。
   **Pi 8/8、Hermes 8/8、Codex 8/8 全绿**（凭据均经界面自己的录入路径加入；两轮真实 DeepSeek 答复、
   首轮回忆 nonce、次轮带上下文）；**OpenCode 6/8（已定因，不记通过）**：长答复诊断显示**流式 delta 与持久 final 丢失同一段尾部且逐字相同**（"数到 40"只到 31），而链路 completed、次轮语义正确 → 丢失在两者共同的上游，即 **OpenCode 读取路径**（中立 driver 接缝 / 托管 `opencode serve`），不是模型、不是 Server 投影、不是组装；截断点随答复长度变化且总在尾部，符合"回合结束事件与最后分片竞态"。**原表述为**（链路跑通但首轮助手文本是片段，未验证完整回忆
+  **与 harness 自身 parts 比对已定因（同一回合原生状态）**：harness 存 87 字符（结尾 `…31\n32\n`）、我们的帧 83 字符（结尾 `…31`）——停在 32 而非 40 是部署输出上限 64 tokens（不是缺陷）；**我们少最后一片 `"32\n"` 是我们的缺陷**，位于 OpenCode 读取路径（`third_party/harness_remote/bridge/src/` 的 parts 累积/完成判定），回合结束时丢最后一批 part 更新，也解释了此前 nonce 案例总少最后一个字符。待修。
   → **不记通过**）。**Hermes 的缺口已修并两端重锁**：`profiles.create` 增加可选 `credentialId`
   （缺省/null = 角色不携带凭据；给值校验存在性与 kind），工件新摘要 TS `7746404984…` /
   `14f7f736…`（取代 `11e3b3e7…`/`5d4fa3bf…`），后端对新工件 32 passed，Hermes UI 门复跑通过。
