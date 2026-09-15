@@ -220,6 +220,25 @@ skip 说明：6 项均为既有平台/环境条件项（不含本轮新增测试
 对应实现：`b0820d4`（壳快照遮蔽）+ 本文件所在提交的 `fix:` 提交（fd 锚定观察器与
 fail-closed 判据）；Worker 源自 c8 构建后未变（`git diff -- workers/` 为空），故 c8 摘要仍为现行 bundle。
 
+## 4.7 源头修复：官方 Codex feature flags（用户提示调研后第一手验证）
+
+用户指出 Codex 官方已公开 app-server 接入面、值得查资料；据此离线检查了本机
+`@openai/codex` 0.154 平台二进制的配置 schema 字符串，发现**官方 feature flag 家族**
+（与 `features.code_mode`、`features.multi_agent` 同族）里有本次观测到的两个行为开关：
+
+- **`features.plugins`**（默认开）→ 会把内置 plugin/skill 语料物化进
+  `$CODEX_HOME/.tmp/plugins/`（本次实测峰值 5,529 文件）。
+- **`features.shell_snapshot`**（默认开）→ 写 `$CODEX_HOME/shell_snapshots/*.sh`，
+  即注入凭据环境变量原文被第一手捕获的位置。
+
+两者已加入受审配置 `deploy/codex/config.toml`（`[features]` 置于顶层键之后、
+`[model_providers.deepseek]` 之前；`OFFICIAL_FEATURE_FLAGS_OFF` 常量 + 模板测试锁定）。
+
+**验证（决定性对照）**：在 **完全关闭 tmpfs 遮蔽** 的 `--legacy-state-diagnostic` 轮内，
+`codex-production-chain-gate.py` exit 0、view 峰值 112、`credentialPathHits=[]`、
+settled 183 轮，且保留根中 `shell_snapshots/` 与 `.tmp/` **目录均不存在**——
+两个问题在源头消失，不再是"靠遮蔽藏起来"。遮蔽机制（§4.5）保留为纵深防御。
+
 ## 5. 全量验证与清理
 
 精确命令（原始输出留在本轮会话日志，不入 Git）：

@@ -101,6 +101,8 @@ SCRIPT = "scripts/server-round1/codex-production-chain-gate.py"
 FAKE_TOKEN = "sk-codex-gate-fake-token-4f7ac21d-non-secret"
 #: Set from --legacy-state-diagnostic in main(); read by the sidecar launcher.
 LEGACY_STATE_DIAGNOSTIC = False
+#: Set from --official-feature-flags in main(); read by the config builder.
+OFFICIAL_FEATURE_FLAGS_ENABLED = False
 #: Credential-path observation budget: a regular file larger than the per-file
 #: cap, or a tree larger than the file-count cap, cannot be claimed as observed
 #: - that marks the scan incomplete instead of "no hit".
@@ -842,10 +844,31 @@ def verify_artifact(artifact: Path, report: dict) -> str:
     return summary["digest"]
 
 
+#: Official Codex feature flags (the same `[features]` family as
+#: `features.code_mode` / `features.multi_agent`). Both default to on and are
+#: what turns this deployment's state churn into an unobservable window:
+#: `plugins` materializes the bundled plugin/skill corpus into
+#: `$CODEX_HOME/.tmp/plugins/` (measured peak 5,529 files) and `shell_snapshot`
+#: writes `$CODEX_HOME/shell_snapshots/*.sh`, which is where the injected
+#: credential environment variable was first-hand found. Setting them false
+#: removes both at the source; the attempt-ephemeral tmpfs shadow stays as
+#: defense in depth.
+OFFICIAL_FEATURE_FLAGS = ("plugins", "shell_snapshot")
+
+
+def feature_flags_config_suffix(enabled: bool = True) -> bytes:
+    """The `[features]` block that disables the two observed state churners."""
+    if not enabled:
+        return b""
+    body = "".join(f"{name} = false\n" for name in OFFICIAL_FEATURE_FLAGS)
+    return f"\n[features]\n{body}".encode()
+
+
 def loopback_config_bytes(endpoint: FakeEndpoint, production) -> bytes:
     """The production configuration with the listed loopback override applied."""
     return production.loopback_config_bytes(endpoint.base_url) + (
-        f"{PROFILE_SENTINEL_COMMENT}: {PROFILE_SENTINEL}\n".encode())
+        f"{PROFILE_SENTINEL_COMMENT}: {PROFILE_SENTINEL}\n".encode()) + (
+        feature_flags_config_suffix(OFFICIAL_FEATURE_FLAGS_ENABLED))
 
 
 def main() -> int:
@@ -855,14 +878,20 @@ def main() -> int:
     parser.add_argument("--keep", action="store_true")
     parser.add_argument("--json", action="store_true")
     parser.add_argument(
+        "--official-feature-flags", action="store_true",
+        help="append the official [features] plugins=false / shell_snapshot=false "
+             "block to the guest config (probe for the source-level fix)",
+    )
+    parser.add_argument(
         "--legacy-state-diagnostic", action="store_true",
         help="run without the attempt-ephemeral .tmp shadow so the credential "
              "scan can name the native-state file that receives the injected "
              "fake token (no-model, fake-token only; never with a real key)",
     )
     options = parser.parse_args()
-    global LEGACY_STATE_DIAGNOSTIC
+    global LEGACY_STATE_DIAGNOSTIC, OFFICIAL_FEATURE_FLAGS_ENABLED
     LEGACY_STATE_DIAGNOSTIC = bool(options.legacy_state_diagnostic)
+    OFFICIAL_FEATURE_FLAGS_ENABLED = bool(options.official_feature_flags)
 
     endpoint: FakeEndpoint | None = None
     created: Path | None = None

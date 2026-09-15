@@ -170,6 +170,15 @@ def official_script_metadata() -> dict[str, Any]:
     return json.loads(OFFICIAL_SCRIPT_METADATA.read_text(encoding="utf-8"))
 
 
+#: The official Codex feature flags this deployment turns off, with the
+#: first-hand evidence recorded in the state-error-boundary report:
+#: `plugins` materializes the bundled plugin/skill corpus into
+#: `$CODEX_HOME/.tmp/plugins/` (measured 5,529 files) and `shell_snapshot`
+#: writes the credential-bearing environment dump into
+#: `$CODEX_HOME/shell_snapshots/*.sh`.
+OFFICIAL_FEATURE_FLAGS_OFF = ("plugins", "shell_snapshot")
+
+
 def config_bytes() -> bytes:
     """签入的原生配置，逐字节（只读投影进隔离 HOME）。"""
     return CONFIG_TEMPLATE.read_bytes()

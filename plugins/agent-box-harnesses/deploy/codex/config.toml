@@ -28,6 +28,20 @@ web_search = "disabled"
 model_catalog_json = "/runtime/home/.codex/models.json"
 cli_auth_credentials_store = "ephemeral"
 
+# AgentBox additions beyond the official shape (evidence: state-error-boundary
+# report). The two flags are the official Codex feature family
+# (`features.code_mode`, `features.multi_agent`, ...); both default to on and are
+# what made this deployment's state churn unobservable:
+#   * `plugins` materializes the bundled plugin/skill corpus into
+#     `$CODEX_HOME/.tmp/plugins/` (measured peak 5,529 files; deterministic
+#     `VIEW_FILE_LIMIT` when it overlapped a capture).
+#   * `shell_snapshot` writes `$CODEX_HOME/shell_snapshots/*.sh` - the file the
+#     injected credential environment variable was first-hand found in.
+# Turning both off removes the churn and the credential path at the source; the
+# attempt-ephemeral tmpfs shadow in the deployment stays as defense in depth.
+[features]
+plugins = false
+shell_snapshot = false
 [model_providers.deepseek]
 name = "deepseek"
 base_url = "https://api.deepseek.com/"

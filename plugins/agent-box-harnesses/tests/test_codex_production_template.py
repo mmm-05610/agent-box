@@ -48,6 +48,13 @@ EXPECTED_CONFIG: dict = {
     "web_search": "disabled",
     "model_catalog_json": "/runtime/home/.codex/models.json",
     "cli_auth_credentials_store": "ephemeral",
+    # The two official feature flags this deployment turns off, with the
+    # first-hand evidence recorded in the state-error-boundary report:
+    # `plugins` materializes the bundled plugin/skill corpus into
+    # `$CODEX_HOME/.tmp/plugins/` (measured peak 5,529 files) and
+    # `shell_snapshot` writes the credential-bearing environment dump into
+    # `$CODEX_HOME/shell_snapshots/*.sh`.
+    "features": {"plugins": False, "shell_snapshot": False},
     "model_providers": {
         "deepseek": {
             "name": "deepseek",
@@ -151,6 +158,21 @@ def test_loopback_override_refuses_anything_but_a_loopback_url():
     for value in ("https://api.deepseek.com/", "http://0.0.0.0:1", "http://192.168.0.1:1", "", None):
         with pytest.raises(production.CodexProductionTemplateError):
             production.loopback_config_bytes(value)
+
+
+def test_the_deployment_config_disables_the_two_official_state_churners():
+    """The reviewed config turns off the two official feature flags whose
+    default behaviour was first-hand observed to churn this deployment's state
+    (plugin materialization) and to write the credential into native state
+    (shell snapshots)."""
+    from agent_box_harnesses.codex import production
+
+    config = production.config_bytes().decode("utf-8")
+    assert "[features]" in config
+    assert "plugins = false" in config
+    assert "shell_snapshot = false" in config
+    for flag in production.OFFICIAL_FEATURE_FLAGS_OFF:
+        assert flag in config
 
 
 def test_the_deployment_document_declares_the_managed_chain():
