@@ -100,6 +100,13 @@ SCRIPT = "scripts/server-round1/codex-production-chain-gate.py"
 FAKE_TOKEN = "sk-codex-gate-fake-token-4f7ac21d-non-secret"
 #: Set from --legacy-state-diagnostic in main(); read by the sidecar launcher.
 LEGACY_STATE_DIAGNOSTIC = False
+#: Credential-path observation budget: a regular file larger than the per-file
+#: cap, or a tree larger than the file-count cap, cannot be claimed as observed
+#: - that marks the scan incomplete instead of "no hit".
+#: The per-file cap matches the deployment's own state-file bound (8 MiB), so
+#: every file a capture could legitimately accept is fully observed here.
+CREDENTIAL_SCAN_FILE_BYTES = 8 * 1024 * 1024
+CREDENTIAL_SCAN_FILES = 4096
 NONCE_ROUND_1 = "CODEX-GATE-NONCE-1F4A9C"
 NONCE_ROUND_2 = "CODEX-GATE-NONCE-2B7D31"
 #: The controlled stand-in for "the user's home": created by this run, carrying
@@ -398,8 +405,20 @@ class FakeEndpoint:
 # worker connector (same ABW1 frames the WSL connector speaks)
 # --------------------------------------------------------------------------
 
-def _open_fd(path: Path) -> int:
-    return os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY)
+def _open_dir_fd(path: Path) -> int:
+    return os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY | os.O_NOFOLLOW)
+
+
+def _read_bounded(fd: int, limit: int) -> bytes:
+    """One bounded, looped read: `os.read` may return short, so keep asking
+    until EOF or the observation budget is reached."""
+    chunks = bytearray()
+    while len(chunks) < limit:
+        chunk = os.read(fd, min(65536, limit - len(chunks)))
+        if not chunk:
+            break
+        chunks += chunk
+    return bytes(chunks)
 
 
 def _open_beneath_fd(
@@ -418,7 +437,10 @@ def _open_beneath_fd(
             fd = os.open(name, flags, dir_fd=current)
             opened.append(fd)
             current = fd
-        return opened[-1]
+        final = opened.pop()
+        for fd in opened:
+            os.close(fd)
+        return final
     except BaseException:
         for fd in opened:
             os.close(fd)
@@ -459,6 +481,9 @@ class StateSymlinkWatcher:
         self.peak_special = 0
         self.token_hits: list[dict] = []
         self.scan_error: str | None = None
+        self.scan_incomplete: str | None = None
+        self.scan_completed = 0
+        self.scanned_files = 0
         self.stopped_cleanly = False
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, daemon=True)
@@ -513,52 +538,92 @@ class StateSymlinkWatcher:
 
         The state subtree is Harness-writable, so this walk is fd-anchored and
         opens every component with O_NOFOLLOW (the same discipline the Worker
-        applies): only fd-verified regular files are read, in one bounded read,
-        and the fd identity is re-checked afterwards. Only the sanitized
+        applies). Only fd-verified regular files are read, in looped bounded
+        reads within the observation budget, with the fd identity re-checked
+        afterwards (mtime/ctime/size). Anything this walk could not observe
+        marks the scan incomplete - absence of a hit only means something when
+        the scan provably covered what it claims to cover. Only the sanitized
         relative path is recorded; the token itself is run-generated.
         """
         token = FAKE_TOKEN.encode()
-        for view_dir in sorted(views.glob("*")):
-            view_fd = None
-            try:
-                view_fd = _open_beneath_fd(_open_fd(view_dir), ("ready",), True)
-                self._scan_tree(view_fd, ("agentbox-sidecar", "deployment", "codex",
-                                          "native-state"), token)
-            except (OSError, AssertionError, ValueError):
-                continue
-            finally:
-                if view_fd is not None:
-                    os.close(view_fd)
-
-    def _scan_tree(self, ready_fd: int, components: tuple[str, ...], token: bytes) -> None:
-        directory = _open_beneath_fd(ready_fd, components, True)
+        # Per cycle, not cumulative: the file budget and the completeness mark
+        # describe this pass over the tree. A genuinely unobservable file
+        # re-marks every pass (and so still fails the gate); a file that merely
+        # changed under one pass clears on the next.
+        self.scanned_files = 0
+        self.scan_incomplete = None
+        views_fd = _open_dir_fd(views)
         try:
-            for name in sorted(os.listdir(f"/proc/self/fd/{directory}")):
-                if len(self.token_hits) >= self.limit:
-                    return
-                child = _open_beneath_fd(directory, (name,), False)
+            for view_name in sorted(os.listdir(f"/proc/self/fd/{views_fd}")):
+                view_fd = None
                 try:
-                    status = os.fstat(child)
-                    if stat.S_ISDIR(status.st_mode):
-                        os.close(child)
-                        self._scan_tree(directory, (*components, name), token)
-                        continue
-                    if not stat.S_ISREG(status.st_mode) or status.st_size > 65536:
-                        continue
-                    payload = os.read(child, 65536)
-                    after = os.fstat(child)
-                    identity = (lambda meta: (meta.st_dev, meta.st_ino, meta.st_size))
-                    if identity(after) != identity(status):
-                        continue
-                    if token in payload:
-                        entry = {"path": "/".join([*components, name]),
-                                 "phase": "during-run"}
-                        if entry not in self.token_hits:
-                            self.token_hits.append(entry)
+                    view_fd = _open_beneath_fd(views_fd, (view_name, "ready"), True)
+                    self._scan_directory(
+                        view_fd, "agentbox-sidecar/deployment/codex/native-state", token)
+                    self.scan_completed += 1
+                except (OSError, ValueError):
+                    # A view that is being created or cleaned up is not an
+                    # observed state tree yet; the next cycle retries.
+                    continue
                 finally:
-                    os.close(child)
+                    if view_fd is not None:
+                        os.close(view_fd)
+        finally:
+            os.close(views_fd)
+
+    def _scan_directory(self, ready_fd: int, relative: str, token: bytes) -> None:
+        """Open the subdirectory once and hand its fd to the entry walk."""
+        directory = _open_beneath_fd(ready_fd, tuple(relative.split("/")), True)
+        try:
+            self._scan_entries(directory, relative, token)
         finally:
             os.close(directory)
+
+    def _scan_entries(self, directory_fd: int, relative_dir: str, token: bytes) -> None:
+        for name in sorted(os.listdir(f"/proc/self/fd/{directory_fd}")):
+            if self.scanned_files >= CREDENTIAL_SCAN_FILES:
+                self.scan_incomplete = f"file budget exhausted under {relative_dir}"
+                return
+            try:
+                child = _open_beneath_fd(directory_fd, (name,), False)
+            except OSError:
+                # A link (ELOOP) or an entry that vanished under the walk
+                # (ENOENT) is skipped: nothing is followed, and the next cycle
+                # simply sees the new state. Any other refusal is equally a
+                # non-observation and is not fatal to the walk.
+                continue
+            try:
+                status = os.fstat(child)
+                relative = f"{relative_dir}/{name}"
+                if stat.S_ISDIR(status.st_mode):
+                    # Recurse on this still-open fd; it has exactly one owner.
+                    self._scan_entries(child, relative, token)
+                    continue
+                if stat.S_ISLNK(status.st_mode) or not stat.S_ISREG(status.st_mode):
+                    continue
+                if status.st_size > CREDENTIAL_SCAN_FILE_BYTES:
+                    # Larger than the observation budget: the walk cannot claim
+                    # to have covered it, so the scan is incomplete.
+                    self.scan_incomplete = f"{relative} exceeds the observation budget"
+                    continue
+                payload = _read_bounded(child, CREDENTIAL_SCAN_FILE_BYTES)
+                after = os.fstat(child)
+                before_identity = (status.st_mtime_ns, status.st_ctime_ns, status.st_size)
+                after_identity = (after.st_mtime_ns, after.st_ctime_ns, after.st_size)
+                if before_identity != after_identity:
+                    # Raced, not unobservable: the file is written while the
+                    # walk reads it, so this cycle did not fully observe it -
+                    # the next cycle retries, and the capture's own fail-closed
+                    # scan reads the settled bytes. Marking the whole scan
+                    # incomplete here would fail live runs forever.
+                    continue
+                self.scanned_files += 1
+                if token in payload:
+                    entry = {"path": relative, "phase": "during-run"}
+                    if entry not in self.token_hits:
+                        self.token_hits.append(entry)
+            finally:
+                os.close(child)
 
     @staticmethod
     def _count(ready: Path) -> tuple[int, int, dict[str, tuple[int, list[str]]]]:
@@ -829,11 +894,17 @@ def main() -> int:
         watcher = StateSymlinkWatcher(temporary / "worker-root")
         watcher.start()
         endpoint.start()
+        chain_failure = None
         try:
             outcome = run_chain(
                 temporary, workspace, worker, artifact, digest, endpoint, production,
                 token_path, host_home,
             )
+        except GateFailure as failure:
+            # Held, not propagated: the credential verdict must be computed on
+            # every path, so a concurrent credential hit can never be masked by
+            # an unrelated chain failure.
+            chain_failure = failure
         finally:
             endpoint.stop()
             watcher.stop()
@@ -863,10 +934,23 @@ def main() -> int:
         REPORT.update(outcome)
         verdict, detail = credential_scan_verdict(
             watcher.token_hits, watcher.scan_error, watcher.stopped_cleanly,
-            LEGACY_STATE_DIAGNOSTIC,
+            LEGACY_STATE_DIAGNOSTIC, watcher.scan_incomplete, watcher.scan_completed,
         )
+        REPORT["credentialScan"] = {
+            "filesObserved": watcher.scanned_files,
+            "cyclesCompleted": watcher.scan_completed,
+            "incomplete": watcher.scan_incomplete,
+            "error": watcher.scan_error,
+            "stoppedCleanly": watcher.stopped_cleanly,
+        }
         if verdict is not None:
+            if chain_failure is not None:
+                REPORT["secondaryFailure"] = {
+                    "code": chain_failure.code, "message": chain_failure.message,
+                }
             fail(verdict, detail)
+        if chain_failure is not None:
+            raise chain_failure
         if endpoint.over_budget:
             fail("CODEX_GATE_EXTRA_PROVIDER_REQUEST",
                  f"{endpoint.over_budget} provider requests exceeded the phase budget")
@@ -1796,7 +1880,8 @@ def run_requests(runs: list[list[dict]], index: int) -> list[dict]:
 
 def credential_scan_verdict(
     token_hits: list[dict], scan_error: str | None, stopped_cleanly: bool,
-    legacy_diagnostic: bool = False,
+    legacy_diagnostic: bool = False, scan_incomplete: str | None = None,
+    scan_completed: int = 1,
 ) -> tuple[str | None, str]:
     """The typed verdict for one run's credential-path scan.
 
@@ -1811,6 +1896,12 @@ def credential_scan_verdict(
     if not stopped_cleanly:
         return ("CODEX_GATE_STATE_SCAN_INCOMPLETE",
                 "the state credential scanner did not stop cleanly")
+    if scan_incomplete is not None:
+        return ("CODEX_GATE_STATE_SCAN_INCOMPLETE",
+                f"the state credential scanner could not cover everything: {scan_incomplete}")
+    if scan_completed <= 0:
+        return ("CODEX_GATE_STATE_SCAN_INCOMPLETE",
+                "the state credential scanner never completed a scan cycle")
     if token_hits:
         paths = [hit.get("path") for hit in token_hits]
         return ("CODEX_GATE_CREDENTIAL_IN_NATIVE_STATE",

@@ -10,6 +10,7 @@ diagnostics only; it never changes an outcome.
 from __future__ import annotations
 
 import importlib.util
+import os
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -66,6 +67,66 @@ def test_the_credential_scan_verdict_fails_closed_in_every_mode():
     # A complete, clean scan passes the verdict (the gate itself stays green).
     verdict, _detail = module.credential_scan_verdict([], None, True, False)
     assert verdict is None
+
+
+def test_the_scan_walks_nested_directories_and_never_follows_links(tmp_path):
+    """The scanner's own isolation: a token nested several directories deep is
+    found, a link to an outside sentinel is not followed, neither the number of
+    open descriptors nor the file budget grows without bound, and every cycle
+    completes."""
+    module = load_gate()
+    root = tmp_path / "worker-root"
+    state = root / "views" / "view-1" / "ready" / "agentbox-sidecar" / "deployment" / "codex" / "native-state"
+    (state / "shell_snapshots").mkdir(parents=True)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "sentinel").write_text(module.FAKE_TOKEN, encoding="utf-8")
+    token = module.FAKE_TOKEN
+    (state / "shell_snapshots" / "deep.sh").write_text(
+        "export X='" + token + "'" + chr(10), encoding="utf-8")
+    (state / "link-to-outside").symlink_to(outside / "sentinel")
+
+    watcher = module.StateSymlinkWatcher(root)
+    before = len(os.listdir("/proc/self/fd"))
+    for _ in range(5):
+        watcher._scan_for_credential(root / "views")
+    watcher._scan_for_credential(root / "views")
+    after = len(os.listdir("/proc/self/fd"))
+    assert watcher.scan_completed >= 6, watcher.scan_completed
+    assert watcher.scan_incomplete is None, watcher.scan_incomplete
+    assert [hit["path"] for hit in watcher.token_hits] == [
+        "agentbox-sidecar/deployment/codex/native-state/shell_snapshots/deep.sh",
+    ], watcher.token_hits
+    assert after <= before + 2, f"descriptors leaked: {before} -> {after}"
+
+
+def test_a_token_beyond_the_first_chunk_is_still_found(tmp_path):
+    """A short read must not hide a token: the read loops within the budget."""
+    module = load_gate()
+    root = tmp_path / "worker-root"
+    state = root / "views" / "view-1" / "ready" / "agentbox-sidecar" / "deployment" / "codex" / "native-state"
+    state.mkdir(parents=True)
+    (state / "big.sh").write_bytes(b"x" * 100_000 + module.FAKE_TOKEN.encode())
+    watcher = module.StateSymlinkWatcher(root)
+    watcher._scan_for_credential(root / "views")
+    assert watcher.scan_incomplete is None
+    assert [hit["path"].rsplit("/", 1)[-1] for hit in watcher.token_hits] == ["big.sh"]
+
+
+def test_a_file_beyond_the_observation_budget_marks_the_scan_incomplete(tmp_path):
+    module = load_gate()
+    root = tmp_path / "worker-root"
+    state = root / "views" / "view-1" / "ready" / "agentbox-sidecar" / "deployment" / "codex" / "native-state"
+    state.mkdir(parents=True)
+    (state / "huge.sh").write_bytes(b"x" * (module.CREDENTIAL_SCAN_FILE_BYTES + 1))
+    watcher = module.StateSymlinkWatcher(root)
+    watcher._scan_for_credential(root / "views")
+    assert "observation budget" in (watcher.scan_incomplete or "")
+    verdict, _detail = module.credential_scan_verdict(
+        watcher.token_hits, watcher.scan_error, True, False,
+        watcher.scan_incomplete, watcher.scan_completed,
+    )
+    assert verdict == "CODEX_GATE_STATE_SCAN_INCOMPLETE"
 
 
 def test_a_green_run_records_neither_blocker_nor_co_observation():

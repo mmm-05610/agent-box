@@ -229,7 +229,7 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   **泄漏路径第一手捕获**：`native-state/shell_snapshots/*.sh`（Codex 环境快照含注入的
   凭据环境变量原文）→ 方案 A 扩展为 `ephemeralPaths: [".tmp", "shell_snapshots"]`。
   **c8 最终复跑（4 轮，含快照遮蔽）**：全部 exit 0、view 峰值 **112**、`tokenInState=false`、
-  credentialPathHits=0、state 78 文件。Python 全量 **828 passed/6 skipped**；Rust 27 passed；
+  credentialPathHits=0、state 78 文件。Python 全量 **832 passed/6 skipped**；Rust 27 passed；
   Worker 源未变（c8 摘要不变）；四门 + Windows r4/PostCheck 已在最终 HEAD 复跑全绿。
 - codex_decision_pending: **已由用户裁决 A（历史条目）**——
   Codex `.tmp/plugins` 突发（VIEW_FILE_LIMIT）与凭据瞬时入 state（SIDECAR_STATE_CONTAINS_SECRET）
