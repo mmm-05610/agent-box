@@ -56,6 +56,10 @@ SCRIPT = "scripts/server-round1/pi-production-chain-gate.py"
 #: Fixed, obviously fake, never a credential. It exists to prove the injection
 #: path; the gate never reads a real secret file.
 FAKE_TOKEN = "pi-gate-fake-token-6f2c19d4-non-secret"
+#: The bytes actually injected this run: the fake token in the no-model gate,
+#: the authorized locator's content in live mode. Only the scans read it, and
+#: nothing prints it.
+INJECTED_CREDENTIAL: bytes = FAKE_TOKEN.encode()
 NONCE_ROUND_1 = "PI-GATE-NONCE-1F4A9C"
 NONCE_ROUND_2 = "PI-GATE-NONCE-2B7D31"
 AUDIT_NAME = ".agentbox-egress-audit"
@@ -381,7 +385,19 @@ def main() -> int:
     parser.add_argument("--artifact", default=None)
     parser.add_argument("--keep", action="store_true")
     parser.add_argument("--json", action="store_true")
+    parser.add_argument(
+        "--live", action="store_true",
+        help="paid mode: the official endpoint and an authorized credential "
+             "locator instead of the loopback fake endpoint (see "
+             "docs/server-round1/fullstack/live-model-preflight.md)",
+    )
+    parser.add_argument(
+        "--authorized-secret", default=None,
+        help="path of the authorized credential file (only with --live)",
+    )
     options = parser.parse_args()
+    if options.live and not options.authorized_secret:
+        fail("PI_GATE_LIVE_SECRET_REQUIRED", "--live requires --authorized-secret")
 
     endpoint = None
     created: Path | None = None
@@ -407,21 +423,47 @@ def main() -> int:
         if official != production.OFFICIAL_BASE_URL:
             fail("PI_GATE_TEMPLATE_NOT_OFFICIAL", f"the production template base URL is {official!r}")
 
-        endpoint = FakeEndpoint(FAKE_TOKEN)
-        endpoint.assert_loopback_only()
-        differences = production.documented_differences(endpoint.base_url)
-        REPORT["template"] = {
-            "officialBaseUrl": official,
-            "loopbackOverrideChanges": {key: list(value) for key, value in differences.items()},
-            "productModelId": production.PRODUCT_MODEL_ID,
-            "nativeModelValue": production.NATIVE_MODEL_VALUE,
-            "artifactTarget": production.ARTIFACT_TARGET,
-            "adapterEntry": production.ADAPTER_ARTIFACT_ENTRY,
-            "outputTokenLimit": production.OUTPUT_TOKEN_LIMIT,
-            "credentialEnvironment": production.CREDENTIAL_ENVIRONMENT,
-        }
-        if set(differences) != {f"providers.{production.PI_PROVIDER}.baseUrl"}:
-            fail("PI_GATE_OVERRIDE_NOT_MINIMAL", f"the loopback override changed {sorted(differences)}")
+        live = bool(options.live)
+        REPORT["mode"] = "live" if live else "loopback-fake-endpoint"
+        if live:
+            # Paid mode: the official template is used exactly as declared, so
+            # there is no override to audit - and no fake endpoint to count
+            # requests for. The credential is an authorized locator; its content
+            # is never printed, only injected.
+            secret_path = Path(options.authorized_secret).resolve()
+            mode = secret_path.stat().st_mode & 0o777
+            if mode & 0o077:
+                fail("PI_GATE_LIVE_SECRET_PERMISSIONS", f"authorized secret mode is {oct(mode)}")
+            endpoint = None
+            differences = {}
+            REPORT["template"] = {
+                "officialBaseUrl": official,
+                "loopbackOverrideChanges": {},
+                "productModelId": production.PRODUCT_MODEL_ID,
+                "nativeModelValue": production.NATIVE_MODEL_VALUE,
+                "artifactTarget": production.ARTIFACT_TARGET,
+                "adapterEntry": production.ADAPTER_ARTIFACT_ENTRY,
+                "outputTokenLimit": production.OUTPUT_TOKEN_LIMIT,
+                "credentialEnvironment": production.CREDENTIAL_ENVIRONMENT,
+                "credentialSource": "authorized-locator",
+            }
+        else:
+            endpoint = FakeEndpoint(FAKE_TOKEN)
+            endpoint.assert_loopback_only()
+            differences = production.documented_differences(endpoint.base_url)
+            REPORT["template"] = {
+                "officialBaseUrl": official,
+                "loopbackOverrideChanges": {key: list(value) for key, value in differences.items()},
+                "productModelId": production.PRODUCT_MODEL_ID,
+                "nativeModelValue": production.NATIVE_MODEL_VALUE,
+                "artifactTarget": production.ARTIFACT_TARGET,
+                "adapterEntry": production.ADAPTER_ARTIFACT_ENTRY,
+                "outputTokenLimit": production.OUTPUT_TOKEN_LIMIT,
+                "credentialEnvironment": production.CREDENTIAL_ENVIRONMENT,
+            }
+            if set(differences) != {f"providers.{production.PI_PROVIDER}.baseUrl"}:
+                fail("PI_GATE_OVERRIDE_NOT_MINIMAL",
+                     f"the loopback override changed {sorted(differences)}")
 
         created = Path(tempfile.mkdtemp(prefix=TEMPORARY_PREFIX))
         temporary = created
@@ -437,42 +479,59 @@ def main() -> int:
             REPORT["artifact"] = {"output": str(artifact), "external": True}
         digest = verify_artifact(artifact, REPORT)
 
+        global INJECTED_CREDENTIAL
         token_path = temporary / "pi-gate-token"
-        token_path.write_bytes(FAKE_TOKEN.encode())
-        token_path.chmod(0o600)
+        if live:
+            # The authorized locator is imported by path: its content is read by
+            # the SecretStore, never printed by this gate. The gate still owns a
+            # temporary token file of its own so cleanup never touches the user's.
+            token_path.write_bytes(secret_path.read_bytes())
+            token_path.chmod(0o600)
+            INJECTED_CREDENTIAL = token_path.read_bytes().strip()
+        else:
+            token_path.write_bytes(FAKE_TOKEN.encode())
+            token_path.chmod(0o600)
+            INJECTED_CREDENTIAL = FAKE_TOKEN.encode()
 
-        endpoint.start()
+        if endpoint is not None:
+            endpoint.start()
         try:
             outcome = run_chain(
                 temporary, workspace, worker, artifact, digest, endpoint, production, token_path,
+                live=live,
             )
         finally:
-            endpoint.stop()
-        REPORT["provider"] = {
-            "requests": endpoint.requests, "paths": endpoint.paths,
-            "unauthorizedRequests": endpoint.unauthorized,
-            "requestsBeyondBudget": endpoint.over_budget,
-            "baseUrl": endpoint.base_url,
-        }
+            if endpoint is not None:
+                endpoint.stop()
+        if endpoint is not None:
+            REPORT["provider"] = {
+                "requests": endpoint.requests, "paths": endpoint.paths,
+                "unauthorizedRequests": endpoint.unauthorized,
+                "requestsBeyondBudget": endpoint.over_budget,
+                "baseUrl": endpoint.base_url,
+            }
         REPORT.update(outcome)
-        if endpoint.over_budget:
+        if endpoint is not None and endpoint.over_budget:
             fail("PI_GATE_EXTRA_PROVIDER_REQUEST",
                  f"{endpoint.over_budget} provider requests exceeded the two-round budget")
 
-        # The endpoint must have been the only way out of the guest.
+        # The endpoint must have been the only way out of the guest. That is a
+        # property of the no-model gate's guard, which live mode deliberately
+        # does not install - there the provider request is the point.
         audit = workspace / AUDIT_NAME
         audit_lines = audit.read_text(encoding="utf-8").splitlines() if audit.is_file() else []
         REPORT["egress"] = {
             "guardLoaded": any(line.startswith("guard-loaded") for line in audit_lines),
             "denied": [line for line in audit_lines if line.startswith("denied")],
             "auditPresent": audit.is_file(),
+            "guardExpected": not live,
         }
-        if not REPORT["egress"]["guardLoaded"]:
+        if not live and not REPORT["egress"]["guardLoaded"]:
             fail("PI_GATE_EGRESS_GUARD_ABSENT", "the offline guard did not load in the adapter process")
         if REPORT["egress"]["denied"]:
             fail("PI_GATE_EGRESS_BLOCKED", f"the adapter tried to reach {REPORT['egress']['denied']}")
         REPORT["reopenObservation"] = observe_reopen(
-            temporary, workspace, worker, artifact, digest, production)
+            temporary, workspace, worker, artifact, digest, production, live=live)
         cleanup_check(temporary, workspace, token_path)
         REPORT["result"] = "PI_PRODUCTION_CHAIN_GATE_OK"
     except GateFailure as failure:
@@ -528,7 +587,8 @@ def main() -> int:
     return 0
 
 
-def observe_reopen(temporary, workspace, worker, artifact, digest, production) -> dict:
+def observe_reopen(temporary, workspace, worker, artifact, digest, production,
+                   *, live: bool = False) -> dict:
     """What the Harness actually sent to reopen the stored Session.
 
     The Server cannot see this: the reopen happens inside the Worker. This
@@ -543,11 +603,14 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production) -
         SidecarHarnessPort, WslSidecarLauncher, sidecar_bundle_files,
     )
 
-    endpoint = FakeEndpoint(FAKE_TOKEN)
-    endpoint.start()
+    endpoint = None if live else FakeEndpoint(FAKE_TOKEN)
+    if endpoint is not None:
+        endpoint.start()
     bundle = sidecar_bundle_files(PLUGIN)
+    catalog = (production.models_document() if live
+               else production.loopback_models_document(endpoint.base_url))
     bundle[f"agentbox-sidecar/deployment/pi/{production.MODELS_SOURCE.rsplit('/', 1)[-1]}"] = json.dumps(
-        production.loopback_models_document(endpoint.base_url)).encode()
+        catalog).encode()
     bundle["agentbox-sidecar/deployment/pi/settings.json"] = production.SETTINGS_TEMPLATE.read_bytes()
     events: list[dict] = []
     state_directory = temporary / "sidecar-state"
@@ -558,7 +621,10 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production) -
             DirectWorkerConnector(temporary, worker, workspace),
             workspace={"distribution": "Ubuntu", "remote_user": os.environ["USER"],
                        "connection_id": "connection-pi-reopen", "remote_path": str(workspace)},
-            bundle=bundle, credential=FAKE_TOKEN.encode(),
+            bundle=bundle,
+            # The reopen injects the credential this run actually uses: the real
+            # one in live mode, the fake token in the no-model gate.
+            credential=(FAKE_TOKEN.encode() if not live else INJECTED_CREDENTIAL),
             runtime_artifact_authorizations=({
                 "path": str(artifact), "target": production.ARTIFACT_TARGET, "digest": digest},),
             runtime_artifact_mounts=((str(artifact), production.ARTIFACT_TARGET),),
@@ -600,7 +666,8 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production) -
         finally:
             second.stop()
     finally:
-        endpoint.stop()
+        if endpoint is not None:
+            endpoint.stop()
     replayed = [item for item in during_reopen
                 if item["kind"] == "message.delta" and NONCE_ROUND_1 in item["text"]]
     result = {
@@ -609,7 +676,7 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production) -
         "chunksDuringReopen": during_reopen,
         "chunksAfterReopenPrompt": after_prompt,
         "replayedStoredTurn": bool(replayed),
-        "providerRequests": len(endpoint.requests),
+        "providerRequests": None if endpoint is None else len(endpoint.requests),
         "note": (
             "Pi reopens its journal through the replaying session/load path; "
             "session/resume would open the same Session without replaying it."
@@ -623,8 +690,15 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production) -
     return result
 
 
-def run_chain(temporary, workspace, worker, artifact, digest, endpoint, production, token_path) -> dict:
-    """The production seam: Server -> Core -> sidecar -> Worker -> bwrap -> Pi."""
+def run_chain(temporary, workspace, worker, artifact, digest, endpoint, production, token_path,
+              *, live: bool = False) -> dict:
+    """The production seam: Server -> Core -> sidecar -> Worker -> bwrap -> Pi.
+
+    `live` is the paid mode: the deployment keeps its official base URL and the
+    workspace carries no loopback guard, so the only difference from the
+    no-model gate is where the provider request goes and which credential is
+    injected.
+    """
     from agent_box.server.bootstrap import build_runtime_from_sidecar_deployment
     from agent_box.server.credentials import CredentialRecords
     from agent_box.server.transport.http import create_app
@@ -633,23 +707,33 @@ def run_chain(temporary, workspace, worker, artifact, digest, endpoint, producti
 
     document = production.deployment_document(
         artifact_source=str(artifact), tree_digest=digest,
-        adapter_environment={
-            **production.ADAPTER_ENVIRONMENT,
-            # Test-only additions, listed in the report: the offline guard, its
-            # audit path inside the project workspace, and nothing else.
-            "NODE_OPTIONS": f"--require {production.LOOPBACK_GUARD_TARGET}",
-            "AGENTBOX_EGRESS_AUDIT": f"/workspace/{AUDIT_NAME}",
-        },
+        adapter_environment=(
+            dict(production.ADAPTER_ENVIRONMENT) if live else {
+                **production.ADAPTER_ENVIRONMENT,
+                # Test-only additions, listed in the report: the offline guard, its
+                # audit path inside the project workspace, and nothing else.
+                "NODE_OPTIONS": f"--require {production.LOOPBACK_GUARD_TARGET}",
+                "AGENTBOX_EGRESS_AUDIT": f"/workspace/{AUDIT_NAME}",
+            }
+        ),
         projection_files_override=(
-            *production.projection_files(),
-            {"source": "deploy/pi/loopback-guard.cjs", "target": production.LOOPBACK_GUARD_TARGET},
+            tuple(production.projection_files()) if live else (
+                *production.projection_files(),
+                {"source": "deploy/pi/loopback-guard.cjs",
+                 "target": production.LOOPBACK_GUARD_TARGET},
+            )
         ),
     )
     deployment = temporary / "deployment.json"
     deployment.write_text(json.dumps(document), encoding="utf-8")
 
-    loopback_models = production.loopback_models_document(endpoint.base_url)
-    loopback_bytes = json.dumps(loopback_models, sort_keys=True, separators=(",", ":")).encode()
+    # Live mode projects the official catalogue byte-for-byte; the no-model mode
+    # rewrites only baseUrl, so the two differ in exactly that one field.
+    catalog_bytes = (
+        json.dumps(production.models_document(), sort_keys=True, separators=(",", ":")).encode()
+        if live else json.dumps(production.loopback_models_document(endpoint.base_url),
+                                sort_keys=True, separators=(",", ":")).encode()
+    )
 
     import agent_box.server.bootstrap.runtime as runtime_module
     runtime_module._builtin_connector = lambda _id: DirectWorkerConnector(
@@ -658,7 +742,7 @@ def run_chain(temporary, workspace, worker, artifact, digest, endpoint, producti
 
     def deployment_file(root, value, relative):
         if relative == production.MODELS_SOURCE:
-            return loopback_bytes
+            return catalog_bytes
         return original_file(root, value, relative)
 
     runtime_module._sidecar_deployment_file = deployment_file
@@ -731,16 +815,24 @@ def run_chain(temporary, workspace, worker, artifact, digest, endpoint, producti
             result["checkpointNativeIdStable"] = True
 
             unknown = run_unknown_model(
-                client, runtime, workspace, opened, production, endpoint, credential_id)
+                client, runtime, workspace, opened, production, endpoint, credential_id,
+                live=live)
             result["unknownModel"] = unknown
 
             result["credential"] = {
-                "injectedTokenReachedProvider": all(
-                    item["authorizationMatchesInjectedToken"] for item in endpoint.requests
-                ) and bool(endpoint.requests),
-                "unauthorizedRequests": endpoint.unauthorized,
-                "tokenInEvents": FAKE_TOKEN in json.dumps(session["events"]),
-                "tokenInReportableState": FAKE_TOKEN in json.dumps(REPORT),
+                # The fake endpoint can see the bearer token; a real endpoint
+                # cannot be asked, so live mode records that the answer itself
+                # (rounds completed with the model's reply) is the evidence.
+                "injectedTokenReachedProvider": (
+                    "verified-by-real-answer" if live else
+                    all(item["authorizationMatchesInjectedToken"]
+                        for item in endpoint.requests) and bool(endpoint.requests)
+                ),
+                "unauthorizedRequests": None if live else endpoint.unauthorized,
+                "tokenInEvents": INJECTED_CREDENTIAL.decode(errors="replace") in json.dumps(
+                    session["events"]),
+                "tokenInReportableState": INJECTED_CREDENTIAL.decode(errors="replace")
+                                         in json.dumps(REPORT),
             }
             result["stateScan"] = scan_state(runtime, session, native_id)
             result["deltaAttribution"] = delta_attribution(session)
@@ -825,7 +917,8 @@ def summarize_turn(session: dict, index: int) -> dict:
     }
 
 
-def run_unknown_model(client, runtime, workspace, opened, production, endpoint, credential_id) -> dict:
+def run_unknown_model(client, runtime, workspace, opened, production, endpoint,
+                      credential_id, *, live: bool = False) -> dict:
     """An unknown product model must be refused before any provider request."""
     provider = wire_post(client, runtime.token, "providerModels.create", {
         "requestId": "pi-gate-unknown-provider", "displayName": "DeepSeek unknown",
@@ -861,13 +954,15 @@ def run_unknown_model(client, runtime, workspace, opened, production, endpoint, 
             reasons.append(json.loads(row["data_json"]).get("error", ""))
     deltas = [event["data"]["text"] for event in session["events"]
               if event["kind"] == "message.delta"]
-    requests_after = len(endpoint.requests)
-    if requests_after != 2:
+    requests_after = None if live else len(endpoint.requests)
+    if requests_after is not None and requests_after != 2:
         fail("PI_GATE_UNKNOWN_MODEL_REACHED_PROVIDER",
              f"the refused model produced {requests_after - 2} provider requests")
     return {
         "state": turn["state"],
-        "providerRequestsAfterRefusal": requests_after - 2,
+        "providerRequestsAfterRefusal": (
+            None if requests_after is None else requests_after - 2),
+        "providerRequestCountAvailable": requests_after is not None,
         "refusedBeforeProviderRequest": requests_after == 2,
         "reasonMentionsModel": any("Harness model is not available" in reason for reason in reasons),
         "reasons": [reason[:200] for reason in reasons],
@@ -883,14 +978,18 @@ def scan_state(runtime, session: dict, native_id: str) -> dict:
     for item in checkpoint.get("files", []):
         content = runtime.objects.read(item["digest"])
         total += len(content)
-        if FAKE_TOKEN.encode() in content:
+        if INJECTED_CREDENTIAL in content:
             hits.append(item["path"])
     return {"files": len(checkpoint.get("files", [])), "bytes": total,
             "tokenHits": hits, "tokenInState": bool(hits)}
 
 
-def cleanup_check(temporary: Path, workspace: Path, token_path: Path) -> None:
-    """Nothing this gate projected may survive the run."""
+def cleanup_check(temporary: Path, workspace: Path, token_path: Path | None) -> None:
+    """Nothing this gate projected may survive the run.
+
+    `token_path` is the gate's own temporary token, or None in live mode: the
+    authorized locator is the user's file, and this gate never deletes it.
+    """
     worker_root = temporary / "worker-root"
     leftovers = [name for name in ("views", "secrets") if (worker_root / name).exists()]
     if leftovers:
@@ -900,14 +999,19 @@ def cleanup_check(temporary: Path, workspace: Path, token_path: Path) -> None:
     ).stdout.splitlines()
     if survivors:
         fail("PI_GATE_PI_PROCESS_ALIVE", f"a Pi adapter process survived: {survivors[:2]}")
-    if token_path.exists():
-        token_path.unlink()
-    if token_path.exists():
-        fail("PI_GATE_CLEANUP_FAILED", "the temporary fake token could not be removed")
+    token_removed = True
+    if token_path is not None:
+        if token_path.exists():
+            token_path.unlink()
+        token_removed = not token_path.exists()
+        if not token_removed:
+            fail("PI_GATE_CLEANUP_FAILED", "the temporary fake token could not be removed")
     remove_tree(workspace)
     REPORT.setdefault("cleanup", {}).update({
         "workerProjectionsRemoved": True, "adapterProcessesRemoved": True,
-        "fakeTokenRemoved": not token_path.exists(), "workspaceRemoved": not workspace.exists(),
+        "gateTokenRemoved": token_removed,
+        "authorizedLocatorDeleted": False if token_path is None else None,
+        "workspaceRemoved": not workspace.exists(),
     })
 
 

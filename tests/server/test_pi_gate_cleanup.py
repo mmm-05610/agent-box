@@ -89,7 +89,8 @@ def stub_chain(gate, monkeypatch, *, failure=None, audit=True):
         report.setdefault("artifact", {})
         return destination
 
-    def run_chain(temporary, workspace, worker, artifact, digest, endpoint, production, token_path):
+    def run_chain(temporary, workspace, worker, artifact, digest, endpoint, production,
+                  token_path, *, live=False):
         if failure is not None:
             raise gate.GateFailure(*failure)
         if audit:

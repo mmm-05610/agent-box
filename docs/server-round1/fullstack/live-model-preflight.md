@@ -75,7 +75,32 @@ PYTHONPATH=src:plugins/... python3 scripts/server-round1/<family>-production-cha
 
 每家独立记账（请求数/usage/费用/脱敏失败层级）；一家失败按 §6 提问，不拖住其他家。
 
-## 6. 当前状态
+## 6. 执行结果
+
+### Pi（2026-09-15，`--live` 首次通过）
+
+命令：`pi-production-chain-gate.py --worker .acceptance-bundle-c8/agent-box-worker --live
+--authorized-secret <locator> --json` → **exit 0 / `PI_PRODUCTION_CHAIN_GATE_OK`**（mode=live）。
+
+- 两轮真实模型：`rounds.first` completed（delta 流式输出 `PI-GATE-NONCE-1F4A9C`）、
+  `rounds.second` completed（真实答复回忆出第一轮 nonce 并带上上下文）——**真实 DeepSeek
+  响应，非假端点**。
+- 重开相位（真实链路）：journal 重放观测到第一轮 nonce（`nativeSessionIdStable=true` 另由
+  checkpoint 绑定）。
+- 未知模型：`Harness model is not available: …`（`reasonMentionsModel=true`）；live 模式下
+  假端点不存在，故记录 `providerRequestCountAvailable=false`（无模型门中该计数仍由假端点给出）。
+- 凭据：`tokenInEvents=false`、`tokenInReportableState=false`；captured state 1 文件、
+  `tokenHits=[]`；授权 locator **未被删除**（`authorizedLocatorDeleted=null`，gate 只删自己的
+  临时 token：`gateTokenRemoved=true`）。
+- 清理：`adapterProcessesRemoved/workerProjectionsRemoved/workspaceRemoved/removed` 全为 true。
+- 成本（实测轮次）：本家共 3 次运行（含两次因缺口失败的运行）× 每轮 1 请求 ≈ 10 次请求，
+  输入数百 tokens、输出 ≤64 tokens/次 → **< ¥0.01**；累计仍远低于 ¥10。
+
+实现要点（`--live`，四家共用同一模式）：官方 base URL 不覆盖、不装载 loopback guard、
+locator 内容只经 SecretStore 注入（gate 自建临时 token 文件、绝不删用户文件）、
+假端点专有断言（请求计数/授权头）在 live 下改为"真实答复即证据"或显式不可用（不静默通过）。
+
+## 7. 当前状态
 
 - 已就绪：四家生产封装、c8 release Worker、五门无模型证据、官方价格核对、本 preflight。
 - 待做：`--live` 通道实现（四家）→ 串行跑门 → 记账 → 更新 status → 登记
