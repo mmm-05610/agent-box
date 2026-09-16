@@ -1,4 +1,4 @@
-"""The sidecar room: one launch plan, and the position-independence it promises.
+"""The sandbox room: one launch plan, and the position-independence it promises.
 
 The channel layer may only supply token bindings.  Everything else about the
 room - the single guest home root, the XDG roots derived from it, which mounts
@@ -98,3 +98,37 @@ def test_the_same_room_on_another_machine_differs_only_in_the_bindings():
     assert here.writable_state_mount[1] == there.writable_state_mount[1]
     assert here.writable_state_mount[0] != there.writable_state_mount[0]
     assert here.ephemeral_state_mounts == there.ephemeral_state_mounts
+
+
+def test_a_native_room_binds_the_workspace_and_the_staged_home_separately():
+    from agent_box_sandbox_bwrap import compose_codex_room
+
+    plan = compose_codex_room(
+        workspace="/wsl/workspaces/project",
+        staged_home="/wsl/views/view-abc",
+        secret="/wsl/views/view-abc/secret",
+        executable="/runtime/bin/codex",
+        secret_target=f"{GUEST_HOME}/config.toml",
+        command=("/runtime/bin/codex", "exec", "--json", "-"),
+        environment={"CODEX_HOME": GUEST_HOME},
+    )
+    argv = list(plan.argv)
+    # The project and the staged home are two different bindings.
+    assert "/wsl/workspaces/project" in argv
+    assert "/wsl/views/view-abc" in argv
+    # The credential lands where the deployment said, and the room carries no
+    # host path for it.
+    assert f"{GUEST_HOME}/config.toml" in argv
+    assert "/wsl/views/view-abc/secret" in argv
+    assert argv[-4:] == ["/runtime/bin/codex", "exec", "--json", "-"]
+
+    elsewhere = compose_codex_room(
+        workspace="/mnt/c/work/project",
+        staged_home="/tmp/views/view-xyz",
+        secret="/tmp/views/view-xyz/secret",
+        executable="/runtime/bin/codex",
+        secret_target=f"{GUEST_HOME}/config.toml",
+        command=("/runtime/bin/codex", "exec", "--json", "-"),
+        environment={"CODEX_HOME": GUEST_HOME},
+    )
+    assert len(elsewhere.argv) == len(plan.argv)

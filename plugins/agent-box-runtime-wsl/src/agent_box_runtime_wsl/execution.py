@@ -5,9 +5,7 @@ import base64
 from dataclasses import dataclass, field
 import hashlib
 import queue
-from typing import Any, Callable, Mapping
-
-from agent_box_sandbox_bwrap import compile_remote_bwrap_argv
+from typing import Any, Callable, Mapping, Sequence
 
 from .client import WorkerClient
 from .connector import WslConnector
@@ -69,10 +67,19 @@ class WslExecutionTransport:
     def start(
         self, *, workspace: Mapping[str, Any], attempt_id: str, generation: int,
         plan: Any, credential: bytes, restored_files: Mapping[str, bytes],
-        credential_target: str = "/runtime/home/auth.json",
+        room_command: Callable[[str, str], Sequence[str]],
+        secret_frame_id: str = "credential",
         projected_files: Mapping[str, bytes] | None = None,
         interactive: bool = False,
     ) -> WslAttempt:
+        """Stage the bytes and run one command, without knowing what it is.
+
+        ``room_command`` is the sandbox layer's product, asked for once the
+        bindings exist: it receives the staged home path and the secret's host
+        location and returns the argv to run. This transport never composes an
+        isolation command, never spells a guest path, and never names a
+        Harness credential shape.
+        """
         client = self.connector.client_for_workspace(
             distribution=workspace["distribution"], user=workspace["remote_user"],
             connection_id=workspace["connection_id"], workspace_path=workspace["remote_path"],
@@ -81,10 +88,6 @@ class WslExecutionTransport:
             ),
         )
         view_id = f"view-{attempt_id}"
-        secret_frame_id = (
-            "codex-config-toml" if credential_target == "/runtime/home/config.toml"
-            else "codex-auth-json"
-        )
         client.start()
         try:
             files = dict(restored_files)
@@ -108,12 +111,7 @@ class WslExecutionTransport:
                 "attemptId": attempt_id, "frameId": secret_frame_id,
                 "data": base64.b64encode(credential).decode(),
             })["path"]
-            argv = compile_remote_bwrap_argv(
-                workspace=workspace["remote_path"], native_home=home,
-                executable=self.codex_linux_path, secret=secret,
-                secret_target=credential_target,
-                command=tuple(plan.command), environment=dict(plan.environment),
-            )
+            argv = list(room_command(home, secret))
             client.request(
                 "spawn",
                 {"argv": argv, "timeoutMs": int(plan.timeout_ms),

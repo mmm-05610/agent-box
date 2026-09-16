@@ -24,7 +24,7 @@ from .provider import (
     compile_remote_bwrap_argv,
     compile_remote_sidecar_bwrap_argv,
 )
-from .sidecar_room import SidecarRoom, compose_sidecar_room, guest_environment
+from .sidecar_room import SandboxRoom, compose_codex_room, compose_sidecar_room, guest_environment
 
 __all__ = [
     "BwrapSandboxProvider", "PROVIDER_ID", "compile_remote_bwrap_argv",
@@ -35,5 +35,5 @@ __all__ = [
     "validate_runtime_artifact_target", "GUEST_HOME", "HOME_TARGET_PREFIX",
     "MAX_TARGET_SEGMENTS", "PROJECTION_DIRECTORY", "PROJECTION_FILE",
     "HomeProjectionRejected", "home_projection_target", "protected_state_paths",
-    "SidecarRoom", "compose_sidecar_room", "guest_environment",
+    "SandboxRoom", "compose_codex_room", "compose_sidecar_room", "guest_environment",
 ]

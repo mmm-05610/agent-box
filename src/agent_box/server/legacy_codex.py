@@ -46,6 +46,7 @@ from agent_box_harnesses.codex.remote import (
     materialize_remote_credential,
 )
 from agent_box_runtime_wsl import WslAttempt, WslExecutionTransport
+from agent_box_sandbox_bwrap import compose_codex_room
 
 
 @dataclass
@@ -242,11 +243,20 @@ class CodexExecutionBackend:
             restored = self._restore_checkpoint(context, continuation.thread_id)
         try:
             projection = materialize_remote_credential(plan, material)
+            # The room is the sandbox layer's product: this backend asks it for
+            # the command to run once the bindings exist, and the transport
+            # stages bytes and runs that command without knowing what it is.
             attempt = self.transport.start(
                 workspace=context, attempt_id=request.dispatch_id,
                 generation=int(context["native_generation"]) + 1,
                 plan=plan, credential=projection.content,
-                credential_target=projection.target,
+                room_command=lambda staged_home, secret: compose_codex_room(
+                    workspace=context["remote_path"], staged_home=staged_home, secret=secret,
+                    executable=self.transport.codex_linux_path,
+                    secret_target=projection.target,
+                    command=tuple(plan.command), environment=dict(plan.environment),
+                ).argv,
+                secret_frame_id="codex-credential",
                 projected_files=projection.view_files,
                 restored_files=restored,
             )

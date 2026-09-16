@@ -1,4 +1,4 @@
-"""The sidecar room: one deployment-independent launch plan for a Harness sidecar.
+"""Sandbox rooms: one deployment-independent launch plan per execution shape.
 
 This module owns every decision the *channel* must not make: the guest
 environment (one home root and the XDG roots derived from it), which mounts are
@@ -17,11 +17,11 @@ from dataclasses import dataclass, field
 from typing import Mapping, Sequence
 
 from .home_projection import GUEST_HOME
-from .provider import compile_remote_sidecar_bwrap_argv
+from .provider import compile_remote_bwrap_argv, compile_remote_sidecar_bwrap_argv
 
 
 @dataclass(frozen=True)
-class SidecarRoom:
+class SandboxRoom:
     """One isolated process's launch plan, in guest terms."""
 
     argv: tuple[str, ...]
@@ -63,7 +63,7 @@ def compose_sidecar_room(
     state_bundle_prefix: str | None = None,
     state_target: str | None = None,
     state_ephemeral_paths: Sequence[str] = (),
-) -> SidecarRoom:
+) -> SandboxRoom:
     """Compose the launch plan for one sidecar execution.
 
     ``workspace``, ``staged_view`` and ``secret`` are the channel's token
@@ -96,9 +96,39 @@ def compose_sidecar_room(
         writable_projection_mounts=() if writable_state_mount is None else (writable_state_mount,),
         ephemeral_state_mounts=ephemeral_state_mounts,
     )
-    return SidecarRoom(
+    return SandboxRoom(
         argv=tuple(argv),
         environment=environment,
         writable_state_mount=writable_state_mount,
         ephemeral_state_mounts=ephemeral_state_mounts,
     )
+
+
+def compose_codex_room(
+    *,
+    workspace: str,
+    staged_home: str,
+    secret: str,
+    executable: str,
+    secret_target: str,
+    command: Sequence[str],
+    environment: Mapping[str, str] | None = None,
+) -> SandboxRoom:
+    """Compose the launch plan for one native (non-sidecar) execution.
+
+    The same rules hold as for the sidecar room: the caller supplies only its
+    token bindings - the staged home directory, the secret's host location and
+    the command to run - and receives one argv whose paths are all guest paths.
+    ``secret_target`` is the guest location the deployment chose for this
+    Harness's credential; it is a room decision, never the channel's.
+    """
+    argv = compile_remote_bwrap_argv(
+        workspace=workspace,
+        native_home=staged_home,
+        executable=executable,
+        secret=secret,
+        secret_target=secret_target,
+        command=tuple(command),
+        environment=dict(environment or {}),
+    )
+    return SandboxRoom(argv=tuple(argv), environment=dict(environment or {}))

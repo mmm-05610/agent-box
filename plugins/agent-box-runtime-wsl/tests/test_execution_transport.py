@@ -44,6 +44,24 @@ class Connector:
         return self.client
 
 
+def codex_room_command(guest_secret="auth.json"):
+    """A stand-in for the sandbox layer's product: the command to run.
+
+    The transport's contract is "stage what I give you, run what I hand you",
+    so this test supplies the command itself instead of re-deriving a room.
+    """
+
+    def command(staged_home, secret):
+        return [
+            "/usr/bin/bwrap",
+            "--bind", staged_home, "/runtime/home",
+            "--ro-bind", secret, f"/runtime/home/{guest_secret}",
+            "/runtime/bin/codex", "exec", "--json", "-",
+        ]
+
+    return command
+
+
 def test_transport_projects_secret_and_prompt_outside_argv():
     connector = Connector()
     executable_digest = "sha256:" + "a" * 64
@@ -62,6 +80,7 @@ def test_transport_projects_secret_and_prompt_outside_argv():
         },
         attempt_id="attempt", generation=1, plan=plan,
         credential=b'{"credential":"private"}',
+        room_command=codex_room_command(),
         restored_files={"sessions/x/rollout-thread.jsonl": b"prior"},
     )
     assert connector.arguments["executable_authorizations"] == ({
@@ -107,7 +126,7 @@ def test_transport_projects_deepseek_config_at_bounded_target():
         workspace={"distribution": "Ubuntu", "remote_user": "tester",
                    "connection_id": "connection", "remote_path": "/workspace"},
         attempt_id="attempt", generation=1, plan=plan,
-        credential=b"secret config", credential_target="/runtime/home/config.toml",
+        credential=b"secret config", room_command=codex_room_command("config.toml"),
         projected_files={"models.json": b'{"models":[]}'}, restored_files={},
     )
     calls = dict(connector.client.calls)
@@ -117,6 +136,8 @@ def test_transport_projects_deepseek_config_at_bounded_target():
 
 
 def test_real_worker_bwrap_runs_authorized_fake_codex_without_model(tmp_path):
+    from agent_box_sandbox_bwrap import compose_codex_room
+
     worker = Path(os.environ.get(
         "AGENT_BOX_TEST_WORKER",
         Path(__file__).resolve().parents[3] / "workers/agent-box-worker/target/debug/agent-box-worker",
@@ -168,7 +189,15 @@ printf '{"type":"turn.completed","usage":{"output_tokens":2}}\n'
             },
             stdin=b"offline prompt", timeout_ms=5000,
         ),
-        credential=b'{"offline":"fixture"}', restored_files={},
+        credential=b'{"offline":"fixture"}',
+        room_command=lambda staged_home, secret: compose_codex_room(
+            workspace=str(workspace), staged_home=staged_home, secret=secret,
+            executable=str(executable), secret_target="/runtime/home/auth.json",
+            command=("/runtime/bin/codex", "exec", "--json", "-"),
+            environment={"HOME": "/runtime/home", "CODEX_HOME": "/runtime/home",
+                         "PATH": "/usr/bin:/bin", "LANG": "C.UTF-8"},
+        ).argv,
+        restored_files={},
     )
     terminal = transport.wait(attempt, timeout=10)
     assert terminal["exitCode"] == 0
