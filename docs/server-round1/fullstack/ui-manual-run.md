@@ -180,3 +180,42 @@ prompt 之前到达的内容在定义上不是这一轮的答复。
   桥自己用 `replaySettleMs: 250` 防这件事，本轮观测到的形状是"整段回放都在 prompt 之前"
   （第 N 轮文本精确以第 N−1 轮全文为前缀，没有交错），故本次以该边界为准。
 
+## S5bis 停止之后：审批是真，连续性断在"取消不捕获"（F4）
+
+用户报告两件事：界面上出现"执行批准"，以及"会话连续性很奇怪"。两者的后端事实：
+
+### 审批提示是**真的**，而且是设计中的权限往返
+
+被取消的那一轮（`execution_3595c07c…`）事件序列：
+
+```
+approval.requested {options: [allow_always "Always allow bash", …]}  → approval.settled {decision: allow}
+approval.requested … → approval.settled {decision: allow}
+approval.requested … → approval.settled {decision: allow}
+approval.requested {… "Always allow read" …} → turn.state {cancel_requested: true} → approval.settled {decision: invalidated, reason: execution_terminal}
+```
+
+即：原生（Pi 的 ACP 权限请求）在跑命令前问了三次，用户批了三次，第四次时用户取消了那一轮，
+未决的审批被 `execution_terminal` 作废。**这是权限往返正常工作**，不是幻觉。
+注意一致性的另一面：注册表里 pi **没有**声明 `permissions` 能力（因为"没观测到运行时裁决"），
+而权限请求仍然如实上报——这正是 Server 的既定规则（如实上报，不据此声明能力）。
+
+### 连续性断在"取消的那一轮不捕获状态"
+
+- `repository.py` 的 `finish_cancelled()` 明确写 `state='cancelled', capture_state='not-captured'`
+  ——取消的执行**不**进检查点（避免把半执行状态固化，这个取舍本身站得住）。
+- 后果（第一手）：第 6 轮（`继续`）恢复的是**第 4 轮**那次捕获的原生状态，因此第 5 轮那句
+  「那你看看这个项目如何」**从未进入模型的上下文**。模型说"我这边没有收到过你让我看项目的指令"
+  是**真话**。
+- 但产品的转写里那句话还在，于是**转写与模型的上下文互相矛盾**——用户感到"很奇怪"的来源。
+
+**F4 = 取消轮次的输入在转写里可见、在模型上下文里不存在，而界面没有任何说明。**
+
+建议（未实施，等用户裁决）：
+
+1. 小改（推荐）：取消的那一轮在转写上标出来（例如"这一轮被取消，其输入未进入下一轮上下文"），
+   让界面不再与模型各说各话；
+2. 大改（不建议现在做）：取消时也捕获原生状态——会把半执行状态固化，需要单独的有界规则。
+
+即时办法：把要求重说一遍即可（第 7 轮用户重说后，模型就开始扫仓库了）。
+
