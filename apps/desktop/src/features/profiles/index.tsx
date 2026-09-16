@@ -16,7 +16,7 @@ import {
   PanelSectionLabel
 } from '@/app/shell/layers/overlays/panel'
 import {
-  harnessChoicesFromProfiles,
+  harnessChoicesFromProviderModels,
   loadProfileRuntimeDescriptor,
   type ProfileMaintenancePort,
   wireProfileMaintenancePort
@@ -44,6 +44,7 @@ import {
   $agentBoxHello,
   $agentBoxProfiles,
   $agentBoxProviderModels,
+  $agentBoxProviderModelState,
   $agentBoxService,
   agentBoxCapabilitySupported,
   upsertAgentBoxProfile
@@ -64,6 +65,10 @@ export interface ProfilesViewProps {
   onClose: () => void
 }
 
+/** Every method the maintenance surface uses; a partial set would render
+ *  controls that cannot save. */
+const MAINTENANCE_METHODS = ['profiles.create', 'profiles.update', 'profiles.updateConfig', 'profiles.archive']
+
 type DescriptorState =
   | { descriptor: ConfigDescriptor; status: 'ready' }
   | { detail: string; status: 'unavailable' }
@@ -72,43 +77,53 @@ type DescriptorState =
 export function ProfilesView({ maintenance, onClose }: ProfilesViewProps) {
   const { t } = useI18n()
   const copy = t.profiles
+  const modelsCopy = t.settings.product.models
   const profiles = useStore($agentBoxProfiles)
   const hello = useStore($agentBoxHello)
+  const providerModels = useStore($agentBoxProviderModels)
+  const providerModelState = useStore($agentBoxProviderModelState)
   const service = useStore($agentBoxService)
   const [selectedId, setSelectedId] = useState<null | string>(null)
   const [query, setQuery] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
   const [archiveTarget, setArchiveTarget] = useState<ProfileRecord | null>(null)
 
-  const productionMaintenance = useMemo(() => {
-    // Config editing is only offered when the service declares every method the
-    // save path uses — a partial set would render controls that cannot save.
-    const methods = ['profiles.create', 'profiles.update', 'profiles.updateConfig', 'profiles.archive']
+  const declared = MAINTENANCE_METHODS.every(method => agentBoxCapabilitySupported(hello, method))
 
-    if (service.phase !== 'ready' || !methods.every(method => agentBoxCapabilitySupported(hello, method))) {
+  const productionMaintenance = useMemo(() => {
+    if (service.phase !== 'ready' || !declared) {
       return undefined
     }
 
-    const harnessChoices = harnessChoicesFromProfiles(profiles)
-
-    return harnessChoices.length > 0
-      ? wireProfileMaintenancePort(agentBoxRuntimeClient(), { harnessChoices })
-      : undefined
-  }, [hello, profiles, service.phase])
+    // A Profile is built on a provider/model record, so the choices are that
+    // catalog's Harness values - the service's own data, never a guessed row.
+    // Editing and archiving an existing Profile need no choice list, so only
+    // the create affordance below depends on one existing.
+    return wireProfileMaintenancePort(agentBoxRuntimeClient(), {
+      harnessChoices: harnessChoicesFromProviderModels(providerModels)
+    })
+  }, [declared, providerModels, service.phase])
 
   const activeMaintenance = maintenance ?? productionMaintenance
+  const canCreate = Boolean(activeMaintenance && activeMaintenance.harnessChoices.length > 0)
 
   const refresh = useCallback(async () => {
+    // Profiles first: that call also carries the hello whose capabilities gate
+    // everything here. Then the provider/model catalog the choices come from.
     await ensureAgentBoxProfileCatalog(agentBoxRuntimeClient()).catch(() => undefined)
+    await ensureAgentBoxProviderModelCatalog(agentBoxRuntimeClient()).catch(() => undefined)
   }, [])
 
   useRefreshHotkey(refresh)
 
   useEffect(() => {
-    if (service.phase === 'idle') {
+    // Also when the profile catalog is already ready: the choices come from the
+    // provider/model catalog, which this view must not assume someone else
+    // loaded - an unloaded one would read as "no Harness exists".
+    if (service.phase === 'idle' || providerModelState.phase === 'idle') {
       void refresh()
     }
-  }, [refresh, service.phase])
+  }, [refresh, providerModelState.phase, service.phase])
 
   useEffect(() => {
     if (selectedId && profiles.some(profile => profile.id === selectedId)) {
@@ -134,6 +149,13 @@ export function ProfilesView({ maintenance, onClose }: ProfilesViewProps) {
 
   const loading = profiles.length === 0 && (service.phase === 'idle' || service.phase === 'loading')
 
+  // The maintenance surface can be missing for two different reasons, and they
+  // need different answers: the service did not declare the operations, or the
+  // service is fine and simply has no provider/model record yet for a Profile
+  // to be built on. Saying "the service declared nothing" for the second one
+  // sends the reader looking for a capability problem that does not exist.
+  const readyButNoModel = service.phase === 'ready' && declared && !canCreate
+
   return (
     <Panel closeLabel={copy.close} onClose={onClose}>
       {loading ? (
@@ -141,17 +163,23 @@ export function ProfilesView({ maintenance, onClose }: ProfilesViewProps) {
       ) : profiles.length === 0 ? (
         <PanelEmpty
           action={
-            activeMaintenance ? (
+            canCreate ? (
               <Button onClick={() => setCreateOpen(true)} size="sm">
                 {copy.newProfile}
               </Button>
             ) : undefined
           }
           description={
-            service.detail || (activeMaintenance ? copy.agentBoxCreateDesc : copy.agentBoxMaintenanceUnavailableDesc)
+            service.detail
+              ? service.detail
+              : canCreate
+                ? copy.agentBoxCreateDesc
+                : readyButNoModel
+                  ? modelsCopy.emptyDescription
+                  : copy.agentBoxMaintenanceUnavailableDesc
           }
           icon="organization"
-          title={activeMaintenance ? copy.noProfiles : copy.agentBoxMaintenanceUnavailable}
+          title={canCreate || readyButNoModel ? copy.noProfiles : copy.agentBoxMaintenanceUnavailable}
         />
       ) : (
         <>
@@ -172,7 +200,7 @@ export function ProfilesView({ maintenance, onClose }: ProfilesViewProps) {
                   profile={profile}
                 />
               ))}
-              {activeMaintenance ? <PanelAddButton label={copy.newProfile} onClick={() => setCreateOpen(true)} /> : null}
+              {canCreate ? <PanelAddButton label={copy.newProfile} onClick={() => setCreateOpen(true)} /> : null}
             </PanelList>
 
             {selected ? (
@@ -190,7 +218,7 @@ export function ProfilesView({ maintenance, onClose }: ProfilesViewProps) {
       )}
 
       <CreateAgentBoxProfileDialog
-        maintenance={activeMaintenance}
+        maintenance={canCreate ? activeMaintenance : undefined}
         onClose={() => setCreateOpen(false)}
         onCreated={profile => {
           upsertAgentBoxProfile(profile)

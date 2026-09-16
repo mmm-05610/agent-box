@@ -1,9 +1,15 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import type { WireV1Client } from '@/api/wire-v1-client'
-import { asRequestId, asWireId, type ProfileRecord, type ProfilesUpdateConfigResult } from '@/types/wire/wire-v1'
+import {
+  asRequestId,
+  asWireId,
+  type ProfileRecord,
+  type ProfilesUpdateConfigResult,
+  type ProviderModelConfigRecord
+} from '@/types/wire/wire-v1'
 
-import { harnessChoicesFromProfiles, wireProfileMaintenancePort } from './profile-maintenance-port'
+import { harnessChoicesFromProviderModels, wireProfileMaintenancePort } from './profile-maintenance-port'
 
 const profile = (overrides: Partial<ProfileRecord> = {}): ProfileRecord => ({
   archivedAt: null,
@@ -12,6 +18,21 @@ const profile = (overrides: Partial<ProfileRecord> = {}): ProfileRecord => ({
   displayName: 'Builder',
   harness: 'opaque-alpha',
   id: asWireId('profile-1'),
+  updatedAt: '2026-09-14T00:00:00.000Z',
+  version: 1,
+  ...overrides
+})
+
+const providerModel = (overrides: Partial<ProviderModelConfigRecord> = {}): ProviderModelConfigRecord => ({
+  archivedAt: null,
+  configuration: [],
+  createdAt: '2026-09-14T00:00:00.000Z',
+  credentialId: null,
+  displayName: 'Provider One',
+  harness: 'opaque-alpha',
+  id: asWireId('provider-one'),
+  models: [],
+  provider: 'opaque-provider',
   updatedAt: '2026-09-14T00:00:00.000Z',
   version: 1,
   ...overrides
@@ -81,16 +102,29 @@ describe('wireProfileMaintenancePort', () => {
     })
   })
 
-  it('derives choices only from opaque service records', () => {
+  it('derives choices only from the service provider/model records', () => {
     expect(
-      harnessChoicesFromProfiles([
-        profile({ harness: 'opaque-zeta' }),
-        profile({ harness: 'opaque-alpha', id: asWireId('profile-2') }),
-        profile({ harness: 'opaque-zeta', id: asWireId('profile-3') })
+      harnessChoicesFromProviderModels([
+        providerModel({ harness: 'opaque-zeta' }),
+        providerModel({ harness: 'opaque-alpha', id: asWireId('provider-two') }),
+        providerModel({ harness: 'opaque-zeta', id: asWireId('provider-three') })
       ])
     ).toEqual([
       { id: 'opaque-alpha', label: 'opaque-alpha' },
       { id: 'opaque-zeta', label: 'opaque-zeta' }
     ])
+  })
+
+  it('offers nothing - not a guessed row - when the service has no provider/model record', () => {
+    expect(harnessChoicesFromProviderModels([])).toEqual([])
+  })
+
+  it('leaves archived provider/model records out of the choices', () => {
+    expect(
+      harnessChoicesFromProviderModels([
+        providerModel({ archivedAt: '2026-09-14T01:00:00.000Z', harness: 'opaque-zeta' }),
+        providerModel({ harness: 'opaque-alpha', id: asWireId('provider-two') })
+      ])
+    ).toEqual([{ id: 'opaque-alpha', label: 'opaque-alpha' }])
   })
 })

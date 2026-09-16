@@ -200,6 +200,42 @@ describe('AgentBox ProfilesView', () => {
     expect(screen.queryByRole('textbox', { name: 'Notes' })).toBeNull()
   })
 
+  it('names the missing provider/model record, not a missing capability, on an empty service', async () => {
+    // The service declares every maintenance method and has simply no
+    // provider/model record yet. Blaming the service for an undeclared
+    // capability here would send the reader looking for a problem that does
+    // not exist.
+    $agentBoxHello.set(hello(MAINTENANCE_METHODS))
+
+    render(<ProfilesView onClose={vi.fn()} />)
+
+    expect(await screen.findByText('No profiles yet.')).toBeTruthy()
+    expect(
+      screen.getByText('Add a service-owned provider/model configuration to make it available to Profiles.')
+    ).toBeTruthy()
+    expect(screen.queryByText('Profile maintenance is unavailable')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'New profile' })).toBeNull()
+  })
+
+  it('builds the Harness choices from the provider/model directory, so a first Profile can be created', async () => {
+    // The cold-start case: no Profile exists yet, so nothing can be derived
+    // from the Profile list, and the choices have to come from the directory
+    // a Profile is actually built on.
+    $agentBoxHello.set(hello(MAINTENANCE_METHODS))
+    $agentBoxProviderModels.set([
+      providerModel({ harness: 'opaque-alpha' }),
+      providerModel({ harness: 'opaque-beta', id: asWireId('provider-two') })
+    ])
+
+    render(<ProfilesView onClose={vi.fn()} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'New profile' }))
+    realClick(await screen.findByRole('combobox'))
+
+    expect(await screen.findByRole('option', { name: 'opaque-alpha' })).toBeTruthy()
+    expect(screen.getByRole('option', { name: 'opaque-beta' })).toBeTruthy()
+  })
+
   it('edits the service-described defaults once the whole maintenance set is declared', async () => {
     $agentBoxProfiles.set([profile()])
     $agentBoxHello.set(hello(MAINTENANCE_METHODS))

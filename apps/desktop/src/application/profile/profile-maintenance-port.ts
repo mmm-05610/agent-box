@@ -6,6 +6,7 @@ import {
   type ConfigOverride,
   type ProfileRecord,
   type ProfilesUpdateConfigResult,
+  type ProviderModelConfigRecord,
   type RequestId
 } from '@/types/wire/wire-v1'
 
@@ -95,9 +96,20 @@ export function wireProfileMaintenancePort(
   }
 }
 
-/** Harness choices remain opaque service data; never manufacture brand rows. */
-export function harnessChoicesFromProfiles(profiles: ProfileRecord[]): ProfileHarnessChoice[] {
-  return [...new Set(profiles.map(profile => profile.harness))]
+/** Harness choices remain opaque service data; never manufacture brand rows.
+ *
+ *  The source is the service's provider/model catalog, not the Profile list: a
+ *  Profile is built on a provider/model record, so deriving the choices from
+ *  Profiles required one to already exist and an empty service could never
+ *  create its first Profile. The records are still the service's own, and a
+ *  service with no provider/model configuration offers no choice rather than a
+ *  guessed one. */
+export function harnessChoicesFromProviderModels(
+  models: readonly ProviderModelConfigRecord[]
+): ProfileHarnessChoice[] {
+  return [
+    ...new Set(models.filter(model => !model.archivedAt).map(model => model.harness))
+  ]
     .sort((left, right) => left.localeCompare(right))
     .map(harness => ({ id: harness, label: harness }))
 }
