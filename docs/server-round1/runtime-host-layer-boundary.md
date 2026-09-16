@@ -128,3 +128,49 @@ stdio 流、不提供 attach"**——今天的状况是既没接也没声明。
 | 探视证 | `AttachDescriptor`（同上，未被产品使用） |
 | 记账 | `coordinator` 的 ledger + `attempt_key`（未被产品使用） |
 | 行李/笔记本 | 投影文件 + 原生状态（检查点对象）；今天由 `execution/sidecar.py` 搬运 |
+
+## 7. 改造进度
+
+### 第 A 步（房间的活搬回沙箱层）——**已实施并验证**（2026-09-16，提交 `0bc9bb8`）
+
+- 新增 `plugins/agent-box-sandbox-bwrap/src/agent_box_sandbox_bwrap/sidecar_room.py`：
+  `compose_sidecar_room(...)` 与 `guest_environment(...)`——guest home 布局、XDG 派生、
+  "哪个挂载可写"、attempt-ephemeral 遮蔽，全部归沙箱层所有。
+- `src/agent_box/server/execution/sidecar.py`：删掉 `import
+  compile_remote_sidecar_bwrap_argv` 与自拼的 guest 环境/可写挂载/ephemeral 推导，
+  并删掉本层重复声明的 `GUEST_HOME`（沙箱层才是它的出处）；现在只把刚拿到的
+  token 绑定（view 路径、secret 路径、workspace）交给沙箱层，换回一份 `SidecarRoom`。
+- **等价性有第一手证明**：用同一组 codex 参数分别跑"旧写法"与 `compose_sidecar_room`，
+  argv 与环境**字节级一致**；新增测试
+  `plugins/agent-box-sandbox-bwrap/tests/test_sidecar_room.py`（5 项）里有一条专门钉
+  "换台机器只换绑定源"——同一份房间在另一处落位时，除绑定源外 argv 完全相同。
+
+**验证（本轮实跑）**
+
+| 项 | 结果 |
+| --- | --- |
+| 后端全量 `pytest tests` | **599 passed / 3 skipped** |
+| sandbox 插件套件 | **117 passed**（含新增 5 项） |
+| `pi-production-chain-gate.py` | exit 0，`PI_PRODUCTION_CHAIN_GATE_OK` |
+| `hermes-production-chain-gate.py` | exit 0，`HERMES_PRODUCTION_CHAIN_GATE_OK` |
+| `codex-production-chain-gate.py`（`--worker …bundle-c8`） | exit 0，`CODEX_PRODUCTION_CHAIN_GATE_OK` |
+| `opencode-production-chain-gate.py`（`--worker …bundle-c8`） | exit 0，`OPENCODE_PRODUCTION_CHAIN_PREPARED` |
+
+### 顺带发现：门脚本默认指向**过期的 worker bundle**
+
+四个门脚本的 `WORKER_BUNDLE` 默认都是 `.acceptance-bundle-c4`，而文档记录的绿色基线是
+**c8**（`sha256:514f48a9…`）。本轮用默认 c4 跑 Codex 门得到
+`CODEX_GATE_STATE_SCAN_INCOMPLETE` / `VIEW_INVALID`（"view contains a symlink"，
+codex 的 state 树里有自身产生的链接）；改用 c8 立刻 exit 0。
+
+- 也就是说：**照默认跑门，复现不出文档里的绿色基线**——这是一条脚本卫生问题；
+- 本轮**没有改这些默认值**（默认值属于证据配方，改动要单独记账），先在文档里记下；
+- 建议：把四个门的默认 bundle 改成当前基线（或让缺参数时直接报错提示"请显式给 --worker"），
+  并同步 status 里的口径。
+
+### 第 A 步的残留（属于 B/C）
+
+`src/agent_box/server/execution/sidecar.py` 仍然 `import` 沙箱插件（虽然只调用一次
+`compose_sidecar_room`，不再知道 bwrap/guest 布局）。这条 import 就是第 B/D 步要替换掉的
+接缝：由匹配层解析出的端口把它换成注入。
+
