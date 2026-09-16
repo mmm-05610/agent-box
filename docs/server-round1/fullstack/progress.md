@@ -929,3 +929,92 @@ provider 侧账单是唯一权威用量记录，本表是本地产物推算的�
   四家六件套齐、测试与门复现通过、共享桥补丁经 Pi 假端点门验证未破坏原有四家；
   4 处小问题（kilo 能力矩阵未按文档回填、dsh 文档一句陈旧文案、claude 能力降级需知会、
   桥补丁缺单测）留待合并前修。
+---
+
+# Work Order 43 — Harness 扩容（2026-09-16，独立工作树 feature/harness-expansion-v1）
+
+## 轮 1：dsh（DeepSeek 官方 Harness 0.1.5-rc.1）
+
+- 六件套全齐；假端点全链门 **exit 0**（`DSH_PRODUCTION_CHAIN_GATE_OK`）。
+- 关键事实与修复：桥的 `setModel` 不支持 ACP 分组配置选项（dsh 的 model 选择器是
+  组结构）→ 打 harness 中立补丁（展平一层，PATCHES.md §3）；模型别名指向第一手
+  观测的 opaque 值 `["deepseek-official","deepseek-flash"]`；settings.yaml 的
+  `off` 必须加引号（YAML 1.1 会解析成布尔）。
+- 证据：`docs/server-round1/fullstack/dsh-production-packaging.md`。
+- checkpoint `d9d36b0`。模型调用 0、费用 ¥0。
+
+## 轮 2：claude-code（官方 ACP 适配器 0.77.0 + Anthropic 专有 SDK/二进制）
+
+- 许可证核查先行（适配器 Apache-2.0；SDK/二进制专有；义务记账：不修改二进制、
+  用户自带凭据）。六件套全齐；假端点全链门 **exit 0**
+  （`CLAUDE_PRODUCTION_CHAIN_GATE_OK`）。
+- 关键事实与修复：原生二进制需要 0555 执行位（builder `EXECUTABLE_FILES`）；
+  glibc/musl 同平台包按构建机 libc 择一；出网守卫必须走 LD_PRELOAD（NODE_OPTIONS
+  到不了原生二进制），实测拦截 4 次 `api.anthropic.com` 解析（厂商遥测，零接触，
+  记为预期观测）；每会话 1 次后台 title 模型调用，单列记录不混入主线断言；未知
+  模型在发包前被桥拒绝（实测后钉死断言）；重开实测非重放 `session/resume`。
+- 证据：`docs/server-round1/fullstack/claude-production-packaging.md`。
+- checkpoint `2c0735c`。模型调用 0、费用 ¥0。
+
+## 环境与共用
+
+- 本工作树缺 42 轮 gitignored 的 Worker 二进制：已从母树复制 `.acceptance-bundle-c4`
+  与 target/debug 二进制（只读复制），并以本树源码重建 release bundle
+  （`sha256:b4b58db1…`，与 c8 记录摘要的差异来自构建工具链，非源码——如实分账）。
+- 修复 opencode 门一处既有缺陷：`INJECTED_CREDENTIAL` 缺模块级初值，门在注入前
+  失败时报告消毒路径以 NameError 崩溃（pi 门有初值）。
+- 全量测试：plugins 161 passed/3 skipped；tests 598 passed/1 skipped。
+- 费用：本轮模型调用 0、累计 ¥0（预算 ≤¥10，真实模型门未开始）。
+
+## 轮 3：qwen-code 0.23.4（官方 `--acp`）
+
+- 六件套全齐；假端点门 **exit 0**（`QWEN_PRODUCTION_CHAIN_GATE_OK`）。
+- 第一手发现：qwen 首启改写 settings.json（EBUSY under 只读投影）→ 本家族不投影
+  原生配置文件，连接事实全走环境（探测验证），settings 由 harness 自持（在 state
+  投影之外）；loopback 覆盖=adapter env 单键差；模型别名指向运行时合成值
+  `$runtime|openai|deepseek-flash(openai)`；守卫拦截 12 次阿里云 RUM 遥测解析
+  （预期观测）。checkpoint `e63a03e`。模型调用 0、费用 ¥0。
+
+## 轮 4：真实模型门（串行，--live，授权 locator 只读注入）
+
+- **dsh：exit 0（live）**——2 次尝试；第 1 次失败是本门重开相位 live 断言缺陷
+  （引用 live 下不存在的假端点），改为模型召回证据后通过。
+- **claude-code：exit 0（live）**——3 次尝试；前 2 次失败同上 + delta 碎片检查
+  缺陷（claude 的 delta 为逐字符碎片，第一手观测），改为拼接全文检查后通过。
+- **qwen：exit 0（live）**——1 次尝试即过。
+- 三家共同证据形态：两轮真实 DeepSeek 答复、次轮真召回、同 native id 续接、
+  未知模型发包前拒绝、凭据零泄漏、授权 locator 未被删、清理干净。
+- **费用账**：确认真实请求 24 次（dsh 8 + claude 12 + qwen 4），另 claude 有每
+  会话 1 次后台 title 调用（live 下未逐次观测）；tokens 上界每请求 <2K → 估计
+  累计 **< ¥0.05**（上限 ¥10，未充值）。机制（假端点）证据与真实模型证据分账。
+
+## 调查后不接 / 未碰
+
+- **Aider（候选 5）：调查后不接**——官方文档（aider.chat/docs/scripting.html、
+  /docs/config/options.html）：headless 为 `--message` 一次性进程退出；stdout 无
+  JSON/结构化输出格式（社区方案是解析 history 文件或屏幕文本）；`--restore-chat-
+  history` 只把历史注入新会话、无 native session id/resume 语义。命中工单排除规则
+  （terminal-screen 解析类 / 无 resume 语义类）。
+- **Goose（候选 4）：已调研、可接、时间盒内未实现**——接入卡齐（v1.50.1
+  Apache-2.0；`goose acp` 一等 stdio ACP；`OPENAI_BASE_URL`/`OPENAI_API_KEY`/
+  `GOOSE_MODEL` 三 env 直连 DeepSeek 兼容端点；`GOOSE_PATH_ROOT` 整目录隔离；
+  sessions SQLite + ACP session/load 可续接；gnu 版二进制 314MB 动态链接 sha256
+  `6cba90db…` / musl 静态版 160MB sha256 `292388ed…`）。设计注意：musl 静态二进制
+  的 LD_PRELOAD 守卫不可用（须用 gnu 版或改 bwrap 网络姿态）。建议后续工单按
+  claude-code 门（LD_PRELOAD 路线）实现。
+- **Crush / OpenHands 及其它**：按工单 §2 顺序（前五家做完才碰），本轮未开始。
+
+## 轮 5（用户追加）：kilo CLI 7.7.2（OpenCode fork，官方 `kilo acp`）
+
+- 调研卡：OpenCode fork 实证（官方文档原文 + 日志前缀 + kilo.json 兼容 + 捆绑
+  bwrap）；MIT（双版权 Kilo Code/opencode）；平台二进制包 optionalDependencies
+  模式（postinstall 下载脚本 --ignore-scripts 永不执行）。
+- 六件套全齐；**假端点门 exit 0 + 真实模型门 exit 0（live，一次尝试即过）**。
+- 关键事实：`kilo acp` 原生二进制即 ACP 服务器（适配器直连二进制，无 node
+  launcher）；配置经 KILO_CONFIG_CONTENT env 交付（探测验证），免文件投影；
+  凭据 `{env:OPENAI_API_KEY}` 替换 → 线上 Bearer 精确匹配；session/load 与
+  session/resume 双通道实测可用（桥实测走 resume，reopenMethod 记录法）；
+  守卫拦截 models.dev/posthog/api.kilo.ai 厂商解析 15 次（预期观测，零接触）；
+  未知模型发包前被桥拒绝。顺带修复 claude 构建器 main() usage 行的 dsh 残留名。
+- 证据：`docs/server-round1/fullstack/kilo-production-packaging.md`。
+- checkpoint `8adebe2`（假端点）+ 收尾提交（live）。费用 +4 次请求，估计 < ¥0.01。

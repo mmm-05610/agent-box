@@ -118,6 +118,12 @@ class _FakeToken:
 
 _ACTIVE: "_FakeToken | None" = None
 
+#: The credential bytes actually injected this run. Module-level default so the
+#: final report-scrub can never be the thing that crashes a run that failed
+#: before injection (e.g. a missing default Worker binary): before injection
+#: there is nothing to scrub, which is exactly what an empty value expresses.
+INJECTED_CREDENTIAL: bytes = b""
+
 
 def current_token() -> "_FakeToken":
     """本次运行的假凭据；运行窗口之外调用即失败（没有 token 可以被误用）。"""

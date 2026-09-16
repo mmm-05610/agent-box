@@ -68,15 +68,21 @@ materializer = "codex-login"
 [[harness]]
 schema_version = 1
 driver = "claude"
-capabilities = ["start", "observe", "finish", "attach", "native_continuation"]
+# Work Order 43 生产化更新：此前是纯静态预声明；现在有生产封装与官方 ACP 适配器
+# （@agentclientprotocol/claude-agent-acp，Apache-2.0；内嵌 Anthropic 专有 SDK 与
+# 平台二进制，许可边界记录在 claude-production-packaging.md）。`attach` 被移除：
+# 真实握手播发的 promptCapabilities 为空，没有任何附件投递证据（诚实规则）；`stream`
+# 加入：适配器播发并实测 agent_message_chunk 流式更新。逐项证据见 FAMILY_MATRIX。
+capabilities = ["start", "observe", "finish", "stream", "native_continuation"]
 [harness.identity]
 harness_type = "claude-code"
 display_name = "Claude Code"
-description = "Anthropic Claude Code Harness"
-version = "2.0"
+description = "Anthropic Claude Code Harness (official ACP adapter)"
+version = "0.77.0"
 [harness.executable]
 identity = "claude"
-resolver_kind = "PATH"
+resolver_kind = "PATH_OR_BUNDLE"
+bundle_members = ["claude"]
 version_probe = ["--version"]
 [harness.profile]
 native_home = ".claude"
@@ -85,29 +91,15 @@ config_format = "json"
 payload_schema = "claude-code-profile-v1"
 codec = "claude"
 overlay_policy = "execution-local"
-slots = ["instruction", "mcp", "skill", "permission"]
-skill_target = "/runtime/home/skills/{skill_id}"
-skill_env = "CLAUDE_CONFIG_DIR"
-[[harness.inputs]]
-contract_id = "agent-box.skill@1"
-minimum = 0
-maximum = 32
-required = false
-selectors = ["agent-skill"]
-target = "skill-tree"
-transformer = "agent-skills"
+slots = ["provider", "instruction"]
 [[harness.launch_modes]]
-name = "interactive"
-argv = ["claude"]
-io = "pty"
-[[harness.launch_modes]]
-name = "exec"
-argv = ["claude", "--print"]
+name = "acp"
+argv = ["claude-agent-acp"]
 io = "stdio"
 [harness.runtime]
 io = "stdio"
 network = "required"
-terminal = "stdio-or-pty"
+terminal = "stdio"
 [harness.continuation]
 kind = "native_session"
 contract_id = "agent-box.claude-continuation@1"
@@ -218,6 +210,131 @@ terminal = "stdio"
 kind = "native_session"
 contract_id = "agent-box.hermes-continuation@1"
 target_provider = "hermes-continuation"
+
+[[harness]]
+schema_version = 1
+driver = "dsh"
+# Work Order 43。静态候选（产品层声明上限），**不是**观测结论：dsh 0.1.5-rc.1 是
+# developer preview，官方 ACP stdio 面（`dsh --profile acp`）文档声明了
+# new/list/resume/close/prompt/cancel/set_config_option/request_permission，但在本仓
+# 的假端点全链门跑出证据之前，observed 一律留空。`attach`/`permissions` 刻意**不**
+# 声明：没有任何运行时证据（四家里的诚实先例）。逐项证据见
+# plugins/agent-box-harnesses/tests/test_capability_declarations.py 的 FAMILY_MATRIX。
+capabilities = ["start", "observe", "finish", "stream", "native_continuation"]
+[harness.identity]
+harness_type = "dsh"
+display_name = "DeepSeek dsh"
+description = "DeepSeek official Harness launcher (dsh), ACP stdio surface"
+version = "0.1.5-rc.1"
+[harness.executable]
+identity = "dsh"
+resolver_kind = "PATH_OR_BUNDLE"
+bundle_members = ["dsh"]
+version_probe = ["--version"]
+[harness.profile]
+native_home = ".dsh"
+guest_home = "/runtime/home"
+config_format = "yaml"
+payload_schema = "dsh-profile-v1"
+codec = "dsh"
+overlay_policy = "execution-local"
+slots = ["provider", "instruction"]
+[[harness.launch_modes]]
+name = "acp"
+argv = ["dsh", "--profile", "acp"]
+io = "stdio"
+[harness.runtime]
+io = "stdio"
+network = "required"
+terminal = "stdio"
+[harness.continuation]
+# 生产链的重开走桥的 session/resume（dsh 明确不支持 session/load；resume 不重放
+# 历史）。门观测到同 native id + 重开相位零重放后，这里才是观测结论；当前是
+# 官方文档声明 + 机制到位的静态声明。
+kind = "native_session"
+contract_id = "agent-box.dsh-continuation@1"
+target_provider = "dsh-continuation"
+
+[[harness]]
+schema_version = 1
+driver = "qwen"
+# Work Order 43。静态候选（产品层声明上限），**不是**观测结论：qwen-code 0.23.4 的
+# 官方 ACP 面（`qwen --acp`）在第一手探测里播发了完整会话面，但 observed 只能由
+# 本仓的假端点全链门回填。`attach`/`permissions` 刻意不声明（无运行时证据）。
+capabilities = ["start", "observe", "finish", "stream", "native_continuation"]
+[harness.identity]
+harness_type = "qwen"
+display_name = "Qwen Code"
+description = "Qwen Code CLI (Gemini CLI fork), official ACP mode"
+version = "0.23.4"
+[harness.executable]
+identity = "qwen"
+resolver_kind = "PATH_OR_BUNDLE"
+bundle_members = ["qwen"]
+version_probe = ["--version"]
+[harness.profile]
+native_home = ".qwen"
+guest_home = "/runtime/home"
+config_format = "json"
+payload_schema = "qwen-profile-v1"
+codec = "qwen"
+overlay_policy = "execution-local"
+slots = ["provider", "instruction"]
+[[harness.launch_modes]]
+name = "acp"
+argv = ["qwen", "--acp"]
+io = "stdio"
+[harness.runtime]
+io = "stdio"
+network = "required"
+terminal = "stdio"
+[harness.continuation]
+# 探测与官方文档：ACP session/load + session/list + session/resume 原生可续接；
+# 门跑完后按实测方法回填（同 dsh 的规矩）。
+kind = "native_session"
+contract_id = "agent-box.qwen-continuation@1"
+target_provider = "qwen-continuation"
+
+[[harness]]
+schema_version = 1
+driver = "kilo"
+# Work Order 43 后续。静态候选（产品层声明上限），**不是**观测结论：kilo 7.7.2
+# （OpenCode fork）的官方 ACP 面（`kilo acp`）在第一手探测里播发了完整会话面
+# （含 session/load+resume），但 observed 只能由本仓的假端点全链门回填。
+# `attach`/`permissions` 刻意不声明（无运行时证据）。
+capabilities = ["start", "observe", "finish", "stream", "native_continuation"]
+[harness.identity]
+harness_type = "kilo"
+display_name = "Kilo"
+description = "Kilo CLI (OpenCode fork), official ACP mode"
+version = "7.7.2"
+[harness.executable]
+identity = "kilo"
+resolver_kind = "PATH_OR_BUNDLE"
+bundle_members = ["kilo"]
+version_probe = ["--version"]
+[harness.profile]
+native_home = ".config/kilo"
+guest_home = "/runtime/home"
+config_format = "json"
+payload_schema = "kilo-profile-v1"
+codec = "kilo"
+overlay_policy = "execution-local"
+slots = ["provider", "instruction"]
+[[harness.launch_modes]]
+name = "acp"
+argv = ["kilo", "acp"]
+io = "stdio"
+[harness.runtime]
+io = "stdio"
+network = "required"
+terminal = "stdio"
+[harness.continuation]
+# 探测实证：session/load（重放）与 session/resume 都可用；桥按播发的
+# capabilities 选择路径，门按实测方法记录。当前为静态声明。
+kind = "native_session"
+contract_id = "agent-box.kilo-continuation@1"
+target_provider = "kilo-continuation"
 
 [[harness]]
 schema_version = 1

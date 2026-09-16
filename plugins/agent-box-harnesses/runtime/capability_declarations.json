@@ -1,10 +1,64 @@
 {
   "schemaVersion": 1,
   "harnessTypes": {
-    "codex": ["attach", "finish", "native_continuation", "observe", "permissions", "start", "stream"],
-    "claude-code": ["attach", "finish", "native_continuation", "observe", "start"],
-    "opencode": ["finish", "native_continuation", "observe", "start", "stream"],
-    "hermes": ["finish", "native_continuation", "observe", "start", "stream"],
-    "pi": ["attach", "finish", "native_continuation", "observe", "start", "stream"]
+    "codex": [
+      "attach",
+      "finish",
+      "native_continuation",
+      "observe",
+      "permissions",
+      "start",
+      "stream"
+    ],
+    "claude-code": [
+      "finish",
+      "native_continuation",
+      "observe",
+      "start",
+      "stream"
+    ],
+    "opencode": [
+      "finish",
+      "native_continuation",
+      "observe",
+      "start",
+      "stream"
+    ],
+    "hermes": [
+      "finish",
+      "native_continuation",
+      "observe",
+      "start",
+      "stream"
+    ],
+    "pi": [
+      "attach",
+      "finish",
+      "native_continuation",
+      "observe",
+      "start",
+      "stream"
+    ],
+    "dsh": [
+      "finish",
+      "native_continuation",
+      "observe",
+      "start",
+      "stream"
+    ],
+    "qwen": [
+      "finish",
+      "native_continuation",
+      "observe",
+      "start",
+      "stream"
+    ],
+    "kilo": [
+      "finish",
+      "native_continuation",
+      "observe",
+      "start",
+      "stream"
+    ]
   }
 }

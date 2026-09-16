@@ -1148,9 +1148,20 @@ export class AcpService {
     const separator = model.indexOf("/")
     const providerID = separator > 0 ? model.slice(0, separator) : ""
     const modelID = separator > 0 ? model.slice(separator + 1) : model
-    const value = option?.options?.find((candidate) => candidate.value === model)?.value
-      ?? option?.options?.find((candidate) => candidate.value === modelID)?.value
-      ?? option?.options?.find((candidate) => selectableAcpModelValue(candidate.value, option, providerID) === modelID)?.value
+    // PATCH (AgentBox Work Order 43) — grouped config options.
+    // An ACP `select` config option may arrive grouped: each top-level entry
+    // carries a `group`/`name` header plus its own nested `options` array of
+    // the real candidates (DeepSeek dsh ships its model picker this way).
+    // Upstream matched only the top level, where group headers carry no
+    // `value`, so every selection against a grouped picker failed with
+    // "Harness model is not available". Flatten exactly one level of groups
+    // before matching - a harness-neutral rule about the ACP shape, not about
+    // any harness - and keep the original match order otherwise.
+    const candidates = (option?.options ?? []).flatMap(
+      (item) => (item && Array.isArray(item.options) ? item.options : [item]))
+    const value = candidates.find((candidate) => candidate?.value === model)?.value
+      ?? candidates.find((candidate) => candidate?.value === modelID)?.value
+      ?? candidates.find((candidate) => selectableAcpModelValue(candidate?.value, option, providerID) === modelID)?.value
     if (!value) throw new Error(`Harness model is not available: ${model}`)
     // Continuing on the model the Session already holds is not a model change. Sending it anyway
     // made every prompt mutate the Session's configuration, which a harness is entitled to journal
