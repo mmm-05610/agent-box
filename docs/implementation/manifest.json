@@ -375,6 +375,109 @@
     "rule": "locator only; never copy the key into any repository, worktree, document, argv, log or evidence"
    },
    "note": "Environment providers: make the local and ssh placements runnable end to end through the placement resolution, with the same deployment document. First blocker is the Worker binary (needs GLIBC_2.39, the experiment host has 2.32). No real model calls without explicit authorization; fake endpoints only. Zero writes to the parent or frontend repositories."
+  },
+  {
+   "id": "45",
+   "document": "work-orders/45-native-home-storage.md",
+   "baseline": "85404f7919914690ccf621654139698f1a3a973d",
+   "worktree": "/home/maoqh/projects/agent-box-env-provider",
+   "branch": "feature/env-provider-v1",
+   "depends_on": [
+    "44"
+   ],
+   "dependency_condition": "44 reached its DoD first; both orders run in this worktree, serialized by one executor.",
+   "stages": [
+    "A-worker-protocol",
+    "B-channel-room",
+    "C-records-audit",
+    "D-local-gates",
+    "E-wsl-regression"
+   ],
+   "write_paths": [
+    "workers/**",
+    "protocols/worker/**",
+    "plugins/agent-box-runtime-wsl/**",
+    "plugins/agent-box-runtime-local/**",
+    "plugins/agent-box-sandbox-bwrap/**",
+    "src/agent_box/**",
+    "tests/**",
+    "scripts/server-round1/**",
+    "docs/server-round1/**",
+    "docs/implementation/status.md"
+   ],
+   "forbidden_write_roots": [
+    "/home/maoqh/projects/agent-box",
+    "/home/maoqh/projects/agent-box-studio",
+    "/home/maoqh/projects/agent-box-desktop-next",
+    "/home/maoqh/projects/agent-box-desktop-next-wsl-round1",
+    "/home/maoqh/projects/agent-box-server-round1"
+   ],
+   "read_only_repositories": [
+    "/home/maoqh/projects/agent-box-desktop-next-wsl-round1",
+    "/home/maoqh/projects/agent-box-server-round1"
+   ],
+   "note": "Native home as the single source of truth: the profile's native state lives in a persistent directory on the machine that runs it (wsl: $HOME/.agent-box/profiles, local: <data_root>/profiles), bound RW into the sandbox; the control plane keeps records plus a reference (native_platform, home_locator, native session id, audit manifest digest) and never the native bytes. Wire stays locked (28 methods, wire/1, no new event kinds); the Worker control protocol goes 3 to 4 with bidirectional rejection and a new bundle c9. No migration of old checkpoints; no real model calls (fake endpoints only). ssh placement belongs to 44. Gates G1-G8, with G1-G5 mandatory and G8 covering F4 (a cancelled turn no longer loses what the harness had already written). Work order and design landing copied from the parent worktree at c28d4f6a189edcbcc65683951cd55e3ec6ad21f0."
+  },
+  {
+   "id": "46",
+   "document": "work-orders/46-all-harnesses-fullstack.md",
+   "baseline": "45 checkpoint",
+   "worktree": "/home/maoqh/projects/agent-box-env-provider",
+   "branch": "feature/env-provider-v1",
+   "depends_on": [
+    "43",
+    "44",
+    "45"
+   ],
+   "dependency_condition": "44 and 45 reach their DoD first, then the harness-expansion branch is merged in (user-authorized once, section 1b of this order) so all eight registered families are present in one tree. One worktree, one executor, no concurrent writers on the same paths.",
+   "authorized_merge": {
+    "from": "feature/harness-expansion-v1",
+    "into": "feature/env-provider-v1",
+    "source_worktree": "/home/maoqh/projects/agent-box-harness-expansion",
+    "authorized_by": "user decision 2026-09-16",
+    "rule": "once, only after the source worktree is clean; record its HEAD and every conflict resolution in the report; never drop either side's defect fix; re-run both sides' gates afterwards"
+   },
+   "stages": [
+    "A-merge-and-install-set",
+    "B-coexistence",
+    "C-per-family-fullstack",
+    "D-isolation-cross-checks",
+    "E-closure"
+   ],
+   "write_paths": [
+    "workers/**",
+    "protocols/worker/**",
+    "plugins/**",
+    "src/agent_box/**",
+    "tests/**",
+    "scripts/server-round1/**",
+    "docs/server-round1/**",
+    "docs/implementation/status.md"
+   ],
+   "forbidden_write_roots": [
+    "/home/maoqh/projects/agent-box",
+    "/home/maoqh/projects/agent-box-studio",
+    "/home/maoqh/projects/agent-box-desktop-next",
+    "/home/maoqh/projects/agent-box-desktop-next-wsl-round1",
+    "/home/maoqh/projects/agent-box-server-round1",
+    "/home/maoqh/projects/agent-box-harness-expansion"
+   ],
+   "read_only_repositories": [
+    "/home/maoqh/projects/agent-box-desktop-next-wsl-round1",
+    "/home/maoqh/projects/agent-box-server-round1",
+    "/home/maoqh/projects/agent-box-harness-expansion"
+   ],
+   "model_authorization": {
+    "granted_by": "user decision 2026-09-16",
+    "scope": "the user's DeepSeek API for this order's per-family fullstack integration",
+    "rule": "still itemised accounting per family (requests and estimated cost); the earlier CNY 10 ceiling is relaxed by this grant but not removed as an accounting duty; UI gate path only, minimum rounds"
+   },
+   "credentials": {
+    "deepseek_key_locator": "/home/maoqh/.agentbox-acceptance-secret.CnsAonj6/deepseek-api-key",
+    "ui_record_id": "credential_15afe78b037445aea72f0d21010938f7",
+    "rule": "locator only; never print, copy into any repository, log, argv, evidence or Git; reports state the path, its permission bits and the zero-leak fact"
+   },
+   "note": "One Server, one deployment document, all eight registered families (codex, claude-code, opencode, hermes, dsh, qwen, kilo, pi). A reusable install-set producer builds or verifies each family's runtime artifact with a pinned digest and generates the document plus a machine-readable install-set.json. Each family then runs the real UI model gate against real DeepSeek. Product gap to record, not to fix here: nothing tells the UI which families this Server actually runs, so availability is discovered at dispatch (HARNESS_DEPLOYMENT_UNAVAILABLE) instead of at configuration time; wire stays locked and a contract change needs a user decision. Frontend repository stays read-only."
   }
  ],
  "authority": "docs/implementation",
