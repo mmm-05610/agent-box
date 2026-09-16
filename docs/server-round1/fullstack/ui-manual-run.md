@@ -44,3 +44,27 @@
 ## 尚未执行
 
 S2 模型与角色、S3 工作区、S4–S10。本记录随执行推进增补。
+
+## S2 模型与角色 — **被人手路径堵住（产品缺陷 F1，冷启动）**
+
+用户按方案点开 `角色`，界面显示：
+
+> **角色维护当前不可用**
+> 服务可以列出角色，但尚未声明创建、编辑、归档或原生记忆控制能力。
+
+这句话把原因说反了。第一手事实：
+
+- Server 的 `server.hello` 明确声明 `profiles.create/update/updateConfig/archive` **全部 supported=true**
+  （实测返回值，见本轮记录），并没有"尚未声明"。
+- 真正的原因是**空白服务上不可能创建第一个角色**：`features/profiles/index.tsx` 里
+  `harnessChoicesFromProfiles(profiles)` 从**已存在的角色**推导可选 harness；没有角色 ⇒ 选择集为空 ⇒
+  `productionMaintenance` 为 `undefined` ⇒ 整个维护界面（含"新建角色"）不渲染。
+  函数注释写着"harness 选择只来自服务的不透明数据，绝不制造品牌行"——规则本身对，
+  但它把来源取成了"角色自身"，于是形成鸡生蛋。
+- 没有别的入口：composer 的角色控件（`profile-controls.tsx`）只是已存在角色的单选列表，
+  没有"新建"；`features/profiles/create-profile-dialog.tsx` 走的是 `@/api/profiles`（另一套 Hermes
+  产品面），不创建 AgentBox 角色。
+
+**F1 = 冷启动缺口 + 误导文案**：空白 Server 上人手无法建第一个角色；界面还把原因归咎于服务能力缺失。
+
+现状：用户在 S2 处停下（正确的做法——这正是要测出来的东西）。S3–S10 未执行。
