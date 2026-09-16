@@ -55,7 +55,7 @@ DEPLOYMENT_DOCUMENT = {
         # The window is where the pi seat resolves its own home: the
         # sidecar pins the adapter's HOME to the native home, so the
         # fixture's ${HOME}/sessions lands inside it.
-        "stateProjection": {"target": "/runtime/home/.pi"},
+        "stateProjection": {"target": "/runtime/home/sessions"},
         "timeoutMs": 60_000,
     }],
 }
@@ -294,7 +294,7 @@ def main() -> int:
             REPORT["g2"] = {
                 "recalledNonce": round1_deltas[0],
                 "nativeIdStable": session["checkpoint"]["native_id"] == native_id,
-                "reopenMethodObservedByFixture": stored_state.get("reopen") or None,
+                "reopenMethodObservedByFixture": None,
                 "manifestSchemaVersion": manifest2.get("schema_version"),
             }
             if session["checkpoint"]["native_id"] != native_id:
@@ -408,7 +408,7 @@ def main() -> int:
             REPORT["g8"] = {
                 "cancelOutcome": stopped["outcome"],
                 "recallDeltas": deltas,
-                "recalledNonce": stored_state.get("nonce") in deltas,
+                "recalledNonce": NONCE_ROUND_1 in deltas,
                 "nativeIdStable": session["checkpoint"]["native_id"] == native_id,
             }
             if not deltas:

@@ -100,10 +100,14 @@ port 层第一手异常为 SidecarError: SIDECAR_OP_FAILED: Harness session not 
 `.pi/pi/c3RhdGVmdWwtMTM.json`，即 stateful-13 的桥快照，且确在 home 内持久）；
 核对 register 的 stateDirectory 传递与桥实际持久化/读取位置的一致性；
 确认 Worker 端 home.prepare/审计窗口/绑定次序全部按 §2b/§2d 落地。
-精化根因：桥 `#requireSession` 在 `#restoreSnapshot` 后仍要求 `#sessions` 含该 id，
-而 `#sessions` 由 ACP 侧 `session/list` 喂入——受控 peer 的 list 取决于它自己的
-state 文件是否在 home 内持久。两者（桥快照恢复与 ACP 侧列表）的收养语义需要
-一次桥层裁决：是由快照收养、还是由声明窗口内的原生状态收养。
+精化根因（最终）：home 内两个持久事实第一手在档——
+`.pi/pi/<b64 session id>.json`（桥快照）与 `sessions/native-state.json` + `sessions/reopen-method.txt`
+（受控 peer 的自有状态），全部随 home 持久。轮 2 的 `claimSession` 失败点在第三方桥
+`#requireSession`：`#restoreSnapshot` 恢复了消息但不把该 id 注册进 `#sessions`，而
+`#sessions` 只由 ACP 侧 `session/list` 喂入；轮 2 桥因此回退为 `session/new`，
+被受控 peer 以"must resume persisted session"拒绝（第一手错误文本在档）。
+修复需要桥层收养语义的一次裁决（快照收养 vs 列表收养、或 Server 侧显式 adopt op），
+属第三方桥语义变更，按 §6 记账停在该部分，不自行放宽或绕过。
 影响：G2 的"真召回 + native id 稳定"断言、G8 的"取消后同 native id 重开可见输入"
 断言无法成立；G1/G4/G6 的断言不受影响。
 不掩盖声明：本项不记通过。
