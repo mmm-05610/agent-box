@@ -481,6 +481,8 @@ def test_the_loader_derives_protected_paths_and_hands_them_to_the_launcher(
         port_factory({
             "harness_type": "fixture", "distribution": "Ubuntu", "remote_user": "tester",
             "connection_id": "connection", "remote_path": "/workspace",
+            # The placement the workspace record carries; it decides the channel.
+            "env_kind": "wsl", "env_host": "Ubuntu", "normalized_path": "/workspace",
             "config_object_digest": frozen.digest,
         }, lambda *_args: None)
     finally:

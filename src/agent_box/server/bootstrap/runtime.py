@@ -344,6 +344,8 @@ def build_runtime_from_sidecar_deployment(
     bindings = dict(mount_bindings or {})
     used_bindings: set[str] = set()
     from agent_box.server.execution import HarnessDescriptor, HarnessRegistry, SidecarExecutionBackend
+    from agent_box.server.execution.local_channel import LocalSidecarLauncher
+    from agent_box.server.execution.placement import WSL_CHANNEL, resolve_placement
     from agent_box.server.execution.sidecar import (
         SidecarHarnessPort, WslSidecarLauncher, sidecar_bundle_files,
     )
@@ -545,9 +547,8 @@ def build_runtime_from_sidecar_deployment(
     declared_credentials = _deployment_credentials(value)
 
     def factory(records, objects, approvals, notifier, connector, credentials, secret_store):
-        if connector is None:
-            raise RuntimeError("WSL_CONNECTOR_UNAVAILABLE")
-
+        # No gate here: whether a connector is required depends on the placement
+        # the workspace names, and that is resolved per turn.
         def port_factory(context, on_event):
             try:
                 deployment = deployments[context["harness_type"]]
@@ -567,27 +568,46 @@ def build_runtime_from_sidecar_deployment(
                 objects, context,
                 enabled=deployment["_state_bundle_prefix"] is not None,
             )
-            launcher = WslSidecarLauncher(
-                connector,
-                workspace={
-                    "distribution": context["distribution"],
-                    "remote_user": context["remote_user"],
-                    "connection_id": context["connection_id"],
-                    "remote_path": context["remote_path"],
-                },
-                bundle=bundle, credential=credential,
-                executable_authorizations=deployment["_executable_authorizations"],
-                executable_mounts=deployment["_executable_mounts"],
-                runtime_artifact_authorizations=deployment["_runtime_artifact_authorizations"],
-                runtime_artifact_mounts=deployment["_runtime_artifact_mounts"],
-                projection_mounts=deployment["_projection_mounts"],
-                state_bundle_prefix=deployment["_state_bundle_prefix"],
-                state_target=deployment["_state_target"],
-                state_ephemeral_paths=deployment["_state_ephemeral_paths"],
-                protected_state_paths=deployment["_protected_state_paths"],
-                restored_state=restored_state,
-                timeout_ms=deployment["_timeout_ms"],
+            # The workspace record says where this turn belongs; that fact - and
+            # only that fact - decides which channel stages and starts it.
+            placement = resolve_placement(
+                context.get("env_kind"), has_connector=connector is not None,
             )
+            if placement.channel == WSL_CHANNEL:
+                launcher = WslSidecarLauncher(
+                    connector,
+                    workspace={
+                        "distribution": context["distribution"],
+                        "remote_user": context["remote_user"],
+                        "connection_id": context["connection_id"],
+                        "remote_path": context["remote_path"],
+                    },
+                    bundle=bundle, credential=credential,
+                    executable_authorizations=deployment["_executable_authorizations"],
+                    executable_mounts=deployment["_executable_mounts"],
+                    runtime_artifact_authorizations=deployment["_runtime_artifact_authorizations"],
+                    runtime_artifact_mounts=deployment["_runtime_artifact_mounts"],
+                    projection_mounts=deployment["_projection_mounts"],
+                    state_bundle_prefix=deployment["_state_bundle_prefix"],
+                    state_target=deployment["_state_target"],
+                    state_ephemeral_paths=deployment["_state_ephemeral_paths"],
+                    protected_state_paths=deployment["_protected_state_paths"],
+                    restored_state=restored_state,
+                    timeout_ms=deployment["_timeout_ms"],
+                )
+            else:
+                launcher = LocalSidecarLauncher(
+                    workspace_path=context.get("normalized_path") or context["remote_path"],
+                    bundle=bundle, credential=credential,
+                    executable_mounts=deployment["_executable_mounts"],
+                    runtime_artifact_mounts=deployment["_runtime_artifact_mounts"],
+                    projection_mounts=deployment["_projection_mounts"],
+                    state_bundle_prefix=deployment["_state_bundle_prefix"],
+                    state_target=deployment["_state_target"],
+                    state_ephemeral_paths=deployment["_state_ephemeral_paths"],
+                    protected_state_paths=deployment["_protected_state_paths"],
+                    restored_state=restored_state,
+                )
             return SidecarHarnessPort(
                 launcher, environment={"AGENTBOX_SIDECAR_ISOLATED": "1"},
                 profile=context["harness_type"], adapter=deployment["adapter"],

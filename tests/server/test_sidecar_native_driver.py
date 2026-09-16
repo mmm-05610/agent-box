@@ -377,6 +377,7 @@ def test_deployment_carries_a_declared_driver_module_into_the_reviewed_bundle(tm
             "harness_type": "fixture-native", "config_object_digest": frozen.digest,
             "distribution": "Ubuntu", "remote_user": os.environ.get("USER", "user"),
             "connection_id": "connection", "remote_path": str(tmp_path),
+            "env_kind": "wsl",
         }, lambda *_args: None)
         assert captured["adapter"]["driver"] == {"module": f"/runtime/view/{bundle_path}"}
         assert captured["adapter"]["command"] == "/runtime/bin/fixture-native"

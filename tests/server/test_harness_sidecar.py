@@ -182,7 +182,12 @@ def test_port_reports_unknown_execution_without_sidecar(tmp_path):
     assert port.cancel("never-opened") is False
 
 
-def test_sidecar_deployment_requires_wsl_connector_without_leaking_root_lock(tmp_path, monkeypatch):
+def test_a_missing_wsl_connector_is_refused_by_placement_not_by_construction(tmp_path, monkeypatch):
+    """A placement decides whether a connector is needed, so the deployment
+    builds either way; what must never happen is a wsl workspace quietly
+    running somewhere else, or a failure that strands the data root."""
+    from agent_box.server.execution.placement import PlacementUnsupported, resolve_placement
+
     deployment = tmp_path / "deployment.json"
     deployment.write_text(json.dumps({
         "schemaVersion": 1,
@@ -193,12 +198,19 @@ def test_sidecar_deployment_requires_wsl_connector_without_leaking_root_lock(tmp
     import agent_box.server.bootstrap.runtime as runtime_module
     monkeypatch.setattr(runtime_module, "_builtin_connector", lambda _instance_id: None)
     root = tmp_path / "server-data"
-    with pytest.raises(RuntimeError, match="WSL_CONNECTOR_UNAVAILABLE"):
-        build_runtime_from_sidecar_deployment(root, deployment, plugin_root=PLUGIN)
-
-    # Construction failure releases the single-writer data-root lease.
-    runtime = build_runtime(root)
+    runtime = build_runtime_from_sidecar_deployment(root, deployment, plugin_root=PLUGIN)
     runtime.stop()
+
+    # The typed refusal is the placement's, with the code the launcher used.
+    with pytest.raises(PlacementUnsupported) as refused:
+        resolve_placement("wsl", has_connector=False)
+    assert refused.value.code == "WSL_CONNECTOR_UNAVAILABLE"
+    # A local workspace needs no connector at all.
+    assert resolve_placement("local", has_connector=False).channel == "local-process"
+
+    # And the single-writer data-root lease is free after either outcome.
+    reopened = build_runtime(root)
+    reopened.stop()
 
 
 def test_sidecar_deployment_projects_bounded_files_and_register_metadata(tmp_path, monkeypatch):

@@ -245,3 +245,31 @@ codex 的 state 树里有自身产生的链接）；改用 c8 立刻 exit 0。
 
 **意义**：同一份部署文档现在可以在本机、WSL、SSH 上使用——"这台机器上的路径"由**启动的人**绑定，
 而不是由文档写死。第 D 步（把"匹配"接进产品链路，让 Server 按能力选实现）是最后一片。
+
+### 第 D 步（把"匹配"接进产品链路）——**已实施并验证**（2026-09-16）
+
+产品里其实早就有"放置"这份数据（`server_workspaces.env_kind`），只是**被写死成 WSL**：
+`port_factory` 无条件构造 `WslSidecarLauncher`。本轮把它变成解析：
+
+- `get_turn_context()` 现在把 `env_kind / env_host / normalized_path` 一并带进 turn 上下文
+  （此前只有 distribution/user/connection/remote_path）。
+- 新增 `src/agent_box/server/execution/placement.py`：`resolve_placement(kind, has_connector)`
+  → `Placement{kind, channel}`，并且**三种拒绝都是类型化的**：
+  - `wsl` 但组合里没有连接器 → `WSL_CONNECTOR_UNAVAILABLE`（与旧错误码一致，只是从"构造期"挪到"这一轮"）；
+  - `ssh` → `PLACEMENT_UNIMPLEMENTED`（**点名拒绝，绝不静默换台机器**）；
+  - 缺失/未知 → `PLACEMENT_UNKNOWN`（历史上"默认按 WSL 跑"正是这一步要取消的东西）。
+- `port_factory` 按解析结果构造通道：`wsl-worker` → `WslSidecarLauncher`（原路径不变）；
+  `local-process` → `LocalSidecarLauncher`（本机通道，工作区路径取 `normalized_path`）。
+- 构造期不再要求连接器（本地放置不需要它）；**这改变了对外契约**，测试已按新契约改写：
+  "没有连接器"不再是构造失败，而是 wsl 放置的解析拒绝，且数据根锁不泄漏。
+
+**验证（本轮实跑）**
+
+| 项 | 结果 |
+| --- | --- |
+| 全量套件（后端 + harnesses + sandbox + runtime-wsl） | **886 passed / 6 skipped** |
+| 新增 `tests/server/test_placement.py` | 6 passed（wsl 需连接器 / local 不需要 / ssh 与未知拒绝 / **产品链路按放置选通道** / 本机通道不含 bwrap 知识） |
+| 四家假端点全链门（Pi/Hermes/Codex/OpenCode） | 全部 exit 0（Codex/OpenCode 用 c8） |
+| 替换门 | `HOST_SUBSTITUTION_GATE_OK` |
+
+**明确记下的缺口**：还没有一条门**端到端**跑"经放置解析 → 本机通道 → 一轮对话"（当前是本机通道单独端到端 + 放置解析单测 + WSL 路径端到端）。补这条门是下一步最值得做的验证。
