@@ -81,3 +81,18 @@ S2 模型与角色、S3 工作区、S4–S10。本记录随执行推进增补。
 - 发现并修掉一处我自己的过度约束：最初把"端口可用"也绑在选择集上，导致**已有角色但目录为空**时
   连编辑都不给——测试当场抓到，已改为只约束"新建"。
 - 提交：`5b647a47`（前端执行树，分支 `feature/agentbox-desktop-product`）。
+
+## 附：前端套件在 Windows 检出上的既有失败（与本次改动无关）
+
+改完后在 Windows 检出跑 `vitest --project ui`：**7952 passed / 24 failed（6 个文件）**。
+6 个文件全是**路径扫描类**结构测试：`api/import-boundary`、`dev/contracts/renderer-layers`、
+`store/store-boundaries`、`store/profile-store-purity`、`store/session-store-purity`、
+`plugins/hermes-bots/cron-prompt`（后者是 `sh` 依赖）。
+
+- 证据：失败信息里出现的路径是 Windows 反斜杠（如 `"api\\client.ts names the preload REST bridge directly"`），
+  而测试内的期望表用正斜杠；模块枚举用 `path.relative` + `readdirSync`，在 Windows 上产出
+  `store\profile.ts`，于是 `'store/profile.ts'` 之类的相等断言必然失败。
+- 这与上一轮记录的 **35 个既有失败**（`test:desktop:platforms`，POSIX/darwin 专属）同一类：
+  **本地检出平台的既有问题**，不是本轮改动引入，也不是产品缺陷。
+- 改动面的 6 个测试文件 62 项全部通过；`tsc --noEmit`、eslint 干净。
+
