@@ -101,11 +101,13 @@ def test_loopback_override_refuses_anything_but_a_loopback_url():
 
 def test_deployment_document_declares_the_managed_chain():
     document = production.deployment_document(
-        binary_source="/home/maoqh/.npm-global/lib/node_modules/opencode-ai/bin/opencode.exe",
+        binary_token="binary",
         binary_digest="sha256:" + "a" * 64,
     )
     assert document["schemaVersion"] == 1
-    assert Path(document["pluginRoot"]) == production.PLUGIN_ROOT
+    # The document names no host path at all: the plugin root and every mount
+    # token are the loader's business, not the file's.
+    assert "pluginRoot" not in document
     harness = document["harnesses"][0]
     assert harness["id"] == "opencode"
     assert harness["credentialKind"] == "api-key"
@@ -114,7 +116,7 @@ def test_deployment_document_declares_the_managed_chain():
     assert harness["controlOptions"] == {production.MODEL_CONTROL_ID: []}
     # 单文件二进制只经 executableMounts 通道；摘要必须与授权工具取证的一致。
     assert harness["executableMounts"] == [{
-        "source": "/home/maoqh/.npm-global/lib/node_modules/opencode-ai/bin/opencode.exe",
+        "token": "binary",
         "target": "/runtime/bin/opencode",
         "digest": "sha256:" + "a" * 64,
     }]
@@ -154,19 +156,17 @@ def test_deployment_document_declares_the_managed_chain():
 
 
 def test_deployment_document_refuses_invalid_binary_declarations():
-    for source, digest in (("relative/path", "sha256:" + "a" * 64),
-                           ("/srv/opencode", "sha256:short"),
-                           ("/srv/opencode", "md5:" + "a" * 32),
-                           ("/srv//opencode", "sha256:" + "a" * 64)):
+    # A token is a name, never a path, and the digest has to be a full sha256:
+    # each of these is refused by the template rather than written into a
+    # document that could not be bound on any machine.
+    for token, digest in (("relative/path", "sha256:" + "a" * 64),
+                          ("/srv/artifact", "sha256:" + "a" * 64),
+                          ("Artifact", "sha256:" + "a" * 64),
+                          ("a" * 33, "sha256:" + "a" * 64),
+                          ("artifact", "sha256:short"),
+                          ("artifact", "md5:" + "a" * 32)):
         with pytest.raises(production.OpenCodeProductionTemplateError):
-            production.deployment_document(binary_source=source, binary_digest=digest)
-    # 覆盖声明同样必须满足形状规则（gate 只在这一处替换挂载）。
-    with pytest.raises(production.OpenCodeProductionTemplateError):
-        production.harness_deployment(
-            binary_source="/srv/opencode", binary_digest="sha256:" + "a" * 64,
-            executable_mounts_override=(
-                {"source": "relative", "target": "/runtime/bin/opencode",
-                 "digest": "sha256:" + "a" * 64},))
+            production.deployment_document(binary_token=token, binary_digest=digest)
 
 
 def test_projection_sources_exist_next_to_the_deployment_template():
@@ -178,7 +178,7 @@ def test_projection_sources_exist_next_to_the_deployment_template():
     # 离线守卫是门资产，不是生产配置。
     assert production.EGRESS_GUARD.is_file()
     assert "egress-guard" not in json.dumps(production.deployment_document(
-        binary_source="/srv/opencode", binary_digest="sha256:" + "a" * 64))
+        binary_token="binary", binary_digest="sha256:" + "a" * 64))
 
 
 def test_product_model_translates_to_the_native_catalogue_value():

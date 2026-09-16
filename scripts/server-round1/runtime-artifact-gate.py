@@ -110,11 +110,10 @@ def assemble(tmp_path: Path, worker: Path, tree: Path, digest: str):
     deployment = tmp_path / "deployment.json"
     deployment.write_text(json.dumps({
         "schemaVersion": 1,
-        "pluginRoot": str(REPO / "plugins" / "agent-box-harnesses"),
         "harnesses": [{
             "id": "pi", "timeoutMs": 30_000,
             "runtimeArtifactMounts": [{
-                "source": str(tree), "target": ARTIFACT_TARGET, "treeDigest": digest,
+                "token": "artifact", "target": ARTIFACT_TARGET, "treeDigest": digest,
             }],
             "adapter": {
                 "command": "/usr/bin/node", "args": [],
@@ -126,10 +125,13 @@ def assemble(tmp_path: Path, worker: Path, tree: Path, digest: str):
     runtime_module._builtin_connector = lambda _id: DirectWorkerConnector(tmp_path, worker)
     original = runtime_module._sidecar_deployment_file
     runtime_module._sidecar_deployment_file = (
-        lambda root, value, relative: PROBE.read_bytes()
-        if relative == str(PROBE.relative_to(REPO)) else original(root, value, relative)
+        lambda root, relative: PROBE.read_bytes()
+        if relative == str(PROBE.relative_to(REPO)) else original(root, relative)
     )
-    return build_runtime_from_sidecar_deployment(tmp_path / "server", deployment)
+    return build_runtime_from_sidecar_deployment(
+        tmp_path / "server", deployment, plugin_root=REPO / "plugins" / "agent-box-harnesses",
+        mount_bindings={"artifact": str(tree)},
+    )
 
 
 def open_session(client, runtime, request_id: str, profile_key: str) -> dict:

@@ -40,6 +40,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import re
 from typing import Any, Mapping, Sequence
 
 from ..registry.capability_claims import capability_claims as _derive_capability_claims
@@ -90,6 +91,9 @@ ADAPTER_ENVIRONMENT = {
 #: product resolves, not one of a fixed set of native strings - and a silently
 #: discovered default would run a model the user never chose.
 MODEL_CONTROL_ID = "model"
+
+#: A mount token is a name the operator binds to a machine-local path.
+TOKEN = re.compile(r"[a-z][a-z0-9-]{0,31}")
 
 PLUGIN_ROOT = Path(__file__).resolve().parents[3]
 DEPLOY_DIRECTORY = PLUGIN_ROOT / "deploy" / "pi"
@@ -176,7 +180,7 @@ def projection_files() -> tuple[dict[str, str], ...]:
 
 def harness_deployment(
     *,
-    artifact_source: str,
+    artifact_token: str,
     tree_digest: str,
     timeout_ms: int = 120_000,
     adapter_environment: Mapping[str, str] | None = None,
@@ -184,8 +188,8 @@ def harness_deployment(
     runtime_artifact_mounts_override: Sequence[Mapping[str, str]] | None = None,
 ) -> dict[str, Any]:
     """One production Harness entry, ready for a non-secret deployment file."""
-    if not isinstance(artifact_source, str) or not artifact_source.startswith("/"):
-        raise PiProductionTemplateError("PI_ARTIFACT_SOURCE_INVALID")
+    if not isinstance(artifact_token, str) or not TOKEN.fullmatch(artifact_token):
+        raise PiProductionTemplateError("PI_ARTIFACT_TOKEN_INVALID")
     if not isinstance(tree_digest, str) or not tree_digest.startswith("sha256:") or len(tree_digest) != 71:
         raise PiProductionTemplateError("PI_ARTIFACT_DIGEST_INVALID")
     if adapter_environment is not None and any(
@@ -194,7 +198,7 @@ def harness_deployment(
     ):
         raise PiProductionTemplateError("PI_ADAPTER_ENVIRONMENT_INVALID")
     mounts = runtime_artifact_mounts_override or ({
-        "source": artifact_source, "target": ARTIFACT_TARGET, "treeDigest": tree_digest,
+        "token": artifact_token, "target": ARTIFACT_TARGET, "treeDigest": tree_digest,
     },)
     return {
         "id": "pi",
@@ -225,14 +229,13 @@ def harness_deployment(
 
 
 def deployment_document(
-    *, artifact_source: str, tree_digest: str, plugin_root: Path | str = PLUGIN_ROOT, **harness: Any,
+    *, artifact_token: str, tree_digest: str, **harness: Any,
 ) -> dict[str, Any]:
     """The whole non-secret deployment file the Server loads."""
     return {
         "schemaVersion": 1,
-        "pluginRoot": str(plugin_root),
         "harnesses": [harness_deployment(
-            artifact_source=artifact_source, tree_digest=tree_digest, **harness,
+            artifact_token=artifact_token, tree_digest=tree_digest, **harness,
         )],
     }
 
@@ -245,12 +248,11 @@ def main(arguments: Sequence[str] | None = None) -> int:
     parser.add_argument("--tree-digest", required=True,
                         help="the artifact manifest's sha256: tree digest")
     parser.add_argument("--out", required=True, help="path of the deployment file to write")
-    parser.add_argument("--plugin-root", default=str(PLUGIN_ROOT))
     parser.add_argument("--timeout-ms", type=int, default=120_000)
     options = parser.parse_args(arguments)
     document = deployment_document(
-        artifact_source=options.artifact_source, tree_digest=options.tree_digest,
-        plugin_root=options.plugin_root, timeout_ms=options.timeout_ms,
+        artifact_token=options.artifact_token, tree_digest=options.tree_digest,
+        timeout_ms=options.timeout_ms,
     )
     output = Path(options.out)
     output.parent.mkdir(parents=True, exist_ok=True)

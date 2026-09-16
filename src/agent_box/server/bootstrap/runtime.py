@@ -315,7 +315,8 @@ def build_runtime(
 
 def build_runtime_from_sidecar_deployment(
     data_root: Path | str, deployment_path: Path | str,
-    secret_store: SecretStore | None = None,
+    secret_store: SecretStore | None = None, *,
+    plugin_root: Path | str, mount_bindings: Mapping[str, str] | None = None,
 ) -> ServerRuntime:
     """Compose registered Harnesses from an explicit non-secret deployment file.
 
@@ -324,12 +325,24 @@ def build_runtime_from_sidecar_deployment(
     credential from, and a caller that already owns one (Windows DPAPI, or an
     acceptance harness with an ephemeral store) passes it here rather than
     relying on the platform default.
+
+    The document names no host path. `plugin_root` is the machine-local root its
+    plugin-relative sources are read from - supplied by whoever runs the Server,
+    never carried in the document - and every mount the document declares names a
+    `token` whose machine-local path `mount_bindings` supplies. A document that
+    still carries a host path, or a mount with no binding, is refused rather than
+    half-used: that refusal is what keeps one document runnable on any machine.
     """
     path = Path(deployment_path).resolve()
     value = json.loads(path.read_text(encoding="utf-8"))
     if (not isinstance(value, dict) or value.get("schemaVersion") != 1
             or not isinstance(value.get("harnesses"), list)):
         raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
+    if "pluginRoot" in value:
+        raise RuntimeError("SIDECAR_DEPLOYMENT_HOST_PATH")
+    root = Path(plugin_root).resolve()
+    bindings = dict(mount_bindings or {})
+    used_bindings: set[str] = set()
     from agent_box.server.execution import HarnessDescriptor, HarnessRegistry, SidecarExecutionBackend
     from agent_box.server.execution.sidecar import (
         SidecarHarnessPort, WslSidecarLauncher, sidecar_bundle_files,
@@ -380,7 +393,7 @@ def build_runtime_from_sidecar_deployment(
         if adapter_source is not None:
             if adapter["command"] != "/usr/bin/node":
                 raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
-            content = _sidecar_deployment_file(path, value, adapter_source)
+            content = _sidecar_deployment_file(root, adapter_source)
             bundle_path = f"agentbox-sidecar/deployment/{harness_id}/adapter.mjs"
             additional_bundle[bundle_path] = content
             adapter["args"] = [f"/runtime/view/{bundle_path}", *adapter.get("args", [])]
@@ -394,7 +407,7 @@ def build_runtime_from_sidecar_deployment(
             if (not isinstance(driver, dict) or set(driver) != {"source"}
                     or not isinstance(driver.get("source"), str)):
                 raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
-            content = _sidecar_deployment_file(path, value, driver["source"])
+            content = _sidecar_deployment_file(root, driver["source"])
             driver_bundle_path = f"agentbox-sidecar/deployment/{harness_id}/driver.mjs"
             additional_bundle[driver_bundle_path] = content
             adapter["driver"] = {"module": f"/runtime/view/{driver_bundle_path}"}
@@ -418,7 +431,7 @@ def build_runtime_from_sidecar_deployment(
             # 目标先校验（同一个 guest home 语法，与 bwrap 侧共用一套实现），
             # 再读源文件：一个越界/非规范的目标不该让 Server 先去读盘。
             target = _home_projection_target(projection.get("target"), kind="file")
-            content = _sidecar_deployment_file(path, value, source)
+            content = _sidecar_deployment_file(root, source)
             suffix = Path(str(source)).name
             bundle_path = f"agentbox-sidecar/deployment/{harness_id}/projection-{index}-{suffix}"
             additional_bundle[bundle_path] = content
@@ -428,16 +441,12 @@ def build_runtime_from_sidecar_deployment(
         executable_authorizations = []
         executable_mounts = []
         for executable in item.get("executableMounts") or ():
-            if not isinstance(executable, dict):
-                raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
-            source = executable.get("source")
+            if not isinstance(executable, dict) or "source" in executable:
+                raise RuntimeError("SIDECAR_DEPLOYMENT_HOST_PATH")
             target = executable.get("target")
             digest_value = executable.get("digest")
-            if (not isinstance(source, str) or not source.startswith("/")
-                    or "//" in source or "\x00" in source
-                    or any(part in {".", ".."} for part in source.split("/"))
-                    or str(PurePosixPath(source)) != source
-                    or not isinstance(target, str)
+            source = _bound_mount_path(executable.get("token"), bindings, used_bindings)
+            if (not isinstance(target, str)
                     or re.fullmatch(r"/runtime/bin/[A-Za-z0-9._-]+", target) is None
                     or not isinstance(digest_value, str)
                     or re.fullmatch(r"sha256:[0-9a-f]{64}", digest_value) is None):
@@ -446,7 +455,9 @@ def build_runtime_from_sidecar_deployment(
             executable_mounts.append((source, target))
         deployment["_executable_authorizations"] = tuple(executable_authorizations)
         deployment["_executable_mounts"] = tuple(executable_mounts)
-        artifact_authorizations = _runtime_artifact_declarations(item.get("runtimeArtifactMounts"))
+        artifact_authorizations = _runtime_artifact_declarations(
+            item.get("runtimeArtifactMounts"), bindings, used_bindings,
+        )
         deployment["_runtime_artifact_authorizations"] = artifact_authorizations
         deployment["_runtime_artifact_mounts"] = tuple(
             (str(declaration["path"]), str(declaration["target"]))
@@ -518,9 +529,12 @@ def build_runtime_from_sidecar_deployment(
             },
             security_locked_controls=tuple(item.get("securityLockedControls") or ()),
         ))
-    bundle = sidecar_bundle_files(
-        value.get("pluginRoot") or path.parent, additional_files=additional_bundle,
-    )
+    unused = sorted(set(bindings) - used_bindings)
+    if unused:
+        # A binding nobody asked for is a typo or a stale document, and silently
+        # ignoring it would hide which artifact the deployment really uses.
+        raise RuntimeError("SIDECAR_ARTIFACT_BINDING_UNUSED")
+    bundle = sidecar_bundle_files(root, additional_files=additional_bundle)
 
     # Credential sources are *declared* here and read from their own files: the
     # deployment document stays a non-secret artifact, and this is the only
@@ -710,15 +724,42 @@ def _protected_state_paths(
         raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID") from None
 
 
-def _runtime_artifact_declarations(value: Any) -> tuple[dict[str, str], ...]:
-    """Validate the shape of `runtimeArtifactMounts` and pass it through.
+#: The token grammar shared by every mount a deployment declares.
+MOUNT_TOKEN = re.compile(r"[a-z][a-z0-9-]{0,31}")
 
-    This is deliberately a shape check only.  A runtime artifact source is a
-    WSL path that does not exist on the Server, so existence, link status, the
-    tree digest and every overlap rule are settled by the Worker, inside the
-    distribution that will read the tree.  The Server's job is to refuse a
-    declaration that could not be verified at all, and to carry the
-    declaration's exact digests to the Worker unchanged.
+
+def _bound_mount_path(
+    token: Any, bindings: Mapping[str, str], used: set[str],
+) -> str:
+    """Resolve one mount token to the machine-local path the caller bound.
+
+    A document that names a host path instead of a token, a token nobody bound,
+    or a binding value that is not an absolute path is refused here: the same
+    document has to run on WSL, on this machine and over SSH, and a path in the
+    document is exactly what stops that from being true.
+    """
+    if not isinstance(token, str) or MOUNT_TOKEN.fullmatch(token) is None:
+        raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
+    bound = bindings.get(token)
+    if not isinstance(bound, str) or not bound.startswith("/"):
+        raise RuntimeError("SIDECAR_ARTIFACT_BINDING_MISSING")
+    if "\\" in bound or "\x00" in bound or "//" in bound or bound.endswith("/"):
+        raise RuntimeError("SIDECAR_ARTIFACT_BINDING_INVALID")
+    used.add(token)
+    return bound
+
+
+def _runtime_artifact_declarations(
+    value: Any, bindings: Mapping[str, str] | None = None, used: set[str] | None = None,
+) -> tuple[dict[str, str], ...]:
+    """Validate `runtimeArtifactMounts`, resolving each token to its binding.
+
+    The document declares *which* artifact tree a Harness needs and its expected
+    digest; where that tree lives on the machine running the Worker is the
+    caller's binding, not the document's line.  Existence, link status, the tree
+    digest and every overlap rule are still settled on that machine, inside the
+    distribution that will read the tree; the Server refuses a declaration that
+    could not be verified at all and carries the exact digests across unchanged.
     """
     from agent_box_sandbox_bwrap import (
         MAX_RUNTIME_ARTIFACT_TREES, RuntimeArtifactRejected,
@@ -733,18 +774,13 @@ def _runtime_artifact_declarations(value: Any) -> tuple[dict[str, str], ...]:
     paths: set[str] = set()
     targets: set[str] = set()
     for item in value:
-        if not isinstance(item, dict) or set(item) != {"source", "target", "treeDigest"}:
-            raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
-        source = item["source"]
+        if not isinstance(item, dict) or set(item) != {"token", "target", "treeDigest"}:
+            raise RuntimeError("SIDECAR_DEPLOYMENT_HOST_PATH" if "source" in item
+                               else "SIDECAR_DEPLOYMENT_INVALID")
+        source = _bound_mount_path(item["token"], bindings or {}, used if used is not None else set())
         target = item["target"]
         digest_value = item["treeDigest"]
-        if (not isinstance(source, str) or not source.startswith("/")
-                or "\\" in source or "\x00" in source or "//" in source
-                or source.endswith("/")
-                or any(part in {"", ".", ".."} for part in source.split("/")[1:])
-                or str(PurePosixPath(source)) != source
-                or any(ord(character) < 0x20 or ord(character) == 0x7F for character in source)
-                or not isinstance(digest_value, str)
+        if (not isinstance(digest_value, str)
                 or re.fullmatch(r"sha256:[0-9a-f]{64}", digest_value) is None):
             raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
         try:
@@ -759,15 +795,18 @@ def _runtime_artifact_declarations(value: Any) -> tuple[dict[str, str], ...]:
     return tuple(declarations)
 
 
-def _sidecar_deployment_file(
-    deployment_path: Path, deployment: Mapping[str, Any], relative: Any,
-) -> bytes:
-    """Read one non-secret plugin artifact named by the deployment."""
-    if (not isinstance(relative, str) or relative.startswith("/") or "\x00" in relative
-            or any(part in {"", ".", ".."} for part in relative.replace("\\", "/").split("/"))):
-        raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
-    root = Path(deployment.get("pluginRoot") or deployment_path.parent).resolve()
-    candidate = root.joinpath(*relative.replace("\\", "/").split("/"))
+def _sidecar_deployment_file(root: Path, relative: Any) -> bytes:
+    """Read one non-secret plugin artifact named by the deployment.
+
+    `relative` is a plugin-relative name, never a host path: a drive letter, a
+    leading separator or a UNC prefix is refused here, so a document written for
+    one machine cannot half-work on another.
+    """
+    if (not isinstance(relative, str) or relative.startswith("/") or "\\" in relative
+            or ":" in relative or "\x00" in relative
+            or any(part in {"", ".", ".."} for part in relative.split("/"))):
+        raise RuntimeError("SIDECAR_DEPLOYMENT_HOST_PATH")
+    candidate = root.joinpath(*relative.split("/"))
     if candidate.is_symlink():
         raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
     try:

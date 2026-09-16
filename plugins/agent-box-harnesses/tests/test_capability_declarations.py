@@ -211,13 +211,13 @@ def _production_claims(family: str) -> dict:
     module = {"pi": pi_production, "hermes": hermes_production, "opencode": opencode_production}[family]
     if family == "pi":
         document = module.deployment_document(
-            artifact_source="/srv/agentbox/artifacts/pi-runtime", tree_digest="sha256:" + "a" * 64)
+            artifact_token="artifact", tree_digest="sha256:" + "a" * 64)
     elif family == "hermes":
         document = module.deployment_document(
-            artifact_source="/srv/agentbox/artifacts/hermes-runtime", tree_digest="sha256:" + "a" * 64)
+            artifact_token="artifact", tree_digest="sha256:" + "a" * 64)
     else:
         document = module.deployment_document(
-            binary_source="/reviewed/bin/opencode", binary_digest="sha256:" + "a" * 64)
+            binary_token="binary", binary_digest="sha256:" + "a" * 64)
     harness = document["harnesses"][0]
     assert harness["id"] == family
     return harness["capabilityClaims"]

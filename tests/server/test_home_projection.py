@@ -311,7 +311,7 @@ def test_the_guest_sees_the_profile_projection_and_not_the_host_home(tmp_path):
 def write_deployment(tmp_path, harness):
     deployment = tmp_path / "deployment.json"
     deployment.write_text(json.dumps({
-        "schemaVersion": 1, "pluginRoot": str(tmp_path), "harnesses": [harness],
+        "schemaVersion": 1, "harnesses": [harness],
     }), encoding="utf-8")
     return deployment
 
@@ -319,7 +319,8 @@ def write_deployment(tmp_path, harness):
 def build_deployment(tmp_path, deployment):
     import agent_box.server.bootstrap.runtime as runtime_module
 
-    return runtime_module.build_runtime_from_sidecar_deployment(tmp_path / "server", deployment)
+    return runtime_module.build_runtime_from_sidecar_deployment(
+        tmp_path / "server", deployment, plugin_root=tmp_path)
 
 
 def fixture_harness(**changes):

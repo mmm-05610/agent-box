@@ -79,13 +79,14 @@ def test_a_deployment_may_only_declare_canonical_boolean_abilities(tmp_path, mon
     def build(claims):
         deployment = tmp_path / "deployment.json"
         deployment.write_text(json.dumps({
-            "schemaVersion": 1, "pluginRoot": str(PLUGIN),
+            "schemaVersion": 1,
             "harnesses": [{
                 "id": "fixture", "capabilityClaims": claims,
                 "adapter": {"command": "/usr/bin/node", "args": []},
             }],
         }), encoding="utf-8")
-        runtime = build_runtime_from_sidecar_deployment(tmp_path / "server", deployment)
+        runtime = build_runtime_from_sidecar_deployment(
+            tmp_path / "server", deployment, plugin_root=PLUGIN)
         runtime.stop()
 
     # The canonical spelling is accepted, including an explicit false.

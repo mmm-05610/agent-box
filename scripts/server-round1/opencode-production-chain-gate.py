@@ -816,7 +816,7 @@ def run_chain(temporary: Path, workspace: Path, worker: Path, authorization: dic
         else production.loopback_config_document(endpoint.base_url), sort_keys=True).encode()
     guard_bytes = guard.read_bytes()
     document = production.deployment_document(
-        binary_source=authorization["source"], binary_digest=authorization["digest"],
+        binary_token="opencode", binary_digest=authorization["digest"],
         adapter_environment=(
             {
                 **production.ADAPTER_ENVIRONMENT,
@@ -850,16 +850,19 @@ def run_chain(temporary: Path, workspace: Path, worker: Path, authorization: dic
         temporary, worker, workspace)
     original_file = runtime_module._sidecar_deployment_file
 
-    def deployment_file(root, value, relative):
+    def deployment_file(root, relative):
         if relative == production.CONFIG_SOURCE:
             return config_bytes
         if relative == GUARD_SOURCE:
             return guard_bytes
-        return original_file(root, value, relative)
+        return original_file(root, relative)
 
     runtime_module._sidecar_deployment_file = deployment_file
     store = MemorySecretStore(values={})
-    runtime = build_runtime_from_sidecar_deployment(temporary / "server", deployment, secret_store=store)
+    runtime = build_runtime_from_sidecar_deployment(
+        temporary / "server", deployment, secret_store=store, plugin_root=PLUGIN,
+        mount_bindings={"opencode": authorization["source"]},
+    )
     result: dict = {"rounds": {}}
     try:
         pass

@@ -177,11 +177,13 @@ def test_the_deployment_config_disables_the_two_official_state_churners():
 
 def test_the_deployment_document_declares_the_managed_chain():
     document = production.deployment_document(
-        artifact_source="/srv/agentbox/artifacts/codex-runtime",
+        artifact_token="artifact",
         tree_digest="sha256:" + "a" * 64,
     )
     assert document["schemaVersion"] == 1
-    assert Path(document["pluginRoot"]) == production.PLUGIN_ROOT
+    # The document names no host path at all: the plugin root and every mount
+    # token are the loader's business, not the file's.
+    assert "pluginRoot" not in document
     harness = document["harnesses"][0]
     assert harness["id"] == "codex"
     assert harness["credentialKind"] == "api-key"
@@ -190,7 +192,7 @@ def test_the_deployment_document_declares_the_managed_chain():
     assert harness["modelControlId"] == production.MODEL_CONTROL_ID
     assert harness["controlOptions"] == {production.MODEL_CONTROL_ID: []}
     assert harness["runtimeArtifactMounts"] == [{
-        "source": "/srv/agentbox/artifacts/codex-runtime",
+        "token": "artifact",
         "target": "/runtime/artifacts/codex-runtime",
         "treeDigest": "sha256:" + "a" * 64,
     }]
@@ -236,11 +238,17 @@ def test_the_projected_files_exist_and_the_state_target_shares_the_home_root():
 
 
 def test_the_deployment_document_refuses_invalid_artifact_declarations():
-    for source, digest in (("relative/path", "sha256:" + "a" * 64),
-                           ("/srv/codex", "sha256:short"),
-                           ("/srv/codex", "md5:" + "a" * 32)):
+    # A token is a name, never a path, and the digest has to be a full sha256:
+    # each of these is refused by the template rather than written into a
+    # document that could not be bound on any machine.
+    for token, digest in (("relative/path", "sha256:" + "a" * 64),
+                          ("/srv/artifact", "sha256:" + "a" * 64),
+                          ("Artifact", "sha256:" + "a" * 64),
+                          ("a" * 33, "sha256:" + "a" * 64),
+                          ("artifact", "sha256:short"),
+                          ("artifact", "md5:" + "a" * 32)):
         with pytest.raises(production.CodexProductionTemplateError):
-            production.deployment_document(artifact_source=source, tree_digest=digest)
+            production.deployment_document(artifact_token=token, tree_digest=digest)
 
 
 def test_the_product_model_needs_no_alias_and_the_sidecar_agrees():

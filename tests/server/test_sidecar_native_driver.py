@@ -357,7 +357,7 @@ def test_deployment_carries_a_declared_driver_module_into_the_reviewed_bundle(tm
     monkeypatch.setattr(sidecar_module, "SidecarHarnessPort", RecordingPort)
     deployment = tmp_path / "deployment.json"
     deployment.write_text(json.dumps({
-        "schemaVersion": 1, "pluginRoot": str(tmp_path),
+        "schemaVersion": 1,
         "harnesses": [{
             "id": "fixture-native",
             "adapter": {
@@ -367,7 +367,8 @@ def test_deployment_carries_a_declared_driver_module_into_the_reviewed_bundle(tm
             },
         }],
     }), encoding="utf-8")
-    runtime = runtime_module.build_runtime_from_sidecar_deployment(tmp_path / "server", deployment)
+    runtime = runtime_module.build_runtime_from_sidecar_deployment(
+        tmp_path / "server", deployment, plugin_root=tmp_path)
     try:
         bundle_path = "agentbox-sidecar/deployment/fixture-native/driver.mjs"
         assert captured["files"][bundle_path] == source.read_bytes()
@@ -384,6 +385,8 @@ def test_deployment_carries_a_declared_driver_module_into_the_reviewed_bundle(tm
 
 
 @pytest.mark.parametrize("driver", [
+    # A driver declaration names a plugin-relative module, so an absolute path is
+    # refused as a host path and a relative escape as a malformed name.
     {"source": "/absolute/driver.mjs"},
     {"source": "../escape.mjs"},
     {"source": "driver.mjs", "extra": True},
@@ -399,11 +402,15 @@ def test_deployment_refuses_a_malformed_driver_declaration(tmp_path, monkeypatch
     monkeypatch.setattr(runtime_module, "_builtin_connector", lambda _instance_id: object())
     deployment = tmp_path / "deployment.json"
     deployment.write_text(json.dumps({
-        "schemaVersion": 1, "pluginRoot": str(tmp_path),
+        "schemaVersion": 1,
         "harnesses": [{
             "id": "fixture-native",
             "adapter": {"command": "/runtime/bin/fixture-native", "args": [], "driver": driver},
         }],
     }), encoding="utf-8")
-    with pytest.raises(RuntimeError, match="SIDECAR_DEPLOYMENT_INVALID"):
-        runtime_module.build_runtime_from_sidecar_deployment(tmp_path / "server", deployment)
+    with pytest.raises(RuntimeError) as refused:
+        runtime_module.build_runtime_from_sidecar_deployment(
+            tmp_path / "server", deployment, plugin_root=tmp_path)
+    assert str(refused.value).startswith(
+        ("SIDECAR_DEPLOYMENT_INVALID", "SIDECAR_DEPLOYMENT_HOST_PATH")
+    ), str(refused.value)

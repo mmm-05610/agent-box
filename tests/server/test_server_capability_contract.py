@@ -198,7 +198,7 @@ def test_descriptor_validates_claims_at_construction_and_registry_exposes_canoni
 def _deployment_record(tmp_path: Path, claims) -> Path:
     deployment = tmp_path / "sidecar-deployment.json"
     deployment.write_text(json.dumps({
-        "schemaVersion": 1, "pluginRoot": str(PLUGIN),
+        "schemaVersion": 1,
         "harnesses": [{
             "id": "fixture", "capabilityClaims": claims,
             "adapter": {"command": "/usr/bin/node", "args": []},
@@ -216,7 +216,7 @@ def test_deployment_seat_rejects_drifted_or_unknown_capability_ids(tmp_path, cla
         pytest.skip("harness plugin runtime is unavailable")
     with pytest.raises(RuntimeError) as refused:
         build_runtime_from_sidecar_deployment(
-            tmp_path / "server", _deployment_record(tmp_path, claims),
+            tmp_path / "server", _deployment_record(tmp_path, claims), plugin_root=PLUGIN,
         )
     assert refused.value.args[0].startswith("SIDECAR_DEPLOYMENT_INVALID")
     assert "CAPABILITY" in str(refused.value)
@@ -230,7 +230,7 @@ def test_deployment_seat_rejects_non_boolean_capability_values(tmp_path, claims)
         pytest.skip("harness plugin runtime is unavailable")
     with pytest.raises(RuntimeError) as refused:
         build_runtime_from_sidecar_deployment(
-            tmp_path / "server", _deployment_record(tmp_path, claims),
+            tmp_path / "server", _deployment_record(tmp_path, claims), plugin_root=PLUGIN,
         )
     assert "CAPABILITY_VALUE_NOT_BOOLEAN" in str(refused.value)
 
@@ -243,9 +243,9 @@ def test_deployment_seat_accepts_the_canonical_spelling(tmp_path, monkeypatch):
     # 只在 Linux 上跑装配：连接器只是占位，能力声明才是这条断言的证据。
     monkeypatch.setattr(runtime_module, "_builtin_connector", lambda _instance_id: object())
     runtime = build_runtime_from_sidecar_deployment(
-        tmp_path / "server", _deployment_record(tmp_path, {
-            "start": True, "stream": False, "native_continuation": True,
-        }),
+        tmp_path / "server",
+        _deployment_record(tmp_path, {"start": True, "stream": False, "native_continuation": True}),
+        plugin_root=PLUGIN,
     )
     try:
         descriptor = runtime.harnesses.get("fixture")

@@ -158,11 +158,13 @@ def test_loopback_override_refuses_anything_but_a_loopback_url():
 
 def test_deployment_document_declares_the_managed_chain():
     document = production.deployment_document(
-        artifact_source="/srv/agentbox/artifacts/hermes-runtime",
+        artifact_token="artifact",
         tree_digest="sha256:" + "a" * 64,
     )
     assert document["schemaVersion"] == 1
-    assert Path(document["pluginRoot"]) == production.PLUGIN_ROOT
+    # The document names no host path at all: the plugin root and every mount
+    # token are the loader's business, not the file's.
+    assert "pluginRoot" not in document
     harness = document["harnesses"][0]
     assert harness["id"] == "hermes"
     assert harness["credentialKind"] == "api-key"
@@ -175,7 +177,7 @@ def test_deployment_document_declares_the_managed_chain():
     assert "modelControlId" not in harness
     assert "controlOptions" not in harness
     assert harness["runtimeArtifactMounts"] == [{
-        "source": "/srv/agentbox/artifacts/hermes-runtime",
+        "token": "artifact",
         "target": "/runtime/artifacts/hermes-runtime",
         "treeDigest": "sha256:" + "a" * 64,
     }]
@@ -232,7 +234,7 @@ def test_deployment_document_declares_the_managed_chain():
 def test_a_model_control_can_only_be_declared_explicitly_for_a_gate():
     """The gate needs the declared-control variant to demonstrate the refusal."""
     variant = production.deployment_document(
-        artifact_source="/srv/agentbox/artifacts/hermes-runtime",
+        artifact_token="artifact",
         tree_digest="sha256:" + "a" * 64,
         model_control_id="model",
     )
@@ -240,7 +242,7 @@ def test_a_model_control_can_only_be_declared_explicitly_for_a_gate():
     assert variant["harnesses"][0]["controlOptions"] == {"model": []}
     # The production default is unaffected by producing the variant.
     assert "modelControlId" not in production.deployment_document(
-        artifact_source="/srv/agentbox/artifacts/hermes-runtime",
+        artifact_token="artifact",
         tree_digest="sha256:" + "a" * 64,
     )["harnesses"][0]
 
@@ -274,10 +276,17 @@ def test_the_guest_home_is_the_one_isolated_root_and_both_paths_converge():
 
 
 def test_deployment_document_refuses_an_invalid_artifact_declaration():
-    for source, digest in (("relative/path", "sha256:" + "a" * 64),
-                           ("/srv/hermes", "sha256:short"), ("/srv/hermes", "md5:" + "a" * 32)):
+    # A token is a name, never a path, and the digest has to be a full sha256:
+    # each of these is refused by the template rather than written into a
+    # document that could not be bound on any machine.
+    for token, digest in (("relative/path", "sha256:" + "a" * 64),
+                          ("/srv/artifact", "sha256:" + "a" * 64),
+                          ("Artifact", "sha256:" + "a" * 64),
+                          ("a" * 33, "sha256:" + "a" * 64),
+                          ("artifact", "sha256:short"),
+                          ("artifact", "md5:" + "a" * 32)):
         with pytest.raises(production.HermesProductionTemplateError):
-            production.deployment_document(artifact_source=source, tree_digest=digest)
+            production.deployment_document(artifact_token=token, tree_digest=digest)
 
 
 def test_product_model_passes_through_and_the_sidecar_glue_has_no_alias():

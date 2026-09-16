@@ -40,7 +40,7 @@ def build(document: Path, *, secret_store, data_root: Path | None = None):
     try:
         return build_runtime_from_sidecar_deployment(
             data_root if data_root is not None else document.parent / f"data-{next(_CALLS)}",
-            document, secret_store=secret_store,
+            document, secret_store=secret_store, plugin_root=PLUGIN_ROOT,
         )
     finally:
         runtime_module._builtin_connector = original
@@ -54,7 +54,6 @@ PLUGIN_ROOT = REPO_ROOT / "plugins" / "agent-box-harnesses"
 def deployment_document(tmp_path: Path, credentials: list[dict] | None = None) -> Path:
     document: dict = {
         "schemaVersion": 1,
-        "pluginRoot": str(PLUGIN_ROOT),
         "harnesses": [
             {
                 "id": "fixture",

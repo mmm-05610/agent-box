@@ -95,11 +95,13 @@ def test_loopback_override_refuses_anything_but_a_loopback_url():
 
 def test_deployment_document_declares_the_managed_chain():
     document = production.deployment_document(
-        artifact_source="/srv/agentbox/artifacts/pi-runtime",
+        artifact_token="artifact",
         tree_digest="sha256:" + "a" * 64,
     )
     assert document["schemaVersion"] == 1
-    assert Path(document["pluginRoot"]) == production.PLUGIN_ROOT
+    # The document names no host path at all: the plugin root and every mount
+    # token are the loader's business, not the file's.
+    assert "pluginRoot" not in document
     harness = document["harnesses"][0]
     assert harness["id"] == "pi"
     assert harness["credentialKind"] == "api-key"
@@ -107,7 +109,7 @@ def test_deployment_document_declares_the_managed_chain():
     assert harness["modelControlId"] == production.MODEL_CONTROL_ID
     assert harness["controlOptions"] == {production.MODEL_CONTROL_ID: []}
     assert harness["runtimeArtifactMounts"] == [{
-        "source": "/srv/agentbox/artifacts/pi-runtime",
+        "token": "artifact",
         "target": "/runtime/artifacts/pi-runtime",
         "treeDigest": "sha256:" + "a" * 64,
     }]
@@ -170,10 +172,17 @@ def test_adapter_entry_is_derived_from_the_artifact_target():
 
 
 def test_deployment_document_refuses_an_invalid_artifact_declaration():
-    for source, digest in ((("relative/path"), "sha256:" + "a" * 64),
-                           ("/srv/pi", "sha256:short"), ("/srv/pi", "md5:" + "a" * 32)):
+    # A token is a name, never a path, and the digest has to be a full sha256:
+    # each of these is refused by the template rather than written into a
+    # document that could not be bound on any machine.
+    for token, digest in (("relative/path", "sha256:" + "a" * 64),
+                          ("/srv/artifact", "sha256:" + "a" * 64),
+                          ("Artifact", "sha256:" + "a" * 64),
+                          ("a" * 33, "sha256:" + "a" * 64),
+                          ("artifact", "sha256:short"),
+                          ("artifact", "md5:" + "a" * 32)):
         with pytest.raises(production.PiProductionTemplateError):
-            production.deployment_document(artifact_source=source, tree_digest=digest)
+            production.deployment_document(artifact_token=token, tree_digest=digest)
 
 
 def test_product_model_translates_to_the_native_catalogue_value():

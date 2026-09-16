@@ -388,7 +388,7 @@ def test_cleanup_fails_loudly_when_a_tree_cannot_be_removed(gate, tmp_path, monk
 def deployment_file(tmp_path: Path, harness: dict) -> Path:
     path = tmp_path / "deployment.json"
     path.write_text(json.dumps({
-        "schemaVersion": 1, "pluginRoot": str(production.PLUGIN_ROOT), "harnesses": [harness],
+        "schemaVersion": 1, "harnesses": [harness],
     }), encoding="utf-8")
     return path
 
@@ -400,11 +400,15 @@ def test_the_production_document_is_accepted_by_the_server(tmp_path, monkeypatch
     # deployment document being accepted and registered without a Harness branch.
     monkeypatch.setattr(runtime_module, "_builtin_connector", lambda _id: object())
     document = production.deployment_document(
-        artifact_source="/srv/agentbox/artifacts/hermes-runtime",
+        artifact_token="hermes-runtime",
         tree_digest="sha256:" + "b" * 64,
     )
     path = deployment_file(tmp_path, document["harnesses"][0])
-    runtime = build_runtime_from_sidecar_deployment(tmp_path / "server", path, secret_store=None)
+    runtime = build_runtime_from_sidecar_deployment(
+        tmp_path / "server", path, secret_store=None, plugin_root=production.PLUGIN_ROOT,
+        # The document names the token; where the tree lives is this binding.
+        mount_bindings={"hermes-runtime": "/srv/agentbox/artifacts/hermes-runtime"},
+    )
     try:
         # No Hermes branch anywhere: the registered descriptor is the generic one.
         descriptor = runtime.harnesses.get("hermes")
@@ -421,7 +425,7 @@ def test_a_credential_shaped_environment_key_is_refused_by_the_deployment_layer(
     monkeypatch.setattr(runtime_module, "_builtin_connector", lambda _id: object())
     """The measured reason the output ceiling is not an adapter environment key."""
     harness = production.deployment_document(
-        artifact_source="/srv/agentbox/artifacts/hermes-runtime",
+        artifact_token="hermes-runtime",
         tree_digest="sha256:" + "b" * 64,
     )["harnesses"][0]
     harness["adapter"]["environment"] = {
@@ -429,7 +433,8 @@ def test_a_credential_shaped_environment_key_is_refused_by_the_deployment_layer(
     }
     path = deployment_file(tmp_path, harness)
     with pytest.raises(RuntimeError) as refused:
-        build_runtime_from_sidecar_deployment(tmp_path / "server", path, secret_store=None)
+        build_runtime_from_sidecar_deployment(
+            tmp_path / "server", path, secret_store=None, plugin_root=production.PLUGIN_ROOT)
     assert "SIDECAR_DEPLOYMENT_INVALID" in str(refused.value)
     assert "HERMES_MAX_TOKENS" not in production.ADAPTER_ENVIRONMENT
 
@@ -439,17 +444,20 @@ def test_a_runtime_artifact_mount_without_a_digest_is_refused(tmp_path, monkeypa
 
     monkeypatch.setattr(runtime_module, "_builtin_connector", lambda _id: object())
     harness = production.deployment_document(
-        artifact_source="/srv/agentbox/artifacts/hermes-runtime",
+        artifact_token="hermes-runtime",
         tree_digest="sha256:" + "b" * 64,
     )["harnesses"][0]
     harness["runtimeArtifactMounts"] = [{
-        "source": "/srv/agentbox/artifacts/hermes-runtime",
+        "token": "hermes-runtime",
         "target": production.ARTIFACT_TARGET, "treeDigest": "sha256:short",
     }]
     with pytest.raises(RuntimeError) as refused:
         build_runtime_from_sidecar_deployment(
-            tmp_path / "server", deployment_file(tmp_path, harness), secret_store=None)
-    assert "SIDECAR_DEPLOYMENT_INVALID" in str(refused.value)
+            tmp_path / "server", deployment_file(tmp_path, harness), secret_store=None,
+            plugin_root=production.PLUGIN_ROOT,
+            mount_bindings={"hermes-runtime": "/srv/agentbox/artifacts/hermes-runtime"})
+    assert str(refused.value).startswith(
+        ("SIDECAR_DEPLOYMENT_INVALID", "SIDECAR_DEPLOYMENT_HOST_PATH"))
 
 
 def test_a_user_directory_cannot_be_declared_as_the_runtime_artifact(tmp_path, monkeypatch):
@@ -458,16 +466,19 @@ def test_a_user_directory_cannot_be_declared_as_the_runtime_artifact(tmp_path, m
     monkeypatch.setattr(runtime_module, "_builtin_connector", lambda _id: object())
     """The artifact is a built, digest-verified tree, never a raw install root."""
     harness = production.deployment_document(
-        artifact_source="/srv/agentbox/artifacts/hermes-runtime",
+        artifact_token="hermes-runtime",
         tree_digest="sha256:" + "b" * 64,
     )["harnesses"][0]
     harness["runtimeArtifactMounts"][0]["target"] = "/runtime/artifacts/../site-packages"
     with pytest.raises(RuntimeError) as refused:
         build_runtime_from_sidecar_deployment(
-            tmp_path / "server", deployment_file(tmp_path, harness), secret_store=None)
-    assert "SIDECAR_DEPLOYMENT_INVALID" in str(refused.value)
+            tmp_path / "server", deployment_file(tmp_path, harness), secret_store=None,
+            plugin_root=production.PLUGIN_ROOT,
+            mount_bindings={"hermes-runtime": "/srv/agentbox/artifacts/hermes-runtime"})
+    assert str(refused.value).startswith(
+        ("SIDECAR_DEPLOYMENT_INVALID", "SIDECAR_DEPLOYMENT_HOST_PATH"))
     for item in production.deployment_document(
-        artifact_source="/srv/agentbox/artifacts/hermes-runtime",
+        artifact_token="hermes-runtime",
         tree_digest="sha256:" + "b" * 64,
     )["harnesses"][0]["runtimeArtifactMounts"]:
         assert item["target"].startswith("/runtime/artifacts/")

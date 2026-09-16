@@ -185,7 +185,7 @@ def test_port_reports_unknown_execution_without_sidecar(tmp_path):
 def test_sidecar_deployment_requires_wsl_connector_without_leaking_root_lock(tmp_path, monkeypatch):
     deployment = tmp_path / "deployment.json"
     deployment.write_text(json.dumps({
-        "schemaVersion": 1, "pluginRoot": str(PLUGIN),
+        "schemaVersion": 1,
         "harnesses": [{
             "id": "pi", "adapter": {"command": "/usr/bin/node", "args": []},
         }],
@@ -194,7 +194,7 @@ def test_sidecar_deployment_requires_wsl_connector_without_leaking_root_lock(tmp
     monkeypatch.setattr(runtime_module, "_builtin_connector", lambda _instance_id: None)
     root = tmp_path / "server-data"
     with pytest.raises(RuntimeError, match="WSL_CONNECTOR_UNAVAILABLE"):
-        build_runtime_from_sidecar_deployment(root, deployment)
+        build_runtime_from_sidecar_deployment(root, deployment, plugin_root=PLUGIN)
 
     # Construction failure releases the single-writer data-root lease.
     runtime = build_runtime(root)
@@ -216,7 +216,7 @@ def test_sidecar_deployment_projects_bounded_files_and_register_metadata(tmp_pat
     )
     deployment = tmp_path / "deployment.json"
     deployment.write_text(json.dumps({
-        "schemaVersion": 1, "pluginRoot": str(tmp_path),
+        "schemaVersion": 1,
         "harnesses": [{
             "id": "pi", "credentialKind": "api-key",
             "credentialEnvironment": "DEEPSEEK_API_KEY",
@@ -224,11 +224,14 @@ def test_sidecar_deployment_projects_bounded_files_and_register_metadata(tmp_pat
             "adapter": {"command": "/usr/bin/node", "source": source.name,
                         "args": ["--safe"], "environment": {"MODE": "fixture"}},
             "projectionFiles": [{"source": projection.name, "target": "/runtime/home/settings.json"}],
-            "executableMounts": [{"source": "/usr/bin/node", "target": "/runtime/bin/node",
+            "executableMounts": [{"token": "node", "target": "/runtime/bin/node",
                                   "digest": "sha256:" + hashlib.sha256(pathlib.Path("/usr/bin/node").read_bytes()).hexdigest()}],
         }],
     }), encoding="utf-8")
-    runtime = runtime_module.build_runtime_from_sidecar_deployment(tmp_path / "server", deployment)
+    runtime = runtime_module.build_runtime_from_sidecar_deployment(
+        tmp_path / "server", deployment, plugin_root=tmp_path,
+        mount_bindings={"node": "/usr/bin/node"},
+    )
     try:
         assert set(captured["files"]) == {
             "agentbox-sidecar/deployment/pi/adapter.mjs",
@@ -245,7 +248,7 @@ ARTIFACT_TARGET = "/runtime/artifacts/fixture-dep"
 
 
 def _artifact_mount(**changes):
-    item = {"source": "/opt/agentbox/artifacts/fixture-dep",
+    item = {"token": "fixture-dep",
             "target": "/runtime/artifacts/fixture-dep",
             "treeDigest": ARTIFACT_DECLARED_DIGEST}
     item.update(changes)
@@ -268,7 +271,7 @@ def _artifact_mount(**changes):
     {"adapter": {"command": "/usr/bin/node", "environment": {"API_TOKEN": "secret"}}},
     # A runtime artifact declaration is validated on its shape only; the digest
     # and every overlap rule are settled by the Worker that can see the tree.
-    {"runtimeArtifactMounts": {"source": "/opt/agentbox/artifacts/a"}},
+    {"runtimeArtifactMounts": {"token": "a"}},
     _artifact_mount(extra="unexpected"),
     _artifact_mount(source="relative/artifacts/a"),
     _artifact_mount(source="/opt/../artifacts/a"),
@@ -296,20 +299,16 @@ def _artifact_mount(**changes):
     _artifact_mount(treeDigest="md5:" + "a" * 32),
     _artifact_mount(treeDigest=ARTIFACT_DECLARED_DIGEST.upper()),
     {"runtimeArtifactMounts": [
-        {"source": "/opt/agentbox/artifacts/a", "target": "/runtime/artifacts/a",
-         "treeDigest": ARTIFACT_DECLARED_DIGEST},
-        {"source": "/opt/agentbox/artifacts/a", "target": "/runtime/artifacts/b",
-         "treeDigest": ARTIFACT_DECLARED_DIGEST},
+        {"token": "a", "target": "/runtime/artifacts/a", "treeDigest": ARTIFACT_DECLARED_DIGEST},
+        {"token": "a", "target": "/runtime/artifacts/b", "treeDigest": ARTIFACT_DECLARED_DIGEST},
     ]},
     {"runtimeArtifactMounts": [
-        {"source": "/opt/agentbox/artifacts/a", "target": "/runtime/artifacts/a",
-         "treeDigest": ARTIFACT_DECLARED_DIGEST},
-        {"source": "/opt/agentbox/artifacts/b", "target": "/runtime/artifacts/a",
-         "treeDigest": ARTIFACT_DECLARED_DIGEST},
+        {"token": "a", "target": "/runtime/artifacts/a", "treeDigest": ARTIFACT_DECLARED_DIGEST},
+        {"token": "b", "target": "/runtime/artifacts/a", "treeDigest": ARTIFACT_DECLARED_DIGEST},
     ]},
     {"runtimeArtifactMounts": [
-        {"source": f"/opt/agentbox/artifacts/a{index}",
-         "target": f"/runtime/artifacts/a{index}", "treeDigest": ARTIFACT_DECLARED_DIGEST}
+        {"token": f"a{index}", "target": f"/runtime/artifacts/a{index}",
+         "treeDigest": ARTIFACT_DECLARED_DIGEST}
         for index in range(9)
     ]},
 ])
@@ -318,10 +317,17 @@ def test_sidecar_deployment_rejects_unbounded_fields(tmp_path, field):
     item = {"id": "pi", "adapter": {"command": "/usr/bin/node", "args": []}}
     item.update(field)
     deployment.write_text(json.dumps({
-        "schemaVersion": 1, "pluginRoot": str(PLUGIN), "harnesses": [item],
+        "schemaVersion": 1, "harnesses": [item],
     }), encoding="utf-8")
-    with pytest.raises(RuntimeError, match="SIDECAR_DEPLOYMENT_INVALID"):
-        build_runtime_from_sidecar_deployment(tmp_path / "server", deployment)
+    # Every one of these must be refused with a typed code. A declaration that
+    # still names a host path is refused as such (`SIDECAR_DEPLOYMENT_HOST_PATH`)
+    # and an unbound mount token as `SIDECAR_ARTIFACT_BINDING_*`: the document may
+    # not carry a path and may not name a tree nobody bound.
+    with pytest.raises(RuntimeError) as refused:
+        build_runtime_from_sidecar_deployment(tmp_path / "server", deployment, plugin_root=PLUGIN)
+    assert str(refused.value).startswith((
+        "SIDECAR_DEPLOYMENT_INVALID", "SIDECAR_DEPLOYMENT_HOST_PATH", "SIDECAR_ARTIFACT_BINDING_",
+    )), str(refused.value)
 
 
 def test_sidecar_deployment_carries_digest_pinned_artifact_declarations(tmp_path, monkeypatch):
@@ -336,20 +342,22 @@ def test_sidecar_deployment_carries_digest_pinned_artifact_declarations(tmp_path
     )
     deployment = tmp_path / "deployment.json"
     deployment.write_text(json.dumps({
-        "schemaVersion": 1, "pluginRoot": str(PLUGIN),
+        "schemaVersion": 1,
         "harnesses": [{
             "id": "pi", "adapter": {"command": "/usr/bin/node", "args": []},
             "runtimeArtifactMounts": [
-                {"source": "/opt/agentbox/artifacts/pi-node-modules",
-                 "target": "/runtime/artifacts/pi-node-modules",
+                {"token": "pi-node-modules", "target": "/runtime/artifacts/pi-node-modules",
                  "treeDigest": ARTIFACT_DECLARED_DIGEST},
-                {"source": "/opt/agentbox/artifacts/pi-native",
-                 "target": "/runtime/artifacts/pi-native",
+                {"token": "pi-native", "target": "/runtime/artifacts/pi-native",
                  "treeDigest": "sha256:" + "b" * 64},
             ],
         }],
     }), encoding="utf-8")
-    runtime = runtime_module.build_runtime_from_sidecar_deployment(tmp_path / "server", deployment)
+    runtime = runtime_module.build_runtime_from_sidecar_deployment(
+        tmp_path / "server", deployment, plugin_root=PLUGIN,
+        mount_bindings={"pi-node-modules": "/opt/agentbox/artifacts/pi-node-modules",
+                        "pi-native": "/opt/agentbox/artifacts/pi-native"},
+    )
     runtime.stop()
     # The declaration is not a bundle file: an artifact is a host directory the
     # Worker verifies in place, never a copy uploaded into the reviewed view.
@@ -366,7 +374,7 @@ def test_sidecar_deployment_refuses_a_session_without_a_declared_credential(tmp_
     """
     deployment = tmp_path / "deployment.json"
     deployment.write_text(json.dumps({
-        "schemaVersion": 1, "pluginRoot": str(PLUGIN),
+        "schemaVersion": 1,
         "harnesses": [{
             "id": "pi", "credentialKind": "api-key",
             "credentialEnvironment": "DEEPSEEK_API_KEY",
@@ -386,7 +394,7 @@ def test_sidecar_deployment_refuses_a_session_without_a_declared_credential(tmp_
 
     import agent_box.server.bootstrap.runtime as runtime_module
     monkeypatch.setattr(runtime_module, "_builtin_connector", lambda _id: StubConnector())
-    runtime = runtime_module.build_runtime_from_sidecar_deployment(tmp_path / "server", deployment)
+    runtime = runtime_module.build_runtime_from_sidecar_deployment(tmp_path / "server", deployment, plugin_root=PLUGIN)
     try:
         with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
             headers = {"Authorization": f"Bearer {runtime.token}"}
@@ -420,7 +428,7 @@ def test_sidecar_deployment_rejects_readonly_and_writable_target_collision(tmp_p
     settings.write_text("{}", encoding="utf-8")
     deployment = tmp_path / "deployment.json"
     deployment.write_text(json.dumps({
-        "schemaVersion": 1, "pluginRoot": str(PLUGIN),
+        "schemaVersion": 1,
         "harnesses": [{
             "id": "pi", "adapter": {"command": "/usr/bin/node", "args": []},
             "projectionFiles": [{
@@ -430,7 +438,7 @@ def test_sidecar_deployment_rejects_readonly_and_writable_target_collision(tmp_p
         }],
     }), encoding="utf-8")
     with pytest.raises(RuntimeError, match="SIDECAR_DEPLOYMENT_INVALID"):
-        build_runtime_from_sidecar_deployment(tmp_path / "server", deployment)
+        build_runtime_from_sidecar_deployment(tmp_path / "server", deployment, plugin_root=PLUGIN)
 
 
 def test_sidecar_checkpoint_manifest_rejects_wrong_schema_and_bounds():
@@ -561,7 +569,6 @@ def test_server_core_real_worker_persists_stream_before_terminal(tmp_path, monke
     deployment = tmp_path / "sidecar-deployment.json"
     deployment.write_text(json.dumps({
         "schemaVersion": 1,
-        "pluginRoot": str(PLUGIN),
         "harnesses": [{
             "id": "pi", "capabilityClaims": {"stream": True, "attach": True},
             "adapter": {
@@ -576,7 +583,7 @@ def test_server_core_real_worker_persists_stream_before_terminal(tmp_path, monke
     import agent_box.server.bootstrap.runtime as runtime_module
     monkeypatch.setattr(runtime_module, "_builtin_connector", lambda _instance_id: connector)
     runtime = build_runtime_from_sidecar_deployment(
-        tmp_path / "server-data", deployment,
+        tmp_path / "server-data", deployment, plugin_root=PLUGIN,
     )
     with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
         headers = {"Authorization": f"Bearer {runtime.token}"}
@@ -707,7 +714,7 @@ def _stateful_real_worker_runtime(tmp_path, monkeypatch, *, harness_id):
 
     deployment = tmp_path / f"stateful-{harness_id}-deployment.json"
     deployment.write_text(json.dumps({
-        "schemaVersion": 1, "pluginRoot": str(PLUGIN),
+        "schemaVersion": 1,
         "harnesses": [{"id": harness_id, "timeoutMs": 30_000,
                        # The stateful peer advertises sessionCapabilities.resume, and the
                        # unified capability contract requires the static ceiling too.
@@ -725,11 +732,11 @@ def _stateful_real_worker_runtime(tmp_path, monkeypatch, *, harness_id):
     fixture = pathlib.Path(__file__).parent / "fixtures" / "stateful_acp_peer.mjs"
     monkeypatch.setattr(
         runtime_module, "_sidecar_deployment_file",
-        lambda root, value, relative: fixture.read_bytes()
+        lambda root, relative: fixture.read_bytes()
         if relative == STATEFUL_FIXTURE_RELATIVE
-        else original_file(root, value, relative),
+        else original_file(root, relative),
     )
-    return build_runtime_from_sidecar_deployment(tmp_path / "server", deployment)
+    return build_runtime_from_sidecar_deployment(tmp_path / "server", deployment, plugin_root=PLUGIN)
 
 
 def _checkpoint_manifest(runtime, session):
@@ -1793,7 +1800,7 @@ def _artifact_runtime(tmp_path, monkeypatch, *, worker, tree, digest_value, adap
     """A Server whose one Harness declares one digest-pinned artifact tree."""
     deployment = tmp_path / "artifact-deployment.json"
     deployment.write_text(json.dumps({
-        "schemaVersion": 1, "pluginRoot": str(PLUGIN),
+        "schemaVersion": 1,
         "harnesses": [{
             "id": "pi", "timeoutMs": 30_000,
             "runtimeArtifactMounts": [{
@@ -1811,11 +1818,11 @@ def _artifact_runtime(tmp_path, monkeypatch, *, worker, tree, digest_value, adap
     fixture = pathlib.Path(__file__).parent / "fixtures" / "artifact_probe_acp_peer.mjs"
     monkeypatch.setattr(
         runtime_module, "_sidecar_deployment_file",
-        lambda root, value, relative: fixture.read_bytes()
+        lambda root, relative: fixture.read_bytes()
         if relative == ARTIFACT_PROBE_RELATIVE
-        else original_file(root, value, relative),
+        else original_file(root, relative),
     )
-    return build_runtime_from_sidecar_deployment(tmp_path / "server", deployment)
+    return build_runtime_from_sidecar_deployment(tmp_path / "server", deployment, plugin_root=PLUGIN)
 
 
 def _artifact_tree(tmp_path, *, dependency=ARTIFACT_DEPENDENCY):

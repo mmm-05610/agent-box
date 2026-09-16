@@ -728,7 +728,7 @@ def gate_deployment(production, artifact: Path, digest: str, endpoint, *, model_
          "target": production.LOOPBACK_GUARD_TARGET},
     ))
     document = production.deployment_document(
-        artifact_source=str(artifact), tree_digest=digest,
+        artifact_token="hermes-runtime", tree_digest=digest,
         adapter_environment=environment,
         projection_files_override=(*production.projection_files(), *guard),
         model_control_id=model_control_id,
@@ -738,7 +738,7 @@ def gate_deployment(production, artifact: Path, digest: str, endpoint, *, model_
 
 def install_runtime(temporary: Path, workspace: Path, worker: Path, deployment_bytes: bytes,
                     endpoint, production, spawns: list, data_root: Path, token_path: Path,
-                    *, config_source: bytes | None = None):
+                    *, config_source: bytes | None = None, artifact: Path):
     """Assemble one Server runtime from a deployment document (test overrides in place)."""
     from agent_box.server.bootstrap import build_runtime_from_sidecar_deployment
     from agent_box.storage import MemorySecretStore
@@ -754,15 +754,16 @@ def install_runtime(temporary: Path, workspace: Path, worker: Path, deployment_b
         temporary, worker, workspace, spawns)
     original_file = runtime_module._sidecar_deployment_file
 
-    def deployment_file(root, value, relative):
+    def deployment_file(root, relative):
         if relative == production.CONFIG_SOURCE:
             return loopback_yaml
-        return original_file(root, value, relative)
+        return original_file(root, relative)
 
     runtime_module._sidecar_deployment_file = deployment_file
     store = MemorySecretStore(values={})
     runtime = build_runtime_from_sidecar_deployment(
         data_root, deployment, secret_store=store,
+        plugin_root=PLUGIN, mount_bindings={"hermes-runtime": str(artifact)},
     )
     return runtime, store, deployment
 
@@ -778,7 +779,8 @@ def run_chain(temporary, workspace, worker, artifact, digest, endpoint, producti
     runtime, store, _deployment = install_runtime(
         temporary, workspace, worker, json.dumps(document).encode("utf-8"),
         endpoint, production, spawns, temporary / "server", token_path,
-        config_source=(production.config_yaml_text().encode("utf-8") if live else None))
+        config_source=(production.config_yaml_text().encode("utf-8") if live else None),
+        artifact=artifact)
     result: dict = {"rounds": {}}
     try:
         credential_id, locator = store.import_file(token_path, "api-key")
@@ -1184,7 +1186,8 @@ def run_model_control_phase(temporary, workspace, worker, artifact, digest, endp
     document = gate_deployment(production, artifact, digest, endpoint, model_control_id="model")
     runtime, store, _deployment = install_runtime(
         temporary, workspace, worker, json.dumps(document).encode("utf-8"),
-        endpoint, production, spawns, temporary / "server-model-control", token_path)
+        endpoint, production, spawns, temporary / "server-model-control", token_path,
+        artifact=artifact)
     outcome: dict = {"declaredControl": "model", "cases": []}
     try:
         before = len(endpoint.requests)

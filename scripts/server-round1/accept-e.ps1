@@ -277,7 +277,6 @@ $deploymentPath = Join-Path ([IO.Path]::GetTempPath()) `
     ("agentbox-sidecar-e-" + [guid]::NewGuid().ToString("N") + ".json")
 $deployment = [ordered]@{
     schemaVersion = 1
-    pluginRoot = $pluginRoot
     harnesses = @(
         [ordered]@{
             id = "pi"
@@ -363,8 +362,11 @@ $requestCounter = 0
 function Start-AgentBoxServer {
     $quotedRoot = '"' + $DataRoot + '"'
     $quotedDeployment = '"' + $deploymentPath + '"'
+    # The document names no host path: this machine's plugin root and every mount
+    # token are bound here, by whoever starts the Server.
     $arguments = (($PythonPrefix + " -m agent_box.server --data-root $quotedRoot " +
-        "--port $Port --sidecar-deployment $quotedDeployment").Trim())
+        "--port $Port --sidecar-deployment $quotedDeployment " +
+        "--plugin-root `"$pluginRoot`"").Trim())
     return Start-Process -FilePath $PythonExe -ArgumentList $arguments -PassThru `
         -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
 }

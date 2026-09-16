@@ -213,3 +213,35 @@ codex 的 state 树里有自身产生的链接）；改用 c8 立刻 exit 0。
 **结论**：host 现在是**可替换的实现**，不再是链路里的隐含前提——同一份上层意图在本机通道上
 产生了同样的产品事实（同样的 native 会话、同样的流、同样的 journal、同样的清理）。第 C 步
 （声明去宿主化）与第 D 步（把"匹配"接进产品链路）是剩下的两片。
+
+### 第 C 步（声明去宿主化）——**已实施并验证**（2026-09-16）
+
+**文档里不再有任何宿主路径**：
+
+| 字段 | 现在是什么 | 谁提供真实路径 |
+| --- | --- | --- |
+| ~~`pluginRoot`~~ | **不再存在**（出现即 `SIDECAR_DEPLOYMENT_HOST_PATH`） | 加载方传 `plugin_root=` |
+| `runtimeArtifactMounts[].token` + `treeDigest` | 令牌 + 摘要 | 加载方传 `mount_bindings=` |
+| `executableMounts[].token` + `digest` | 同上 | 同上 |
+
+- **fail-closed 校验**：源路径里出现绝对路径、盘符、反斜杠或 UNC → 直接拒绝（`SIDECAR_DEPLOYMENT_HOST_PATH`）。
+  今天那次"Windows 把 Linux pluginRoot 解析成 `C:\home\...`"的启动失败，现在会在**加载期**被当场挡下。
+- **绑定两个方向都 fail-closed**：文档点名了某令牌但没人绑定 → `SIDECAR_ARTIFACT_BINDING_MISSING`；
+  绑了却没人用 → `SIDECAR_ARTIFACT_BINDING_UNUSED`。
+- **Server CLI**：新增 `--plugin-root` 与可重复的 `--mount TOKEN=PATH`。
+- **四个家族的产出器**：`deployment_document(artifact_token=…/binary_token=…)`；模块 CLI 相应改为
+  `--artifact-token` / `--binary-token`，不再有 `--plugin-root`。
+- **调用方全部对齐**：4 个家族门脚本、`runtime-artifact-gate.py`、Windows 验收脚本 `accept-e.ps1`、
+  手工 UI 启动脚本与 `pi-ui-deployment.json`（已按新形态重新生成）。
+
+**验证（本轮实跑）**
+
+| 项 | 结果 |
+| --- | --- |
+| 全量套件（后端 + harnesses + sandbox + runtime-wsl） | **880 passed / 6 skipped** |
+| Pi / Hermes / Codex 假端点全链门 | exit 0（Codex 用 c8 基线） |
+| OpenCode 门 | exit 0，`OPENCODE_PRODUCTION_CHAIN_PREPARED` |
+| Windows 冒烟（新文档 + `--plugin-root` + `--mount`） | `live=True`，退出无残留 |
+
+**意义**：同一份部署文档现在可以在本机、WSL、SSH 上使用——"这台机器上的路径"由**启动的人**绑定，
+而不是由文档写死。第 D 步（把"匹配"接进产品链路，让 Server 按能力选实现）是最后一片。

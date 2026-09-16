@@ -35,6 +35,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import re
 from typing import Any, Mapping, Sequence
 
 from ..registry.capability_claims import capability_claims as _derive_capability_claims
@@ -99,6 +100,8 @@ MODEL_CONTROL_ID = "model"
 PROVIDER_REQUESTS_PER_PROMPT = 1
 #: 对可重试失败，一次 prompt 的 provider 尝试上界（受控实验实测 6 次）。
 MEASURED_RETRY_ATTEMPTS = 6
+
+TOKEN = re.compile(r"[a-z][a-z0-9-]{0,31}")
 
 PLUGIN_ROOT = Path(__file__).resolve().parents[3]
 DEPLOY_DIRECTORY = PLUGIN_ROOT / "deploy" / "opencode"
@@ -170,24 +173,25 @@ def projection_files() -> tuple[dict[str, str], ...]:
     return ({"source": CONFIG_SOURCE, "target": CONFIG_TARGET},)
 
 
-def executable_mount(binary_source: str, digest: str) -> dict[str, str]:
-    """单文件二进制的可执行挂载声明（摘要由授权工具取证）。"""
-    if (not isinstance(binary_source, str) or not binary_source.startswith("/")
-            or "\\" in binary_source or "\x00" in binary_source or "//" in binary_source
-            or binary_source.endswith("/")
-            or any(part in {"", ".", ".."} for part in binary_source.split("/")[1:])):
-        raise OpenCodeProductionTemplateError("OPENCODE_BINARY_SOURCE_INVALID")
+def executable_mount(binary_token: str, digest: str) -> dict[str, str]:
+    """单文件二进制的可执行挂载声明（摘要由授权工具取证）。
+
+    声明里给的是**令牌**：这台机器上这个二进制在哪，由加载部署的人绑定，
+    不写进文档——同一份文档因此可以在本机、WSL 或远端使用。
+    """
+    if (not isinstance(binary_token, str) or TOKEN.fullmatch(binary_token) is None):
+        raise OpenCodeProductionTemplateError("OPENCODE_BINARY_TOKEN_INVALID")
     if (not isinstance(digest, str) or len(digest) != 71 or not digest.startswith("sha256:")
             or any(character not in "0123456789abcdef" for character in digest[7:])):
         raise OpenCodeProductionTemplateError("OPENCODE_BINARY_DIGEST_INVALID")
-    return {"source": binary_source, "target": BINARY_TARGET, "digest": digest}
+    return {"token": binary_token, "target": BINARY_TARGET, "digest": digest}
 
 
 def validated_mounts(override: Sequence[Mapping[str, str]]) -> tuple[dict[str, str], ...]:
     """调用方给出的挂载覆盖必须与模板自己产生的形状完全一致。"""
     mounts = []
     for item in override:
-        if not isinstance(item, Mapping) or set(item) != {"source", "target", "digest"}:
+        if not isinstance(item, Mapping) or set(item) != {"token", "target", "digest"}:
             raise OpenCodeProductionTemplateError("OPENCODE_EXECUTABLE_MOUNT_INVALID")
         if item["target"] != BINARY_TARGET:
             raise OpenCodeProductionTemplateError("OPENCODE_EXECUTABLE_MOUNT_INVALID")
@@ -197,7 +201,7 @@ def validated_mounts(override: Sequence[Mapping[str, str]]) -> tuple[dict[str, s
 
 def harness_deployment(
     *,
-    binary_source: str,
+    binary_token: str,
     binary_digest: str,
     timeout_ms: int = 120_000,
     adapter_environment: Mapping[str, str] | None = None,
@@ -211,7 +215,7 @@ def harness_deployment(
     ):
         raise OpenCodeProductionTemplateError("OPENCODE_ADAPTER_ENVIRONMENT_INVALID")
     mounts = (validated_mounts(executable_mounts_override) if executable_mounts_override is not None
-              else (executable_mount(binary_source, binary_digest),))
+              else (executable_mount(binary_token, binary_digest),))
     return {
         "id": "opencode",
         "timeoutMs": timeout_ms,
@@ -243,14 +247,13 @@ def harness_deployment(
 
 
 def deployment_document(
-    *, binary_source: str, binary_digest: str, plugin_root: Path | str = PLUGIN_ROOT, **harness: Any,
+    *, binary_token: str, binary_digest: str, **harness: Any,
 ) -> dict[str, Any]:
     """Server 加载的完整非秘密 deployment 文件。"""
     return {
         "schemaVersion": 1,
-        "pluginRoot": str(plugin_root),
         "harnesses": [harness_deployment(
-            binary_source=binary_source, binary_digest=binary_digest, **harness,
+            binary_token=binary_token, binary_digest=binary_digest, **harness,
         )],
     }
 
@@ -258,15 +261,14 @@ def deployment_document(
 def main(arguments: Sequence[str] | None = None) -> int:
     """为一个已授权的二进制输出生产部署文件。"""
     parser = argparse.ArgumentParser(description="Emit the OpenCode production deployment file.")
-    parser.add_argument("--binary-source", required=True,
+    parser.add_argument("--binary-token", required=True,
                         help="canonical path of the authorized single-file binary")
     parser.add_argument("--binary-digest", required=True, help="its full sha256: digest")
     parser.add_argument("--out", required=True, help="path of the deployment file to write")
-    parser.add_argument("--plugin-root", default=str(PLUGIN_ROOT))
     parser.add_argument("--timeout-ms", type=int, default=120_000)
     options = parser.parse_args(arguments)
     document = deployment_document(
-        binary_source=options.binary_source, binary_digest=options.binary_digest,
+        binary_token=options.binary_token, binary_digest=options.binary_digest,
         plugin_root=options.plugin_root, timeout_ms=options.timeout_ms,
     )
     output = Path(options.out)

@@ -52,6 +52,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import re
 import tomllib
 from typing import Any, Mapping, Sequence
 
@@ -107,6 +108,9 @@ ADAPTER_ENVIRONMENT = {
 #: `configOptions`（id=model，值就是产品 id），所以这条控件可以声明；控件不给默认值
 #: （模型是 Provider/Model 引用，由产品解析）。
 MODEL_CONTROL_ID = "model"
+
+#: A mount token is a name the operator binds to a machine-local path.
+TOKEN = re.compile(r"[a-z][a-z0-9-]{0,31}")
 
 PLUGIN_ROOT = Path(__file__).resolve().parents[3]
 DEPLOY_DIRECTORY = PLUGIN_ROOT / "deploy" / "codex"
@@ -261,7 +265,7 @@ def projection_files() -> tuple[dict[str, str], ...]:
 
 def harness_deployment(
     *,
-    artifact_source: str,
+    artifact_token: str,
     tree_digest: str,
     timeout_ms: int = 120_000,
     adapter_environment: Mapping[str, str] | None = None,
@@ -270,8 +274,8 @@ def harness_deployment(
     preferred_auth_method: str | None = PREFERRED_AUTH_METHOD,
 ) -> dict[str, Any]:
     """一条生产 Harness 声明，可直接写进非秘密 deployment 文件。"""
-    if not isinstance(artifact_source, str) or not artifact_source.startswith("/"):
-        raise CodexProductionTemplateError("CODEX_ARTIFACT_SOURCE_INVALID")
+    if not isinstance(artifact_token, str) or not TOKEN.fullmatch(artifact_token):
+        raise CodexProductionTemplateError("CODEX_ARTIFACT_TOKEN_INVALID")
     if (not isinstance(tree_digest, str) or len(tree_digest) != 71
             or not tree_digest.startswith("sha256:")
             or any(character not in "0123456789abcdef" for character in tree_digest[7:])):
@@ -286,7 +290,7 @@ def harness_deployment(
     ):
         raise CodexProductionTemplateError("CODEX_PREFERRED_AUTH_METHOD_INVALID")
     mounts = runtime_artifact_mounts_override or ({
-        "source": artifact_source, "target": ARTIFACT_TARGET, "treeDigest": tree_digest,
+        "token": artifact_token, "target": ARTIFACT_TARGET, "treeDigest": tree_digest,
     },)
     declaration: dict[str, Any] = {
         "id": HARNESS_ID,
@@ -329,14 +333,13 @@ def harness_deployment(
 
 
 def deployment_document(
-    *, artifact_source: str, tree_digest: str, plugin_root: Path | str = PLUGIN_ROOT, **harness: Any,
+    *, artifact_token: str, tree_digest: str, **harness: Any,
 ) -> dict[str, Any]:
     """Server 加载的完整非秘密 deployment 文件。"""
     return {
         "schemaVersion": 1,
-        "pluginRoot": str(plugin_root),
         "harnesses": [harness_deployment(
-            artifact_source=artifact_source, tree_digest=tree_digest, **harness,
+            artifact_token=artifact_token, tree_digest=tree_digest, **harness,
         )],
     }
 
@@ -349,12 +352,11 @@ def main(arguments: Sequence[str] | None = None) -> int:
     parser.add_argument("--tree-digest", required=True,
                         help="the artifact manifest's sha256: tree digest")
     parser.add_argument("--out", required=True, help="path of the deployment file to write")
-    parser.add_argument("--plugin-root", default=str(PLUGIN_ROOT))
     parser.add_argument("--timeout-ms", type=int, default=120_000)
     options = parser.parse_args(arguments)
     document = deployment_document(
-        artifact_source=options.artifact_source, tree_digest=options.tree_digest,
-        plugin_root=options.plugin_root, timeout_ms=options.timeout_ms,
+        artifact_token=options.artifact_token, tree_digest=options.tree_digest,
+        timeout_ms=options.timeout_ms,
     )
     output = Path(options.out)
     output.parent.mkdir(parents=True, exist_ok=True)

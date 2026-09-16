@@ -734,7 +734,7 @@ def run_chain(temporary, workspace, worker, artifact, digest, endpoint, producti
     from fastapi.testclient import TestClient
 
     document = production.deployment_document(
-        artifact_source=str(artifact), tree_digest=digest,
+        artifact_token="pi-runtime", tree_digest=digest,
         adapter_environment=(
             dict(production.ADAPTER_ENVIRONMENT) if live else {
                 **production.ADAPTER_ENVIRONMENT,
@@ -768,15 +768,16 @@ def run_chain(temporary, workspace, worker, artifact, digest, endpoint, producti
         temporary, worker, workspace)
     original_file = runtime_module._sidecar_deployment_file
 
-    def deployment_file(root, value, relative):
+    def deployment_file(root, relative):
         if relative == production.MODELS_SOURCE:
             return catalog_bytes
-        return original_file(root, value, relative)
+        return original_file(root, relative)
 
     runtime_module._sidecar_deployment_file = deployment_file
     store = MemorySecretStore(values={})
     runtime = build_runtime_from_sidecar_deployment(
         temporary / "server", deployment, secret_store=store,
+        plugin_root=PLUGIN, mount_bindings={"pi-runtime": str(artifact)},
     )
     result: dict = {"rounds": {}}
     try:
