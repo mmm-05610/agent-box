@@ -21,6 +21,10 @@ import time
 from typing import Any, Callable, Mapping, Protocol, Sequence
 from uuid import uuid4
 
+from .state_capture import (
+    StateCaptureError, merge_state_into_bundle, settled_state, state_snapshot,
+)
+
 from agent_box.resource_contracts.harness_capabilities import (
     CapabilityDeclaration, capability_view, merge_capabilities, validate_claims,
 )
@@ -296,34 +300,16 @@ class WslSidecarLauncher:
         #: them.
         self.protected_state_paths = tuple(_safe_relative_state_path(path) for path in protected_state_paths)
         self.state_ephemeral_paths = tuple(state_ephemeral_paths)
-        if self.state_ephemeral_paths and state_target is None:
-            raise ValueError('SIDECAR_STATE_EPHEMERAL_WITHOUT_STATE')
-        if (state_bundle_prefix is None) != (state_target is None):
-            raise ValueError("SIDECAR_STATE_PROJECTION_INVALID")
-        if self.protected_state_paths and state_bundle_prefix is None:
-            raise ValueError("SIDECAR_STATE_PROJECTION_INVALID")
-        if state_bundle_prefix is not None:
-            _safe_relative_state_path(state_bundle_prefix)
-            marker_path = f"{state_bundle_prefix}/.agentbox-state"
-            if marker_path in self.bundle:
-                raise ValueError("SIDECAR_STATE_PATH_CONFLICT")
-            self.bundle[marker_path] = b"state-v1\n"
-            for relative, content in (restored_state or {}).items():
-                _safe_relative_state_path(relative)
-                if relative in self.protected_state_paths:
-                    raise ValueError("SIDECAR_STATE_PROTECTED_PATH")
-                if _matches_ephemeral_prefix(relative, self.state_ephemeral_paths):
-                    # An old checkpoint may contain attempt-ephemeral scratch
-                    # (decision A). It is not authoritative state: restoring it
-                    # would put it back into the view, so it is dropped here,
-                    # exactly as the capture drops live files under the prefix.
-                    continue
-                bundle_path = f"{state_bundle_prefix}/{relative}"
-                if bundle_path in self.bundle:
-                    raise ValueError("SIDECAR_STATE_PATH_CONFLICT")
-                self.bundle[bundle_path] = bytes(content)
-            if len(self.bundle) > 1024 or sum(map(len, self.bundle.values())) > 64 * 1024 * 1024:
-                raise ValueError("SIDECAR_BUNDLE_OUTSIDE_WORKER_BOUNDS")
+        try:
+            merge_state_into_bundle(
+                self.bundle, state_bundle_prefix=state_bundle_prefix, state_target=state_target,
+                restored_state=restored_state,
+                protected_state_paths=self.protected_state_paths,
+                state_ephemeral_paths=self.state_ephemeral_paths,
+            )
+        except StateCaptureError as error:
+            # This constructor's callers expect a ValueError carrying the code.
+            raise ValueError(error.code) from error
         self.timeout_ms = timeout_ms
 
     def launch(self, environment: Mapping[str, str]):
@@ -554,99 +540,39 @@ class _WorkerChannels:
     STATE_SETTLE_DEADLINE_SECONDS = 10.0
 
     def _state_snapshot(self) -> tuple[dict[str, tuple[int, str]], dict[str, bytes]]:
-        """List the declared state subtree and read it, within every bound.
+        """List the declared state subtree and read it through the shared rules.
 
-        Returns the content identity of what was read plus the bytes themselves.
-        Bound violations and credential material are typed failures; a file that
-        changes while it is being read surfaces as an identity conflict, and a
-        file or directory that moves under the Worker's own read surfaces as
-        `VIEW_CHANGED`. Both mean "not settled yet" to the settle loop, which is
-        the only place that decides to wait - a special file, a traversal or
-        file-count overflow, or a plain fault is reported straight through.
+        The rules themselves live in `state_capture`, because the local channel
+        captures the same subtree under exactly the same bounds.
         """
         if self.state_bundle_prefix is None:
             return {}, {}
-        prefix = self.state_bundle_prefix + "/"
-        listing = self.client.request("view.list", {"viewId": self.view_id})
-        selected: list[tuple[str, str, int]] = []
-        total = 0
-        for item in listing.get("files", ()):
-            path = item.get("path")
-            size = item.get("size")
-            if not isinstance(path, str) or not path.startswith(prefix):
-                continue
-            relative = path[len(prefix):]
-            if relative == ".agentbox-state":
-                continue
-            _safe_relative_state_path(relative)
-            if relative in self.protected_state_paths:
-                # Declared read-only configuration, not captured state.
-                continue
-            if self._under_ephemeral_prefix(relative):
-                # Attempt-ephemeral scratch is shadowed by a tmpfs inside the
-                # sandbox; should a file ever appear here on the view side
-                # (e.g. restored by an older generation), it is not state.
-                continue
-            if not isinstance(size, int) or size < 0 or size > 8 * 1024 * 1024:
-                raise SidecarError("SIDECAR_STATE_OUTSIDE_BOUNDS", "state file exceeds bound")
-            total += size
-            if len(selected) >= 256 or total > 8 * 1024 * 1024:
-                raise SidecarError("SIDECAR_STATE_OUTSIDE_BOUNDS", "state projection exceeds bound")
-            selected.append((path, relative, size))
-        contents: dict[str, bytes] = {}
-        identity: dict[str, tuple[int, str]] = {}
-        for path, relative, size in selected:
-            content, digest_value = self._view_bytes(path)
-            if len(content) != size:
-                raise SidecarError(
-                    "SIDECAR_STATE_IDENTITY_CONFLICT", "state size changed during capture",
-                )
-            if self._forbidden_content and self._forbidden_content in content:
-                # The path is diagnostics and names the file to investigate;
-                # the message never carries the matched material itself.
-                raise SidecarError(
-                    "SIDECAR_STATE_CONTAINS_SECRET",
-                    f"credential material found in native state: {relative}",
-                )
-            contents[relative] = content
-            identity[relative] = (size, digest_value)
-        return identity, contents
+        listing = self.client.request("view.list", {"viewId": self.view_id}).get("files", ())
+        try:
+            return state_snapshot(
+                listing, self._view_bytes,
+                state_bundle_prefix=self.state_bundle_prefix,
+                protected_state_paths=tuple(self.protected_state_paths),
+                state_ephemeral_paths=self.state_ephemeral_paths,
+                forbidden_content=self._forbidden_content,
+            )
+        except StateCaptureError as error:
+            # The shared rules speak their own error type; this layer's callers
+            # expect the sidecar's, with the same code.
+            raise SidecarError(error.code, str(error)) from error
 
     def _settled_state(self, *, deadline_seconds: float | None = None,
                        interval_seconds: float | None = None) -> dict[str, bytes]:
-        """Wait, bounded, until the state subtree stops changing, then return it.
-
-        A native Harness may still be finishing its own writes right after
-        `close` - appending transcripts, removing the short-lived alias links it
-        created - so the first snapshots can differ. Two identical consecutive
-        snapshots mean it stopped, and only then are those bytes returned; a
-        subtree that never stops changing fails with `SIDECAR_STATE_NOT_SETTLED`
-        rather than producing a checkpoint that mixes two moments.
-        """
+        """Wait, bounded, until the state subtree stops changing, then return it."""
         if self.state_bundle_prefix is None:
             return {}
-        deadline = time.monotonic() + (
-            self.STATE_SETTLE_DEADLINE_SECONDS if deadline_seconds is None else deadline_seconds
-        )
-        pause = (self.STATE_SETTLE_INTERVAL_SECONDS
-                 if interval_seconds is None else interval_seconds)
-        previous: dict[str, tuple[int, str]] | None = None
-        while True:
-            try:
-                identity, contents = self._state_snapshot()
-            except BaseException as error:  # noqa: BLE001 - classified, not swallowed
-                if not _state_error_is_transient(error):
-                    raise
-                identity, contents = None, None
-            if identity is not None and previous is not None and identity == previous:
-                return contents
-            previous = identity
-            if time.monotonic() >= deadline:
-                raise SidecarError(
-                    "SIDECAR_STATE_NOT_SETTLED",
-                    "the native state subtree did not stop changing before the deadline",
-                )
-            time.sleep(pause)
+        try:
+            return settled_state(
+                self._state_snapshot, is_transient=_state_error_is_transient,
+                deadline_seconds=deadline_seconds, interval_seconds=interval_seconds,
+            )
+        except StateCaptureError as error:
+            raise SidecarError(error.code, str(error)) from error
 
     def capture_state(self, *, deadline_seconds: float | None = None,
                       interval_seconds: float | None = None) -> dict[str, bytes]:

@@ -174,3 +174,42 @@ codex 的 state 树里有自身产生的链接）；改用 c8 立刻 exit 0。
 `compose_sidecar_room`，不再知道 bwrap/guest 布局）。这条 import 就是第 B/D 步要替换掉的
 接缝：由匹配层解析出的端口把它换成注入。
 
+### 第 B 步（通道收窄 + 替换门）——**已实施并验证**（2026-09-16，提交 `d4255ac` + 本轮）
+
+**B-1 通道收窄（`d4255ac`）**
+
+- `plugins/agent-box-runtime-wsl/src/agent_box_runtime_wsl/execution.py`：删掉
+  `import compile_remote_bwrap_argv`、删掉从 guest 路径推导凭据帧 id 的逻辑；
+  `start()` 改为接收 `room_command(staged_home, secret) -> argv` 回调——先落位、
+  再由沙箱层给命令、再跑。
+- `plugins/agent-box-runtime-wsl/pyproject.toml`：**去掉对 `agent-box-sandbox-bwrap` 的依赖**
+  （这一行曾经就是"通道依赖房间"的证据）。
+- `src/agent_box/server/legacy_codex.py`：由它合成房间（`compose_codex_room`）并把命令交给通道。
+
+**B-2 通道接口 + 本机实现 + 替换门（本轮）**
+
+- `src/agent_box/server/execution/state_capture.py`（新）：把**状态收获规则**从通道里抽出来，
+  成为与通道无关的一份实现（边界/受保护路径/ephemeral/凭据扫描/"两次快照一致"的 settle），
+  外加 `merge_state_into_bundle`（标记 + 恢复状态并入 bundle 的规则）。WSL 通道改为调用它
+  （构造期仍抛 `ValueError(code)`，运行期仍抛 `SidecarError(code)`，对外口径不变）。
+- `src/agent_box/server/execution/local_channel.py`（新）：**同一份房间的本机实现**——落位到本地
+  临时目录、放密钥（0600）、合成房间、直接执行那条 argv、stdio 接上、按同一套规则收获状态、
+  退出时按进程组回收并清理。它**不是**隔离机制：隔离属于房间。
+- `scripts/server-round1/host-substitution-gate.py`（新）：**替换门**。用同一份 Pi 部署、同一条
+  命令、同一份房间，走**本机通道**（这台机器上直接跑 bwrap，全程没有 Worker）跑完整条链，
+  并断言：native 会话建立、凭据到达假端点、流式输出带答案、`prompt` 报告 done、
+  捕获的 journal **带着这一轮内容**、房间换一处落位**只差绑定源**、清理无残留。
+  **结果：`HOST_SUBSTITUTION_GATE_OK`。**
+
+**本轮验证汇总**
+
+| 项 | 结果 |
+| --- | --- |
+| 替换门（本机通道，无 Worker） | **exit 0，`HOST_SUBSTITUTION_GATE_OK`** |
+| Pi 假端点全链门（Worker 路径） | exit 0，`PI_PRODUCTION_CHAIN_GATE_OK`（两轮 completed、重开同 id、重开请求带旧轮） |
+| 后端全量 | **599 passed / 3 skipped** |
+| 通道插件 + 沙箱插件 | **154 passed** |
+
+**结论**：host 现在是**可替换的实现**，不再是链路里的隐含前提——同一份上层意图在本机通道上
+产生了同样的产品事实（同样的 native 会话、同样的流、同样的 journal、同样的清理）。第 C 步
+（声明去宿主化）与第 D 步（把"匹配"接进产品链路）是剩下的两片。
