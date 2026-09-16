@@ -121,3 +121,31 @@ F1 修完后用户建出了角色（`pi-test`，harness=pi），但**模型槽�
 - 前端无需改动：`ModelSlotSelect` 已支持 `model: null`（显示"未设置"+目录选项），
   `buildProfileConfigValues` 会发 `{providerId, modelId}`。
 
+## S3 工作区 + S4 第一轮真实对话 — **通过（人手路径）**
+
+修完 F1/F2 后，用户重启（我用新后端代码重起了 Server）并完成：
+
+- **工作区**：通过向导建了两个 WSL 工作区记录——`agent-box`(`/home/maoqh/projects/agent-box`，
+  conn=unverified) 与 `agent-box-desktop-next`(`/home/maoqh/projects/agent-box-desktop-next`，
+  conn=verified)。
+- **角色**：`pi-test`（harness=pi），配置 rev=2，里面是
+  `{"model":{"modelId":"deepseek-flash","providerId":"provider_123fd827…"}}` ——
+  即**模型引用是经界面选出来保存的**（这正是 F2 修好的那条路）。
+- **一轮真实对话**（后端第一手事实，`inspect.py`）：
+  - session `session_83a27512…`，workspace=`ws_c40a0aec…`，profile=`pi-test`，
+    **native session id `01a0a809-216c-799f-864d-b72b6f5b85ba`**（原生 Harness 真的跑了）；
+  - turn `execution_f605dd06…`：state=**completed**、error=None、capture=captured、cleanup=cleaned；
+  - 事件：**message.delta × 42**、message.final × 1、turn.accepted、turn.capture、turn.state × 2
+    ——**流式先于终态**，与门里的观测同型。
+- 界面上表现为：消息框可用、回答流式出现、最后稳定。用户原话："完成一次对话了，非常好"。
+
+**这一段的证据意义**：人手路径（打开工作区 → 选角色 → 输入 → 流式回答 → 终态）
+**首次走通**，此前只有脚本路径。它同时证明了 F1/F2 两处修复对真实手感有效。
+
+遗留：用户建了第二个 provider model `pi专属`（模型 id `deepsee-flash`，拼写少一个 k）。
+不影响链，但建议在界面上归档它（顺带覆盖归档路径）。
+
+## 尚未执行
+
+S5 第二轮上下文、S6 工具/文件改动、S7 停止、S8 重启续接、S9 负例、S10 收尾。
+
