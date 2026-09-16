@@ -96,9 +96,14 @@ port 层第一手异常为 SidecarError: SIDECAR_OP_FAILED: Harness session not 
 为什么阻塞：续接召回需要桥在重启后"收养"自己持久化的会话快照；
 在原生目录模型下该收养路径对本机放置未生效。需要桥层（第三方快照代码）的
 一次设计裁决与修改——按工单 §8"复杂问题记录并停"，执行者不自行改第三方桥语义。
-已尝试：核对桥快照文件存在性与命名（base64url(sessionId).json 一致）；
-核对 stateDirectory 传递（register 参数）与桥实际持久化位置；
+已尝试：核对桥快照文件存在性与命名（base64url(sessionId).json，第一手在档
+`.pi/pi/c3RhdGVmdWwtMTM.json`，即 stateful-13 的桥快照，且确在 home 内持久）；
+核对 register 的 stateDirectory 传递与桥实际持久化/读取位置的一致性；
 确认 Worker 端 home.prepare/审计窗口/绑定次序全部按 §2b/§2d 落地。
+精化根因：桥 `#requireSession` 在 `#restoreSnapshot` 后仍要求 `#sessions` 含该 id，
+而 `#sessions` 由 ACP 侧 `session/list` 喂入——受控 peer 的 list 取决于它自己的
+state 文件是否在 home 内持久。两者（桥快照恢复与 ACP 侧列表）的收养语义需要
+一次桥层裁决：是由快照收养、还是由声明窗口内的原生状态收养。
 影响：G2 的"真召回 + native id 稳定"断言、G8 的"取消后同 native id 重开可见输入"
 断言无法成立；G1/G4/G6 的断言不受影响。
 不掩盖声明：本项不记通过。
