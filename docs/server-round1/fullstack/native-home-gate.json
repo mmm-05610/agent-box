@@ -1,21 +1,25 @@
 {
- "code": "NATIVE_HOME_GATE_ROUND2_FAILED",
+ "code": "NATIVE_HOME_GATE_WIRE_REFUSED",
  "deploymentDocument": {
   "hostPaths": false,
-  "sha256": "sha256:e6e778f52829f50371cd4e3a074de158e6476cb3162b5df7f42e576b49f08db9"
+  "sha256": "sha256:3094413ec61fcd48db5e2745f70b640bbc9e55299b0e458845694c5bce42d4e1"
  },
- "error": "EXECUTION_FAILED: [\"{'state': 'running'}\", \"{'checkpoint_native_id': 'stateful-13', 'checkpoint_object_digest': 'sha256:6fa7d66171f3788f919b78070262b6a0fe80febeb5c7f0c09d99f8a640ab98b2', 'result_object_digest': 'sha256:f76290693fe4e4ef375b4f2a4adb0919a72dfffe7b7af4952dfafbea3e9595fc', 'state': 'captured'}\", \"{'state': 'completed'}\", \"{'error_code': 'EXECUTION_FAILED', 'state': 'failed'}\", \"{'error_code': 'EXECUTION_FAILED', 'state': 'failed'}\"]",
+ "error": "sessions.createAndSend: {\"code\": \"CONFLICT_REQUEST\", \"message\": \"Session or Profile already has an active execution\", \"details\": {\"internalCode\": \"TURN_CONCURRENCY_CONFLICT\", \"retryable\": false}}",
  "g1": "pass",
  "g1HomeFile": {
   "files": [
    ".agentbox-profile.json",
-   ".pi/pi/c3RhdGVmdWwtMTM.json"
+   "sessions/native-state.json",
+   "sessions/pi/c3RhdGVmdWwtMTM.json",
+   "sessions/reopen-method.txt"
   ],
   "roleDir": "profiles/native-home-gate"
  },
  "g1Manifest": {
   "files": [
-   "pi/c3RhdGVmdWwtMTM.json"
+   "native-state.json",
+   "pi/c3RhdGVmdWwtMTM.json",
+   "reopen-method.txt"
   ],
   "homeLocator": "native-home-gate/.pi",
   "nativePlatform": "local",
@@ -30,9 +34,16 @@
   "note": "deployment bundle + records only; state is not there",
   "objects": 4
  },
+ "g2": {
+  "manifestSchemaVersion": 3,
+  "nativeIdStable": true,
+  "recalledNonce": "STATEFUL-NONCE-7A21",
+  "reopenMethodObservedByFixture": null,
+  "result": "pass"
+ },
  "homeLocator": "native-home-gate/.pi",
  "reportPath": "docs/server-round1/fullstack/native-home-gate.json",
  "result": "NATIVE_HOME_GATE_FAILED",
  "script": "scripts/server-round1/native-home-gate.py",
- "temporaryRoot": "/tmp/agentbox-native-home-gate-8_pbsyxu"
+ "temporaryRoot": "/tmp/agentbox-native-home-gate-c_c7h7kp"
 }

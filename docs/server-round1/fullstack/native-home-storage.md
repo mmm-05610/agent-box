@@ -72,9 +72,11 @@ peer 为 harness，**无模型调用**：
 
 | 门 | 结果 |
 | --- | --- |
-| **G1** 一轮写目录 | ✅ home 出现 harness 持久会话事实（`.pi/pi/stateful-13.json`）；对象库**无**状态字节对象（逐 digest 对照）；审计 manifest（schema 3）记录文件与摘要；`nativePlatform=local`、`homeLocator` 落记录 |
-| **G2** 二轮靠 home 续接 | ❌ 阻塞（§4） |
-| **G8** 取消后仍连续 | ❌ 依赖 G2 的续接语义，随之阻塞 |
+| **G1** 一轮写目录 | ✅ home 出现 harness 持久会话事实（桥快照 `.pi/pi/<b64 session id>.json`）；对象库**无**状态字节对象（逐 digest 对照）；审计 manifest（schema 3）记录文件与摘要；`nativePlatform=local`、`homeLocator` 落记录 |
+| **G2** 二轮靠 home 续接 | ✅ 同 Session 第二轮 `session/load` 重开（reopen-method.txt 记录 `session/new`→`session/load`）、真召回首轮 nonce、native id 稳定 |
+| **G3** 并行不丢 | ⚠️ 阻塞（产品层）：同 Profile 第二个并行 Session 被产品执行锁拒绝（`TURN_CONCURRENCY_CONFLICT`）——并行放行是产品语义变更（Profile run_state/native_generation 锁），按 §6 记账交裁决 |
+| **G4** 凭据与遮蔽 | 部分：干净轮 audit fail-closed 扫描零命中（manifest `truncated` 全 0）；正向注入断言未完成 |
+| **G8** 取消后仍连续 | ❌ 依赖 G2 同款续接召回（受控 peer 的单会话模型限制），与 G2 同源阻塞 |
 
 四家假端点全链门（G5 组成部分，全部 exit 0，c9 上复跑）：
 `PI_PRODUCTION_CHAIN_GATE_OK`、`HERMES_PRODUCTION_CHAIN_GATE_OK`、
