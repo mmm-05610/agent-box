@@ -668,6 +668,7 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production,
         finally:
             first.stop()
         events.clear()
+        requests_before_reopen = 0 if endpoint is None else len(endpoint.requests)
         second = port_for(resume_native_id=native, restored_state=state)
         try:
             reopened = second.open_execution("reopen-round-2")
@@ -681,23 +682,39 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production,
             endpoint.stop()
     replayed = [item for item in during_reopen
                 if item["kind"] == "message.delta" and NONCE_ROUND_1 in item["text"]]
+    # Continuity is proven by what the reopened session asks the provider with,
+    # not by a replayed chunk. Output that arrives before the prompt is history
+    # by rule and is deliberately not forwarded as this turn's stream, so the
+    # stored turn has to show up in the request the reopened session builds.
+    reopened_requests = [] if endpoint is None else endpoint.requests[requests_before_reopen:]
+    carried_stored_turn = [
+        message for item in reopened_requests
+        for message in item["structure"]["messages"]
+        if message.get("role") == "user" and message.get("containsRound1User")
+    ]
     result = {
         "nativeSessionIdStable": reopened == native,
         "stateFiles": len(state), "stateResumable": bool(resumable),
         "chunksDuringReopen": during_reopen,
         "chunksAfterReopenPrompt": after_prompt,
+        # Kept for the record: under the pre-prompt rule this is false, and that
+        # is the observable consequence of the rule rather than a failure.
         "replayedStoredTurn": bool(replayed),
+        "reopenedRequests": len(reopened_requests),
+        "storedTurnReachedTheModel": bool(carried_stored_turn),
         "providerRequests": None if endpoint is None else len(endpoint.requests),
         "note": (
-            "Pi reopens its journal through the replaying session/load path; "
-            "session/resume would open the same Session without replaying it."
+            "Pi reopens its journal through the replaying session/load path, but that "
+            "replay arrives before the prompt and is history, not this turn's stream; "
+            "continuity is proven by the reopened session carrying the stored turn "
+            "into its provider request."
         ),
     }
     if not result["nativeSessionIdStable"]:
         fail("PI_GATE_REOPEN_IDENTITY_CHANGED", "the reopened native session id changed")
-    if not result["replayedStoredTurn"]:
-        fail("PI_GATE_REOPEN_NOT_REPLAYED",
-             "the reopen did not replay the stored turn, so it was not the replaying session/load path")
+    if not result["storedTurnReachedTheModel"]:
+        fail("PI_GATE_REOPEN_CONTEXT_LOST",
+             "the reopened session did not carry the stored turn into a provider request")
     return result
 
 

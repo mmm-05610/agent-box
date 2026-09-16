@@ -34,9 +34,11 @@ import subprocess
 import pytest
 
 from agent_box.server.execution.sidecar import (
-    GUEST_HOME, SidecarError, WslSidecarLauncher, _WorkerChannels,
+    SidecarError, WslSidecarLauncher, _WorkerChannels,
 )
-from agent_box_sandbox_bwrap import compile_remote_sidecar_bwrap_argv
+# The guest home is the sandbox layer's constant; the channel layer no longer
+# spells it.
+from agent_box_sandbox_bwrap import GUEST_HOME, compile_remote_sidecar_bwrap_argv
 
 REPO = Path(__file__).resolve().parents[2]
 BWRAP = shutil.which("bwrap")

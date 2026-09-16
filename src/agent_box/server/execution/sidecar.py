@@ -84,7 +84,6 @@ def _state_error_is_transient(error: BaseException) -> bool:
 #: read-only configuration files and one bounded writable state subtree, both
 #: declared by the deployment. It is never the host home and never a Windows
 #: profile root.
-GUEST_HOME = "/runtime/home"
 
 
 class SidecarError(RuntimeError):
@@ -328,7 +327,7 @@ class WslSidecarLauncher:
         self.timeout_ms = timeout_ms
 
     def launch(self, environment: Mapping[str, str]):
-        from agent_box_sandbox_bwrap import compile_remote_sidecar_bwrap_argv
+        from agent_box_sandbox_bwrap import compose_sidecar_room
 
         attempt_id = f"sidecar-{uuid4().hex}"
         view_id = f"view-{attempt_id}"
@@ -368,46 +367,27 @@ class WslSidecarLauncher:
                         "data": base64.b64encode(content[offset:offset + 32 * 1024]).decode(),
                     })
             runtime_view = client.request("view.commit", {"viewId": view_id})["path"]
-            # One isolated home root, and the XDG roots derived from it, so a
-            # Harness's default location and its explicit variable resolve to
-            # the same projection. The root is an execution-private mount
-            # namespace directory; the host home is never bound here.
-            guest_environment = {
-                "PATH": "/usr/bin:/bin", "LANG": "C.UTF-8",
-                "HOME": GUEST_HOME,
-                "XDG_CONFIG_HOME": f"{GUEST_HOME}/.config",
-                "XDG_CACHE_HOME": f"{GUEST_HOME}/.cache",
-                "XDG_DATA_HOME": f"{GUEST_HOME}/.local/share",
-                "AGENTBOX_SIDECAR_ISOLATED": environment.get(
-                    "AGENTBOX_SIDECAR_ISOLATED", "1",
-                ),
-            }
             secret = None
             if credential_material is not None:
                 secret = client.request("secret.put", {
                     "attemptId": attempt_id, "frameId": secret_frame_id,
                     "data": base64.b64encode(credential_material).decode(),
                 })["path"]
-            writable_projection_mounts = ()
-            if self.state_bundle_prefix is not None:
-                writable_projection_mounts = ((
-                    runtime_view + "/" + self.state_bundle_prefix, str(self.state_target),
-                ),)
-            argv = compile_remote_sidecar_bwrap_argv(
-                workspace=self.workspace["remote_path"], runtime_view=runtime_view,
-                environment=guest_environment, secret=secret,
+            # The room is the sandbox layer's product, not this channel's: the
+            # guest home layout, the XDG roots, which mounts are writable and
+            # which state paths are attempt-ephemeral are all decided there.
+            # This layer only supplies the token bindings it just obtained.
+            room = compose_sidecar_room(
+                workspace=self.workspace["remote_path"], staged_view=runtime_view,
+                secret=secret, base_environment=environment,
                 executable_mounts=self.executable_mounts,
-                projection_mounts=tuple(
-                    (runtime_view + "/" + source, target)
-                    for source, target in self.projection_mounts
-                ),
+                projection_mounts=self.projection_mounts,
                 runtime_artifact_mounts=self.runtime_artifact_mounts,
-                writable_projection_mounts=writable_projection_mounts,
-                ephemeral_state_mounts=tuple(
-                    f'{self.state_target.rstrip(chr(47))}/{relative}'
-                    for relative in self.state_ephemeral_paths
-                ),
+                state_bundle_prefix=self.state_bundle_prefix,
+                state_target=self.state_target,
+                state_ephemeral_paths=self.state_ephemeral_paths,
             )
+            argv = list(room.argv)
             channels = _WorkerChannels(
                 client, attempt_id, 1, view_id,
                 secret_frame_id if secret is not None else None,
