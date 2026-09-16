@@ -53,7 +53,9 @@
 ### S1 凭据录入（本轮核心：人手路径）
 - **操作**：`Settings`（设置）→ 左侧 `Models` → 找到"新增凭据 / Add credential"区：
   `名称 / Name` 填 `deepseek-manual`，`API 密钥 / API key` 粘贴你的 DeepSeek key → `保存 / Save`。
-- **期望**：凭据列表出现一条记录，显示名称，**不显示密钥**；刷新页面仍在。
+- **期望**：保存后表单收起、输入框清空（**这一步的界面上没有"凭据列表"**——凭据只在
+  "新增 / Add"（新建 provider model）表单的 `凭据` 下拉里以名称出现，见 S2）。
+  所以 S1 的通过判据是"保存成功且无报错"，而"看得见"由 S2 的下拉完成。
 - **我核对**：`server_credentials` 多一行（kind=api-key、locator 指向 Desktop 记录文件），
   `credentials.json` 里有对应记录；全程日志无密钥。
 - **判据**：这是"界面能录入凭据"，上一轮只有 preload API 级证据。
