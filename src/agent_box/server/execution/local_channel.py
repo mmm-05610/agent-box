@@ -153,7 +153,14 @@ class LocalHome:
         except OSError as exc:
             raise LocalChannelError("HOME_IO", "home listing failed") from exc
         for entry in entries:
-            info = entry.stat(follow_symlinks=False)
+            try:
+                info = entry.stat(follow_symlinks=False)
+            except FileNotFoundError:
+                # The entry vanished between listing and stat: churn, reported
+                # as a truncation fact by the audit accounting below.
+                audit["visited"] += 1
+                audit["truncated"]["entries"] += 1
+                continue
             audit["visited"] += 1
             if audit["visited"] > 4096:
                 # The walk is cut here: at least this entry was not audited.
@@ -274,24 +281,25 @@ class LocalSidecarLauncher:
                 stream.write(self.credential)
             secret_path = str(secret_file)
         home_dir = None
+        native_bind_target = None
         window_host = None
         if self.home is not None:
             home_dir = str(self.home.prepare())
+            # Two read-write binds: the native home at its guest target, and —
+            # when the deployment declared a window elsewhere — the window at
+            # its own guest target.
+            native_bind_target = f"/runtime/home/{self.native_home}"
             if self.home.window and self.home.window != self.native_home:
-                # A declared window outside the native home (role-relative) is
-                # bound separately, read-write, at its declared guest target.
                 window_host = str(self.home.role_dir / self.home.window)
-        state_target = self.state_target or (
-            f"/runtime/home/{self.home.native_home}" if self.home else None)
+        window_target = self.state_target if window_host else None
         room = compose_sidecar_room(
             workspace=self.workspace_path, staged_view=str(view), secret=secret_path,
             base_environment=environment, executable_mounts=self.executable_mounts,
             projection_mounts=self.projection_mounts,
             runtime_artifact_mounts=self.runtime_artifact_mounts,
-            state_home_source=home_dir, state_target=state_target,
+            state_home_source=home_dir, state_target=native_bind_target,
             state_window_source=window_host,
-            state_window_target=(
-                self.state_target if window_host else None),
+            state_window_target=window_target,
             state_ephemeral_paths=self.state_ephemeral_paths,
         )
         # stderr goes to a file, not a pipe: a pipe nobody drains would block
