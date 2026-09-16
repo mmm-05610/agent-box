@@ -85,6 +85,19 @@ def registry():
     return reg
 
 
+def directory_model_control_registry():
+    """The production shape: the deployment names its model control and declares
+    no static values for it, so the reference can only come from the
+    Provider/Model directory."""
+    reg = HarnessRegistry()
+    reg.register(HarnessDescriptor(
+        "alpha", capability_claims={"stream": True},
+        model_control_id="model", control_options={"model": ()},
+        configuration_validator=lambda value: None if isinstance(value, dict) else ValueError(),
+    ))
+    return reg
+
+
 class Wire:
     def __init__(self, client, headers):
         self.client = client
@@ -134,6 +147,19 @@ def wire(tmp_path):
         api = Wire(client, headers)
         runtime.repository.register_credential("cred-1", None, "locator") if False else None
         yield runtime, api, execution
+
+
+@pytest.fixture
+def wire_directory_model(tmp_path):
+    """Same Server, but the harness declares a directory-backed model control."""
+    execution = RecordingExecution(block=True)
+    runtime = build_runtime(
+        tmp_path / "data", harnesses=directory_model_control_registry(),
+        connector=FakeConnector(), execution=execution,
+    )
+    with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
+        headers = {"Authorization": f"Bearer {runtime.token}"}
+        yield runtime, Wire(client, headers), execution
 
 
 ENVIRONMENT = {"kind": "wsl", "host": "Ubuntu", "user": None}
@@ -330,6 +356,66 @@ def test_profiles_list_exposes_harness_as_data_only(wire):
     assert item["harness"] == "alpha"
     assert item["displayName"] == "role"
     assert listing["nextCursor"] is None
+
+
+def test_a_directory_backed_model_control_is_a_slot_before_anything_is_chosen(wire_directory_model):
+    """A first-time reader must be told this control takes a Provider/Model
+    reference. Described as an enum of an empty list it offered nothing to
+    choose, and a brand-new Profile could not be given a model at all - the
+    interface had no way through, while the wire accepted the reference."""
+    _runtime, api, _execution = wire_directory_model
+    provider = api.ok("providerModels.create", {
+        "requestId": "provider-directory", "displayName": "Official API",
+        "harness": "alpha", "provider": "opaque-provider", "credentialId": None,
+        "configuration": [],
+        "models": [{
+            "modelId": "model-a", "displayName": "Model A",
+            "availability": "unknown", "unavailableReason": None,
+        }],
+    })["providerModel"]
+    created = api.ok("profiles.create", {
+        "requestId": "profile-directory", "displayName": "Builder", "harness": "alpha",
+    })["profile"]
+
+    descriptor = api.ok("config.describe", {
+        "profileId": created["id"], "workspaceId": None,
+    })["descriptor"]
+    control = next(item for item in descriptor["controls"] if item["controlId"] == "model")
+    assert control["kind"] == "model_slot"
+    assert control["editable"] is True
+    assert control["slots"] == [{"name": "model", "model": None}]
+
+    configured = api.ok("profiles.updateConfig", {
+        "requestId": "profile-directory-config", "profileId": created["id"],
+        "expectedVersion": created["version"],
+        "values": [{"controlId": "model", "value": {
+            "providerId": provider["id"], "modelId": "model-a",
+        }}],
+    })
+    assert configured["profile"]["version"] == created["version"] + 1
+
+    after = api.ok("config.describe", {
+        "profileId": created["id"], "workspaceId": None,
+    })["descriptor"]
+    chosen = next(item for item in after["controls"] if item["controlId"] == "model")
+    assert chosen["kind"] == "model_slot"
+    assert chosen["slots"][0]["model"]["modelId"] == "model-a"
+
+
+def test_a_control_with_declared_values_stays_an_enum(wire):
+    """The directory rule applies to the control the deployment names as its
+    model control; a control with a declared value list is an enumeration."""
+    _runtime, api, _execution = wire
+    make_profile(api)
+    created = api.ok("profiles.create", {
+        "requestId": "profile-enum", "displayName": "Enum role", "harness": "alpha",
+    })["profile"]
+    descriptor = api.ok("config.describe", {
+        "profileId": created["id"], "workspaceId": None,
+    })["descriptor"]
+    control = next(item for item in descriptor["controls"] if item["controlId"] == "model")
+    assert control["kind"] == "enum"
+    assert control["values"] == ["alpha-default", "alpha-fast"]
 
 
 def test_profile_and_provider_model_maintenance_is_versioned_and_referential(wire):

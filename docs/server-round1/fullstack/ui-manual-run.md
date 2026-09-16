@@ -96,3 +96,28 @@ S2 模型与角色、S3 工作区、S4–S10。本记录随执行推进增补。
   **本地检出平台的既有问题**，不是本轮改动引入，也不是产品缺陷。
 - 改动面的 6 个测试文件 62 项全部通过；`tsc --noEmit`、eslint 干净。
 
+## S2bis：模型槽（F2，后端一处描述缺陷，已修）
+
+F1 修完后用户建出了角色（`pi-test`，harness=pi），但**模型槽选不了**。第一手探测（直接问 Server）：
+
+- `providerModels.list`：`pi-deepseek` 已在界面里建好——harness=pi、provider=deepseek、
+  `credentialId=credential_15afe78b…`、模型 `deepseek-flash`（界面这条路径是通的）。
+- `config.describe`（该角色）：**只有一个控件** `{"kind":"enum","controlId":"model","values":[]}`
+  ——**空枚举**，界面上没有可选项。
+
+根因在后端 `wire/handlers.py` 的 `_controls()`：部署把模型控件声明为
+`modelControlId="model"` + `controlOptions={"model": []}`（目录驱动，值必须是
+`{providerId, modelId}` 引用，`freeze_execution_configuration` 也拒绝别的形状），
+但描述器只在**已经存了引用**时才输出 `kind: "model_slot"`，否则退化成"空枚举"——
+于是"第一次选模型"没有入口（与 F1 同型的鸡生蛋）。
+
+**修法（后端）**：当控件就是部署声明的模型控件、且声明值列表为空时，直接描述成
+`kind: "model_slot"` + `slots: [{"name": controlId, "model": null}]`（wire schema 本就允许
+`model: null`）；已有引用时照旧带回引用；**声明了值列表的控件仍然是枚举**（不猜）。
+
+- 测试：`tests/server/test_wire_v1.py` 新增两项——目录驱动的新角色在未选模型时描述为
+  空槽、选完之后带回引用；以及"声明了值列表仍是枚举"的反例。
+- `tests/server/test_wire_v1.py` 34 passed；全量后端套件见下。
+- 前端无需改动：`ModelSlotSelect` 已支持 `model: null`（显示"未设置"+目录选项），
+  `buildProfileConfigValues` 会发 `{providerId, modelId}`。
+

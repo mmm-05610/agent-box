@@ -533,9 +533,30 @@ class WireService:
             descriptor = self.harnesses.get(harness)
             for control_id, values in sorted((descriptor.control_options or {}).items()):
                 current = configured.get(control_id)
-                if (isinstance(current, Mapping) and self.model_configs is not None
-                        and isinstance(current.get("providerId"), str)
-                        and isinstance(current.get("modelId"), str)):
+                holds_reference = (
+                    isinstance(current, Mapping) and self.model_configs is not None
+                    and isinstance(current.get("providerId"), str)
+                    and isinstance(current.get("modelId"), str)
+                )
+                # The control the deployment names as its model control takes a
+                # Provider/Model reference and declares no static values for it
+                # (the reference comes from the directory, and
+                # `freeze_execution_configuration` refuses anything else). As an
+                # enum of an empty list it offered a first-time reader nothing to
+                # choose, and a brand-new Profile could not be given a model at
+                # all; as a slot it says what it wants, and the client fills it
+                # from the directory it already holds. A declared value list means
+                # this really is an enumeration and stays one.
+                if (descriptor.model_control_id == control_id and not values
+                        and self.model_configs is not None):
+                    model = (self.model_configs.reference(current["providerId"], current["modelId"])
+                             if holds_reference else None)
+                    controls.append({
+                        "kind": "model_slot", "controlId": control_id, "editable": True,
+                        "slots": [{"name": control_id, "model": model}],
+                    })
+                    continue
+                if holds_reference:
                     model = self.model_configs.reference(current["providerId"], current["modelId"])
                     controls.append({
                         "kind": "model_slot", "controlId": control_id, "editable": True,
