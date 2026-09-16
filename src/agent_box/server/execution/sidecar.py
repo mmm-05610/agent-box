@@ -975,6 +975,12 @@ class SidecarHarnessPort:
         self._observed: dict[str, dict[str, bool | None]] = {}
         self._evidence: dict[str, dict[str, str]] = {}
         self._current: str = ""
+        # 已经发出过 prompt 的执行。原生在重开一个已存在的会话时可能先把存下来的
+        # 历史回放一遍（Pi 的 session/load 就是这样），那些块是历史，不是这一轮的
+        # 答复；prompt 之前到达的增量一律不计入本轮。规则与 harness 品牌无关。
+        self._prompted: set[str] = set()
+        # 被排除掉的历史回放字符数：不进本轮答复，但要记得住，便于事后核对。
+        self._replayed: dict[str, int] = {}
         self._lock = threading.RLock()
 
     def open_execution(self, execution_id: str) -> str:
@@ -1075,6 +1081,8 @@ class SidecarHarnessPort:
             )
         with self._lock:
             self._current = execution_id
+            # 标记在请求发出之前：prompt 一发出，随后到达的块就是这一轮的输出。
+            self._prompted.add(execution_id)
         result = envelope.request(
             {"op": "prompt", "sessionId": self._native_sessions[execution_id], "text": text,
              "model": self.model, "attachments": items},
@@ -1102,6 +1110,8 @@ class SidecarHarnessPort:
             self._native_sessions.pop(execution_id, None)
             self._observed.pop(execution_id, None)
             self._evidence.pop(execution_id, None)
+            self._prompted.discard(execution_id)
+            self._replayed.pop(execution_id, None)
             native_closed = execution_id in self._native_closed
             self._native_closed.discard(execution_id)
             self._approvals = {
@@ -1122,6 +1132,8 @@ class SidecarHarnessPort:
             self._native_sessions.clear()
             self._observed.clear()
             self._evidence.clear()
+            self._prompted.clear()
+            self._replayed.clear()
             self._native_closed.clear()
             self._approvals.clear()
         for envelope in sessions:
@@ -1193,6 +1205,11 @@ class SidecarHarnessPort:
             if evidence is not None:
                 self._evidence.setdefault(execution_id, {})[capability_id] = evidence
 
+    def replayed_history_chars(self, execution_id: str) -> int:
+        """原生在 prompt 之前回放的历史字符数：排除在本轮答复之外，只作记账。"""
+        with self._lock:
+            return self._replayed.get(execution_id, 0)
+
     def _native(self, execution_id: str) -> str:
         native = self._native_sessions.get(execution_id)
         if native is None:
@@ -1216,7 +1233,14 @@ class SidecarHarnessPort:
             update = ((data.get("params") or {}).get("update") or {})
             if update.get("sessionUpdate") == "agent_message_chunk":
                 text = ((update.get("content") or {}).get("text") or "")
-                if text:
+                # 只有 prompt 已经发出之后到达的块才是这一轮的答复；重开会话时
+                # 回放的历史在这里被排除，否则它会成为答复的前缀（真实复现：
+                # 每一轮都把上一轮的全文重复一遍）。
+                live = bool(text) and execution_id in self._prompted
+                if text and not live:
+                    with self._lock:
+                        self._replayed[execution_id] = self._replayed.get(execution_id, 0) + len(text)
+                if live:
                     # 收到一条流式增量，就是 stream 被真实观测到的证据；两条传输
                     # （ACP 与 deployment-declared driver）在这里汇成同一个产品事实。
                     self._record_observation(

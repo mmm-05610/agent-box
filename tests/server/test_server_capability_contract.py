@@ -467,6 +467,57 @@ def test_stream_and_finish_are_observed_from_the_real_operations():
         port.stop()
 
 
+class _ReplayingChannels(_ScriptedChannels):
+    """A scripted sidecar that answers a session open by replaying history.
+
+    Pi's `session/load` is exactly this: reopening a stored Session re-emits the
+    whole conversation through the same notification channel as live output.
+    """
+
+    def __init__(self, *, start_result, replay_events=(), prompt_events=()) -> None:
+        super().__init__(start_result=start_result, events=prompt_events)
+        self.replay_events = list(replay_events)
+
+    def write_line(self, value: str) -> None:
+        request = json.loads(value)
+        if request.get("op") in {"create", "open"} and self.replay_events:
+            for event in self.replay_events:
+                self._lines.put(json.dumps(event) + "\n")
+        super().write_line(value)
+
+
+def _chunk(text: str) -> dict:
+    return {"event": "acp_notification", "data": {"params": {
+        "sessionId": "native-fixture",
+        "update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": text}},
+    }}}
+
+
+def test_history_replayed_before_the_prompt_is_not_this_turns_answer():
+    """A reopened Session's replay is history; only output after the prompt is
+    the answer. Mixing them made every reply repeat the previous one."""
+    channels = _ReplayingChannels(
+        start_result={},
+        replay_events=[_chunk("上一轮的全文")],
+        prompt_events=[_chunk("这一轮的答复")],
+    )
+    observed: list[tuple[str, str]] = []
+    port = _port(channels, on_event=lambda _execution, kind, payload: observed.append((kind, payload.get("text", ""))))
+    try:
+        port.open_execution("execution-replay")
+
+        # 打开会话时到达的回放不算这一轮的增量（`started` 是生命周期事件，不是答复）。
+        assert [text for kind, text in observed if kind == "message.delta"] == []
+        assert port.replayed_history_chars("execution-replay") == len("上一轮的全文")
+
+        port.prompt("execution-replay", "talk")
+
+        assert [text for kind, text in observed if kind == "message.delta"] == ["这一轮的答复"]
+        assert port.replayed_history_chars("execution-replay") == len("上一轮的全文")
+    finally:
+        port.stop()
+
+
 def test_steer_is_never_promoted_in_this_stage():
     channels = _ScriptedChannels(start_result={"sessionCapabilities": {"resume": {}}})
     port = _port(channels, declared_capabilities={"start": True, "steer": True})

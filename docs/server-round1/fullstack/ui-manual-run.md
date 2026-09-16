@@ -149,3 +149,34 @@ F1 修完后用户建出了角色（`pi-test`，harness=pi），但**模型槽�
 
 S5 第二轮上下文、S6 工具/文件改动、S7 停止、S8 重启续接、S9 负例、S10 收尾。
 
+## S5 第二轮上下文 — **发现 F3：每轮答复都重复上一轮全文**（后端已修）
+
+用户实测第 2/3 轮：**每条答复都以相同开场白开头，并把上一轮全文重复一遍**；越答越长。
+用户问"前端还是后端问题"。第一手判定（后端原始事件，不是界面观感）：
+
+- 三轮的**输入**是干净的：`{"message":{"text":"你好"}}`、`"我刚才给你发了啥"`、`"你啥意思"`
+  ——产品没有把历史塞进用户消息。
+- 三轮的 **delta/final 文本本身**在累加：81 → 130 → 275 字符，且第 N 轮的文本**以第 N−1 轮
+  全文为前缀**。也就是说重复发生在**原生输出流里**，前端只是如实显示 → **不是前端问题**。
+
+机制（已在链路上定位）：Pi 的原生会话重开走 `session/load`，而 ACP 的 `session/load`
+**按定义会回放**历史（`harness_remote` 的 Pi profile 自己写了 `replaySettleMs: 250`，
+注释是"reopen 时保留 replay 尾流"）。回放块与实时输出走同一个
+`agent_message_chunk` 通道：Worker 把**每条** ACP 通知原样上报
+（`runtime/worker-entry.mjs` 的 `agent.on("notification", …)`），Server 又把每条
+`agent_message_chunk` 当成这一轮的 `message.delta` —— 于是历史成了答复的前缀。
+
+**修法（后端 `execution/sidecar.py`）**：以 **prompt 是否已发出**为界——
+`prompt()` 在发包前把该执行标记为"已提示"，`_forward()` 只把**标记之后**到达的
+`agent_message_chunk` 当作本轮增量；prompt 之前到达的一律排除（并计数
+`replayed_history_chars()` 记账，便于事后核对）。规则与 harness 品牌无关：
+prompt 之前到达的内容在定义上不是这一轮的答复。
+
+- 测试：`tests/server/test_server_capability_contract.py` 新增
+  `test_history_replayed_before_the_prompt_is_not_this_turns_answer`——脚本化通道在 open 时
+  回放一段历史、prompt 时给一段实时输出，断言本轮的增量**只有**后者、回放计入计数。
+- 全量后端套件 **599 passed / 3 skipped**。
+- 残余风险（如实记录）：回放若在 prompt 之后仍在排空（Pi 的尾流），可能有少量历史漏进本轮；
+  桥自己用 `replaySettleMs: 250` 防这件事，本轮观测到的形状是"整段回放都在 prompt 之前"
+  （第 N 轮文本精确以第 N−1 轮全文为前缀，没有交错），故本次以该边界为准。
+
