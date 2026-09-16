@@ -1,0 +1,15 @@
+{
+  "requestId": "request-2",
+  "connectionId": "connection-1",
+  "serverInstanceId": "server-1",
+  "op": "home.prepare",
+  "arguments": {
+    "locator": "../escape/.pi",
+    "marker": {
+      "profileId": "profile_0123abcd",
+      "harnessType": "pi",
+      "nativeHome": ".pi"
+    }
+  },
+  "expectedError": "HOME_LOCATOR_INVALID"
+}

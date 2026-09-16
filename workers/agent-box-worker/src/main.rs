@@ -109,15 +109,23 @@ async fn main() -> io::Result<()> {
     if args.get(1).map(String::as_str) == Some("--cleanup-manifest") {
         return cleanup_from_manifest(&args);
     }
-    let (root, workspace, result_ttl_secs) = arguments(&args)?;
+    let (root, workspace, home_root, result_ttl_secs) = arguments(&args)?;
     let root = root.ok_or_else(|| io::Error::other("--root is required"))?;
     let root = prepare_root(Path::new(&root))?;
     let workspace = match workspace {
         Some(path) => Some(canonical_directory(Path::new(&path))?),
         None => None,
     };
+    // The persistent home lives for years while the ephemeral root is deleted
+    // on exit; the two must never be nested, or one lifetime would destroy the
+    // other's facts.
+    let home_root = match home_root {
+        Some(path) => canonical_directory(Path::new(&path))?,
+        None => default_home_root()?,
+    };
+    ensure_home_outside_root(&home_root, &root)?;
     let ephemeral = workspace.is_none();
-    let outcome = serve(root.clone(), workspace, result_ttl_secs).await;
+    let outcome = serve(root.clone(), workspace, home_root, result_ttl_secs).await;
     if ephemeral
         && fs::read_to_string(root.join(".agentbox-worker-root"))
             .ok()
@@ -129,9 +137,10 @@ async fn main() -> io::Result<()> {
     outcome
 }
 
-fn arguments(args: &[String]) -> io::Result<(Option<String>, Option<String>, u64)> {
+fn arguments(args: &[String]) -> io::Result<(Option<String>, Option<String>, Option<String>, u64)> {
     let mut root = None;
     let mut workspace = None;
+    let mut home_root = None;
     let mut result_ttl_secs = RESULT_TTL_SECS;
     let mut index = 1;
     while index < args.len() {
@@ -139,11 +148,11 @@ fn arguments(args: &[String]) -> io::Result<(Option<String>, Option<String>, u64
             return Err(io::Error::other("malformed arguments"));
         }
         match args[index].as_str() {
-            "--root" | "--workspace" => {
-                let target = if args[index] == "--root" {
-                    &mut root
-                } else {
-                    &mut workspace
+            "--root" | "--workspace" | "--home-root" => {
+                let target = match args[index].as_str() {
+                    "--root" => &mut root,
+                    "--workspace" => &mut workspace,
+                    _ => &mut home_root,
                 };
                 if target.is_some() {
                     return Err(io::Error::other("malformed arguments"));
@@ -162,10 +171,15 @@ fn arguments(args: &[String]) -> io::Result<(Option<String>, Option<String>, u64
         }
         index += 2;
     }
-    Ok((root, workspace, result_ttl_secs))
+    Ok((root, workspace, home_root, result_ttl_secs))
 }
 
-async fn serve(root: PathBuf, workspace: Option<PathBuf>, result_ttl_secs: u64) -> io::Result<()> {
+async fn serve(
+    root: PathBuf,
+    workspace: Option<PathBuf>,
+    home_root: PathBuf,
+    result_ttl_secs: u64,
+) -> io::Result<()> {
     let mut input = tokio::io::stdin();
     let mut output = tokio::io::stdout();
     let bootstrap = decode_bootstrap(&read_encoded(&mut input).await?)
@@ -311,6 +325,12 @@ async fn serve(root: PathBuf, workspace: Option<PathBuf>, result_ttl_secs: u64) 
                     }
                     "view.prepare" | "view.put" | "view.commit" | "view.list" | "view.get" | "view.cleanup" => {
                         match handle_view(&root, &request.op, &request.arguments) {
+                            Ok(value) => write_response(&mut output, sequence, &request.request_id, value).await?,
+                            Err((code, message)) => write_error_for(&mut output, sequence, &request.request_id, code, message).await?,
+                        }
+                    }
+                    "home.prepare" | "home.list" | "home.get" => {
+                        match handle_home(&home_root, &request.op, &request.arguments) {
                             Ok(value) => write_response(&mut output, sequence, &request.request_id, value).await?,
                             Err((code, message)) => write_error_for(&mut output, sequence, &request.request_id, code, message).await?,
                         }
@@ -493,6 +513,7 @@ fn capabilities() -> Value {
         "spawn.interactive@2",
         "attempt.write@2",
         "runtime.artifact.mount@3",
+        "home@4",
         "observe@1",
         "cancel@1",
         "result@1",
@@ -1760,6 +1781,370 @@ fn handle_secret(
     }
 }
 
+/// One Profile's home: the durable directory on this machine that is the only
+/// source of truth for the harness's native state. Everything here outlives the
+/// attempt, the view cleanup and the Worker process itself, which is why the
+/// home root must sit outside the ephemeral `--root`.
+///
+/// The marker at `<home root>/<role>/.agentbox-profile.json` records which
+/// product identity owns the directory. A conflict is a typed refusal
+/// (`HOME_MARKER_CONFLICT`): two Profiles must never share one home, and the
+/// Server is the side that translates this into its own
+/// `PROFILE_HOME_CONFLICT` wording.
+const HOME_MARKER_FILE: &str = ".agentbox-profile.json";
+/// Audit bounds. They mirror the state-capture bounds the channels already
+/// had: 1024 audited files, 8 MiB per digested file, 64 MiB digested in
+/// total, 4096 visited entries per walk. Everything beyond a bound is a
+/// reported fact (`truncated`), never a silently skipped entry.
+const MAX_HOME_FILES: usize = 1024;
+const MAX_HOME_FILE_BYTES: usize = 8 * 1024 * 1024;
+const MAX_HOME_AUDIT_BYTES: u64 = 64 * 1024 * 1024;
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct HomeMarker {
+    profile_id: String,
+    harness_type: String,
+    native_home: String,
+    #[serde(default)]
+    created_at: Option<u64>,
+}
+
+/// A locator is `<role>` or `<role>/<native-home>`, one to two segments, each
+/// a short safe name. `.` and `..` are explicitly refused even though the
+/// character class alone would admit them: a locator that traverses is not a
+/// locator, it is an escape.
+fn home_locator(value: &str) -> Result<Vec<String>, (&'static str, &'static str)> {
+    let segments: Vec<&str> = value.split('/').collect();
+    if segments.is_empty() || segments.len() > 2 || segments.iter().any(|s| s.is_empty()) {
+        return Err(("HOME_LOCATOR_INVALID", "home locator is invalid"));
+    }
+    for segment in &segments {
+        let bytes = segment.as_bytes();
+        if bytes.len() > 64
+            || !bytes
+                .iter()
+                .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
+            || *segment == "."
+            || *segment == ".."
+        {
+            return Err(("HOME_LOCATOR_INVALID", "home locator is invalid"));
+        }
+    }
+    Ok(segments.iter().map(|s| s.to_string()).collect())
+}
+
+fn home_dir(home_root: &Path, locator: &str) -> Result<PathBuf, (&'static str, &'static str)> {
+    let segments = home_locator(locator)?;
+    let mut dir = home_root.to_path_buf();
+    for segment in segments {
+        dir.push(segment);
+    }
+    Ok(dir)
+}
+
+/// The resolved home must stay inside the home root: a symlinked segment
+/// planted under the root must not relocate the home elsewhere on disk.
+fn ensure_inside_home_root(
+    home_root: &Path,
+    candidate: &Path,
+) -> Result<(), (&'static str, &'static str)> {
+    let root = canonical_directory(home_root).map_err(|_| ("HOME_IO", "home root is unusable"))?;
+    let resolved = candidate
+        .canonicalize()
+        .map_err(|_| ("HOME_NOT_FOUND", "home directory does not exist"))?;
+    if !resolved.starts_with(&root) {
+        return Err(("HOME_OUTSIDE_ROOT", "home escapes the home root"));
+    }
+    Ok(())
+}
+
+fn read_home_marker(path: &Path) -> Result<Option<HomeMarker>, (&'static str, &'static str)> {
+    match fs::read(path) {
+        Ok(bytes) => serde_json::from_slice(&bytes)
+            .map(Some)
+            .map_err(|_| ("HOME_MARKER_CONFLICT", "home marker is not a valid marker")),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(_) => Err(("HOME_IO", "home marker read failed")),
+    }
+}
+
+fn handle_home(
+    home_root: &Path,
+    op: &str,
+    args: &Value,
+) -> Result<Value, (&'static str, &'static str)> {
+    let locator = value_string(args, "locator")?;
+    let dir = home_dir(home_root, locator)?;
+    match op {
+        "home.prepare" => {
+            let marker: HomeMarker =
+                serde_json::from_value(args.get("marker").cloned().unwrap_or(Value::Null))
+                    .map_err(|_| ("HOME_LOCATOR_INVALID", "home marker is invalid"))?;
+            if marker.profile_id.is_empty()
+                || marker.profile_id.len() > 128
+                || marker.harness_type.is_empty()
+                || marker.harness_type.len() > 64
+                || marker.native_home.is_empty()
+                || marker.native_home.len() > 255
+            {
+                return Err(("HOME_LOCATOR_INVALID", "home marker is invalid"));
+            }
+            // Create the directory before reading anything: an absent home is
+            // a fresh home, and preparation is the one operation that may
+            // create it.
+            fs::create_dir_all(&dir).map_err(|_| ("HOME_IO", "home directory creation failed"))?;
+            ensure_inside_home_root(home_root, &dir)?;
+            let marker_path = home_root
+                .join(home_locator(locator)?[0].clone())
+                .join(HOME_MARKER_FILE);
+            let (created, marker_state) = match read_home_marker(&marker_path)? {
+                None => {
+                    let stamp = SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .map_err(|_| ("HOME_IO", "clock is before the epoch"))?
+                        .as_secs();
+                    let recorded = HomeMarker {
+                        created_at: Some(stamp),
+                        ..marker
+                    };
+                    use std::io::Write;
+                    fs::OpenOptions::new()
+                        .write(true)
+                        .create_new(true)
+                        .mode(0o600)
+                        .open(&marker_path)
+                        .and_then(|mut file| {
+                            file.write_all(
+                                &serde_json::to_vec(&recorded).map_err(io::Error::other)?,
+                            )
+                        })
+                        .map_err(|_| ("HOME_IO", "home marker write failed"))?;
+                    (true, "written")
+                }
+                Some(existing) => {
+                    if existing.profile_id != marker.profile_id
+                        || existing.harness_type != marker.harness_type
+                        || existing.native_home != marker.native_home
+                    {
+                        return Err((
+                            "HOME_MARKER_CONFLICT",
+                            "the home belongs to another profile identity",
+                        ));
+                    }
+                    (false, "verified")
+                }
+            };
+            // The audit window (the stateProjection target minus the native
+            // home prefix) must exist before the harness starts: harnesses
+            // differ in what they do with a missing directory, and the window
+            // is ours to own, not theirs.
+            if let Some(window) = args.get("window").and_then(Value::as_str) {
+                let relative = safe_relative(window)?;
+                let target = dir.join(&relative);
+                fs::create_dir_all(&target)
+                    .map_err(|_| ("HOME_IO", "home window creation failed"))?;
+                ensure_inside_home_root(home_root, &target)?;
+            }
+            Ok(json!({"path": dir, "created": created, "markerState": marker_state}))
+        }
+        "home.list" | "home.get" => {
+            ensure_inside_home_root(home_root, &dir)?;
+            let dir_fd =
+                fs::File::open(&dir).map_err(|_| ("HOME_NOT_FOUND", "home does not exist"))?;
+            if op == "home.get" {
+                let relative = safe_relative(value_string(args, "path")?)?;
+                let file = read_view_entry(dir_fd.as_raw_fd(), &relative)?;
+                let offset = args.get("offset").and_then(Value::as_u64).unwrap_or(0) as usize;
+                let maximum = args
+                    .get("maxLength")
+                    .and_then(Value::as_u64)
+                    .unwrap_or(MAX_FETCH_BYTES as u64) as usize;
+                if maximum == 0 || maximum > MAX_FETCH_BYTES || offset > file.len() {
+                    return Err(("VIEW_INVALID", "home fetch range is invalid"));
+                }
+                let end = (offset + maximum).min(file.len());
+                Ok(
+                    json!({"path": value_string(args, "path")?, "offset": offset, "nextOffset": end,
+                           "totalBytes": file.len(), "digest": digest(&file),
+                           "data": BASE64.encode(&file[offset..end]), "eof": end == file.len()}),
+                )
+            } else {
+                let relative = match args.get("relative") {
+                    Some(Value::String(value)) if !value.is_empty() => Some(safe_relative(value)?),
+                    _ => None,
+                };
+                enum Base {
+                    Pinned(fs::File),
+                    Owned(fs::File),
+                }
+                let base = match &relative {
+                    Some(relative) => {
+                        Base::Owned(open_beneath(dir_fd.as_raw_fd(), relative, true)?)
+                    }
+                    None => Base::Pinned(dir_fd),
+                };
+                let raw = match &base {
+                    Base::Pinned(file) => file.as_raw_fd(),
+                    Base::Owned(file) => file.as_raw_fd(),
+                };
+                let mut audit = HomeAudit::default();
+                let walk = audit_home_files(raw, "", &mut audit);
+                drop(base);
+                walk?;
+                Ok(json!({
+                    "files": audit.files,
+                    "truncated": {"entries": audit.truncated_entries, "bytes": audit.truncated_bytes,
+                                  "oversize": audit.oversize},
+                    "skipped": audit.skipped,
+                }))
+            }
+        }
+        _ => unreachable!(),
+    }
+}
+
+/// One bounded audit walk over a home directory. Same descent rules as a view
+/// listing - every step pinned with `openat(.., O_NOFOLLOW)`, links skipped,
+/// special files never read - but the outcome is a fact, not a failure: what
+/// did not fit is counted in `truncated`, because an audit that refused to
+/// report would be an audit that never runs.
+#[derive(Default)]
+struct HomeAudit {
+    files: Vec<Value>,
+    bytes: u64,
+    skipped: u64,
+    truncated_entries: u64,
+    truncated_bytes: u64,
+    oversize: u64,
+    visited: usize,
+}
+
+fn audit_home_files(
+    directory_fd: RawFd,
+    prefix: &str,
+    audit: &mut HomeAudit,
+) -> Result<(), (&'static str, &'static str)> {
+    for entry in
+        fs::read_dir(fd_path(directory_fd)).map_err(|_| ("VIEW_IO", "home listing failed"))?
+    {
+        let entry = entry.map_err(|_| ("VIEW_IO", "home listing failed"))?;
+        let name = entry.file_name();
+        let metadata = entry
+            .metadata()
+            .map_err(|_| ("VIEW_IO", "home metadata failed"))?;
+        audit.visited += 1;
+        if audit.visited > MAX_VIEW_TRAVERSAL_ENTRIES {
+            // The walk is cut here: at least this entry was not audited, and
+            // the report says so instead of pretending the walk finished.
+            audit.truncated_entries += 1;
+            return Ok(());
+        }
+        let child_prefix = if prefix.is_empty() {
+            name.to_string_lossy().into_owned()
+        } else {
+            format!("{prefix}/{}", name.to_string_lossy())
+        };
+        if metadata.file_type().is_symlink() {
+            audit.skipped += 1;
+            continue;
+        }
+        if metadata.is_dir() {
+            match open_at(directory_fd, &name, true) {
+                Ok(child_fd) => {
+                    let walked = audit_home_files(child_fd, &child_prefix, audit);
+                    unsafe { libc::close(child_fd) };
+                    walked?;
+                }
+                Err(("VIEW_MISSING", _)) | Err(("VIEW_SPECIAL_FILE", _)) => {
+                    audit.truncated_entries += 1;
+                }
+                Err(other) => return Err(other),
+            }
+        } else if metadata.is_file() {
+            let size = metadata.len();
+            if audit.files.len() >= MAX_HOME_FILES
+                || size > MAX_HOME_FILE_BYTES as u64
+                || audit.bytes + size > MAX_HOME_AUDIT_BYTES
+            {
+                audit.truncated_entries += 1;
+                audit.truncated_bytes += size;
+                if size > MAX_HOME_FILE_BYTES as u64 {
+                    audit.oversize += 1;
+                }
+                continue;
+            }
+            let file = open_beneath(directory_fd, Path::new(&name), false)?;
+            // SAFETY: `file` is a freshly opened descriptor this call owns.
+            let mut owned = file;
+            let bytes = read_home_entry(&mut owned)?;
+            audit.files.push(json!({
+                "path": child_prefix, "size": bytes.len(), "digest": digest(&bytes)
+            }));
+            audit.bytes += bytes.len() as u64;
+        } else {
+            // A FIFO, socket or device is never read; the audit says it was
+            // seen and skipped rather than listing a file that is not there.
+            audit.truncated_entries += 1;
+        }
+    }
+    Ok(())
+}
+
+/// Read one open home entry to the end with the same swap protection as a
+/// view read: the fd was opened with `O_NOFOLLOW`, identity is checked before
+/// and after, and an entry that changed mid-read is churn the caller will see
+/// as a different digest next time, not bytes this Worker invented.
+fn read_home_entry(file: &fs::File) -> Result<Vec<u8>, (&'static str, &'static str)> {
+    use std::io::Read;
+    let before = file
+        .metadata()
+        .map_err(|_| ("VIEW_IO", "home file metadata failed"))?;
+    if !before.is_file() {
+        return Err(("VIEW_SPECIAL_FILE", "home file is not a regular file"));
+    }
+    let mut bytes = Vec::with_capacity(before.len() as usize);
+    file.take(MAX_HOME_FILE_BYTES as u64 + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|_| ("VIEW_IO", "home file read failed"))?;
+    if bytes.len() as u64 > MAX_HOME_FILE_BYTES as u64 {
+        return Err(("VIEW_FILE_LIMIT", "home file exceeds the audit bound"));
+    }
+    let after = file
+        .metadata()
+        .map_err(|_| ("VIEW_IO", "home file metadata failed"))?;
+    let identity = |metadata: &fs::Metadata| (metadata.dev(), metadata.ino(), metadata.len());
+    if identity(&after) != identity(&before) {
+        return Err(("VIEW_CHANGED", "home file changed while it was being read"));
+    }
+    Ok(bytes)
+}
+
+/// The default home root is this user's own home, one step removed: the
+/// Worker knows its `$HOME` on any machine it runs on, which is exactly what
+/// "the machine that runs it" means.
+fn default_home_root() -> io::Result<PathBuf> {
+    let home =
+        std::env::var("HOME").map_err(|_| io::Error::other("HOME is not set; pass --home-root"))?;
+    let trimmed = home.trim();
+    if trimmed.is_empty() {
+        return Err(io::Error::other("HOME is not set; pass --home-root"));
+    }
+    Ok(Path::new(trimmed).join(".agent-box").join("profiles"))
+}
+
+/// The ephemeral root is deleted on exit; the home root must not be inside it,
+/// and the root must not be inside the home. Either nesting would let one
+/// lifetime destroy the other's facts.
+fn ensure_home_outside_root(home_root: &Path, root: &Path) -> io::Result<()> {
+    if home_root.starts_with(root) || root.starts_with(home_root) {
+        return Err(io::Error::other(
+            "--home-root must sit outside the ephemeral --root",
+        ));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod view_listing_tests {
     use super::*;
@@ -2125,7 +2510,7 @@ mod view_error_envelope_tests {
     async fn the_worker_still_answers_at_the_control_protocol_version_it_announces() {
         // The client compares this number on handshake, so it is checked against
         // the constant the same frame encoder uses rather than a literal here.
-        assert_eq!(protocol::PROTOCOL_VERSION, 3);
+        assert_eq!(protocol::PROTOCOL_VERSION, 4);
         let mut buffer = Vec::new();
         write_error(&mut buffer, 4, "VIEW_CHANGED", "a view refusal")
             .await
@@ -2133,5 +2518,210 @@ mod view_error_envelope_tests {
         let frame = protocol::decode_frame(&buffer).unwrap();
         let payload: Value = serde_json::from_slice(&frame.payload).unwrap();
         assert_eq!(payload["error"]["code"], json!("VIEW_CHANGED"));
+    }
+}
+
+/// The home operation family: durable per-Profile state on this machine, the
+/// only place the harness's native facts live. Each rule here is one a gate
+/// depends on, so each has a counter-example.
+#[cfg(test)]
+mod home_tests {
+    use super::*;
+    use serde_json::json;
+
+    fn scratch(name: &str) -> std::path::PathBuf {
+        let root = std::env::temp_dir().join(format!("agentbox-{}-{}", name, std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        root
+    }
+
+    fn marker() -> Value {
+        json!({"profileId": "profile_aaaa", "harnessType": "pi", "nativeHome": ".pi"})
+    }
+
+    #[test]
+    fn a_locator_refuses_traversal_absolute_and_bad_segments() {
+        assert_eq!(home_locator("pi/.pi").unwrap().len(), 2);
+        assert_eq!(home_locator("pi").unwrap().len(), 1);
+        for bad in [
+            "../escape",
+            "pi/../escape",
+            "/absolute",
+            "pi//double",
+            "pi/.",
+            ".",
+            "..",
+            "pi/with space",
+            "pi/back\\slash",
+            "",
+        ] {
+            assert_eq!(
+                home_locator(bad).unwrap_err().0,
+                "HOME_LOCATOR_INVALID",
+                "locator {bad:?} must be refused"
+            );
+        }
+    }
+
+    #[test]
+    fn prepare_writes_then_verifies_the_marker_and_refuses_a_conflict() {
+        let root = scratch("home-marker");
+        let arguments = |marker: Value| json!({"locator": "pi-test/.pi", "marker": marker});
+        let first = handle_home(&root, "home.prepare", &arguments(marker())).unwrap();
+        assert_eq!(first["created"], json!(true));
+        assert_eq!(first["markerState"], json!("written"));
+        assert!(root.join("pi-test/.agentbox-profile.json").is_file());
+        assert!(root.join("pi-test/.pi").is_dir());
+        let again = handle_home(&root, "home.prepare", &arguments(marker())).unwrap();
+        assert_eq!(again["created"], json!(false));
+        assert_eq!(again["markerState"], json!("verified"));
+        let mut foreign = marker();
+        foreign["profileId"] = json!("profile_bbbb");
+        let conflict = handle_home(&root, "home.prepare", &arguments(foreign)).unwrap_err();
+        assert_eq!(conflict.0, "HOME_MARKER_CONFLICT");
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn prepare_creates_the_audit_window_before_the_harness_runs() {
+        let root = scratch("home-window");
+        let arguments = json!({
+            "locator": "pi-test/.pi",
+            "marker": marker(),
+            "window": "agent/sessions",
+        });
+        let prepared = handle_home(&root, "home.prepare", &arguments).unwrap();
+        let home = PathBuf::from(prepared["path"].as_str().unwrap());
+        assert!(home.join("agent").join("sessions").is_dir());
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn list_audits_digests_and_reports_what_it_could_not_audit() {
+        let root = scratch("home-list");
+        let arguments = json!({
+            "locator": "pi-test/.pi",
+            "marker": marker(),
+            "window": "sessions",
+        });
+        handle_home(&root, "home.prepare", &arguments).unwrap();
+        let home = root.join("pi-test").join(".pi");
+        fs::write(home.join("sessions").join("journal.jsonl"), b"line one\n").unwrap();
+        fs::write(home.join("sessions").join("state.db"), b"state-bytes").unwrap();
+        std::os::unix::fs::symlink("elsewhere", home.join("alias")).unwrap();
+        let listed = handle_home(&root, "home.list", &json!({"locator": "pi-test/.pi"})).unwrap();
+        assert_eq!(listed["skipped"], json!(1));
+        assert_eq!(listed["truncated"]["entries"], json!(0));
+        let files = listed["files"].as_array().unwrap();
+        assert_eq!(files.len(), 2);
+        assert!(files
+            .iter()
+            .all(|file| file["digest"].as_str().unwrap().starts_with("sha256:")));
+        // A relative window lists only its own subtree, like a view does.
+        let window = handle_home(
+            &root,
+            "home.list",
+            &json!({"locator": "pi-test/.pi", "relative": "sessions"}),
+        )
+        .unwrap();
+        assert_eq!(window["files"].as_array().unwrap().len(), 2);
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn list_reports_truncation_instead_of_refusing_a_large_tree() {
+        let root = scratch("home-truncated");
+        let arguments = json!({"locator": "pi-test/.pi", "marker": marker()});
+        handle_home(&root, "home.prepare", &arguments).unwrap();
+        let home = root.join("pi-test").join(".pi");
+        let big = home.join("big.bin");
+        fs::write(&big, vec![7u8; MAX_HOME_FILE_BYTES as usize + 1]).unwrap();
+        let listed = handle_home(&root, "home.list", &json!({"locator": "pi-test/.pi"})).unwrap();
+        // The oversized file is a fact, not a failure: it is counted, its
+        // bytes are counted, and nothing was read from it.
+        assert_eq!(listed["truncated"]["oversize"], json!(1));
+        assert!(listed["truncated"]["entries"].as_u64().unwrap() >= 1);
+        assert_eq!(listed["files"].as_array().unwrap().len(), 0);
+        let _ = fs::remove_dir_all(&big);
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn get_serves_bounded_chunks_of_one_home_file() {
+        let root = scratch("home-get");
+        let arguments = json!({"locator": "pi-test/.pi", "marker": marker()});
+        handle_home(&root, "home.prepare", &arguments).unwrap();
+        let payload = b"0123456789abcdef";
+        fs::write(root.join("pi-test/.pi/journal.jsonl"), payload).unwrap();
+        let chunk = handle_home(
+            &root,
+            "home.get",
+            &json!({"locator": "pi-test/.pi", "path": "journal.jsonl",
+                    "offset": 4, "maxLength": 4}),
+        )
+        .unwrap();
+        assert_eq!(chunk["offset"], json!(4));
+        assert_eq!(chunk["nextOffset"], json!(8));
+        assert_eq!(chunk["eof"], json!(false));
+        assert_eq!(
+            chunk["digest"],
+            json!(digest(payload)),
+            "the digest covers the whole file, as a view fetch does"
+        );
+        let missing = handle_home(
+            &root,
+            "home.get",
+            &json!({"locator": "pi-test/.pi", "path": "no-such-file",
+                    "offset": 0, "maxLength": 8}),
+        )
+        .unwrap_err();
+        assert_eq!(missing.0, "VIEW_MISSING");
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn an_unprepared_home_is_not_found_not_created_by_reads() {
+        let root = scratch("home-missing");
+        let missing =
+            handle_home(&root, "home.list", &json!({"locator": "pi-test/.pi"})).unwrap_err();
+        assert_eq!(missing.0, "HOME_NOT_FOUND");
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_symlink_segment_cannot_relocate_a_home_outside_the_root() {
+        let root = scratch("home-outside");
+        let outside = scratch("home-outside-target");
+        std::os::unix::fs::symlink(&outside, root.join("pi-test")).unwrap();
+        let arguments = json!({"locator": "pi-test/.pi", "marker": marker()});
+        // `create_dir_all` through the link succeeds on the filesystem, and
+        // that is exactly the escape the inside-root check exists to refuse:
+        // the resolved home is outside the home root, so nothing is prepared.
+        let refused = handle_home(&root, "home.prepare", &arguments).unwrap_err();
+        assert_eq!(refused.0, "HOME_OUTSIDE_ROOT");
+        let _ = fs::remove_dir_all(&root);
+        let _ = fs::remove_dir_all(&outside);
+    }
+
+    #[test]
+    fn the_home_root_may_not_nest_the_ephemeral_root() {
+        let nested = scratch("home-nested-root").join("worker-root");
+        let home = nested.join("home");
+        assert!(ensure_home_outside_root(&home, &nested).is_err());
+        assert!(ensure_home_outside_root(&nested, &home).is_err());
+        let separate = scratch("home-separate");
+        let other = scratch("home-separate-other");
+        assert!(ensure_home_outside_root(&separate, &other).is_ok());
+        let _ = fs::remove_dir_all(&separate);
+        let _ = fs::remove_dir_all(&other);
+    }
+
+    #[test]
+    fn the_default_home_root_sits_under_this_users_home() {
+        let root = default_home_root().unwrap();
+        let home = PathBuf::from(std::env::var("HOME").unwrap());
+        assert!(root.starts_with(home));
+        assert!(root.ends_with(".agent-box/profiles"));
     }
 }

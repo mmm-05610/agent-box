@@ -25,9 +25,11 @@ WORKER_ERROR = 8
 # Control-protocol generation. The frame format is unchanged; version 2 added
 # interactive spawn, attempt.write, and pre-terminal process.output events;
 # version 3 adds digest-pinned runtime artifact trees the Worker verifies
-# inside WSL before bwrap may mount one read-only. Every mismatch is a loud
-# handshake failure in both directions, never a silent one-shot fallback.
-PROTOCOL_VERSION = 3
+# inside WSL before bwrap may mount one read-only; version 4 adds the
+# persistent home operation family (home.prepare / home.list / home.get) that
+# the native-home storage model requires. Every mismatch is a loud handshake
+# failure in both directions, never a silent one-shot fallback.
+PROTOCOL_VERSION = 4
 
 
 class WorkerError(RuntimeError):

@@ -1,0 +1,15 @@
+{
+  "requestId": "request-1",
+  "connectionId": "connection-1",
+  "serverInstanceId": "server-1",
+  "op": "home.prepare",
+  "arguments": {
+    "locator": "pi-test/.pi",
+    "marker": {
+      "profileId": "profile_0123abcd",
+      "harnessType": "pi",
+      "nativeHome": ".pi"
+    },
+    "window": "sessions"
+  }
+}

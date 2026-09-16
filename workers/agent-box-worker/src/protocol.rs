@@ -10,10 +10,14 @@ pub const MAX_PAYLOAD: usize = 64 * 1024;
 /// Control-protocol generation. Version 2 added bidirectional stdin writes and
 /// pre-terminal stdout/stderr events for long-lived attempts. Version 3 adds
 /// digest-pinned runtime artifact trees to the bootstrap, which the Worker
-/// verifies before it will bind one read-only. The frame format itself is
-/// unchanged and every mismatch is a loud handshake failure, in both
-/// directions: a v3 client never silently accepts a v2 Worker and a v2 client
-/// is refused by a v3 Worker instead of degrading to unverified directories.
+/// verifies before it will bind one read-only. Version 4 adds the persistent
+/// home operation family (`home.prepare`, `home.list`, `home.get`): a
+/// Profile's native state lives in a durable directory outside `--root`, and
+/// only a Worker that can prepare and audit that directory may carry the
+/// native-home model. The frame format itself is unchanged and every mismatch
+/// is a loud handshake failure, in both directions: a v4 client never silently
+/// accepts a v3 Worker and a v3 client is refused by a v4 Worker instead of
+/// degrading to a model where state is unknowable.
 ///
 /// The version still stays 3 while error codes are added below it. The codes
 /// are part of the contract, and the set grows only additively: the frame
@@ -30,7 +34,7 @@ pub const MAX_PAYLOAD: usize = 64 * 1024;
 /// `VIEW_CHANGED`) is additive in exactly that sense; `view_error_envelope_tests`
 /// checks the envelope frame by frame, and the fail-closed rule is pinned by
 /// `tests/server/test_state_capture_error_boundary.py`.
-pub const PROTOCOL_VERSION: u32 = 3;
+pub const PROTOCOL_VERSION: u32 = 4;
 pub const MAX_RUNTIME_ARTIFACTS: usize = 8;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

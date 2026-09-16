@@ -1,0 +1,11 @@
+{
+  "requestId": "request-4",
+  "connectionId": "connection-1",
+  "serverInstanceId": "server-1",
+  "op": "home.list",
+  "arguments": {
+    "locator": "pi-test/.pi",
+    "relative": "/etc"
+  },
+  "expectedError": "HOME_LOCATOR_INVALID"
+}

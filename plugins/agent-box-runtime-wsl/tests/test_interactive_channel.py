@@ -112,10 +112,12 @@ def test_current_client_refuses_the_preserved_previous_generation_worker(tmp_pat
     assert "invalid bootstrap" in refused.value.message
     client.close()
     # The generations really are different, so the case above is not a typo in
-    # the fixture: this client speaks 3, that Worker speaks 2.
+    # the fixture: this client speaks the current generation, that Worker
+    # speaks one behind it. The pin moves exactly when the generation moves -
+    # order 45's home operation family is what moved it to 4.
     import agent_box_runtime_wsl.client as client_module
 
-    assert client_module.PROTOCOL_VERSION == 3
+    assert client_module.PROTOCOL_VERSION == 4
 
 
 def test_interactive_attempt_streams_output_and_takes_stdin_before_terminal(tmp_path):
