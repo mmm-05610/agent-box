@@ -60,7 +60,7 @@ def test_loopback_override_refuses_anything_but_a_loopback_url():
 
 def test_deployment_document_declares_the_managed_chain():
     document = production.deployment_document(
-        artifact_source="/srv/agentbox/artifacts/claude-runtime",
+        artifact_token="claude-runtime",
         tree_digest="sha256:" + "a" * 64,
     )
     assert document["schemaVersion"] == 1
@@ -69,8 +69,7 @@ def test_deployment_document_declares_the_managed_chain():
     assert harness["credentialKind"] == "api-key"
     assert harness["credentialEnvironment"] == "ANTHROPIC_AUTH_TOKEN"
     assert harness["runtimeArtifactMounts"] == [{
-        "source": "/srv/agentbox/artifacts/claude-runtime",
-        "target": "/runtime/artifacts/claude-runtime",
+        "token": "claude-runtime", "target": "/runtime/artifacts/claude-runtime",
         "treeDigest": "sha256:" + "a" * 64,
     }]
     assert harness["stateProjection"] == {"target": "/runtime/home/.claude/projects"}
@@ -113,7 +112,7 @@ def test_deployment_document_refuses_an_invalid_artifact_declaration():
     for source, digest in ((("relative/path"), "sha256:" + "a" * 64),
                            ("/srv/claude", "sha256:short"), ("/srv/claude", "md5:" + "a" * 32)):
         with pytest.raises(production.ClaudeProductionTemplateError):
-            production.deployment_document(artifact_source=source, tree_digest=digest)
+            production.deployment_document(artifact_token=source, tree_digest=digest)
 
 
 def test_product_model_translates_identity():

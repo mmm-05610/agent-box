@@ -65,7 +65,7 @@ def test_loopback_override_changes_only_the_base_url():
 
 def test_deployment_document_declares_the_managed_chain():
     document = production.deployment_document(
-        artifact_source="/srv/agentbox/artifacts/kilo-runtime",
+        artifact_token="kilo-runtime",
         tree_digest="sha256:" + "a" * 64,
     )
     assert document["schemaVersion"] == 1
@@ -74,8 +74,7 @@ def test_deployment_document_declares_the_managed_chain():
     assert harness["credentialKind"] == "api-key"
     assert harness["credentialEnvironment"] == "OPENAI_API_KEY"
     assert harness["runtimeArtifactMounts"] == [{
-        "source": "/srv/agentbox/artifacts/kilo-runtime",
-        "target": "/runtime/artifacts/kilo-runtime",
+        "token": "kilo-runtime", "target": "/runtime/artifacts/kilo-runtime",
         "treeDigest": "sha256:" + "a" * 64,
     }]
     assert harness["stateProjection"] == {"target": "/runtime/home/.local/share/kilo"}
@@ -116,7 +115,7 @@ def test_deployment_document_refuses_an_invalid_artifact_declaration():
     for source, digest in ((("relative/path"), "sha256:" + "a" * 64),
                            ("/srv/kilo", "sha256:short"), ("/srv/kilo", "md5:" + "a" * 32)):
         with pytest.raises(production.KiloProductionTemplateError):
-            production.deployment_document(artifact_source=source, tree_digest=digest)
+            production.deployment_document(artifact_token=source, tree_digest=digest)
 
 
 def test_product_model_translates_to_the_native_config_value():

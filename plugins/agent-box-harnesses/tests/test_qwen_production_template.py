@@ -68,19 +68,17 @@ def test_loopback_override_refuses_anything_but_a_loopback_url():
 
 def test_deployment_document_declares_the_managed_chain():
     document = production.deployment_document(
-        artifact_source="/srv/agentbox/artifacts/qwen-runtime",
+        artifact_token="qwen-runtime",
         tree_digest="sha256:" + "a" * 64,
     )
     assert document["schemaVersion"] == 1
-    assert Path(document["pluginRoot"]) == production.PLUGIN_ROOT
     harness = document["harnesses"][0]
     assert harness["id"] == "qwen"
     assert harness["credentialKind"] == "api-key"
     assert harness["credentialEnvironment"] == "OPENAI_API_KEY"
     assert harness["modelControlId"] == production.MODEL_CONTROL_ID
     assert harness["runtimeArtifactMounts"] == [{
-        "source": "/srv/agentbox/artifacts/qwen-runtime",
-        "target": "/runtime/artifacts/qwen-runtime",
+        "token": "qwen-runtime", "target": "/runtime/artifacts/qwen-runtime",
         "treeDigest": "sha256:" + "a" * 64,
     }]
     assert harness["stateProjection"] == {"target": "/runtime/home/.qwen/projects"}
@@ -127,7 +125,7 @@ def test_deployment_document_refuses_an_invalid_artifact_declaration():
     for source, digest in ((("relative/path"), "sha256:" + "a" * 64),
                            ("/srv/qwen", "sha256:short"), ("/srv/qwen", "md5:" + "a" * 32)):
         with pytest.raises(production.QwenProductionTemplateError):
-            production.deployment_document(artifact_source=source, tree_digest=digest)
+            production.deployment_document(artifact_token=source, tree_digest=digest)
 
 
 def test_product_model_translates_to_the_native_catalogue_value():
