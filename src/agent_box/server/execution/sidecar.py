@@ -21,9 +21,7 @@ import time
 from typing import Any, Callable, Mapping, Protocol, Sequence
 from uuid import uuid4
 
-from .state_capture import (
-    StateCaptureError, merge_state_into_bundle, settled_state, state_snapshot,
-)
+from .state_capture import StateCaptureError, audit_snapshot
 
 from agent_box.resource_contracts.harness_capabilities import (
     CapabilityDeclaration, capability_view, merge_capabilities, validate_claims,
@@ -275,11 +273,10 @@ class WorkerSidecarLauncher:
         runtime_artifact_authorizations: Sequence[Mapping[str, str]] = (),
         runtime_artifact_mounts: Sequence[tuple[str, str]] = (),
         projection_mounts: Sequence[tuple[str, str]] = (),
-        state_bundle_prefix: str | None = None,
-        state_target: str | None = None,
+        home_locator: str = "", native_home: str = "", profile_id: str = "",
+        harness_type: str = "", audit_window: str | None = None,
         state_ephemeral_paths: Sequence[str] = (),
         protected_state_paths: Sequence[str] = (),
-        restored_state: Mapping[str, bytes] | None = None,
         timeout_ms: int = 120_000,
     ) -> None:
         self.connector = connector
@@ -298,25 +295,21 @@ class WorkerSidecarLauncher:
             self.runtime_artifact_authorizations, self.runtime_artifact_mounts,
         )
         self.projection_mounts = tuple((str(source), str(target)) for source, target in projection_mounts)
-        self.state_bundle_prefix = state_bundle_prefix
-        self.state_target = state_target
-        #: Paths (relative to the state target) that a read-only projection owns
-        #: inside the writable state subtree. They are excluded from the
-        #: checkpoint by name and refused when a checkpoint tries to restore
-        #: one, rather than relying on the read-only overlay happening to hide
-        #: them.
+        #: The Profile's durable home on the target machine: `<role>/<native
+        #: home>` under the machine's home root. The Worker creates and marker-
+        #: verifies it; nothing about it is ever uploaded or restored.
+        self.home_locator = str(home_locator)
+        self.native_home = str(native_home)
+        self.profile_id = str(profile_id)
+        self.harness_type = str(harness_type)
+        #: The declared audit window: the deployment's `stateProjection.target`
+        #: minus the guest home prefix, relative to the role directory.
+        self.audit_window = audit_window
+        #: Paths (relative to the audit window) that a read-only projection
+        #: owns. They are excluded from the audit by name: configuration the
+        #: deployment projects read-only is not Harness state.
         self.protected_state_paths = tuple(_safe_relative_state_path(path) for path in protected_state_paths)
         self.state_ephemeral_paths = tuple(state_ephemeral_paths)
-        try:
-            merge_state_into_bundle(
-                self.bundle, state_bundle_prefix=state_bundle_prefix, state_target=state_target,
-                restored_state=restored_state,
-                protected_state_paths=self.protected_state_paths,
-                state_ephemeral_paths=self.state_ephemeral_paths,
-            )
-        except StateCaptureError as error:
-            # This constructor's callers expect a ValueError carrying the code.
-            raise ValueError(error.code) from error
         self.timeout_ms = timeout_ms
 
     def launch(self, environment: Mapping[str, str]):
@@ -366,6 +359,28 @@ class WorkerSidecarLauncher:
                     "attemptId": attempt_id, "frameId": secret_frame_id,
                     "data": base64.b64encode(credential_material).decode(),
                 })["path"]
+            # The home is prepared before the room exists: the Worker creates
+            # (or marker-verifies) the Profile's directory and the declared
+            # audit window, and answers with the host path that the room will
+            # bind read-write. Nothing is uploaded; nothing is restored.
+            home_path = None
+            window_host = None
+            if self.home_locator:
+                home_path = client.request("home.prepare", {
+                    "locator": self.home_locator,
+                    "marker": {"profileId": self.profile_id, "harnessType": self.harness_type,
+                               "nativeHome": self.native_home},
+                    **({"window": self.audit_window} if self.audit_window else {}),
+                })["path"]
+                if self.audit_window and self.audit_window != self.native_home:
+                    # The prepared path ends with the locator's segments, so the
+                    # role directory it belongs to is the prefix above the
+                    # native home; the window hangs off that role directory.
+                    suffix = f"/{self.native_home}"
+                    role_dir = (
+                        home_path[: -len(suffix)] if home_path.endswith(suffix) else home_path
+                    )
+                    window_host = f"{role_dir}/{self.audit_window}"
             # The room is the sandbox layer's product, not this channel's: the
             # guest home layout, the XDG roots, which mounts are writable and
             # which state paths are attempt-ephemeral are all decided there.
@@ -376,15 +391,19 @@ class WorkerSidecarLauncher:
                 executable_mounts=self.executable_mounts,
                 projection_mounts=self.projection_mounts,
                 runtime_artifact_mounts=self.runtime_artifact_mounts,
-                state_bundle_prefix=self.state_bundle_prefix,
-                state_target=self.state_target,
+                state_home_source=home_path,
+                state_target=f"/runtime/home/{self.native_home}" if home_path else None,
+                state_window_source=window_host,
+                state_window_target=(
+                    f"/runtime/home/{self.audit_window}" if window_host else None
+                ),
                 state_ephemeral_paths=self.state_ephemeral_paths,
             )
             argv = list(room.argv)
             channels = _WorkerChannels(
                 client, attempt_id, 1, view_id,
                 secret_frame_id if secret is not None else None,
-                state_bundle_prefix=self.state_bundle_prefix,
+                home_locator=self.home_locator, audit_window=self.audit_window,
                 protected_state_paths=self.protected_state_paths,
                 state_ephemeral_paths=self.state_ephemeral_paths,
                 forbidden_content=(credential_material or b"").strip(),
@@ -422,7 +441,7 @@ class _WorkerChannels:
     def __init__(
         self, client, attempt_id: str, generation: int, view_id: str,
         secret_frame_id: str | None = None,
-        state_bundle_prefix: str | None = None,
+        home_locator: str = "", audit_window: str | None = None,
         protected_state_paths: Sequence[str] = (),
         state_ephemeral_paths: Sequence[str] = (),
         forbidden_content: bytes = b"",
@@ -432,9 +451,10 @@ class _WorkerChannels:
         self.generation = generation
         self.view_id = view_id
         self.secret_frame_id = secret_frame_id
-        self.state_bundle_prefix = state_bundle_prefix
-        #: Read-only configuration that lives *inside* the writable state
-        #: subtree. It is not state: it must not be captured into a checkpoint.
+        self.home_locator = home_locator
+        self.audit_window = audit_window
+        #: Read-only configuration that lives *inside* the audited window. It
+        #: is not state: it must not enter the audit manifest.
         self.protected_state_paths = frozenset(protected_state_paths)
         self.state_ephemeral_paths = tuple(state_ephemeral_paths)
         self._forbidden_content = forbidden_content
@@ -545,117 +565,76 @@ class _WorkerChannels:
             except BaseException:  # noqa: BLE001 - stopping must never mask the turn
                 pass
 
-    #: A capture accepts only bytes that stopped changing. Comparing paths and
-    #: sizes is not enough - a rewrite that keeps its length looks stable - so two
-    #: consecutive snapshots must agree on path, size *and* digest, and the bytes
-    #: returned are exactly the ones that matched.
-    STATE_SETTLE_INTERVAL_SECONDS = 0.25
-    STATE_SETTLE_DEADLINE_SECONDS = 10.0
+    def audit_state(self) -> dict[str, Any]:
+        """Audit the declared home window through the shared audit rules.
 
-    def _state_snapshot(self) -> tuple[dict[str, tuple[int, str]], dict[str, bytes]]:
-        """List the declared state subtree and read it through the shared rules.
-
-        The rules themselves live in `state_capture`, because the local channel
-        captures the same subtree under exactly the same bounds.
+        Nothing is uploaded and nothing is restored: the Worker lists its own
+        durable home (`home.list`, digest included, bounded, truncation as a
+        fact), and the only bytes read are the ones the fail-closed credential
+        scan must look at. The manifest that comes out is a *record* of what
+        the home looks like, not a copy of it.
         """
-        if self.state_bundle_prefix is None:
-            return {}, {}
-        listing = self.client.request("view.list", {"viewId": self.view_id}).get("files", ())
+        if not self.home_locator or self.audit_window is None:
+            return {
+                "files": [], "skipped": 0,
+                "truncated": {"entries": 0, "bytes": 0, "oversize": 0},
+                "audited": {"files": 0, "bytes": 0,
+                            "truncated": {"entries": 0, "bytes": 0, "oversize": 0}},
+            }
+        result = self.client.request("home.list", {
+            "locator": self.home_locator, "relative": self.audit_window,
+        })
         try:
-            return state_snapshot(
-                listing, self._view_bytes,
-                state_bundle_prefix=self.state_bundle_prefix,
+            return audit_snapshot(
+                result.get("files", ()), self._home_bytes,
                 protected_state_paths=tuple(self.protected_state_paths),
                 state_ephemeral_paths=self.state_ephemeral_paths,
                 forbidden_content=self._forbidden_content,
+                truncated=result.get("truncated") or {},
+                skipped=int(result.get("skipped") or 0),
             )
         except StateCaptureError as error:
             # The shared rules speak their own error type; this layer's callers
-            # expect the sidecar's, with the same code.
-            raise SidecarError(error.code, str(error)) from error
+            # expect the sidecar's, with the same code - and the credential
+            # rule needs the offending relative path with it.
+            failure = SidecarError(error.code, str(error))
+            failure.path = getattr(error, "path", None)
+            raise failure from error
 
-    def _settled_state(self, *, deadline_seconds: float | None = None,
-                       interval_seconds: float | None = None) -> dict[str, bytes]:
-        """Wait, bounded, until the state subtree stops changing, then return it."""
-        if self.state_bundle_prefix is None:
-            return {}
-        try:
-            return settled_state(
-                self._state_snapshot, is_transient=_state_error_is_transient,
-                deadline_seconds=deadline_seconds, interval_seconds=interval_seconds,
-            )
-        except StateCaptureError as error:
-            raise SidecarError(error.code, str(error)) from error
+    def delete_state_file(self, relative: str) -> None:
+        """Remove exactly one home file - the credential rule's clean-up."""
+        self.client.request("home.delete", {
+            "locator": self.home_locator,
+            "path": f"{self.audit_window}/{relative}" if self.audit_window else relative,
+        }, timeout=10)
 
-    def capture_state(self, *, deadline_seconds: float | None = None,
-                      interval_seconds: float | None = None) -> dict[str, bytes]:
-        """Read back only the deployment-declared writable state subtree, once it
-        has stopped changing."""
-        return self._settled_state(
-            deadline_seconds=deadline_seconds, interval_seconds=interval_seconds,
-        )
-
-    def settle_state(self, *, deadline_seconds: float | None = None,
-                     interval_seconds: float | None = None) -> None:
-        """Wait until the state subtree stops changing, without reading it out."""
-        self._settled_state(
-            deadline_seconds=deadline_seconds, interval_seconds=interval_seconds,
-        )
-
-    def _under_ephemeral_prefix(self, relative: str) -> bool:
-        """Whether a state-relative path is (under) an attempt-ephemeral dir.
-
-        Decision A: these paths are shadowed by a tmpfs inside the sandbox, so
-        neither the capture nor a restore may treat them as durable state.
-        """
-        return _matches_ephemeral_prefix(relative, self.state_ephemeral_paths)
-
-    def _view_bytes(self, path: str) -> tuple[bytes, str]:
+    def _home_bytes(self, path: str) -> tuple[bytes, str]:
         chunks = bytearray()
         expected = None
+        full = f"{self.audit_window}/{path}" if self.audit_window else path
         while True:
-            try:
-                item = self.client.request("view.get", {
-                    "viewId": self.view_id, "path": path,
-                    "offset": len(chunks), "maxLength": 32 * 1024,
-                })
-            except BaseException as error:  # noqa: BLE001 - classified, not swallowed
-                code = getattr(error, "code", None)
-                # The Worker refuses a missing path as a deterministic
-                # VIEW_MISSING because it cannot know whether the caller ever
-                # saw the file. This capture just listed it, so here - and only
-                # here - the refusal means "the bytes moved": retry, bounded.
-                if code == "VIEW_MISSING":
-                    raise SidecarError(
-                        "SIDECAR_STATE_IDENTITY_CONFLICT", "state file is gone",
-                    ) from error
-                # A range refusal mid-read means the file no longer reaches the
-                # offset this capture was served a moment ago - it got shorter
-                # under the read. The first request has no such history, so its
-                # range refusal stays the deterministic error it arrived as.
-                if code == "VIEW_INVALID" and chunks:
-                    raise SidecarError(
-                        "SIDECAR_STATE_IDENTITY_CONFLICT", "state fetch offset moved",
-                    ) from error
-                raise
+            item = self.client.request("home.get", {
+                "locator": self.home_locator, "path": full,
+                "offset": len(chunks), "maxLength": 32 * 1024,
+            })
             if expected is None:
                 expected = item.get("digest")
             if (item.get("digest") != expected or item.get("offset") != len(chunks)
                     or not isinstance(item.get("data"), str)):
-                raise SidecarError("SIDECAR_STATE_IDENTITY_CONFLICT", "state fetch identity changed")
+                raise SidecarError("SIDECAR_STATE_IDENTITY_CONFLICT", "home fetch identity changed")
             try:
                 chunks.extend(base64.b64decode(item["data"], validate=True))
             except ValueError as exc:
-                raise SidecarError("SIDECAR_STATE_INVALID", "state chunk is invalid") from exc
+                raise SidecarError("SIDECAR_STATE_INVALID", "home chunk is invalid") from exc
             if item.get("nextOffset") != len(chunks):
-                raise SidecarError("SIDECAR_STATE_IDENTITY_CONFLICT", "state fetch offset changed")
+                raise SidecarError("SIDECAR_STATE_IDENTITY_CONFLICT", "home fetch offset changed")
             if item.get("eof") is True:
                 break
             if item.get("nextOffset") == item.get("offset"):
-                raise SidecarError("SIDECAR_STATE_INVALID", "state fetch made no progress")
+                raise SidecarError("SIDECAR_STATE_INVALID", "home fetch made no progress")
         content = bytes(chunks)
         if expected != _sha256(content):
-            raise SidecarError("SIDECAR_STATE_DIGEST_MISMATCH", "state digest did not match")
+            raise SidecarError("SIDECAR_STATE_DIGEST_MISMATCH", "home digest did not match")
         return content, str(expected)
 
     def close(self) -> None:
@@ -782,14 +761,20 @@ class SidecarEnvelope:
             with self._condition:
                 self._condition.notify_all()
 
-    def capture_state(self) -> dict[str, bytes]:
-        capture = getattr(self._channels, "capture_state", None)
-        return capture() if callable(capture) else {}
+    def audit_state(self) -> dict[str, Any]:
+        """Audit the declared home window, whichever channel supplies the walk."""
+        audit = getattr(self._channels, "audit_state", None)
+        return audit() if callable(audit) else {
+            "files": [], "skipped": 0,
+            "truncated": {"entries": 0, "bytes": 0, "oversize": 0},
+            "audited": {"files": 0, "bytes": 0,
+                        "truncated": {"entries": 0, "bytes": 0, "oversize": 0}},
+        }
 
-    def settle_state(self) -> None:
-        settle = getattr(self._channels, "settle_state", None)
-        if callable(settle):
-            settle()
+    def delete_state_file(self, relative: str) -> None:
+        delete = getattr(self._channels, "delete_state_file", None)
+        if callable(delete):
+            delete(relative)
 
     # -- reader ------------------------------------------------------------
 
@@ -866,6 +851,8 @@ class SidecarHarnessPort:
         state_directory: str = "/tmp/agentbox-sidecar",
         directory: str = "/workspace", on_event=None,
         declared_capabilities: Mapping[str, bool] | None = None,
+        native_platform: str | None = None,
+        home_locator: str | None = None,
     ) -> None:
         self.launcher = launcher
         self.environment = dict(environment)
@@ -879,6 +866,12 @@ class SidecarHarnessPort:
         self.resume_native_id = resume_native_id
         self.state_directory = state_directory
         self.directory = directory
+        #: Which machine family owns this Profile's home, and where it sits on
+        #: that machine (relative to the machine's home root). Both go into the
+        #: audit manifest as the *reference*; the absolute host path the
+        #: channel resolved never leaves this process.
+        self.native_platform = native_platform
+        self.home_locator = home_locator
         self.on_event = on_event or (lambda *_: None)
         # 静态上限：只能来自部署/插件声明（经 canonical 校验）；缺省按“全部 false”
         # 处理——不猜、不默认 true。
@@ -965,8 +958,13 @@ class SidecarHarnessPort:
         })
         return native
 
-    def capture_execution(self, execution_id: str) -> tuple[dict[str, bytes], bool]:
-        """Flush the adapter, then capture its declared native state before cleanup."""
+    def capture_execution(self, execution_id: str) -> tuple[dict[str, Any], bool]:
+        """Flush the adapter, then audit the declared home window.
+
+        The audit is a record, not a copy: what comes back are facts about the
+        home directory the Harness owns on this machine (per-file digests,
+        counts, truncation), never bytes to store.
+        """
         envelope = self._require(execution_id)
         with self._lock:
             already_closed = execution_id in self._native_closed
@@ -974,11 +972,20 @@ class SidecarHarnessPort:
             envelope.request({"op": "close"}, timeout=10)
             with self._lock:
                 self._native_closed.add(execution_id)
-        state = envelope.capture_state()
-        # checkpoint 的可续接性读的是有效能力：静态声明了 native_continuation
-        # 且本次执行真的被原生播发过，才允许声明 resumable。
+        audit = envelope.audit_state()
+        # resumable 的算法不变：静态声明了 native_continuation 且本次执行真的
+        # 被原生播发过，才允许声明 resumable。
         resumable = self._effective_supported(execution_id, "native_continuation")
-        return state, resumable
+        return {
+            "nativePlatform": self.native_platform,
+            "homeLocator": self.home_locator,
+            **audit,
+        }, resumable
+
+    def delete_home_file(self, execution_id: str, relative: str) -> None:
+        """Remove one leaked file from the home (the credential rule)."""
+        envelope = self._require(execution_id)
+        envelope.delete_state_file(relative)
 
     def accept(self, execution_id: str, *, overrides: Mapping[str, Any] | None = None) -> None:
         """Open the execution; the prompt is issued by `prompt`."""

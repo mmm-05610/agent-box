@@ -57,7 +57,8 @@ class RealConnector:
 
     def client_for_workspace(self, **arguments):
         return WorkerClient(
-            [str(WORKER), "--root", str(self.root / "worker-root"), "--workspace", str(REPO)],
+            [str(WORKER), "--root", str(self.root / "worker-root"),
+             "--home-root", str(self.root / "profile-home"), "--workspace", str(REPO)],
             worker_digest="sha256:" + hashlib.sha256(WORKER.read_bytes()).hexdigest(),
             worker_version="0.1.0", connection_id=arguments["connection_id"],
             project_id=arguments["connection_id"], effective_user=os.environ["USER"],
@@ -84,8 +85,11 @@ def _port(tmp_path, *, host_sentinel: Path, protected: tuple[str, ...] = (),
                    "connection_id": "connection-home", "remote_path": str(REPO)},
         bundle=_bundle_with(config_source), timeout_ms=60_000,
         projection_mounts=((BUNDLE_CONFIG, CONFIG_TARGET),),
-        state_bundle_prefix="agentbox-sidecar/deployment/fixture/native-state",
-        state_target=STATE_TARGET,
+        home_locator="home-test/.fixture",
+        native_home=".fixture",
+        profile_id="profile_home",
+        harness_type="fixture",
+        audit_window=".fixture/state",
         protected_state_paths=protected,
     )
     return SidecarHarnessPort(
@@ -99,6 +103,7 @@ def _port(tmp_path, *, host_sentinel: Path, protected: tuple[str, ...] = (),
                  }},
         declared_capabilities={"native_continuation": True},
         state_directory="/tmp/agentbox-sidecar-state", directory="/workspace",
+        native_platform="wsl", home_locator="home-test/.fixture",
     )
 
 
@@ -171,8 +176,13 @@ def test_a_config_inside_the_state_subtree_is_not_captured_and_cannot_be_restore
                    "connection_id": "connection-home-nested", "remote_path": str(REPO)},
         bundle=_bundle_with(config), timeout_ms=60_000,
         projection_mounts=((BUNDLE_CONFIG, config_target),),
-        state_bundle_prefix="agentbox-sidecar/deployment/fixture/native-state",
-        state_target=state_target,
+        home_locator="home-test/.fixture",
+        native_home=".fixture",
+        profile_id="profile_home",
+        harness_type="fixture",
+        # The whole native home is the declared window here, so the read-only
+        # configuration inside it is excluded from the audit by name.
+        audit_window=".fixture",
         protected_state_paths=("config.json",),
     )
     port = SidecarHarnessPort(
@@ -186,6 +196,7 @@ def test_a_config_inside_the_state_subtree_is_not_captured_and_cannot_be_restore
                  }},
         declared_capabilities={"native_continuation": True},
         state_directory="/tmp/agentbox-sidecar-state", directory="/workspace",
+        native_platform="wsl", home_locator="home-test/.fixture",
     )
     try:
         port.open_execution("execution-nested")
@@ -193,29 +204,13 @@ def test_a_config_inside_the_state_subtree_is_not_captured_and_cannot_be_restore
         assert report["converged"] is True, report
         assert report["configWrite"]["ok"] is False, report
         assert report["stateWrite"]["ok"] is True, report
-        state, resumable = port.capture_execution("execution-nested")
+        audit, resumable = port.capture_execution("execution-nested")
         # The read-only configuration is not state, even though it sits inside
-        # the writable subtree: it must not reach the checkpoint.
-        assert "config.json" not in state, sorted(state)
-        assert any(path.startswith("state/") for path in state), sorted(state)
+        # the writable home: it must not reach the audit manifest.
+        audited = {item["path"] for item in audit["files"]}
+        assert "config.json" not in audited, sorted(audited)
+        assert any(path.startswith("state/") for path in audited), sorted(audited)
         assert resumable is True
     finally:
         port.stop()
     _await_worker_projection_cleanup(tmp_path / "worker-root")
-
-
-def test_a_checkpoint_cannot_restore_over_a_protected_configuration(tmp_path):
-    """The refusal is explicit, not an accident of mount ordering."""
-    config = tmp_path / "config.json"
-    config.write_text("{}\n", encoding="utf-8")
-    with pytest.raises(ValueError) as refused:
-        WslSidecarLauncher(
-            RealConnector(tmp_path),
-            workspace={"distribution": "Ubuntu", "remote_user": os.environ["USER"],
-                       "connection_id": "connection-restore", "remote_path": str(REPO)},
-            bundle={}, state_bundle_prefix="deployment/fixture/native-state",
-            state_target=f"{GUEST_HOME}/.fixture",
-            protected_state_paths=("config.json",),
-            restored_state={"config.json": b"tamper\n"},
-        )
-    assert "SIDECAR_STATE_PROTECTED_PATH" in str(refused.value)

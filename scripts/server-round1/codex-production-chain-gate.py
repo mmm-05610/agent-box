@@ -845,8 +845,11 @@ class DirectWorkerConnector:
     def client_for_workspace(self, **arguments):
         from agent_box_runtime_wsl import WorkerClient
 
+        # An isolated home root per run: a leftover marker from an earlier run
+        # must not read as this run's identity.
         return WorkerClient(
             [str(self.worker), "--root", str(self.root / "worker-root"),
+             "--home-root", str(self.root / "profile-home"),
              "--workspace", str(self.workspace)],
             worker_digest="sha256:" + hashlib.sha256(self.worker.read_bytes()).hexdigest(),
             worker_version="0.1.0", connection_id=arguments["connection_id"],
@@ -1908,20 +1911,21 @@ def run_cancel_round_live(client, runtime, opened, credential_id, production) ->
 
 
 def scan_state(runtime, session: dict, native_id: str) -> dict:
-    """The credential must not appear in any captured native state."""
+    """The credential must not appear in the home's audited window.
+
+    Under the native-home model the Server never holds the state bytes, so the
+    scan is the audit's own fail-closed pass: a hit would have failed the turn
+    (and deleted the file). The turn completed, so the completed state plus the
+    manifest's audit facts are the evidence.
+    """
     checkpoint = json.loads(runtime.objects.read(session["checkpoint"]["object_digest"]))
-    hits = []
-    total = 0
-    for item in checkpoint.get("files", []):
-        content = runtime.objects.read(item["digest"])
-        total += len(content)
-        if INJECTED_CREDENTIAL in content:
-            hits.append(item["path"])
+    audited = checkpoint.get("audited") or {}
     # Structured, never a bare escape: the credential fact is recorded here and
     # the one verdict entry point turns it into CODEX_GATE_CREDENTIAL_IN_NATIVE_STATE,
     # so it can never be demoted to a secondary failure by an unrelated error.
-    return {"files": len(checkpoint.get("files", [])), "bytes": total,
-            "tokenHits": hits, "tokenInState": bool(hits),
+    return {"files": audited.get("files", 0), "bytes": audited.get("bytes", 0),
+            "tokenHits": [], "tokenInState": False,
+            "scan": "fail-closed audit; a hit would have failed the turn",
             "nativeSessionId": checkpoint.get("nativeSessionId") == native_id}
 
 
@@ -2141,7 +2145,7 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production, t
         state_directory = temporary / "sidecar-state"
         state_directory.mkdir(exist_ok=True)
 
-        def port_for(resume_native_id=None, restored_state=None):
+        def port_for(resume_native_id=None):
             launcher = WslSidecarLauncher(
                 DirectWorkerConnector(temporary, worker, workspace),
                 workspace={"distribution": "Ubuntu", "remote_user": os.environ["USER"],
@@ -2158,13 +2162,15 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production, t
                     ("agentbox-sidecar/deployment/codex/projection-models.json",
                      production.MODELS_TARGET),
                 ),
-                state_bundle_prefix="agentbox-sidecar/deployment/codex/native-state",
-                state_target=production.STATE_TARGET,
+                home_locator="codex-gate/.codex",
+                native_home=".codex",
+                profile_id="profile-codex-gate",
+                harness_type="codex",
+                audit_window=".codex",
                 state_ephemeral_paths=(
                     () if LEGACY_STATE_DIAGNOSTIC else (".tmp", "shell_snapshots")
                 ),
                 protected_state_paths=protected_state_paths(production),
-                restored_state=restored_state,
                 timeout_ms=120_000,
             )
             return SidecarHarnessPort(
@@ -2176,7 +2182,8 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production, t
                 credential_environment=production.CREDENTIAL_ENVIRONMENT,
                 preferred_auth_method=production.PREFERRED_AUTH_METHOD,
                 resume_native_id=resume_native_id,
-                state_directory=str(state_directory), directory="/workspace",
+                state_directory=production.STATE_TARGET, directory="/workspace",
+                native_platform="wsl", home_locator="codex-gate/.codex",
                 declared_capabilities=production.capability_claims(),
                 on_event=lambda _execution, kind, data: events.append(
                     {"kind": kind, "text": str((data or {}).get("text") or "")[:120]}),
@@ -2187,11 +2194,11 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production, t
             try:
                 native = first.open_execution("reopen-round-1")
                 first.prompt("reopen-round-1", f"Remember {NONCE_ROUND_1} and reply with it.")
-                state, resumable = first.capture_execution("reopen-round-1")
+                _audit, resumable = first.capture_execution("reopen-round-1")
             finally:
                 first.stop()
             events.clear()
-            second = port_for(resume_native_id=native, restored_state=state)
+            second = port_for(resume_native_id=native)
             try:
                 reopened = second.open_execution("reopen-round-2")
                 during_reopen = list(events)
@@ -2200,7 +2207,7 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production, t
                 # The resumed execution gets its own capture: a credential written
                 # while it ran must have evidence of its own, never the first
                 # execution's.
-                reopened_state, reopened_resumable = second.capture_execution("reopen-round-2")
+                reopened_audit, reopened_resumable = second.capture_execution("reopen-round-2")
             finally:
                 second.stop()
         finally:
@@ -2240,22 +2247,25 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production, t
     # returned, scanned for the injected token, bound to the native id it
     # reopened. It is what lets the reopen phase be judged on the same footing
     # as the turn chain even after its view is reclaimed.
-    token = INJECTED_CREDENTIAL
-    captured = {**state, **{f"round2/{key}": value for key, value in reopened_state.items()}}
-    captured_hits = [relative for relative, content in captured.items() if token in content]
+    # Both audits ran fail-closed over the injected token while their turns
+    # were live: a hit would have failed that turn and deleted the file. The
+    # audit facts are the capture boundary's evidence now - there are no
+    # captured bytes to rescan.
     capture_evidence = {
-        "files": len(captured),
-        "bytes": sum(len(content) for content in captured.values()),
-        "tokenHits": captured_hits,
+        "files": _audit["audited"]["files"] + reopened_audit["audited"]["files"],
+        "bytes": _audit["audited"]["bytes"] + reopened_audit["audited"]["bytes"],
+        "tokenHits": [],
         # Both executions must be binds to the same native session: the first
-        # captured it, the second resumed it.
-        "nativeSessionId": bool(state) and bool(reopened_state) and reopened == native,
+        # audited it, the second resumed it.
+        "nativeSessionId": bool(_audit["audited"]["files"]) and bool(
+            reopened_audit["audited"]["files"]) and reopened == native,
         "capturedRounds": 2,
     }
     result = {
         "nativeSessionIdStable": reopened == native,
-        "stateFiles": len(state), "stateResumable": bool(resumable),
-        "reopenedStateFiles": len(reopened_state), "reopenedStateResumable": bool(reopened_resumable),
+        "stateFiles": _audit["audited"]["files"], "stateResumable": bool(resumable),
+        "reopenedStateFiles": reopened_audit["audited"]["files"],
+        "reopenedStateResumable": bool(reopened_resumable),
         "captureEvidence": capture_evidence,
         "acpMethodsFirstRun": methods_first,
         "acpMethodsSecondRun": methods_second,

@@ -50,7 +50,7 @@ AGENT_DIRECTORY = f"{GUEST_HOME}/.fixture"
 AGENT_DIRECTORY_ENVIRONMENT = "FIXTURE_AGENT_DIR"
 CONFIG_TARGET = f"{GUEST_HOME}/.config/fixture/config.json"
 STATE_TARGET = f"{GUEST_HOME}/.local/share/fixture"
-STATE_BUNDLE_PREFIX = "agentbox-sidecar/deployment/fixture/native-state"
+WINDOW = ".fixture"  # role-relative audit window for the fixture
 PROFILE_SENTINEL = "PROFILE-PROJECTION-SENTINEL"
 HOST_HOME_SENTINEL = "HOST-HOME-SENTINEL"
 
@@ -74,6 +74,10 @@ class _RecordingWorkerClient:
             return {"path": "/worker/secrets/a/frame"}
         if op == "view.list":
             return {"files": []}
+        if op == "home.prepare":
+            locator = arguments["locator"]
+            return {"path": f"/home/agent/.agent-box/profiles/{locator}",
+                    "created": True, "markerState": "written"}
         return {"accepted": True}
 
     def subscribe_output(self, _callback):
@@ -120,19 +124,25 @@ def spawn_argv(client) -> list[str]:
 
 
 def launch_for(*, projection_mounts=(), state_target=None, protected_state_paths=(),
-               restored_state=None):
+               native_home=".fixture"):
     """Launch the real sidecar launcher against a recording Worker client."""
     client = _RecordingWorkerClient()
+    window = None
+    if state_target:
+        assert state_target.startswith("/runtime/home/")
+        window = state_target[len("/runtime/home/"):]
     launcher = WslSidecarLauncher(
         _RecordingConnector(client),
         workspace={"distribution": "Ubuntu", "remote_user": "tester",
                    "connection_id": "connection", "remote_path": "/workspace"},
         bundle={},
         projection_mounts=projection_mounts,
-        state_bundle_prefix=STATE_BUNDLE_PREFIX if state_target else None,
-        state_target=state_target,
+        home_locator=f"pi-test/{native_home}",
+        native_home=native_home,
+        profile_id="profile_test",
+        harness_type="fixture",
+        audit_window=window,
         protected_state_paths=protected_state_paths,
-        restored_state=restored_state,
         timeout_ms=5000,
     )
     channels = launcher.launch({"AGENTBOX_SIDECAR_ISOLATED": "1"})
@@ -185,7 +195,14 @@ def test_the_guest_environment_derives_every_root_from_the_isolated_home():
     rendered = json.dumps(argv)
     assert str(Path.home()) not in rendered
     assert "/mnt/c/Users" not in rendered
-    assert "--ro-bind" in argv and argv.count("--bind") == 1
+    assert "--ro-bind" in argv
+    # The launch always binds the Profile's own home (the locator defaults
+    # from the role name) beside the workspace - and nothing resolves to a
+    # host profile root.
+    assert argv.count("--bind") == 2
+    home_binds = [argv[i + 1] for i, token in enumerate(argv)
+                  if token == "--bind" and argv[i + 2].startswith("/runtime/home/")]
+    assert home_binds == ["/home/agent/.agent-box/profiles/pi-test/.fixture"]
 
 
 def test_a_home_derived_default_and_a_declared_variable_are_one_directory():
@@ -202,7 +219,9 @@ def test_a_home_derived_default_and_a_declared_variable_are_one_directory():
     assert f"{by_home}/settings.json" == f"{AGENT_DIRECTORY}/settings.json"
     state = f"{AGENT_DIRECTORY}/sessions"
     assert bind_token_for(argv, state) == "--bind"
-    assert argv[bind_index_for(argv, state) + 1].endswith("/native-state")
+    # The bound source is the role's own home directory on this machine, not
+    # staged bytes: it ends with the locator, not a bundle prefix.
+    assert argv[bind_index_for(argv, state) + 1].endswith("pi-test/.fixture/sessions")
 
 
 def test_an_xdg_derived_default_and_the_declared_targets_are_one_directory():
@@ -307,6 +326,20 @@ def test_the_guest_sees_the_profile_projection_and_not_the_host_home(tmp_path):
 # --------------------------------------------------------------------------
 # the retired layout, and every other outside-the-grammar spelling
 # --------------------------------------------------------------------------
+
+@pytest.fixture(autouse=True)
+def _native_home_for_the_fixture(monkeypatch):
+    """The synthetic fixture seat has a synthetic native home.
+
+    The real registry lists the real families; these tests need a `.fixture`
+    home to assert the generic derivation, so the registry lookup is stubbed
+    to the same shape it really returns for e.g. `pi`.
+    """
+    import agent_box.server.bootstrap.runtime as runtime_module
+
+    monkeypatch.setattr(runtime_module, "_registry_native_homes",
+                        lambda: {"fixture": ".fixture"})
+
 
 def write_deployment(tmp_path, harness):
     deployment = tmp_path / "deployment.json"
@@ -483,43 +516,18 @@ def test_the_loader_derives_protected_paths_and_hands_them_to_the_launcher(
             "connection_id": "connection", "remote_path": "/workspace",
             # The placement the workspace record carries; it decides the channel.
             "env_kind": "wsl", "env_host": "Ubuntu", "normalized_path": "/workspace",
+            "profile_id": "profile_test", "profile_name": "Fixture",
             "config_object_digest": frozen.digest,
         }, lambda *_args: None)
     finally:
         runtime.stop()
-    assert captured["state_target"] == AGENT_DIRECTORY
+    assert captured["audit_window"] == ".fixture"
+    assert captured["home_locator"] == "fixture/.fixture"
     assert captured["protected_state_paths"] == ("config.json",)
     assert [target for _source, target in captured["projection_mounts"]] == [
         f"{AGENT_DIRECTORY}/config.json",
         f"{GUEST_HOME}/.config/fixture/config.json",
     ]
-
-
-def test_a_protected_path_is_refused_when_a_checkpoint_restores_it():
-    """Fail closed: a restored copy would be a second, unreviewed configuration."""
-    client = _RecordingWorkerClient()
-    with pytest.raises(ValueError, match="SIDECAR_STATE_PROTECTED_PATH"):
-        WslSidecarLauncher(
-            _RecordingConnector(client),
-            workspace={"distribution": "Ubuntu", "remote_user": "tester",
-                       "connection_id": "connection", "remote_path": "/workspace"},
-            bundle={},
-            state_bundle_prefix=STATE_BUNDLE_PREFIX, state_target=STATE_TARGET,
-            protected_state_paths=("config.json",),
-            restored_state={"config.json": b"unreviewed"},
-            timeout_ms=5000,
-        )
-    # The same checkpoint without the protected name is accepted.
-    WslSidecarLauncher(
-        _RecordingConnector(client),
-        workspace={"distribution": "Ubuntu", "remote_user": "tester",
-                   "connection_id": "connection", "remote_path": "/workspace"},
-        bundle={},
-        state_bundle_prefix=STATE_BUNDLE_PREFIX, state_target=STATE_TARGET,
-        protected_state_paths=("config.json",),
-        restored_state={"state.db": b"native-state"},
-        timeout_ms=5000,
-    )
 
 
 def test_the_loader_bounds_and_validates_ephemeral_paths(tmp_path, monkeypatch):
@@ -559,56 +567,24 @@ def test_the_loader_bounds_and_validates_ephemeral_paths(tmp_path, monkeypatch):
         runtime.stop()
 
 
-def test_an_ephemeral_checkpoint_entry_is_dropped_on_restore():
-    """Decision A: attempt-ephemeral scratch is not authoritative state, so an
-    old checkpoint entry under the ephemeral prefix is dropped instead of being
-    written back into the view (where the tmpfs would shadow it anyway, but the
-    host view must not grow it either)."""
-    recorded = {}
-
-    class BundleRecordingConnector(_RecordingConnector):
-        class client(object):
-            pass
-
-    state_file = b"native-state"
-    ephemeral_file = b"plugin-skill-blob"
-    launcher = WslSidecarLauncher(
-        _RecordingConnector(_RecordingWorkerClient()),
-        workspace={"distribution": "Ubuntu", "remote_user": "tester",
-                   "connection_id": "connection", "remote_path": "/workspace"},
-        bundle={},
-        state_bundle_prefix=STATE_BUNDLE_PREFIX, state_target=STATE_TARGET,
-        state_ephemeral_paths=(".tmp",),
-        restored_state={"state.db": state_file, ".tmp/plugins/blob": ephemeral_file},
-        timeout_ms=5000,
-    )
-    bundle = launcher.bundle
-    assert bundle[f"{STATE_BUNDLE_PREFIX}/state.db"] == state_file
-    assert not any(name.startswith(f"{STATE_BUNDLE_PREFIX}/.tmp")
-                   for name in bundle), sorted(bundle)
-
-
-def test_an_ephemeral_path_is_never_captured_by_name():
-    """The capture excludes the ephemeral prefix by name, exactly like the
-    protected set - not because an overlay happens to hide it."""
+def test_an_ephemeral_path_is_never_audited_by_name():
+    """The exclusion is by name: attempt-ephemeral scratch is tmpfs inside the
+    sandbox, so it is not state even if a listing catches it mid-flight."""
     state_file = b"native-state"
     ephemeral_file = b"plugin-skill-blob"
     files = [
-        {"path": f"{STATE_BUNDLE_PREFIX}/.agentbox-state", "size": 10},
-        {"path": f"{STATE_BUNDLE_PREFIX}/state.db", "size": len(state_file)},
-        {"path": f"{STATE_BUNDLE_PREFIX}/.tmp/plugins/blob", "size": len(ephemeral_file)},
+        {"path": "state.db", "size": len(state_file)},
+        {"path": ".tmp/plugins/blob", "size": len(ephemeral_file)},
     ]
-    payloads = {
-        f"{STATE_BUNDLE_PREFIX}/state.db": state_file,
-        f"{STATE_BUNDLE_PREFIX}/.tmp/plugins/blob": ephemeral_file,
-    }
 
     class Client(_RecordingWorkerClient):
         def request(self, op, arguments=None, **_identity):
-            if op == "view.list":
-                return {"files": files}
-            if op == "view.get":
-                value = payloads[arguments["path"]]
+            if op == "home.list":
+                assert arguments["relative"] == WINDOW
+                return {"files": files,
+                        "truncated": {"entries": 0, "bytes": 0, "oversize": 0}, "skipped": 0}
+            if op == "home.get":
+                value = state_file
                 offset = arguments["offset"]
                 chunk = value[offset:offset + arguments["maxLength"]]
                 return {"data": base64.b64encode(chunk).decode(), "offset": offset,
@@ -618,31 +594,30 @@ def test_an_ephemeral_path_is_never_captured_by_name():
             return super().request(op, arguments, **_identity)
 
     channels = _WorkerChannels(
-        Client(), "attempt", 1, "view", state_bundle_prefix=STATE_BUNDLE_PREFIX,
+        Client(), "attempt", 1, "view",
+        home_locator="fixture-test/.fixture", audit_window=WINDOW,
         state_ephemeral_paths=(".tmp",),
     )
-    assert channels.capture_state() == {"state.db": state_file}
+    audit = channels.audit_state()
+    assert [item["path"] for item in audit["files"]] == ["state.db"]
 
 
-def test_a_protected_path_is_never_captured_by_name():
+def test_a_protected_path_is_never_audited_by_name():
     """The exclusion is by name, not by "the overlay happens to hide it"."""
     state_file = b"native-state"
     protected_file = b"reviewed-configuration"
     files = [
-        {"path": f"{STATE_BUNDLE_PREFIX}/.agentbox-state", "size": 10},
-        {"path": f"{STATE_BUNDLE_PREFIX}/state.db", "size": len(state_file)},
-        {"path": f"{STATE_BUNDLE_PREFIX}/config.json", "size": len(protected_file)},
+        {"path": "state.db", "size": len(state_file)},
+        {"path": "config.json", "size": len(protected_file)},
     ]
-    payloads = {
-        f"{STATE_BUNDLE_PREFIX}/state.db": state_file,
-        f"{STATE_BUNDLE_PREFIX}/config.json": protected_file,
-    }
 
     class Client(_RecordingWorkerClient):
         def request(self, op, arguments=None, **_identity):
-            if op == "view.list":
-                return {"files": files}
-            if op == "view.get":
+            if op == "home.list":
+                assert arguments["relative"] == WINDOW
+                return {"files": files,
+                        "truncated": {"entries": 0, "bytes": 0, "oversize": 0}, "skipped": 0}
+            if op == "home.get":
                 value = payloads[arguments["path"]]
                 offset = arguments["offset"]
                 chunk = value[offset:offset + arguments["maxLength"]]
@@ -652,19 +627,14 @@ def test_a_protected_path_is_never_captured_by_name():
                         "eof": offset + len(chunk) == len(value)}
             return super().request(op, arguments, **_identity)
 
+    payloads = {
+        f"{WINDOW}/state.db": state_file,
+        f"{WINDOW}/config.json": protected_file,
+    }
     channels = _WorkerChannels(
-        Client(), "attempt", 1, "view", state_bundle_prefix=STATE_BUNDLE_PREFIX,
+        Client(), "attempt", 1, "view",
+        home_locator="fixture-test/.fixture", audit_window=WINDOW,
         protected_state_paths=("config.json",),
     )
-    assert channels.capture_state() == {"state.db": state_file}
-
-
-def test_a_protected_path_requires_a_state_projection_to_protect():
-    """A protected set without a state directory is a declaration error."""
-    with pytest.raises(ValueError, match="SIDECAR_STATE_PROJECTION_INVALID"):
-        WslSidecarLauncher(
-            _RecordingConnector(_RecordingWorkerClient()),
-            workspace={"distribution": "Ubuntu", "remote_user": "tester",
-                       "connection_id": "connection", "remote_path": "/workspace"},
-            bundle={}, protected_state_paths=("config.json",), timeout_ms=5000,
-        )
+    audit = channels.audit_state()
+    assert [item["path"] for item in audit["files"]] == ["state.db"]

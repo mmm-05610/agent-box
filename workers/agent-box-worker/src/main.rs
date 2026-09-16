@@ -120,9 +120,11 @@ async fn main() -> io::Result<()> {
     // on exit; the two must never be nested, or one lifetime would destroy the
     // other's facts.
     let home_root = match home_root {
-        Some(path) => canonical_directory(Path::new(&path))?,
+        Some(path) => Path::new(&path).to_path_buf(),
         None => default_home_root()?,
     };
+    fs::create_dir_all(&home_root)?;
+    let home_root = canonical_directory(&home_root)?;
     ensure_home_outside_root(&home_root, &root)?;
     let ephemeral = workspace.is_none();
     let outcome = serve(root.clone(), workspace, home_root, result_ttl_secs).await;
@@ -329,7 +331,7 @@ async fn serve(
                             Err((code, message)) => write_error_for(&mut output, sequence, &request.request_id, code, message).await?,
                         }
                     }
-                    "home.prepare" | "home.list" | "home.get" => {
+                    "home.prepare" | "home.list" | "home.get" | "home.delete" => {
                         match handle_home(&home_root, &request.op, &request.arguments) {
                             Ok(value) => write_response(&mut output, sequence, &request.request_id, value).await?,
                             Err((code, message)) => write_error_for(&mut output, sequence, &request.request_id, code, message).await?,
@@ -355,7 +357,7 @@ async fn serve(
                             write_error_for(&mut output, sequence, &request.request_id, "WORKSPACE_UNAUTHORIZED", "worker has no authorized workspace").await?; sequence += 1; continue;
                         };
                         let spec = match parse_spawn(
-                            &request.arguments, &workspace, &root,
+                            &request.arguments, &workspace, &root, &home_root,
                             &authorized_executables, &authorized_artifacts,
                         ) {
                             Ok(value) => value,
@@ -845,6 +847,7 @@ fn parse_spawn(
     value: &Value,
     workspace: &Path,
     root: &Path,
+    home_root: &Path,
     authorized_executables: &[PathBuf],
     authorized_artifacts: &[VerifiedArtifact],
 ) -> Result<SpawnArgs, (&'static str, &'static str)> {
@@ -877,6 +880,7 @@ fn parse_spawn(
         &spec.argv,
         workspace,
         root,
+        &home_root,
         authorized_executables,
         authorized_artifacts,
     )?;
@@ -893,6 +897,7 @@ fn validate_bwrap(
     argv: &[String],
     workspace: &Path,
     root: &Path,
+    home_root: &Path,
     authorized_executables: &[PathBuf],
     authorized_artifacts: &[VerifiedArtifact],
 ) -> Result<(), (&'static str, &'static str)> {
@@ -944,8 +949,14 @@ fn validate_bwrap(
                     && Path::new("/etc/resolv.conf")
                         .canonicalize()
                         .is_ok_and(|value| source == value && source.is_file());
+                // The Profile's durable home is a third authorized root: it
+                // is created and marker-verified by this Worker's own
+                // `home.prepare`, and binding it read-write into the room is
+                // exactly the native-home contract.
+                let in_home = argv[i] == "--bind" && source.starts_with(&home_root);
                 if !system
                     && !wsl_resolver
+                    && !in_home
                     && !source.starts_with(workspace)
                     && !source.starts_with(root)
                     && !authorized_executables.contains(&source)
@@ -1816,7 +1827,9 @@ struct HomeMarker {
 /// locator, it is an escape.
 fn home_locator(value: &str) -> Result<Vec<String>, (&'static str, &'static str)> {
     let segments: Vec<&str> = value.split('/').collect();
-    if segments.is_empty() || segments.len() > 2 || segments.iter().any(|s| s.is_empty()) {
+    // One role segment plus the registry's native home, which may itself be
+    // nested (`.config/opencode`), so up to 6 segments are well-formed.
+    if segments.is_empty() || segments.len() > 6 || segments.iter().any(|s| s.is_empty()) {
         return Err(("HOME_LOCATOR_INVALID", "home locator is invalid"));
     }
     for segment in &segments {
@@ -1876,7 +1889,51 @@ fn handle_home(
 ) -> Result<Value, (&'static str, &'static str)> {
     let locator = value_string(args, "locator")?;
     let dir = home_dir(home_root, locator)?;
+    // Every path in the home ops is relative to the role directory, not to
+    // the native home: a Harness's declared audit window may name another
+    // subtree of the same role (OpenCode's data lives under
+    // `.local/share/opencode` while its native home is `.config/opencode`),
+    // and a role-relative path covers both without a second authority.
+    let role_dir = home_root.join(home_locator(locator)?[0].clone());
     match op {
+        "home.delete" => {
+            // The one destructive home operation, and it deletes exactly one
+            // regular file: the credential rule is "a hit file is removed, and
+            // nothing else is touched". Links are never followed, directories
+            // are never removed here.
+            ensure_inside_home_root(home_root, &role_dir)?;
+            let relative = safe_relative(value_string(args, "path")?)?;
+            let dir_fd =
+                fs::File::open(&role_dir).map_err(|_| ("HOME_NOT_FOUND", "home does not exist"))?;
+            let parent = match relative.parent() {
+                Some(parent) if !parent.as_os_str().is_empty() => {
+                    open_beneath(dir_fd.as_raw_fd(), parent, true)?
+                }
+                _ => dir_fd
+                    .try_clone()
+                    .map_err(|_| ("HOME_IO", "home open failed"))?,
+            };
+            let name = relative
+                .file_name()
+                .ok_or(("PATH_INVALID", "relative path is invalid"))?
+                .to_owned();
+            let c_name = std::ffi::CString::new(name.as_bytes())
+                .map_err(|_| ("PATH_INVALID", "relative path is invalid"))?;
+            let removed = unsafe { libc::unlinkat(parent.as_raw_fd(), c_name.as_ptr(), 0) };
+            if removed != 0 {
+                let error = std::io::Error::last_os_error();
+                return Err(match error.raw_os_error() {
+                    Some(libc::EISDIR) | Some(libc::EPERM) => {
+                        ("HOME_IO", "only a regular file may be removed from a home")
+                    }
+                    _ if error.kind() == io::ErrorKind::NotFound => {
+                        ("VIEW_MISSING", "home entry is not there")
+                    }
+                    _ => ("HOME_IO", "home entry removal failed"),
+                });
+            }
+            Ok(json!({"deleted": value_string(args, "path")?}))
+        }
         "home.prepare" => {
             let marker: HomeMarker =
                 serde_json::from_value(args.get("marker").cloned().unwrap_or(Value::Null))
@@ -1935,13 +1992,16 @@ fn handle_home(
                     (false, "verified")
                 }
             };
-            // The audit window (the stateProjection target minus the native
+            // The audit window (the stateProjection target minus the guest
             // home prefix) must exist before the harness starts: harnesses
             // differ in what they do with a missing directory, and the window
-            // is ours to own, not theirs.
+            // is ours to own, not theirs. It is role-relative, so it covers a
+            // window outside the native home too - OpenCode's data lives under
+            // `.local/share/opencode` while its native home is
+            // `.config/opencode`.
             if let Some(window) = args.get("window").and_then(Value::as_str) {
                 let relative = safe_relative(window)?;
-                let target = dir.join(&relative);
+                let target = role_dir.join(&relative);
                 fs::create_dir_all(&target)
                     .map_err(|_| ("HOME_IO", "home window creation failed"))?;
                 ensure_inside_home_root(home_root, &target)?;
@@ -1949,9 +2009,9 @@ fn handle_home(
             Ok(json!({"path": dir, "created": created, "markerState": marker_state}))
         }
         "home.list" | "home.get" => {
-            ensure_inside_home_root(home_root, &dir)?;
+            ensure_inside_home_root(home_root, &role_dir)?;
             let dir_fd =
-                fs::File::open(&dir).map_err(|_| ("HOME_NOT_FOUND", "home does not exist"))?;
+                fs::File::open(&role_dir).map_err(|_| ("HOME_NOT_FOUND", "home does not exist"))?;
             if op == "home.get" {
                 let relative = safe_relative(value_string(args, "path")?)?;
                 let file = read_view_entry(dir_fd.as_raw_fd(), &relative)?;
@@ -2589,7 +2649,7 @@ mod home_tests {
         let arguments = json!({
             "locator": "pi-test/.pi",
             "marker": marker(),
-            "window": "agent/sessions",
+            "window": ".pi/agent/sessions",
         });
         let prepared = handle_home(&root, "home.prepare", &arguments).unwrap();
         let home = PathBuf::from(prepared["path"].as_str().unwrap());
@@ -2603,7 +2663,7 @@ mod home_tests {
         let arguments = json!({
             "locator": "pi-test/.pi",
             "marker": marker(),
-            "window": "sessions",
+            "window": ".pi/sessions",
         });
         handle_home(&root, "home.prepare", &arguments).unwrap();
         let home = root.join("pi-test").join(".pi");
@@ -2614,7 +2674,9 @@ mod home_tests {
         assert_eq!(listed["skipped"], json!(1));
         assert_eq!(listed["truncated"]["entries"], json!(0));
         let files = listed["files"].as_array().unwrap();
-        assert_eq!(files.len(), 2);
+        // The role-relative listing also sees the ownership marker; the
+        // Server's audit excludes it by name, the Worker just reports.
+        assert_eq!(files.len(), 3);
         assert!(files
             .iter()
             .all(|file| file["digest"].as_str().unwrap().starts_with("sha256:")));
@@ -2622,7 +2684,7 @@ mod home_tests {
         let window = handle_home(
             &root,
             "home.list",
-            &json!({"locator": "pi-test/.pi", "relative": "sessions"}),
+            &json!({"locator": "pi-test/.pi", "relative": ".pi/sessions"}),
         )
         .unwrap();
         assert_eq!(window["files"].as_array().unwrap().len(), 2);
@@ -2642,7 +2704,7 @@ mod home_tests {
         // bytes are counted, and nothing was read from it.
         assert_eq!(listed["truncated"]["oversize"], json!(1));
         assert!(listed["truncated"]["entries"].as_u64().unwrap() >= 1);
-        assert_eq!(listed["files"].as_array().unwrap().len(), 0);
+        assert_eq!(listed["files"].as_array().unwrap().len(), 1);
         let _ = fs::remove_dir_all(&big);
         let _ = fs::remove_dir_all(&root);
     }
@@ -2657,7 +2719,7 @@ mod home_tests {
         let chunk = handle_home(
             &root,
             "home.get",
-            &json!({"locator": "pi-test/.pi", "path": "journal.jsonl",
+            &json!({"locator": "pi-test/.pi", "path": ".pi/journal.jsonl",
                     "offset": 4, "maxLength": 4}),
         )
         .unwrap();
@@ -2672,7 +2734,7 @@ mod home_tests {
         let missing = handle_home(
             &root,
             "home.get",
-            &json!({"locator": "pi-test/.pi", "path": "no-such-file",
+            &json!({"locator": "pi-test/.pi", "path": ".pi/no-such-file",
                     "offset": 0, "maxLength": 8}),
         )
         .unwrap_err();
@@ -2715,6 +2777,43 @@ mod home_tests {
         assert!(ensure_home_outside_root(&separate, &other).is_ok());
         let _ = fs::remove_dir_all(&separate);
         let _ = fs::remove_dir_all(&other);
+    }
+
+    #[test]
+    fn delete_removes_one_regular_file_and_nothing_else() {
+        let root = scratch("home-delete");
+        let arguments = json!({"locator": "pi-test/.pi", "marker": marker()});
+        handle_home(&root, "home.prepare", &arguments).unwrap();
+        let home = root.join("pi-test").join(".pi");
+        fs::write(home.join("leaked.txt"), b"secret bytes").unwrap();
+        fs::create_dir_all(home.join("keep").join("me")).unwrap();
+        fs::write(home.join("keep").join("me").join("state.db"), b"keep").unwrap();
+        let removed = handle_home(
+            &root,
+            "home.delete",
+            &json!({"locator": "pi-test/.pi", "path": ".pi/leaked.txt"}),
+        )
+        .unwrap();
+        assert_eq!(removed["deleted"], json!(".pi/leaked.txt"));
+        assert!(!home.join("leaked.txt").exists());
+        assert!(home.join("keep").join("me").join("state.db").is_file());
+        // A directory is never a deletion target, and a second delete of the
+        // same name is a typed miss rather than a silent success.
+        let directory = handle_home(
+            &root,
+            "home.delete",
+            &json!({"locator": "pi-test/.pi", "path": ".pi/keep"}),
+        )
+        .unwrap_err();
+        assert_eq!(directory.0, "HOME_IO");
+        let twice = handle_home(
+            &root,
+            "home.delete",
+            &json!({"locator": "pi-test/.pi", "path": ".pi/leaked.txt"}),
+        )
+        .unwrap_err();
+        assert_eq!(twice.0, "VIEW_MISSING");
+        let _ = fs::remove_dir_all(&root);
     }
 
     #[test]

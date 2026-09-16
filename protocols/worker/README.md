@@ -19,16 +19,22 @@ Generation 4 adds the persistent home operation family. A Profile's native
 state lives in a durable directory on this machine — the machine that runs it —
 and the Worker is the only process that touches files there:
 
-- `home.prepare {locator, marker, window?}` resolves `locator` (`<role>` or
-  `<role>/<native-home>`, one to two segments, each `^[A-Za-z0-9._-]{1,64}$`,
-  `.` and `..` refused), creates the directory, and writes or verifies the
+- `home.prepare {locator, marker, window?}` resolves `locator` as
+  `<role>/<native-home>` - a role segment plus the registry's native home,
+  which may be nested (`.config/opencode` is two segments), up to six
+  segments of `^[A-Za-z0-9._-]{1,64}$` each, with `.` and `..` refused. It
+  creates the directory, and writes or verifies the
   ownership marker `<home root>/<role>/.agentbox-profile.json`
   (`markerState: "written" | "verified"`). A marker that names another product
   identity is a typed `HOME_MARKER_CONFLICT` refusal — two Profiles never share
   one home, and the Server translates this into its own
   `PROFILE_HOME_CONFLICT` wording. The optional `window` is a safe relative
-  path created with `mkdir -p` inside the home, so the declared audit window
-  exists before the Harness starts. The response's `path` is the resolved
+  path under the role directory (so it can name a declared audit window
+  outside the native home - OpenCode's data lives under
+  `.local/share/opencode` while its native home is `.config/opencode`),
+  created with `mkdir -p` before the Harness starts. Every path in
+  `home.list`, `home.get` and `home.delete` is role-relative for the same
+  reason. The response's `path` is the resolved
   absolute home directory; it is for the channel's mount decision only and is
   never recorded by the Server.
 - `home.list {locator, relative?}` walks the directory the way a view listing
@@ -39,6 +45,12 @@ and the Worker is the only process that touches files there:
   never a silent omission and never a refused turn.
 - `home.get {locator, path, offset, maxLength}` serves one bounded,
   digest-pinned chunk of one regular file, field-for-field like `view.get`.
+
+- `home.delete {locator, path}` removes exactly one regular file from the
+  home. It exists for the credential rule - an injected value found in a home
+  means "fail the turn, delete the one file that holds it, record the fact" -
+  and it deletes nothing else: directories, links and missing names are typed
+  refusals.
 
 Read-path refusals reuse the audited `view.*` code family; the home-specific
 codes are `HOME_LOCATOR_INVALID`, `HOME_OUTSIDE_ROOT` (a resolved home that

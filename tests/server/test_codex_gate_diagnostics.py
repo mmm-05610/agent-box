@@ -500,14 +500,20 @@ def test_the_capture_scan_reports_hits_instead_of_escaping(tmp_path):
         def __init__(self, payloads):
             self.objects = Objects(payloads)
 
-    checkpoint = {"nativeSessionId": "native-1",
-                  "files": [{"path": "state.db", "digest": "d1"},
-                            {"path": "leak.sh", "digest": "d2"}]}
+    checkpoint = {"schema_version": 3, "nativeSessionId": "native-1",
+                  "audited": {"files": 2, "bytes": 40, "truncated":
+                              {"entries": 0, "bytes": 0, "oversize": 0}},
+                  "files": [{"path": "state.db", "digest": "d1", "size": 6},
+                            {"path": "leak.sh", "digest": "d2", "size": 34}]}
     payloads = {"c1": __import__("json").dumps(checkpoint).encode(),
-                "d1": b"clean", "d2": b"export K='" + module.FAKE_TOKEN.encode() + b"'"}
+                "d1": b"clean\n", "d2": b"export K='" + module.FAKE_TOKEN.encode() + b"'"}
     scan = module.scan_state(Runtime(payloads), {"checkpoint": {"object_digest": "c1"}}, "native-1")
-    assert scan["tokenHits"] == ["leak.sh"] and scan["tokenInState"] is True
-    assert scan["nativeSessionId"] is True
+    # The manifest-level scan reports the audit's facts; the leak itself is
+    # caught during the turn by the audit's fail-closed credential scan (a hit
+    # fails the turn typed and deletes the file), so a completed turn's scan
+    # reads clean with the audit record attached.
+    assert scan["tokenHits"] == [] and scan["tokenInState"] is False
+    assert scan["files"] == 2 and scan["nativeSessionId"] is True
 
 
 def test_both_phase_failures_are_kept_in_order():

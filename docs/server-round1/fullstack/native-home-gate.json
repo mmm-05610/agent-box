@@ -1,0 +1,38 @@
+{
+ "code": "NATIVE_HOME_GATE_ROUND2_FAILED",
+ "deploymentDocument": {
+  "hostPaths": false,
+  "sha256": "sha256:e6e778f52829f50371cd4e3a074de158e6476cb3162b5df7f42e576b49f08db9"
+ },
+ "error": "EXECUTION_FAILED: [\"{'state': 'running'}\", \"{'checkpoint_native_id': 'stateful-13', 'checkpoint_object_digest': 'sha256:6fa7d66171f3788f919b78070262b6a0fe80febeb5c7f0c09d99f8a640ab98b2', 'result_object_digest': 'sha256:f76290693fe4e4ef375b4f2a4adb0919a72dfffe7b7af4952dfafbea3e9595fc', 'state': 'captured'}\", \"{'state': 'completed'}\", \"{'error_code': 'EXECUTION_FAILED', 'state': 'failed'}\", \"{'error_code': 'EXECUTION_FAILED', 'state': 'failed'}\"]",
+ "g1": "pass",
+ "g1HomeFile": {
+  "files": [
+   ".agentbox-profile.json",
+   ".pi/pi/c3RhdGVmdWwtMTM.json"
+  ],
+  "roleDir": "profiles/native-home-gate"
+ },
+ "g1Manifest": {
+  "files": [
+   "pi/c3RhdGVmdWwtMTM.json"
+  ],
+  "homeLocator": "native-home-gate/.pi",
+  "nativePlatform": "local",
+  "schemaVersion": 3,
+  "truncated": {
+   "bytes": 107,
+   "entries": 1,
+   "oversize": 0
+  }
+ },
+ "g1ObjectStore": {
+  "note": "deployment bundle + records only; state is not there",
+  "objects": 4
+ },
+ "homeLocator": "native-home-gate/.pi",
+ "reportPath": "docs/server-round1/fullstack/native-home-gate.json",
+ "result": "NATIVE_HOME_GATE_FAILED",
+ "script": "scripts/server-round1/native-home-gate.py",
+ "temporaryRoot": "/tmp/agentbox-native-home-gate-8_pbsyxu"
+}

@@ -60,8 +60,10 @@ def compose_sidecar_room(
     executable_mounts: Sequence[tuple[str, str]] = (),
     projection_mounts: Sequence[tuple[str, str]] = (),
     runtime_artifact_mounts: Sequence[tuple[str, str]] = (),
-    state_bundle_prefix: str | None = None,
+    state_home_source: str | None = None,
     state_target: str | None = None,
+    state_window_source: str | None = None,
+    state_window_target: str | None = None,
     state_ephemeral_paths: Sequence[str] = (),
 ) -> SandboxRoom:
     """Compose the launch plan for one sidecar execution.
@@ -71,18 +73,46 @@ def compose_sidecar_room(
     sources with their guest targets; this function performs the one join that
     turns a view-relative source into a bind source, so the caller never spells
     a guest layout itself.
+
+    ``state_home_source`` is the Profile's durable home directory on the
+    machine that runs this turn, bound read-write at ``state_target`` (the
+    deployment's declared native-home target inside the guest). It is a real
+    directory, not staged bytes: whatever the Harness writes here outlives the
+    attempt, which is the whole point of the native-home model. The depth
+    ordering is unchanged, so a read-only configuration that projects inside
+    the home still binds after - and therefore wins over - the home, and every
+    ephemeral path is still tmpfs-shadowed after both.
     """
     environment = guest_environment(base_environment)
+    #: Ephemeral paths are declared relative to the audit window (the
+    #: deployment's `stateProjection.target`), which is the window bind's guest
+    #: target when one is declared, and the native home's bind otherwise.
+    ephemeral_anchor = state_window_target or state_target
     writable_state_mount = (
-        (f"{staged_view}/{state_bundle_prefix}", str(state_target))
-        if state_bundle_prefix is not None and state_target is not None
+        (str(state_home_source), str(state_target))
+        if state_home_source is not None and state_target is not None
+        else None
+    )
+    # A declared audit window that is not inside the native home (OpenCode's
+    # data under `.local/share/opencode`, native home `.config/opencode`) is
+    # the same role's directory and is bound separately, read-write. The depth
+    # ordering below still decides who wins, so a read-only projection inside
+    # either bind keeps its authority.
+    writable_window_mount = (
+        (str(state_window_source), str(state_window_target))
+        if (state_window_source is not None and state_window_target is not None
+            and str(state_window_source) != str(state_home_source))
         else None
     )
     ephemeral_state_mounts = tuple(
-        f"{str(state_target).rstrip('/')}/{relative}"
+        f"{str(ephemeral_anchor).rstrip('/')}/{relative}"
         for relative in state_ephemeral_paths
-    ) if state_target is not None else ()
+    ) if ephemeral_anchor is not None else ()
 
+    writable_mounts = [
+        mount for mount in (writable_state_mount, writable_window_mount)
+        if mount is not None
+    ]
     argv = compile_remote_sidecar_bwrap_argv(
         workspace=workspace,
         runtime_view=staged_view,
@@ -93,7 +123,7 @@ def compose_sidecar_room(
             (f"{staged_view}/{source}", target) for source, target in projection_mounts
         ),
         runtime_artifact_mounts=runtime_artifact_mounts,
-        writable_projection_mounts=() if writable_state_mount is None else (writable_state_mount,),
+        writable_projection_mounts=tuple(writable_mounts),
         ephemeral_state_mounts=ephemeral_state_mounts,
     )
     return SandboxRoom(

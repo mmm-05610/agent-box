@@ -156,7 +156,7 @@ def test_port_turns_neutral_driver_deltas_into_product_facts(bundle, tmp_path):
         assert native == "fixture-native-1"
         port.prompt("execution-1", "hello driver")
         state, resumable = port.capture_execution("execution-1")
-        assert state == {}
+        assert state['files'] == [] and state['audited']['files'] == 0
         assert resumable is True
     finally:
         port.stop()
@@ -367,6 +367,10 @@ def test_deployment_carries_a_declared_driver_module_into_the_reviewed_bundle(tm
             },
         }],
     }), encoding="utf-8")
+    # A synthetic seat has no registry entry, so its native home is stubbed to
+    # the same shape the real registry returns for the real families.
+    monkeypatch.setattr(runtime_module, "_registry_native_homes",
+                        lambda: {"fixture-native": ".fixture-native"})
     runtime = runtime_module.build_runtime_from_sidecar_deployment(
         tmp_path / "server", deployment, plugin_root=tmp_path)
     try:
@@ -377,7 +381,8 @@ def test_deployment_carries_a_declared_driver_module_into_the_reviewed_bundle(tm
             "harness_type": "fixture-native", "config_object_digest": frozen.digest,
             "distribution": "Ubuntu", "remote_user": os.environ.get("USER", "user"),
             "connection_id": "connection", "remote_path": str(tmp_path),
-            "env_kind": "wsl",
+            "env_kind": "wsl", "profile_id": "profile_driver",
+            "profile_name": "fixture-native",
         }, lambda *_args: None)
         assert captured["adapter"]["driver"] == {"module": f"/runtime/view/{bundle_path}"}
         assert captured["adapter"]["command"] == "/runtime/bin/fixture-native"

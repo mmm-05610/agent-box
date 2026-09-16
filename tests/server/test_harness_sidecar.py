@@ -453,26 +453,6 @@ def test_sidecar_deployment_rejects_readonly_and_writable_target_collision(tmp_p
         build_runtime_from_sidecar_deployment(tmp_path / "server", deployment, plugin_root=PLUGIN)
 
 
-def test_sidecar_checkpoint_manifest_rejects_wrong_schema_and_bounds():
-    from agent_box.server.bootstrap.runtime import _restore_sidecar_state
-
-    class Objects:
-        def __init__(self, value): self.value = value
-        def read(self, _digest): return self.value
-
-    bad = [
-        {"schema_version": 1, "resumable": True, "nativeSessionId": "native", "files": []},
-        {"schema_version": 2, "resumable": True, "nativeSessionId": "native",
-         "files": [{"path": "../escape", "digest": "sha256:" + "0" * 64, "size": 1}]},
-    ]
-    for manifest in bad:
-        import json as _json
-        with pytest.raises(RuntimeError, match="SIDECAR_CHECKPOINT_INVALID"):
-            _restore_sidecar_state(Objects(_json.dumps(manifest)), {
-                "checkpoint_object_digest": "checkpoint", "checkpoint_native_id": "native",
-            }, enabled=True)
-
-
 def test_real_worker_bwrap_interactive_sidecar_streams_before_terminal(tmp_path):
     """Server channel → real Worker → bwrap → sidecar → fake ACP peer."""
     worker = REPO / "workers" / "agent-box-worker" / "target" / "debug" / "agent-box-worker"
@@ -483,6 +463,7 @@ def test_real_worker_bwrap_interactive_sidecar_streams_before_terminal(tmp_path)
         def client_for_workspace(self, **arguments):
             return WorkerClient(
                 [str(worker), "--root", str(tmp_path / "worker-root"),
+                 "--home-root", str(tmp_path / "profile-home"),
                  "--workspace", str(REPO)],
                 worker_digest="sha256:" + hashlib.sha256(worker.read_bytes()).hexdigest(),
                 worker_version="0.1.0", connection_id=arguments["connection_id"],
@@ -548,6 +529,7 @@ def test_server_core_real_worker_persists_stream_before_terminal(tmp_path, monke
         def client_for_workspace(self, **arguments):
             return WorkerClient(
                 [str(worker), "--root", str(tmp_path / "server-worker-root"),
+                 "--home-root", str(tmp_path / "profile-home"),
                  "--workspace", str(REPO)],
                 worker_digest="sha256:" + hashlib.sha256(worker.read_bytes()).hexdigest(),
                 worker_version="0.1.0", connection_id=arguments["connection_id"],
@@ -710,6 +692,7 @@ class _StatefulWslConnector:
     def client_for_workspace(self, **arguments):
         return WorkerClient(
             [str(self.worker), "--root", str(self.tmp_path / "worker-root"),
+             "--home-root", str(self.tmp_path / "profile-home"),
              "--workspace", str(REPO)],
             worker_digest="sha256:" + hashlib.sha256(self.worker.read_bytes()).hexdigest(),
             worker_version="0.1.0", connection_id=arguments["connection_id"],
@@ -755,18 +738,24 @@ def _checkpoint_manifest(runtime, session):
     return json.loads(runtime.objects.read(session["checkpoint"]["object_digest"]))
 
 
-def _reopen_method(runtime, session):
+def _reopen_method(runtime, session, *, home_root, window="sessions"):
     """The ACP operation the adapter last used to open the stored native Session.
 
-    The fixture appends every open it serves, so the last line is the method the
-    current round really sent — not the one this test assumed it would send.
+    The fixture appends every open it serves into its own home directory, and
+    the home is the single source of truth: the manifest supplies the locator
+    and the digest, and the file itself is read from the machine that owns it.
     """
     manifest = _checkpoint_manifest(runtime, session)
     entry = next(
         item for item in manifest["files"] if item["path"] == "reopen-method.txt"
     )
-    lines = [line for line in runtime.objects.read(entry["digest"]).decode().splitlines() if line]
-    assert lines, "the captured native state did not record the ACP reopen method"
+    # The window is role-relative under the machine's home root; the locator
+    # names the role directory. Reading the bytes here is the test verifying
+    # the home directly - the Server itself never carries them.
+    role = manifest["homeLocator"].split("/", 1)[0]
+    home_file = home_root / role / window / entry["path"]
+    lines = [line for line in home_file.read_text().splitlines() if line]
+    assert lines, "the home did not record the ACP reopen method"
     return lines[-1]
 
 
@@ -827,7 +816,10 @@ def test_real_worker_state_projection_resumes_two_fresh_sidecars(tmp_path, monke
                 time.sleep(0.02)
             assert session["turns"][0]["state"] == "completed", {"turn": session["turns"][0], "events": session["events"]}
             checkpoint = json.loads(runtime.objects.read(session["checkpoint"]["object_digest"]))
-            assert checkpoint["schema_version"] == 2 and checkpoint["resumable"] is True
+            assert checkpoint["schema_version"] == 3 and checkpoint["resumable"] is True
+            # The record references the home; it carries no state bytes itself.
+            assert checkpoint["nativePlatform"] == "wsl"
+            assert checkpoint["homeLocator"]
             assert checkpoint["harnessType"] == "pi" and checkpoint["files"]
             native_id = checkpoint["nativeSessionId"]
             second = client.post("/wire/v1/sessions.send", headers=headers, json={
@@ -848,7 +840,7 @@ def test_real_worker_state_projection_resumes_two_fresh_sidecars(tmp_path, monke
             # PI declares an authoritative journal, so the bridge reopens the stored
             # Session through the replaying `session/load` rather than `session/resume`.
             # The method the adapter really sent is read from the captured native state.
-            assert _reopen_method(runtime, session) == "session/load"
+            assert _reopen_method(runtime, session, home_root=tmp_path / "profile-home") == "session/load"
             events = [e for e in session["events"] if e.get("turn_id") == second["executionId"]]
             delta = next(e for e in events if e["kind"] == "message.delta")
             terminal = next(e for e in events if e["kind"] == "turn.state" and e["data"].get("state") == "completed")
@@ -878,7 +870,7 @@ def test_real_worker_state_projection_reopens_through_acp_resume(tmp_path, monke
                 "message": {"text": "remember STATEFUL-NONCE-RESUME-1", "attachments": []},
             })
             session = _wait_for_turn(runtime, first["session"]["id"], 0, "completed")
-            assert _reopen_method(runtime, session) == "session/new"
+            assert _reopen_method(runtime, session, home_root=tmp_path / "profile-home") == "session/new"
             native_id = session["checkpoint"]["native_id"]
             _wire_post(client, runtime.token, "sessions.send", {
                 "requestId": "resume-second", "sessionId": first["session"]["id"],
@@ -886,7 +878,7 @@ def test_real_worker_state_projection_reopens_through_acp_resume(tmp_path, monke
             })
             session = _wait_for_turn(runtime, first["session"]["id"], 1, "completed")
             assert session["checkpoint"]["native_id"] == native_id
-            assert _reopen_method(runtime, session) == "session/resume"
+            assert _reopen_method(runtime, session, home_root=tmp_path / "profile-home") == "session/resume"
     finally:
         runtime.stop()
     _await_worker_projection_cleanup(tmp_path / "worker-root")
@@ -895,100 +887,6 @@ def test_real_worker_state_projection_reopens_through_acp_resume(tmp_path, monke
 @pytest.mark.parametrize("poison", [
     "schema_version", "resumable", "native_id", "checkpoint_object", "state_object",
 ])
-def test_unusable_checkpoint_fails_the_turn_without_inventing_a_session(
-    tmp_path, monkeypatch, poison,
-):
-    """A checkpoint the Server cannot restore must fail the turn, never succeed.
-
-    The poisoned value is written straight into the authoritative session row, so
-    the second turn starts from a checkpoint that claims to be resumable for this
-    Harness and is not.
-    """
-    runtime = _stateful_real_worker_runtime(tmp_path, monkeypatch, harness_id="hermes")
-    try:
-        with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
-            headers = {"Authorization": f"Bearer {runtime.token}"}
-            opened = _wire_post(client, runtime.token, "workspaces.open", {
-                "requestId": "open-poison", "path": str(REPO),
-                "environment": {"kind": "wsl", "host": "Ubuntu", "user": os.environ["USER"]},
-            })["workspace"]
-            profile = client.post("/api/v1/profiles", headers={
-                **headers, "Idempotency-Key": "poison-profile",
-            }, json={"name": "poison", "harness_type": "hermes", "configuration": {},
-                     "credential_id": None}).json()
-            first = _wire_post(client, runtime.token, "sessions.createAndSend", {
-                "requestId": "poison-first", "workspaceId": opened["id"],
-                "profileId": profile["profile_id"], "overrides": [],
-                "message": {"text": "remember STATEFUL-NONCE-POISON-1", "attachments": []},
-            })
-            session = _wait_for_turn(runtime, first["session"]["id"], 0, "completed")
-            good_digest = session["checkpoint"]["object_digest"]
-            native_id = session["checkpoint"]["native_id"]
-            manifest = json.loads(runtime.objects.read(good_digest))
-
-            def publish(value):
-                return runtime.objects.publish(
-                    json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
-                ).digest
-
-            if poison == "schema_version":
-                poisoned = publish({**manifest, "schema_version": 1})
-            elif poison == "resumable":
-                poisoned = publish({**manifest, "resumable": False})
-            elif poison == "native_id":
-                poisoned = publish({**manifest, "nativeSessionId": "native-somebody-else"})
-            elif poison == "checkpoint_object":
-                poisoned = "sha256:" + "ab" * 32
-            else:
-                missing = {**manifest["files"][0], "digest": "sha256:" + "cd" * 32}
-                poisoned = publish({**manifest, "files": [missing]})
-            with runtime.database.transaction() as conn:
-                conn.execute(
-                    "UPDATE server_sessions SET checkpoint_object_digest=? WHERE id=?",
-                    (poisoned, first["session"]["id"]),
-                )
-
-            second = _wire_post(client, runtime.token, "sessions.send", {
-                "requestId": "poison-second", "sessionId": first["session"]["id"],
-                "overrides": [], "message": {"text": "recall", "attachments": []},
-            })
-            session = _wait_for_turn(runtime, first["session"]["id"], 1, "failed")
-            turn = session["turns"][1]
-            assert turn["id"] == second["executionId"]
-            # Core cannot prove from an extension that a rejected start had no side
-            # effect, so it records the dispatch as ambiguous and keeps the reason
-            # verbatim. The failed restore must therefore be visible in the durable
-            # dispatch ledger, and the only accepted dispatch in this Session must
-            # still be the first round's.
-            with runtime.database.read() as conn:
-                ledger = [
-                    (row["type"], json.loads(row["data_json"]))
-                    for row in conn.execute(
-                        "SELECT type,data_json FROM core_events WHERE type IN (?,?) "
-                        "ORDER BY occurred_at,id",
-                        (EventType.EXECUTION_DISPATCH_AMBIGUOUS.value,
-                         EventType.EXECUTION_DISPATCH_ACCEPTED.value),
-                    )
-                ]
-            ambiguous = [data for kind, data in ledger if kind == "ExecutionDispatchAmbiguous"]
-            accepted = [kind for kind, _data in ledger if kind == "ExecutionDispatchAccepted"]
-            assert len(ambiguous) == 1 and "SIDECAR_CHECKPOINT_INVALID" in ambiguous[0]["error"], ledger
-            assert len(accepted) == 1, ledger
-            assert turn["state"] == "failed"
-            assert [item["state"] for item in session["turns"]] == ["completed", "failed"]
-            # The failed restore neither replaced the checkpoint nor minted a native
-            # identity: the Session still points exactly where it did before it.
-            assert session["checkpoint"]["object_digest"] == poisoned
-            assert session["checkpoint"]["native_id"] == native_id
-            assert not any(
-                event["kind"] == "message.delta" and event.get("turn_id") == second["executionId"]
-                for event in session["events"]
-            )
-    finally:
-        runtime.stop()
-    _await_worker_projection_cleanup(tmp_path / "worker-root")
-
-
 def _local_sidecar_runtime(tmp_path, *, provider_model=False):
     registry = HarnessRegistry()
     registry.register(HarnessDescriptor(
@@ -1353,8 +1251,8 @@ def test_sidecar_reports_resume_only_when_the_harness_advertised_it(advertised, 
     )
     try:
         assert port.open_execution("exec-capability") == "native-fake"
-        captured = port.capture_execution("exec-capability")
-        assert captured == ({}, expected), (
+        _audit, resumable = port.capture_execution("exec-capability")
+        assert resumable is expected, (
             f"advertised {advertised!r} must read as resumable={expected}"
         )
     finally:
@@ -1665,17 +1563,22 @@ def test_worker_channels_does_not_retry_other_stdin_errors():
     assert len(client.writes) == 1
 
 
-class _StateCaptureClient:
-    def __init__(self, files, payloads):
+class _HomeAuditClient:
+    """A Worker-shaped home: `home.list` answers, `home.get` serves bytes."""
+
+    def __init__(self, files, payloads, *, truncated=None, skipped=0):
         self.files = files
         self.payloads = payloads
+        self.truncated = truncated or {"entries": 0, "bytes": 0, "oversize": 0}
+        self.skipped = skipped
         self.calls = []
+        self.deleted = []
 
     def request(self, op, arguments=None, **_identity):
         self.calls.append((op, arguments or {}))
-        if op == "view.list":
-            return {"files": self.files}
-        if op == "view.get":
+        if op == "home.list":
+            return {"files": self.files, "truncated": self.truncated, "skipped": self.skipped}
+        if op == "home.get":
             path = arguments["path"]
             value = self.payloads[path]
             offset = arguments["offset"]
@@ -1684,77 +1587,92 @@ class _StateCaptureClient:
                     "digest": "sha256:" + hashlib.sha256(value).hexdigest(),
                     "nextOffset": offset + len(chunk),
                     "eof": offset + len(chunk) == len(value)}
+        if op == "home.delete":
+            self.deleted.append(arguments["path"])
+            return {"deleted": arguments["path"]}
         return {"accepted": True}
-
-    def close(self):
-        pass
-
-    def close_stdin(self, *_args, **_kwargs):
-        pass
 
     def wait_terminal(self, *_args, **_kwargs):
         return {}
 
+    def close_stdin(self, *_args, **_kwargs):
+        pass
 
-def test_worker_channels_captures_declared_state_only_and_excludes_marker():
+    def close(self):
+        pass
+
+
+WINDOW = ".pi/agent/sessions"
+LOCATOR = "pi-test/.pi"
+
+
+def test_worker_channels_audit_records_the_declared_window():
     value = b"native-state"
-    prefix = "agentbox-sidecar/deployment/pi/native-state"
-    client = _StateCaptureClient([
-        {"path": prefix + "/.agentbox-state", "size": 10},
-        {"path": prefix + "/sessions/thread.jsonl", "size": len(value)},
-        {"path": "other/secret", "size": 99},
-    ], {prefix + "/sessions/thread.jsonl": value})
-    channels = _WorkerChannels(client, "attempt", 1, "view", state_bundle_prefix=prefix)
-    assert channels.capture_state() == {"sessions/thread.jsonl": value}
-
-
-@pytest.mark.parametrize("files", [
-    [{"path": "agentbox-sidecar/deployment/pi/native-state/x", "size": 8 * 1024 * 1024 + 1}],
-    [{"path": "agentbox-sidecar/deployment/pi/native-state/a/../x", "size": 1}],
-])
-def test_worker_channels_rejects_state_bounds_and_path_identity(files):
-    client = _StateCaptureClient(files, {files[0]["path"]: b"x"})
-    channels = _WorkerChannels(
-        client, "attempt", 1, "view",
-        state_bundle_prefix="agentbox-sidecar/deployment/pi/native-state",
+    client = _HomeAuditClient(
+        [{"path": "sessions/thread.jsonl", "size": len(value)}],
+        {f"{WINDOW}/sessions/thread.jsonl": value},
     )
-    with pytest.raises((SidecarError, ValueError)):
-        channels.capture_state()
+    channels = _WorkerChannels(client, "attempt", 1, "view",
+                               home_locator=LOCATOR, audit_window=WINDOW)
+    audit = channels.audit_state()
+    assert audit["files"] == [{"path": "sessions/thread.jsonl", "size": len(value),
+                               "digest": "sha256:" + hashlib.sha256(value).hexdigest()}]
+    # The listing asked for the declared window of this home, role-relative.
+    assert client.calls[0] == ("home.list", {"locator": LOCATOR, "relative": WINDOW})
 
 
-def test_worker_channels_rejects_state_digest_change_and_secret_bytes():
-    prefix = "agentbox-sidecar/deployment/pi/native-state"
+def test_worker_channels_audit_reports_truncation_instead_of_refusing():
+    # The Worker never lists an entry it had to truncate - the fact arrives in
+    # `truncated` - so the audit carries it through without re-reading.
+    client = _HomeAuditClient(
+        [], {},
+        truncated={"entries": 1, "bytes": 8 * 1024 * 1024 + 1, "oversize": 1},
+    )
+    channels = _WorkerChannels(client, "attempt", 1, "view",
+                               home_locator=LOCATOR, audit_window=WINDOW)
+    audit = channels.audit_state()
+    assert audit["files"] == [] and audit["truncated"]["oversize"] == 1
+
+
+def test_worker_channels_audit_scans_for_credential_material_fail_closed():
     value = b"not-the-secret"
-    client = _StateCaptureClient(
-        [{"path": prefix + "/state.json", "size": len(value)}],
-        {prefix + "/state.json": value},
+    client = _HomeAuditClient(
+        [{"path": "state.json", "size": len(value)}],
+        {f"{WINDOW}/state.json": value},
     )
-    channels = _WorkerChannels(client, "attempt", 1, "view", state_bundle_prefix=prefix,
+    channels = _WorkerChannels(client, "attempt", 1, "view",
+                               home_locator=LOCATOR, audit_window=WINDOW,
                                forbidden_content=b"secret")
     with pytest.raises(SidecarError, match="SECRET"):
-        channels.capture_state()
+        channels.audit_state()
     assert channels._forbidden_content == b"secret"
     channels.close()
     assert channels._forbidden_content == b""
 
 
 def test_worker_channels_rejects_state_digest_change():
-    prefix = "agentbox-sidecar/deployment/pi/native-state"
     value = b"native-state"
-    client = _StateCaptureClient(
-        [{"path": prefix + "/state.json", "size": len(value)}],
-        {prefix + "/state.json": value},
+    client = _HomeAuditClient(
+        [{"path": "state.json", "size": len(value)}],
+        {f"{WINDOW}/state.json": value},
     )
     original = client.request
+
     def wrong_digest(op, arguments=None, **identity):
         result = original(op, arguments, **identity)
-        if op == "view.get":
+        if op == "home.get":
             result["digest"] = "sha256:" + "0" * 64
         return result
+
     client.request = wrong_digest
-    channels = _WorkerChannels(client, "attempt", 1, "view", state_bundle_prefix=prefix)
-    with pytest.raises(SidecarError, match="DIGEST"):
-        channels.capture_state()
+    channels = _WorkerChannels(client, "attempt", 1, "view",
+                               home_locator=LOCATOR, audit_window=WINDOW)
+    # A file whose bytes moved under the read is unaudited, and the manifest
+    # says so: it is a reported fact, never a silently clean scan.
+    audit = channels.audit_state()
+    assert audit["files"] == []
+    assert audit["truncated"]["entries"] == 1
+    assert audit["audited"]["files"] == 0
 
 
 ARTIFACT_PROBE_RELATIVE = "tests/server/fixtures/artifact_probe_acp_peer.mjs"
@@ -1796,6 +1714,7 @@ class _ReleaseWorkerConnector:
     def client_for_workspace(self, **arguments):
         return WorkerClient(
             [str(self.worker), "--root", str(self.tmp_path / "worker-root"),
+             "--home-root", str(self.tmp_path / "profile-home"),
              "--workspace", str(REPO)],
             worker_digest="sha256:" + hashlib.sha256(self.worker.read_bytes()).hexdigest(),
             worker_version="0.1.0", connection_id=arguments["connection_id"],

@@ -424,8 +424,11 @@ class DirectWorkerConnector:
     def client_for_workspace(self, **arguments):
         from agent_box_runtime_wsl import WorkerClient
 
+        # An isolated home root per run: a leftover marker from an earlier run
+        # must not read as this run's identity.
         return WorkerClient(
             [str(self.worker), "--root", str(self.root / "worker-root"),
+             "--home-root", str(self.root / "profile-home"),
              "--workspace", str(self.workspace)],
             worker_digest="sha256:" + hashlib.sha256(self.worker.read_bytes()).hexdigest(),
             worker_version="0.1.0", connection_id=arguments["connection_id"],
@@ -712,17 +715,19 @@ def observe_turn(session: dict, index: int) -> dict:
 
 
 def scan_state(runtime, session: dict) -> dict:
-    checkpoint = json.loads(runtime.objects.read(session["checkpoint"]["object_digest"]))
-    hits = []
-    total = 0
-    for item in checkpoint.get("files", []):
-        content = runtime.objects.read(item["digest"])
-        total += len(content)
-        if current_token().bytes() in content:
-            hits.append(item["path"])
-    return {"files": len(checkpoint.get("files", [])), "bytes": total,
-            "tokenHits": hits, "tokenInState": bool(hits),
-            "paths": sorted(item["path"] for item in checkpoint.get("files", []))}
+    """The audit's own fail-closed scan is the credential evidence.
+
+    Under the native-home model the Server never holds the state bytes; a hit
+    during the audit would have failed the turn (and deleted the file). The
+    completed turn plus the manifest's audit facts are the record.
+    """
+    manifest = json.loads(runtime.objects.read(session["checkpoint"]["object_digest"]))
+    audited = manifest.get("audited") or {}
+    files = manifest.get("files") or []
+    return {"files": audited.get("files", 0), "bytes": audited.get("bytes", 0),
+            "tokenHits": [], "tokenInState": False,
+            "truncated": manifest.get("truncated"),
+            "paths": sorted(item["path"] for item in files)}
 
 
 
@@ -934,7 +939,7 @@ def run_chain(temporary: Path, workspace: Path, worker: Path, authorization: dic
                 "nativeSessionId": checkpoint.get("nativeSessionId"),
                 "files": sorted(item["path"] for item in checkpoint.get("files", [])),
             }
-            if checkpoint.get("schema_version") != 2 or checkpoint.get("resumable") is not True:
+            if checkpoint.get("schema_version") != 3 or checkpoint.get("resumable") is not True:
                 fail("OPENCODE_GATE_CHECKPOINT_NOT_RESUMABLE",
                      f"checkpoint is {checkpoint.get('schema_version')}/{checkpoint.get('resumable')}")
             if not any(path.endswith("opencode.db") for path in result["checkpointAfterFirst"]["files"]):
@@ -1148,14 +1153,21 @@ def unknown_model_refusal(client, runtime, workspace, opened, production, endpoi
 
 
 def invalid_checkpoint_refusal(runtime, workspace, production) -> dict:
-    """不可用的 checkpoint 必须失败，绝不允许静默新造一个原生会话。"""
+    """原生目录模型下没有恢复步骤，坏 checkpoint 不再是派发路径上的事实。
+
+    旧模型的这条反例（坏 checkpoint → SIDECAR_CHECKPOINT_INVALID）随恢复路径一起
+    退役：恢复不存在，坏字节无从被读。它对应的现代事实是两个，且都在这里断言：
+    1) 缺失 env_kind 的记录被放置解析点名拒绝（PLACEMENT_UNKNOWN），绝不静默回退；
+    2) 带 native_home 的记录上，坏 checkpoint 不被读取，port 正常构造（新原生
+       会话 + 变更后的 native id 是产品层的如实说明，见设计 §11）。
+    """
     frozen = runtime.objects.publish(json.dumps(
         {"execution": {"model": production.PRODUCT_MODEL_ID}}).encode())
     stale = runtime.objects.publish(json.dumps({
         "schema_version": 1, "harnessType": "opencode", "resumable": False,
         "nativeSessionId": "ses_stale", "files": [],
     }).encode())
-    context = {
+    base = {
         "harness_type": "opencode", "config_object_digest": frozen.digest,
         "distribution": "Ubuntu", "remote_user": os.environ["USER"],
         "connection_id": "connection-opencode-gate", "remote_path": str(workspace),
@@ -1164,13 +1176,18 @@ def invalid_checkpoint_refusal(runtime, workspace, production) -> dict:
     }
     code = None
     try:
-        runtime.execution.port_factory(context, lambda *_: None)
+        runtime.execution.port_factory({**base, "env_kind": None}, lambda *_: None)
     except RuntimeError as error:
         code = str(error)
-    if code != "SIDECAR_CHECKPOINT_INVALID":
+    if "PLACEMENT_UNKNOWN" not in (code or ""):
         fail("OPENCODE_GATE_STALE_CHECKPOINT_ACCEPTED",
-             f"an unusable checkpoint produced {code!r} instead of SIDECAR_CHECKPOINT_INVALID")
-    return {"refused": True, "code": code, "dispatched": False}
+             f"an unnamed placement produced {code!r} instead of PLACEMENT_UNKNOWN")
+    # The stale checkpoint alone (no env_kind removed) builds a port: nothing
+    # reads it, so nothing can be poisoned by it.
+    runtime.execution.port_factory({**base, "env_kind": "wsl",
+                                    "profile_id": "profile_oc", "profile_name": "oc-gate"},
+                                   lambda *_: None)
+    return {"refused": True, "code": "PLACEMENT_UNKNOWN", "checkpointReadAtDispatch": False}
 
 
 # --------------------------------------------------------------------------
@@ -1219,7 +1236,7 @@ def observe_driver(temporary: Path, workspace: Path, worker: Path, authorization
         with lock:
             events.append({"kind": kind, "text": str((data or {}).get("text") or "")[:200]})
 
-    def port_for(resume_native_id=None, restored_state=None):
+    def port_for(resume_native_id=None):
         launcher = WslSidecarLauncher(
             DirectWorkerConnector(temporary, worker, workspace),
             workspace={"distribution": "Ubuntu", "remote_user": os.environ["USER"],
@@ -1232,16 +1249,21 @@ def observe_driver(temporary: Path, workspace: Path, worker: Path, authorization
                 (CONFIG_BUNDLE_PATH, production.CONFIG_TARGET),
                 (GUARD_SOURCE, GUARD_TARGET),
             ),
-            state_bundle_prefix=STATE_BUNDLE_PREFIX,
-            state_target=production.STATE_TARGET, restored_state=restored_state,
+            home_locator="opencode-gate/.config/opencode",
+            native_home=".config/opencode",
+            profile_id="profile-opencode-gate",
+            harness_type="opencode",
+            audit_window=".local/share/opencode",
             timeout_ms=120_000,
         )
         return SidecarHarnessPort(
             launcher, environment={"AGENTBOX_SIDECAR_ISOLATED": "1"},
             profile="opencode", adapter=adapter, model=production.PRODUCT_MODEL_ID,
             credential_environment=production.CREDENTIAL_ENVIRONMENT,
-            resume_native_id=resume_native_id, state_directory=str(state_directory),
-            directory="/workspace", on_event=record,
+            resume_native_id=resume_native_id,
+            state_directory=production.STATE_TARGET,
+            directory="/workspace", native_platform="wsl",
+            home_locator="opencode-gate/.config/opencode", on_event=record,
         )
 
     result: dict = {"note": (
@@ -1251,24 +1273,25 @@ def observe_driver(temporary: Path, workspace: Path, worker: Path, authorization
     try:
         native = first.open_execution("observe-round-1")
         first.prompt("observe-round-1", f"Remember {NONCE_ROUND_1} and reply with it.")
-        state, resumable = first.capture_execution("observe-round-1")
+        audit, resumable = first.capture_execution("observe-round-1")
     finally:
         first.stop()
     with lock:
         round_a_events = list(events)
         events.clear()
+    audited_paths = [item["path"] for item in audit["files"]]
     result["roundA"] = {
         "nativeSessionId": native,
-        "stateFiles": sorted(state),
-        "stateBytes": sum(len(content) for content in state.values()),
+        "auditedFiles": audited_paths,
+        "auditedBytes": audit["audited"]["bytes"],
         "stateResumable": bool(resumable),
         "deltas": [item for item in round_a_events if item["kind"] == "message.delta"],
     }
-    if not any(name.endswith("opencode.db") for name in state):
+    if not any(name.endswith("opencode.db") for name in audited_paths):
         fail("OPENCODE_GATE_OBSERVE_STATE_MISSING_DATABASE",
-             f"the native state has no database: {sorted(state)}")
+             f"the audited home has no database: {sorted(audited_paths)}")
 
-    second = port_for(resume_native_id=native, restored_state=state)
+    second = port_for(resume_native_id=native)
     try:
         reopened = second.open_execution("observe-round-2")
         with lock:
@@ -1280,10 +1303,10 @@ def observe_driver(temporary: Path, workspace: Path, worker: Path, authorization
         second.stop()
     result["roundB"] = {
         "nativeSessionIdStable": reopened == native,
-        # 上一轮的 state 是被 Server 捕获、再回投进这一轮 sidecar 的；
-        # 这里记录回投的文件数与字节数，让"恢复路径"有可核对的事实。
-        "stateRestoredFiles": sorted(state),
-        "stateRestoredBytes": sum(len(content) for content in state.values()),
+        # 原生目录模型下没有"捕获-回投"：第二轮直接靠 home 里的原生状态续接，
+        # 审计事实（文件数与字节）就是这条路径的可核对证据。
+        "stateAuditedFiles": len(audit["files"]),
+        "stateAuditedBytes": audit["audited"]["bytes"],
         "chunksDuringReopen": during_reopen,
         "chunksAfterReopenPrompt": after_prompt,
         "deltas": [item for item in after_prompt if item["kind"] == "message.delta"],
@@ -1494,10 +1517,11 @@ def driver_negatives(temporary: Path, workspace: Path, worker: Path, authorizati
             (CONFIG_BUNDLE_PATH, production.CONFIG_TARGET),
             (GUARD_SOURCE, GUARD_TARGET),
         ),
-        state_bundle_prefix=STATE_BUNDLE_PREFIX,
-        state_target=production.STATE_TARGET, restored_state={
-            # 一个"看起来有会话"但实际不存在的恢复：驱动必须拒绝，不得新建。
-        },
+        home_locator="opencode-negative/.config/opencode",
+        native_home=".config/opencode",
+        profile_id="profile-opencode-negative",
+        harness_type="opencode",
+        audit_window=".local/share/opencode",
         timeout_ms=120_000,
     )
     port = SidecarHarnessPort(
@@ -1505,7 +1529,8 @@ def driver_negatives(temporary: Path, workspace: Path, worker: Path, authorizati
         profile="opencode", adapter=adapter, model=production.PRODUCT_MODEL_ID,
         credential_environment=production.CREDENTIAL_ENVIRONMENT,
         resume_native_id="ses_that_was_never_stored",
-        state_directory=str(state_directory), directory="/workspace",
+        state_directory=production.STATE_TARGET, directory="/workspace",
+        native_platform="wsl", home_locator="opencode-negative/.config/opencode",
         on_event=lambda _execution, kind, data: observations.append(
             {"kind": kind, "text": str((data or {}).get("text") or "")[:200]}),
     )

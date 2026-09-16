@@ -63,7 +63,8 @@ def _deployment(tmp_path: Path) -> Path:
     document.write_text(json.dumps({
         "schemaVersion": 1,
         "harnesses": [{
-            "id": "fixture",
+            # A seat the registry knows: only a declared native home may run.
+            "id": "pi",
             "adapter": {"command": "/usr/bin/node", "args": []},
         }],
     }), encoding="utf-8")
@@ -108,9 +109,10 @@ def _channel_for(tmp_path, monkeypatch, env_kind: str, *, ssh_connector: bool = 
     try:
         frozen = runtime.objects.publish(json.dumps({"execution": {}}).encode())
         runtime.execution.port_factory({
-            "harness_type": "fixture", "distribution": "Ubuntu", "remote_user": "tester",
+            "harness_type": "pi", "distribution": "Ubuntu", "remote_user": "tester",
             "connection_id": "connection", "remote_path": "/workspace",
             "env_kind": env_kind, "env_host": "Ubuntu", "normalized_path": "/workspace",
+            "profile_id": "profile_test", "profile_name": "Pi Test",
             "config_object_digest": frozen.digest,
         }, lambda *_args: None)
     finally:
@@ -139,10 +141,12 @@ def test_the_ssh_placement_is_refused_without_its_connector(tmp_path, monkeypatc
         frozen = runtime.objects.publish(json.dumps({"execution": {}}).encode())
         with pytest.raises(PlacementUnsupported) as refused:
             runtime.execution.port_factory({
-                "harness_type": "fixture", "distribution": "203.0.113.7",
+                "harness_type": "pi", "distribution": "203.0.113.7",
                 "remote_user": "root", "connection_id": "connection",
                 "remote_path": "/workspace", "env_kind": "ssh", "env_host": "203.0.113.7",
-                "normalized_path": "/workspace", "config_object_digest": frozen.digest,
+                "normalized_path": "/workspace",
+                "profile_id": "profile_test", "profile_name": "Pi Test",
+                "config_object_digest": frozen.digest,
             }, lambda *_args: None)
     finally:
         runtime.stop()

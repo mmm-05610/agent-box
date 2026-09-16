@@ -50,7 +50,8 @@
         "attempt.cleanup",
         "home.prepare",
         "home.list",
-        "home.get"
+        "home.get",
+        "home.delete"
       ]
     },
     "arguments": {

@@ -1,0 +1,10 @@
+{
+  "requestId": "request-5",
+  "connectionId": "connection-1",
+  "serverInstanceId": "server-1",
+  "op": "home.delete",
+  "arguments": {
+    "locator": "pi-test/.pi",
+    "path": "sessions/leaked.txt"
+  }
+}

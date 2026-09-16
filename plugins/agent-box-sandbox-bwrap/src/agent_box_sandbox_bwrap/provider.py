@@ -243,8 +243,10 @@ def compile_remote_sidecar_bwrap_argv(
     writable_targets: list[str] = []
     for source, target in writable_projection_mounts:
         _validate_remote_path(source)
-        if not source.startswith(runtime_view + "/"):
-            raise ProjectionRejected("sidecar writable projection source is outside the reviewed view")
+        # The writable state was once staged view bytes, so its source had to
+        # sit under the view. In the native-home model it is the Profile's own
+        # durable directory on this machine - prepared and marker-verified by
+        # the channel - and its being outside the view is the point.
         writable_targets.append(home_projection_target(target, kind=PROJECTION_DIRECTORY))
     ephemeral_targets: list[str] = []
     for target in ephemeral_state_mounts:

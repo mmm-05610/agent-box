@@ -332,7 +332,7 @@ def test_acp_resume_object_is_observed_and_makes_checkpoints_resumable():
         assert entry["declared"] is True and entry["observed"] is True
         assert entry["supported"] is True
         assert entry["nativeEvidence"] == "sessionCapabilities.resume"
-        assert port.capture_execution("execution-resume") == ({}, True)
+        assert port.capture_execution("execution-resume")[1] is True
     finally:
         port.stop()
 
@@ -346,7 +346,7 @@ def test_explicit_resume_false_is_observed_unsupported():
         assert entry["observed"] is False
         assert entry["supported"] is False
         assert entry["reason"] == caps.CAPABILITY_OBSERVED_UNSUPPORTED
-        assert port.capture_execution("execution-no-resume") == ({}, False)
+        assert port.capture_execution("execution-no-resume")[1] is False
     finally:
         port.stop()
 
@@ -361,7 +361,7 @@ def test_declared_resume_without_native_advertisement_is_not_observed():
         assert entry["supported"] is False
         assert entry["reason"] == caps.CAPABILITY_NOT_OBSERVED
         # checkpoint 也必须诚实：没有原生播发就不是 resumable。
-        assert port.capture_execution("execution-silent") == ({}, False)
+        assert port.capture_execution("execution-silent")[1] is False
     finally:
         port.stop()
 
@@ -375,7 +375,7 @@ def test_native_resume_claim_without_static_declaration_fails_closed():
         assert entry["declared"] is False and entry["observed"] is True
         assert entry["supported"] is False
         assert entry["reason"] == caps.CAPABILITY_CONFLICT_OBSERVED_WITHOUT_DECLARATION
-        assert port.capture_execution("execution-conflict") == ({}, False)
+        assert port.capture_execution("execution-conflict")[1] is False
         # 静态声明没有被运行时观测改写
         assert port.declared_capabilities == {"stream": True}
     finally:

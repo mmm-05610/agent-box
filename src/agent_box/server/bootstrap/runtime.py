@@ -536,12 +536,8 @@ def build_runtime_from_sidecar_deployment(
             tuple(projection_targets), state_target,
         )
         if state_target is not None:
-            deployment["_state_bundle_prefix"] = (
-                f"agentbox-sidecar/deployment/{harness_id}/native-state"
-            )
             deployment["_state_target"] = state_target
         else:
-            deployment["_state_bundle_prefix"] = None
             deployment["_state_target"] = None
         deployment["_state_ephemeral_paths"] = state_ephemeral_paths
         deployments[harness_id] = deployment
@@ -569,6 +565,15 @@ def build_runtime_from_sidecar_deployment(
         # A binding nobody asked for is a typo or a stale document, and silently
         # ignoring it would hide which artifact the deployment really uses.
         raise RuntimeError("SIDECAR_ARTIFACT_BINDING_UNUSED")
+
+    # Each seat's native home comes from the Harness registry, never from the
+    # document: the document describes how a room runs, the registry says where
+    # a Harness's own state lives. A seat with no declared native home cannot
+    # run in the native-home model and is refused when a turn asks for it.
+    native_homes = _registry_native_homes()
+    for harness_id, deployment in deployments.items():
+        deployment["_native_home"] = native_homes.get(harness_id)
+
     bundle = sidecar_bundle_files(root, additional_files=additional_bundle)
 
     # Credential sources are *declared* here and read from their own files: the
@@ -578,6 +583,11 @@ def build_runtime_from_sidecar_deployment(
     # key set below is what enforces "no secret in the document" - a `value` or
     # `secret` key is a typed refusal, not an ignored extra.
     declared_credentials = _deployment_credentials(value)
+
+    # The local placement's home root is this Server's own data root: the
+    # Server *is* the machine that runs those turns. It is a machine-local
+    # fact, never a document field and never a recorded path.
+    local_home_root = str(Path(data_root).resolve() / "profiles")
 
     def factory(records, objects, approvals, notifier, connectors, credentials, secret_store):
         # No gate here: whether a connector is required depends on the placement
@@ -597,15 +607,26 @@ def build_runtime_from_sidecar_deployment(
                 if secret_store is None:
                     raise RuntimeError("CREDENTIAL_STORE_UNAVAILABLE")
                 credential = secret_store.read(record["secret_locator"])
-            resume_native_id, restored_state = _restore_sidecar_state(
-                objects, context,
-                enabled=deployment["_state_bundle_prefix"] is not None,
+            # The native home: no restore, no upload. The Harness reopens its
+            # own durable directory on the machine that runs this turn; the
+            # record's locator (kept once a turn has run) survives renames,
+            # and the first turn of a Session derives it from the role name.
+            native_home = deployment.get("_native_home")
+            if not native_home:
+                raise RuntimeError(
+                    f"HARNESS_NATIVE_HOME_UNDECLARED: {context['harness_type']}"
+                )
+            home_locator = context.get("home_locator") or _profile_home_locator(
+                context.get("profile_name") or context["harness_type"], native_home,
             )
             # The workspace record says where this turn belongs; that fact - and
             # only that fact - decides which channel stages and starts it.
             kind = context.get("env_kind")
             placement = resolve_placement(
                 kind, has_connector=connectors.get(kind) is not None,
+            )
+            audit_window = _window_of_state_target(
+                deployment["_state_target"], native_home,
             )
             if placement.channel in {WSL_CHANNEL, SSH_CHANNEL}:
                 launcher = WorkerSidecarLauncher(
@@ -622,11 +643,13 @@ def build_runtime_from_sidecar_deployment(
                     runtime_artifact_authorizations=deployment["_runtime_artifact_authorizations"],
                     runtime_artifact_mounts=deployment["_runtime_artifact_mounts"],
                     projection_mounts=deployment["_projection_mounts"],
-                    state_bundle_prefix=deployment["_state_bundle_prefix"],
-                    state_target=deployment["_state_target"],
+                    home_locator=home_locator,
+                    native_home=native_home,
+                    profile_id=context["profile_id"],
+                    harness_type=context["harness_type"],
+                    audit_window=audit_window,
                     state_ephemeral_paths=deployment["_state_ephemeral_paths"],
                     protected_state_paths=deployment["_protected_state_paths"],
-                    restored_state=restored_state,
                     timeout_ms=deployment["_timeout_ms"],
                 )
             else:
@@ -636,11 +659,13 @@ def build_runtime_from_sidecar_deployment(
                     executable_mounts=deployment["_executable_mounts"],
                     runtime_artifact_mounts=deployment["_runtime_artifact_mounts"],
                     projection_mounts=deployment["_projection_mounts"],
-                    state_bundle_prefix=deployment["_state_bundle_prefix"],
+                    home_root=local_home_root,
+                    home_locator=home_locator,
+                    profile_id=context["profile_id"],
+                    harness_type=context["harness_type"],
                     state_target=deployment["_state_target"],
                     state_ephemeral_paths=deployment["_state_ephemeral_paths"],
                     protected_state_paths=deployment["_protected_state_paths"],
-                    restored_state=restored_state,
                 )
             return SidecarHarnessPort(
                 launcher, environment={"AGENTBOX_SIDECAR_ISOLATED": "1"},
@@ -650,8 +675,27 @@ def build_runtime_from_sidecar_deployment(
                     descriptor.credential_environment if credential is not None else None
                 ),
                 preferred_auth_method=deployment.get("preferredAuthMethod"),
-                resume_native_id=resume_native_id,
-                state_directory="/tmp/agentbox-sidecar-state", directory="/workspace",
+                # A recorded native id is reopened only when the harness
+                # declares durable state (a native-home window) and a turn has
+                # already recorded a locator under it. Anything less - a
+                # pre-home Session, a seat with no declared window - opens a
+                # fresh native session, and the changed native id says so
+                # instead of pretending a reopen succeeded.
+                resume_native_id=(
+                    context.get("checkpoint_native_id")
+                    if context.get("home_locator") and deployment["_state_target"]
+                    else None
+                ),
+                # The sidecar's own working state (a bridge's session index)
+                # lives inside the home window: it must survive the attempt,
+                # because the next turn's resume reads it from the same durable
+                # directory the room binds. It was an ephemeral /tmp path when
+                # state travelled as bytes; the home replaces both.
+                state_directory=deployment["_state_target"]
+                or f"/runtime/home/{native_home}",
+                directory="/workspace",
+                native_platform=placement.kind if kind else None,
+                home_locator=home_locator,
                 # 静态上限只能来自已校验的注册声明（不依赖 port 的默认值）。
                 declared_capabilities=descriptor.capability_claims,
                 on_event=on_event,
@@ -873,49 +917,57 @@ def _sidecar_deployment_file(root: Path, relative: Any) -> bytes:
     return resolved.read_bytes()
 
 
-def _restore_sidecar_state(
-    objects: ObjectStore, context: Mapping[str, Any], *, enabled: bool,
-) -> tuple[str | None, dict[str, bytes]]:
-    """Load one bounded opaque native checkpoint from Windows authority."""
-    checkpoint_digest = context.get("checkpoint_object_digest")
-    native_id = context.get("checkpoint_native_id")
-    if not enabled or not checkpoint_digest or not native_id:
-        return None, {}
+def _registry_native_homes() -> dict[str, str]:
+    """The native home each registered Harness declares, keyed by seat id.
+
+    Asked once per composition. The registry is the only place a Harness says
+    where its own state lives; a deployment cannot invent one, and a seat the
+    registry does not know has none (refused at dispatch, not guessed here).
+    """
     try:
-        manifest = json.loads(objects.read(checkpoint_digest))
-    except (OSError, ValueError, TypeError, json.JSONDecodeError):
-        raise RuntimeError("SIDECAR_CHECKPOINT_INVALID") from None
-    files = manifest.get("files") if isinstance(manifest, dict) else None
-    if isinstance(manifest, dict) and manifest.get("harnessType") != context.get("harness_type"):
-        return None, {}
-    if (manifest.get("schema_version") != 2 or manifest.get("resumable") is not True
-            or manifest.get("nativeSessionId") != native_id or not isinstance(files, list)
-            or not files):
-        raise RuntimeError("SIDECAR_CHECKPOINT_INVALID")
-    restored: dict[str, bytes] = {}
-    total = 0
-    for item in files:
-        if not isinstance(item, dict) or set(item) != {"path", "digest", "size"}:
-            raise RuntimeError("SIDECAR_CHECKPOINT_INVALID")
-        relative = item.get("path")
-        digest_value = item.get("digest")
-        size = item.get("size")
-        if (not isinstance(relative, str) or relative.startswith("/") or "\\" in relative
-                or "\x00" in relative or "//" in relative
-                or any(part in {"", ".", ".."} for part in relative.split("/"))
-                or str(PurePosixPath(relative)) != relative
-                or relative in restored or not isinstance(digest_value, str)
-                or re.fullmatch(r"sha256:[0-9a-f]{64}", digest_value) is None
-                or not isinstance(size, int) or size < 0 or size > 8 * 1024 * 1024):
-            raise RuntimeError("SIDECAR_CHECKPOINT_INVALID")
-        try:
-            content = objects.read(digest_value)
-        except (OSError, ValueError):
-            raise RuntimeError("SIDECAR_CHECKPOINT_INVALID") from None
-        if len(content) != size:
-            raise RuntimeError("SIDECAR_CHECKPOINT_INVALID")
-        total += size
-        if len(restored) >= 256 or total > 8 * 1024 * 1024:
-            raise RuntimeError("SIDECAR_CHECKPOINT_INVALID")
-        restored[relative] = content
-    return str(native_id), restored
+        from agent_box_harnesses.registry import load_builtin_registry
+    except ImportError:
+        return {}
+    try:
+        registry = load_builtin_registry()
+    except Exception:
+        return {}
+    homes = {}
+    for definition in registry.all():
+        homes[definition.identity.harness_type] = definition.profile.native_home
+    return homes
+
+
+def _profile_home_locator(name: str, native_home: str) -> str:
+    """`<role>/<native home>` - the locator a first Session records.
+
+    The role directory is a normalized label chosen at creation; a later
+    rename never recomputes it, because the Session (and the marker inside)
+    keeps the locator that was recorded when the home was made.
+    """
+    normalized = re.sub(r"[^a-z0-9-]+", "-", (name or "").lower()).strip("-")
+    normalized = normalized[:40] or "role"
+    return f"{normalized}/{native_home}"
+
+
+def _window_of_state_target(state_target: str | None, native_home: str) -> str | None:
+    """The audit window relative to the role directory, or None.
+
+    `stateProjection.target` stays a guest path under the guest home; the
+    window is that path minus the guest home prefix, so it can name a subtree
+    outside the native home as well as one inside it - whichever way the
+    Harness family declares its own durable state. A target outside the guest
+    home cannot be served by a home bind and is refused.
+    """
+    del native_home
+    if not state_target:
+        return None
+    prefix = "/runtime/home/"
+    if not state_target.startswith(prefix) or state_target == prefix:
+        raise RuntimeError("SIDECAR_STATE_PROJECTION_INVALID")
+    window = state_target[len(prefix):]
+    if (not window or window.startswith("/")
+            or any(part in {"", ".", ".."} for part in window.split("/"))
+            or "\\" in window or "\x00" in window):
+        raise RuntimeError("SIDECAR_STATE_PROJECTION_INVALID")
+    return window

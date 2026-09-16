@@ -8,7 +8,7 @@ import threading
 from typing import Iterator
 
 
-PRODUCT_SCHEMA_VERSION = 5
+PRODUCT_SCHEMA_VERSION = 6
 
 
 class FutureSchemaError(RuntimeError):
@@ -78,6 +78,8 @@ CREATE TABLE IF NOT EXISTS server_sessions (
     profile_id TEXT NOT NULL REFERENCES server_profiles(id),
     checkpoint_object_digest TEXT,
     checkpoint_native_id TEXT,
+    native_platform TEXT,
+    home_locator TEXT,
     status TEXT NOT NULL DEFAULT 'ready',
     display_name TEXT,
     pinned INTEGER NOT NULL DEFAULT 0,
@@ -239,6 +241,21 @@ def _add_columns(conn: sqlite3.Connection, table: str, additions: dict[str, str]
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {declaration}")
 
 
+def _migrate_5_to_6(conn: sqlite3.Connection) -> None:
+    """Reference the native home instead of storing its bytes.
+
+    `native_platform` names the machine family that owns the Profile's home
+    directory and `home_locator` locates it relative to that machine's home
+    root - never an absolute host path. `checkpoint_object_digest` keeps its
+    column and its name, but from this schema on it points at the audit
+    manifest (a record), not at captured state bytes.
+    """
+    _add_columns(conn, "server_sessions", {
+        "native_platform": "TEXT",
+        "home_locator": "TEXT",
+    })
+
+
 def _migrate_2_to_3(conn: sqlite3.Connection) -> None:
     """Add the wire/1 record identity, version, and archive fields.
 
@@ -369,6 +386,8 @@ class Database:
                 _migrate_3_to_4(conn)
             if current in (1, 2, 3, 4):
                 _migrate_4_to_5(conn)
+            if current in (1, 2, 3, 4, 5):
+                _migrate_5_to_6(conn)
             conn.executescript(_SCHEMA)
             conn.execute(
                 "INSERT OR IGNORE INTO agentbox_product_schema(singleton, version, applied_at) "

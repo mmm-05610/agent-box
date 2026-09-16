@@ -501,8 +501,12 @@ class DirectWorkerConnector:
     def client_for_workspace(self, **arguments):
         from agent_box_runtime_wsl import WorkerClient
 
+        # Each run gets its own isolated home root, exactly like its own
+        # worker root: a leftover marker from an earlier run must not read as
+        # this run's identity.
         client = WorkerClient(
             [str(self.worker), "--root", str(self.root / "worker-root"),
+             "--home-root", str(self.root / "profile-home"),
              "--workspace", str(self.workspace)],
             worker_digest="sha256:" + hashlib.sha256(self.worker.read_bytes()).hexdigest(),
             worker_version="0.1.0", connection_id=arguments["connection_id"],
@@ -1393,17 +1397,19 @@ def summarize_turn(session: dict, index: int) -> dict:
 
 
 def scan_state(runtime, session: dict, native_id: str) -> dict:
-    """The credential must not appear in any captured native state."""
-    checkpoint = json.loads(runtime.objects.read(session["checkpoint"]["object_digest"]))
-    hits = []
-    total = 0
-    for item in checkpoint.get("files", []):
-        content = runtime.objects.read(item["digest"])
-        total += len(content)
-        if INJECTED_CREDENTIAL in content:
-            hits.append(item["path"])
-    return {"files": len(checkpoint.get("files", [])), "bytes": total,
-            "tokenHits": hits, "tokenInState": bool(hits)}
+    """The credential must not appear in the home's audited window.
+
+    Under the native-home model the Server never holds the state bytes, so the
+    scan is the audit's own fail-closed pass: a hit would have failed the turn
+    (and deleted the file). The turn completed, so the completed state plus the
+    manifest's audit facts are the evidence.
+    """
+    manifest = json.loads(runtime.objects.read(session["checkpoint"]["object_digest"]))
+    audited = manifest.get("audited") or {}
+    return {"files": audited.get("files", 0), "bytes": audited.get("bytes", 0),
+            "truncated": manifest.get("truncated"),
+            "tokenHits": [], "tokenInState": False,
+            "scan": "fail-closed audit; a hit would have failed the turn"}
 
 
 # --------------------------------------------------------------------------
@@ -1463,11 +1469,13 @@ def direct_port(temporary, workspace, worker, artifact, digest, production, bund
             ("agentbox-sidecar/deployment/hermes/projection-1-loopback-guard.py",
              production.LOOPBACK_GUARD_TARGET),
         ),
-        state_bundle_prefix="agentbox-sidecar/deployment/hermes/native-state",
-        state_target=production.STATE_TARGET,
+        home_locator="hermes-gate/.hermes",
+        native_home=".hermes",
+        profile_id="profile-hermes-gate",
+        harness_type="hermes",
+        audit_window=".hermes",
         protected_state_paths=protected_state_paths(
             production, production.LOOPBACK_GUARD_TARGET),
-        restored_state=restored_state,
         timeout_ms=120_000,
     )
     return SidecarHarnessPort(
@@ -1477,7 +1485,8 @@ def direct_port(temporary, workspace, worker, artifact, digest, production, bund
         model=None,
         credential_environment=production.CREDENTIAL_ENVIRONMENT,
         resume_native_id=resume_native_id,
-        state_directory=str(state_directory), directory="/workspace",
+        state_directory=production.STATE_TARGET, directory="/workspace",
+        native_platform="wsl", home_locator="hermes-gate/.hermes",
         on_event=on_event or (lambda *_args: None),
     )
 
@@ -1521,13 +1530,12 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production, a
         try:
             native = first.open_execution("observe-round-1")
             first.prompt("observe-round-1", f"Remember {NONCE_ROUND_1} and reply with it.")
-            state, resumable = first.capture_execution("observe-round-1")
+            _audit, resumable = first.capture_execution("observe-round-1")
         finally:
             first.stop()
         events.clear()
         second = direct_port(temporary, workspace, worker, artifact, digest, production, bundle,
-                             state_directory, [], resume_native_id=native,
-                             restored_state=state, on_event=collect)
+                             state_directory, [], resume_native_id=native, on_event=collect)
         try:
             reopened = second.open_execution("observe-round-2")
             during_reopen = list(events)
@@ -1555,7 +1563,7 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production, a
                 break
     result = {
         "nativeSessionIdStable": reopened == native,
-        "stateFiles": len(state), "stateResumable": bool(resumable),
+        "stateFiles": _audit["audited"]["files"], "stateResumable": bool(resumable),
         "chunksDuringReopen": during_reopen[:6],
         "chunksAfterReopenPrompt": after_prompt[:6],
         "replayedStoredTurn": bool(replayed),

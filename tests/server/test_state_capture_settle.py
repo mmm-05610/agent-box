@@ -1,46 +1,52 @@
-"""State capture is a content-stability gate, not a size heuristic.
+"""The home audit is a bounded record, never a refused turn.
 
-A capture reads the declared state subtree back into a checkpoint, so it must
-only accept bytes that stopped changing. Comparing path and size is not enough:
-a file whose content is rewritten with the same length looks stable, and a
-capture that then reports a mixture of the two contents is worse than a failed
-turn.
+Under the native-home model nothing is uploaded, so an over-large or churning
+home cannot fail a turn the way a capture could: whatever did not fit is a
+reported fact (`truncated`). The one rule that stays fail-closed is the
+credential scan - an injected value that reached the home names the file, and
+the caller deletes exactly that file.
 
-These tests drive the channel against an in-memory view that the Worker would
-serve, so the churn is exact and the deadline is short.
+These tests drive the channel against an in-memory home that the Worker would
+serve, so the churn and the bounds are exact.
 """
 from __future__ import annotations
 
 import base64
 import hashlib
-import time
 
 import pytest
 
 from agent_box.server.execution.sidecar import SidecarError, _WorkerChannels
 
 
-PREFIX = "deployment/fixture/native-state"
-STATE_FILE = f"{PREFIX}/state.db"
+WINDOW = ".pi/sessions"
+FILE = f"{WINDOW}/state.db"
 
 
-class FakeView:
-    """A committed view the Worker would serve, with a mutable file set."""
+class FakeHome:
+    """A home the Worker would serve, with a mutable file set."""
 
     def __init__(self, files: dict[str, bytes] | None = None) -> None:
         self.files: dict[str, bytes] = dict(files or {})
         self.list_calls = 0
         self.get_calls = 0
+        self.deleted: list[str] = []
         self.before_get = None
 
     def request(self, op, arguments=None, **_keywords):
-        if op == "view.list":
+        if op == "home.list":
             self.list_calls += 1
-            return {"status": "listed", "files": [
+            relative = arguments.get("relative") or ""
+            prefix = f"{relative}/" if relative else ""
+            files = [
                 {"path": path, "size": len(content)}
                 for path, content in sorted(self.files.items())
-            ]}
-        if op == "view.get":
+                if path.startswith(prefix)
+            ]
+            stripped = [{"path": f["path"][len(prefix):], "size": f["size"]} for f in files]
+            return {"files": stripped,
+                    "truncated": {"entries": 0, "bytes": 0, "oversize": 0}, "skipped": 0}
+        if op == "home.get":
             if self.before_get is not None:
                 self.before_get(self)
             self.get_calls += 1
@@ -55,105 +61,86 @@ class FakeView:
                 "data": base64.b64encode(content[offset:end]).decode(),
                 "eof": end == len(content),
             }
+        if op == "home.delete":
+            self.deleted.append(arguments["path"])
+            self.files.pop(arguments["path"], None)
+            return {"deleted": arguments["path"]}
         raise AssertionError(f"unexpected op {op}")
 
 
-def channels(view: FakeView, **keywords) -> _WorkerChannels:
+def channels(home: FakeHome, **keywords) -> _WorkerChannels:
     return _WorkerChannels(
-        view, "attempt-1", 1, "view-1",
-        state_bundle_prefix=PREFIX,
+        home, "attempt-1", 1, "view-1",
+        home_locator="pi-test/.pi", audit_window=WINDOW,
         **keywords,
     )
 
 
-def settle_and_capture(view: FakeView, *, deadline: float, interval: float = 0.01, **keywords):
-    channel = channels(view, **keywords)
-    return channel.capture_state(
-        deadline_seconds=deadline, interval_seconds=interval,
+def test_the_audit_records_what_the_home_contains():
+    home = FakeHome({FILE: b"state-bytes"})
+    audit = channels(home).audit_state()
+    assert audit["audited"]["files"] == 1
+    assert audit["files"] == [{"path": "state.db", "size": 11,
+                               "digest": "sha256:" + hashlib.sha256(b"state-bytes").hexdigest()}]
+
+
+def test_a_protected_path_is_not_part_of_the_audit():
+    """Read-only configuration is not state: it never enters the manifest."""
+    home = FakeHome({FILE: b"state", f"{WINDOW}/config.yaml": b"config"})
+    audit = channels(home, protected_state_paths=("config.yaml",)).audit_state()
+    assert [item["path"] for item in audit["files"]] == ["state.db"]
+    assert audit["audited"]["files"] == 1
+
+
+def test_oversize_files_are_truncation_facts_not_failures():
+    """Nothing is uploaded any more, so a big file is bookkeeping, not a fault."""
+    home = FakeHome({FILE: b"state", f"{WINDOW}/big.bin": b"x" * (9 * 1024 * 1024)})
+    audit = channels(home).audit_state()
+    assert [item["path"] for item in audit["files"]] == ["state.db"]
+    assert audit["truncated"]["oversize"] == 1
+    assert audit["truncated"]["entries"] >= 1
+    assert audit["truncated"]["bytes"] >= 9 * 1024 * 1024
+
+
+def test_worker_reported_truncation_flows_into_the_manifest():
+    home = FakeHome()
+    home.request = lambda op, arguments=None, **kw: (
+        {"files": [], "truncated": {"entries": 7, "bytes": 4096, "oversize": 1}, "skipped": 2}
+        if op == "home.list" else (_ for _ in ()).throw(AssertionError("no reads expected"))
     )
+    audit = channels(home).audit_state()
+    assert audit["truncated"] == {"entries": 7, "bytes": 4096, "oversize": 1}
+    assert audit["skipped"] == 2
+    assert home.get_calls == 0, "truncated entries are counted, never read"
 
 
-def test_a_same_size_rewrite_is_never_accepted_as_stable():
-    """Two identical (path, size) listings, different bytes: not settled."""
-    view = FakeView({STATE_FILE: b"aaaa"})
-    state = {"round": 0}
-
-    def churn(_view):
-        # Every read sees a different four-byte content: the size never changes.
-        state["round"] += 1
-        view.files[STATE_FILE] = f"{state['round']:04d}".encode()
-
-    view.before_get = churn
-    started = time.monotonic()
+def test_a_credential_in_the_home_names_the_file_and_fails_closed():
+    home = FakeHome({
+        FILE: b"clean",
+        f"{WINDOW}/leaked.json": b'{"key": "fake-token-abc"}',
+        f"{WINDOW}/other.db": b"more",
+    })
     with pytest.raises(SidecarError) as refused:
-        settle_and_capture(view, deadline=0.4)
-    assert refused.value.code == "SIDECAR_STATE_NOT_SETTLED", refused.value
-    assert time.monotonic() - started < 5, "the deadline must bound the wait"
-
-
-def test_a_content_that_stops_changing_is_captured_with_its_final_bytes():
-    view = FakeView({STATE_FILE: b"one"})
-    view.before_get = lambda _view: view.files.__setitem__(STATE_FILE, b"final-state")
-    captured = settle_and_capture(view, deadline=2.0)
-    assert captured == {"state.db": b"final-state"}
-
-
-def test_a_change_between_the_snapshots_only_delays_the_capture():
-    """Churn while settling is fine; what is returned must be the settled bytes."""
-    view = FakeView({STATE_FILE: b"a"})
-    seen = {"count": 0}
-
-    def churn(_view):
-        seen["count"] += 1
-        if seen["count"] <= 2:
-            view.files[STATE_FILE] = b"b" * seen["count"]
-
-    view.before_get = churn
-    captured = settle_and_capture(view, deadline=2.0)
-    digest = "sha256:" + hashlib.sha256(captured["state.db"]).hexdigest()
-    assert digest == "sha256:" + hashlib.sha256(view.files[STATE_FILE]).hexdigest()
-    assert seen["count"] > 2, "the churn must have happened before the capture"
-
-
-def test_an_empty_state_settles_after_two_empty_snapshots():
-    view = FakeView()
-    assert settle_and_capture(view, deadline=1.0) == {}
-    assert view.list_calls >= 2, "an empty state still needs two identical snapshots"
-
-
-def test_a_protected_path_is_not_part_of_the_stability_snapshot():
-    """Read-only configuration is not state: it can never block a capture."""
-    view = FakeView({STATE_FILE: b"state", f"{PREFIX}/config.yaml": b"config"})
-    counter = {"reads": 0}
-
-    def churn(_view):
-        counter["reads"] += 1
-        view.files[f"{PREFIX}/config.yaml"] = f"cfg{counter['reads']}".encode()
-
-    view.before_get = churn
-    captured = settle_and_capture(view, deadline=1.0, protected_state_paths=("config.yaml",))
-    assert captured == {"state.db": b"state"}
-    assert "config.yaml" not in captured
-
-
-def test_the_captured_bytes_must_match_the_snapshot_they_were_validated_against():
-    """A rewrite that lands between validation and return cannot slip through."""
-    view = FakeView({STATE_FILE: b"first"})
-    captured = settle_and_capture(view, deadline=2.0)
-    assert captured == {"state.db": b"first"}
-    # The view changed afterwards; the returned bytes are the validated ones.
-    view.files[STATE_FILE] = b"second"
-    assert captured != {"state.db": b"second"}
-
-
-def test_secret_scanning_and_bounds_still_apply():
-    view = FakeView({STATE_FILE: b"state-with-secret"})
-    view.files[STATE_FILE] = b"x" * 10 + b"fake-token-abc"
-    with pytest.raises(SidecarError) as refused:
-        settle_and_capture(view, deadline=1.0, forbidden_content=b"fake-token-abc")
+        channels(home, forbidden_content=b"fake-token-abc").audit_state()
     assert refused.value.code == "SIDECAR_STATE_CONTAINS_SECRET"
+    # The rule's clean-up: delete exactly the one file that leaked.
+    channels(home, forbidden_content=b"fake-token-abc")  # a fresh channel for symmetry
+    leak_relative = str(refused.value).rsplit(": ", 1)[-1]
+    home.request("home.delete", {"locator": "pi-test/.pi",
+                                 "path": f"{WINDOW}/{leak_relative}"})
+    assert f"{WINDOW}/leaked.json" not in home.files
+    assert home.files[FILE] == b"clean", "no other file is touched"
 
-    oversized = FakeView({STATE_FILE: b"x" * (9 * 1024 * 1024)})
-    with pytest.raises(SidecarError) as too_big:
-        settle_and_capture(oversized, deadline=1.0)
-    assert too_big.value.code == "SIDECAR_STATE_OUTSIDE_BOUNDS"
+
+def test_an_empty_window_audits_to_nothing_without_reads():
+    home = FakeHome()
+    audit = channels(home).audit_state()
+    assert audit["audited"]["files"] == 0
+    assert home.get_calls == 0
+
+
+def test_a_channel_without_a_home_audits_to_nothing():
+    channel = _WorkerChannels(FakeHome(), "attempt-1", 1, "view-1")
+    audit = channel.audit_state()
+    assert audit["audited"]["files"] == 0
+    assert audit["files"] == []

@@ -564,7 +564,9 @@ class SessionRecords:
         with self.database.read() as conn:
             row = conn.execute(
                 "SELECT t.*,s.workspace_id,s.checkpoint_object_digest,s.checkpoint_native_id,"
-                "p.harness_type,p.config_object_digest AS profile_config_object_digest,"
+                "s.native_platform,s.home_locator,"
+                "p.harness_type,p.name AS profile_name,"
+                "p.config_object_digest AS profile_config_object_digest,"
                 "COALESCE(t.effective_config_object_digest,p.config_object_digest) "
                 "AS config_object_digest,p.credential_id,"
                 "w.connection_id,w.distribution,w.remote_user,w.remote_path,"
@@ -604,6 +606,7 @@ class SessionRecords:
     def complete_turn(
         self, turn_id: str, *, checkpoint_object_digest: str,
         checkpoint_native_id: str, result_object_digest: str, queue_records=None,
+        native_platform: str | None = None, home_locator: str | None = None,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         with self.database.transaction() as conn:
             row = conn.execute("SELECT * FROM server_turns WHERE id=?", (turn_id,)).fetchone()
@@ -623,8 +626,10 @@ class SessionRecords:
                 (result_object_digest, timestamp, turn_id),
             )
             conn.execute(
-                "UPDATE server_sessions SET status='ready',checkpoint_object_digest=?,checkpoint_native_id=?,updated_at=? WHERE id=?",
-                (checkpoint_object_digest, checkpoint_native_id, timestamp, row["session_id"]),
+                "UPDATE server_sessions SET status='ready',checkpoint_object_digest=?,checkpoint_native_id=?,"
+                "native_platform=COALESCE(?,native_platform),home_locator=COALESCE(?,home_locator),updated_at=? WHERE id=?",
+                (checkpoint_object_digest, checkpoint_native_id, native_platform, home_locator,
+                 timestamp, row["session_id"]),
             )
             updated_profile = conn.execute(
                 "UPDATE server_profiles SET run_state='idle',native_generation=native_generation+1,"
@@ -702,7 +707,23 @@ class SessionRecords:
                 {"state": row["state"], "cancel_requested": True},
             )
 
-    def finish_cancelled(self, turn_id: str, *, queue_records=None) -> dict[str, Any]:
+    def finish_cancelled(
+        self, turn_id: str, *, queue_records=None,
+        checkpoint_object_digest: str | None = None,
+        checkpoint_native_id: str | None = None,
+        native_platform: str | None = None,
+        home_locator: str | None = None,
+    ) -> dict[str, Any]:
+        """Record a cancelled turn without pretending its input vanished.
+
+        Under the native-home model the Harness kept writing its own directory
+        up to the moment it stopped, so a cancel that arrives mid-turn still
+        leaves facts behind: when an audit of that directory succeeded, the
+        Session keeps its reference (manifest, native id, platform, locator)
+        and the next turn reopens the same native session. With no audit the
+        columns are left exactly as they were - which is itself the honest
+        statement that nothing was observed.
+        """
         with self.database.transaction() as conn:
             row = conn.execute("SELECT * FROM server_turns WHERE id=?", (turn_id,)).fetchone()
             if row is None:
@@ -711,13 +732,18 @@ class SessionRecords:
                 return dict(row)
             timestamp = now()
             conn.execute(
-                "UPDATE server_turns SET state='cancelled',capture_state='not-captured',"
+                "UPDATE server_turns SET state='cancelled',capture_state=?,"
                 "error_code='TURN_CANCELLED',updated_at=? WHERE id=?",
-                (timestamp, turn_id),
+                ("captured" if checkpoint_object_digest else "not-captured", timestamp, turn_id),
             )
             conn.execute(
-                "UPDATE server_sessions SET status='ready',updated_at=? WHERE id=?",
-                (timestamp, row["session_id"]),
+                "UPDATE server_sessions SET status='ready',"
+                "checkpoint_object_digest=COALESCE(?,checkpoint_object_digest),"
+                "checkpoint_native_id=COALESCE(?,checkpoint_native_id),"
+                "native_platform=COALESCE(?,native_platform),"
+                "home_locator=COALESCE(?,home_locator),updated_at=? WHERE id=?",
+                (checkpoint_object_digest, checkpoint_native_id, native_platform,
+                 home_locator, timestamp, row["session_id"]),
             )
             conn.execute(
                 "UPDATE server_profiles SET run_state='idle',updated_at=? WHERE id=?",

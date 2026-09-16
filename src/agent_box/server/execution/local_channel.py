@@ -1,13 +1,16 @@
 """The same room, run on this machine instead of through a Worker.
 
-This is the second implementation of one channel shape: stage the bytes, ask the
-sandbox layer for the room's command, run it, hand its stdio up, capture the
-declared state subtree, and leave nothing behind. It shares the capture rules
+This is the second implementation of one channel shape: stage the bytes, ask
+the sandbox layer for the room's command, run it, hand its stdio up, audit the
+declared home subtree, and leave nothing behind. It shares the audit rules
 with the Worker-hosted channel (`state_capture`) rather than restating them.
 
-What it is *not*: an isolation mechanism. The command it runs is the room's, so
-the isolation is the room's too - this launcher only decides where the bytes
-land and how the process is started and stopped.
+The Profile's native home on this machine is `<home root>/<locator>`, created
+and marker-verified here exactly as the Worker does on a remote machine - the
+marker is the one fact that says which product identity owns the directory.
+What it is *not*: an isolation mechanism. The command it runs is the room's,
+so the isolation is the room's too - this launcher only decides where the
+bytes land and how the process is started and stopped.
 """
 from __future__ import annotations
 
@@ -15,6 +18,7 @@ import hashlib
 import os
 import shutil
 import signal
+import stat
 import subprocess
 import tempfile
 import threading
@@ -25,7 +29,10 @@ from typing import Any, Callable, Mapping, Sequence
 from agent_box_sandbox_bwrap import compose_sidecar_room
 
 from .state_capture import (
-    StateCaptureError, merge_state_into_bundle, settled_state, state_snapshot,
+    MAX_AUDIT_FILES,
+    MAX_AUDIT_FILE_BYTES,
+    MAX_AUDIT_TOTAL_BYTES,
+    StateCaptureError, audit_snapshot,
 )
 
 #: One bundled file may not exceed this many bytes, nor the bundle this many.
@@ -42,9 +49,174 @@ def _safe_bundle_path(value: str) -> str:
     return value
 
 
-def _is_transient(error: BaseException) -> bool:
-    code = getattr(error, "code", None)
-    return code in {"SIDECAR_STATE_IDENTITY_CONFLICT", "VIEW_CHANGED", "VIEW_MISSING"}
+class LocalChannelError(RuntimeError):
+    """A typed channel refusal; ``code`` names the boundary."""
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(f"{code}: {message}")
+        self.code = code
+        self.message = message
+
+
+def _safe_relative(value: str) -> str:
+    if (not isinstance(value, str) or not value or value.startswith("/")
+            or "\\" in value or "\x00" in value or "//" in value
+            or any(part in {"", ".", ".."} for part in value.split("/"))
+            or str(PurePosixPath(value)) != value):
+        raise StateCaptureError("SIDECAR_STATE_PATH_INVALID", "state path is not a bounded relative path")
+    return value
+
+
+def home_locator_segments(locator: str) -> list[str]:
+    """`<role>` or `<role>/<native-home>`, each a short safe name.
+
+    The same rule the Worker enforces for its own homes: one rule, two
+    implementations, and `.` / `..` refused even though the character class
+    alone would admit them.
+    """
+    segments = locator.split("/") if isinstance(locator, str) else []
+    if not segments or len(segments) > 2 or any(not segment for segment in segments):
+        raise LocalChannelError("HOME_LOCATOR_INVALID", "home locator is invalid")
+    for segment in segments:
+        if (len(segment) > 64 or segment in {".", ".."}
+                or any(not (character.isascii() and (
+                    character.isalnum() or character in "._-"))
+                       for character in segment)):
+            raise LocalChannelError("HOME_LOCATOR_INVALID", "home locator is invalid")
+    return segments
+
+
+class LocalHome:
+    """One Profile's durable home directory on this machine."""
+
+    def __init__(self, home_root: str | Path, locator: str, *,
+                 profile_id: str, harness_type: str, native_home: str,
+                 window: str = "") -> None:
+        segments = home_locator_segments(locator)
+        self.root = Path(home_root)
+        self.role_dir = self.root.joinpath(*segments[:1])
+        self.dir = self.root.joinpath(*segments)
+        self.locator = "/".join(segments)
+        self.profile_id = profile_id
+        self.harness_type = harness_type
+        self.native_home = native_home
+        self.marker = self.role_dir / ".agentbox-profile.json"
+        self.window = _safe_relative(window) if window else ""
+
+    def prepare(self) -> Path:
+        """Create the home, write or verify the marker, open the window.
+
+        Returns the resolved home directory for the room's mount. A marker
+        that names another product identity is a typed refusal: two Profiles
+        never share one home.
+        """
+        self.dir.mkdir(parents=True, exist_ok=True)
+        resolved = self.dir.resolve()
+        if not resolved.is_relative_to(self.root.resolve()):
+            raise LocalChannelError("HOME_OUTSIDE_ROOT", "home escapes the home root")
+        facts = {"profileId": self.profile_id, "harnessType": self.harness_type,
+                 "nativeHome": self.native_home}
+        if self.marker.exists():
+            try:
+                import json
+
+                existing = json.loads(self.marker.read_text(encoding="utf-8"))
+            except (OSError, ValueError) as exc:
+                raise LocalChannelError("HOME_MARKER_CONFLICT", "home marker is not a valid marker") from exc
+            if any(existing.get(key) != value for key, value in facts.items()):
+                raise LocalChannelError(
+                    "HOME_MARKER_CONFLICT", "the home belongs to another profile identity",
+                )
+        else:
+            import json
+            import time
+
+            self.marker.parent.mkdir(parents=True, exist_ok=True)
+            self.marker.write_text(json.dumps({**facts, "createdAt": int(time.time())}),
+                                   encoding="utf-8")
+            os.chmod(self.marker, 0o600)
+        if self.window:
+            # The window is role-relative: it may name a subtree outside the
+            # native home, and prepare must create exactly the directory the
+            # declared guest target binds to.
+            (self.role_dir / self.window).mkdir(parents=True, exist_ok=True)
+        return resolved
+
+    # -- audit -------------------------------------------------------------
+
+    def _relative_entries(self, base: Path, prefix: str, audit: dict) -> None:
+        """One bounded, link-free walk of the window, as audit facts."""
+        try:
+            entries = sorted(os.scandir(base), key=lambda item: item.name)
+        except FileNotFoundError:
+            return
+        except OSError as exc:
+            raise LocalChannelError("HOME_IO", "home listing failed") from exc
+        for entry in entries:
+            info = entry.stat(follow_symlinks=False)
+            audit["visited"] += 1
+            if audit["visited"] > 4096:
+                # The walk is cut here: at least this entry was not audited.
+                audit["truncated"]["entries"] += 1
+                return
+            relative = f"{prefix}/{entry.name}" if prefix else entry.name
+            if stat.S_ISLNK(info.st_mode):
+                audit["skipped"] += 1
+                continue
+            if stat.S_ISDIR(info.st_mode):
+                self._relative_entries(Path(entry.path), relative, audit)
+                continue
+            if not stat.S_ISREG(info.st_mode):
+                audit["truncated"]["entries"] += 1
+                continue
+            if (len(audit["files"]) >= MAX_AUDIT_FILES
+                    or info.st_size > MAX_AUDIT_FILE_BYTES
+                    or audit["bytes"] + info.st_size > MAX_AUDIT_TOTAL_BYTES):
+                audit["truncated"]["entries"] += 1
+                audit["truncated"]["bytes"] += info.st_size
+                if info.st_size > MAX_AUDIT_FILE_BYTES:
+                    audit["truncated"]["oversize"] += 1
+                continue
+            audit["files"].append({"path": relative, "size": info.st_size})
+            audit["bytes"] += info.st_size
+
+    def audit_facts(self) -> tuple[list[dict[str, Any]], dict[str, int], int]:
+        facts: dict[str, Any] = {
+            "files": [], "bytes": 0, "skipped": 0, "visited": 0,
+            "truncated": {"entries": 0, "bytes": 0, "oversize": 0},
+        }
+        base = self.role_dir / self.window if self.window else self.dir
+        self._relative_entries(base, "", facts)
+        return facts["files"], facts["truncated"], facts["skipped"]
+
+    def read(self, relative: str) -> tuple[bytes, str]:
+        relative = _safe_relative(relative)
+        base = self.role_dir / self.window if self.window else self.dir
+        target = (base / relative).resolve()
+        if not target.is_relative_to(base.resolve()):
+            raise StateCaptureError("SIDECAR_STATE_PATH_INVALID", "state path escapes the window")
+        try:
+            info = os.lstat(target)
+        except FileNotFoundError as exc:
+            raise StateCaptureError("VIEW_MISSING", "the home file is gone") from exc
+        if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode):
+            raise StateCaptureError("VIEW_SPECIAL_FILE", "home file is not a regular file")
+        if info.st_size > MAX_AUDIT_FILE_BYTES:
+            raise StateCaptureError("SIDECAR_STATE_OUTSIDE_BOUNDS", "home file exceeds the audit bound")
+        handle = os.open(target, os.O_RDONLY | os.O_NOFOLLOW)
+        with os.fdopen(handle, "rb") as stream:
+            content = stream.read(MAX_AUDIT_FILE_BYTES + 1)
+        if len(content) > MAX_AUDIT_FILE_BYTES:
+            raise StateCaptureError("SIDECAR_STATE_OUTSIDE_BOUNDS", "home file exceeds the audit bound")
+        return content, "sha256:" + hashlib.sha256(content).hexdigest()
+
+    def delete(self, relative: str) -> None:
+        relative = _safe_relative(relative)
+        target = self.role_dir / self.window / relative if self.window else self.dir / relative
+        info = os.lstat(target)
+        if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode):
+            raise LocalChannelError("HOME_IO", "only a regular file may be removed from a home")
+        os.unlink(target)
 
 
 class LocalSidecarLauncher:
@@ -55,10 +227,11 @@ class LocalSidecarLauncher:
         credential: bytes, projection_mounts: Sequence[tuple[str, str]] = (),
         runtime_artifact_mounts: Sequence[tuple[str, str]] = (),
         executable_mounts: Sequence[tuple[str, str]] = (),
-        state_bundle_prefix: str | None = None, state_target: str | None = None,
+        home_root: str | None = None, home_locator: str | None = None,
+        profile_id: str | None = None, harness_type: str | None = None,
+        native_home: str | None = None, state_target: str | None = None,
         state_ephemeral_paths: Sequence[str] = (),
         protected_state_paths: Sequence[str] = (),
-        restored_state: Mapping[str, bytes] | None = None,
     ) -> None:
         if len(bundle) > MAX_BUNDLE_FILES or sum(map(len, bundle.values())) > MAX_BUNDLE_BYTES:
             raise ValueError("LOCAL_CHANNEL_BUNDLE_OUTSIDE_BOUNDS")
@@ -66,24 +239,21 @@ class LocalSidecarLauncher:
             _safe_bundle_path(path)
         self.workspace_path = workspace_path
         self.bundle = dict(bundle)
-        self.restored_state = dict(restored_state or {})
-        # The same state projection the Worker-hosted channel carries: the
-        # marker that makes the state directory exist, and the restored files
-        # under it, minus the read-only configuration and the scratch.
-        try:
-            merge_state_into_bundle(
-                self.bundle, state_bundle_prefix=state_bundle_prefix, state_target=state_target,
-                restored_state=self.restored_state,
-                protected_state_paths=protected_state_paths,
-                state_ephemeral_paths=state_ephemeral_paths,
-            )
-        except StateCaptureError as error:
-            raise ValueError(error.code) from error
         self.credential = credential
         self.projection_mounts = tuple(projection_mounts)
         self.runtime_artifact_mounts = tuple(runtime_artifact_mounts)
         self.executable_mounts = tuple(executable_mounts)
-        self.state_bundle_prefix = state_bundle_prefix
+        # The home is this machine's own directory: prepare is done here, in
+        # Python, exactly as the Worker does it remotely - same marker rule,
+        # same window rule, no second authority.
+        segments = home_locator_segments(home_locator) if home_locator else []
+        self.native_home = native_home or (segments[-1] if len(segments) > 1 else "")
+        self.home = (
+            LocalHome(home_root, home_locator, profile_id=profile_id,
+                      harness_type=harness_type, native_home=self.native_home,
+                      window=_window_of(state_target, self.native_home))
+            if home_root is not None and home_locator else None
+        )
         self.state_target = state_target
         self.state_ephemeral_paths = tuple(state_ephemeral_paths)
         self.protected_state_paths = tuple(protected_state_paths)
@@ -103,12 +273,25 @@ class LocalSidecarLauncher:
             with os.fdopen(fd, "wb") as stream:
                 stream.write(self.credential)
             secret_path = str(secret_file)
+        home_dir = None
+        window_host = None
+        if self.home is not None:
+            home_dir = str(self.home.prepare())
+            if self.home.window and self.home.window != self.native_home:
+                # A declared window outside the native home (role-relative) is
+                # bound separately, read-write, at its declared guest target.
+                window_host = str(self.home.role_dir / self.home.window)
+        state_target = self.state_target or (
+            f"/runtime/home/{self.home.native_home}" if self.home else None)
         room = compose_sidecar_room(
             workspace=self.workspace_path, staged_view=str(view), secret=secret_path,
             base_environment=environment, executable_mounts=self.executable_mounts,
             projection_mounts=self.projection_mounts,
             runtime_artifact_mounts=self.runtime_artifact_mounts,
-            state_bundle_prefix=self.state_bundle_prefix, state_target=self.state_target,
+            state_home_source=home_dir, state_target=state_target,
+            state_window_source=window_host,
+            state_window_target=(
+                self.state_target if window_host else None),
             state_ephemeral_paths=self.state_ephemeral_paths,
         )
         # stderr goes to a file, not a pipe: a pipe nobody drains would block
@@ -127,10 +310,8 @@ class LocalSidecarLauncher:
         stderr_file.close()
         return _LocalChannels(
             process, root=root, view=view, stderr_path=stderr_path,
-            # A room may run with no credential at all; an absent secret scans
-            # as nothing rather than crashing the launch that did not need one.
-            credential=(self.credential or b"").strip(),
-            state_bundle_prefix=self.state_bundle_prefix,
+            credential=(self.credential or b'').strip(),
+            home=self.home,
             protected_state_paths=self.protected_state_paths,
             state_ephemeral_paths=self.state_ephemeral_paths,
         )
@@ -141,7 +322,7 @@ class _LocalChannels:
 
     def __init__(
         self, process: subprocess.Popen, *, root: Path, view: Path, stderr_path: Path,
-        credential: bytes, state_bundle_prefix: str | None,
+        credential: bytes, home: LocalHome | None,
         protected_state_paths: Sequence[str], state_ephemeral_paths: Sequence[str],
     ) -> None:
         self.process = process
@@ -149,7 +330,7 @@ class _LocalChannels:
         self.view = view
         self.stderr_path = stderr_path
         self._credential = credential
-        self.state_bundle_prefix = state_bundle_prefix
+        self.home = home
         self.protected_state_paths = tuple(protected_state_paths)
         self.state_ephemeral_paths = tuple(state_ephemeral_paths)
         self._lock = threading.RLock()
@@ -192,65 +373,31 @@ class _LocalChannels:
                     pass
             if os.environ.get("AGENTBOX_LOCAL_CHANNEL_KEEP") != "1":
                 # A debug switch: keeping the root is how a failed launch's
-                # stderr survives the close that a failure triggers.
+                # stderr survives the close that a failure triggers. The home
+                # is deliberately not part of this cleanup: it is the Profile's
+                # durable directory, not this attempt's scratch.
                 shutil.rmtree(self.root, ignore_errors=True)
 
-    # -- state -------------------------------------------------------------
-    def _listing(self) -> list[dict[str, Any]]:
-        """Every file under the staged view, as the state rules expect them.
-
-        A symlink is refused rather than followed: the state subtree is carried
-        into a checkpoint by value, and a link would name something that does
-        not exist on the other side.
-        """
-        if self.state_bundle_prefix is None:
-            return []
-        base = self.view.joinpath(*self.state_bundle_prefix.split("/"))
-        if not base.is_dir():
-            return []
-        listing: list[dict[str, Any]] = []
-        for item in sorted(base.rglob("*")):
-            relative = item.relative_to(base).as_posix()
-            if item.is_symlink():
-                raise StateCaptureError("VIEW_INVALID", "view contains a symlink")
-            if item.is_dir():
-                continue
-            listing.append({
-                "path": f"{self.state_bundle_prefix}/{relative}",
-                "size": item.stat().st_size,
-            })
-        return listing
-
-    def _read(self, path: str) -> tuple[bytes, str]:
-        target = self.view.joinpath(*path.split("/"))
-        if target.is_symlink():
-            raise StateCaptureError("VIEW_INVALID", "view contains a symlink")
-        content = target.read_bytes()
-        return content, "sha256:" + hashlib.sha256(content).hexdigest()
-
-    def _snapshot(self) -> tuple[dict[str, tuple[int, str]], dict[str, bytes]]:
-        if self.state_bundle_prefix is None:
-            return {}, {}
-        return state_snapshot(
-            self._listing(), self._read,
-            state_bundle_prefix=self.state_bundle_prefix,
+    # -- audit -------------------------------------------------------------
+    def audit_state(self) -> dict[str, Any]:
+        """Audit the declared home window under the shared audit rules."""
+        if self.home is None:
+            return {"files": [], "audited": {"files": 0, "bytes": 0,
+                                             "truncated": {"entries": 0, "bytes": 0, "oversize": 0}},
+                    "truncated": {"entries": 0, "bytes": 0, "oversize": 0}, "skipped": 0}
+        files, truncated, skipped = self.home.audit_facts()
+        return audit_snapshot(
+            files, self.home.read,
             protected_state_paths=self.protected_state_paths,
             state_ephemeral_paths=self.state_ephemeral_paths,
             forbidden_content=self._credential,
+            truncated=truncated,
+            skipped=skipped,
         )
 
-    def capture_state(self, *, deadline_seconds: float | None = None,
-                      interval_seconds: float | None = None) -> dict[str, bytes]:
-        if self.state_bundle_prefix is None:
-            return {}
-        return settled_state(
-            self._snapshot, is_transient=_is_transient,
-            deadline_seconds=deadline_seconds, interval_seconds=interval_seconds,
-        )
-
-    def settle_state(self, *, deadline_seconds: float | None = None,
-                     interval_seconds: float | None = None) -> None:
-        self.capture_state(deadline_seconds=deadline_seconds, interval_seconds=interval_seconds)
+    def delete_state_file(self, relative: str) -> None:
+        if self.home is not None:
+            self.home.delete(relative)
 
     # -- diagnostics -------------------------------------------------------
     def stderr_tail(self, maximum: int = 2000) -> str:
@@ -260,4 +407,22 @@ class _LocalChannels:
             return ""
 
 
-__all__ = ["LocalSidecarLauncher"]
+def _window_of(state_target: str | None, native_home: str) -> str:
+    """The audit window relative to the role directory: `state_target` minus
+    the guest home prefix. `.pi/agent/sessions` and `.local/share/opencode`
+    are both role-relative windows; a target outside the guest home cannot be
+    served by a home bind and is refused."""
+    del native_home
+    if not state_target:
+        return ""
+    prefix = "/runtime/home/"
+    if not state_target.startswith(prefix) or state_target == prefix:
+        raise ValueError("SIDECAR_STATE_PROJECTION_INVALID")
+    window = state_target[len(prefix):]
+    if (not window or window.startswith("/")
+            or any(part in {"", ".", ".."} for part in window.split("/"))):
+        raise ValueError("SIDECAR_STATE_PROJECTION_INVALID")
+    return window
+
+
+__all__ = ["LocalSidecarLauncher", "LocalChannelError", "LocalHome", "home_locator_segments"]

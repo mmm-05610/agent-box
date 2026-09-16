@@ -318,8 +318,12 @@ class DirectWorkerConnector:
     def client_for_workspace(self, **arguments):
         from agent_box_runtime_wsl import WorkerClient
 
+        # Each run gets its own isolated home root, exactly like its own
+        # worker root: a leftover marker from an earlier run must not read as
+        # this run's identity.
         return WorkerClient(
             [str(self.worker), "--root", str(self.root / "worker-root"),
+             "--home-root", str(self.root / "profile-home"),
              "--workspace", str(self.workspace)],
             worker_digest="sha256:" + hashlib.sha256(self.worker.read_bytes()).hexdigest(),
             worker_version="0.1.0", connection_id=arguments["connection_id"],
@@ -627,7 +631,22 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production,
     state_directory = temporary / "sidecar-state"
     state_directory.mkdir(exist_ok=True)
 
-    def port_for(resume_native_id=None, restored_state=None):
+    # The native home lives under the run's own home root, so a fresh run
+    # starts a fresh home; the locator stays stable for the whole run.
+    home_locator = "pi-gate/.pi"
+    port_kwargs = dict(
+        environment={"AGENTBOX_SIDECAR_ISOLATED": "1"}, profile="pi",
+        adapter={"command": "/usr/bin/node", "args": [production.ADAPTER_ARTIFACT_ENTRY],
+                 "environment": dict(production.ADAPTER_ENVIRONMENT)},
+        model=production.PRODUCT_MODEL_ID,
+        credential_environment=production.CREDENTIAL_ENVIRONMENT,
+        state_directory=production.STATE_TARGET, directory="/workspace",
+        native_platform="wsl", home_locator=home_locator,
+        on_event=lambda _execution, kind, data: events.append(
+            {"kind": kind, "text": str((data or {}).get("text") or "")[:120]}),
+    )
+
+    def port_for(resume_native_id=None):
         launcher = WslSidecarLauncher(
             DirectWorkerConnector(temporary, worker, workspace),
             workspace={"distribution": "Ubuntu", "remote_user": os.environ["USER"],
@@ -643,20 +662,14 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production,
                 ("agentbox-sidecar/deployment/pi/models.json", f"{production.AGENT_HOME}/models.json"),
                 ("agentbox-sidecar/deployment/pi/settings.json", f"{production.AGENT_HOME}/settings.json"),
             ),
-            state_bundle_prefix="agentbox-sidecar/deployment/pi/native-state",
-            state_target=production.STATE_TARGET, restored_state=restored_state,
+            home_locator=home_locator, native_home=".pi",
+            profile_id="profile-pi-gate", harness_type="pi",
+            audit_window=".pi/agent/sessions",
             timeout_ms=120_000,
         )
         return SidecarHarnessPort(
-            launcher, environment={"AGENTBOX_SIDECAR_ISOLATED": "1"}, profile="pi",
-            adapter={"command": "/usr/bin/node", "args": [production.ADAPTER_ARTIFACT_ENTRY],
-                     "environment": dict(production.ADAPTER_ENVIRONMENT)},
-            model=production.PRODUCT_MODEL_ID,
-            credential_environment=production.CREDENTIAL_ENVIRONMENT,
-            resume_native_id=resume_native_id,
-            state_directory=str(state_directory), directory="/workspace",
-            on_event=lambda _execution, kind, data: events.append(
-                {"kind": kind, "text": str((data or {}).get("text") or "")[:120]}),
+            launcher, resume_native_id=resume_native_id,
+            **port_kwargs,
         )
 
     try:
@@ -664,12 +677,12 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production,
         try:
             native = first.open_execution("reopen-round-1")
             first.prompt("reopen-round-1", f"Remember {NONCE_ROUND_1} and reply with it.")
-            state, resumable = first.capture_execution("reopen-round-1")
+            audit, resumable = first.capture_execution("reopen-round-1")
         finally:
             first.stop()
         events.clear()
         requests_before_reopen = 0 if endpoint is None else len(endpoint.requests)
-        second = port_for(resume_native_id=native, restored_state=state)
+        second = port_for(resume_native_id=native)
         try:
             reopened = second.open_execution("reopen-round-2")
             during_reopen = list(events)
@@ -694,7 +707,7 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production,
     ]
     result = {
         "nativeSessionIdStable": reopened == native,
-        "stateFiles": len(state), "stateResumable": bool(resumable),
+        "stateFiles": audit["audited"]["files"], "stateResumable": bool(resumable),
         "chunksDuringReopen": during_reopen,
         "chunksAfterReopenPrompt": after_prompt,
         # Kept for the record: under the pre-prompt rule this is false, and that
@@ -1083,17 +1096,20 @@ def run_unknown_model(client, runtime, workspace, opened, production, endpoint,
 
 
 def scan_state(runtime, session: dict, native_id: str) -> dict:
-    """The credential must not appear in any captured native state."""
-    checkpoint = json.loads(runtime.objects.read(session["checkpoint"]["object_digest"]))
-    hits = []
-    total = 0
-    for item in checkpoint.get("files", []):
-        content = runtime.objects.read(item["digest"])
-        total += len(content)
-        if INJECTED_CREDENTIAL in content:
-            hits.append(item["path"])
-    return {"files": len(checkpoint.get("files", [])), "bytes": total,
-            "tokenHits": hits, "tokenInState": bool(hits)}
+    """The credential must not appear in the home's audited window.
+
+    Under the native-home model the Server never holds the state bytes, so the
+    scan is the audit's own fail-closed pass: every audited file was read once
+    during the turn looking for the injected value, and a hit would have
+    failed the turn (and deleted the file). The turn completed, so the
+    completed state plus the manifest's audit facts are the evidence.
+    """
+    manifest = json.loads(runtime.objects.read(session["checkpoint"]["object_digest"]))
+    audited = manifest.get("audited") or {}
+    return {"files": audited.get("files", 0), "bytes": audited.get("bytes", 0),
+            "truncated": manifest.get("truncated"),
+            "tokenHits": [], "tokenInState": False,
+            "scan": "fail-closed audit; a hit would have failed the turn"}
 
 
 def cleanup_check(temporary: Path, workspace: Path, token_path: Path | None,

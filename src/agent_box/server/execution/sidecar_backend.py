@@ -333,35 +333,59 @@ class SidecarExecutionBackend:
                         datetime.now(timezone.utc),
                     ),
                 ))
-                self.records.finish_cancelled(run.turn_id, queue_records=self.queue)
+                # A cancel is not an erasure. The Harness kept writing its own
+                # home up to the moment it stopped; audit what is there now and
+                # keep the reference, so the next turn reopens the same native
+                # session and sees the input that was already on disk. If the
+                # audit itself cannot run, the record honestly stays as it was.
+                try:
+                    audit, native_resume_supported = _audited_home(run)
+                    manifest = {
+                        "schema_version": 3,
+                        "nativeSessionId": run.native_id,
+                        "harnessType": self._contexts[run.turn_id]["harness_type"],
+                        "nativePlatform": audit["nativePlatform"],
+                        "homeLocator": audit["homeLocator"],
+                        "resumable": bool(native_resume_supported and audit["files"]),
+                        "sourceExecutionId": run.core_execution_id,
+                        "audited": audit["audited"],
+                        "truncated": audit["truncated"],
+                        "files": audit["files"],
+                    }
+                    checkpoint = self.objects.publish(
+                        json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
+                    )
+                except BaseException:
+                    checkpoint = None
+                self.records.finish_cancelled(
+                    run.turn_id, queue_records=self.queue,
+                    **({"checkpoint_object_digest": checkpoint.digest,
+                        "checkpoint_native_id": run.native_id,
+                        "native_platform": audit["nativePlatform"],
+                        "home_locator": audit["homeLocator"]} if checkpoint is not None else {}),
+                )
                 self.work_service.complete_work(run.work_id, "Turn cancelled through Harness sidecar")
                 return
             if run.error is not None:
                 raise run.error
             with self._lock:
                 text = "".join(self._message_parts.get(run.turn_id, ()))
-            state, native_resume_supported = run.port.capture_execution(run.turn_id)
-            state_files = []
-            total = 0
-            for path, content in sorted(state.items()):
-                if (not isinstance(path, str) or not path or path.startswith("/")
-                        or "\\" in path or "\x00" in path or "//" in path
-                        or any(part in {"", ".", ".."} for part in path.split("/"))
-                        or str(PurePosixPath(path)) != path or not isinstance(content, bytes)):
-                    raise RuntimeError("SIDECAR_STATE_INVALID")
-                total += len(content)
-                if len(state_files) >= 256 or total > 8 * 1024 * 1024:
-                    raise RuntimeError("SIDECAR_STATE_OUTSIDE_BOUNDS")
-                state_object = self.objects.publish(content)
-                state_files.append({
-                    "path": path, "digest": state_object.digest, "size": state_object.size,
-                })
-            resumable = bool(native_resume_supported and state_files)
+            audit, native_resume_supported = _audited_home(run)
+            resumable = bool(native_resume_supported and audit["files"])
+            # The manifest is a *record*: it references the home on the machine
+            # that ran the turn (platform + locator, never a host path) and
+            # fixes what that home looked like when the turn ended. The native
+            # bytes themselves are never published.
             checkpoint = self.objects.publish(json.dumps({
-                "schema_version": 2, "nativeSessionId": run.native_id,
+                "schema_version": 3, "nativeSessionId": run.native_id,
                 "harnessType": self._contexts[run.turn_id]["harness_type"],
-                "resumable": resumable, "sourceExecutionId": run.core_execution_id,
-                "files": state_files,
+                "nativePlatform": audit["nativePlatform"],
+                "homeLocator": audit["homeLocator"],
+                "resumable": resumable,
+                "sourceExecutionId": run.core_execution_id,
+                "audited": audit["audited"],
+                "truncated": audit["truncated"],
+                "files": audit["files"],
             }, sort_keys=True, separators=(",", ":")).encode())
             result = self.objects.publish(json.dumps({
                 "schema_version": 1, "text": text, "nativeResult": run.result or {},
@@ -379,6 +403,7 @@ class SidecarExecutionBackend:
                 run.turn_id, checkpoint_object_digest=checkpoint.digest,
                 checkpoint_native_id=run.native_id, result_object_digest=result.digest,
                 queue_records=self.queue,
+                native_platform=audit["nativePlatform"], home_locator=audit["homeLocator"],
             )
             next_execution_id = completed.get("next_execution_id")
             self.work_service.complete_work(run.work_id, "Turn completed through Harness sidecar")
@@ -508,6 +533,27 @@ def _effective_attachment_support(port, execution_id: str) -> bool:
         if entry.get("id") == "attach":
             return bool(entry.get("supported"))
     return False
+
+
+def _audited_home(run: "_Run") -> tuple[dict[str, Any], bool]:
+    """Audit the home of a finished attempt, applying the credential rule.
+
+    An injected value found in the home means the one-shot projection leaked:
+    the file that carries it is deleted (the home stays usable for the next
+    turn), and the typed failure records the fact - the turn does not pass
+    with a secret sitting in a durable directory.
+    """
+    try:
+        return run.port.capture_execution(run.turn_id)
+    except BaseException as exc:
+        if getattr(exc, "code", None) == "SIDECAR_STATE_CONTAINS_SECRET":
+            relative = getattr(exc, "path", None)
+            if relative:
+                try:
+                    run.port.delete_home_file(run.turn_id, relative)
+                except BaseException:  # noqa: BLE001 - the leak failure stands
+                    pass
+        raise
 
 
 def _safe_code(exc: BaseException) -> str:

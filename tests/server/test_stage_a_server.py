@@ -306,7 +306,7 @@ def test_schema_one_migrates_turn_identity_columns_idempotently(tmp_path):
     with database.read() as conn:
         assert conn.execute(
             "SELECT version FROM agentbox_product_schema WHERE singleton=1"
-        ).fetchone()[0] == 5
+        ).fetchone()[0] == 6
         row = conn.execute("SELECT * FROM server_turns WHERE id='turn-old'").fetchone()
         assert row["profile_id"] == "profile-old"
         assert {"work_id", "execution_id", "dispatch_id", "result_object_digest",
