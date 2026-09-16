@@ -16,6 +16,7 @@ const rl = readline.createInterface({ input: process.stdin, crlfDelay: Infinity 
 const send = (m) => process.stdout.write(`${JSON.stringify(m)}\n`)
 let sessionId = null
 let nonce = null
+let pendingHeldPrompt = null
 
 for await (const line of rl) {
   if (!line.trim()) continue
@@ -58,10 +59,24 @@ for await (const line of rl) {
       mkdirSync(stateDir, { recursive: true })
       writeFileSync(stateFile, JSON.stringify({ schema_version: 2, nativeSessionId: sessionId, nonce }))
     }
+    if (text.includes("wait-for-cancel")) {
+      // Journal the input immediately, then hold: what the harness wrote
+      // before the cancel lands in the home, which is exactly what F4
+      // protects. The response only goes out once the abort arrives.
+      mkdirSync(stateDir, { recursive: true })
+      appendFileSync(`${stateDir}/cancel-journal.txt`, `input:${text}\n`)
+      continue
+    }
     send({ jsonrpc: "2.0", method: "session/update", params: {
       sessionId, update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: nonce } },
     } })
     send({ jsonrpc: "2.0", id, result: { stopReason: "end_turn" } })
-  } else if (method === "session/cancel") send({ jsonrpc: "2.0", id, result: {} })
+  } else if (method === "session/cancel") {
+    if (pendingHeldPrompt !== null) {
+      send({ jsonrpc: "2.0", id: pendingHeldPrompt, result: { stopReason: "cancelled" } })
+      pendingHeldPrompt = null
+    }
+    send({ jsonrpc: "2.0", id, result: {} })
+  }
   else if (id !== undefined) send({ jsonrpc: "2.0", id, result: {} })
 }

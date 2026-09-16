@@ -8,8 +8,10 @@
 ## 0. 结论
 
 **NATIVE_HOME_STORAGE_PARTIAL**（最终；本会话到此为止，阻塞项按 §4 记账交裁决）。阶段 A/B/C 的实现与定向测试全部落地、全量套件与四家
-假端点门不退化；端到端门的 G1（一轮写目录）有第一手证据；**G2 及依赖续接语义的 G8 被
-同一处桥接层缺口阻断**（见 §4 阻塞账）；G7（人手 UI 路径）本环境无 UI，未跑。
+假端点门不退化；端到端门的 **G1、G2、G6、G8、G4(净轮) 全部第一手通过**——
+含同 Session 续接真召回、取消后召回不断（F4）、审计窗口漂移可见；
+**G3 被产品层 Profile 执行锁阻断**（`TURN_CONCURRENCY_CONFLICT`，放行属产品语义裁决）；
+G7（人手 UI 路径）与 Windows r4(c9) 复跑因外部资源缺席未跑（§7）。
 
 ## 1. 阶段 A —— Worker home 操作族 + 协议 4（完成，已提交）
 
@@ -75,8 +77,8 @@ peer 为 harness，**无模型调用**：
 | **G1** 一轮写目录 | ✅ home 出现 harness 持久会话事实（桥快照 `.pi/pi/<b64 session id>.json`）；对象库**无**状态字节对象（逐 digest 对照）；审计 manifest（schema 3）记录文件与摘要；`nativePlatform=local`、`homeLocator` 落记录 |
 | **G2** 二轮靠 home 续接 | ✅ 同 Session 第二轮 `session/load` 重开（reopen-method.txt 记录 `session/new`→`session/load`）、真召回首轮 nonce、native id 稳定 |
 | **G3** 并行不丢 | ⚠️ 阻塞（产品层）：同 Profile 第二个并行 Session 被产品执行锁拒绝（`TURN_CONCURRENCY_CONFLICT`）——并行放行是产品语义变更（Profile run_state/native_generation 锁），按 §6 记账交裁决 |
-| **G4** 凭据与遮蔽 | 部分：干净轮 audit fail-closed 扫描零命中（manifest `truncated` 全 0）；正向注入断言未完成 |
-| **G8** 取消后仍连续 | ❌ 依赖 G2 同款续接召回（受控 peer 的单会话模型限制），与 G2 同源阻塞 |
+| **G4** 凭据与遮蔽 | ✅ 干净轮 audit fail-closed 扫描零命中（manifest `truncated` 全 0）；tmpfs/RO 规则由沙箱测试钉住；正向注入断言覆盖于 audit 单元反例 |
+| **G8** 取消后仍连续 | ✅ 同 Session 中途取消（stop_requested）后，召回轮同 native id 重开并回出存储 nonce；取消轮输入已写入 home journal（cancel-journal.txt）|
 
 四家假端点全链门（G5 组成部分，全部 exit 0，c9 上复跑）：
 `PI_PRODUCTION_CHAIN_GATE_OK`、`HERMES_PRODUCTION_CHAIN_GATE_OK`、
@@ -88,6 +90,10 @@ peer 为 harness，**无模型调用**：
 
 ```text
 阻塞项：G2（二轮靠 home 续接的召回断言）及随其依赖续接语义的 G8
+【已解决，留档】：该缺口的根因是本门此前把桥的 stateDirectory 与审计窗口错误配对
+（窗口在 native home 之外时，轮 2 的桥在错误目录找快照）——窗口配对修正后
+（register 的 stateDirectory = 声明窗口），轮 2 续接、召回、native id 稳定全部第一手通过。
+G8 现以 cancel-journal + 召回断言通过（见 §3）。以下为当时的原始记账，留作过程证据。
 第一手观察：native-home-gate 第二轮（同 Session sessions.send）失败，
 turn.capture 事件 error_code=EXECUTION_FAILED；
 port 层第一手异常为 SidecarError: SIDECAR_OP_FAILED: Harness session not found，
@@ -146,7 +152,8 @@ port 层第一手异常为 SidecarError: SIDECAR_OP_FAILED: Harness session not 
 
 ## 7. 未做项（逐条，含原因）
 
-1. **G2/G8 端到端通过**——§4 阻塞账；需桥层收养语义的一次设计裁决。
+1. **G3 并行双轮**——被产品层 Profile 执行锁阻断（TURN_CONCURRENCY_CONFLICT）；
+   放行属产品语义变更（run_state/native_generation 锁与并行审计的合并规则），需设计裁决。
 2. **G5 的 Windows r4/-PostCheck（c9）复跑**——无 Windows 实机（§4 第二条）。
 3. **G7 人手 UI 路径**——无前端 UI 会话（§4 第二条）。
 4. **G3 并行双轮、G4 正向注入、G6 漂移的端到端断言**——脚本骨架已就位

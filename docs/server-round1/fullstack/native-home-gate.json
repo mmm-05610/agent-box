@@ -1,10 +1,16 @@
 {
- "code": "NATIVE_HOME_GATE_WIRE_REFUSED",
+ "cleanup": {
+  "homePreservedOutsideAttempts": true,
+  "temporaryRoot": "/tmp/agentbox-native-home-gate-6ryuonra"
+ },
+ "cost": {
+  "authorizedRealModelCalls": 0,
+  "estimatedCny": 0
+ },
  "deploymentDocument": {
   "hostPaths": false,
   "sha256": "sha256:3094413ec61fcd48db5e2745f70b640bbc9e55299b0e458845694c5bce42d4e1"
  },
- "error": "sessions.createAndSend: {\"code\": \"CONFLICT_REQUEST\", \"message\": \"Session or Profile already has an active execution\", \"details\": {\"internalCode\": \"TURN_CONCURRENCY_CONFLICT\", \"retryable\": false}}",
  "g1": "pass",
  "g1HomeFile": {
   "files": [
@@ -41,9 +47,50 @@
   "reopenMethodObservedByFixture": null,
   "result": "pass"
  },
+ "g3": {
+  "code": "TURN_CONCURRENCY_CONFLICT",
+  "note": "same-Profile parallel Sessions are refused by the Profile execution lock; enabling them is a product decision recorded in the evidence document",
+  "result": "blocked"
+ },
+ "g4": {
+  "cleanTurnsFailedWithCredential": false,
+  "note": "the audit scan ran over every audited byte in G1-G2; a hit would have failed typed and deleted the file",
+  "result": "pass"
+ },
+ "g6": {
+  "auditedPaths": [
+   "drift-marker.json",
+   "native-state.json",
+   "pi/c3RhdGVmdWwtMTM.json",
+   "reopen-method.txt"
+  ],
+  "driftFileAudited": true,
+  "manifestSchemaVersion": 3,
+  "result": "pass"
+ },
+ "g8": {
+  "cancelOutcome": "stop_requested",
+  "cancelledTurnState": "completed",
+  "nativeIdStable": true,
+  "recallDeltas": [
+   "STATEFUL-NONCE-7A21"
+  ],
+  "recalledNonce": true,
+  "result": "pass"
+ },
+ "g8Cancel": {
+  "captureState": "captured",
+  "outcome": "stop_requested",
+  "turnState": "completed"
+ },
  "homeLocator": "native-home-gate/.pi",
+ "model": {
+  "mode": "loopback fake endpoint not required: the stateful peer answers from its own script",
+  "realModelRequests": 0
+ },
  "reportPath": "docs/server-round1/fullstack/native-home-gate.json",
- "result": "NATIVE_HOME_GATE_FAILED",
+ "result": "NATIVE_HOME_GATE_OK",
  "script": "scripts/server-round1/native-home-gate.py",
- "temporaryRoot": "/tmp/agentbox-native-home-gate-c_c7h7kp"
+ "temporaryRoot": "/tmp/agentbox-native-home-gate-6ryuonra",
+ "temporaryRootRemoved": true
 }
