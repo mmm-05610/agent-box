@@ -1816,7 +1816,10 @@ def _artifact_runtime(tmp_path, monkeypatch, *, worker, tree, digest_value, adap
         "harnesses": [{
             "id": "pi", "timeoutMs": 30_000,
             "runtimeArtifactMounts": [{
-                "source": str(tree), "target": ARTIFACT_TARGET, "treeDigest": digest_value,
+                # 部署文档不携带宿主路径：令牌 + 绑定是现行合同（7011ed0 起），
+                # 本 fixture 曾用已废弃的 `source` 键，只是因为基线环境里没有
+                # release Worker，这两条用例一直被 skip 掩盖着。
+                "token": "fixture-dep", "target": ARTIFACT_TARGET, "treeDigest": digest_value,
             }],
             "adapter": adapter,
         }],
@@ -1834,7 +1837,10 @@ def _artifact_runtime(tmp_path, monkeypatch, *, worker, tree, digest_value, adap
         if relative == ARTIFACT_PROBE_RELATIVE
         else original_file(root, relative),
     )
-    return build_runtime_from_sidecar_deployment(tmp_path / "server", deployment, plugin_root=PLUGIN)
+    return build_runtime_from_sidecar_deployment(
+        tmp_path / "server", deployment, plugin_root=PLUGIN,
+        mount_bindings={"fixture-dep": str(tree)},
+    )
 
 
 def _artifact_tree(tmp_path, *, dependency=ARTIFACT_DEPENDENCY):

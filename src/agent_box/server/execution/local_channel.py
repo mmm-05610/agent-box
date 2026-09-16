@@ -127,7 +127,9 @@ class LocalSidecarLauncher:
         stderr_file.close()
         return _LocalChannels(
             process, root=root, view=view, stderr_path=stderr_path,
-            credential=self.credential.strip(),
+            # A room may run with no credential at all; an absent secret scans
+            # as nothing rather than crashing the launch that did not need one.
+            credential=(self.credential or b"").strip(),
             state_bundle_prefix=self.state_bundle_prefix,
             protected_state_paths=self.protected_state_paths,
             state_ephemeral_paths=self.state_ephemeral_paths,

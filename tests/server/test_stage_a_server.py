@@ -159,11 +159,18 @@ def test_secret_shaped_configuration_is_rejected_before_object_publication(serve
 
 def test_unconfigured_runtime_reports_typed_capability_blockers(tmp_path):
     runtime = build_runtime(tmp_path / "unavailable")
+    # A Server with no connector can still serve local workspaces whenever the
+    # host can run the room; this test pins the typed-blocker contract on a
+    # host where it cannot, so the blocker names the placement that is missing.
+    from agent_box.server.workspaces.local_environment import LocalEnvironmentProvider
+    runtime.service.workspaces.local = LocalEnvironmentProvider(
+        sandbox_probe=lambda: {"status": "unavailable", "code": "binary_missing"},
+    )
     with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
         headers = {"Authorization": f"Bearer {runtime.token}"}
         readiness = client.get("/api/v1/readiness", headers=headers).json()
         assert {item["code"] for item in readiness["blockers"]} == {
-            "WSL_CONNECTOR_UNAVAILABLE", "EXECUTION_CAPABILITY_UNAVAILABLE",
+            "LOCAL_SANDBOX_UNAVAILABLE", "EXECUTION_CAPABILITY_UNAVAILABLE",
         }
         assert readiness["capabilities"]["harnesses"] == {}
         assert readiness["capabilities"]["execution"] is False

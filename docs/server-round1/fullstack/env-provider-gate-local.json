@@ -1,0 +1,108 @@
+{
+ "beforeRooms": [],
+ "browse": {
+  "entries": 0,
+  "path": "/tmp/agentbox-local-env-gate-qwyu1qyl/project"
+ },
+ "capability": {
+  "sessionsSend": {
+   "id": "sessions.send",
+   "supported": true
+  },
+  "workspacesOpen": {
+   "id": "workspaces.open",
+   "supported": true
+  }
+ },
+ "checkpoint": {
+  "files": [],
+  "nativeId": "fake-native-13-1",
+  "resumable": false
+ },
+ "cleanup": {
+  "leftoverLocalChannelRoots": [],
+  "preexistingRootsIgnored": [],
+  "workspaceFilesKept": [
+   "note.txt"
+  ]
+ },
+ "cost": {
+  "authorizedRealModelCalls": 0,
+  "estimatedCny": 0
+ },
+ "deploymentDocument": {
+  "hostPaths": false,
+  "note": "the same document runs both placements; placement is chosen per open",
+  "path": "/tmp/agentbox-local-env-gate-qwyu1qyl/deployment.json",
+  "sha256": "sha256:6026b906712d97d4c75cad56ba896dad3fd3923cb1667282ff994eabf4387266"
+ },
+ "executionIds": [
+  "execution_52b67943f97a49248cf0da1cd8e0c8ff",
+  "execution_6d2d4e1b406645a482c92350aedf25ec"
+ ],
+ "model": {
+  "endpoint": "none; the peer answers from a fixed script",
+  "harness": "controlled ACP peer (fake_acp_peer.mjs)",
+  "mode": "no-model-fixture",
+  "note": "mechanism evidence only; no real-model evidence is claimed by this gate",
+  "realModelRequests": 0
+ },
+ "placement": "local",
+ "placementResolution": {
+  "channel": "local-process",
+  "envKind": "local"
+ },
+ "reopened": {
+  "created": false,
+  "sameId": true
+ },
+ "reportPath": "docs/server-round1/fullstack/env-provider-gate-local.json",
+ "result": "LOCAL_ENV_GATE_OK",
+ "roundOne": {
+  "captureEvents": [
+   {
+    "code": null,
+    "files": null
+   }
+  ],
+  "captureState": "captured",
+  "cleanupState": "cleaned",
+  "deltaBeforeCompleted": true,
+  "deltaTexts": [
+   "controlled stream"
+  ],
+  "deltas": 1,
+  "state": "completed",
+  "turnId": "execution_52b67943f97a49248cf0da1cd8e0c8ff"
+ },
+ "roundTwo": {
+  "captureEvents": [
+   {
+    "code": null,
+    "files": null
+   }
+  ],
+  "captureState": "captured",
+  "cleanupState": "cleaned",
+  "deltaBeforeCompleted": true,
+  "deltaTexts": [
+   "image:text/plain:8d44f84aa9aed6aded5a2a173a75abb39265ae5983432c8d97983ee25ecce7cc"
+  ],
+  "deltas": 1,
+  "state": "completed",
+  "turnId": "execution_6d2d4e1b406645a482c92350aedf25ec"
+ },
+ "script": "scripts/server-round1/env-provider-gate.py",
+ "temporaryRoot": "/tmp/agentbox-local-env-gate-qwyu1qyl",
+ "temporaryRootRemoved": true,
+ "workspace": {
+  "created": true,
+  "environment": {
+   "host": null,
+   "kind": "local",
+   "user": null
+  },
+  "id": "ws_eb0db5b3ba564e35aad9d968b467bdc3",
+  "normalizedPath": "/tmp/agentbox-local-env-gate-qwyu1qyl/project"
+ }
+}

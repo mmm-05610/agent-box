@@ -11,6 +11,8 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
+import tempfile
 import threading
 
 from fastapi.testclient import TestClient
@@ -19,6 +21,7 @@ import pytest
 from agent_box.server.bootstrap import build_runtime
 from agent_box.server.execution import HarnessDescriptor, HarnessRegistry
 from agent_box.server.transport.http import create_app
+from agent_box.server.workspaces.local_environment import LocalEnvironmentProvider
 
 
 class FakeConnector:
@@ -234,12 +237,33 @@ def test_unavailable_capabilities_carry_a_reason(tmp_path):
         api = Wire(client, {"Authorization": f"Bearer {runtime.token}"})
         result = api.ok("server.hello", {"clientVersions": ["wire/1"], "clientPresentationSupports": []})
         entries = {item["id"]: item for item in result["capabilities"]}
-        assert entries["workspaces.open"]["supported"] is False
-        assert entries["workspaces.open"]["reason"] == "WSL_CONNECTOR_UNAVAILABLE"
+        # A Server with no connector can still open local workspaces whenever
+        # this host can run the sandbox room, so the capability follows the
+        # composition rather than the WSL connector alone.
+        assert entries["workspaces.open"]["supported"] is True
         assert entries["sessions.send"]["supported"] is False
         assert entries["sessions.send"]["reason"] == "EXECUTION_CAPABILITY_UNAVAILABLE"
         # Capabilities that need no Harness stay honest rather than blanket-false.
         assert entries["profiles.list"]["supported"] is True
+
+
+def test_a_workspace_capability_names_what_this_composition_lacks(tmp_path):
+    runtime = build_runtime(tmp_path / "bare", harnesses=registry())
+    runtime.service.workspaces.local = LocalEnvironmentProvider(
+        sandbox_probe=lambda: {"status": "unavailable", "code": "binary_missing"},
+    )
+    with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
+        api = Wire(client, {"Authorization": f"Bearer {runtime.token}"})
+        result = api.ok("server.hello", {"clientVersions": ["wire/1"], "clientPresentationSupports": []})
+        entries = {item["id"]: item for item in result["capabilities"]}
+        assert entries["workspaces.open"]["supported"] is False
+        assert entries["workspaces.open"]["reason"] == "LOCAL_SANDBOX_UNAVAILABLE"
+        refused = api.err("workspaces.open", {
+            "requestId": "open-refused",
+            "environment": {"kind": "local", "host": None, "user": None}, "path": "/tmp",
+        })
+        assert refused["code"] == "UNAVAILABLE"
+        assert refused["details"]["internalCode"] == "LOCAL_SANDBOX_UNAVAILABLE"
 
 
 def test_envelope_rejects_malformed_and_unknown_requests(wire):
@@ -289,13 +313,57 @@ def test_browse_reports_read_and_write_independently(wire):
     assert by_name["README.md"]["reason"] == "not_a_directory"
 
 
-def test_browse_refuses_environments_this_server_does_not_provide(wire):
+def test_browse_reports_local_locations_through_the_same_entry_shape(wire):
+    """The local placement answers with the same entry contract as WSL.
+
+    Nothing here depends on which environment was browsed: a directory is
+    openable, a non-directory is listed with its reason, and the path that comes
+    back is the location the room would bind.
+    """
     _runtime, api, _execution = wire
-    error = api.err("workspaces.browse", {
-        "requestId": "browse-local",
-        "environment": {"kind": "local", "host": None, "user": None}, "path": "/tmp",
+    root = Path(tempfile.mkdtemp(prefix="wire-local-browse-"))
+    try:
+        (root / "src").mkdir()
+        (root / "README.md").write_text("readme", encoding="utf-8")
+        result = api.ok("workspaces.browse", {
+            "requestId": "browse-local",
+            "environment": {"kind": "local", "host": None, "user": None},
+            "path": str(root),
+        })
+        assert result["path"] == str(root.resolve())
+        by_name = {entry["name"]: entry for entry in result["entries"]}
+        assert by_name["src"]["kind"] == "directory" and by_name["src"]["canOpen"] is True
+        assert by_name["README.md"]["canOpen"] is False
+        assert by_name["README.md"]["reason"] == "not_a_directory"
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
+def test_local_locations_are_refused_by_name_not_silently(wire):
+    _runtime, api, _execution = wire
+    for path, code in (
+        ("/definitely/not/here", "LOCAL_PATH_MISSING"),
+        ("/etc/hostname", "LOCAL_PATH_NOT_DIRECTORY"),
+        ("/", "LOCAL_PATH_FORBIDDEN"),
+        ("relative/path", "LOCAL_PATH_INVALID"),
+        ("/tmp/../tmp", "LOCAL_PATH_INVALID"),
+    ):
+        error = api.err("workspaces.open", {
+            "requestId": f"open-refused-{code}",
+            "environment": {"kind": "local", "host": None, "user": None}, "path": path,
+        })
+        assert error["details"]["internalCode"] == code, (path, error)
+
+
+def test_an_ssh_workspace_without_a_connector_is_refused_by_name(wire):
+    _runtime, api, _execution = wire
+    error = api.err("workspaces.open", {
+        "requestId": "open-ssh",
+        "environment": {"kind": "ssh", "host": "203.0.113.7", "user": "root"},
+        "path": "/srv/project",
     })
-    assert error["code"] == "CAPABILITY_UNSUPPORTED"
+    assert error["code"] == "UNAVAILABLE"
+    assert error["details"]["internalCode"] == "SSH_CONNECTOR_UNAVAILABLE"
 
 
 def test_reopening_the_same_location_keeps_identity(wire):

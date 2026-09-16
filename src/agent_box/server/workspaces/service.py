@@ -5,6 +5,7 @@ from typing import Any, Mapping, Protocol
 
 from agent_box.server.errors import ServerError, unavailable
 from agent_box.server.records import digest
+from agent_box.server.workspaces.local_environment import LocalEnvironmentProvider
 from agent_box.server.workspaces.repository import WorkspaceRecords
 
 
@@ -15,17 +16,35 @@ class WslConnectionPort(Protocol):
     def open_workspace(self, probe_id: str, path: str) -> dict[str, Any]: ...
 
 
+class SshConnectionPort(Protocol):
+    def probe(self, target: str, user: str | None) -> dict[str, Any]: ...
+    def browse(self, probe_id: str, path: str) -> dict[str, Any]: ...
+    def open_workspace(self, probe_id: str, path: str) -> dict[str, Any]: ...
+
+
 class WorkspaceService:
     def __init__(self, records: WorkspaceRecords, idempotency, *,
-                 connector: WslConnectionPort | None = None) -> None:
+                 connector: WslConnectionPort | None = None,
+                 ssh_connector: SshConnectionPort | None = None,
+                 local: LocalEnvironmentProvider | None = None) -> None:
         self.records = records
         self.idempotency = idempotency
         self.connector = connector
+        self.ssh_connector = ssh_connector
+        #: Local locations need no remote peer, so this defaults to the real
+        #: provider; a caller that wants the refusal without the probe injects
+        #: a stub instead of pretending the placement is unimplemented.
+        self.local = local if local is not None else LocalEnvironmentProvider()
 
     def readiness_blockers(self) -> list[dict[str, Any]]:
-        return [] if self.connector is not None else [
-            {"code": "WSL_CONNECTOR_UNAVAILABLE", "retryable": True},
-        ]
+        """Why this Server could not open a Workspace at all, if that is so.
+
+        Environments are answered per request; this is the composition-level
+        fact only - whether *any* placement can be served here.
+        """
+        if self.connector is not None or self.ssh_connector is not None:
+            return []
+        return self.local.readiness_blockers()
 
     def distributions(self):
         if self.connector is None:
@@ -106,17 +125,14 @@ class WorkspaceService:
         refused merely for being read-only (core-semantics/1 §4).
         """
         kind, host, user = self._validate_environment(environment)
-        if kind != "wsl":
-            # Local selection belongs to the Electron host, and no SSH
-            # execution端 is wired in this deployment; saying so is the honest
-            # answer instead of pretending to browse.
-            raise ServerError(
-                "CAPABILITY_UNSUPPORTED",
-                f"{kind} browsing is not provided by this Server",
-                status=503,
-            )
-        probe = self._wsl_probe(host, user)
-        result = self._connector_call(self.connector.browse, probe["probe_id"], path)
+        if kind == "local":
+            return self.local.browse(path)
+        if kind == "ssh":
+            probe = self._ssh_probe(host, user)
+            result = self._ssh_call(self.ssh_connector.browse, probe["probe_id"], path)
+        else:
+            probe = self._wsl_probe(host, user)
+            result = self._connector_call(self.connector.browse, probe["probe_id"], path)
         entries = []
         for item in result.get("directories", ()):
             name = item if isinstance(item, str) else str(item.get("name", ""))
@@ -136,11 +152,23 @@ class WorkspaceService:
         self, *, environment: Any, path: str, expected_version: int | None,
     ) -> tuple[bool, dict[str, Any]]:
         kind, host, user = self._validate_environment(environment)
-        if kind != "wsl":
-            raise ServerError(
-                "CAPABILITY_UNSUPPORTED",
-                f"{kind} workspaces are not provided by this Server",
-                status=503,
+        if kind == "local":
+            # A local location is this machine's own fact: the provider
+            # validates it and answers the path the room will actually bind.
+            # The record names no host and no remote user, because there is
+            # neither - inventing either would be a workspace that claims to
+            # live somewhere it does not.
+            verified = self.local.open_workspace(path)
+            return self.records.upsert_by_location(
+                env_kind="local", env_host=None, remote_user=None,
+                normalized_path=verified["path"], connection_id=None,
+            )
+        if kind == "ssh":
+            probe = self._ssh_probe(host, user)
+            verified = self._ssh_call(self.ssh_connector.open_workspace, probe["probe_id"], path)
+            return self.records.upsert_by_location(
+                env_kind="ssh", env_host=verified["host"], remote_user=verified.get("user") or user,
+                normalized_path=verified["path"], connection_id=verified["connection_id"],
             )
         probe = self._wsl_probe(host, user)
         verified = self._connector_call(self.connector.open_workspace, probe["probe_id"], path)
@@ -149,10 +177,69 @@ class WorkspaceService:
             normalized_path=verified["path"], connection_id=verified["connection_id"],
         )
 
+    def _ssh_probe(self, host: str | None, user: str | None) -> dict[str, Any]:
+        if self.ssh_connector is None:
+            raise unavailable("SSH_CONNECTOR_UNAVAILABLE", "SSH connector is not configured")
+        if not host:
+            raise ServerError("ENVIRONMENT_INVALID", "ssh environment needs a host", status=422)
+        return self._ssh_call(self.ssh_connector.probe, host, user)
+
+    def read_workspace_file(self, workspace: Any, relative_path: str) -> tuple[bytes, str]:
+        """Read one workspace file from wherever this workspace actually lives.
+
+        The caller supplies the stored record; which machine serves the bytes is
+        the record's placement, not the caller's guess. A local workspace is
+        served by this Server, a remote one by the connector that reached it.
+        """
+        kind = workspace.get("env_kind") or "wsl"
+        if kind == "local":
+            return self.local.read_workspace_file(
+                normalized_path=workspace["normalized_path"], relative_path=relative_path,
+            )
+        if kind == "ssh":
+            if self.ssh_connector is None:
+                raise unavailable("SSH_CONNECTOR_UNAVAILABLE", "SSH connector is not configured")
+            return self._ssh_call(
+                self.ssh_connector.read_workspace_file,
+                distribution=workspace.get("env_host"),
+                user=workspace.get("remote_user"),
+                connection_id=workspace["connection_id"],
+                workspace_path=workspace["remote_path"],
+                relative_path=relative_path,
+            )
+        if self.connector is None:
+            raise unavailable("WSL_CONNECTOR_UNAVAILABLE", "WSL connector is not configured")
+        reader = getattr(self.connector, "read_workspace_file", None)
+        if not callable(reader):
+            raise unavailable(
+                "WSL_CONNECTOR_UNAVAILABLE", "workspace attachment reading is unavailable",
+            )
+        return self._connector_call(
+            reader,
+            distribution=workspace["distribution"], user=workspace.get("remote_user"),
+            connection_id=workspace["connection_id"],
+            workspace_path=workspace["remote_path"], relative_path=relative_path,
+        )
+
     @staticmethod
-    def _connector_call(method, *args):
+    def _ssh_call(method, *args, **kwargs):
         try:
-            return method(*args)
+            return method(*args, **kwargs)
+        except ServerError:
+            raise
+        except Exception as exc:
+            code = str(getattr(exc, "code", "SSH_OPERATION_FAILED"))
+            status = 409 if code == "PROBE_EXPIRED" else (
+                422 if code in {"SSH_TARGET_INVALID", "SSH_IDENTITY_INVALID"} else 503
+            )
+            raise ServerError(
+                code, str(getattr(exc, "message", "SSH operation failed")), status=status,
+            ) from exc
+
+    @staticmethod
+    def _connector_call(method, *args, **kwargs):
+        try:
+            return method(*args, **kwargs)
         except ServerError:
             raise
         except Exception as exc:

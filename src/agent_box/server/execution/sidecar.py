@@ -257,8 +257,15 @@ def sidecar_bundle_files(
     return files
 
 
-class WslSidecarLauncher:
-    """Launch the reviewed sidecar through Worker interactive + bwrap."""
+class WorkerSidecarLauncher:
+    """Launch the reviewed sidecar through one Worker's interactive channel.
+
+    The Worker is the host boundary, and this launcher is what it looks like from
+    the product side: stage the bytes, ask the sandbox layer for the room, spawn,
+    stream, capture. Which machine the Worker runs on is the connector's fact,
+    not this class's - a WSL Worker and an SSH Worker take exactly this path, and
+    neither one makes this layer know a host name.
+    """
 
     def __init__(
         self, connector, *, workspace: Mapping[str, Any], bundle: Mapping[str, bytes],
@@ -403,6 +410,12 @@ class WslSidecarLauncher:
                 pass
             client.close()
             raise
+
+
+#: The name under which this launcher was WSL-only. Every caller it had - the
+#: four family gates, the Windows acceptance and the tests - still reads it; the
+#: class itself has since stopped knowing which machine its Worker runs on.
+WslSidecarLauncher = WorkerSidecarLauncher
 
 
 class _WorkerChannels:

@@ -464,7 +464,7 @@ def test_the_loader_derives_protected_paths_and_hands_them_to_the_launcher(
         sidecar_module, "sidecar_bundle_files",
         lambda root, additional_files=None: dict(additional_files or {}),
     )
-    monkeypatch.setattr(sidecar_module, "WslSidecarLauncher", RecordingLauncher)
+    monkeypatch.setattr(sidecar_module, "WorkerSidecarLauncher", RecordingLauncher)
     deployment = write_deployment(tmp_path, fixture_harness(
         projectionFiles=[
             {"source": "config.json", "target": f"{AGENT_DIRECTORY}/config.json"},

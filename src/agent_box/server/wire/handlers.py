@@ -279,8 +279,11 @@ class WireService:
 
     def _capability(self, capability_id: str) -> tuple[bool, str | None]:
         if capability_id.startswith("workspaces."):
-            if self.workspaces.connector is None:
-                return False, "WSL_CONNECTOR_UNAVAILABLE"
+            # Environments are answered per request; this is the composition's
+            # one fact - whether *any* placement can be served here at all.
+            blockers = self.workspaces.readiness_blockers()
+            if blockers:
+                return False, str(blockers[0]["code"])
             return True, None
         if capability_id.startswith("sessions.") or capability_id == "sendOutcome.query":
             if self.execution is None:
@@ -979,15 +982,9 @@ class WireService:
                     or any(part in {"", ".", ".."} for part in relative.parts)
                     or relative.as_posix() != item["ref"]):
                 raise WireError("INVALID_REQUEST", "attachment ref must be a normalized workspace path")
-            connector = self.workspaces.connector
-            reader = getattr(connector, "read_workspace_file", None)
-            if not callable(reader):
-                raise WireError("CAPABILITY_UNSUPPORTED", "workspace attachment reading is unavailable")
             try:
-                content, content_digest = reader(
-                    distribution=workspace["distribution"], user=workspace["remote_user"],
-                    connection_id=workspace["connection_id"],
-                    workspace_path=workspace["remote_path"], relative_path=relative.as_posix(),
+                content, content_digest = self.workspaces.read_workspace_file(
+                    workspace, relative.as_posix(),
                 )
             except Exception as exc:
                 raise WireError("INVALID_REQUEST", "attachment is outside the authorized workspace or unreadable") from exc

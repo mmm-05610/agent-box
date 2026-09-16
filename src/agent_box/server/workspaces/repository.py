@@ -67,7 +67,7 @@ class WorkspaceRecords:
 
     def upsert_by_location(
         self, *, env_kind: str, env_host: str | None, remote_user: str | None,
-        normalized_path: str, connection_id: str,
+        normalized_path: str, connection_id: str | None,
     ) -> tuple[bool, dict[str, Any]]:
         """Open-or-return a Workspace identified by environment + location.
 
@@ -89,11 +89,15 @@ class WorkspaceRecords:
             # environment-scoped id is not the product identity, so two
             # locations in one environment never share this value.
             del connection_id
+            # `distribution` is the legacy name of the connector's environment
+            # identity and the column is NOT NULL. A local workspace has no
+            # remote identity to record, so the placement itself is what the
+            # column says - never a host path, never a borrowed WSL name.
             conn.execute(
                 "INSERT INTO server_workspaces(id,connection_id,distribution,remote_user,remote_path,"
                 "connection_state,display_name,version,archived_at,env_kind,env_host,normalized_path,"
                 "created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                (workspace_id, opaque_id("conn"), env_host, remote_user, normalized_path,
+                (workspace_id, opaque_id("conn"), env_host or "local", remote_user, normalized_path,
                  "verified", normalized_path.rsplit("/", 1)[-1] or normalized_path, 1, None,
                  env_kind, env_host, normalized_path, timestamp, timestamp),
             )

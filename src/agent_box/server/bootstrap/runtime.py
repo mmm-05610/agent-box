@@ -145,6 +145,30 @@ def _builtin_connector(server_instance_id: str) -> WslConnectionPort | None:
     )
 
 
+def _builtin_ssh_connector(server_instance_id: str):
+    """Compose the SSH connector from process bindings, the way WSL's is.
+
+    Like the WSL connector's bindings, these name machine-local facts the
+    deployment document must not carry: which manifest pins the Worker, where
+    the Worker already lives on the remote host, and the locator of the identity
+    that may reach it. A binding left unset simply means that placement is not
+    composed here - which `resolve_placement` then says out loud.
+    """
+    manifest = os.environ.get("AGENT_BOX_SSH_WORKER_MANIFEST")
+    worker = os.environ.get("AGENT_BOX_SSH_WORKER_REMOTE_PATH")
+    identity = os.environ.get("AGENT_BOX_SSH_IDENTITY_FILE")
+    if not manifest or not worker or not identity:
+        return None
+    from agent_box.server.execution.ssh_connector import SshConnector
+
+    port = os.environ.get("AGENT_BOX_SSH_PORT")
+    return SshConnector(
+        manifest_path=manifest, remote_worker_path=worker,
+        identity_file=identity, server_instance_id=server_instance_id,
+        port=int(port) if port else 22,
+    )
+
+
 @dataclass
 class ServerRuntime:
     data_root: Path
@@ -221,6 +245,7 @@ def build_runtime(
     data_root: Path | str, *,
     harnesses: HarnessRegistry | None = None,
     connector: WslConnectionPort | None = None,
+    ssh_connector=None,
     secret_store: SecretStore | None = None,
     execution: TurnExecutionPort | None = None,
     execution_factory=None,
@@ -245,6 +270,11 @@ def build_runtime(
     notifier = EventNotifier()
     registry = harnesses if harnesses is not None else HarnessRegistry()
     connector_instance = connector if connector is not None else _builtin_connector(owner.instance_id)
+    ssh_instance = ssh_connector if ssh_connector is not None else _builtin_ssh_connector(owner.instance_id)
+    # The composition's connectors, keyed by the placement that consumes them.
+    # Everything downstream reads this mapping, so "which environments can this
+    # Server actually reach" is one fact stated once.
+    connectors = {"wsl": connector_instance, "ssh": ssh_instance}
     secrets_store = secret_store
     if secrets_store is None and os.name == "nt":
         from agent_box.storage import WindowsDpapiSecretStore
@@ -265,7 +295,7 @@ def build_runtime(
     if execution is None and execution_factory is not None:
         try:
             execution = execution_factory(
-                session_records, objects, approval_records, notifier, connector_instance,
+                session_records, objects, approval_records, notifier, connectors,
                 credentials, secrets_store,
             )
         except BaseException:
@@ -274,7 +304,10 @@ def build_runtime(
     if execution is not None and hasattr(execution, "bind_queue"):
         execution.bind_queue(queue_records)
 
-    workspace_service = WorkspaceService(workspace_records, idempotency, connector=connector_instance)
+    workspace_service = WorkspaceService(
+        workspace_records, idempotency, connector=connector_instance,
+        ssh_connector=ssh_instance,
+    )
     profile_service = ProfileService(profile_records, idempotency, objects,
                                      harnesses=registry, credentials=credentials)
     provider_model_service = ProviderModelService(
@@ -345,9 +378,9 @@ def build_runtime_from_sidecar_deployment(
     used_bindings: set[str] = set()
     from agent_box.server.execution import HarnessDescriptor, HarnessRegistry, SidecarExecutionBackend
     from agent_box.server.execution.local_channel import LocalSidecarLauncher
-    from agent_box.server.execution.placement import WSL_CHANNEL, resolve_placement
+    from agent_box.server.execution.placement import SSH_CHANNEL, WSL_CHANNEL, resolve_placement
     from agent_box.server.execution.sidecar import (
-        SidecarHarnessPort, WslSidecarLauncher, sidecar_bundle_files,
+        SidecarHarnessPort, WorkerSidecarLauncher, sidecar_bundle_files,
     )
     from agent_box.resource_contracts.harness_capabilities import (
         CapabilityDeclarationError, validate_claims,
@@ -546,7 +579,7 @@ def build_runtime_from_sidecar_deployment(
     # `secret` key is a typed refusal, not an ignored extra.
     declared_credentials = _deployment_credentials(value)
 
-    def factory(records, objects, approvals, notifier, connector, credentials, secret_store):
+    def factory(records, objects, approvals, notifier, connectors, credentials, secret_store):
         # No gate here: whether a connector is required depends on the placement
         # the workspace names, and that is resolved per turn.
         def port_factory(context, on_event):
@@ -570,12 +603,13 @@ def build_runtime_from_sidecar_deployment(
             )
             # The workspace record says where this turn belongs; that fact - and
             # only that fact - decides which channel stages and starts it.
+            kind = context.get("env_kind")
             placement = resolve_placement(
-                context.get("env_kind"), has_connector=connector is not None,
+                kind, has_connector=connectors.get(kind) is not None,
             )
-            if placement.channel == WSL_CHANNEL:
-                launcher = WslSidecarLauncher(
-                    connector,
+            if placement.channel in {WSL_CHANNEL, SSH_CHANNEL}:
+                launcher = WorkerSidecarLauncher(
+                    connectors[placement.kind],
                     workspace={
                         "distribution": context["distribution"],
                         "remote_user": context["remote_user"],

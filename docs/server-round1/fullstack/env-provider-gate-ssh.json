@@ -1,0 +1,114 @@
+{
+ "beforeRooms": [],
+ "browse": {
+  "entries": 0,
+  "path": "/root/agentbox-env-gate/run"
+ },
+ "capability": {
+  "sessionsSend": {
+   "id": "sessions.send",
+   "supported": true
+  },
+  "workspacesOpen": {
+   "id": "workspaces.open",
+   "supported": true
+  }
+ },
+ "checkpoint": {
+  "files": [],
+  "nativeId": "fake-native-13-1",
+  "resumable": false
+ },
+ "cleanup": {
+  "remoteWorkerFiles": "0",
+  "remoteWorkerProcesses": "0",
+  "remoteWorkspaceRemoved": "removed"
+ },
+ "cost": {
+  "authorizedRealModelCalls": 0,
+  "estimatedCny": 0
+ },
+ "deploymentDocument": {
+  "hostPaths": false,
+  "note": "the same document runs both placements; placement is chosen per open",
+  "path": "/tmp/agentbox-ssh-env-gate-pu9yqx0k/deployment.json",
+  "sha256": "sha256:6026b906712d97d4c75cad56ba896dad3fd3923cb1667282ff994eabf4387266"
+ },
+ "executionIds": [
+  "execution_5b9b63cac07c4b038b1c4c8f19be01bd",
+  "execution_f258b211a53e4b8c96025564998ef956"
+ ],
+ "model": {
+  "endpoint": "none; the peer answers from a fixed script",
+  "harness": "controlled ACP peer (fake_acp_peer.mjs)",
+  "mode": "no-model-fixture",
+  "note": "mechanism evidence only; no real-model evidence is claimed by this gate",
+  "realModelRequests": 0
+ },
+ "placement": "ssh",
+ "placementResolution": {
+  "channel": "ssh-worker",
+  "envKind": "ssh"
+ },
+ "reopened": {
+  "created": false,
+  "sameId": true
+ },
+ "reportPath": "docs/server-round1/fullstack/env-provider-gate-ssh.json",
+ "result": "SSH_ENV_GATE_OK",
+ "roundOne": {
+  "captureEvents": [
+   {
+    "code": null,
+    "files": null
+   }
+  ],
+  "captureState": "captured",
+  "cleanupState": "cleaned",
+  "deltaBeforeCompleted": true,
+  "deltaTexts": [
+   "controlled stream"
+  ],
+  "deltas": 1,
+  "state": "completed",
+  "turnId": "execution_5b9b63cac07c4b038b1c4c8f19be01bd"
+ },
+ "roundTwo": {
+  "captureEvents": [
+   {
+    "code": null,
+    "files": null
+   }
+  ],
+  "captureState": "captured",
+  "cleanupState": "cleaned",
+  "deltaBeforeCompleted": true,
+  "deltaTexts": [
+   "image:text/plain:8d44f84aa9aed6aded5a2a173a75abb39265ae5983432c8d97983ee25ecce7cc"
+  ],
+  "deltas": 1,
+  "state": "completed",
+  "turnId": "execution_f258b211a53e4b8c96025564998ef956"
+ },
+ "script": "scripts/server-round1/env-provider-gate.py",
+ "ssh": {
+  "host": "121.40.184.111",
+  "identityLocator": "/home/maoqh/.ssh/maomaokingdom.pem",
+  "identityPermissions": "0o600",
+  "remoteWorker": "/root/agentbox-worker/agent-box-worker",
+  "user": "root",
+  "workspace": "/root/agentbox-env-gate/run"
+ },
+ "temporaryRoot": "/tmp/agentbox-ssh-env-gate-pu9yqx0k",
+ "temporaryRootRemoved": true,
+ "workspace": {
+  "created": true,
+  "environment": {
+   "host": "121.40.184.111",
+   "kind": "ssh",
+   "user": "root"
+  },
+  "id": "ws_3caa438edf694600ab074f8bd2c00135",
+  "normalizedPath": "/root/agentbox-env-gate/run"
+ }
+}

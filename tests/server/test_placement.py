@@ -26,20 +26,36 @@ def test_a_wsl_workspace_needs_a_connector_and_says_so():
     assert refused.value.code == "WSL_CONNECTOR_UNAVAILABLE"
 
 
+def test_an_ssh_workspace_resolves_once_its_connector_is_composed():
+    assert resolve_placement("ssh", has_connector=True).channel == "ssh-worker"
+    with pytest.raises(PlacementUnsupported) as refused:
+        resolve_placement("ssh", has_connector=False)
+    assert refused.value.code == "SSH_CONNECTOR_UNAVAILABLE"
+
+
 def test_a_local_workspace_needs_no_connector():
     placement = resolve_placement("local", has_connector=False)
     assert (placement.kind, placement.channel) == ("local", "local-process")
 
 
-def test_a_named_but_unimplemented_placement_is_refused_not_downgraded():
-    with pytest.raises(PlacementUnsupported) as refused:
-        resolve_placement("ssh", has_connector=True)
-    assert refused.value.code == "PLACEMENT_UNIMPLEMENTED"
+def test_every_named_placement_has_an_implementation_so_none_is_downgraded():
+    """No placement is named without being served, and no unknown one is served.
+
+    The historic failure this guards against is a name that resolves into
+    "whatever channel happens to exist": a workspace whose record says `ssh` must
+    never quietly become a local turn because that was the easier machine.
+    """
+    assert {resolve_placement(kind, has_connector=True).kind for kind in ("local", "wsl", "ssh")} == {
+        "local", "wsl", "ssh",
+    }
+    with pytest.raises(PlacementUnsupported) as unknown:
+        resolve_placement("serial", has_connector=True)
+    assert unknown.value.code == "PLACEMENT_UNKNOWN"
     # A workspace that names no placement at all is refused too: the historic
     # "assume WSL" default is exactly what this resolution removes.
-    with pytest.raises(PlacementUnsupported) as unknown:
+    with pytest.raises(PlacementUnsupported) as unnamed:
         resolve_placement(None, has_connector=True)
-    assert unknown.value.code == "PLACEMENT_UNKNOWN"
+    assert unnamed.value.code == "PLACEMENT_UNKNOWN"
 
 
 def _deployment(tmp_path: Path) -> Path:
@@ -54,7 +70,7 @@ def _deployment(tmp_path: Path) -> Path:
     return document
 
 
-def _channel_for(tmp_path, monkeypatch, env_kind: str) -> str:
+def _channel_for(tmp_path, monkeypatch, env_kind: str, *, ssh_connector: bool = False) -> str:
     """Which channel the product's own port factory builds for one placement."""
     import agent_box.server.bootstrap.runtime as runtime_module
     import agent_box.server.execution.local_channel as local_module
@@ -62,20 +78,26 @@ def _channel_for(tmp_path, monkeypatch, env_kind: str) -> str:
 
     chosen: dict = {}
 
-    class RecordingWsl:
-        def __init__(self, *_args, **_kwargs) -> None:
-            chosen["channel"] = "wsl-worker"
+    class RecordingWorker:
+        def __init__(self, connector, *_args, **_kwargs) -> None:
+            # The launcher must be handed the connector of the placement it is
+            # about to run on, not whichever one the composition happens to have.
+            chosen["channel"] = "worker"
+            chosen["connector"] = connector
 
     class RecordingLocal:
         def __init__(self, *_args, **_kwargs) -> None:
             chosen["channel"] = "local-process"
 
-    monkeypatch.setattr(runtime_module, "_builtin_connector", lambda _id: object())
+    wsl = object() if env_kind == "wsl" else None
+    ssh = object() if ssh_connector else None
+    monkeypatch.setattr(runtime_module, "_builtin_connector", lambda _id: wsl)
+    monkeypatch.setattr(runtime_module, "_builtin_ssh_connector", lambda _id: ssh)
     monkeypatch.setattr(
         sidecar_module, "sidecar_bundle_files",
         lambda root, additional_files=None: dict(additional_files or {}),
     )
-    monkeypatch.setattr(sidecar_module, "WslSidecarLauncher", RecordingWsl)
+    monkeypatch.setattr(sidecar_module, "WorkerSidecarLauncher", RecordingWorker)
     # The builder imports both launchers at call time, so patching the source
     # module's attributes is what the product path actually reads.
     monkeypatch.setattr(local_module, "LocalSidecarLauncher", RecordingLocal)
@@ -97,7 +119,34 @@ def _channel_for(tmp_path, monkeypatch, env_kind: str) -> str:
 
 
 def test_the_placement_picks_the_channel_through_the_product_path(tmp_path, monkeypatch):
-    assert _channel_for(tmp_path, monkeypatch, "wsl") == "wsl-worker"
+    assert _channel_for(tmp_path, monkeypatch, "wsl") == "worker"
+
+
+def test_the_ssh_placement_runs_on_its_own_connector(tmp_path, monkeypatch):
+    chosen_channel = _channel_for(tmp_path, monkeypatch, "ssh", ssh_connector=True)
+    assert chosen_channel == "worker"
+
+
+def test_the_ssh_placement_is_refused_without_its_connector(tmp_path, monkeypatch):
+    import agent_box.server.bootstrap.runtime as runtime_module
+
+    monkeypatch.setattr(runtime_module, "_builtin_connector", lambda _id: object())
+    monkeypatch.setattr(runtime_module, "_builtin_ssh_connector", lambda _id: None)
+    runtime = build_runtime_from_sidecar_deployment(
+        tmp_path / "server", _deployment(tmp_path), plugin_root=PLUGIN,
+    )
+    try:
+        frozen = runtime.objects.publish(json.dumps({"execution": {}}).encode())
+        with pytest.raises(PlacementUnsupported) as refused:
+            runtime.execution.port_factory({
+                "harness_type": "fixture", "distribution": "203.0.113.7",
+                "remote_user": "root", "connection_id": "connection",
+                "remote_path": "/workspace", "env_kind": "ssh", "env_host": "203.0.113.7",
+                "normalized_path": "/workspace", "config_object_digest": frozen.digest,
+            }, lambda *_args: None)
+    finally:
+        runtime.stop()
+    assert refused.value.code == "SSH_CONNECTOR_UNAVAILABLE"
 
 
 def test_a_local_workspace_runs_through_the_local_channel(tmp_path, monkeypatch):

@@ -1,0 +1,223 @@
+"""This machine, as an environment a Workspace can live in.
+
+The `local` placement needs the same two things every other placement needs - a
+validated location and a truthful answer about what can be done with it - and
+nothing else. There is no connector here because there is no other machine to
+ask, and there is no new deployment field because the document already says how
+a room runs, on whichever machine it runs.
+
+What stays in this module is the part that is genuinely local: turning a
+caller-supplied path into a location, listing one directory honestly, and
+refusing - in typed terms - when the path is not a location this Server may
+open. Nothing here stages bytes, composes a room, or starts a process; that is
+the channel's job and it is the same channel for any host.
+"""
+from __future__ import annotations
+
+import hashlib
+import os
+import shutil
+import stat
+from pathlib import Path, PurePosixPath
+from typing import Any, Callable, Mapping
+
+from agent_box.server.errors import ServerError
+
+#: One workspace file, as the Worker channel bounds it too.
+MAX_WORKSPACE_FILE_BYTES = 8 * 1024 * 1024
+
+#: The one path that can never be a Workspace. A room binds its workspace
+#: writable, so accepting `/` would hand the whole host filesystem to the guest
+#: at the workspace mount - a placement that is never a product intent and is
+#: cheap to refuse by name.
+FORBIDDEN_ROOTS = frozenset({"/"})
+
+#: Directory entries this listing reports. Anything else is a non-directory
+#: entry with a reason, never a silent omission.
+_DIRECTORY = "directory"
+_FILE = "file"
+
+
+def _refuse(code: str, message: str, status: int, *, retryable: bool = False) -> ServerError:
+    return ServerError(code, message, status=status, retryable=retryable)
+
+
+class LocalEnvironmentProvider:
+    """Validate and list paths on the machine this Server runs on.
+
+    `sandbox_probe` answers whether this host can run the room the sandbox layer
+    composes. It is injectable so the refusal can be exercised without a host
+    that genuinely lacks it, and it is asked only where it matters: browsing a
+    directory needs no sandbox, opening a Workspace does.
+    """
+
+    def __init__(self, *, sandbox_probe: Callable[[], Mapping[str, Any]] | None = None) -> None:
+        self._sandbox_probe = sandbox_probe or _host_sandbox_probe
+        self._sandbox_answer: bool | None = None
+
+    # -- capability --------------------------------------------------------
+
+    def sandbox_available(self) -> bool:
+        """Whether this host can run the composed room, asked of the sandbox layer.
+
+        Answered once per Server: the host's ability to run the room does not
+        change while the process lives, and `server.hello` asks this on every
+        connect - it must not cost a subprocess each time.
+        """
+        if self._sandbox_answer is None:
+            try:
+                self._sandbox_answer = self._sandbox_probe().get("status") == "available"
+            except Exception:
+                # An unavailable probe is an unavailable sandbox: pretending a
+                # room could run here is the one answer that must never be guessed.
+                self._sandbox_answer = False
+        return self._sandbox_answer
+
+    def readiness_blockers(self) -> list[dict[str, Any]]:
+        if self.sandbox_available():
+            return []
+        return [{"code": "LOCAL_SANDBOX_UNAVAILABLE", "retryable": True}]
+
+    # -- locations ---------------------------------------------------------
+
+    def validate(self, path: Any) -> str:
+        """Return the location's normalized form, or refuse in typed terms.
+
+        The returned value is what the Workspace record stores, so two spellings
+        of one directory are one Workspace rather than two.
+        """
+        if not isinstance(path, str) or not path or "\x00" in path:
+            raise _refuse("LOCAL_PATH_INVALID", "a local workspace path must be a non-empty string", 422)
+        if not path.startswith("/"):
+            # A relative path would mean "relative to wherever the Server was
+            # started", which is not a location a product can reopen later.
+            raise _refuse("LOCAL_PATH_INVALID", "a local workspace path must be absolute", 422)
+        if str(PurePosixPath(path)) != path or "//" in path:
+            raise _refuse("LOCAL_PATH_INVALID", "a local workspace path must be normalized", 422)
+        if any(part in {".", ".."} for part in path.split("/")):
+            raise _refuse("LOCAL_PATH_INVALID", "a local workspace path must not traverse", 422)
+        if path in FORBIDDEN_ROOTS:
+            raise _refuse("LOCAL_PATH_FORBIDDEN", "this root may not be opened as a workspace", 403)
+        try:
+            info = os.stat(path)
+        except FileNotFoundError as exc:
+            raise _refuse("LOCAL_PATH_MISSING", "the local path does not exist", 404) from exc
+        except PermissionError as exc:
+            raise _refuse("LOCAL_PATH_NOT_READABLE", "the local path is not readable", 403) from exc
+        except OSError as exc:
+            raise _refuse("LOCAL_PATH_UNAVAILABLE", "the local path could not be inspected", 503) from exc
+        if not os.path.isdir(path):
+            raise _refuse("LOCAL_PATH_NOT_DIRECTORY", "the local path is not a directory", 422)
+        if not os.access(path, os.R_OK):
+            raise _refuse("LOCAL_PATH_NOT_READABLE", "the local path is not readable", 403)
+        # Symlinks are resolved into the stored identity: the record must name
+        # the directory the room will actually bind, not one of its aliases.
+        return os.path.realpath(path)
+
+    def open_workspace(self, path: Any) -> dict[str, Any]:
+        """Validate one location for opening; the caller records the result."""
+        normalized = self.validate(path)
+        self.require_sandbox()
+        return {"path": normalized}
+
+    def require_sandbox(self) -> None:
+        """Refuse an open this host cannot actually run, rather than half-open it."""
+        if not self.sandbox_available():
+            raise _refuse(
+                "LOCAL_SANDBOX_UNAVAILABLE",
+                "this host cannot run the sandbox room a local workspace needs",
+                503, retryable=True,
+            )
+
+    # -- browsing ----------------------------------------------------------
+
+    def browse(self, path: Any) -> dict[str, Any]:
+        """List one directory: readable and writable are separate facts.
+
+        A directory is never refused for being read-only, and a non-directory is
+        listed with its reason instead of being dropped - the client should not
+        have to guess why an entry it can see on disk is missing from a listing.
+        """
+        normalized = self.validate(path)
+        try:
+            entries = sorted(os.scandir(normalized), key=lambda item: item.name)
+        except PermissionError as exc:
+            raise _refuse("LOCAL_PATH_NOT_READABLE", "the local path is not readable", 403) from exc
+        except OSError as exc:
+            raise _refuse("LOCAL_PATH_UNAVAILABLE", "the local path could not be listed", 503) from exc
+        items = []
+        for entry in entries:
+            try:
+                is_directory = entry.is_dir()
+            except OSError:
+                is_directory = False
+            if is_directory:
+                items.append({
+                    "name": entry.name, "kind": _DIRECTORY, "canOpen": True,
+                    "canWrite": os.access(entry.path, os.W_OK), "reason": None,
+                })
+            else:
+                items.append({
+                    "name": entry.name, "kind": _FILE, "canOpen": False,
+                    "canWrite": False, "reason": "not_a_directory",
+                })
+        return {"path": normalized, "entries": items}
+
+
+    # -- workspace files ---------------------------------------------------
+
+    def read_workspace_file(self, *, normalized_path: str, relative_path: str,
+                            ) -> tuple[bytes, str]:
+        """Read one bounded file from an opened local workspace.
+
+        The Server owns this machine, so no Worker round trip is needed - but the
+        boundary is the same one the Worker channel enforces elsewhere: the path
+        stays inside the recorded workspace, links are not followed, and only a
+        regular file is ever read.
+        """
+        if not isinstance(relative_path, str) or not relative_path:
+            raise _refuse("LOCAL_PATH_INVALID", "a workspace file must be named", 422)
+        parts = relative_path.split("/")
+        if (relative_path.startswith("/") or "\\" in relative_path or "\x00" in relative_path
+                or any(part in {"", ".", ".."} for part in parts)):
+            raise _refuse("LOCAL_PATH_INVALID", "a workspace file path must be normalized", 422)
+        target = Path(normalized_path).joinpath(*parts)
+        try:
+            info = os.lstat(target)
+        except (FileNotFoundError, NotADirectoryError) as exc:
+            raise _refuse("LOCAL_PATH_MISSING", "the workspace file does not exist", 404) from exc
+        except OSError as exc:
+            raise _refuse("LOCAL_PATH_UNAVAILABLE", "the workspace file could not be read", 503) from exc
+        if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode):
+            raise _refuse("LOCAL_PATH_NOT_READABLE",
+                          "only a regular file inside the workspace may be read", 403)
+        if info.st_size > MAX_WORKSPACE_FILE_BYTES:
+            raise _refuse("LOCAL_PATH_UNAVAILABLE", "the workspace file is too large", 503)
+        try:
+            handle = os.open(target, os.O_RDONLY | os.O_NOFOLLOW)
+        except OSError as exc:
+            # The name was a regular file when inspected and a link when opened:
+            # that race is a refusal, never a read of whatever replaced it.
+            raise _refuse("LOCAL_PATH_NOT_READABLE", "the workspace file changed while opening", 403) from exc
+        with os.fdopen(handle, "rb") as stream:
+            content = stream.read(MAX_WORKSPACE_FILE_BYTES + 1)
+        if len(content) > MAX_WORKSPACE_FILE_BYTES:
+            raise _refuse("LOCAL_PATH_UNAVAILABLE", "the workspace file is too large", 503)
+        return content, "sha256:" + hashlib.sha256(content).hexdigest()
+
+
+def _host_sandbox_probe() -> Mapping[str, Any]:
+    """Ask the sandbox plugin whether a room can run here.
+
+    The probe is the plugin's own: it checks the binary and runs the production
+    read-only system root, so "available" means the room's argv would really
+    start on this host, not that a file happens to be on PATH.
+    """
+    if shutil.which("bwrap") is None:
+        return {"status": "unavailable", "code": "binary_missing"}
+    from agent_box_sandbox_bwrap import BwrapSandboxProvider
+
+    return BwrapSandboxProvider().probe()
+
+
+__all__ = ["FORBIDDEN_ROOTS", "LocalEnvironmentProvider"]
