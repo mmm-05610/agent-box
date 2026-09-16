@@ -910,3 +910,22 @@ provider 侧账单是唯一权威用量记录，本表是本地产物推算的�
 `b84dc87`(39) → `38b28d6`(40-A) → `05053f9`(40-B) → `340fcad`(40-C) → `b70cd3f`(40-D)
 → `7e9ffd8`(41) → `8eeb422`(42-A 观察) → `978918d`(sidecar 桥)。
 未 push、未 merge、未 force、未改动发布源或用户真实数据。
+
+## 2026-09-16 — 人手 UI 验收（方案就绪，执行者=用户本人）
+
+- 背景：脚本驱动的四条路径已全部有证据，**人手控件路径**在
+  `agent-box-desktop-next-wsl-round1/evidence/p42-ui-controls/` 里如实记为"未验证"。
+  本轮补上这一段，两者不互替。
+- 方案：[ui-manual-test-plan.md](ui-manual-test-plan.md)，S0–S10 逐阶段（启动/凭据录入/
+  模型与角色/工作区/两轮真实对话/工具与文件改动/停止/重启续接/负例/收尾）+ 可选 S11 第二家。
+- 环境（仓库外，`C:\Users\maoqh\` 与 `/home/maoqh/.agentbox-ui-manual/`）：
+  `run-ui-manual.ps1` 一条命令起 Server（真实 Pi 部署 + WSL release Worker）+ 桌面应用；
+  `stop-ui-manual.ps1` 兜底停止；`inspect.py` 只读核对会话/turn/事件/凭据（只打 id 与 kind）。
+- Harness 工件 `sha256:afe238d3…`（与真实模型门记录一致）已固定到
+  `/home/maoqh/.agentbox-ui-manual/artifacts/pi-runtime`；部署文档 pluginRoot 指向该目录的
+  硬链接副本，**唯一差异**是 `deploy/pi/models.json` 的 `maxTokens` 由 64 提到 1024
+  （64 是付费门的验收上限，会把真实回答截断；属人工运行配置，不构成生产声明）。
+- 扩容分支核查（只读，未合并）：[harness-expansion-review.md](harness-expansion-review.md)——
+  四家六件套齐、测试与门复现通过、共享桥补丁经 Pi 假端点门验证未破坏原有四家；
+  4 处小问题（kilo 能力矩阵未按文档回填、dsh 文档一句陈旧文案、claude 能力降级需知会、
+  桥补丁缺单测）留待合并前修。
