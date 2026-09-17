@@ -258,6 +258,15 @@ export const SessionRecordSchema = z.object({
   /** Shared business metadata, not a renderer-local sidebar preference. */
   pinned: z.boolean(),
   archivedAt: WireTimestampSchema.nullable(),
+  /** Order 51: the session-level latest usage fact (tokens only), or null
+   *  while no family on this session has reported one. */
+  latestUsage: z.strictObject({
+    turnId: WireIdSchema,
+    usageSource: z.string(),
+    inputTokens: z.number().int().nonnegative().optional(),
+    outputTokens: z.number().int().nonnegative().optional(),
+    totalTokens: z.number().int().nonnegative().optional()
+  }).nullable().optional(),
   createdAt: WireTimestampSchema,
   updatedAt: WireTimestampSchema
 })
@@ -442,6 +451,18 @@ export const WireEventSchema = z.discriminatedUnion('kind', [
   z.strictObject({
     kind: z.literal('message.delta'), sessionId: WireIdSchema, messageId: WireIdSchema,
     role: z.literal('assistant'), text: z.string()
+  }),
+  /** Order 51: the usage a family's own native store reported for one turn.
+   *  Fields the family did not report are absent — never zero, never
+   *  estimated. Emitted once per completed turn that has a fact. */
+  z.strictObject({
+    kind: z.literal('usage.updated'), sessionId: WireIdSchema,
+    turnId: WireIdSchema,
+    usage: z.strictObject({
+      inputTokens: z.number().int().nonnegative().optional(),
+      outputTokens: z.number().int().nonnegative().optional(),
+      totalTokens: z.number().int().nonnegative().optional()
+    })
   }),
   z.strictObject({
     kind: z.literal('message.final'), sessionId: WireIdSchema, messageId: WireIdSchema,
