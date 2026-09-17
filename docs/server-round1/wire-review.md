@@ -349,3 +349,28 @@ ProviderModelConfigRecord = {
    接受后派发失败不回滚接受；「已接受/已拒绝/仍未知」以原请求标识查询。
 5. SSE 游标：`id:`=会话内单调 seq；游标超前 409 `EVENT_CURSOR_AHEAD`
    （wire 面投影为 `resync_required`）。
+
+
+## Order 51 D — `usage.updated` 事件与会话最新值（2026-09-17，env-provider 工作树）
+
+- **动机与来源**：用量事实（tokens）在 ACP 协议面不可靠（`PromptResponse.usage` UNSTABLE/
+  optional），各家的权威数字在自己的 native journal/数据库里（51 阶段 A 逐家观察：
+  usage-context-observation-51.md）。Server 在 capture 完成后、channel 存活期内，按部署的
+  `usageProbe {journalSuffix, format}` 声明经既有 `home.list`/`home.get` 受控回读并解析为
+  中立字段（tokens only；缺失即缺失，禁止估算）。
+- **新增事件 kind**：`usage.updated`（WireEvent oneOf 新成员）——每个完成且该家族报了
+  数字的 turn 一帧：`{kind, sessionId, turnId, usage: {inputTokens?, outputTokens?,
+  totalTokens?}}`（严格，整型非负，缺省字段缺失）。
+- **会话最新值**：`SessionRecord.latestUsage`（nullable optional）——`{turnId, usageSource,
+  inputTokens?, outputTokens?, totalTokens?}`，后加入的客户端无需重放即可读到。
+- **两仓摘要（前端 HEAD bd5336bb，分支 feature/agentbox-desktop-product，lease RELEASED）**：
+  TS 合同 `apps/desktop/src/types/wire/wire-v1.ts` sha256
+  `990cf905586791c0b8a78ed5fd04431b4119f9229faeb00863e7d39cc9c902b7`；
+  生成工件 `wire-v1.schema.json` sha256
+  `9e7f28381fdb5db91873d85e26acbd0ca3237737d4d5b4c4b8524d04a4b8b0f4`
+  （后端侧证据副本：`docs/server-round1/fullstack/generated/wire-v1.schema.json`）。
+- **严格校验**：`AGENT_BOX_WIRE_SCHEMA=<工件>` 下 `tests/server/test_wire_v1.py`
+  **37 passed**——含 FRAME_COVERAGE 注入的 `usage.updated` 帧（positive）与会话投影的
+  `latestUsage`；pi 全链门（c10）在工件在位时 exit 0，真实 usage.updated 帧通过前端
+  严格 schema。
+- **不动的**：28 方法集、wire/1、既有 9 个事件 kind 与载荷、既有方法语义——纯新增面。
