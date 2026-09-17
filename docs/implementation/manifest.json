@@ -478,6 +478,270 @@
     "rule": "locator only; never print, copy into any repository, log, argv, evidence or Git; reports state the path, its permission bits and the zero-leak fact"
    },
    "note": "One Server, one deployment document, all eight registered families (codex, claude-code, opencode, hermes, dsh, qwen, kilo, pi). A reusable install-set producer builds or verifies each family's runtime artifact with a pinned digest and generates the document plus a machine-readable install-set.json. Each family then runs the real UI model gate against real DeepSeek. Product gap to record, not to fix here: nothing tells the UI which families this Server actually runs, so availability is discovered at dispatch (HARNESS_DEPLOYMENT_UNAVAILABLE) instead of at configuration time; wire stays locked and a contract change needs a user decision. Frontend repository stays read-only."
+  },
+  {
+   "id": "47",
+   "document": "work-orders/47-sandbox-plan-seam.md",
+   "baseline": "46 checkpoint",
+   "worktree": "/home/maoqh/projects/agent-box-env-provider",
+   "branch": "feature/env-provider-v1",
+   "depends_on": [
+    "46",
+    "50"
+   ],
+   "dependency_condition": "Absorbs the capability layer first (order 50), so 47 projects the semantic trio over that mechanism instead of inventing a second vocabulary; the capability branch touched the same three Server files, so the two must not be written concurrently.",
+   "stages": [
+    "A-consume-protocol",
+    "B-grammar-up",
+    "C-host-registration",
+    "D-conformance-gate",
+    "E-regression"
+   ],
+   "write_paths": [
+    "src/agent_box/**",
+    "plugins/**",
+    "protocols/worker/**",
+    "tests/**",
+    "scripts/server-round1/**",
+    "docs/server-round1/**",
+    "docs/implementation/status.md"
+   ],
+   "forbidden_write_roots": [
+    "/home/maoqh/projects/agent-box",
+    "/home/maoqh/projects/agent-box-studio",
+    "/home/maoqh/projects/agent-box-desktop-next",
+    "/home/maoqh/projects/agent-box-desktop-next-wsl-round1",
+    "/home/maoqh/projects/agent-box-server-round1",
+    "/home/maoqh/projects/agent-box-harness-expansion"
+   ],
+   "read_only_repositories": [
+    "/home/maoqh/projects/agent-box-desktop-next-wsl-round1",
+    "/home/maoqh/projects/agent-box-server-round1",
+    "/home/maoqh/projects/agent-box-harness-expansion"
+   ],
+   "note": "The upper layer states requirements, the resolved sandbox provider translates them. Today the channels import the bwrap composer directly (sidecar.py:316, local_channel.py:25), bootstrap hard-imports WslConnector (runtime.py:139) and the layout grammar (runtime.py:727/739/784), the coordinator is never called on the product path, the sandbox never declares isolation.wrap@1 while preflight treats an undeclared capability as passing, and legacy_codex.py is dead code that would re-fuse the layers if revived. This order consumes the existing protocol (MountPlan -> wrap -> IsolatedProcessSpec), unifies the two capability vocabularies and makes an undeclared capability a refusal, moves the layout grammar into the contracts layer, registers the wsl host provider, adds a sandbox conformance gate whose counter-example must fail, and keeps behaviour byte-identical (the substitution gate and the four family gates stay green). Deployment document format does not change. Real model calls: zero. Runs after order 50, which absorbs the capability layer from feature/capability-entry-v1 by content."
+  },
+  {
+   "id": "48",
+   "document": "work-orders/48-windows-placement.md",
+   "baseline": "47 checkpoint",
+   "worktree": "/home/maoqh/projects/agent-box-env-provider",
+   "branch": "feature/env-provider-v1",
+   "depends_on": [
+    "47"
+   ],
+   "dependency_condition": "Stage A (the seven-question spike) may run at any time because it writes only evidence docs; stages B and later must wait for 47, or the Windows provider would be another concrete sandbox imported by the Server.",
+   "stages": [
+    "A-spike",
+    "B-sandbox-provider",
+    "C-host-stack",
+    "D-conformance",
+    "E-per-family-and-regression"
+   ],
+   "write_paths": [
+    "plugins/**",
+    "src/agent_box/**",
+    "workers/**",
+    "tests/**",
+    "scripts/server-round1/**",
+    "docs/server-round1/**",
+    "docs/implementation/status.md"
+   ],
+   "forbidden_write_roots": [
+    "/home/maoqh/projects/agent-box",
+    "/home/maoqh/projects/agent-box-studio",
+    "/home/maoqh/projects/agent-box-desktop-next",
+    "/home/maoqh/projects/agent-box-desktop-next-wsl-round1",
+    "/home/maoqh/projects/agent-box-server-round1",
+    "/home/maoqh/projects/agent-box-harness-expansion"
+   ],
+   "read_only_repositories": [
+    "/home/maoqh/projects/agent-box-desktop-next-wsl-round1",
+    "/home/maoqh/projects/agent-box-server-round1",
+    "/home/maoqh/projects/agent-box-harness-expansion"
+   ],
+   "model_authorization": {
+    "granted_by": "user decision 2026-09-16 (the same grant as order 46)",
+    "scope": "per-family real model runs on Windows",
+    "rule": "itemised accounting; locator only for the credential; if the user changes the terms, the user's instruction at that time wins"
+   },
+   "note": "Native Windows placement: Server on Windows, harness on Windows, AppContainer as the sandbox (capability based, access granted by ACL, no virtualisation so the home stays a real directory), a Job Object for the tree and its lifetime, and no Worker at all because the Server already runs on that machine and reads the directory directly for the audit. Materialisation has no bind mount to lean on, so config goes to a per-execution directory pointed at by environment variables (or into the home with an ACL granting read only, when a harness insists on a fixed filename), credentials go into the child's environment block, and the tmpfs masks become 'do not write plus delete', never recorded as masked. Read isolation is the linchpin: the official wording is that read-only access is less restricted, so it must be measured, and if reads are not denied the capability is declared false and the platform is reported as weaker than Linux. Wasted: Windows Sandbox (VM shape, mapped folders are a redirected filesystem), Windows containers, Sandboxie, minifilters, and remapping (junctions or a per-process DOS device) except when a harness hardcodes a path."
+  },
+  {
+   "id": "49",
+   "document": "work-orders/49-evidence-hygiene.md",
+   "baseline": "any checkpoint (independent)",
+   "worktree": "/home/maoqh/projects/agent-box-env-provider",
+   "branch": "feature/env-provider-v1",
+   "depends_on": [],
+   "dependency_condition": "Independent of 44-48; touches only the gate scripts' defaults and the status wording, so it may be interleaved at any stage boundary.",
+   "stages": [
+    "A-gate-defaults",
+    "B-explicit-rerun",
+    "C-status-and-chores",
+    "D-regression"
+   ],
+   "write_paths": [
+    "scripts/server-round1/**",
+    "tests/**",
+    "docs/implementation/status.md",
+    "docs/implementation/work-orders/47-sandbox-plan-seam.md",
+    "docs/server-round1/**"
+   ],
+   "forbidden_write_roots": [
+    "/home/maoqh/projects/agent-box",
+    "/home/maoqh/projects/agent-box-studio",
+    "/home/maoqh/projects/agent-box-desktop-next",
+    "/home/maoqh/projects/agent-box-desktop-next-wsl-round1",
+    "/home/maoqh/projects/agent-box-server-round1",
+    "/home/maoqh/projects/agent-box-harness-expansion"
+   ],
+   "read_only_repositories": [
+    "/home/maoqh/projects/agent-box-desktop-next-wsl-round1",
+    "/home/maoqh/projects/agent-box-server-round1",
+    "/home/maoqh/projects/agent-box-harness-expansion"
+   ],
+   "note": "The four production-chain gates default --worker to .acceptance-bundle-c4 while the current bundle is c8, and c2 through c8 all still exist on disk, so running a gate with no arguments silently produces a passing result from 2026-09-14 artifacts - a false-green entry point. The order makes an omitted worker a typed refusal, adds a counter-example test per gate, re-runs at least one gate and Windows r4 explicitly against c8, unifies the status counts (scope plus command plus HEAD, exactly one 'current'), prunes the two stale worktrees without deleting any bundle, and notes that removing legacy_codex.py must take its two importing tests with it. Zero real model calls. It also records, without executing anything, that feature/capability-entry-v1 is unmerged with 61 files and +8590 lines claiming CAPABILITY_ENTRY_SLICE_REVIEW_READY - merging it stays a separate user decision."
+  },
+  {
+   "id": "50",
+   "document": "work-orders/50-absorb-capability-layer.md",
+   "baseline": "46 checkpoint",
+   "worktree": "/home/maoqh/projects/agent-box-env-provider",
+   "branch": "feature/env-provider-v1",
+   "depends_on": [
+    "46"
+   ],
+   "dependency_condition": "Touches the same three Server files as 44-48, so it runs once those are quiescent and before 47.",
+   "stages": [
+    "A-transplant-library",
+    "B-declarations",
+    "C-server-replay",
+    "D-convergence",
+    "E-regression"
+   ],
+   "write_paths": [
+    "src/agent_box/**",
+    "plugins/agent-box-sandbox-bwrap/**",
+    "tests/**",
+    "scripts/server-round1/**",
+    "docs/server-round1/**",
+    "docs/implementation/status.md"
+   ],
+   "forbidden_write_roots": [
+    "/home/maoqh/projects/agent-box",
+    "/home/maoqh/projects/agent-box-studio",
+    "/home/maoqh/projects/agent-box-desktop-next",
+    "/home/maoqh/projects/agent-box-desktop-next-wsl-round1",
+    "/home/maoqh/projects/agent-box-server-round1",
+    "/home/maoqh/projects/agent-box-harness-expansion",
+    "/home/maoqh/projects/agent-box-capability-entry-v1"
+   ],
+   "read_only_repositories": [
+    "/home/maoqh/projects/agent-box-desktop-next-wsl-round1",
+    "/home/maoqh/projects/agent-box-server-round1",
+    "/home/maoqh/projects/agent-box-harness-expansion",
+    "/home/maoqh/projects/agent-box-capability-entry-v1"
+   ],
+   "note": "Absorbs by content what feature/capability-entry-v1 (baseline 897a833, HEAD 1c74d15) built for capability entry: the agent_box.extensions.capability package (ids, requirements, match, selection, documents, errors), the sandbox-side declarations.py with per-execution declaration documents, and roughly 2000 lines of tests - without merging that branch, its history, its own dispatch snapshot under dispatch/agentbox-system/, or its CAP-02..05 queue. The design commitments worth keeping verbatim: the declarable set must be a subset of the actually enforceable set (a target outside the plugin's own path grammar is a typed refusal, not a smaller claim), every declaration carries a file-symbol evidence anchor bound to the execution environment and time, an honest 'unavailable' state exists (the remote argv never emits --unshare-net), declaration providers must appear in an explicit approval map because installed-or-loaded is not authorization, and grants come from the deployment document plus module constants rather than from the declaration document itself. It also converges a real over-claim found while reading: _CAPS declares network.none@1 supported for the whole provider while the sidecar compiler never emits --unshare-net. Zero real model calls; wire untouched."
+  },
+  {
+   "id": "51",
+   "document": "work-orders/51-usage-context-fact.md",
+   "baseline": "50 checkpoint",
+   "worktree": "/home/maoqh/projects/agent-box-env-provider",
+   "branch": "feature/env-provider-v1",
+   "depends_on": [
+    "50"
+   ],
+   "dependency_condition": "Stage A (per-family observation, no code change) may run at any time; stages B-D touch the same channel and wire files as 47/48, so the executor serializes them.",
+   "exclusive_group": "backend-driver-resources",
+   "stages": [
+    "A-observation",
+    "B-neutral-fact",
+    "C-server-ledger",
+    "D-wire-relock",
+    "E-frontend-handoff"
+   ],
+   "write_paths": [
+    "src/agent_box/**",
+    "plugins/agent-box-harnesses/**",
+    "workers/**",
+    "protocols/**",
+    "tests/**",
+    "scripts/server-round1/**",
+    "docs/server-round1/**",
+    "docs/implementation/status.md"
+   ],
+   "conditional_cross_repo_write": {
+    "worktree": "/home/maoqh/projects/agent-box-desktop-next-wsl-round1",
+    "expected_branch": "feature/agentbox-desktop-product",
+    "condition": "Only for the wire relock (TS contract plus generated artifact digests); dual readiness and a released writer lease, and the writer must take the lease per that worktree's handoff-policy.",
+    "write_paths": [
+     "apps/desktop/src/types/**",
+     "apps/desktop/contracts/**",
+     "docs/desktop-product-delivery/status.md",
+     "docs/desktop-product-delivery/evidence/**"
+    ]
+   },
+   "forbidden_write_roots": [
+    "/home/maoqh/projects/agent-box",
+    "/home/maoqh/projects/agent-box-studio",
+    "/home/maoqh/projects/agent-box-desktop-next",
+    "/home/maoqh/projects/agent-box-desktop-next-wsl-round1",
+    "/home/maoqh/projects/agent-box-server-round1",
+    "/home/maoqh/projects/agent-box-harness-expansion"
+   ],
+   "note": "Real usage and context numbers, end to end, reported only when the harness actually reports them. Nothing in the chain carries usage today: the sidecar bridge and the opencode driver have zero usage handling, the Server's _forward() knows only message chunks, permission requests and exits, and the wire has no usage field at all - and the vendored ACP SDK definition has no usage or contextWindow, so the ACP families cannot supply it at the protocol level and need another source, which stage A must establish per family. The denominator (context window) is a separate source from the numerator and must be found per family, otherwise the percentage stays unknown. The fact added to the envelope is neutral (no brand names, no guessed fields), the Server records it in the turn ledger and a session-level latest value, and the wire change is the minimum that works with a two-repository relock. Estimation is forbidden: a family that does not report shows unknown, and the frontend container from P08 consumes only what arrives."
+  },
+  {
+   "id": "52",
+   "document": "work-orders/52-session-process-facts.md",
+   "baseline": "50 checkpoint",
+   "worktree": "/home/maoqh/projects/agent-box-env-provider",
+   "branch": "feature/env-provider-v1",
+   "depends_on": [
+    "50"
+   ],
+   "dependency_condition": "Stage A (per-family observation) may run any time; B-D serialize with 47/48 and must run in the same pass as 51 so both facts share one wire relock.",
+   "exclusive_group": "backend-driver-resources",
+   "stages": [
+    "A-observation",
+    "B-neutral-mapping",
+    "C-server-ledger",
+    "D-shared-wire-relock",
+    "E-frontend-handoff"
+   ],
+   "write_paths": [
+    "src/agent_box/**",
+    "plugins/agent-box-harnesses/**",
+    "workers/**",
+    "protocols/**",
+    "tests/**",
+    "scripts/server-round1/**",
+    "docs/server-round1/**",
+    "docs/implementation/status.md"
+   ],
+   "conditional_cross_repo_write": {
+    "worktree": "/home/maoqh/projects/agent-box-desktop-next-wsl-round1",
+    "expected_branch": "feature/agentbox-desktop-product",
+    "condition": "Only for the shared wire relock with order 51; dual readiness and a released writer lease, and the writer must take the lease per that worktree's handoff-policy.",
+    "write_paths": [
+     "apps/desktop/src/types/**",
+     "apps/desktop/contracts/**",
+     "docs/desktop-product-delivery/status.md",
+     "docs/desktop-product-delivery/evidence/**"
+    ]
+   },
+   "forbidden_write_roots": [
+    "/home/maoqh/projects/agent-box",
+    "/home/maoqh/projects/agent-box-studio",
+    "/home/maoqh/projects/agent-box-desktop-next",
+    "/home/maoqh/projects/agent-box-desktop-next-wsl-round1",
+    "/home/maoqh/projects/agent-box-server-round1",
+    "/home/maoqh/projects/agent-box-harness-expansion"
+   ],
+   "note": "The process facts a ZCode/Codex-style transcript needs already exist upstream and are being dropped: the ACP schema's sessionUpdate vocabulary is agent_message_chunk, agent_thought_chunk, tool_call, tool_call_update, plan_update, plan_removed and current_mode_update, while the bridge and the Server's _forward() know only agent_message_chunk. This order maps thoughts, the tool lifecycle, plans and mode changes into neutral events, derives durations from the existing event timestamps instead of adding estimated fields, and shares ONE wire relock with order 51 (usage) to avoid two contract churns. Tool arguments and outputs are trimmed and scanned before they enter the ledger. No fake progress: a family that emits nothing shows nothing."
   }
  ],
  "authority": "docs/implementation",
