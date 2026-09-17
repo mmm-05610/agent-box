@@ -55,7 +55,9 @@ def test_added_modified_removed_with_line_counts(tmp_path):
     # a.txt is modified: its 3 new lines are the entry's addedLines; the
     # top-level addedLines sums the *added* entries (new.txt's 2).
     assert change["addedLines"] == 2
-    assert change['removedLines'] == 1 + 2  # gone.txt + a.txt's replaced lines
+    # a.txt is modified: its replacement lines are the entry's own counts;
+    # the top-level removedLines sums the *removed* entries (gone.txt's 1).
+    assert change["removedLines"] == 1
 
 
 def test_symlinks_and_special_files_are_facts_not_entries(tmp_path):
