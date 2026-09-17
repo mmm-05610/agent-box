@@ -1208,6 +1208,7 @@ def test_wire_event_stream_resumes_from_snapshot_cursor_without_sse(wire):
 #: so a newly declared kind cannot slip past unnoticed.
 FRAME_COVERAGE = (
     ("message.delta", {"text": "chunk"}, True),
+    ("usage.updated", {"turn_id": "t-usage", "usage": {"totalTokens": 18}}, True),
     ("message.final", {"text": "answer", "role": "assistant", "display_kind": "visible"}, True),
     ("tool.update", {"state": "failed", "tool_call_id": "harness", "tool": None,
                      "summary": "HARNESS_FAILED"}, True),

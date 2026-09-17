@@ -18,6 +18,7 @@ from agent_box.server.wire.errors import WireError
 WIRE_EVENT_KINDS = frozenset({
     "message.delta",
     "message.final",
+    "usage.updated",
     "tool.update",
     "approval.requested",
     "approval.settled",
@@ -34,6 +35,7 @@ _EVENT_KIND_MAP = {
     "turn.state": "execution.state",
     "message.delta": "message.delta",
     "message.final": "message.final",
+    "usage.updated": "usage.updated",
     "tool.update": "tool.update",
     "approval.requested": "approval.requested",
     "approval.settled": "approval.settled",
@@ -111,6 +113,20 @@ def profile_record(row: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def _latest_usage(row: Mapping[str, Any]) -> dict[str, Any] | None:
+    """The session-level latest usage fact, or None while unknown."""
+    try:
+        raw = row.get("latest_usage")
+    except (AttributeError, KeyError, TypeError):
+        return None
+    if not raw:
+        return None
+    try:
+        return json.loads(raw)
+    except ValueError:
+        return None
+
+
 def session_record(row: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "id": row["id"],
@@ -120,6 +136,9 @@ def session_record(row: Mapping[str, Any]) -> dict[str, Any]:
         "displayName": row.get("display_name") or row["id"],
         "pinned": bool(row.get("pinned", False)),
         "archivedAt": row.get("archived_at"),
+        # Order 51: the session-level latest usage fact (tokens only), absent
+        # while no family on this session has reported one.
+        "latestUsage": _latest_usage(row),
         "createdAt": row["created_at"],
         "updatedAt": row["updated_at"],
     }
@@ -195,6 +214,18 @@ def _event_body(kind: str, row: Mapping[str, Any], data: Mapping[str, Any]) -> d
         else:
             body["role"] = str(data.get("role") or "assistant")
             body["displayKind"] = str(data.get("display_kind") or "visible")
+        return body
+    if kind == "usage.updated":
+        usage = data.get("usage") if isinstance(data.get("usage"), Mapping) else {}
+        body = {
+            "kind": kind,
+            "sessionId": session_id,
+            "turnId": str(data.get("turn_id") or row.get("turn_id") or "turn"),
+            "usage": {
+                key: int(usage[key]) for key in sorted(usage)
+                if isinstance(usage.get(key), int) and not isinstance(usage.get(key), bool)
+            },
+        }
         return body
     if kind == "tool.update":
         return {

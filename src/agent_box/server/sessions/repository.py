@@ -662,6 +662,11 @@ class SessionRecords:
                     "Profile native generation changed during the Turn",
                     status=409,
                 )
+            if latest_usage:
+                self._append_session_event(
+                    conn, row["session_id"], turn_id, "usage.updated",
+                    {"turn_id": turn_id, "usage": usage},
+                )
             event = self._append_session_event(
                 conn, row["session_id"], turn_id, "turn.capture",
                 {"state": "captured", "checkpoint_native_id": checkpoint_native_id,
