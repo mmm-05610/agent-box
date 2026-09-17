@@ -165,6 +165,27 @@
       "note": "Hook management: one shell with a family selector whose form is rebuilt per family from the backend's declared schema, because the three models are genuinely different kinds - Claude Code declarative events and matchers and handlers with official default timeouts, OpenCode user-supplied plugin source treated as a code asset with digest and preview rather than assembled from form fields, and Codex rendered only after backend order 59's stage A observes its event model instead of guessing. Hooks stay disabled until the user enables them and can see the full command; the UI states they run inside the sandbox with that execution's isolation and network posture. Trigger records show name, event, time, exit code and a bounded output summary, and a blocking exit code is labelled as blocking rather than shown as an ordinary success. Two standing rules from the user: every setting must be editable - a family that genuinely cannot accept something says so instead of showing a dead control - and credentials appear only as reference state, never as content."
     },
     {
+      "id": "P17",
+      "file": "work-orders/P17-profile-settings.md",
+      "depends_on": [
+        "P16"
+      ],
+      "exclusive_group": "desktop-product",
+      "scope": [
+        "docs/desktop-product-delivery/**",
+        "apps/desktop/src/features/profiles/**",
+        "apps/desktop/src/features/settings/**",
+        "apps/desktop/src/features/chat/**",
+        "apps/desktop/src/api/**",
+        "apps/desktop/src/types/**",
+        "apps/desktop/src/i18n/**",
+        "apps/desktop/e2e/**",
+        "tests-js/**"
+      ],
+      "requires_approved_contract": true,
+      "note": "The role page becomes the single binding point - instruction asset, model slot, credential or account, skill/MCP/hook selection, and a per-tool permission table replacing the single mode chip, with ask/allow/deny, glob maps, last-match-wins stated in the UI, presets that per-tool rules override, and ask explained as the approvals round trip it already is. Every section is editable; a family that does not support a slot says so instead of showing a dead control. The order also carries the user's ownership correction: a session belongs to the workspace, never to a profile, so no surface may say 'this profile's sessions' - the current binding and the per-turn attribution are what get shown, and rebinding is an action on the session. Consequences are stated before the action, not after: within one harness the family's storage shape decides whether the native session moves along (file-per-session journals) or restarts (shared databases), and changing family is only offered as cloning into a new profile, listing what migrates and what cannot, with session-type assets explicitly excluded and no claim of inheriting the old native session."
+    },
+    {
       "id": "P08",
       "file": "work-orders/P08-composer-input-bar.md",
       "depends_on": [
