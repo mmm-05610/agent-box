@@ -4,6 +4,7 @@ import { type FC, type ReactNode, useEffect, useMemo, useState } from 'react'
 
 import { getLocalModelsStatus } from '@/api/local-models'
 import { activitySignature, toolNarratesWait, TURN_QUIET_S } from '@/application/transcript/turn-activity'
+import { Shimmer } from '@/components/assistant-ui/shimmer'
 import { toolPresentVerb } from '@/components/assistant-ui/tool/run-summary'
 import { useElapsedSeconds } from '@/components/chat/activity-timer'
 import { ActivityTimerText } from '@/components/chat/activity-timer-text'
@@ -52,7 +53,9 @@ const StatusRow: FC<{ children: ReactNode; label: string } & React.ComponentProp
 const COMPACTION_LABEL = 'Summarizing thread'
 
 const HintText: FC<{ children: ReactNode }> = ({ children }) => (
-  <span className={cn(SCAFFOLD_LABEL_CLASS, 'shimmer min-w-0 flex-1 truncate')}>{children}</span>
+  <Shimmer as="span" className={cn(SCAFFOLD_LABEL_CLASS, 'min-w-0 flex-1 truncate')}>
+    {children}
+  </Shimmer>
 )
 
 /** Renderer-side load synthesis: poll the local-models status while a turn
@@ -134,7 +137,9 @@ const WaitHint: FC<{ hint: string }> = ({ hint }) => {
 
 const ProgressHint: FC<{ label: string; percent: null | number }> = ({ label, percent }) => (
   <span className="flex min-w-0 flex-1 items-center gap-2">
-    <span className={cn(SCAFFOLD_LABEL_CLASS, 'shimmer min-w-0 shrink truncate')}>{label}</span>
+    <Shimmer as="span" className={cn(SCAFFOLD_LABEL_CLASS, 'min-w-0 shrink truncate')}>
+      {label}
+    </Shimmer>
     {percent !== null && (
       <>
         <span className="h-1 w-24 shrink-0 overflow-hidden rounded-full bg-(--ui-bg-tertiary)">

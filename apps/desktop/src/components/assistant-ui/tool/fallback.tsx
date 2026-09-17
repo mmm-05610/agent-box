@@ -44,7 +44,6 @@ import { Tip } from '@/components/ui/tooltip'
 import { useI18n } from '@/i18n'
 import { urlSlugTitleLabel } from '@/lib/external-link'
 import { AlertCircle, CheckCircle2 } from '@/lib/icons'
-import { normalize } from '@/lib/text'
 import {
   buildToolView,
   clampForDisplay,
@@ -433,15 +432,14 @@ function ToolEntry({ part }: ToolEntryProps) {
       .filter(Boolean)
 
     const [summary = '', ...rest] = chunks
-    const subtitleNorm = normalize(view.subtitle)
-    const summaryDuplicatesSubtitle = summary && summary.toLowerCase() === subtitleNorm
 
-    if (summaryDuplicatesSubtitle) {
-      return { body: rest.join('\n\n').trim(), summary: '' }
-    }
-
+    // A summary that repeats the subtitle still has to be shown: the subtitle
+    // is not rendered as visible text anywhere in this row (it feeds tooltips
+    // and the redundancy checks), so suppressing it here would erase the
+    // failure's reason — a tool row reading "Ran command" and never saying
+    // why. The remaining chunks follow as the body.
     return { body: rest.join('\n\n').trim(), summary }
-  }, [view.detail, view.status, view.subtitle])
+  }, [view.detail, view.status])
 
   // `looksRedundant` normalizes the FULL (uncapped) detail payload — a
   // read_file / terminal result can be huge. Memoize on the view fields so it

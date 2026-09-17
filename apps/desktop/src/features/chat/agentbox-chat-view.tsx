@@ -50,17 +50,28 @@ export function agentBoxProjectionMessages(
   const byId = new Map(messages.map(message => [message.id, message]))
 
   for (const tool of Object.values(projection.tools)) {
-    const terminal = tool.state === 'completed' || tool.state === 'failed' || tool.state === 'denied'
+    const failed = tool.state === 'failed' || tool.state === 'denied'
+    const terminal = failed || tool.state === 'completed'
 
     const result = terminal
       ? tool.state === 'completed'
         ? { result: tool.resultExcerpt ?? null, summary: tool.summary ?? null }
-        : { error: tool.summary ?? tool.state, result: tool.resultExcerpt ?? null }
+        : {
+            // The service's reason and its presentable excerpt are both the
+            // failure's text; joined here so the row can show them even when
+            // there is no stream output to expand into.
+            error: [tool.summary ?? tool.state, tool.resultExcerpt].filter(Boolean).join('\n\n'),
+            result: tool.resultExcerpt ?? null
+          }
       : undefined
 
     const part = {
       args: {},
       ...(result ? { result } : {}),
+      // A failed call is a FAILURE, not a completed activity: without this the
+      // row paints as a successful run and the service's own failure text is
+      // never shown (the reason the excerpt/summary are carried at all).
+      ...(failed ? { isError: true } : {}),
       toolCallId: tool.toolCallId,
       toolName: tool.tool ?? 'tool',
       type: 'tool-call'

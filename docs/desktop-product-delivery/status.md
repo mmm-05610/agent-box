@@ -1222,3 +1222,27 @@ typecheck 当场暴露；新测试 4 条 ESLint warning 收口为 0。
   调度方追加的 P10–P15 派单提交已复查；其中 `2b7dce49` 把本执行者已写的接管节一并提交（内容逐字保留）。
   下一步按派工表执行 **P09**（writer_lease 继续 ACTIVE，按单切换写集）。
 
+## P09 收口（2026-09-17）：会话区过程呈现 — `P09_GREEN — TRANSCRIPT_PROCESS_VIEW_CLIENT_READY`
+
+- **门结果**（完整证据 `evidence/P09.md`）：
+  - **G1 事实对照表成立**：逐元素给出「事件名/字段」或「无」；并把「schema 已有但后端未上行」（tool 生命周期）
+    与「合同不存在」（思考、输出摘要、分组、每步耗时、用量）分开记录。
+  - **G2 不伪造成立**：wire 无 reasoning 事件 → 渲染层反例（无 `aui_thinking-disclosure`）+ 投影层反例
+    （part 类型集合恒为 {text, tool-call}）；非终态调用不带 result/isError。
+  - **G3 形状成立（按需取件）**：取 AI Elements `Shimmer`（Apache-2.0 © Vercel, Inc.，commit `6a9d5b1`，
+    适配本仓 `.shimmer` CSS 动画以保住动画暂停纪律）；`Tool`/`Reasoning`/`Chain of Thought`/`Terminal`
+    评估后不取，理由与触发条件（后端 51/52 落地时增量接入）写入 evidence。
+  - **G4 时长诚实（如实收窄）**：尾部计时器为客户端观测间隔（既有语义）；整轮时长**不**声称事件时间戳推导
+    （帧 `emittedAt` 未被投影消费，投影不在本单写集）；每步耗时无开始事件 → 不显示。
+  - **G5 不退化成立**：wide gate `src/features/chat` + `src/components/assistant-ui` + `src/components/chat`
+    **165 files / 1209 tests 全通过，exit 0**；定向 39 files / 233 tests；`tsc -p . --noEmit` exit 0；
+    改动 7 文件 ESLint 0/0；`git diff --check` 干净；保护路径与后端仓零改动；e2e/tests-js 未改。
+- **本轮修掉两个真实缺陷**（点亮过程中发现，均有用例锁定）：
+  ①**失败工具行被渲染成成功活动行**（AgentBox 失败 part 缺 `isError`）→ 补 `isError`；
+  ②**失败原因被吞**（共享工具行的 `view.subtitle` 从不显示，且 error 详情在 summary==subtitle 时被丢弃）
+  → 共享行不再丢弃该 summary，投影把服务 `summary`+`resultExcerpt` 合并为 error 文本。
+- **等待项（如实）**：整轮时长的事件时间戳来源（需改 `application/session/**`，不在本单写集）；
+  思考行/工具生命周期/分组/输出摘要/每步耗时（等后端 52）、上下文用量（等后端 51）；
+  状态尾品牌文案属 P14。
+- 下一步按派工表执行 **P10**（侧栏重构；`depends_on: P07`，排序在 P08/P09 之后）。writer_lease 继续 ACTIVE。
+
