@@ -100,6 +100,29 @@ for await (const line of rl) {
       pendingPrompt = id
       continue
     }
+    if (text.includes("process-facts")) {
+      // Order 52: exercise every neutral fact class through the real ACP wire:
+      // the harness's reasoning, a tool call and its completion, a plan
+      // snapshot and the selected mode.
+      const sid = params.sessionId
+      const update = (u) => send({ jsonrpc: "2.0", method: "session/update", params: {
+        sessionId: sid, update: u,
+      } })
+      update({ sessionUpdate: "agent_thought_chunk",
+               content: { type: "text", text: "reasoning through the steps" } })
+      update({ sessionUpdate: "tool_call", toolCallId: "call-52",
+               _meta: { toolName: "shell" }, title: "list the files",
+               rawInput: { command: "ls" } })
+      update({ sessionUpdate: "tool_call_update", toolCallId: "call-52",
+               status: "completed" })
+      update({ sessionUpdate: "plan", entries: [
+        { content: "step one", status: "completed", priority: "high" },
+        { content: "step two", status: "pending" },
+      ] })
+      update({ sessionUpdate: "current_mode_update", currentModeId: "code" })
+      send({ jsonrpc: "2.0", id, result: { stopReason: "end_turn" } })
+      continue
+    }
     if (text.includes("delay-success")) {
       setTimeout(() => send({ jsonrpc: "2.0", id, result: { stopReason: "end_turn" } }), 500)
       continue

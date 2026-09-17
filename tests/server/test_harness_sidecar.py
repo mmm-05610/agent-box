@@ -2185,3 +2185,57 @@ def test_stop_reports_honestly_when_a_completion_worker_outlasts_the_deadline(mo
         release.set()
         worker.join(2)
         assert not worker.is_alive()
+
+
+def test_process_facts_land_in_the_ledger_and_wire(tmp_path):
+    """Order 52: the four ACP fact classes reach the ledger and the wire.
+
+    The fake peer replays a thought, a tool call and its completion, a plan
+    snapshot and the selected mode over the real ACP wire; the Server maps
+    them onto neutral facts in the turn ledger and the wire projection
+    carries them to clients — each fact exactly as reported, nothing
+    synthesized for a class the harness did not emit.
+    """
+    runtime = _local_sidecar_runtime(tmp_path)
+    with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
+        profile, first, _second = _queue_setup(client, runtime, tmp_path, "process-facts-52")
+        deadline = time.monotonic() + 30
+        session = runtime.repository.get_session(first["session"]["id"])
+        while time.monotonic() < deadline and session["turns"][0]["state"] in {"accepted", "dispatching", "running", "capturing"}:
+            time.sleep(0.05)
+            session = runtime.repository.get_session(first["session"]["id"])
+        assert session["turns"][0]["state"] == "completed", session["turns"][0]
+
+        print("TURN STATE BEFORE HISTORY:", session["turns"][0]["state"],
+              "capture:", session["turns"][0]["capture_state"])
+        frames = _wire_post(client, runtime.token, "history.snapshot", {
+            "sessionId": first["session"]["id"],
+        })["frames"]
+        kinds = [frame["event"]["kind"] for frame in frames]
+        kinds = [frame["event"]["kind"] for frame in frames]
+        print("WIRE KINDS:", sorted(set(kinds)))
+        assert "thought.delta" in kinds
+        assert "tool.update" in kinds
+        assert "plan.updated" in kinds
+        assert "mode.updated" in kinds
+
+        by_kind: dict[str, list[dict]] = {}
+        for frame in frames:
+            by_kind.setdefault(frame["event"]["kind"], []).append(frame["event"])
+        assert any("reasoning through the steps" in e.get("text", "")
+                   for e in by_kind["thought.delta"])
+        tool = [e for e in by_kind["tool.update"] if e.get("toolCallId") == "call-52"]
+        assert tool and any(e.get("state") == "completed" for e in tool)
+        plan = by_kind["plan.updated"][-1]
+        assert [entry["content"] for entry in plan["entries"]] == ["step one", "step two"]
+        assert by_kind["mode.updated"][-1]["currentModeId"] == "code"
+
+        # The queued successor turn is still in flight; let every turn reach a
+        # terminal state before the runtime stops, or the stop times out.
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline:
+            session = runtime.repository.get_session(first["session"]["id"])
+            if all(t["state"] in {"completed", "failed", "cancelled"}
+                   for t in session["turns"]):
+                break
+            time.sleep(0.05)
