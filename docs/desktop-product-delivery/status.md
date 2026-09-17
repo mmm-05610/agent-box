@@ -1325,6 +1325,27 @@ typecheck 当场暴露；新测试 4 条 ESLint warning 收口为 0。
     **G9 未达成**（逐句判别未完成）；**G10 达成**（i18n 组与边界用例通过）；**G11 达成**（两条字符串守卫）。
   - **顺带**：`renderer-layers` 守卫在 Windows 上同因（反斜杠路径）空转，已与 store 守卫同法修复。
   - 宽面终门 **346 files / 3228 tests passed，exit 0**；`tsc -p . --noEmit` exit 0；改动文件 ESLint 0/0。
-- **下一步**：P15（Settings 剪枝 + skill/MCP 中枢）**尚未开始**；P14-D 的余量已量化并留给下一轮（守卫会随段落转换扩展）。
-  writer_lease 继续 ACTIVE。
+- **下一步**：P15（Settings 剪枝 + skill/MCP 中枢）**已开工（A 阶段进行中）**。writer_lease 继续 ACTIVE。
+
+## P14-D 收口（2026-09-17）：Hermes 品牌语义清理 — `P14_D_GREEN — BRAND_SWEEP_DONE`
+
+- 判据（家族名 / legacy 句 / 内部标识保留；其余产品文案改 AgentBox）与逐段执行见
+  `evidence/P14-D-brand-sweep.md`。
+- **值级命中 631 → 8**（全部为 legacy 例外句）；六语言 × 键名保留按工单。
+- 源码产品路径 9 个模块的 10 处硬编码文案清理（含 3 处 aria/标题、4 处超时错误、2 处 MCP OAuth 指引、1 处斜杠命令描述）。
+- **守卫三条规则**（`dev/contracts/product-copy-guard.test.ts`）：裸可用性词（六语言全量）、品牌规则（六语言全量 + 两类例外）、
+  源码产品路径（9 模块清单）；解析器为缩进感知键路径解析，并有「解析出 20+ composer 键」的自检。
+- 5 处既有用例的文案断言随新文案更新；`api/import-boundary` 守卫的反斜杠路径空转一并修复。
+- 门：**全量 UI 804 passed / 1 failed（`hermes-bots/cron-prompt.test.ts` 在 Windows 上 `spawnSync('sh')` ENOENT，
+  该文件无改动、`sh` 不在 PATH → Windows 环境基线）**；`tsc -p . --noEmit` exit 0。
+
+## P15-A 收口（2026-09-17）：设置页剪裁台账 + 真删 — `P15_A_GREEN — SETTINGS_PRUNED`
+
+- 台账（9 个产品视图 + 10 个 legacy 重定向 + 删除项）见 `evidence/P15-A-settings-ledger.md`。
+- **删除 45 个死模块 + 6 个新增孤儿 + 28 个测试文件**（billing 全目录、gateway/SSH、旧模型/密钥/配置/记忆面板、
+  以及只服务它们的 store）；`settings-search.ts` 剪到 appearance 所需部分。
+- **G2 无孤儿引用达成**：删除前后均用导入图（from / import() / 侧效 import / require）判定，
+  `tsc -p . --noEmit` exit 0、全量 UI 套件通过；`plugin-install-modal` 测试改为直接挂载存活组件。
+- **G3 保留项不退化**：删除后仅剩 `cron-prompt`（POSIX sh）这一 Windows 环境基线失败。
+- **P15-B/C 未开工**：Skill Hub / MCP Hub 需要后端 58；当前 `product:resources` 保持诚实占位。
 

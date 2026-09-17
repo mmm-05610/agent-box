@@ -22,20 +22,26 @@ import { $activeGatewayProfile } from '@/store/profile'
 import { $connection, $gatewayState } from '@/store/session'
 
 import { PluginInstallModal } from './plugin-install-modal'
-import { PluginsSettings } from './plugins-settings'
 
 const probePluginRepo = vi.fn()
 const installDesktopPlugin = vi.fn()
 
-const renderFlow = () =>
-  render(
+/** The modal's own door: the retired plugins page used to open it, and the
+ *  request store is what that page did — so the flow starts where the page
+ *  ended, with the same request shape. */
+const renderFlow = () => {
+  const view = render(
     <MemoryRouter initialEntries={['/settings?tab=plugins']}>
       <QueryClientProvider client={queryClient}>
-        <PluginsSettings />
         <PluginInstallModal />
       </QueryClientProvider>
     </MemoryRouter>
   )
+
+  act(() => openPluginInstallRequest({ repo: '' }))
+
+  return view
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -58,7 +64,6 @@ describe('Install from Git entry flow', () => {
     async mode => {
       $connection.set({ mode } as NonNullable<ReturnType<typeof $connection.get>>)
       renderFlow()
-      fireEvent.click(screen.getByRole('button', { name: 'Install from Git' }))
       const input = await screen.findByRole('textbox', { name: 'Repository' })
       const review = screen.getByRole('button', { name: 'Review repository' })
       expect((review as HTMLButtonElement).disabled).toBe(true)
@@ -88,11 +93,10 @@ describe('Install from Git entry flow', () => {
 
   it('cancels repository entry and starts fresh when reopened', async () => {
     renderFlow()
-    fireEvent.click(screen.getByRole('button', { name: 'Install from Git' }))
     fireEvent.change(await screen.findByRole('textbox', { name: 'Repository' }), { target: { value: 'unfinished' } })
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect($pluginInstallRequest.get()).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Install from Git' }))
+    act(() => openPluginInstallRequest({ repo: '' }))
     expect(((await screen.findByRole('textbox', { name: 'Repository' })) as HTMLInputElement).value).toBe('')
     expect(probePluginRepo).not.toHaveBeenCalled()
     expect(installDesktopPlugin).not.toHaveBeenCalled()
