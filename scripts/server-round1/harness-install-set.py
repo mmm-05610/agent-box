@@ -309,6 +309,10 @@ def main() -> int:
         entry = family_entry(family, module, artifact_ref)
         entry["id"] = family
         deployment_seats.append(entry)
+        install_set["mountBindings"][artifact_ref["token"]] = (
+            str(source) if family in reuse else
+            str((output / "artifacts" / family).resolve())
+            if family != "opencode" else str(binary))
 
         models_doc = models_document_for(module, family)
         (output / "models" / f"{family}.json").write_text(
@@ -327,8 +331,6 @@ def main() -> int:
             "treeDigest": digest,
         })
         install_set["families"][family] = facts
-        install_set["mountBindings"][f"{family}-runtime"] = str(
-            (output / "artifacts" / family).resolve())
 
     deployment = {"schemaVersion": 1, "harnesses": deployment_seats}
     deployment_bytes = json.dumps(deployment, indent=2, sort_keys=True).encode()

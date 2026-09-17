@@ -1,0 +1,53 @@
+{
+ "hello": "wire/1",
+ "families": {
+  "codex": {
+   "workspaceOpened": true,
+   "profileCreated": 201,
+   "providerModelId": "provider_c448adff5f2c405abd0ac73024cd6cf9",
+   "secondRoleCreated": 201
+  },
+  "claude-code": {
+   "workspaceOpened": true,
+   "profileCreated": 201,
+   "providerModelId": "provider_930a8564abee4e51a5ef3e872429b646",
+   "secondRoleCreated": 201
+  },
+  "opencode": {
+   "workspaceOpened": true,
+   "profileCreated": 201,
+   "providerModelId": "provider_98f3dbbe55174a279e13607d31070e42",
+   "secondRoleCreated": 201
+  },
+  "hermes": {
+   "workspaceOpened": true,
+   "profileCreated": 201,
+   "providerModelId": "provider_46c15c305d14428b9248fa50723499f9",
+   "secondRoleCreated": 201
+  },
+  "dsh": {
+   "workspaceOpened": true,
+   "profileCreated": 201,
+   "providerModelId": "provider_36bbec56ee264b87997998f8c99d36a1",
+   "secondRoleCreated": 201
+  },
+  "qwen": {
+   "workspaceOpened": true,
+   "profileCreated": 201,
+   "providerModelId": "provider_cfb617bfc7054182979f54ea3ae60dbd",
+   "secondRoleCreated": 201
+  },
+  "kilo": {
+   "workspaceOpened": true,
+   "profileCreated": 201,
+   "providerModelId": "provider_8a98860f95b44a25905f4bd82b38763c",
+   "secondRoleCreated": 201
+  },
+  "pi": {
+   "workspaceOpened": true,
+   "profileCreated": 201,
+   "providerModelId": "provider_ce39ee0290dc42d49df9dc09a87f008c",
+   "secondRoleCreated": 201
+  }
+ }
+}
