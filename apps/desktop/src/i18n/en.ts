@@ -4,7 +4,7 @@ import type { Translations } from './types'
 export const en: Translations = {
   sessionImport: {
     title: 'Continue from another app',
-    subtitle: 'Bring a conversation into Hermes and pick up where you left off.',
+    subtitle: 'Bring a conversation into AgentBox and pick up where you left off.',
     action: 'Import session',
     readingFrom: 'Reading from',
     connectedComputer: 'the connected computer',
@@ -22,18 +22,18 @@ export const en: Translations = {
     more: 'Load more sessions',
     messages: 'messages',
     choose: 'A conversation worth continuing',
-    chooseHelp: 'Choose a session to read its history before bringing it into Hermes.',
+    chooseHelp: 'Choose a session to read its history before bringing it into AgentBox.',
     previewLoading: 'Opening preview',
     previewError: 'Preview unavailable',
     previewHelp: 'The source may have moved or changed. Refresh the list and try again.',
     previewLimit: 'Preview shortened for readability. The complete conversation is imported.',
     you: 'You',
-    snapshot: 'This conversation is already in Hermes. Open your existing copy to continue.',
+    snapshot: 'This conversation is already in AgentBox. Open your existing copy to continue.',
     copyNotice:
       'Copies conversation text. Source files stay unchanged. Tool output and reasoning are not carried over.',
     importing: 'Importing…',
-    open: 'Open in Hermes',
-    continue: 'Continue in Hermes',
+    open: 'Open in AgentBox',
+    continue: 'Continue in AgentBox',
     importError: 'Could not import this conversation.'
   },
   common: {
@@ -98,19 +98,19 @@ export const en: Translations = {
   },
 
   boot: {
-    ready: 'Hermes Desktop is ready',
+    ready: 'AgentBox Desktop is ready',
     desktopBootFailedWithMessage: message => `Desktop boot failed: ${message}`,
     steps: {
       connectingGateway: 'Connecting live desktop gateway',
-      loadingSettings: 'Loading Hermes settings',
+      loadingSettings: 'Loading AgentBox settings',
       loadingSessions: 'Loading recent sessions',
-      retryingRemoteBackend: 'Reconnecting to the remote Hermes backend…',
+      retryingRemoteBackend: 'Reconnecting to the remote AgentBox backend…',
       startingDesktopConnection: 'Starting desktop connection',
-      startingHermesDesktop: 'Starting Hermes Desktop…'
+      startingHermesDesktop: 'Starting AgentBox Desktop…'
     },
     errors: {
-      backgroundExited: 'Hermes background process exited.',
-      backgroundExitedDuringStartup: 'Hermes background process exited during startup.',
+      backgroundExited: 'AgentBox background process exited.',
+      backgroundExitedDuringStartup: 'AgentBox background process exited during startup.',
       backendStopped: 'Backend stopped',
       desktopBootFailed: 'Desktop boot failed',
       gatewayConnectionLost: 'Lost connection to the gateway',
@@ -120,7 +120,7 @@ export const en: Translations = {
       ipcBridgeUnavailable: 'Desktop IPC bridge is unavailable.'
     },
     failure: {
-      title: "Hermes couldn't start",
+      title: "AgentBox couldn't start",
       description:
         "The background gateway didn't come up. Try one of the recovery steps below. Nothing here deletes your chats or settings.",
       remoteTitle: 'Remote gateway sign-in required',
@@ -143,11 +143,11 @@ export const en: Translations = {
         'The Nous-managed cloud agent this gateway connects to is returning a server error. It cannot be restarted from here — check its status, switch to the local gateway, or get support.',
       cloudDownHint:
         'The buttons below open the Nous Portal (instance status and controls) and our Discord for support.',
-      notFoundTitle: 'Hermes isn\'t installed',
+      notFoundTitle: 'AgentBox isn\'t installed',
       notFoundDescription:
-        'The desktop couldn\'t find a Hermes runtime to launch. It looks for the hermes command on your PATH, or an install it manages itself. Install Hermes, then retry — nothing here deletes your chats or settings.',
+        'The desktop couldn\'t find an AgentBox runtime to launch. It looks for the hermes command on your PATH, or an install it manages itself. Install AgentBox, then retry — nothing here deletes your chats or settings.',
       notFoundHint:
-        'Repair install runs the Hermes installer; Retry looks for it again once it\'s available.',
+        'Repair install runs the AgentBox installer; Retry looks for it again once it\'s available.',
       cloudDownCheckPortal: 'Check Portal status',
       cloudDownDiscord: 'Get help on Discord',
       hideRecentLogs: 'Hide recent logs',
@@ -175,9 +175,9 @@ export const en: Translations = {
     copyDetailFailed: 'Could not copy notification detail',
     backendOutOfDateTitle: 'Backend out of date',
     backendOutOfDateMessage:
-      'Your Hermes backend is older than this desktop build and may not work correctly. Update to align them.',
+      'Your AgentBox backend is older than this desktop build and may not work correctly. Update to align them.',
     installMethodUnsupportedTitle: 'Unsupported install method',
-    updateHermes: 'Update Hermes',
+    updateHermes: 'Update AgentBox',
     updateReadyTitle: 'Update ready',
     updateReadyMessage: count => `${count} new change${count === 1 ? '' : 's'} available.`,
     updateReadyMessageUnknown: 'A new update is available.',
@@ -196,7 +196,7 @@ export const en: Translations = {
       diskFull: 'Disk full — free some space, then try again.',
       gatewayAuthFailed: 'Gateway authentication failed — check your API_SERVER_KEY.',
       methodNotAllowed:
-        'The desktop backend rejected that request (405 Method Not Allowed). Try restarting Hermes Desktop.',
+        'The desktop backend rejected that request (405 Method Not Allowed). Try restarting AgentBox Desktop.',
       microphonePermission: 'Microphone permission was denied.',
       openaiRejectedApiKey: 'OpenAI rejected the API key.',
       openaiRejectedApiKeyWithStatus: status => `OpenAI rejected the API key (${status} invalid_api_key).`,
@@ -220,8 +220,8 @@ export const en: Translations = {
       approveAction: 'Approve',
       rejectAction: 'Reject',
       inputTitle: 'Input needed',
-      inputBody: 'Hermes is waiting for your response.',
-      turnDoneTitle: 'Hermes finished',
+      inputBody: 'AgentBox is waiting for your response.',
+      turnDoneTitle: 'AgentBox finished',
       turnDoneBody: '',
       turnErrorTitle: 'Turn failed',
       backgroundDoneTitle: 'Background task finished',
@@ -431,7 +431,7 @@ export const en: Translations = {
     exportConfig: 'Export config',
     importConfig: 'Import config',
     resetToDefaults: 'Reset to defaults',
-    resetConfirm: 'Reset all settings to Hermes defaults?',
+    resetConfirm: 'Reset all settings to AgentBox defaults?',
     exportFailed: 'Export failed',
     resetFailed: 'Reset failed',
     nav: {
@@ -578,7 +578,7 @@ export const en: Translations = {
         agentTargetLocal: profile => `Installs into the ${profile} backend (~/.hermes/plugins/)`,
         agentTargetRemote: profile => `Installs into the connected ${profile} backend`,
         catalogPinned: (name, sha) =>
-          `Hermes catalog entry "${name}" — the agent component installs at the reviewed pin${sha ? ` ${sha}` : ''}, not the branch tip.`,
+          `AgentBox catalog entry "${name}" — the agent component installs at the reviewed pin${sha ? ` ${sha}` : ''}, not the branch tip.`,
         reviewedHeading: 'Reviewed catalog entry',
         reviewedIntro:
           'This entry was human-reviewed at its pinned commit. You can still inspect the exact code below.',
@@ -616,7 +616,7 @@ export const en: Translations = {
       intro: 'OS notifications (not in-app toasts). Per device.',
       enableAll: 'Enable notifications',
       enableAllDesc: 'Off silences every notification below.',
-      focusedHint: 'Completion alerts only fire while Hermes is in the background.',
+      focusedHint: 'Completion alerts only fire while AgentBox is in the background.',
       kinds: {
         approval: {
           label: 'Approval needed',
@@ -624,11 +624,11 @@ export const en: Translations = {
         },
         input: {
           label: 'Input needed',
-          description: 'Hermes asked a question or needs a password or secret.'
+          description: 'AgentBox asked a question or needs a password or secret.'
         },
         turnDone: {
           label: 'Response ready',
-          description: 'A turn finished while Hermes was in the background.'
+          description: 'A turn finished while AgentBox was in the background.'
         },
         turnError: {
           label: 'Turn failed',
@@ -644,11 +644,11 @@ export const en: Translations = {
         },
         plugin: {
           label: 'Plugin notifications',
-          description: 'A desktop plugin sent a notification while Hermes was in the background.'
+          description: 'A desktop plugin sent a notification while AgentBox was in the background.'
         }
       },
       test: 'Send test notification',
-      testTitle: 'Hermes',
+      testTitle: 'AgentBox',
       testBody: 'Notifications are working.',
       testSent: 'Test sent. If nothing appears, check your OS notification permissions and Focus/Do Not Disturb.',
       testUnsupported: 'This system does not support native notifications.',
@@ -667,7 +667,7 @@ export const en: Translations = {
       advanced: 'Advanced'
     },
     searchPlaceholder: {
-      about: 'About Hermes Desktop',
+      about: 'About AgentBox Desktop',
       config: 'Search settings...',
       gateway: 'Gateway connection...',
       keys: 'Search API keys...',
@@ -683,7 +683,7 @@ export const en: Translations = {
       title: 'Appearance',
       intro: 'Desktop-only. Mode is brightness; theme is palette and chat chrome.',
       colorMode: 'Color Mode',
-      colorModeDesc: 'Pick a fixed mode or let Hermes follow your system setting.',
+      colorModeDesc: 'Pick a fixed mode or let AgentBox follow your system setting.',
       toolViewTitle: 'Tool Call Display',
       toolViewDesc: 'Product hides raw tool payloads; Technical shows full input/output.',
       reasoningCollapsedTitle: 'Collapse thinking by default',
@@ -734,13 +734,13 @@ export const en: Translations = {
       introSplashTitle: 'Intro Splash',
       introSplashDesc: 'The wordmark and prompt shown on an empty chat.',
       reactionsTitle: 'Message Reactions',
-      reactionsDesc: 'iMessage-style emoji tapbacks — react to messages, and Hermes can react to yours.',
+      reactionsDesc: 'iMessage-style emoji tapbacks — react to messages, and AgentBox can react to yours.',
       tipsTitle: 'In-App Tips',
       tipsDesc:
-        'A small bubble pointing at one part of the app, shown occasionally while idle and by Hermes when it helps. Closing one retires it for good.',
+        'A small bubble pointing at one part of the app, shown occasionally while idle and by AgentBox when it helps. Closing one retires it for good.',
       tipsReset: (count: number) => `Bring back ${count} closed ${count === 1 ? 'tip' : 'tips'}`,
       toursTitle: 'Guided Tours',
-      toursDesc: 'Let Hermes walk you through the app, dimming the screen and spotlighting each step.',
+      toursDesc: 'Let AgentBox walk you through the app, dimming the screen and spotlighting each step.',
       composerPopoutTitle: 'Floating Composer',
       composerPopoutDesc: 'Allow dragging the composer out of its dock. Turn this off to keep it locked at the bottom.',
       vibeHeartsTitle: 'Vibe Hearts',
@@ -776,9 +776,9 @@ export const en: Translations = {
       pet: {
         title: 'Pet',
         intro:
-          'Adopt an animated petdex mascot that floats over the app and reacts to what Hermes is doing — running while tools execute, celebrating on success, sulking on errors.',
+          'Adopt an animated petdex mascot that floats over the app and reacts to what AgentBox is doing — running while tools execute, celebrating on success, sulking on errors.',
         restartHint:
-          'Pets need a quick restart — the running app started before this feature was added. Quit and reopen Hermes, then come back here.',
+          'Pets need a quick restart — the running app started before this feature was added. Quit and reopen AgentBox, then come back here.',
         on: 'On',
         off: 'Off',
         scaleTitle: 'Size',
@@ -816,17 +816,17 @@ export const en: Translations = {
     fieldLabels: FIELD_LABELS,
     fieldDescriptions: FIELD_DESCRIPTIONS,
     about: {
-      heading: 'Hermes Desktop',
+      heading: 'AgentBox Desktop',
       version: value => `Version ${value}`,
       versionUnavailable: 'Version unavailable',
       bundleOutOfSync: 'App build out of date',
       bundleOutOfSyncDesc:
-        'The Hermes runtime was updated, but the desktop app itself is still an older build — new interface features (like Bot Mode) will be missing until it updates. Run the update below to rebuild the app. If that doesn\u2019t clear this warning, reinstall from the latest desktop installer.',
+        'The AgentBox runtime was updated, but the desktop app itself is still an older build — new interface features (like Bot Mode) will be missing until it updates. Run the update below to rebuild the app. If that doesn\u2019t clear this warning, reinstall from the latest desktop installer.',
       bundleOutOfSyncAction: 'Get the installer',
       bundleSwapPending: 'Restart to finish the update',
       bundleSwapPendingDesc:
-        'The updated app is already installed — Hermes only needs to restart to load it. Chats and settings are untouched.',
-      bundleSwapPendingAction: 'Restart Hermes',
+        'The updated app is already installed — AgentBox only needs to restart to load it. Chats and settings are untouched.',
+      bundleSwapPendingAction: 'Restart AgentBox',
       updates: 'Updates',
       checkNow: 'Check now',
       checking: 'Checking…',
@@ -844,7 +844,7 @@ export const en: Translations = {
       justNowSuffix: ' · just now',
       automaticUpdates: 'Automatic updates',
       automaticUpdatesDesc:
-        'Hermes checks for updates automatically in the background and lets you know when one is ready.',
+        'AgentBox checks for updates automatically in the background and lets you know when one is ready.',
       branchCommit: (branch, commit) => `Branch ${branch} · Commit ${commit}`,
       never: 'never',
       justNow: 'just now',
@@ -861,7 +861,7 @@ export const en: Translations = {
       searchPlaceholder: 'Search…',
       noResults: 'No results found',
       systemDefault: 'System default',
-      loading: 'Loading Hermes configuration...',
+      loading: 'Loading AgentBox configuration...',
       emptyTitle: 'Nothing to configure',
       emptyDesc: 'This section has no adjustable settings.',
       failedLoad: 'Settings failed to load',
@@ -883,7 +883,7 @@ export const en: Translations = {
     quickEntry: {
       enabledTitle: 'Quick Entry',
       enabledDesc:
-        'Summon a small composer from anywhere with a global shortcut and fire a prompt without opening Hermes.',
+        'Summon a small composer from anywhere with a global shortcut and fire a prompt without opening AgentBox.',
       shortcutTitle: 'Quick Entry shortcut',
       shortcutDesc: 'Needs at least one modifier, e.g. CommandOrControl+Shift+Space.',
       active: 'Shortcut is active.',
@@ -913,7 +913,7 @@ export const en: Translations = {
     // v2 multi-connection registry: Settings → Gateways.
     connections: {
       title: 'Registered gateways',
-      intro: 'Manage this device and every Hermes gateway it can reach through remote, SSH, or Cloud connections.',
+      intro: 'Manage this device and every AgentBox gateway it can reach through remote, SSH, or Cloud connections.',
       stagedNote:
         'Switch gateways from Sessions. Profiles, chats, messaging, and cron jobs stay with their gateway; work on other gateways keeps running.',
       launchModeTitle: 'At startup, return to Sessions on the last-used gateway',
@@ -940,15 +940,15 @@ export const en: Translations = {
       updateAllRunning: 'Updating all instances…',
       updateAllDone: 'Updates dispatched',
       updateAllFailed: 'Update fan-out failed',
-      updateSkippedCloud: 'Managed by Hermes Cloud',
+      updateSkippedCloud: 'Managed by AgentBox Cloud',
       kindLocal: 'Local',
       kindRemote: 'Remote gateway',
-      kindCloud: 'Hermes Cloud',
+      kindCloud: 'AgentBox Cloud',
       kindSsh: 'SSH',
-      kindLocalDesc: 'The Hermes runtime managed by this app.',
-      kindRemoteDesc: 'A Hermes gateway reachable over HTTP(S) — LAN, Tailscale, or the internet.',
-      kindCloudDesc: 'A hosted instance discovered through your Hermes Cloud account.',
-      kindSshDesc: 'A Hermes install reached over SSH.',
+      kindLocalDesc: 'The AgentBox runtime managed by this app.',
+      kindRemoteDesc: 'An AgentBox gateway reachable over HTTP(S) — LAN, Tailscale, or the internet.',
+      kindCloudDesc: 'A hosted instance discovered through your AgentBox Cloud account.',
+      kindSshDesc: 'An AgentBox install reached over SSH.',
       labelTitle: 'Name',
       labelDesc: 'Required. Shown everywhere this instance appears; must be unique (e.g. “Homelab”, “Work laptop”).',
       labelPlaceholder: 'Homelab',
@@ -956,7 +956,7 @@ export const en: Translations = {
       sshHostTitle: 'SSH host',
       headersTitle: 'Extra gateway headers',
       headersDesc:
-        'Sent with every HTTP and WebSocket request to this gateway — for access proxies such as Cloudflare Access (CF-Access-Client-Id / CF-Access-Client-Secret). Values are stored encrypted. Headers Hermes manages (Authorization, Cookie, Host…) are ignored.',
+        'Sent with every HTTP and WebSocket request to this gateway — for access proxies such as Cloudflare Access (CF-Access-Client-Id / CF-Access-Client-Secret). Values are stored encrypted. Headers AgentBox manages (Authorization, Cookie, Host…) are ignored.',
       headerValuePlaceholder: 'Value',
       headerValueSaved: 'Saved — leave blank to keep',
       headerAdd: 'Add header',
@@ -967,7 +967,7 @@ export const en: Translations = {
       sameBackendHint: (label: string) => `Same backend as “${label}”`,
       localAddHint: 'Local is unavailable: the managed local connection already exists (there is only ever one).',
       cloudAddHint:
-        'Tip: signing in under Hermes Cloud above discovers your agents automatically — use this form only to register a known instance URL by hand.',
+        'Tip: signing in under AgentBox Cloud above discovers your agents automatically — use this form only to register a known instance URL by hand.',
       save: 'Save connection',
       saving: 'Saving…',
       cancel: 'Cancel',
@@ -998,22 +998,22 @@ export const en: Translations = {
       title: 'Gateway Connection',
       envOverride: 'env override',
       intro:
-        'Local by default. Use remote when this app should drive a Hermes backend elsewhere. Gateway connections are machine-level; profiles are discovered from the gateways you connect.',
+        'Local by default. Use remote when this app should drive an AgentBox backend elsewhere. Gateway connections are machine-level; profiles are discovered from the gateways you connect.',
       envOverrideTitle: 'Environment variables are controlling this desktop session.',
       envOverrideDesc:
         'Unset HERMES_DESKTOP_REMOTE_URL and HERMES_DESKTOP_REMOTE_TOKEN to use the saved setting below.',
       modeTitle: 'Connection mode',
       localTitle: 'Local gateway',
-      localDesc: 'Start a private Hermes backend on localhost. This is the default and works offline.',
+      localDesc: 'Start a private AgentBox backend on localhost. This is the default and works offline.',
       remoteTitle: 'Remote gateway',
-      remoteDesc: 'Connect this desktop shell to a remote Hermes backend.',
+      remoteDesc: 'Connect this desktop shell to a remote AgentBox backend.',
       remoteAuthHint: 'Hosted gateways use OAuth or a username and password; self-hosted ones may use a session token.',
-      cloudTitle: 'Hermes Cloud',
-      cloudDesc: 'Sign in once to Hermes Cloud and pick from the agents on your account — no URL to paste.',
-      cloudSignInTitle: 'Hermes Cloud',
-      cloudSignIn: 'Sign in to Hermes Cloud',
-      cloudSignedIn: 'Signed in to Hermes Cloud',
-      cloudNeedsSignIn: 'Sign in to Hermes Cloud to discover the agents on your account.',
+      cloudTitle: 'AgentBox Cloud',
+      cloudDesc: 'Sign in once to AgentBox Cloud and pick from the agents on your account — no URL to paste.',
+      cloudSignInTitle: 'AgentBox Cloud',
+      cloudSignIn: 'Sign in to AgentBox Cloud',
+      cloudSignedIn: 'Signed in to AgentBox Cloud',
+      cloudNeedsSignIn: 'Sign in to AgentBox Cloud to discover the agents on your account.',
       cloudSignedInDesc: 'You are signed in. Pick an agent below; the session refreshes automatically.',
       cloudAgentsTitle: 'Your agents',
       cloudOrgPickerTitle: 'Choose an organization',
@@ -1034,11 +1034,11 @@ export const en: Translations = {
       cloudUseSaved: 'Use gateway',
       cloudActive: 'Active in this window',
       cloudConnecting: 'Connecting…',
-      cloudDiscoverFailed: 'Could not load your Hermes Cloud agents',
+      cloudDiscoverFailed: 'Could not load your AgentBox Cloud agents',
       cloudConnectFailed: 'Could not connect to that agent',
-      cloudSignInFailed: 'Hermes Cloud sign-in failed',
-      cloudSignedOutTitle: 'Signed out of Hermes Cloud',
-      cloudSignedOutMessage: 'Cleared the Hermes Cloud session.',
+      cloudSignInFailed: 'AgentBox Cloud sign-in failed',
+      cloudSignedOutTitle: 'Signed out of AgentBox Cloud',
+      cloudSignedOutMessage: 'Cleared the AgentBox Cloud session.',
       cloudConnectedTitle: 'Connected',
       cloudConnectedPill: 'Connected',
       cloudConnectedTo: name => `Connected to ${name}.`,
@@ -1088,7 +1088,7 @@ export const en: Translations = {
       enterUrlFirst: 'Enter a remote URL first.',
       restartingTitle: 'Gateway connection restarting',
       savedTitle: 'Gateway settings saved',
-      restartingMessage: 'Hermes Desktop will reconnect using the saved settings — the shell stays open.',
+      restartingMessage: 'AgentBox Desktop will reconnect using the saved settings — the shell stays open.',
       savedMessage: 'Saved for the next restart.',
       connectedTo: (baseUrl, version) => `Connected to ${baseUrl}${version ? ` · Hermes ${version}` : ''}`,
       reachableTitle: 'Remote gateway reachable',
@@ -1102,7 +1102,7 @@ export const en: Translations = {
       saveFailed: 'Could not save gateway settings',
       sshTitle: 'Connect via SSH',
       sshDesc:
-        'Hermes is launched on the remote over SSH and tunneled to this app — nothing to start or expose yourself. Requires working key-based SSH access to the host.',
+        'AgentBox is launched on the remote over SSH and tunneled to this app — nothing to start or expose yourself. Requires working key-based SSH access to the host.',
       sshTrustHint: 'The first presented host key is trusted and pinned; later changes fail closed.',
       sshHostTitle: 'Host',
       sshHostDesc: 'user@host, or a Host alias from ~/.ssh/config.',
@@ -1117,25 +1117,25 @@ export const en: Translations = {
       sshPortDesc: 'Blank = 22 or the ~/.ssh/config port.',
       sshKeyTitle: 'Identity file',
       sshKeyDesc: 'Private key path. Blank = ssh-agent or ~/.ssh/config.',
-      sshHermesPathTitle: 'Hermes path (optional)',
+      sshHermesPathTitle: 'AgentBox path (optional)',
       sshHermesPathDesc: 'Full path to the remote hermes binary. Blank = auto-detect.',
       sshHermesPathPlaceholder: 'auto-detect',
       sshTestConnection: 'Test SSH',
       sshConnect: 'Connect',
       sshButtonsHint: 'Save applies on the next launch. Connect reconnects now.',
-      sshReachable: (host, platform) => `Reachable: ${host} (${platform}) — Hermes found`,
+      sshReachable: (host, platform) => `Reachable: ${host} (${platform}) — AgentBox found`,
       sshIncompleteHost: 'Enter an SSH host before connecting.',
       sshErrUnreachable: 'Could not reach that host over SSH. Check the host, port, and your network.',
       sshErrAuth:
-        'SSH authentication failed. Load your key into the ssh-agent (ssh-add) or set an IdentityFile in ~/.ssh/config — Hermes runs ssh non-interactively.',
+        'SSH authentication failed. Load your key into the ssh-agent (ssh-add) or set an IdentityFile in ~/.ssh/config — AgentBox runs ssh non-interactively.',
       sshErrHostKey:
         'The host key has CHANGED since you last connected. Verify this is expected, then run ssh-keygen -R <host> and reconnect.',
       sshErrNotInstalled:
-        'Hermes is not installed on the remote host. Install it there (curl -fsSL https://hermes-agent.nousresearch.com/install.sh | sh) or set the Hermes path.',
+        'AgentBox is not installed on the remote host. Install it there (curl -fsSL https://hermes-agent.nousresearch.com/install.sh | sh) or set the AgentBox path.',
       sshErrPlatform:
-        'Unsupported remote platform. Hermes Desktop SSH mode supports Linux, macOS, and Windows remote hosts.',
+        'Unsupported remote platform. AgentBox Desktop SSH mode supports Linux, macOS, and Windows remote hosts.',
       sshErrTimeout: 'SSH connection timed out. The host may be unreachable or asleep.',
-      sshErrUpdateRequired: 'Update Hermes on the remote host before connecting with Desktop SSH.',
+      sshErrUpdateRequired: 'Update AgentBox on the remote host before connecting with Desktop SSH.',
       sshErrUnknown: 'SSH connection failed.'
     },
     keys: {
@@ -1221,7 +1221,7 @@ export const en: Translations = {
       noOutput: 'No output yet.',
       deepLinkTitle: 'Add MCP server?',
       deepLinkDescription:
-        'A link asked to add this MCP server to Hermes. Review the exact configuration below — it comes from the link, not from Hermes.',
+        'A link asked to add this MCP server to AgentBox. Review the exact configuration below — it comes from the link, not from AgentBox.',
       deepLinkStdioWarning:
         'This server runs a local process on your machine with the command shown below. Only continue if you trust its source.',
       deepLinkConfirm: 'Add server',
@@ -1282,7 +1282,7 @@ export const en: Translations = {
       serverRunning: 'Running',
       runtimeInstalled: 'llama.cpp runtime installed',
       runtimeInstalledDetail: (tag, backend) =>
-        `Build ${tag}, ${backend} backend. Hermes starts and manages the server for you.`,
+        `Build ${tag}, ${backend} backend. AgentBox starts and manages the server for you.`,
       installTitle: 'Install the local runtime',
       installDetail:
         'Downloads the llama.cpp inference engine (a few hundred MB). Models you download run entirely on this machine — no account, nothing leaves your computer.',
@@ -1333,7 +1333,7 @@ export const en: Translations = {
       updateAction: 'Update engine',
       updating: 'Updating engine…',
       upToDateTitle: 'Engine up to date',
-      upToDateDetail: (tag, backend) => `Running llama.cpp ${tag} (${backend}) — the latest build Hermes ships.`,
+      upToDateDetail: (tag, backend) => `Running llama.cpp ${tag} (${backend}) — the latest build AgentBox ships.`,
       updateToast: next => `A newer local engine build (${next}) is available. Update from Settings → Local Models.`,
       activeDetail: 'New chats use this model — it loads when you send your first message',
       activeNotLoaded: 'Loads on your first message',
@@ -1397,7 +1397,7 @@ export const en: Translations = {
       connectAccount: 'Connect an account',
       haveApiKey: 'Have an API key instead?',
       intro:
-        'Sign in with a subscription — no API key to copy. Hermes runs the browser sign-in for you, right here in the app.',
+        'Sign in with a subscription — no API key to copy. AgentBox runs the browser sign-in for you, right here in the app.',
       connected: 'Connected',
       collapse: 'Collapse',
       connectAnother: 'Connect another provider',
@@ -1418,7 +1418,7 @@ export const en: Translations = {
       noKeysMatch: 'No providers match your search.',
       localEndpoint: {
         title: 'Local / custom endpoint',
-        description: 'Point Hermes at any OpenAI-compatible endpoint (Zyphra, vLLM, llama.cpp, Ollama, etc).'
+        description: 'Point AgentBox at any OpenAI-compatible endpoint (Zyphra, vLLM, llama.cpp, Ollama, etc).'
       },
       loading: 'Loading providers...'
     },
@@ -1542,7 +1542,7 @@ export const en: Translations = {
         failedSave: 'Could not save the real-profile setting',
         prompt: {
           title: 'Stay signed in to your sites',
-          body: 'Let Hermes browse with a snapshot of your default browser profile, so sites open already signed in.',
+          body: 'Let AgentBox browse with a snapshot of your default browser profile, so sites open already signed in.',
           bulletSnapshot: 'Cookies and logins are copied into a managed snapshot.',
           bulletLiveProfile: 'Your live browser profile is never opened directly.',
           bulletLocal: 'Nothing leaves this computer.',
@@ -1616,7 +1616,7 @@ export const en: Translations = {
       emptyHint: 'Browse the catalog below and install a reviewed plugin with one click.',
       loadFailed: 'Could not load agent plugins',
       toggleFailed: (name: string) => `Could not toggle ${name}`,
-      legacyBackend: 'This backend predates key-addressed plugin toggles — update Hermes to manage it here.',
+      legacyBackend: 'This backend predates key-addressed plugin toggles — update AgentBox to manage it here.',
       portableBadge: 'portable',
       catalogTitle: 'Plugin catalog',
       catalogBrowse: 'Browse',
@@ -1624,7 +1624,7 @@ export const en: Translations = {
       catalogHint:
         'Hit "+ Add to this Agent" on any plugin — reviewed entries install at their pinned commit into the selected profile. Bundled agent+desktop plugins offer both halves.',
       alreadyInstalled: (name: string) => `${name} is already installed in this profile.`,
-      catalogProvenance: (sha: string) => `Installed from the Hermes catalog${sha ? ` at pin ${sha}` : ''}.`,
+      catalogProvenance: (sha: string) => `Installed from the AgentBox catalog${sha ? ` at pin ${sha}` : ''}.`,
       tierOfficial: 'official',
       tierCommunity: 'community',
       updateToPin: (sha: string) => `Update to ${sha}`,
@@ -1701,7 +1701,7 @@ export const en: Translations = {
     loadFailed: 'Could not load memory graph',
     loading: 'Loading…',
     emptyTitle: 'Nothing learned yet',
-    emptyDesc: 'As Hermes builds skills and memories for your work, they appear here.',
+    emptyDesc: 'As AgentBox builds skills and memories for your work, they appear here.',
     share: 'Share map',
     shareHint:
       'Copy the code to share this map, or paste one to load. It only includes the layout, not your memory or skill text.',
@@ -1783,7 +1783,7 @@ export const en: Translations = {
       placeholder: 'Search pets…',
       loading: 'Loading petdex gallery…',
       error: 'Could not reach the petdex gallery.',
-      staleBackend: 'Restart Hermes to use pets — the backend predates this feature.',
+      staleBackend: 'Restart AgentBox to use pets — the backend predates this feature.',
       empty: 'No matching pets.',
       turnOff: 'Turn off',
       turnOn: 'Turn on',
@@ -1810,8 +1810,8 @@ export const en: Translations = {
       hatchComposing: 'Piecing it together…',
       hatchSaving: 'Almost there…',
       namePlaceholder: 'Name your pet',
-      staleBackend: 'Update Hermes to generate pets.',
-      backgroundHint: 'You can close this — Hermes will notify you when it’s done.',
+      staleBackend: 'Update AgentBox to generate pets.',
+      backgroundHint: 'You can close this — AgentBox will notify you when it’s done.',
       slowProviderHint: 'This can take several minutes',
       remix: 'Remix',
       remixConfirmTitle: 'Remix this look?',
@@ -1850,7 +1850,7 @@ export const en: Translations = {
       'System, usage and maintenance panels belong to the legacy Hermes runtime, which the AgentBox shell does not call.',
     nav: {
       newChat: { title: 'New session', detail: 'Start a fresh session' },
-      settings: { title: 'Settings', detail: 'Configure Hermes desktop' },
+      settings: { title: 'Settings', detail: 'Configure AgentBox desktop' },
       skills: { title: 'Capabilities', detail: 'Skills, tools, and MCP servers' },
       artifacts: { title: 'Artifacts', detail: 'Browse generated outputs' }
     },
@@ -1871,11 +1871,11 @@ export const en: Translations = {
     noSessions: 'No sessions yet.',
     gatewayRunning: 'Messaging gateway running',
     gatewayStopped: 'Messaging gateway stopped',
-    hermesActiveSessions: (version, count) => `Hermes ${version} · Active sessions ${count}`,
+    hermesActiveSessions: (version, count) => `AgentBox ${version} · Active sessions ${count}`,
     restartGateway: 'Restart gateway',
     openBrowser: 'Open browser',
     gatewayRestartFailed: 'Gateway restart failed.',
-    updateHermes: 'Update Hermes',
+    updateHermes: 'Update AgentBox',
     reloadWindow: 'Reload window',
     actionRunning: 'running',
     actionDone: 'done',
@@ -2050,7 +2050,7 @@ export const en: Translations = {
       menuItem: 'Connect to a remote host…',
       badge: (host: string) => `Runs on ${host}`,
       title: (profile: string) => `Connect ${profile} to a remote host`,
-      description: 'Sessions in this profile will run on the remote Hermes you point it at, instead of this computer.',
+      description: 'Sessions in this profile will run on the remote AgentBox you point it at, instead of this computer.',
       urlLabel: 'Remote address',
       urlPlaceholder: 'https://hermes.example.com',
       urlInvalid: 'Enter a full address starting with http:// or https://',
@@ -2115,7 +2115,7 @@ export const en: Translations = {
     deleteDescMid: ' and remove its ',
     deleteDescSuffix: ' directory. This cannot be undone.',
     deleting: 'Deleting...',
-    createDesc: 'Profiles are independent Hermes environments: separate config, skills, and SOUL.md.',
+    createDesc: 'Profiles are independent AgentBox environments: separate config, skills, and SOUL.md.',
     nameLabel: 'Name',
     cloneFrom: 'Clone from',
     cloneFromNone: 'None (blank)',
@@ -2184,7 +2184,7 @@ export const en: Translations = {
         `${count} unpinned scheduled ${count === 1 ? 'job keeps' : 'jobs keep'} running on the model ${count === 1 ? 'it was' : 'they were'} created under. Pin ${count === 1 ? 'it' : 'them'} or set cron.model to move ${count === 1 ? 'it' : 'them'}.`,
       detailMore: (names, remaining) => `${names} and ${remaining} more`,
       review: 'Review scheduled jobs',
-      saveFailed: 'Hermes did not save that model change.',
+      saveFailed: 'AgentBox did not save that model change.',
       confirmTitle: 'Model Selection Warning',
       confirmDetail: 'Confirm only if you accept this trade-off.',
       confirmAction: 'Confirm',
@@ -2245,7 +2245,7 @@ export const en: Translations = {
     everyHourAt: minute => `Every hour at :${minute}`,
     newCron: 'New cron',
     emptyDescNew:
-      'Schedule a prompt to run on a cron expression. Hermes will run it and deliver results to the destination you pick.',
+      'Schedule a prompt to run on a cron expression. AgentBox will run it and deliver results to the destination you pick.',
     emptyDescSearch: 'Try a broader search query.',
     emptyTitleNew: 'No scheduled jobs yet',
     emptyTitleSearch: 'No matches',
@@ -2490,8 +2490,8 @@ export const en: Translations = {
         'The backend file system did not answer, so this folder cannot be verified. Nothing was created or started — reconnect and pick the folder again.',
       createFailed: 'Could not create project',
       staleBackend:
-        'Update the Hermes backend to create projects — your backend is older than this desktop app (Settings → Updates → Backend).',
-      deleteConfirm: 'This removes the saved project from Hermes. Files, git repos, and worktrees stay untouched.',
+        'Update the AgentBox backend to create projects — your backend is older than this desktop app (Settings → Updates → Backend).',
+      deleteConfirm: 'This removes the saved project from AgentBox. Files, git repos, and worktrees stay untouched.',
       startWork: 'New worktree',
       newWorktreeTitle: 'New worktree',
       newWorktreeDesc: 'Name the branch for this worktree.',
@@ -2501,7 +2501,7 @@ export const en: Translations = {
       baseBranchNone: 'No branches found',
       startWorkFailed: 'Could not create worktree',
       worktreeStaleBackend:
-        'Update the Hermes backend to create worktrees over this remote connection — it predates the git worktree API.',
+        'Update the AgentBox backend to create worktrees over this remote connection — it predates the git worktree API.',
       worktreeProjectLabel: 'Project',
       worktreeProjectPlaceholder: 'Search projects…',
       worktreeProjectNone: 'No projects with a folder',
@@ -2631,12 +2631,12 @@ export const en: Translations = {
     contextUsage: 'Context usage',
     contextUsageUnknown: 'Unknown',
     wakingProfile: profile => `Waking up ${profile}…`,
-    placeholderStarting: 'Starting Hermes...',
-    placeholderReconnecting: 'Reconnecting to Hermes…',
+    placeholderStarting: 'Starting AgentBox...',
+    placeholderReconnecting: 'Reconnecting to AgentBox…',
     placeholderFollowUp: 'Send follow-up',
     newSessionPlaceholders: [
       'What are we building?',
-      'Give Hermes a task',
+      'Give AgentBox a task',
       "What's on your mind?",
       'Describe what you need',
       'What should we tackle?',
@@ -2683,7 +2683,7 @@ export const en: Translations = {
       'composer.history': 'cycle popover / history'
     },
     attachUrlTitle: 'Attach a URL',
-    attachUrlDesc: 'Hermes will fetch the page and include it as context for this turn.',
+    attachUrlDesc: 'AgentBox will fetch the page and include it as context for this turn.',
     urlPlaceholder: 'https://example.com/post',
     urlHintPre: 'Include the full URL, e.g. ',
     attach: 'Attach',
@@ -2921,7 +2921,7 @@ export const en: Translations = {
       createPr: 'Create PR',
       openPr: 'Open PR',
       ghMissing: 'Install the GitHub CLI (gh) and sign in to open PRs',
-      agentShip: 'Ask Hermes to open PR',
+      agentShip: 'Ask AgentBox to open PR',
       agentShipUnavailable: "The chat that owns these changes isn't on screen.",
       agentShipPrompt:
         'Review the current changes, commit them with a clear conventional-commit message, push the branch, and open a pull request.',
@@ -2940,9 +2940,9 @@ export const en: Translations = {
       fetch: 'Downloading…',
       pull: 'Almost there…',
       pydeps: 'Finishing up…',
-      update: 'Updating Hermes…',
+      update: 'Updating AgentBox…',
       rebuild: 'Rebuilding the desktop app…',
-      restart: 'Restarting Hermes…',
+      restart: 'Restarting AgentBox…',
       done: 'Update complete',
       manual: 'Update from your terminal',
       guiSkew: 'Update the desktop app',
@@ -2952,43 +2952,43 @@ export const en: Translations = {
     checkFailedTitle: 'Couldn’t check for updates',
     tryAgain: 'Try again',
     notAvailableTitle: 'Update not available',
-    unsupportedMessage: 'This version of Hermes can’t update itself from inside the app.',
+    unsupportedMessage: 'This version of AgentBox can’t update itself from inside the app.',
     connectionRetry: 'Check your connection and try again.',
     latestBody: 'You’re running the latest version.',
     latestBodyBackend: 'The backend is running the latest version.',
     allSetTitle: 'You’re all set',
     availableTitle: 'New update available',
-    availableBody: 'A new version of Hermes is ready to install.',
+    availableBody: 'A new version of AgentBox is ready to install.',
     availableTitleBackend: 'Backend update available',
-    availableBodyBackend: 'A newer version of the connected Hermes backend is ready to install.',
+    availableBodyBackend: 'A newer version of the connected AgentBox backend is ready to install.',
     availableBodyNoChangelog: 'A newer version is ready. Release notes aren’t available for this install type.',
     updateNow: 'Update now',
     maybeLater: 'Maybe later',
     moreChanges: count => `+ ${count} more change${count === 1 ? '' : 's'} included.`,
     manualTitle: 'Update from your terminal',
-    manualBody: 'You installed Hermes from the command line, so updates run there too. Paste this into your terminal:',
-    manualPickedUp: 'Hermes will pick up the new version next time you launch it.',
+    manualBody: 'You installed AgentBox from the command line, so updates run there too. Paste this into your terminal:',
+    manualPickedUp: 'AgentBox will pick up the new version next time you launch it.',
     guiSkewTitle: 'Update the desktop app',
     guiSkewBody:
-      'The backend was updated, but this desktop app package wasn’t changed. Update or reinstall the Hermes desktop app (your AppImage / .deb / .rpm) to match.',
+      'The backend was updated, but this desktop app package wasn’t changed. Update or reinstall the AgentBox desktop app (your AppImage / .deb / .rpm) to match.',
     copy: 'Copy',
     copied: 'Copied',
     done: 'Done',
     applyingBody:
-      'The Hermes updater takes over in its own window and reopens Hermes automatically when it’s done. Please don’t reopen Hermes yourself while it’s updating.',
+      'The AgentBox updater takes over in its own window and reopens AgentBox automatically when it’s done. Please don’t reopen AgentBox yourself while it’s updating.',
     applyingBodyBackend:
-      'The remote backend is applying the update and will restart. Hermes reconnects automatically when it’s back.',
-    applyingClose: 'This window will close while the update runs, then Hermes reopens on its own.',
+      'The remote backend is applying the update and will restart. AgentBox reconnects automatically when it’s back.',
+    applyingClose: 'This window will close while the update runs, then AgentBox reopens on its own.',
     errorTitle: 'Update didn’t finish',
     errorBody: 'No worries — nothing was lost. You can try again now.',
-    blockerTitle: 'Close local previews to update Hermes?',
+    blockerTitle: 'Close local previews to update AgentBox?',
     blockerBody:
-      'Hermes needs to stop these local previews before updating. This will not modify or delete your files.',
-    foreignBlockerTitle: 'Close other processes to update Hermes',
+      'AgentBox needs to stop these local previews before updating. This will not modify or delete your files.',
+    foreignBlockerTitle: 'Close other processes to update AgentBox',
     foreignBlockerBody:
-      'Hermes can’t safely close these processes automatically. Close the app, terminal, or service that owns each one, then try the update again.',
+      'AgentBox can’t safely close these processes automatically. Close the app, terminal, or service that owns each one, then try the update again.',
     mixedBlockerBody:
-      'Hermes can close the local previews listed below. Other processes must be closed manually before the update can continue.',
+      'AgentBox can close the local previews listed below. Other processes must be closed manually before the update can continue.',
     closePreviewsAndUpdate: 'Close previews and update',
     closePreviewsAndCheckAgain: 'Close previews and check again',
     localPreview: 'Local preview',
@@ -3022,7 +3022,7 @@ export const en: Translations = {
       skipped: 'Skipped',
       failed: 'Failed'
     },
-    oneTimeTitle: 'Hermes needs a one-time install',
+    oneTimeTitle: 'AgentBox needs a one-time install',
     unsupportedDesc: platform =>
       `Automated first-launch install isn’t available on ${platform} yet. Open Terminal and run the command below, then relaunch this app. Subsequent launches will skip this step.`,
     installCommand: 'Install command',
@@ -3030,22 +3030,22 @@ export const en: Translations = {
     viewDocs: 'View install docs',
     installTo: 'Will install to',
     retryAfterRun: 'I’ve run it -- retry',
-    setupChoiceTitle: 'Set up Hermes Desktop',
+    setupChoiceTitle: 'Set up AgentBox Desktop',
     setupChoiceDesc:
-      'Connect this app to a Hermes gateway you already run, or install Hermes locally on this computer.',
-    connectExistingTitle: 'Connect to existing Hermes',
+      'Connect this app to an AgentBox gateway you already run, or install AgentBox locally on this computer.',
+    connectExistingTitle: 'Connect to existing AgentBox',
     connectExistingShort: 'Connect existing',
     connectExistingDesc: 'Use a remote backend with a session token or browser sign-in. No local install will start.',
-    installLocalTitle: 'Install Hermes locally',
-    installLocalDesc: 'Download Hermes, create its Python environment, and run the backend on this computer.',
-    localStartUnavailable: 'Local installation could not start. Restart Hermes Desktop and try again.',
-    remoteSetupTitle: 'Connect to existing Hermes',
-    remoteSetupDesc: 'Enter your gateway URL. Hermes Desktop will detect whether it needs a token or browser sign-in.',
+    installLocalTitle: 'Install AgentBox locally',
+    installLocalDesc: 'Download AgentBox, create its Python environment, and run the backend on this computer.',
+    localStartUnavailable: 'Local installation could not start. Restart AgentBox Desktop and try again.',
+    remoteSetupTitle: 'Connect to existing AgentBox',
+    remoteSetupDesc: 'Enter your gateway URL. AgentBox Desktop will detect whether it needs a token or browser sign-in.',
     remoteUrlTitle: 'Gateway URL',
-    remoteUrlDesc: 'Use the base URL of the Hermes gateway, including https:// when remote.',
+    remoteUrlDesc: 'Use the base URL of the AgentBox gateway, including https:// when remote.',
     remoteUrlPlaceholder: 'https://gateway.example.com/hermes',
     probing: 'Detecting gateway authentication...',
-    probeError: 'Could not reach that Hermes gateway.',
+    probeError: 'Could not reach that AgentBox gateway.',
     identityProvider: 'your identity provider',
     authTitle: 'Authentication',
     authNeedsOauth: provider => `Sign in with ${provider} before testing this gateway.`,
@@ -3065,12 +3065,12 @@ export const en: Translations = {
     applyRemote: 'Apply and reconnect',
     backToSetup: 'Back',
     failedTitle: 'Installation failed',
-    settingUpTitle: 'Setting up Hermes Agent',
+    settingUpTitle: 'Setting up AgentBox Agent',
     finishingTitle: 'Finishing up',
     failedDesc:
-      'One of the install steps failed. On Windows, this can happen if another Hermes CLI or desktop instance is running. Stop any running Hermes instances, then retry. Check the details below or the desktop log for the full transcript.',
+      'One of the install steps failed. On Windows, this can happen if another AgentBox CLI or desktop instance is running. Stop any running AgentBox instances, then retry. Check the details below or the desktop log for the full transcript.',
     activeDesc:
-      'This is a one-time setup. The Hermes installer is downloading dependencies and configuring your machine. Subsequent launches will skip this step.',
+      'This is a one-time setup. The AgentBox installer is downloading dependencies and configuring your machine. Subsequent launches will skip this step.',
     progress: (completed, total) => `${completed} of ${total} steps complete`,
     currentStage: stage => ` -- now: ${stage}`,
     fetchingManifest: 'Fetching installer manifest...',
@@ -3088,10 +3088,10 @@ export const en: Translations = {
   },
 
   onboarding: {
-    headerTitle: "Let's get you setup with Hermes Agent",
+    headerTitle: "Let's get you setup with AgentBox Agent",
     headerDesc: 'Connect a model provider to start chatting. Most options take one click.',
-    preparingInstall: 'Hermes is finishing install. This usually takes under a minute on first run.',
-    starting: 'Starting Hermes…',
+    preparingInstall: 'AgentBox is finishing install. This usually takes under a minute on first run.',
+    starting: 'Starting AgentBox…',
     lookingUpProviders: 'Looking up providers...',
     collapse: 'Collapse',
     otherProviders: 'Other providers',
@@ -3099,7 +3099,7 @@ export const en: Translations = {
     chooseLater: "I'll choose a provider later",
     recommended: 'Recommended',
     connected: 'Connected',
-    featuredPitch: 'One subscription, 300+ frontier models — the recommended way to run Hermes',
+    featuredPitch: 'One subscription, 300+ frontier models — the recommended way to run AgentBox',
     fireworksPitch: 'Direct model API — Fireworks-hosted frontier models',
     localModelsTitle: 'Run models locally',
     localModelsPitch: 'No account needed — download a model and run it on this machine',
@@ -3118,7 +3118,7 @@ export const en: Translations = {
       xai: { short: 'Grok models', description: 'Direct access to xAI Grok models.' },
       local: {
         short: 'self-hosted',
-        description: 'Point Hermes at a local or self-hosted OpenAI-compatible endpoint (vLLM, llama.cpp, Ollama, etc).'
+        description: 'Point AgentBox at a local or self-hosted OpenAI-compatible endpoint (vLLM, llama.cpp, Ollama, etc).'
       }
     },
     backToSignIn: 'Back to sign in',
@@ -3131,7 +3131,7 @@ export const en: Translations = {
     update: 'Update',
     flowSubtitles: {
       pkce: 'Opens your browser to sign in, then continues here',
-      device_code: 'Opens a verification page in your browser — Hermes connects automatically',
+      device_code: 'Opens a verification page in your browser — AgentBox connects automatically',
       external: 'Sign in once in your terminal, then come back to chat'
     },
     startingSignIn: provider => `Starting sign-in for ${provider}...`,
@@ -3144,12 +3144,12 @@ export const en: Translations = {
     pickDifferentProvider: 'Pick a different provider',
     signInWith: provider => `Sign in with ${provider}`,
     openedBrowser: provider => `We opened ${provider} in your browser.`,
-    authorizeThere: 'Authorize Hermes there.',
+    authorizeThere: 'Authorize AgentBox there.',
     copyAuthCode: 'Copy the authorization code and paste it below.',
     pasteAuthCode: 'Paste authorization code',
     reopenAuthPage: 'Re-open authorization page',
     autoBrowser: provider =>
-      `We opened ${provider} in your browser. Authorize Hermes there and you'll be connected automatically — nothing to copy or paste.`,
+      `We opened ${provider} in your browser. Authorize AgentBox there and you'll be connected automatically — nothing to copy or paste.`,
     reopenSignInPage: 'Re-open sign-in page',
     waitingAuthorize: 'Waiting for you to authorize...',
     externalPending: provider =>
@@ -3254,13 +3254,13 @@ export const en: Translations = {
       update: 'update',
       updateInProgress: 'Update in progress',
       commitsBehind: (count, branch) => `${count} commit${count === 1 ? '' : 's'} behind ${branch}`,
-      desktopVersion: version => `Hermes Desktop v${version}`,
+      desktopVersion: version => `AgentBox Desktop v${version}`,
       backendVersion: version => `Backend v${version}`,
       clientLabel: version => `client v${version}`,
       connectionSsh: host => `SSH: ${host}`,
       connectionRemote: host => `Remote: ${host}`,
       connectionCloud: host => `Cloud: ${host}`,
-      connectionCloudTooltip: host => `Hermes Cloud · ${host}`,
+      connectionCloudTooltip: host => `AgentBox Cloud · ${host}`,
       connectionSshTooltip: host => `SSH · ${host}`,
       connectionRemoteTooltip: host => `Remote · ${host}`,
       backendLabel: version => `backend v${version}`,
@@ -3405,7 +3405,7 @@ export const en: Translations = {
     binaryTitle: 'This looks like a binary file',
     binaryBody: label => `Previewing ${label} may show unreadable text.`,
     largeTitle: 'This file is large',
-    largeBody: (label, size) => `${label} is ${size}. Hermes will only show the first 512 KB.`,
+    largeBody: (label, size) => `${label} is ${size}. AgentBox will only show the first 512 KB.`,
     previewAnyway: 'Preview anyway',
     truncated: 'Showing first 512 KB.',
     noInlineTitle: 'No inline preview',
@@ -3446,11 +3446,11 @@ export const en: Translations = {
         'This address points at the machine running your agent, not this one. The browser pane loads pages locally, so a remote dev server needs a port forward or a reachable hostname.',
       failedToLoad: 'Preview failed to load',
       tryAgain: 'Try again',
-      restarting: 'Hermes is restarting...',
-      askRestart: 'Ask Hermes to restart the server',
-      lookingRestart: taskId => `Hermes is looking for a preview server to restart (${taskId})`,
+      restarting: 'AgentBox is restarting...',
+      askRestart: 'Ask AgentBox to restart the server',
+      lookingRestart: taskId => `AgentBox is looking for a preview server to restart (${taskId})`,
       restartingTitle: 'Restarting preview server',
-      restartingMessage: 'Hermes is working in the background. Watch the preview console for progress.',
+      restartingMessage: 'AgentBox is working in the background. Watch the preview console for progress.',
       startRestartFailed: message => `Could not start server restart: ${message}`,
       restartFailed: 'Server restart failed',
       hideConsole: 'Hide preview console',
@@ -3462,16 +3462,16 @@ export const en: Translations = {
       reload: 'Reload page',
       address: 'Address',
       addressPlaceholder: 'Enter address',
-      blankPageBody: 'Type an address above to browse, or ask Hermes to open a page.',
-      finishedRestarting: message => `Hermes finished restarting the preview server${message ? `: ${message}` : ''}`,
+      blankPageBody: 'Type an address above to browse, or ask AgentBox to open a page.',
+      finishedRestarting: message => `AgentBox finished restarting the preview server${message ? `: ${message}` : ''}`,
       failedRestarting: message => `Server restart failed: ${message}`,
       unknownError: 'unknown error',
       restartedTitle: 'Preview server restarted',
       reloadingNow: 'Reloading the preview now.',
       restartFailedTitle: 'Preview restart failed',
-      restartFailedMessage: 'Hermes could not restart the server.',
+      restartFailedMessage: 'AgentBox could not restart the server.',
       stillWorking:
-        'Hermes is still working, but no restart result has arrived yet. The server command may be running in the foreground.',
+        'AgentBox is still working, but no restart result has arrived yet. The server command may be running in the foreground.',
       workspaceReloading: 'Workspace changed, reloading preview',
       fileChanged: url => `File changed, reloading preview: ${url}`,
       filesChanged: (count, url) => `${count} file changes, reloading preview: ${url}`,
@@ -3634,7 +3634,7 @@ export const en: Translations = {
       attachingFile: 'Attaching…'
     },
     approval: {
-      gatewayDisconnected: 'Hermes gateway is not connected',
+      gatewayDisconnected: 'AgentBox gateway is not connected',
       sendFailed: 'Could not send approval response',
       run: 'Run',
       command: 'Command',
@@ -3645,12 +3645,12 @@ export const en: Translations = {
       reject: 'Reject',
       alwaysTitle: 'Always allow this command?',
       alwaysDescription: pattern =>
-        `This adds the “${pattern}” pattern to your permanent allowlist (~/.hermes/config.yaml). Hermes won’t ask again for commands like this — in this session or any future one.`,
+        `This adds the “${pattern}” pattern to your permanent allowlist (~/.hermes/config.yaml). AgentBox won’t ask again for commands like this — in this session or any future one.`,
       alwaysAllow: 'Always allow'
     },
     clarify: {
       notReady: 'Clarify request is not ready yet',
-      gatewayDisconnected: 'Hermes gateway is not connected',
+      gatewayDisconnected: 'AgentBox gateway is not connected',
       sendFailed: 'Could not send clarify response',
       loadingQuestion: 'Loading question…',
       other: 'Other (type your answer)',
@@ -3685,7 +3685,7 @@ export const en: Translations = {
       envRequired: 'Fill in the required credentials first',
       sendFailed: 'Could not send MCP setup response',
       reloadFailed: 'Server saved, but reloading MCP tools failed — they load next session',
-      gatewayDisconnected: 'Hermes gateway is not connected'
+      gatewayDisconnected: 'AgentBox gateway is not connected'
     },
     tool: {
       copyCode: 'Copy code',
@@ -3776,14 +3776,14 @@ export const en: Translations = {
   },
 
   prompts: {
-    gatewayDisconnected: 'Hermes gateway is not connected',
+    gatewayDisconnected: 'AgentBox gateway is not connected',
     sudoSendFailed: 'Could not send sudo password',
     secretSendFailed: 'Could not send secret',
     sudoTitle: 'Administrator password',
-    sudoDesc: 'Hermes needs your sudo password to run a privileged command. It is sent only to your local agent.',
+    sudoDesc: 'AgentBox needs your sudo password to run a privileged command. It is sent only to your local agent.',
     sudoPlaceholder: 'sudo password',
     secretTitle: 'Secret required',
-    secretDesc: 'Hermes needs a credential to continue.',
+    secretDesc: 'AgentBox needs a credential to continue.',
     secretPlaceholder: 'secret value'
   },
 
@@ -3840,8 +3840,8 @@ export const en: Translations = {
     sessionExportFailed: 'Could not export session',
     imageSaved: 'Image saved',
     downloadStarted: 'Download started',
-    restartToUseSaveImage: 'Restart Hermes Desktop to use Save Image.',
-    restartToSaveImages: 'Restart Hermes Desktop to save images',
+    restartToUseSaveImage: 'Restart AgentBox Desktop to use Save Image.',
+    restartToSaveImages: 'Restart AgentBox Desktop to save images',
     imageDownloadFailed: 'Image download failed',
     openImage: 'Open image',
     downloadImage: 'Download image',
@@ -3873,10 +3873,10 @@ export const en: Translations = {
       },
       skills: {
         title: 'Teach it once',
-        text: 'Skills are folders of instructions Hermes loads when the work calls for them.'
+        text: 'Skills are folders of instructions AgentBox loads when the work calls for them.'
       },
       artifacts: {
-        title: 'Everything Hermes made',
+        title: 'Everything AgentBox made',
         text: 'Images, files and links from every session, indexed in one place.'
       },
       cron: {
@@ -3889,7 +3889,7 @@ export const en: Translations = {
       },
       profiles: {
         title: 'Profiles are separate',
-        text: 'Each one is its own Hermes — own keys, own memory, own sessions.'
+        text: 'Each one is its own AgentBox — own keys, own memory, own sessions.'
       },
       'composer-mentions': {
         title: 'Attach and command',

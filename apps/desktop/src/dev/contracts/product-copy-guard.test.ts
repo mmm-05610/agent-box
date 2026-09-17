@@ -27,30 +27,24 @@ import { describe, expect, it } from 'vitest'
  * The scan reads catalog source on purpose: the catalogs ARE the copy, and a
  * translation that reintroduces a bare word is a defect in that locale.
  */
-const I18N_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'i18n')
+const SRC_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
+const I18N_DIR = resolve(SRC_DIR, 'i18n')
 const CATALOGS = ['en.ts', 'zh.ts', 'zh-hant.ts', 'ja.ts', 'ar.ts', 'ru.ts'] as const
 
 /** Exactly these values are forbidden — a state named by nothing else. */
 const BARE_WORDS = new Set(['unavailable', 'not available', 'offline', 'not connected', 'n/a', 'na'])
 
-/** The product surface's copy sections. A key inside one of these may not name
- *  the harness family as if it were the product. */
-const PRODUCT_SECTIONS = [
-  'settings.product',
-  'sidebar.agentBox',
-  'composer.emptyState',
-  'composer.modelSelector',
-  'composer.modelSelectorSearch',
-  'composer.modelSelectorEmpty',
-  'composer.modelSelectorDefault',
-  'composer.contextUsage',
-  'composer.contextUsageUnknown',
-  'composer.serviceUnreachable',
-  'composer.workspaceMissing',
-  'composer.disabledPlaceholder',
-  'assistant.thread.loadingResponse',
-  'assistant.thread.loadingSession'
-] as const
+/** The ONLY places a catalog value may still name `Hermes`:
+ *
+ *  1. A HARNESS FAMILY slot — the family is called `hermes`, and the copy that
+ *     names it lives under a key path that says so (`...harness`, `...family`,
+ *     or a value that IS the family token).
+ *  2. A sentence that explains a LEGACY surface's absence — the old runtime is
+ *     a fact about what this product does NOT call, and saying so is honest.
+ *
+ *  Everything else is a product-brand claim and must read AgentBox. */
+const FAMILY_PATH = /harness|family|家族|家系|ファミリー|المجموعة|семейств/i
+const LEGACY_ABSENCE = /legacy|old runtime|旧版|舊版|旧线|従来|القديمة|старой/i
 
 interface Entry {
   path: string
@@ -132,21 +126,19 @@ describe('catalog copy guards', () => {
     expect(offenders).toEqual([])
   })
 
-  it('keeps the product surface from claiming a harness family name as its own', () => {
+  it('names the product AgentBox everywhere but the two documented exceptions', () => {
     const offenders: Entry[] = []
 
     for (const [catalog, source] of catalogs) {
       for (const entry of catalogEntries(source)) {
-        const onProductSurface = PRODUCT_SECTIONS.some(
-          section => entry.path === section || entry.path.startsWith(`${section}.`)
-        )
+        if (!/\bHermes\b/.test(entry.value)) {
+          continue
+        }
 
-        // Naming the LEGACY runtime while explaining that a legacy surface is
-        // absent is a fact about the old product, not a brand claim about this
-        // one — the exception is spelled out here rather than left implicit.
-        const explainsLegacyAbsence = /legacy|old runtime|旧版|舊版|従来|القديمة|старой/i.test(entry.value)
+        const familySlot = entry.value.trim() === 'Hermes' && FAMILY_PATH.test(entry.path)
+        const explainsLegacyAbsence = LEGACY_ABSENCE.test(entry.value)
 
-        if (onProductSurface && /\bHermes\b/.test(entry.value) && !explainsLegacyAbsence) {
+        if (!familySlot && !explainsLegacyAbsence) {
           offenders.push({ path: `${catalog}:${entry.path}`, value: entry.value })
         }
       }
@@ -155,3 +147,51 @@ describe('catalog copy guards', () => {
     expect(offenders).toEqual([])
   })
 })
+
+/** Production modules on the product path whose user-facing literals are
+ *  judged directly (the rest of the tree is the legacy data plane, and the
+ *  order keeps internal identifiers as they are). */
+const PRODUCT_SOURCE_FILES = [
+  'api/client.ts',
+  'application/mcp-oauth.ts',
+  'application/session/gateway-event/status.ts',
+  'components/assistant-ui/thread/message-reactions.tsx',
+  'components/assistant-ui/thread/status.tsx',
+  'components/chat/intro.tsx',
+  'components/hooks/use-gateway-request.ts',
+  'features/runtime/gateway/hooks/use-gateway-boot.ts',
+  'lib/desktop-slash-commands.ts'
+] as const
+
+const USER_FACING_LITERAL =
+  /(?:aria-label|title|placeholder|label|message|description|text)\s*[:=]\s*(?:'|\"|`)([^'\"`]*Hermes[^'\"`]*)(?:'|\"|`)/
+
+describe('source copy guards', () => {
+  it('keeps the product path from naming the harness family as the product', () => {
+    const offenders: string[] = []
+
+    for (const relative of PRODUCT_SOURCE_FILES) {
+      const source = readFileSync(resolve(SRC_DIR, relative), 'utf8')
+
+      for (const [index, line] of source.split('\n').entries()) {
+        const trimmed = line.trim()
+
+        if (trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/*')) {
+          continue
+        }
+
+        if (/\bHermes\b/.test(line) && userFacing(line)) {
+          offenders.push(`${relative}:${index + 1}: ${trimmed.slice(0, 100)}`)
+        }
+      }
+    }
+
+    expect(offenders).toEqual([])
+  })
+})
+
+/** A line is user-facing when a UI/transport prop carries a Hermes literal —
+ *  the same property set the sweep used, kept here so it cannot drift. */
+function userFacing(line: string): boolean {
+  return USER_FACING_LITERAL.test(line)
+}

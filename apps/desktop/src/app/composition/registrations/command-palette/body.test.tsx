@@ -171,7 +171,7 @@ describe('CommandPaletteBody — legacy Hermes shortcuts follow the authority', 
     await act(async () => {})
 
     expect(screen.queryByRole('option', { name: /Restart gateway/ })).toBeNull()
-    expect(screen.queryByRole('option', { name: /Update Hermes/ })).toBeNull()
+    expect(screen.queryByRole('option', { name: /Update AgentBox/ })).toBeNull()
     expect(screen.queryByRole('option', { name: 'System' })).toBeNull()
     expect(screen.queryByRole('option', { name: 'Usage' })).toBeNull()
 
@@ -201,7 +201,7 @@ describe('CommandPaletteBody — legacy Hermes shortcuts follow the authority', 
     renderPalette('hermes')
     await act(async () => {})
 
-    expect(screen.getByRole('option', { name: /Update Hermes/ })).toBeTruthy()
+    expect(screen.getByRole('option', { name: /Update AgentBox/ })).toBeTruthy()
     expect(screen.getByRole('option', { name: 'System' })).toBeTruthy()
     expect(screen.getByRole('option', { name: 'Usage' })).toBeTruthy()
 

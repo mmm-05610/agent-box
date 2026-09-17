@@ -30,7 +30,7 @@ export class HermesGateway extends JsonRpcGatewayClient {
   constructor() {
     super({
       closedErrorMessage: 'Hermes gateway connection closed',
-      connectErrorMessage: 'Could not connect to Hermes gateway',
+      connectErrorMessage: 'Could not connect to the AgentBox service',
       createRequestId: nextId => nextId,
       notConnectedErrorMessage: 'Hermes gateway is not connected',
       requestTimeoutMs: DEFAULT_GATEWAY_REQUEST_TIMEOUT_MS
