@@ -389,7 +389,10 @@ class WorkerSidecarLauncher:
                 })["path"]
             # Order 54: the launcher's before-snapshot of the declared
             # workspace, taken while the room's files do not exist yet — the
-            # audit's after listing diffs against this.
+            # audit's after listing diffs against this. An older Worker
+            # without the op (or a deployment that declared no workspace)
+            # degrades to None: the change set stays honestly unknown instead
+            # of failing the turn.
             before_snapshot = None
             try:
                 listing = client.request("workspace.list", {}, timeout=60.0)
@@ -398,7 +401,7 @@ class WorkerSidecarLauncher:
                     for entry in listing.get("files", ())
                     if entry.get("path")
                 }
-            except SidecarError:
+            except Exception:
                 before_snapshot = None
             # The home is prepared before the room exists: the Worker creates
             # (or marker-verifies) the Profile's directory and the declared
