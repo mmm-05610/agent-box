@@ -10,9 +10,32 @@
   "default_execution": "serial; capability-level progress may bypass waiting subitems",
   "orders": [
     {
+      "id": "P08",
+      "file": "work-orders/P08-composer-input-bar.md",
+      "depends_on": [
+        "P07"
+      ],
+      "exclusive_group": "desktop-product",
+      "scope": [
+        "docs/desktop-product-delivery/**",
+        "apps/desktop/src/features/chat/composer/**",
+        "apps/desktop/src/features/profiles/**",
+        "apps/desktop/src/components/assistant-ui/**",
+        "apps/desktop/src/i18n/**",
+        "apps/desktop/e2e/**",
+        "tests-js/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "requires_approved_contract": false,
+      "note": "Composer input bar only: keep the profile selector, add a provider/model selector, render the profile's declared controls dynamically (reuse the existing renderer), a permission chip only when the backend declares such a control, and a context-usage container that shows unknown unless the backend supplies real data (estimation is forbidden). Adopt an external copy-in component library for the shapes with a licence check; consume the locked wire only - no wire or backend changes."
+    },
+    {
       "id": "P07",
       "file": "work-orders/P07-core-contract-and-handoff.md",
-      "depends_on": ["P00"],
+      "depends_on": [
+        "P00"
+      ],
       "exclusive_group": "desktop-product",
       "scope": [
         "docs/desktop-product-delivery/**",
