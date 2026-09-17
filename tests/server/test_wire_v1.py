@@ -1209,6 +1209,10 @@ def test_wire_event_stream_resumes_from_snapshot_cursor_without_sse(wire):
 FRAME_COVERAGE = (
     ("message.delta", {"text": "chunk"}, True),
     ("usage.updated", {"turn_id": "t-usage", "usage": {"totalTokens": 18}}, True),
+    ("thought.delta", {"text": "reasoning"}, True),
+    ("plan.updated", {"entries": [{"id": "1", "content": "step", "status": "pending",
+                                   "priority": "medium"}]}, True),
+    ("mode.updated", {"currentModeId": "code"}, True),
     ("message.final", {"text": "answer", "role": "assistant", "display_kind": "visible"}, True),
     ("tool.update", {"state": "failed", "tool_call_id": "harness", "tool": None,
                      "summary": "HARNESS_FAILED"}, True),
