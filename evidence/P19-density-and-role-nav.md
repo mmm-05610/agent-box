@@ -66,3 +66,12 @@
 
 - 种子数据截图对照（G2）：需要运行中的服务与种子数据；截图基础设施已有（P06/P42 驱动）
 - access chip 组件：等后端声明权限控制项（P08-E 同一规则）
+
+---
+
+## P19-G4 补充 — access chip 诚实性正反例（2026-09-18）
+
+- 正例：服务 configDescriptor 声明 `permission` 控件（enum，值 `default/acceptEdits/bypassPermissions`）→
+  `ComposerAccessChip` 渲染 Select，选中时通过既有 override seam 写入。
+- 反例：configDescriptor `controls` 为空数组 → 芯片**不渲染**（不显示禁用占位）。
+- 测试：`access-chip.test.tsx` **2 passed**（`vitest run --project ui src/features/chat/composer/access-chip.test.tsx`）。
