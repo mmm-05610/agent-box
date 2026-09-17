@@ -16,7 +16,7 @@
   `evidence/P06.md`、`evidence/DESKTOP_IMPLEMENTATION_HANDOFF.md`）
 - `REAL_FLOW_VERIFIED = 否`（无真实 Server/Harness/模型链路证据）
 - `AGENTBOX_DESKTOP_PRODUCT_GREEN = 否 / 待全栈`（整体产品需外围能力矩阵另验，核心联调 GREEN 不等于产品 GREEN）
-- **`writer_lease = RELEASED（验收小修完成，2026-09-17）`** —— 前端 goal 已停止全部写入（含文档）。
+- **`writer_lease = ACTIVE（UI 逐屏走查：后端调度维护者，2026-09-17 21:32）`** —— 前端 goal 已停止全部写入（含文档）。
   **后端执行者可按 `docs/desktop-product-delivery/handoff-policy.md` 的 42 双门规则接管全栈**：
   读取本文件与 `evidence/DESKTOP_IMPLEMENTATION_HANDOFF.md`，核对分支/HEAD/摘要/可运行性，
   确认无新前端 writer、无子代理、无未交接修改后，在正式派单指定的工作树记录
@@ -1419,3 +1419,37 @@ typecheck 当场暴露；新测试 4 条 ESLint warning 收口为 0。
 验证：六语言值级 gateway 残留 0；`git diff` 逐行目检（纯引号内等结构替换）；
 被改键无测试断言（grep 为空）。**未复跑** Windows 侧全量（环境：UNC+cmd 限制），此前计数仍以
 P18 报告为准。租约用后即释。
+
+## P19 UI 逐屏走查（2026-09-17，后端调度维护者执行；本记录即验收素材）
+
+**方法**：G4 那棵树（`C:\Users\maoqh\agentbox-wsl-round1`，Ordessa 构建树，dist 09-17 20:14）
+的 `e2e/p42-ui-survey.mjs`（= `p42-ui-recon.mjs` 加 `--shots`/`--plugin-root`/`--mount`/容错点击），
+Server 只读取自后端父工作树（`PYTHONDONTWRITEBYTECODE=1`，数据根在沙箱内），Electron 无 GPU 启动。
+**产物**：`evidence/P19-ui-survey/`（15 张截图 + `ui-recon.json` 控件清单 + 3 张对照图 + 运行脚本）。
+
+**看到的（结论）**：标题 **Ordessa**；空状态是"What are we building?" + 一次性的 composer
+（右侧 `Choose a profile ▾`、`Context usage: Unknown`、发送禁用）；侧栏 `Profiles` + `New task`/`Search`；
+设置九页（Models / Skills & MCP / Identities / Harnesses / Hooks / Data management / Appearance /
+Keyboard Shortcuts / About）**全部点通**，除 Models 外每页都是同一套诚实占位：
+橙色 `Not available yet` + **Product scope** + **Safety boundary** 要点 + 统一收尾句
+"Controls appear only after the Pacthold service declares the matching capability. Nothing here will fall
+back to legacy Hermes settings or pretend a local change was saved."；Models 因**老后端已声明
+provider/model 维护**而真的可用（`Add a service` / `Add the first provider model` 可点，非假控件）；
+Appearance（8 套主题 + 语言 + UI Scale + 终端字体）与 Keyboard Shortcuts（含 Switch to profile 1–5）
+是完整可用的真页面。
+
+**本次走查新发现的三个问题（均未修，交用户裁量）**：
+
+1. **硬编码英文 + 品牌残留**：`apps/desktop/src/features/settings/uninstall-section.tsx:124/154`
+   直接写死 `"Danger zone"` / `"Uninstall Hermes"` / `"Confirm uninstall"`（**提交态即如此**）——
+   既**不在 i18n**（六语言永远未翻译），也**逃过了 P18 的品牌扫描**（那只扫 catalog 的**值**）。
+   About 页因此仍显示 "Uninstall Hermes"。
+2. **composer 占位文案指向不存在的说明**：`disabledPlaceholder = 'Sending is on hold — see the note above
+   the input'`，但空状态截图里输入框**上方没有任何 note**（指引只在右侧 `Choose a profile`）→ 文案与状态不一致。
+3. **About 的 Updates 区块与 P18 报告矛盾**：截图显示红色错误框 "Could not access the repository.
+   Ensure there is a git checkout…"、一个 **Automatic updates** 开关、以及 "17 Releases notes" 链接；
+   而 P18 报告称"**没有自动更新通道**（无 electron-updater、`--publish never`）"。**这三条字符串我在当前源码里
+   找不到**（src/electron 均无）→ 要么该 About 组件来自别处、要么 dist 与源码不同步。**待定位，不作结论。**
+
+**未覆盖**：命令面板/快捷键（走查只支持按标签点击，不能按键）、悬停与过渡态、`03-open-remote-folder`
+那一步因浮层遮挡被跳过（脚本按设计跳过并仍截图）。租约用后即释。

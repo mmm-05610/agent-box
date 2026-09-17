@@ -1,0 +1,89 @@
+{
+  "buttons": [
+    "Profiles",
+    "New task",
+    "Open folder",
+    "Open remote folder",
+    "Settings",
+    "Gatewayno service connection",
+    "v0.17.2",
+    "Models",
+    "Skills & MCP",
+    "Identities",
+    "Harnesses",
+    "Hooks",
+    "Data management",
+    "Appearance",
+    "Notifications",
+    "Keyboard Shortcuts",
+    "About",
+    "Check now",
+    "Uninstall Chat GUI onlyRemove this deskt",
+    "SearchCtrlK"
+  ],
+  "dialogText": [],
+  "editables": [],
+  "inputs": [
+    {
+      "tag": "input",
+      "type": "checkbox",
+      "label": null,
+      "placeholder": null
+    }
+  ],
+  "labelled": [
+    {
+      "label": "Profiles",
+      "role": "button"
+    },
+    {
+      "label": "Search",
+      "role": "button"
+    },
+    {
+      "label": "Settings",
+      "role": "button"
+    },
+    {
+      "label": "Close",
+      "role": "button"
+    },
+    {
+      "label": "Restore",
+      "role": "button"
+    },
+    {
+      "label": "Close settings",
+      "role": "button"
+    },
+    {
+      "label": "Ctrl K",
+      "role": "span"
+    }
+  ],
+  "settingsEntries": [
+    "Profiles",
+    "Settings",
+    "Models"
+  ],
+  "slots": [
+    "sidebar-wrapper",
+    "sidebar",
+    "sidebar-content",
+    "sidebar-group",
+    "sidebar-group-content",
+    "sidebar-menu",
+    "sidebar-menu-item",
+    "sidebar-menu-button",
+    "button",
+    "context-menu-trigger",
+    "statusbar",
+    "tooltip-trigger",
+    "dropdown-menu-trigger",
+    "kbd-group",
+    "kbd"
+  ],
+  "testIds": [],
+  "url": "#/settings?tab=about",
+  "title": "Ordessa"
+}

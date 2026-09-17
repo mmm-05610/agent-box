@@ -19,6 +19,22 @@ const OUT_DIR = process.argv[3]
 const SERVER_PORT = Number(process.env.AGENTBOX_UI_GATE_PORT ?? '18770')
 const DEPLOYMENT = process.env.AGENTBOX_UI_GATE_DEPLOYMENT
 
+// UI survey additions (2026-09-17): optional per-step screenshots and the
+// artifact mount bindings the current Server CLI requires.
+const SHOTS_DIR = (() => {
+  const index = process.argv.indexOf('--shots')
+  return index > 0 && process.argv[index + 1] ? process.argv[index + 1] : null
+})()
+const MOUNTS = (process.env.AGENTBOX_UI_GATE_MOUNTS ?? '').split(',').map(v => v.trim()).filter(Boolean)
+
+if (SHOTS_DIR) {
+  fs.mkdirSync(SHOTS_DIR, { recursive: true })
+}
+
+function shotSlug(value) {
+  return String(value).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'step'
+}
+
 function electronBinary() {
   for (const candidate of [
     path.join(DESKTOP_ROOT, 'node_modules', 'electron', 'dist', 'electron.exe'),
@@ -57,8 +73,11 @@ async function main() {
     ].join(';')
   }
 
+  const backendWindowsRoot = process.env.AGENTBOX_SERVER_SOURCE_ROOT ?? ''
   const server = spawn('py.exe', ['-3.12', '-m', 'agent_box.server', '--data-root', serverDataRoot,
-    '--port', String(SERVER_PORT), '--sidecar-deployment', DEPLOYMENT],
+    '--port', String(SERVER_PORT), '--sidecar-deployment', DEPLOYMENT,
+    ...(backendWindowsRoot ? ['--plugin-root', path.join(backendWindowsRoot, 'plugins', 'agent-box-harnesses')] : []),
+    ...MOUNTS.flatMap(binding => ['--mount', binding])],
     { env: serverEnv, stdio: ['ignore', logFd, logFd] })
 
   const deadline = Date.now() + 30000
@@ -99,6 +118,21 @@ async function main() {
     await page.waitForLoadState('domcontentloaded')
     await new Promise(resolve => setTimeout(resolve, 6000))
 
+    let shotIndex = 0
+
+    const snap = async label => {
+      if (!SHOTS_DIR) {
+        return
+      }
+
+      shotIndex += 1
+      await page.screenshot({
+        path: path.join(SHOTS_DIR, `${String(shotIndex).padStart(2, '0')}-${shotSlug(label)}.png`)
+      })
+    }
+
+    await snap('boot')
+
     // Optionally open one dialog first, so the dump describes what a user sees
     // after clicking: `--click "Open folder"` or `--click "Choose a profile"`.
     // Every `--click <label>` opens one dialog or page, in order, so a whole
@@ -110,8 +144,14 @@ async function main() {
 
       const label = process.argv[index + 1]
 
-      await page.getByRole('button', { name: label }).first().click()
+      try {
+        await page.getByRole('button', { name: label }).first().click({ timeout: 5000 })
+      } catch (error) {
+        console.error(`click skipped: ${label} (${error.message.split('\n')[0]})`)
+      }
+
       await new Promise(resolve => setTimeout(resolve, 2500))
+      await snap(label)
     }
 
     const dump = await page.evaluate(() => {
