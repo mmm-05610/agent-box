@@ -87,6 +87,12 @@ def _typed_http_error(error: urllib.error.HTTPError) -> ProbeError:
     return ProbeError("PROBE_HTTP_ERROR", f"the endpoint answered with HTTP {error.code}")
 
 
+def _open_request(request: urllib.request.Request, timeout: float):
+    """The one network touch. A module-level function so tests (and only
+    tests) can substitute the transport without patching the stdlib."""
+    return urllib.request.urlopen(request, timeout=timeout)
+
+
 def _fetch_models_response(base_url: str, api_key: str | None) -> bytes:
     url = f"{base_url}/models"
     request = urllib.request.Request(url, method="GET")
@@ -94,9 +100,7 @@ def _fetch_models_response(base_url: str, api_key: str | None) -> bytes:
         request.add_header("Authorization", f"Bearer {api_key}")
     request.add_header("Accept", "application/json")
     try:
-        with urllib.request.urlopen(
-            request, timeout=CONNECT_TIMEOUT_SECONDS,
-        ) as response:
+        with _open_request(request, CONNECT_TIMEOUT_SECONDS) as response:
             return response.read(MAX_RESPONSE_BYTES + 1)
     except urllib.error.HTTPError as error:
         if error.code in {401, 403}:

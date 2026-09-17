@@ -253,8 +253,6 @@ def test_pull_models_rejects_oversized_and_shapeless_responses():
 
     import agent_box.server.model_configs.probe as probe_module
 
-    original = probe_module.urllib.request.urlopen
-
     class _FakeUrlopen:
         def __init__(self, content):
             self._content = content
@@ -268,18 +266,19 @@ def test_pull_models_rejects_oversized_and_shapeless_responses():
         def __exit__(self, *exc):
             return False
 
-    probe_module.urllib.request.urlopen = _FakeUrlopen(oversized)
+    original = probe_module._open_request
+    probe_module._open_request = _FakeUrlopen(oversized)
     try:
         with pytest.raises(ProbeError) as too_large:
             pull_models("https://models.example.com/v1", "key")
         assert too_large.value.code == "PROBE_RESPONSE_TOO_LARGE"
     finally:
-        probe_module.urllib.request.urlopen = original
+        probe_module._open_request = original
 
-    probe_module.urllib.request.urlopen = _FakeUrlopen(b'{"nope": true}')
+    probe_module._open_request = _FakeUrlopen(b'{"nope": true}')
     try:
         with pytest.raises(ProbeError) as shapeless:
             pull_models("https://models.example.com/v1", "key")
         assert shapeless.value.code == "PROBE_FORMAT_INVALID"
     finally:
-        probe_module.urllib.request.urlopen = original
+        probe_module._open_request = original
