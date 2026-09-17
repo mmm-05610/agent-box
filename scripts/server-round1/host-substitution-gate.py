@@ -149,6 +149,15 @@ def main() -> int:
         bundle = bundle_for(production, endpoint, artifact)
         state_directory = temporary / "sidecar-state"
         state_directory.mkdir()
+        # Order 45 moved the native state from projected bytes to a real home
+        # directory on the machine that runs the turn; the gate stages that
+        # directory itself, exactly as the channel would.
+        homes = temporary / "homes"
+        (homes / "pi-gate" / ".pi").mkdir(parents=True)
+        from agent_box.extensions.runtime_composition.sandbox_port import (
+            resolve_sandbox_port,
+        )
+
         launcher = LocalSidecarLauncher(
             workspace_path=str(workspace),
             bundle=bundle,
@@ -158,8 +167,10 @@ def main() -> int:
                 ("agentbox-sidecar/deployment/pi/models.json", f"{production.AGENT_HOME}/models.json"),
                 ("agentbox-sidecar/deployment/pi/settings.json", f"{production.AGENT_HOME}/settings.json"),
             ),
-            state_bundle_prefix="agentbox-sidecar/deployment/pi/native-state",
+            home_root=str(homes), home_locator="pi-gate/.pi",
+            profile_id="profile-host-gate", harness_type="pi", native_home=".pi",
             state_target=production.STATE_TARGET,
+            sandbox_port=resolve_sandbox_port("sandbox-bwrap"),
         )
         port = SidecarHarnessPort(
             launcher, environment={"AGENTBOX_SIDECAR_ISOLATED": "1"}, profile="pi",
@@ -179,12 +190,20 @@ def main() -> int:
         REPORT["promptResult"] = answer
         state, resumable = port.capture_execution("substitution-1")
         REPORT["nativeSessionId"] = native
-        REPORT["stateFiles"] = sorted(state)
+        # Order 45 changed the capture contract: it returns audit *facts* about
+        # the real home directory (paths, digests, counts), never the bytes.
+        RECORD = state if isinstance(state, dict) else {}
+        REPORT["stateFiles"] = sorted(
+            entry.get("path") for entry in RECORD.get("files", ()) if entry.get("path")
+        )
+        REPORT["stateAuditTruncated"] = RECORD.get("truncated")
         # `resumable` is the *advertised* capability (Pi's adapter advertises no
         # resume, so it is false in every Pi chain); the continuity fact this
-        # gate can prove is that the captured journal carries this turn.
+        # gate can prove is that the audit carries this turn's journal file.
         REPORT["stateAdvertisedResumable"] = bool(resumable)
-        REPORT["stateCarriesTheTurn"] = any(NONCE.encode() in content for content in state.values())
+        REPORT["stateCarriesTheTurn"] = any(
+            str(path).endswith(".jsonl") for path in REPORT["stateFiles"]
+        )
         REPORT["events"] = events
         REPORT["providerRequests"] = endpoint.requests
 
@@ -197,17 +216,18 @@ def main() -> int:
             base_environment={"AGENTBOX_SIDECAR_ISOLATED": "1"},
             projection_mounts=(("deployment/models.json", f"{production.AGENT_HOME}/models.json"),),
             runtime_artifact_mounts=(("/local/artifact", production.ARTIFACT_TARGET),),
-            state_bundle_prefix="deployment/native-state", state_target=production.STATE_TARGET,
+            state_home_source="/local/homes/pi-gate/.pi", state_target=production.STATE_TARGET,
         )
         there = compose_sidecar_room(
             workspace="/wsl/workspace", staged_view="/wsl/view", secret="/wsl/secret",
             base_environment={"AGENTBOX_SIDECAR_ISOLATED": "1"},
             projection_mounts=(("deployment/models.json", f"{production.AGENT_HOME}/models.json"),),
             runtime_artifact_mounts=(("/wsl/artifact", production.ARTIFACT_TARGET),),
-            state_bundle_prefix="deployment/native-state", state_target=production.STATE_TARGET,
+            state_home_source="/wsl/homes/pi-gate/.pi", state_target=production.STATE_TARGET,
         )
         bindings = (("/local/view", "/wsl/view"), ("/local/workspace", "/wsl/workspace"),
-                    ("/local/secret", "/wsl/secret"), ("/local/artifact", "/wsl/artifact"))
+                    ("/local/secret", "/wsl/secret"), ("/local/artifact", "/wsl/artifact"),
+                    ("/local/homes", "/wsl/homes"))
 
         def normalize(argv, index):
             values = [pair[index] for pair in bindings]

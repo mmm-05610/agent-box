@@ -21,7 +21,7 @@ from agent_box_sandbox_bwrap import (
     GUEST_HOME, compile_remote_bwrap_argv, compile_remote_sidecar_bwrap_argv,
     provider as bwrap_provider,
 )
-from agent_box_sandbox_bwrap.home_projection import (
+from agent_box.resource_contracts.home_projection import (
     HomeProjectionRejected, home_projection_target, protected_state_paths,
 )
 

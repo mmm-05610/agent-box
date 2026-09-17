@@ -65,6 +65,15 @@ class RealConnector:
         )
 
 
+def _bwrap_room_port():
+    """The real bwrap port: this module drives the real Worker chain."""
+    from agent_box.extensions.runtime_composition.sandbox_port import (
+        resolve_sandbox_port,
+    )
+
+    return resolve_sandbox_port("sandbox-bwrap")
+
+
 def open_port(tmp_path: pathlib.Path, *, client_factory=None, observed=None):
     launcher = WslSidecarLauncher(
         RealConnector(tmp_path, client_factory),
@@ -73,6 +82,7 @@ def open_port(tmp_path: pathlib.Path, *, client_factory=None, observed=None):
             "connection_id": "connection-lease", "remote_path": str(REPO),
         },
         bundle=sidecar_bundle_files(PLUGIN), timeout_ms=60_000,
+        sandbox_port=_bwrap_room_port(),
     )
     port = SidecarHarnessPort(
         launcher, environment={"AGENTBOX_SIDECAR_ISOLATED": "1"}, profile="pi",

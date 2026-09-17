@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import hashlib
 import os
-import shutil
 import stat
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Mapping
@@ -207,17 +206,24 @@ class LocalEnvironmentProvider:
 
 
 def _host_sandbox_probe() -> Mapping[str, Any]:
-    """Ask the sandbox plugin whether a room can run here.
+    """Ask the resolved sandbox provider whether a room can run here.
 
-    The probe is the plugin's own: it checks the binary and runs the production
-    read-only system root, so "available" means the room's argv would really
-    start on this host, not that a file happens to be on PATH.
+    The probe is the provider's own: it checks its binary and runs the
+    production read-only system root, so "available" means the room's argv
+    would really start on this host, not that a file happens to be on PATH.
+    The provider is resolved by name (never imported here); an unresolvable
+    provider reports unavailable rather than guessing another sandbox.
     """
-    if shutil.which("bwrap") is None:
-        return {"status": "unavailable", "code": "binary_missing"}
-    from agent_box_sandbox_bwrap import BwrapSandboxProvider
-
-    return BwrapSandboxProvider().probe()
+    from agent_box.extensions.runtime_composition.sandbox_port import (
+        SandboxPortError, resolve_sandbox_port,
+    )
+    try:
+        port = resolve_sandbox_port(
+            os.environ.get("AGENT_BOX_SANDBOX_PROVIDER") or "sandbox-bwrap"
+        )
+        return port.probe()
+    except SandboxPortError:
+        return {"status": "unavailable", "code": "sandbox_provider_unresolved"}
 
 
 __all__ = ["FORBIDDEN_ROOTS", "LocalEnvironmentProvider"]

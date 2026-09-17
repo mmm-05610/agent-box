@@ -16,7 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Mapping, Sequence
 
-from .home_projection import GUEST_HOME
+from agent_box.resource_contracts.home_projection import GUEST_HOME
 from .provider import compile_remote_bwrap_argv, compile_remote_sidecar_bwrap_argv
 
 
@@ -65,6 +65,7 @@ def compose_sidecar_room(
     state_window_source: str | None = None,
     state_window_target: str | None = None,
     state_ephemeral_paths: Sequence[str] = (),
+    entrypoint: str = "/runtime/view/agentbox-sidecar/runtime/worker-entry.mjs",
 ) -> SandboxRoom:
     """Compose the launch plan for one sidecar execution.
 
@@ -125,6 +126,7 @@ def compose_sidecar_room(
         runtime_artifact_mounts=runtime_artifact_mounts,
         writable_projection_mounts=tuple(writable_mounts),
         ephemeral_state_mounts=ephemeral_state_mounts,
+        entrypoint=entrypoint,
     )
     return SandboxRoom(
         argv=tuple(argv),

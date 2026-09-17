@@ -12,5 +12,8 @@ requires-python = ">=3.10"
 # decision, made where the room is composed.
 dependencies = ["agent-box-cli==2.0.0a1"]
 
+[project.entry-points."agent_box.plugins"]
+runtime-wsl = "agent_box_runtime_wsl.registration:create_connector"
+
 [tool.setuptools.packages.find]
 where = ["src"]

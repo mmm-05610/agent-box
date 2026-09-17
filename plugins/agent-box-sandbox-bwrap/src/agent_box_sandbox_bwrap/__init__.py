@@ -1,4 +1,4 @@
-from .artifacts import (
+from agent_box.resource_contracts.runtime_artifacts import (
     MAX_RUNTIME_ARTIFACT_BYTES,
     MAX_RUNTIME_ARTIFACT_ENTRIES,
     MAX_RUNTIME_ARTIFACT_TREES,
@@ -8,7 +8,7 @@ from .artifacts import (
     runtime_artifact_tree_summary,
     validate_runtime_artifact_target,
 )
-from .home_projection import (
+from agent_box.resource_contracts.home_projection import (
     GUEST_HOME,
     HOME_TARGET_PREFIX,
     MAX_TARGET_SEGMENTS,
@@ -25,6 +25,10 @@ from .provider import (
     compile_remote_sidecar_bwrap_argv,
 )
 from .sidecar_room import SandboxRoom, compose_codex_room, compose_sidecar_room, guest_environment
+#: The neutral sandbox-seam factory: `agent_box.extensions.runtime_composition.sandbox_port`
+#: looks this up by name (entry point or AGENT_BOX_SANDBOX_MODULE), never by
+#: importing this package's module path itself.
+from .port import BwrapSidecarRoomPort, create_sidecar_room_port
 
 __all__ = [
     "BwrapSandboxProvider", "PROVIDER_ID", "compile_remote_bwrap_argv",
@@ -36,4 +40,5 @@ __all__ = [
     "MAX_TARGET_SEGMENTS", "PROJECTION_DIRECTORY", "PROJECTION_FILE",
     "HomeProjectionRejected", "home_projection_target", "protected_state_paths",
     "SandboxRoom", "compose_codex_room", "compose_sidecar_room", "guest_environment",
+    "BwrapSidecarRoomPort", "create_sidecar_room_port",
 ]

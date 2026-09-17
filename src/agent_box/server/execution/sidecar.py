@@ -278,6 +278,7 @@ class WorkerSidecarLauncher:
         state_ephemeral_paths: Sequence[str] = (),
         protected_state_paths: Sequence[str] = (),
         timeout_ms: int = 120_000,
+        sandbox_port: "SandboxPort | None" = None,
     ) -> None:
         self.connector = connector
         self.workspace = dict(workspace)
@@ -311,9 +312,21 @@ class WorkerSidecarLauncher:
         self.protected_state_paths = tuple(_safe_relative_state_path(path) for path in protected_state_paths)
         self.state_ephemeral_paths = tuple(state_ephemeral_paths)
         self.timeout_ms = timeout_ms
+        #: The resolved sandbox, injected by the assembly boundary. The channel
+        #: states the demand; this object translates it. A missing port is a
+        #: typed refusal at launch, never a silent run without isolation.
+        self.sandbox_port = sandbox_port
 
     def launch(self, environment: Mapping[str, str]):
-        from agent_box_sandbox_bwrap import compose_sidecar_room
+        from agent_box.extensions.runtime_composition.sandbox_port import (
+            SandboxPortUnavailable, SidecarRoomRequest,
+        )
+
+        if self.sandbox_port is None:
+            raise SidecarError(
+                "SANDBOX_PORT_UNAVAILABLE",
+                "no sandbox provider was resolved for this execution",
+            )
 
         attempt_id = f"sidecar-{uuid4().hex}"
         view_id = f"view-{attempt_id}"
@@ -384,21 +397,22 @@ class WorkerSidecarLauncher:
             # The room is the sandbox layer's product, not this channel's: the
             # guest home layout, the XDG roots, which mounts are writable and
             # which state paths are attempt-ephemeral are all decided there.
-            # This layer only supplies the token bindings it just obtained.
-            room = compose_sidecar_room(
+            # This layer only supplies the token bindings it just obtained and
+            # the neutral demand; the resolved provider translates it.
+            room = self.sandbox_port.compose_sidecar_room(SidecarRoomRequest(
                 workspace=self.workspace["remote_path"], staged_view=runtime_view,
                 secret=secret, base_environment=environment,
-                executable_mounts=self.executable_mounts,
-                projection_mounts=self.projection_mounts,
-                runtime_artifact_mounts=self.runtime_artifact_mounts,
+                executable_mounts=tuple(self.executable_mounts),
+                projection_mounts=tuple(self.projection_mounts),
+                runtime_artifact_mounts=tuple(self.runtime_artifact_mounts),
                 state_home_source=home_path,
                 state_target=f"/runtime/home/{self.native_home}" if home_path else None,
                 state_window_source=window_host,
                 state_window_target=(
                     f"/runtime/home/{self.audit_window}" if window_host else None
                 ),
-                state_ephemeral_paths=self.state_ephemeral_paths,
-            )
+                state_ephemeral_paths=tuple(self.state_ephemeral_paths),
+            ))
             argv = list(room.argv)
             channels = _WorkerChannels(
                 client, attempt_id, 1, view_id,

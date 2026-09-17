@@ -55,6 +55,18 @@ import time
 from typing import Sequence
 
 REPO = Path(__file__).resolve().parents[2]
+
+
+def _gate_sandbox_port():
+    """The real bwrap port for gate-local launcher constructions (Order 47:
+    a launcher without an injected port refuses to run, and the gate drives the
+    same reviewed launcher the product uses)."""
+    from agent_box.extensions.runtime_composition.sandbox_port import (
+        resolve_sandbox_port,
+    )
+
+    return resolve_sandbox_port("sandbox-bwrap")
+
 PLUGIN = REPO / "plugins" / "agent-box-harnesses"
 AUTHORIZER = REPO / "scripts" / "server-round1" / "build-opencode-authorization.mjs"
 SCRIPT = "scripts/server-round1/opencode-production-chain-gate.py"
@@ -1260,6 +1272,7 @@ def observe_driver(temporary: Path, workspace: Path, worker: Path, authorization
             harness_type="opencode",
             audit_window=".local/share/opencode",
             timeout_ms=120_000,
+            sandbox_port=_gate_sandbox_port(),
         )
         return SidecarHarnessPort(
             launcher, environment={"AGENTBOX_SIDECAR_ISOLATED": "1"},
@@ -1528,6 +1541,7 @@ def driver_negatives(temporary: Path, workspace: Path, worker: Path, authorizati
         harness_type="opencode",
         audit_window=".local/share/opencode",
         timeout_ms=120_000,
+        sandbox_port=_gate_sandbox_port(),
     )
     port = SidecarHarnessPort(
         launcher, environment={"AGENTBOX_SIDECAR_ISOLATED": "1"},

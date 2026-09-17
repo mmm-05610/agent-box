@@ -123,6 +123,15 @@ def spawn_argv(client) -> list[str]:
     return next(payload["argv"] for op, payload in client.calls if op == "spawn")
 
 
+def _bwrap_room_port():
+    """The real bwrap port: this module asserts the room argv itself."""
+    from agent_box.extensions.runtime_composition.sandbox_port import (
+        resolve_sandbox_port,
+    )
+
+    return resolve_sandbox_port("sandbox-bwrap")
+
+
 def launch_for(*, projection_mounts=(), state_target=None, protected_state_paths=(),
                native_home=".fixture"):
     """Launch the real sidecar launcher against a recording Worker client."""
@@ -144,6 +153,7 @@ def launch_for(*, projection_mounts=(), state_target=None, protected_state_paths
         audit_window=window,
         protected_state_paths=protected_state_paths,
         timeout_ms=5000,
+        sandbox_port=_bwrap_room_port(),
     )
     channels = launcher.launch({"AGENTBOX_SIDECAR_ISOLATED": "1"})
     channels.close()

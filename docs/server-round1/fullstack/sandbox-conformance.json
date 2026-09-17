@@ -1,0 +1,45 @@
+{
+ "provider": "sandbox-bwrap",
+ "checks": {
+  "network_none": {
+   "status": "refused",
+   "code": "SANDBOX_NETWORK_POSTURE_UNSUPPORTED"
+  },
+  "credential_not_in_argv": {
+   "status": "pass",
+   "secret_path_in_argv": true
+  },
+  "room_exit": {
+   "status": 0
+  },
+  "home_is_real": {
+   "status": "pass",
+   "in_room_write": "ok",
+   "host_file_present": true
+  },
+  "host_home_blind": {
+   "status": "pass"
+  },
+  "ro_immutable": {
+   "status": "pass",
+   "in_room_write": "EROFS"
+  },
+  "temp_no_residue": {
+   "status": "pass"
+  },
+  "workspace_writable": {
+   "status": "pass"
+  },
+  "tree_dies": {
+   "status": "pass",
+   "control_before_kill": [
+    "684933"
+   ],
+   "after_kill": []
+  },
+  "cleanup_bounded": {
+   "status": "pass"
+  }
+ },
+ "result": "SANDBOX_CONFORMANCE_GATE_OK"
+}

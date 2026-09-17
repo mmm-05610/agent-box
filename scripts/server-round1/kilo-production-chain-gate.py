@@ -34,6 +34,18 @@ import threading
 import time
 
 REPO = Path(__file__).resolve().parents[2]
+
+
+def _gate_sandbox_port():
+    """The real bwrap port for gate-local launcher constructions (Order 47:
+    a launcher without an injected port refuses to run, and the gate drives the
+    same reviewed launcher the product uses)."""
+    from agent_box.extensions.runtime_composition.sandbox_port import (
+        resolve_sandbox_port,
+    )
+
+    return resolve_sandbox_port("sandbox-bwrap")
+
 PLUGIN = REPO / "plugins" / "agent-box-harnesses"
 BUILDER = REPO / "scripts" / "server-round1" / "build-kilo-runtime-artifact.mjs"
 SCRIPT = "scripts/server-round1/kilo-production-chain-gate.py"
@@ -685,6 +697,7 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production,
             state_bundle_prefix="agentbox-sidecar/deployment/kilo/native-state",
             state_target=production.STATE_TARGET, restored_state=restored_state,
             timeout_ms=120_000,
+            sandbox_port=_gate_sandbox_port(),
         )
         return SidecarHarnessPort(
             launcher, environment={"AGENTBOX_SIDECAR_ISOLATED": "1"}, profile="kilo",

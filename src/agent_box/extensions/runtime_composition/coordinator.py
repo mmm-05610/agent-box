@@ -61,10 +61,14 @@ class RuntimeCompositionCoordinator:
         refs = (binding.runtime_host_ref, binding.sandbox_ref, binding.terminal_session_ref)
         if len({ref.affinity for ref in refs}) != 1:
             return CompositionPreflightReceipt(digest(binding), digest("affinity-rejected"), False, binding.runtime_host_ref.affinity, "AFFINITY_MISMATCH")
-        # Capabilities are deliberately semantic, not provider IDs.
+        # Capabilities are deliberately semantic, not provider IDs. An
+        # undeclared capability is a refusal: "no answer" must never pass as
+        # "supported" (Work Order 47 - the old `None` branch was exactly that).
         for component, capability in ((resolved.host, "process.spawn.typed@1"), (resolved.sandbox, "isolation.wrap@1"), (resolved.terminal, "terminal.run@1")):
             value = self._capability_value(component, capability)
-            if value not in (CapabilityStatus.SUPPORTED, "supported", None):
+            if value is None:
+                return CompositionPreflightReceipt(digest(binding), digest((capability, "undeclared")), False, binding.runtime_host_ref.affinity, "CAPABILITY_UNDECLARED")
+            if value not in (CapabilityStatus.SUPPORTED, "supported"):
                 return CompositionPreflightReceipt(digest(binding), digest((capability, value)), False, binding.runtime_host_ref.affinity, "CAPABILITY_UNSUPPORTED")
         return CompositionPreflightReceipt(digest(binding), digest((binding, "accepted")), True, binding.runtime_host_ref.affinity)
 

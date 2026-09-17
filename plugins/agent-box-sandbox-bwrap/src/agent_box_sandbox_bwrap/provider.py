@@ -15,8 +15,8 @@ from agent_box.extensions.credentials import PreparedSecretMount
 from agent_box.work_core.models import Ref, RefType
 from agent_box.work_core.registry import ProviderDescriptor, ResourceResolutionContext
 
-from .artifacts import validate_runtime_artifact_target
-from .home_projection import (
+from agent_box.resource_contracts.runtime_artifacts import validate_runtime_artifact_target
+from agent_box.resource_contracts.home_projection import (
     GUEST_HOME, PROJECTION_DIRECTORY, PROJECTION_FILE, home_projection_target,
     protected_state_paths,
 )
@@ -31,7 +31,13 @@ PROVIDER_ID = "bwrap-sandbox"
 # (network.inherit@1 supported, network.none@1 unavailable, anchored on the
 # argv block that lacks the flag); the capability gate consumes that document,
 # so the union here never becomes the sidecar execution's promise.
-_CAPS = ("filesystem.mounts@1", "filesystem.readonly@1", "filesystem.writable@1", "filesystem.tmpfs@1", "filesystem.symlink-safe@1", "network.none@1", "network.inherit@1", "env.bounded@1", "home.workspace@1", "digest.read-back@1")
+#
+# This provider really does provide the semantic slot the coordinator asks for
+# (`isolation.wrap@1`), so it declares the slot id itself alongside the
+# concrete abilities; the abstract slot and the concrete concrete faces are
+# registered together in `agent_box.extensions.capability.slots` (test-locked:
+# the slot group there equals `_CAPS` minus the slot id).
+_CAPS = ("isolation.wrap@1", "filesystem.mounts@1", "filesystem.readonly@1", "filesystem.writable@1", "filesystem.tmpfs@1", "filesystem.symlink-safe@1", "network.none@1", "network.inherit@1", "env.bounded@1", "home.workspace@1", "digest.read-back@1")
 _ENV_KEY = re.compile(r"^[A-Z_][A-Z0-9_]{0,63}$")
 _UNSAFE_RW = {"/", "/usr", "/etc", "/bin", "/lib", "/lib64", "/proc", "/dev"}
 _SYSTEM_MOUNTS = ("/usr", "/bin", "/lib", "/lib64", "/etc")

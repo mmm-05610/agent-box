@@ -43,8 +43,8 @@ from agent_box.extensions.capability import (
     require_capability_id,
 )
 
-from .artifacts import RuntimeArtifactRejected, validate_runtime_artifact_target
-from .home_projection import (
+from agent_box.resource_contracts.runtime_artifacts import RuntimeArtifactRejected, validate_runtime_artifact_target
+from agent_box.resource_contracts.home_projection import (
     PROJECTION_DIRECTORY,
     PROJECTION_FILE,
     HomeProjectionRejected,

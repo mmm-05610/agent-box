@@ -61,10 +61,15 @@ def test_sidecar_requirements_are_registered_under_the_isolation_slot():
 
 
 def test_isolation_slot_matches_the_sandbox_cross_template_union():
-    """登记表不是第二套词汇：它与 sandbox 的 ``_CAPS`` 必须逐项相等。"""
+    """登记表不是第二套词汇：它与 sandbox 的 ``_CAPS`` 必须逐项对齐。
+
+    47 起 ``_CAPS`` 同时含槽位 id 本身（``isolation.wrap@1``，表示"本 provider
+    真的提供这个机制"）与具体能力面；登记表只登记具体面，槽位 id 由槽位键表达。
+    """
     from agent_box_sandbox_bwrap.provider import _CAPS
 
-    assert tuple(_CAPS) == COMPONENT_SLOT_CAPABILITIES[SANDBOX_SLOT]
+    assert set(_CAPS) - {SANDBOX_SLOT} == set(COMPONENT_SLOT_CAPABILITIES[SANDBOX_SLOT])
+    assert SANDBOX_SLOT in _CAPS
 
 
 def test_host_slot_matches_the_runtime_local_declaration():

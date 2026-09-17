@@ -81,6 +81,18 @@ import time
 import tomllib
 
 REPO = Path(__file__).resolve().parents[2]
+
+
+def _gate_sandbox_port():
+    """The real bwrap port for gate-local launcher constructions (Order 47:
+    a launcher without an injected port refuses to run, and the gate drives the
+    same reviewed launcher the product uses)."""
+    from agent_box.extensions.runtime_composition.sandbox_port import (
+        resolve_sandbox_port,
+    )
+
+    return resolve_sandbox_port("sandbox-bwrap")
+
 PLUGIN = REPO / "plugins" / "agent-box-harnesses"
 
 # The three source roots this gate imports from. They are added here rather than
@@ -2178,6 +2190,7 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production, t
                 ),
                 protected_state_paths=protected_state_paths(production),
                 timeout_ms=120_000,
+                sandbox_port=_gate_sandbox_port(),
             )
             return SidecarHarnessPort(
                 launcher, environment={"AGENTBOX_SIDECAR_ISOLATED": "1"}, profile="codex",

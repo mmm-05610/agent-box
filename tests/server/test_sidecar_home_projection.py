@@ -77,6 +77,15 @@ def _bundle_with(config_source: Path) -> dict:
     )
 
 
+def _bwrap_room_port():
+    """The real bwrap port: these tests assert the room argv and guest layout."""
+    from agent_box.extensions.runtime_composition.sandbox_port import (
+        resolve_sandbox_port,
+    )
+
+    return resolve_sandbox_port("sandbox-bwrap")
+
+
 def _port(tmp_path, *, host_sentinel: Path, protected: tuple[str, ...] = (),
           config_source: Path) -> SidecarHarnessPort:
     launcher = WslSidecarLauncher(
@@ -91,6 +100,7 @@ def _port(tmp_path, *, host_sentinel: Path, protected: tuple[str, ...] = (),
         harness_type="fixture",
         audit_window=".fixture/state",
         protected_state_paths=protected,
+        sandbox_port=_bwrap_room_port(),
     )
     return SidecarHarnessPort(
         launcher, environment={"AGENTBOX_SIDECAR_ISOLATED": "1"}, profile="pi",
@@ -184,6 +194,7 @@ def test_a_config_inside_the_state_subtree_is_not_captured_and_cannot_be_restore
         # configuration inside it is excluded from the audit by name.
         audit_window=".fixture",
         protected_state_paths=("config.json",),
+        sandbox_port=_bwrap_room_port(),
     )
     port = SidecarHarnessPort(
         launcher, environment={"AGENTBOX_SIDECAR_ISOLATED": "1"}, profile="pi",

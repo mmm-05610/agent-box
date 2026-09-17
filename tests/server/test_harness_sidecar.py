@@ -507,6 +507,7 @@ def test_real_worker_bwrap_interactive_sidecar_streams_before_terminal(tmp_path)
             "connection_id": "connection-sidecar", "remote_path": str(REPO),
         },
         bundle=sidecar_bundle_files(PLUGIN), timeout_ms=30_000,
+        sandbox_port=_bwrap_test_port(),
     )
     port = SidecarHarnessPort(
         launcher, environment={"AGENTBOX_SIDECAR_ISOLATED": "1"}, profile="pi",
@@ -1535,12 +1536,27 @@ class _WorkerConnectorFake:
     def client_for_workspace(self, **_kwargs): return self.client
 
 
+def _bwrap_test_port():
+    """The real bwrap port for tests that exercise the room argv itself.
+
+    These tests assert the actual room argv (`--ro-bind`, secret mount, ...), so
+    they inject the real provider through the same name resolution production
+    uses, rather than a stand-in that would make the assertions meaningless.
+    """
+    from agent_box.extensions.runtime_composition.sandbox_port import (
+        resolve_sandbox_port,
+    )
+
+    return resolve_sandbox_port("sandbox-bwrap")
+
+
 def _launcher_for_test(client):
     return WslSidecarLauncher(
         _WorkerConnectorFake(client),
         workspace={"distribution": "Ubuntu", "remote_user": "tester",
                    "connection_id": "connection", "remote_path": "/workspace"},
         bundle={}, credential=b"fixture-secret", timeout_ms=5000,
+        sandbox_port=_bwrap_test_port(),
     )
 
 
@@ -1597,6 +1613,7 @@ def test_wsl_sidecar_carries_runtime_artifacts_to_bootstrap_and_bwrap():
         bundle={}, timeout_ms=5000,
         runtime_artifact_authorizations=(declaration,),
         runtime_artifact_mounts=((ARTIFACT_SOURCE, ARTIFACT_TARGET),),
+        sandbox_port=_bwrap_test_port(),
     )
     channels = launcher.launch({})
     try:
@@ -1640,6 +1657,7 @@ def test_wsl_sidecar_refuses_artifact_declarations_that_do_not_match(
             bundle={}, timeout_ms=5000,
             runtime_artifact_authorizations=authorizations,
             runtime_artifact_mounts=mounts,
+            sandbox_port=_bwrap_test_port(),
         )
 
 
@@ -1693,6 +1711,7 @@ def test_sidecar_bundle_uploads_every_chunk_offset_exactly_once():
         workspace={"distribution": "Ubuntu", "remote_user": "tester",
                    "connection_id": "connection", "remote_path": "/workspace"},
         bundle=bundle, timeout_ms=5000,
+        sandbox_port=_bwrap_test_port(),
     )
     channels = launcher.launch({})
     try:

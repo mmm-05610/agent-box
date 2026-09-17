@@ -25,6 +25,7 @@ from agent_box.server.approvals import ApprovalRecords
 from agent_box.server.credentials import CredentialRecords
 from agent_box.server.events import EventNotifier
 from agent_box.server.execution import HarnessRegistry, TurnExecutionPort
+from agent_box.extensions.runtime_composition.sandbox_port import resolve_sandbox_port
 from agent_box.server.idempotency import IdempotentRecords
 from agent_box.server.model_configs import ProviderModelRecords, ProviderModelService
 from agent_box.server.profiles import ProfileRecords, ProfileService
@@ -141,14 +142,43 @@ def _builtin_connector(server_instance_id: str) -> WslConnectionPort | None:
     worker = os.environ.get("AGENT_BOX_WSL_WORKER_LINUX_PATH")
     if os.name != "nt" or not manifest or not worker:
         return None
+    # A host connector is resolved by name here, exactly as the sandbox
+    # provider is: the installed plugin entry point first, the importable
+    # package as the PYTHONPATH-runtime fallback. Bindings left unset compose
+    # no connector, which `resolve_placement` then refuses out loud.
+    bindings = {
+        "manifest_path": manifest, "linux_worker_path": worker,
+        "server_instance_id": server_instance_id,
+    }
+    factory = _entry_point_factory("runtime-wsl")
+    if factory is not None:
+        try:
+            return factory(**bindings)
+        except TypeError:
+            pass
     try:
         from agent_box_runtime_wsl import WslConnector
     except ImportError:
         return None
-    return WslConnector(
-        manifest_path=manifest, linux_worker_path=worker,
-        server_instance_id=server_instance_id,
+    return WslConnector(**bindings)
+
+
+def _entry_point_factory(name: str):
+    """The callable a plugin entry point registers under ``name``, if any."""
+    from importlib import metadata
+
+    from agent_box.extensions.loader import ENTRY_POINT_GROUP
+
+    discovered = metadata.entry_points()
+    group = (
+        discovered.select(group=ENTRY_POINT_GROUP)
+        if hasattr(discovered, "select") else discovered.get(ENTRY_POINT_GROUP, ())
     )
+    wanted = name.strip().lower().replace("-", "_")
+    for entry_point in group:
+        if entry_point.name.lower().replace("-", "_") == wanted:
+            return entry_point.load()
+    return None
 
 
 def _builtin_ssh_connector(server_instance_id: str):
@@ -634,6 +664,15 @@ def build_runtime_from_sidecar_deployment(
             audit_window = _window_of_state_target(
                 deployment["_state_target"], native_home,
             )
+            # The sandbox is resolved by name, never imported here: the name
+            # comes from the deployment, the process environment, or the one
+            # documented default provider id. An unresolvable name is a typed
+            # refusal, not a silent run without isolation.
+            sandbox_port = resolve_sandbox_port(
+                deployment.get("sandboxProvider")
+                or os.environ.get("AGENT_BOX_SANDBOX_PROVIDER")
+                or "sandbox-bwrap"
+            )
             if placement.channel in {WSL_CHANNEL, SSH_CHANNEL}:
                 launcher = WorkerSidecarLauncher(
                     connectors[placement.kind],
@@ -657,6 +696,7 @@ def build_runtime_from_sidecar_deployment(
                     state_ephemeral_paths=deployment["_state_ephemeral_paths"],
                     protected_state_paths=deployment["_protected_state_paths"],
                     timeout_ms=deployment["_timeout_ms"],
+                    sandbox_port=sandbox_port,
                 )
             else:
                 launcher = LocalSidecarLauncher(
@@ -672,6 +712,7 @@ def build_runtime_from_sidecar_deployment(
                     state_target=deployment["_state_target"],
                     state_ephemeral_paths=deployment["_state_ephemeral_paths"],
                     protected_state_paths=deployment["_protected_state_paths"],
+                    sandbox_port=sandbox_port,
                 )
             capability_documents, capability_grants, authorized, binding = (
                 _capability_material(context, deployment)
@@ -773,15 +814,17 @@ def _capability_material(
     )
     documents: tuple[Any, ...] = ()
     try:
-        from agent_box_sandbox_bwrap.declarations import sandbox_declaration_document
-        from agent_box_sandbox_bwrap.plugin import create_plugin
-        from agent_box_sandbox_bwrap.provider import ProjectionRejected
-
         # 身份独立核对：实际安装插件的 descriptor id 与声明自报的 provider 必须
         # 一致，且两者都落在本模块的锁定批准映射内。"已安装/已加载"本身不构成
         # 授权——descriptor 只是待比对的身份，批准集才是授权来源。
-        descriptor_id = create_plugin().descriptor().id
-        document = sandbox_declaration_document(
+        # 声明文档由**已解析的沙箱端口**构造（上层不认识具体沙箱）。
+        port = resolve_sandbox_port(
+            deployment.get("sandboxProvider")
+            or os.environ.get("AGENT_BOX_SANDBOX_PROVIDER")
+            or "sandbox-bwrap"
+        )
+        descriptor_id = port.descriptor_id()
+        document = port.declaration_document(
             readonly_targets=executable_targets + projection_targets + artifact_targets,
             writable_targets=((state_target,) if state_target else ()),
             environment_binding=binding,
@@ -793,7 +836,9 @@ def _capability_material(
             and document.provider == descriptor_id
         ):
             documents = (document,)
-    except ProjectionRejected:
+    except Exception:
+        # 解析不到端口、或 provider 按自己的语法拒绝了声明的面：材料留空；
+        # 能力门随后 fail-closed 拒绝本次执行——绝不把失败变成一份声明。
         documents = ()
     return documents, grants, tuple(sorted(_APPROVED_CAPABILITY_DECLARERS)), binding
 
@@ -888,7 +933,9 @@ def _home_projection_target(target: Any, *, kind: str) -> str:
     deployment is therefore accepted here if and only if the compiler can mount
     it.
     """
-    from agent_box_sandbox_bwrap import HomeProjectionRejected, home_projection_target
+    from agent_box.resource_contracts.home_projection import (
+        HomeProjectionRejected, home_projection_target,
+    )
 
     try:
         return home_projection_target(target, kind=kind)
@@ -900,7 +947,9 @@ def _protected_state_paths(
     projection_targets: tuple[str, ...], state_target: str | None,
 ) -> tuple[str, ...]:
     """Derive the read-only paths inside the writable state subtree."""
-    from agent_box_sandbox_bwrap import HomeProjectionRejected, protected_state_paths
+    from agent_box.resource_contracts.home_projection import (
+        HomeProjectionRejected, protected_state_paths,
+    )
 
     try:
         return protected_state_paths(projection_targets, state_target)
@@ -945,7 +994,7 @@ def _runtime_artifact_declarations(
     distribution that will read the tree; the Server refuses a declaration that
     could not be verified at all and carries the exact digests across unchanged.
     """
-    from agent_box_sandbox_bwrap import (
+    from agent_box.resource_contracts.runtime_artifacts import (
         MAX_RUNTIME_ARTIFACT_TREES, RuntimeArtifactRejected,
         validate_runtime_artifact_target,
     )

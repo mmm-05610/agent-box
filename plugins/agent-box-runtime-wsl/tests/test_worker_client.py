@@ -273,7 +273,9 @@ def test_disconnect_cancels_execution_reclaims_secret_and_expires_isolated_resul
 
 def artifact_tree(tmp_path, name="fixture-dep"):
     """A small immutable dependency directory, as a deployment would stage it."""
-    from agent_box_sandbox_bwrap import runtime_artifact_tree_digest
+    from agent_box.resource_contracts.runtime_artifacts import (
+        runtime_artifact_tree_digest,
+    )
 
     root = tmp_path / "artifacts" / name
     (root / "nested").mkdir(parents=True)
@@ -322,7 +324,9 @@ def test_real_worker_verifies_and_read_only_mounts_a_runtime_artifact_tree(tmp_p
         assert stdout == b"export const VALUE = 'fixed-value'\n|extra\n|write:refused"
         # The host tree is unchanged: the projection was read-only, and the
         # guest's write attempt left nothing behind.
-        from agent_box_sandbox_bwrap import runtime_artifact_tree_digest
+        from agent_box.resource_contracts.runtime_artifacts import (
+        runtime_artifact_tree_digest,
+    )
 
         assert runtime_artifact_tree_digest(root) == declared
         assert not (root / "written").exists()

@@ -65,7 +65,7 @@ def test_golden_encoding_is_byte_exact_and_ordered(tmp_path):
     """
     document = json.loads((GOLDEN / GOLDEN_FIXTURES[0]).read_text(encoding="utf-8"))
     root = materialize(tmp_path / "tree", document)
-    from agent_box_sandbox_bwrap.artifacts import _encode
+    from agent_box.resource_contracts.runtime_artifacts import _encode
 
     encoding, entries, total = _encode(root, MAX_RUNTIME_ARTIFACT_ENTRIES, MAX_RUNTIME_ARTIFACT_BYTES)
     assert encoding.hex() == document["canonical_encoding_hex"]

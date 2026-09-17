@@ -26,8 +26,6 @@ import time
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Mapping, Sequence
 
-from agent_box_sandbox_bwrap import compose_sidecar_room
-
 from .state_capture import (
     MAX_AUDIT_FILES,
     MAX_AUDIT_FILE_BYTES,
@@ -239,6 +237,7 @@ class LocalSidecarLauncher:
         native_home: str | None = None, state_target: str | None = None,
         state_ephemeral_paths: Sequence[str] = (),
         protected_state_paths: Sequence[str] = (),
+        sandbox_port: "object | None" = None,
     ) -> None:
         if len(bundle) > MAX_BUNDLE_FILES or sum(map(len, bundle.values())) > MAX_BUNDLE_BYTES:
             raise ValueError("LOCAL_CHANNEL_BUNDLE_OUTSIDE_BOUNDS")
@@ -264,8 +263,20 @@ class LocalSidecarLauncher:
         self.state_target = state_target
         self.state_ephemeral_paths = tuple(state_ephemeral_paths)
         self.protected_state_paths = tuple(protected_state_paths)
+        #: The resolved sandbox, injected by the assembly boundary; a missing
+        #: port is a typed refusal at launch, never a silent run.
+        self.sandbox_port = sandbox_port
 
     def launch(self, environment: Mapping[str, str]):
+        from agent_box.extensions.runtime_composition.sandbox_port import (
+            SandboxPortUnavailable, SidecarRoomRequest,
+        )
+
+        if self.sandbox_port is None:
+            raise LocalChannelError(
+                "SANDBOX_PORT_UNAVAILABLE",
+                "no sandbox provider was resolved for this execution",
+            )
         root = Path(tempfile.mkdtemp(prefix="agentbox-local-channel-"))
         view = root / "view"
         view.mkdir()
@@ -292,16 +303,16 @@ class LocalSidecarLauncher:
             if self.home.window and self.home.window != self.native_home:
                 window_host = str(self.home.role_dir / self.home.window)
         window_target = self.state_target if window_host else None
-        room = compose_sidecar_room(
+        room = self.sandbox_port.compose_sidecar_room(SidecarRoomRequest(
             workspace=self.workspace_path, staged_view=str(view), secret=secret_path,
-            base_environment=environment, executable_mounts=self.executable_mounts,
-            projection_mounts=self.projection_mounts,
-            runtime_artifact_mounts=self.runtime_artifact_mounts,
+            base_environment=environment, executable_mounts=tuple(self.executable_mounts),
+            projection_mounts=tuple(self.projection_mounts),
+            runtime_artifact_mounts=tuple(self.runtime_artifact_mounts),
             state_home_source=home_dir, state_target=native_bind_target,
             state_window_source=window_host,
             state_window_target=window_target,
-            state_ephemeral_paths=self.state_ephemeral_paths,
-        )
+            state_ephemeral_paths=tuple(self.state_ephemeral_paths),
+        ))
         # stderr goes to a file, not a pipe: a pipe nobody drains would block
         # the child, and the tail is what a failure needs to report.
         stderr_path = root / "stderr.log"
