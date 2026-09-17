@@ -1953,6 +1953,17 @@ export interface Translations {
     agentBoxServiceNoReason: string
     agentBoxServiceOffline: string
     agentBoxValuePending: string
+    roleSettings: {
+      zonesTitle: string
+      zones: readonly string[]
+      zonesPending: string
+      ownershipTitle: string
+      ownership: string
+      permissionsTitle: string
+      permissions: readonly string[]
+      rebindTitle: string
+      rebind: readonly string[]
+    }
     agentBoxCapabilityAbsent: string
     agentBoxMaintenanceUnavailable: string
     agentBoxMaintenanceUnavailableDesc: string

@@ -58,6 +58,7 @@ import {
   type ProfileConfigDraft,
   ProfileConfigEditor
 } from './profile-config-editor'
+import { ProfileRoleSettings } from './profile-role-settings'
 
 export interface ProfilesViewProps {
   /** Explicit adapter override for isolated component tests. */
@@ -425,6 +426,8 @@ function ProfileDetail({ maintenance, profile, serviceOffline }: ProfileDetailPr
           <p className="mt-1 text-xs text-muted-foreground">{copy.agentBoxMaintenanceUnavailableDesc}</p>
         </div>
       ) : null}
+
+      <ProfileRoleSettings copy={copy.roleSettings} />
 
       {serviceOffline ? (
         <div className="rounded bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">

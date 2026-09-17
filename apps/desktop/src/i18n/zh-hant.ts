@@ -1762,6 +1762,17 @@ export const zhHant = defineLocale({
     agentBoxServiceOffline: 'AgentBox 服務離線——角色與設定需要它',
     agentBoxCapabilitiesNotDeclared: '服務尚未為該角色宣告任何能力',
     agentBoxValuePending: '服務未宣告',
+    roleSettings: {
+      zonesTitle: '角色將承載什麼',
+      zones: ['指令（資產引用與文本本身）', '模型槽（取自 provider/model 記錄）', '憑據或帳號引用', '技能、MCP 與 hook（依角色啟用）', '權限規則', '服務宣告的進階執行上限'],
+      zonesPending: '編輯能力隨擁有這些記錄的服務一起到來：在服務宣告之前，本頁只列出分區，不顯示無法儲存的控件。',
+      ownershipTitle: '工作階段屬於工作區',
+      ownership: '角色被綁定到一次對話，但不擁有它。綁定可以更換，更換是**工作階段上的動作**——歷史保留，且每一輪記錄當時用的是哪個角色、哪一版。',
+      permissionsTitle: '權限規則的運作方式',
+      permissions: ['每個工具鍵一行（read、edit、bash、task、external_directory、webfetch、skill……），取值 ask / allow / deny，支援 glob', '**最後匹配的規則生效**——介面展示的就是這一條，而不是第一條', '預設（完全存取／預設／計畫）一次性填表，逐項仍可覆寫；被覆寫的行顯示為「已自訂」', 'ask 就是我們的審批往返：執行時暫停並詢問你'],
+      rebindTitle: '更換綁定與複製',
+      rebind: ['同家族：允許。檔案式 journal 的家族會把原生工作階段一起搬過去；共用同一資料庫的家族會重新開始原生連續性——提示出現在**操作之前**，不是事後', '換家族：不提供就地切換；改為**複製**成另一個家族的角色，複製介面列出可遷移與不可遷移項', 'session 類資產不遷移，複製也**不會繼承舊的原生工作階段']
+    },
     agentBoxCapabilityAbsent: '未宣告',
     agentBoxMaintenanceUnavailable: '角色維護目前無法使用',
     agentBoxMaintenanceUnavailableDesc: '服務可以列出角色，但尚未宣告建立、編輯、封存或原生記憶控制能力。',

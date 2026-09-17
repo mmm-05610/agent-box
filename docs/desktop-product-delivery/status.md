@@ -1358,5 +1358,13 @@ typecheck 当场暴露；新测试 4 条 ESLint warning 收口为 0。
   **不渲染任何表单/开关/按钮**（任何一个都无法生效 → 不摆死控件）；零凭据字段。
   门：G3/G4/G5 成立（当前形态），G1/G2/G6/G7 不适用（属 59）；新增 4 例 + 导航清单同步，
   settings+i18n+contracts+app **120 files / 1147 tests passed, exit 0**；`tsc -p . --noEmit` exit 0。
-- **下一步**：P17（Profile 设置）。writer_lease 继续 ACTIVE。
+- **P17 收口：`P17_PARTIAL — ROLE_SURFACE_SEMANTICS_DONE`**（语义与文案已完成，字段面等后端 60）：
+  角色详情页新增 `ProfileRoleSettings`：**六区清单**（指令/模型槽/凭据或账号/技能·MCP·hook/权限规则/高级上限）、
+  **会话归属陈述**（会话属于工作区；角色只是绑定，换绑是会话上的动作）、**权限模型**（逐工具键 ask|allow|deny + glob、
+  **最后匹配生效**、预设一次性填表且可逐项覆盖、ask = 审批往返）、**换绑与克隆后果**（文件式 journal 家族搬原生会话／
+  共享 DB 家族重新开始，提示在操作前；换家族只克隆、session 类资产不迁移、不继承旧原生会话）；**零可点控件**。
+  另把 `profiles.remoteOverride.description` 的「this profile's sessions」改为绑定措辞，并新增 **ownership 文案守卫**
+  （六语言 + 非空对照）。门：G2/G6（文案半）成立，G1/G3–G5/G7–G9 属 60（如实标注）；新增 5+2 例，
+  profiles+settings+i18n+contracts **36 files / 338 tests passed, exit 0**；`tsc -p . --noEmit` exit 0。
+- **下一步**：P18（Ordessa 品牌落地，派单表明确排在 P17 之后；**不得插队**）。writer_lease 继续 ACTIVE。
 

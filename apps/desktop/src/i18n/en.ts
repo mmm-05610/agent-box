@@ -2064,7 +2064,7 @@ export const en: Translations = {
       menuItem: 'Connect to a remote host…',
       badge: (host: string) => `Runs on ${host}`,
       title: (profile: string) => `Connect ${profile} to a remote host`,
-      description: 'Sessions in this profile will run on the remote AgentBox you point it at, instead of this computer.',
+      description: 'Sessions opened while this profile is bound will run on the remote AgentBox you point it at, instead of this computer.',
       urlLabel: 'Remote address',
       urlPlaceholder: 'https://hermes.example.com',
       urlInvalid: 'Enter a full address starting with http:// or https://',
@@ -2168,6 +2168,17 @@ export const en: Translations = {
     agentBoxServiceOffline: 'The AgentBox service is offline — roles and settings need it',
     agentBoxCapabilitiesNotDeclared: 'The service has not declared any capability for this role',
     agentBoxValuePending: 'Not declared by the service',
+    roleSettings: {
+      zonesTitle: 'What a role will carry',
+      zones: ['Instructions (asset references and the text itself)', 'Model slot, from the provider/model records', 'Credential or account reference', 'Skills, MCP and hooks, enabled per role', 'Permission rules', 'Advanced runtime limits declared by the service'],
+      zonesPending: 'Editing arrives with the service that owns these records: until it declares them this page names the zones instead of showing controls that could not save.',
+      ownershipTitle: 'Sessions belong to a workspace',
+      ownership: 'A role is bound to a conversation; it does not own it. The binding can change, and changing it is an action on the session — history stays, and each turn records which role and which revision ran it.',
+      permissionsTitle: 'How permission rules will work',
+      permissions: ['One row per tool key (read, edit, bash, task, external_directory, webfetch, skill, …), each ask, allow or deny, with glob patterns allowed', 'The LAST matching rule wins — that is the rule the surface will show, not the first', 'Presets (full access, default, plan) fill the table once and stay overridable; an overridden row reads as customised', 'ask means our approval round trip: the run pauses and asks you at execution time'],
+      rebindTitle: 'Changing the binding, and cloning',
+      rebind: ['Same family: allowed. A family with file-based journals carries its native sessions along; a family sharing one database restarts native continuity — the notice appears BEFORE the change, never after', 'Another family: no in-place switch. Clone the role instead, and the clone lists what migrates and what does not', 'Session-class assets do not migrate, and a clone never inherits an old native session']
+    },
     agentBoxCapabilityAbsent: 'not declared',
     agentBoxMaintenanceUnavailable: 'Profile maintenance is unavailable',
     agentBoxMaintenanceUnavailableDesc:

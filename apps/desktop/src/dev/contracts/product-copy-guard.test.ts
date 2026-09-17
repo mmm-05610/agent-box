@@ -195,3 +195,35 @@ describe('source copy guards', () => {
 function userFacing(line: string): boolean {
   return USER_FACING_LITERAL.test(line)
 }
+
+/** Ownership phrasings that would make a SESSION read as something a role
+ *  owns. P17's semantic correction starts in the copy: sessions belong to a
+ *  workspace, and a role is bound to a run. */
+const OWNERSHIP_PATTERNS = [
+  /sessions?\s+(?:of|in|belonging to|owned by)\s+(?:this|the)\s+(?:role|profile)/i,
+  /(?:this|the)\s+(?:role|profile)['’]s\s+sessions/i,
+  /(?:角色|檔案|プロファイル|الملف|профиля)\s*的?\s*(?:工作階段|会话|會話|セッション|جلسات|сеансы)/i
+] as const
+
+describe('session ownership copy guard', () => {
+  it('never makes a role the owner of a session', () => {
+    const offenders: Entry[] = []
+
+    for (const [catalog, source] of catalogs) {
+      for (const entry of catalogEntries(source)) {
+        if (OWNERSHIP_PATTERNS.some(pattern => pattern.test(entry.value))) {
+          offenders.push({ path: `${catalog}:${entry.path}`, value: entry.value })
+        }
+      }
+    }
+
+    expect(offenders).toEqual([])
+  })
+
+  it('has the patterns to judge, so the rule above is not vacuous', () => {
+    expect(OWNERSHIP_PATTERNS.some(pattern => pattern.test('Sessions in this profile will run elsewhere'))).toBe(true)
+    expect(OWNERSHIP_PATTERNS.some(pattern => pattern.test('this role’s sessions'))).toBe(true)
+    expect(OWNERSHIP_PATTERNS.some(pattern => pattern.test('该角色的会话'))).toBe(true)
+    expect(OWNERSHIP_PATTERNS.some(pattern => pattern.test('Sessions belong to a workspace'))).toBe(false)
+  })
+})

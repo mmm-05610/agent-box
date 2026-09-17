@@ -1818,6 +1818,17 @@ export const ja = defineLocale({
     agentBoxServiceOffline: 'AgentBox サービスはオフラインです — プロファイルと設定に必要です',
     agentBoxCapabilitiesNotDeclared: 'サービスはこのプロファイルの機能を宣言していません',
     agentBoxValuePending: 'サービス未宣言',
+    roleSettings: {
+      zonesTitle: 'プロファイルが担うもの',
+      zones: ['指示（資産参照と本文）', 'モデルスロット（provider/model レコード由来）', '資格情報またはアカウント参照', 'スキル・MCP・フック（プロファイル単位で有効化）', '権限ルール', 'サービスが宣言する実行上限'],
+      zonesPending: '編集はこれらのレコードを所有するサービスと共に届きます。サービスが宣言するまでは、保存できないコントロールではなく区分を表示します。',
+      ownershipTitle: 'セッションはワークスペースに属します',
+      ownership: 'プロファイルは会話にバインドされるだけで、所有はしません。バインドは変更でき、その変更は**セッション上の操作**です — 履歴は残り、各ターンは使用したプロファイルとリビジョンを記録します。',
+      permissionsTitle: '権限ルールの仕組み',
+      permissions: ['ツールキーごとに 1 行（read、edit、bash、task、external_directory、webfetch、skill …）、値は ask / allow / deny、glob 可', '**最後に一致したルールが有効** — 画面が示すのはこちらで、最初の一致ではありません', 'プリセット（完全アクセス／既定／プラン）は一度だけ表を埋め、各行は上書き可能。上書きされた行は「カスタム」と表示します', 'ask は承認ラウンドトリップ：実行時に停止して確認します'],
+      rebindTitle: 'バインドの変更と複製',
+      rebind: ['同一環境：許可。ファイル式ジャーナルの環境はネイティブセッションを引き継ぎ、単一データベースを共有する環境はネイティブ連続性をやり直します — 通知は**変更の前**に出ます', '別環境：その場での切り替えは提供しません。代わりに複製し、複製画面が移行できるものとできないものを列挙します', 'session 系の資産は移行されず、複製が古いネイティブセッションを継承することもありません']
+    },
     agentBoxCapabilityAbsent: '未宣言',
     agentBoxMaintenanceUnavailable: 'プロファイルの管理を利用できません',
     agentBoxMaintenanceUnavailableDesc:

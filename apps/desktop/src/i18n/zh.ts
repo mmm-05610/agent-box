@@ -2332,6 +2332,17 @@ export const zh: Translations = {
     agentBoxServiceOffline: 'AgentBox 服务离线——角色与设置需要它',
     agentBoxCapabilitiesNotDeclared: '服务尚未为该角色声明任何能力',
     agentBoxValuePending: '服务未声明',
+    roleSettings: {
+      zonesTitle: '角色将承载什么',
+      zones: ['指令（资产引用与文本本身）', '模型槽（取自 provider/model 记录）', '凭据或账号引用', '技能、MCP 与 hook（按角色启用）', '权限规则', '服务声明的高级运行上限'],
+      zonesPending: '编辑能力随拥有这些记录的服务一起到来：在服务声明之前，本页只列出分区，不显示无法保存的控件。',
+      ownershipTitle: '会话属于工作区',
+      ownership: '角色被绑定到一次对话，但不拥有它。绑定可以更换，更换是**会话上的动作**——历史保留，且每一轮记录当时用的是哪个角色、哪一版。',
+      permissionsTitle: '权限规则的运作方式',
+      permissions: ['每个工具键一行（read、edit、bash、task、external_directory、webfetch、skill……），取值 ask / allow / deny，支持 glob', '**最后匹配的规则生效**——界面展示的就是这一条，而不是第一条', '预设（完全访问／默认／计划）一次性填表，逐项仍可覆盖；被覆盖的行显示为「已自定义」', 'ask 就是我们的审批往返：执行时暂停并询问你'],
+      rebindTitle: '更换绑定与克隆',
+      rebind: ['同家族：允许。文件式 journal 的家族会把原生会话一起搬过去；共享同一数据库的家族会重新开始原生连续性——提示出现在**操作之前**，不是事后', '换家族：不提供就地切换；改为**克隆**成另一个家族的角色，克隆界面列出可迁移与不可迁移项', 'session 类资产不迁移，克隆也**不会继承旧的原生会话']
+    },
     agentBoxCapabilityAbsent: '未声明',
     agentBoxMaintenanceUnavailable: '角色维护当前不可用',
     agentBoxMaintenanceUnavailableDesc: '服务可以列出角色，但尚未声明创建、编辑、归档或原生记忆控制能力。',
