@@ -407,7 +407,10 @@ export const zhHant = defineLocale({
       harnesses: {
         title: 'Harness',
         description: '只在這台電腦上安裝與更新支援的 Harness。',
-        boundary: '工作區連線與遠端目標屬於各自 Workspace；Desktop 不自造安裝命令。'
+        boundary: '工作區連線與遠端目標屬於各自 Workspace；Desktop 不自造安裝命令。',
+        programFields: ['目前版本', '已安裝的其他版本', '大小', '來源', '安裝時間', '摘要', '可更新徽標'],
+        fieldsPending: '程式目錄尚不可用：以下欄位會在服務宣告該能力後出現。在此之前不做任何猜測——版本、大小、可更新徽標一律不顯示。',
+        nextTurn: '切換 harness 版本在下一輪生效：無需重啟，執行中的一輪繼續使用它開始時使用的版本。'
       },
       data: {
         title: '資料管理',

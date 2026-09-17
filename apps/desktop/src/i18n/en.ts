@@ -533,7 +533,10 @@ export const en: Translations = {
       harnesses: {
         title: 'Harnesses',
         description: 'Install and update supported Harnesses on this computer only.',
-        boundary: 'Workspace connections and remote targets stay with each Workspace; Desktop never invents install commands.'
+        boundary: 'Workspace connections and remote targets stay with each Workspace; Desktop never invents install commands.',
+        programFields: ['Current version', 'Other installed versions', 'Size', 'Source', 'Installed at', 'Summary', 'Update badge'],
+        fieldsPending: 'The program directory is not available: these fields appear once the service declares it. Nothing is guessed in the meantime — no version, no size, no update badge.',
+        nextTurn: 'Changing a harness version takes effect on the next turn: nothing restarts, and a turn already running keeps the version it started with.'
       },
       data: {
         title: 'Data management',

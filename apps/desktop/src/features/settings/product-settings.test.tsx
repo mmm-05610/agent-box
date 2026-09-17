@@ -23,3 +23,44 @@ describe('ProductSettings', () => {
     expect(screen.getByText(/Credentials, project files, and downloadable tools are excluded/i)).toBeTruthy()
   })
 })
+
+// P13: the harness program directory belongs to the service (57). Until it
+// declares one, the surface names the fields it will carry and says outright
+// that nothing is being guessed — and renders no row, no version and no
+// action that could not run.
+describe('ProductSettings harness program plan', () => {
+  it('names the fields a program row will carry, and says the directory is missing', () => {
+    const { container } = render(<ProductSettings view="harnesses" />)
+
+    const plan = container.querySelector('[data-harness-program-plan]')
+
+    expect(plan).toBeTruthy()
+    expect(plan?.textContent).toContain('The program directory is not available')
+    for (const field of ['Current version', 'Other installed versions', 'Size', 'Source', 'Installed at', 'Update badge']) {
+      expect(plan?.textContent).toContain(field)
+    }
+    expect(plan?.textContent).toContain('Nothing is guessed in the meantime')
+  })
+
+  it('shows the next-turn meaning of a version change', () => {
+    render(<ProductSettings view="harnesses" />)
+
+    expect(screen.getByText(/takes effect on the next turn/)).toBeTruthy()
+    expect(screen.getByText(/keeps the version it started with/)).toBeTruthy()
+  })
+
+  it('renders no program data and no action: no version, no size, no install button', () => {
+    const { container } = render(<ProductSettings view="harnesses" />)
+
+    expect(screen.queryByRole('button')).toBeNull()
+    // No version-shaped or size-shaped values anywhere on the page.
+    expect(container.textContent).not.toMatch(/\bv?\d+\.\d+\.\d+\b/)
+    expect(container.textContent).not.toMatch(/\b\d+(\.\d+)?\s?(MB|GB)\b/)
+  })
+
+  it('keeps the plan off the other product views', () => {
+    const { container } = render(<ProductSettings view="data" />)
+
+    expect(container.querySelector('[data-harness-program-plan]')).toBeNull()
+  })
+})

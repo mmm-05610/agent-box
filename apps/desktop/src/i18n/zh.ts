@@ -518,7 +518,10 @@ export const zh: Translations = {
       harnesses: {
         title: 'Harness',
         description: '只在这台电脑上安装和更新受支持的 Harness。',
-        boundary: '工作区连接与远端目标归各自 Workspace；Desktop 不自造安装命令。'
+        boundary: '工作区连接与远端目标归各自 Workspace；Desktop 不自造安装命令。',
+        programFields: ['当前版本', '已安装的其他版本', '大小', '来源', '安装时间', '摘要', '可更新徽标'],
+        fieldsPending: '程序目录尚不可用：以下字段会在服务声明该能力后出现。在此之前不做任何猜测——版本、大小、可更新徽标一律不显示。',
+        nextTurn: '切换 harness 版本在下一轮生效：无需重启，运行中的一轮继续使用它开始时使用的版本。'
       },
       data: {
         title: '数据管理',

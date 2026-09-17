@@ -415,7 +415,10 @@ export const ja = defineLocale({
       harnesses: {
         title: 'Harness',
         description: 'このコンピューター上の対応 Harness のみをインストール、更新します。',
-        boundary: 'Workspace 接続とリモート対象は各 Workspace が所有し、Desktop はインストールコマンドを作りません。'
+        boundary: 'Workspace 接続とリモート対象は各 Workspace が所有し、Desktop はインストールコマンドを作りません。',
+        programFields: ['現在のバージョン', '他のインストール済みバージョン', 'サイズ', '取得元', 'インストール日時', '概要', '更新バッジ'],
+        fieldsPending: 'プログラムのカタログはまだ利用できません。これらの項目はサービスが対応を宣言した時点で表示されます。それまで推測はしません（バージョン、サイズ、更新バッジを出しません）。',
+        nextTurn: 'ハーネスのバージョン変更は次のターンから有効です。再起動は不要で、実行中のターンは開始時のバージョンを使い続けます。'
       },
       data: {
         title: 'データ管理',

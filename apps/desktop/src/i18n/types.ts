@@ -467,7 +467,16 @@ export interface Translations {
       }
       resources: { title: string; description: string; boundary: string }
       identities: { title: string; description: string; boundary: string }
-      harnesses: { title: string; description: string; boundary: string }
+      harnesses: {
+        title: string
+        description: string
+        boundary: string
+        /** The fields a program row WILL carry — named while the directory is
+         *  absent so nothing is guessed in its place. */
+        programFields: readonly string[]
+        fieldsPending: string
+        nextTurn: string
+      }
       data: { title: string; description: string; boundary: string }
     }
     plugins: {
