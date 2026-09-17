@@ -1347,5 +1347,10 @@ typecheck 当场暴露；新测试 4 条 ESLint warning 收口为 0。
 - **G2 无孤儿引用达成**：删除前后均用导入图（from / import() / 侧效 import / require）判定，
   `tsc -p . --noEmit` exit 0、全量 UI 套件通过；`plugin-install-modal` 测试改为直接挂载存活组件。
 - **G3 保留项不退化**：删除后仅剩 `cron-prompt`（POSIX sh）这一 Windows 环境基线失败。
-- **P15-B/C 未开工**：Skill Hub / MCP Hub 需要后端 58；当前 `product:resources` 保持诚实占位。
+- **P15-B/C 收口：`P15_BC_GREEN — SKILL_MCP_VIEW_CLIENT_READY`**（诚实占位）：
+  `product:resources` 逐项列出 Skill 列表与 MCP server 列表**将携带的字段**并声明缺源；**不渲染任何按钮/开关**
+  （测试连接与启用都要等 58）；凭据只引用不显示内容；「无槽位的家族会说明而不是给一个无效开关」写在界面上。
+  门：G5/G6 成立（当前形态）、G4/G7 不适用（三态与失败可读性属 58）；新增 4 例，settings+i18n+contracts
+  **31 files / 279 tests passed, exit 0**；`tsc -p . --noEmit` exit 0。
+- **下一步**：P16（Hook 管理器）。writer_lease 继续 ACTIVE。
 

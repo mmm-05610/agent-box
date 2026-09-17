@@ -397,7 +397,12 @@ export const zhHant = defineLocale({
       resources: {
         title: 'Skills 與 MCP',
         description: '管理共享資源庫，再由每個 Profile 明確選擇資源。',
-        boundary: '發現資源不會自動啟用，加入 MCP 設定也不會自動啟動。'
+        boundary: '發現資源不會自動啟用，加入 MCP 設定也不會自動啟動。',
+        skillFields: ['名稱與描述（來自 SKILL.md）', '來源', '摘要／修訂', '安裝時間', '可更新（由服務宣告）', '依角色啟用'],
+        skillPending: '技能庫尚不可用：以下欄位會在服務宣告該能力後出現。在此之前不做任何猜測——不顯示已安裝狀態、摘要或可更新徽標。',
+        mcpFields: ['Server 名稱', '傳輸（stdio 或 remote）', '命令或 URL', '憑據引用與是否缺失', '上次測試時間與結果', '依角色啟用'],
+        mcpPending: 'MCP server 清單尚不可用：以下欄位會在服務宣告該能力後出現。憑據只顯示引用、絕不顯示內容；在服務能執行測試之前不提供測試按鈕。',
+        enablement: '啟用依角色進行：某家沒有該資源的槽位時會如實說明，而不是給一個不可能生效的開關。'
       },
       identities: {
         title: '身分',

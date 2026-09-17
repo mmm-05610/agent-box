@@ -465,7 +465,19 @@ export interface Translations {
         loginGuidance: string
         hotSwitchNote: string
       }
-      resources: { title: string; description: string; boundary: string }
+      resources: {
+        title: string
+        description: string
+        boundary: string
+        /** The Skill Hub's fields, named while backend 58's library is absent. */
+        skillFields: readonly string[]
+        skillPending: string
+        /** The MCP Hub's fields — credential REFERENCES, never values. */
+        mcpFields: readonly string[]
+        mcpPending: string
+        /** Per-profile enablement rule, stated before it can be used. */
+        enablement: string
+      }
       identities: { title: string; description: string; boundary: string }
       harnesses: {
         title: string

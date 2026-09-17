@@ -64,3 +64,50 @@ describe('ProductSettings harness program plan', () => {
     expect(container.querySelector('[data-harness-program-plan]')).toBeNull()
   })
 })
+
+// P15-B/C: the skill library and MCP server list belong to the service (58).
+// Until it declares them this surface names their fields, states what is
+// missing, and holds the line that matters most here: a credential is only
+// ever a reference, and no switch or test button exists before it could work.
+describe('ProductSettings skill and MCP hubs', () => {
+  it('names both lists' + "'" + ' fields and says each library is missing', () => {
+    const { container } = render(<ProductSettings view="resources" />)
+
+    const skill = container.querySelector('[data-skill-plan]')
+    const mcp = container.querySelector('[data-mcp-plan]')
+
+    expect(skill?.textContent).toContain('The skill library is not available')
+    for (const field of ['SKILL.md', 'Source', 'Digest / revision', 'Enabled per profile']) {
+      expect(skill?.textContent).toContain(field)
+    }
+    expect(mcp?.textContent).toContain('The MCP server list is not available')
+    for (const field of ['Transport (stdio or remote)', 'Command or URL', 'Credential reference']) {
+      expect(mcp?.textContent).toContain(field)
+    }
+  })
+
+  it('promises credential references only, and no test button before one can run', () => {
+    const { container } = render(<ProductSettings view="resources" />)
+
+    const mcp = container.querySelector('[data-mcp-plan]')?.textContent ?? ''
+
+    expect(mcp).toContain('never its value')
+    expect(mcp).toContain('no test button exists until the service can run one')
+    expect(screen.queryByRole('button')).toBeNull()
+  })
+
+  it('states the per-profile enablement rule, including the absent-slot case', () => {
+    const { container } = render(<ProductSettings view="resources" />)
+
+    expect(container.querySelector('[data-resource-enablement-rule]')?.textContent).toContain(
+      'a family without a slot for a resource says so'
+    )
+  })
+
+  it('renders no installed state, digest or update badge for either list', () => {
+    const { container } = render(<ProductSettings view="resources" />)
+
+    expect(container.textContent).not.toMatch(/\bv?\d+\.\d+\.\d+\b/)
+    expect(container.textContent).not.toMatch(/sha256|sk-[A-Za-z0-9]{6,}/i)
+  })
+})

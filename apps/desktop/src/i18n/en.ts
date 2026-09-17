@@ -523,7 +523,12 @@ export const en: Translations = {
       resources: {
         title: 'Skills & MCP',
         description: 'Manage a shared resource library, then explicitly select resources on each Profile.',
-        boundary: 'Discovery never auto-enables a resource, and adding MCP configuration does not start it.'
+        boundary: 'Discovery never auto-enables a resource, and adding MCP configuration does not start it.',
+        skillFields: ['Name and description (from SKILL.md)', 'Source', 'Digest / revision', 'Installed at', 'Update available (declared by the service)', 'Enabled per profile'],
+        skillPending: 'The skill library is not available: these fields appear once the service declares it. Nothing is guessed meanwhile — no installed state, no digest, no update badge.',
+        mcpFields: ['Server name', 'Transport (stdio or remote)', 'Command or URL', 'Credential reference and whether one is missing', 'Last test time and result', 'Enabled per profile'],
+        mcpPending: 'The MCP server list is not available: these fields appear once the service declares it. A credential is shown as a reference only — never its value — and no test button exists until the service can run one.',
+        enablement: 'Enablement is per profile: a family without a slot for a resource says so instead of offering a switch that could not work.'
       },
       identities: {
         title: 'Identities',

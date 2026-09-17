@@ -508,7 +508,12 @@ export const zh: Translations = {
       resources: {
         title: 'Skills 与 MCP',
         description: '管理共享资源库，再由每个 Profile 明确选择资源。',
-        boundary: '发现资源不会自动启用，添加 MCP 配置也不会自动启动。'
+        boundary: '发现资源不会自动启用，添加 MCP 配置也不会自动启动。',
+        skillFields: ['名称与描述（来自 SKILL.md）', '来源', '摘要/修订', '安装时间', '可更新（由服务声明）', '按角色启用'],
+        skillPending: '技能库尚不可用：以下字段会在服务声明该能力后出现。在此之前不做任何猜测——不显示已装状态、摘要或可更新徽标。',
+        mcpFields: ['Server 名称', '传输（stdio 或 remote）', '命令或 URL', '凭据引用与是否缺失', '上次测试时间与结果', '按角色启用'],
+        mcpPending: 'MCP server 列表尚不可用：以下字段会在服务声明该能力后出现。凭据只显示引用、绝不显示内容；在服务能执行测试之前不提供测试按钮。',
+        enablement: '启用按角色进行：某家没有该资源的槽位时会如实说明，而不是给一个不可能生效的开关。'
       },
       identities: {
         title: '身份',
