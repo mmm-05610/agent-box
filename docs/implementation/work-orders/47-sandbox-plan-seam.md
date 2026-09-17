@@ -93,6 +93,7 @@ home 必须是真实目录），由**已解析的沙箱 provider**翻译成自�
 ### E 收口
 
 - `legacy_codex.py`：**删除**（生产装配无引用；留着就是"复活即重新绑死"的隐患）。**注意：它不是纯死代码**——`tests/server/test_stage_c_codex.py` 与 `tests/server/test_stage_c_windows_wsl_offline.py` 都 import 它，删除要连这两个测试一起处理（或把它们改成显式"历史保留"并断言不再被生产装配引用），不得只删实现留下 import 错误。
+  - **已由工单 49 提前完成**（2026-09-17）：`src/agent_box/server/legacy_codex.py` 与上述两个测试文件一并删除（实现 423 行 + 测试 639 行；全仓引用仅这两个测试，无生产引用）。本单 E 阶段不再重复此项。
 - `docs/server-round1/runtime-host-layer-boundary.md` 补一节："协议被消费之后的分层"（把 A–D 的
   实际形状写进去，纠正该文档里"协调器没人调用"的现状描述）。
 - status 分账 + 费用（本单默认零真实模型调用）。

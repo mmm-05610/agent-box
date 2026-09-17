@@ -56,7 +56,6 @@ from typing import Sequence
 
 REPO = Path(__file__).resolve().parents[2]
 PLUGIN = REPO / "plugins" / "agent-box-harnesses"
-WORKER_BUNDLE = REPO / "workers" / "agent-box-worker" / ".acceptance-bundle-c4" / "agent-box-worker"
 AUTHORIZER = REPO / "scripts" / "server-round1" / "build-opencode-authorization.mjs"
 SCRIPT = "scripts/server-round1/opencode-production-chain-gate.py"
 
@@ -1927,7 +1926,7 @@ def verify_external_binary(binary: Path, expected: dict, report: dict) -> None:
 def main() -> int:
     global _ACTIVE
     parser = argparse.ArgumentParser()
-    parser.add_argument("--worker", default=str(WORKER_BUNDLE))
+    parser.add_argument("--worker", default=None)
     parser.add_argument("--binary", default=None,
                         help="an external single-file OpenCode binary to authorize read-only")
     parser.add_argument("--keep", action="store_true")
@@ -1957,7 +1956,14 @@ def main() -> int:
     _ACTIVE = _FakeToken()
 
     try:
-        worker = Path(options.worker).resolve()
+        declared = options.worker or os.environ.get("AGENTBOX_W43_WORKER")
+        if not declared:
+            bundles = sorted(
+                p.name for p in (REPO / "workers" / "agent-box-worker").glob(".acceptance-bundle-*")
+            )
+            fail("GATE_WORKER_REQUIRED",
+                 "pass --worker <agent-box-worker binary>; bundles on disk: " + ", ".join(bundles))
+        worker = Path(declared).resolve()
         REPORT["worker"] = {"path": str(worker)}
         if not worker.is_file():
             fail("OPENCODE_GATE_WORKER_MISSING", f"the release Worker binary is unavailable: {worker}")

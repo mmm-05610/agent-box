@@ -92,7 +92,6 @@ for _root in (
 ):
     if str(_root) not in sys.path:
         sys.path.insert(0, str(_root))
-WORKER_BUNDLE = REPO / "workers" / "agent-box-worker" / ".acceptance-bundle-c4" / "agent-box-worker"
 BUILDER = REPO / "scripts" / "server-round1" / "build-codex-runtime-artifact.mjs"
 SCRIPT = "scripts/server-round1/codex-production-chain-gate.py"
 
@@ -984,7 +983,7 @@ def loopback_config_bytes(endpoint: FakeEndpoint, production) -> bytes:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--worker", default=str(WORKER_BUNDLE))
+    parser.add_argument("--worker", default=None)
     parser.add_argument("--artifact", default=None)
     parser.add_argument("--keep", action="store_true")
     parser.add_argument("--json", action="store_true")
@@ -1029,7 +1028,14 @@ def main() -> int:
     external_artifact: Path | None = None
 
     try:
-        worker = Path(options.worker).resolve()
+        declared = options.worker or os.environ.get("AGENTBOX_W43_WORKER")
+        if not declared:
+            bundles = sorted(
+                p.name for p in (REPO / "workers" / "agent-box-worker").glob(".acceptance-bundle-*")
+            )
+            fail("GATE_WORKER_REQUIRED",
+                 "pass --worker <agent-box-worker binary>; bundles on disk: " + ", ".join(bundles))
+        worker = Path(declared).resolve()
         REPORT["worker"] = {"path": str(worker)}
         if not worker.is_file():
             fail("CODEX_GATE_WORKER_MISSING", f"the release Worker binary is unavailable: {worker}")

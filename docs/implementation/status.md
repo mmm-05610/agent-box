@@ -1,6 +1,20 @@
 # Backend Server — status
 
-更新：2026-09-16 02:5x +08:00（执行者：Work Order 43 harness 扩容会话，工作树 /home/maoqh/projects/agent-box-harness-expansion，分支 feature/harness-expansion-v1；42 及以前的记录未被本会话改动）。
+## 计数口径（工单 49 G3；2026-09-17）
+
+**现行计数（全文件仅此一条，随每轮回归更新）**：
+
+- 范围 `tests/`（根套件）：`PYTHONPATH=src:plugins/agent-box-harnesses/src:plugins/agent-box-runtime-wsl/src:plugins/agent-box-runtime-local/src:plugins/agent-box-sandbox-bwrap/src:plugins/agent-box-skills/src:plugins/agent-box-terminal-session/src python3 -m pytest tests/ -q` → **601 passed / 0 failed / 0 skipped**，HEAD = 49 实现提交（工作树含 45 遗留修复：Worker 审计帧 1MiB、审计超时 120s、audit 元数据竞态容忍；该三项随 49 后提交收口）。
+- 范围 `plugins/agent-box-harnesses/tests/`（插件套件）：`python3 -m pytest plugins/agent-box-harnesses/tests/ -q` → **195 passed / 3 skipped / 0 failed**，同上 HEAD。
+- 范围 `workers/agent-box-worker`（Rust）：`cargo test --locked --release` → **38 passed / 0 failed**，同上 HEAD。
+
+**除上述三条外，本文件出现的其余全部计数一律视为历史（已被取代）**——包括 577 / 605 / 608 /
+820 / 843 / 886 / 890 / 915 等根套件数字与各阶段增量；历史条目的原文保留不改写，
+仅以本节声明统一其效力。命令口径变更记录：46 之前的"全量"数字不含
+`plugins/agent-box-runtime-local`、`plugins/agent-box-skills`、`plugins/agent-box-terminal-session`
+三个 PYTHONPATH 条目，46 起补齐（补齐后收集面更宽，计数不可与旧口径直接比较）。
+
+更新：2026-09-17（执行者：env-provider 工单会话）。42 及以前的记录未被本会话改动。
 37 的独立验收仍为 PARTIAL；历史证据保留。
 当前授权39→40→41→42。执行进度：39 完成；40 A/B/C/D 完成（四家组件门通过，
 无真实模型）；41 的 28 方法与队列终态已按前端 `3aba5c5c` 新摘要严格 29/29 重锁，Windows r4 平台门

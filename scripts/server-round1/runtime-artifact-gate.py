@@ -236,12 +236,15 @@ def refusal_gate(tmp_path: Path, worker: Path) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--worker", default=str(REPO / "workers" / "agent-box-worker" / "target"
-                                 / "release" / "agent-box-worker"),
-    )
+    parser.add_argument("--worker", default=None)
     parser.add_argument("--json", action="store_true")
     arguments = parser.parse_args()
+    if not arguments.worker:
+        bundles = sorted(
+            p.name for p in (REPO / "workers" / "agent-box-worker").glob(".acceptance-bundle-*")
+        )
+        fail("GATE_WORKER_REQUIRED: pass --worker <agent-box-worker binary>; "
+             "bundles on disk: " + ", ".join(bundles))
     worker = Path(arguments.worker).resolve()
     if not worker.is_file():
         fail(f"the Worker binary is unavailable: {worker}")
