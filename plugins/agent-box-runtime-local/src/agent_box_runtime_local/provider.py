@@ -26,7 +26,9 @@ from agent_box.work_core import Ref, RefType, ProviderDescriptor
 CONTRACT_ID = "agent-box.runtime-host@1"
 PROVIDER_ID = "runtime-host-local"
 SCHEMA_VERSION = "local-realm@1"
-_REALMS = {"native-linux", "wsl"}
+#: `windows` joined the vocabulary in Order 48 (D7): the same provider
+#: serves the host realm the Server itself runs on.
+_REALMS = {"native-linux", "wsl", "windows"}
 
 
 def _sha(value: object) -> str:
@@ -57,6 +59,28 @@ def _wsl_info() -> tuple[bool, str, str]:
     return is_wsl, distro_guid, distro_name
 
 
+def _windows_identity(distro_guid: str) -> dict[str, str]:
+    """The Windows realm's identity: no /proc, and no libc as an ABI.
+
+    `platform.libc_ver()` reports the MSVC runtime on Windows, which is not an
+    ABI and drifts with toolchain updates; carrying it into the digest would
+    make the affinity churn for no reason. The identity records the OS build
+    and the architecture instead (Work Order 48, D7).
+    """
+    return {
+        "schema": SCHEMA_VERSION,
+        "realm": "windows",
+        "os": "windows",
+        "abi": "win32",
+        "architecture": platform.machine().lower(),
+        "kernel_release": platform.win32_ver()[1] if hasattr(platform, "win32_ver") else "",
+        "filesystem_realm": "windows-root",
+        "distro_guid": "",
+        "distro_name": "",
+        "windows_build": platform.version(),
+    }
+
+
 def _identity(realm: str) -> dict[str, str]:
     is_wsl, distro_guid, distro_name = _wsl_info()
     if realm not in _REALMS:
@@ -66,6 +90,12 @@ def _identity(realm: str) -> dict[str, str]:
     if realm == "wsl" and not distro_guid:
         raise CompositionRejected(CompositionErrorCode.CAPABILITY_UNAVAILABLE, "WSL distro GUID is unavailable")
     system = platform.system().lower()
+    if realm == "windows":
+        if system != "windows":
+            raise CompositionRejected(
+                CompositionErrorCode.CAPABILITY_UNAVAILABLE, "the Windows realm is unavailable",
+            )
+        return _windows_identity("")
     if realm == "native-linux" and system != "linux":
         raise CompositionRejected(CompositionErrorCode.CAPABILITY_UNAVAILABLE, "native Linux is unavailable")
     return {

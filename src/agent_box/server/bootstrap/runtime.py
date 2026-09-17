@@ -687,10 +687,15 @@ def build_runtime_from_sidecar_deployment(
             # comes from the deployment, the process environment, or the one
             # documented default provider id. An unresolvable name is a typed
             # refusal, not a silent run without isolation.
+            # The documented default provider id is platform-specific: a
+            # bwrap provider cannot exist on Windows, and the Windows provider
+            # (Job life cycle, no container - see the order-48 spike) cannot
+            # exist on Linux. The name is still resolved, never imported.
+            _default_provider = "sandbox-windows" if os.name == "nt" else "sandbox-bwrap"
             sandbox_port = resolve_sandbox_port(
                 deployment.get("sandboxProvider")
                 or os.environ.get("AGENT_BOX_SANDBOX_PROVIDER")
-                or "sandbox-bwrap"
+                or _default_provider
             )
             if placement.channel in {WSL_CHANNEL, SSH_CHANNEL}:
                 launcher = WorkerSidecarLauncher(
@@ -853,10 +858,11 @@ def _capability_material(
         # 一致，且两者都落在本模块的锁定批准映射内。"已安装/已加载"本身不构成
         # 授权——descriptor 只是待比对的身份，批准集才是授权来源。
         # 声明文档由**已解析的沙箱端口**构造（上层不认识具体沙箱）。
+        _default_provider = "sandbox-windows" if os.name == "nt" else "sandbox-bwrap"
         port = resolve_sandbox_port(
             deployment.get("sandboxProvider")
             or os.environ.get("AGENT_BOX_SANDBOX_PROVIDER")
-            or "sandbox-bwrap"
+            or _default_provider
         )
         descriptor_id = port.descriptor_id()
         document = port.declaration_document(

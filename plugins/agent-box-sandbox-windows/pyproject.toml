@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61,<77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-box-sandbox-windows"
+version = "2.0.0a1"
+description = "Agent-Box Windows sandbox provider (Job life cycle, no container)"
+requires-python = ">=3.10"
+dependencies = ["agent-box-cli==2.0.0a1"]
+
+[project.entry-points."agent_box.plugins"]
+sandbox-windows = "agent_box_sandbox_windows:create_sidecar_room_port"
+
+[tool.setuptools.packages.find]
+where = ["src"]

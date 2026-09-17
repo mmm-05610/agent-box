@@ -428,6 +428,7 @@ class WorkerSidecarLauncher:
                 runtime_artifact_mounts=tuple(self.runtime_artifact_mounts),
                 state_home_source=home_path,
                 state_target=f"/runtime/home/{self.native_home}" if home_path else None,
+                native_home=self.native_home,
                 state_window_source=window_host,
                 state_window_target=(
                     self.session_store_target if self.session_store_harness

@@ -339,6 +339,7 @@ class LocalSidecarLauncher:
             projection_mounts=tuple(self.projection_mounts),
             runtime_artifact_mounts=tuple(self.runtime_artifact_mounts),
             state_home_source=home_dir, state_target=native_bind_target,
+            native_home=self.native_home,
             state_window_source=window_host,
             state_window_target=window_target,
             state_ephemeral_paths=tuple(self.state_ephemeral_paths),
@@ -347,20 +348,29 @@ class LocalSidecarLauncher:
         # the child, and the tail is what a failure needs to report.
         stderr_path = root / "stderr.log"
         stderr_file = stderr_path.open("wb")
+        # Windows has no session/process-group with kill-on-close semantics:
+        # the child joins a Job Object right after creation, and the Job is the
+        # one thing that kills the whole tree (Order 48, D3). On POSIX the
+        # session + killpg path stays exactly as it was.
+        job = _new_process_job() if os.name == "nt" else None
         try:
             process = subprocess.Popen(  # noqa: S603 - the argv is the reviewed room
                 list(room.argv), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                stderr=stderr_file, start_new_session=True,
+                stderr=stderr_file, start_new_session=(os.name != "nt"),
             )
+            if job is not None:
+                job.assign_pid(process.pid)
         except BaseException:
             stderr_file.close()
+            if job is not None:
+                job.close()
             shutil.rmtree(root, ignore_errors=True)
             raise
         stderr_file.close()
         return _LocalChannels(
             process, root=root, view=view, stderr_path=stderr_path,
             credential=(self.credential or b'').strip(),
-            home=self.home,
+            home=self.home, job=job,
             protected_state_paths=self.protected_state_paths,
             state_ephemeral_paths=self.state_ephemeral_paths,
         )
@@ -373,8 +383,12 @@ class _LocalChannels:
         self, process: subprocess.Popen, *, root: Path, view: Path, stderr_path: Path,
         credential: bytes, home: LocalHome | None,
         protected_state_paths: Sequence[str], state_ephemeral_paths: Sequence[str],
+        job: "object | None" = None,
     ) -> None:
         self.process = process
+        #: The Job Object that owns this child's tree on Windows; None on POSIX
+        #: (there the session + killpg pair does the same work).
+        self.job = job
         self.root = root
         self.view = view
         self.stderr_path = stderr_path
@@ -404,16 +418,32 @@ class _LocalChannels:
                 return
             self._closed = True
         try:
-            if self.process.poll() is None:
-                os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
-                deadline = time.monotonic() + 5
-                while self.process.poll() is None and time.monotonic() < deadline:
-                    time.sleep(0.05)
-            if self.process.poll() is None:
-                os.killpg(os.getpgid(self.process.pid), signal.SIGKILL)
+            if self.job is not None:
+                # The whole tree, one call; KILL_ON_JOB_CLOSE reaps whatever
+                # the kill raced with when the handle closes below.
+                if self.process.poll() is None:
+                    self.job.kill()
+                    deadline = time.monotonic() + 5
+                    while self.process.poll() is None and time.monotonic() < deadline:
+                        time.sleep(0.05)
+            else:
+                if self.process.poll() is None:
+                    os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
+                    deadline = time.monotonic() + 5
+                    while self.process.poll() is None and time.monotonic() < deadline:
+                        time.sleep(0.05)
+                if self.process.poll() is None:
+                    os.killpg(os.getpgid(self.process.pid), signal.SIGKILL)
         except ProcessLookupError:
             pass
         finally:
+            if self.job is not None:
+                # Closing the last handle is the backstop: KILL_ON_JOB_CLOSE
+                # reaps anything the explicit kill raced with.
+                try:
+                    self.job.close()
+                except Exception:
+                    pass
             for stream in (self.process.stdin, self.process.stdout):
                 try:
                     if stream is not None:
@@ -454,6 +484,25 @@ class _LocalChannels:
             return self.stderr_path.read_text(errors="replace")[-maximum:]
         except OSError:
             return ""
+
+
+def _new_process_job():
+    """The Windows Job Object for one attempt's process tree (D3)."""
+    import sys as _sys
+
+    if _sys.platform != "win32":
+        return None
+    package_root = os.environ.get("AGENT_BOX_SANDBOX_WINDOWS_PATH")
+    if package_root and package_root not in _sys.path:
+        _sys.path.insert(0, package_root)
+    try:
+        from agent_box_sandbox_windows.job import Job
+    except ImportError:
+        raise LocalChannelError(
+            "WINDOWS_JOB_UNAVAILABLE",
+            "the Windows host stack needs the agent-box-sandbox-windows package",
+        ) from None
+    return Job(f"agentbox-attempt-{os.getpid()}-{time.monotonic_ns()}")
 
 
 def _window_of(state_target: str | None, native_home: str) -> str:

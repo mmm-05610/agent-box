@@ -105,6 +105,12 @@ class SidecarRoomRequest:
     runtime_artifact_mounts: tuple[tuple[str, str], ...] = ()
     state_home_source: str | None = None
     state_target: str | None = None
+    #: The profile's native home *relative* name inside the role directory
+    #: (`.pi/agent`, `.codex`, ...). The Linux shape binds
+    #: `state_home_source` at `/runtime/home/<native_home>` and needs no
+    #: further mapping; a platform without binds (Windows) needs it to rewrite
+    #: guest targets back onto the real role directory.
+    native_home: str = ""
     state_window_source: str | None = None
     state_window_target: str | None = None
     state_ephemeral_paths: tuple[str, ...] = ()

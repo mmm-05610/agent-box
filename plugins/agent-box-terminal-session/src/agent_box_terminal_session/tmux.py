@@ -42,13 +42,18 @@ class TmuxSession:
         self.ref = ref
         self.binary = str(binary or shutil.which("tmux") or "tmux")
         self._runner = runner or self._real_runner
+        # Order 48 D7: tmux does not exist on Windows; the provider declares
+        # the whole surface unsupported there instead of failing at first use.
+        platform_state = (
+            CapabilityStatus.SUPPORTED if os.name != "nt" else CapabilityStatus.UNSUPPORTED
+        )
         self.capabilities = CapabilitySet({
-            "terminal.run@1": CapabilityStatus.SUPPORTED,
-            "pty": CapabilityStatus.SUPPORTED, "persistence": CapabilityStatus.SUPPORTED,
-            "detach_attach": CapabilityStatus.SUPPORTED, "scrollback": CapabilityStatus.SUPPORTED,
-            "resize": CapabilityStatus.SUPPORTED, "signal_terminate": CapabilityStatus.SUPPORTED,
-            "multiple_clients": CapabilityStatus.SUPPORTED, "multiple_units": CapabilityStatus.SUPPORTED,
-            "safe_direct_spawn": CapabilityStatus.SUPPORTED, "exact_unit_identity": CapabilityStatus.SUPPORTED,
+            "terminal.run@1": platform_state,
+            "pty": platform_state, "persistence": platform_state,
+            "detach_attach": platform_state, "scrollback": platform_state,
+            "resize": platform_state, "signal_terminate": platform_state,
+            "multiple_clients": platform_state, "multiple_units": platform_state,
+            "safe_direct_spawn": platform_state, "exact_unit_identity": platform_state,
         }, affinity=ref.affinity)
         self._allocation: TerminalAllocation | None = None
         self._identity: TmuxIdentity | None = None
