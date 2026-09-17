@@ -31,3 +31,24 @@ relock is recorded in env-provider `docs/server-round1/wire-review.md`
 Consuming these in the UI (a thinking view, a plan panel, a mode indicator)
 is frontend work and belongs to a frontend order — this handoff documents the
 contract and does not modify any UI container.
+
+
+## Digest cross-check (backend wire-review ↔ this repository, verified)
+
+- `apps/desktop/src/types/wire/wire-v1.ts` @ b1f44a23:
+  sha256 `8ff6d183732b20979d9226c5abe84ea47eaa952c2feef701e2f87fdeed968f83` ✓
+- Regenerated artifact (backend copy at env-provider
+  `docs/server-round1/fullstack/generated/wire-v1.schema.json`):
+  sha256 `0cdc459cd8b8a5bc34d86fe61595bcbd7aea7648be9ef974020f6b5616c348a7` ✓
+- The contract carries all four new faces: `usage.updated`, `thought.delta`,
+  `plan.updated`, `mode.updated`, plus `SessionRecord.latestUsage`.
+
+## Follow-up frontend orders this handoff implies
+
+1. **Thought rendering** — a "thinking" treatment consuming `thought.delta`.
+2. **Plan panel** — a plan view consuming `plan.updated` snapshots (replace,
+   not diff; status vocabulary is the harness's own).
+3. **Mode indicator** — consuming `mode.updated`.
+4. **Usage container** — the P08 container graduates onto `usage.updated` +
+   `SessionRecord.latestUsage` (order 51 handoff); families that do not report
+   stay "unknown" by design.
