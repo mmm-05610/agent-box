@@ -1,27 +1,28 @@
 import { useState } from 'react'
 
-import { useI18n } from '@/i18n'
-import type { Translations } from '@/i18n'
 import { cn } from '@/lib/utils'
 
-type WorkCopy = Translations['composer']['emptyState']
-
 /** P20 work status panel: collapsed single line by default; expanded shows
- *  available facts. Dimensions with no backend source (git, goals,
- *  sub-agents, background) are NOT rendered — per the work order's honesty
- *  discipline. Uses existing `motion` and Tailwind tokens; no new deps. */
-export function WorkStatusPanel({ busy, elapsedSeconds, queueCount, className }: {
+ *  available facts. Dimensions with no backend source (git, goals, sub-agents,
+ *  background) are NOT rendered — per the work order's honesty discipline. */
+export interface WorkStatusPanelProps {
   busy: boolean
   elapsedSeconds: number
   queueCount: number
-  className?: string
-}) {
-  const { t } = useI18n()
+}
+
+export function WorkStatusPanel({ busy, elapsedSeconds, queueCount }: WorkStatusPanelProps) {
   const [expanded, setExpanded] = useState(false)
-  const copy: WorkCopy = t.composer.emptyState
 
   const mm = Math.floor(elapsedSeconds / 60)
   const ss = String(elapsedSeconds % 60).padStart(2, '0')
+
+  const parts: string[] = []
+  if (busy) parts.push('Running')
+  if (queueCount > 0) parts.push(`Queue: ${queueCount}`)
+  if (elapsedSeconds > 0) parts.push(`${mm}:${ss}`)
+
+  if (parts.length === 0) return null
 
   return (
     <div data-work-status-panel="">
@@ -37,14 +38,13 @@ export function WorkStatusPanel({ busy, elapsedSeconds, queueCount, className }:
             busy ? 'animate-pulse bg-(--ui-accent)' : 'bg-(--ui-stroke-quaternary)'
           )}
         />
-        <span className="truncate">
-          {busy ? `${copy.waiting} · ${mm}:${ss}` : '—'}
-        </span>
-        {queueCount > 0 && <span className="ml-auto tabular-nums">{queueCount}</span>}
+        {parts.map((part, i) => (
+          <span key={i}>{part}</span>
+        ))}
       </button>
       {expanded && (
         <div className="border-t border-(--ui-stroke-tertiary) px-2 py-1.5 text-xs text-muted-foreground">
-          <div>{copy.subtitle}</div>
+          <div>Details expand here when backend 59/52 data is available.</div>
         </div>
       )}
     </div>
