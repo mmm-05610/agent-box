@@ -1477,3 +1477,10 @@ Appearance（8 套主题 + 语言 + UI Scale + 终端字体）与 Keyboard Short
 ## P20 状态 — `P20_NOT_STARTED`
 
 - G1 四栏表已写为诚实占位（`evidence/P20-work-status-panel.md`）；面板组件**未开始**（需要新组件开发）。
+
+## P19-B 追加（2026-09-18）：access chip 挂载 — `d2090a86`
+
+- `ComposerAccessChip`（access-chip.tsx）挂载于输入条左菜单组（`+` 旁），仅在 AgentBox authority
+  且 `state.profile` 存在时渲染。选择值通过 `profile.onOverrideChange` 写入该轮覆盖值。
+- 后端未声明权限控制项 → chip 不渲染（不假、不禁用）。
+- 门：TSC=0（chat-bar.tsx + access-chip.tsx 均通过编译）。
