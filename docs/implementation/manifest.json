@@ -892,6 +892,44 @@
     "/home/maoqh/projects/agent-box-harness-expansion"
    ],
    "note": "Subscriptions become a credential kind beside api-key, but the login state is NOT kept in the native home: it is a managed asset in the control plane (encrypted in the SecretStore), materialised into the profile home per turn as a writable working copy and reclaimed at the end, which makes hot switching fall out for free - the next turn is a fresh process reading a freshly materialised home, so changing the bound account needs no CLI restart. This introduces the first write-back path in the product, so it is bounded and explicit: only the declared files are reclaimed, over-limit is a typed failure that keeps the previous asset, one lock per account serialises concurrent turns, a lost lock is a typed conflict rather than a silent overwrite, and writes are atomic with the digest recorded. Tokens never reach logs, argv, events or evidence; the host's own login state is never read; nothing is filled in or scraped. Stage A must establish per family where the login state lives, whether it is a single file, whether it is machine bound, and whether the harness rewrites it - any family that fails one of those is declared unsupported for subscriptions rather than faked. Order 45's credential scan matches only the injected per-run value, so the materialised working copy is not a leak, and that note goes into code and tests."
+  },
+  {
+   "id": "57",
+   "document": "work-orders/57-harness-artifact-management.md",
+   "baseline": "50/56 checkpoint",
+   "worktree": "/home/maoqh/projects/agent-box-env-provider",
+   "branch": "feature/env-provider-v1",
+   "depends_on": [
+    "50"
+   ],
+   "dependency_condition": "Folds into the same wire relock as 51/52/53/55/56; stage A observation (available sources per family, whether each self-updates) can start any time.",
+   "exclusive_group": "backend-driver-resources",
+   "stages": [
+    "A-sources-and-self-update-observation",
+    "B-catalog",
+    "C-fetch-or-build-and-verify",
+    "D-version-dirs-and-reference",
+    "E-regression"
+   ],
+   "write_paths": [
+    "src/agent_box/**",
+    "plugins/**",
+    "workers/**",
+    "protocols/**",
+    "tests/**",
+    "scripts/server-round1/**",
+    "docs/server-round1/**",
+    "docs/implementation/status.md"
+   ],
+   "forbidden_write_roots": [
+    "/home/maoqh/projects/agent-box",
+    "/home/maoqh/projects/agent-box-studio",
+    "/home/maoqh/projects/agent-box-desktop-next",
+    "/home/maoqh/projects/agent-box-desktop-next-wsl-round1",
+    "/home/maoqh/projects/agent-box-server-round1",
+    "/home/maoqh/projects/agent-box-harness-expansion"
+   ],
+   "note": "Harness programs become product objects: an installed set per family (version, tree digest, source, size, entry count, install time), a catalog of available versions synced into the control plane so the UI paints immediately, and install, update and rollback as explicit user actions. Versions live in content-addressed directories with the active one held as a reference, so updating adds a directory and moves the reference - running sessions are unaffected and rollback is just moving it back. Fetches and builds happen on the execution side, bounded and cancellable, and the tree digest is always re-derived; a signature is verified when one exists and the weaker 'digest pinned only' fact is recorded when it does not. No automatic updates, no silent source switching, failures never land (atomic replacement keeps the previous version), and the profile home's cross-version compatibility stays the harness's business but must be reported honestly rather than papered over. The references were gathered this round: Applite's catalog-first, asynchronously annotated package UI is the reusable pattern, Ollama's repository tree hints at version-pin plus manifest plus content-addressed blobs without documenting it, and two negatives matter as much - claude-squad makes users update the CLI themselves and vibe-kanban assumes installed agents and is sunsetting, so this class has no existing implementation to copy. Stage A must establish per family which official source exists, whether it is signed, and whether the harness self-updates, since a self-updating harness has to be handled by treating our installed tree as authoritative."
   }
  ],
  "authority": "docs/implementation",
