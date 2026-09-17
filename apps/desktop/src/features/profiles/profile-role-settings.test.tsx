@@ -1,68 +1,60 @@
-import { cleanup, render, screen } from '@testing-library/react'
+// @vitest-environment jsdom
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { I18nProvider } from '@/i18n'
 import { en } from '@/i18n/en'
 
-import { ProfileRoleSettings, profileRoleSettingsCopy } from './profile-role-settings'
+import { ProfileRoleSettings } from './profile-role-settings'
 
 afterEach(cleanup)
 
 const copy = en.profiles.roleSettings
 
-const renderSettings = () => render(
-  <I18nProvider localePreference={null}>
-    <ProfileRoleSettings copy={copy} />
-  </I18nProvider>
-)
+const renderSettings = (harness = 'codex') =>
+  render(<ProfileRoleSettings copy={copy} displayName="P42 role" harness={harness} maintenanceAvailable={false} modelEditor={<div data-testid="model-editor" />} />)
 
 describe('ProfileRoleSettings', () => {
-  it('states that sessions belong to a workspace, not to the role', () => {
-    const { container } = renderSettings()
+  it('shows the ownership statement first', () => {
+    renderSettings()
 
-    const ownership = container.querySelector('[data-session-ownership]')?.textContent ?? ''
-
-    expect(ownership).toContain('Sessions belong to a workspace')
-    expect(ownership).toContain('it does not own it')
-    expect(ownership).toContain('an action on the session')
+    expect(screen.getByText('Sessions belong to a workspace')).toBeTruthy()
+    expect(screen.getByText(/it does not own it/)).toBeTruthy()
   })
 
-  it('names the six zones a role will carry and says editing waits for the service', () => {
-    const { container } = renderSettings()
+  it('shows nav entries only for registry-declared slots plus the always-on pair', () => {
+    renderSettings('hermes')
 
-    const zones = container.querySelector('[data-role-zones]')?.textContent ?? ''
-
-    for (const zone of ['Instructions', 'Model slot', 'Credential or account reference', 'Skills, MCP and hooks', 'Permission rules', 'Advanced runtime limits']) {
-      expect(zones).toContain(zone)
-    }
-    expect(container.querySelector('[data-role-zones-pending]')?.textContent).toContain('could not save')
+    // hermes declares instruction/mcp/skill
+    expect(navButton('Instructions')).toBeTruthy()
+    expect(navButton('Skills')).toBeTruthy()
+    expect(navButton('MCP')).toBeTruthy()
   })
 
-  it('writes down the permission model: last match wins, presets stay overridable, ask is the approval round trip', () => {
-    const text = profileRoleSettingsCopy(copy).join('\n')
+  it('shows the honest unsupported line for an undeclared slot', () => {
+    renderSettings('hermes')
 
-    expect(text).toContain('LAST matching rule wins')
-    expect(text).toContain('stay overridable')
-    expect(text).toContain('ask means our approval round trip')
+    fireEvent.click(screen.getByRole('button', { name: 'Model' }))
+
+    expect(screen.getByText(/does not support/)).toBeTruthy()
+    expect(screen.queryByTestId('model-editor')).toBeNull()
   })
 
-  it('states both rebind consequences before the action, and that a clone inherits no native session', () => {
-    const text = profileRoleSettingsCopy(copy).join('\n')
+  it('shows the model editor for a harness that declares the provider slot', () => {
+    renderSettings('codex')
 
-    expect(text).toContain('carries its native sessions along')
-    expect(text).toContain('restarts native continuity')
-    expect(text).toContain('BEFORE the change')
-    expect(text).toContain('Session-class assets do not migrate')
-    expect(text).toContain('never inherits an old native session')
+    fireEvent.click(navButton('Model'))
+
+    expect(screen.getByTestId('model-editor')).toBeTruthy()
   })
 
-  it('renders no control: the records behind these zones are the service\u2019s', () => {
-    const { container } = renderSettings()
+  it('renders no save/submit/switch control: backend 60 owns the records', () => {
+    renderSettings('codex')
 
-    expect(container.querySelector('[data-role-settings]')).toBeTruthy()
-    expect(screen.queryByRole('button')).toBeNull()
+    expect(screen.queryByRole('button', { name: /save/i })).toBeNull()
     expect(screen.queryByRole('switch')).toBeNull()
-    expect(screen.queryByRole('textbox')).toBeNull()
-    expect(screen.queryByRole('combobox')).toBeNull()
   })
 })
+
+function navButton(label: string) {
+  return screen.getByRole('button', { name: label })
+}

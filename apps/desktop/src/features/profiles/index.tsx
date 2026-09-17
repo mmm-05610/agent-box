@@ -427,7 +427,30 @@ function ProfileDetail({ maintenance, profile, serviceOffline }: ProfileDetailPr
         </div>
       ) : null}
 
-      <ProfileRoleSettings copy={copy.roleSettings} />
+      <ProfileRoleSettings
+        copy={copy.roleSettings}
+        displayName={profile.displayName}
+        harness={profile.harness}
+        maintenanceAvailable={maintenance !== undefined}
+        modelEditor={
+          descriptor.status === 'loading' ? (
+            <PageLoader className="min-h-24" label={copy.loading} />
+          ) : descriptor.status === 'unavailable' ? (
+            <div className="text-xs text-muted-foreground">{descriptor.detail}</div>
+          ) : maintenance ? (
+            <ProfileConfigEditor
+              descriptor={descriptor.descriptor}
+              disabled={saving}
+              draft={draft}
+              harness={profile.harness}
+              models={providerModels}
+              onChange={setDraft}
+            />
+          ) : (
+            <RuntimeConfigSummary controls={descriptor.descriptor.controls} />
+          )
+        }
+      />
 
       {serviceOffline ? (
         <div className="rounded bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">

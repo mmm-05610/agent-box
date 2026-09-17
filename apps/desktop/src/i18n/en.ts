@@ -2168,7 +2168,25 @@ export const en: Translations = {
     agentBoxServiceOffline: 'The Pacthold service is offline — roles and settings need it',
     agentBoxCapabilitiesNotDeclared: 'The service has not declared any capability for this role',
     agentBoxValuePending: 'Not declared by the service',
+
     roleSettings: {
+        roleNav: {
+          basics: 'Basics',
+          harness: 'Harness',
+          model: 'Model',
+          credentials: 'Credentials',
+          instruction: 'Instructions',
+          skill: 'Skills',
+          mcp: 'MCP',
+          permission: 'Permission rules'
+        },
+        unsupportedSlot: slot => `This harness does not support the ${slot} configuration`,
+        pendingRecords: 'Editing arrives with the service that owns these records. Until it declares them this section names itself instead of showing controls that could not save.',
+        pendingInstruction: 'Instruction assets attach per role once the service declares the instruction slot.',
+        pendingSkill: 'Skills are enabled per role once the service declares the skill slot.',
+        pendingMcp: 'MCP servers are enabled per role once the service declares the MCP slot.',
+        pendingPermission: 'Permission rules are edited here once the service declares the permission slot.',
+        credentialsNote: 'Credentials attach to the provider/model records this role points at (see Model). A per-role credential reference waits for the service.',
       zonesTitle: 'What a role will carry',
       zones: ['Instructions (asset references and the text itself)', 'Model slot, from the provider/model records', 'Credential or account reference', 'Skills, MCP and hooks, enabled per role', 'Permission rules', 'Advanced runtime limits declared by the service'],
       zonesPending: 'Editing arrives with the service that owns these records: until it declares them this page names the zones instead of showing controls that could not save.',

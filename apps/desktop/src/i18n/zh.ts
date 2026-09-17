@@ -2332,7 +2332,25 @@ export const zh: Translations = {
     agentBoxServiceOffline: 'Pacthold 服务离线——角色与设置需要它',
     agentBoxCapabilitiesNotDeclared: '服务尚未为该角色声明任何能力',
     agentBoxValuePending: '服务未声明',
+
     roleSettings: {
+        roleNav: {
+          basics: '基本信息',
+          harness: 'Harness',
+          model: '模型',
+          credentials: '凭据/账号',
+          instruction: '指令',
+          skill: '技能',
+          mcp: 'MCP',
+          permission: '权限规则'
+        },
+        pendingRecords: '编辑能力随拥有这些记录的服务一起到来：在服务声明之前，本节只列出名称，不显示无法保存的控件。',
+        pendingInstruction: '服务声明 instruction 槽位后，即可按角色附加指令资产。',
+        pendingSkill: '服务声明 skill 槽位后，即可按角色启用技能。',
+        pendingMcp: '服务声明 MCP 槽位后，即可按角色启用 MCP server。',
+        pendingPermission: '服务声明 permission 槽位后，即可在此编辑权限规则。',
+        credentialsNote: '凭据挂在该角色指向的 provider/model 记录上（见「模型」）；按角色的凭据引用等待服务。',
+        unsupportedSlot: (slot: string) => '该 harness 不支持此项：{slot}'.replace('{slot}', slot),
       zonesTitle: '角色将承载什么',
       zones: ['指令（资产引用与文本本身）', '模型槽（取自 provider/model 记录）', '凭据或账号引用', '技能、MCP 与 hook（按角色启用）', '权限规则', '服务声明的高级运行上限'],
       zonesPending: '编辑能力随拥有这些记录的服务一起到来：在服务声明之前，本页只列出分区，不显示无法保存的控件。',

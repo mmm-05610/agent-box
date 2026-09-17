@@ -1762,7 +1762,25 @@ export const zhHant = defineLocale({
     agentBoxServiceOffline: 'Pacthold 服務離線——角色與設定需要它',
     agentBoxCapabilitiesNotDeclared: '服務尚未為該角色宣告任何能力',
     agentBoxValuePending: '服務未宣告',
+
     roleSettings: {
+        roleNav: {
+          basics: '基本資訊',
+          harness: 'Harness',
+          model: '模型',
+          credentials: '憑據/帳號',
+          instruction: '指令',
+          skill: '技能',
+          mcp: 'MCP',
+          permission: '權限規則'
+        },
+        pendingRecords: '編輯能力隨擁有這些記錄的服務一起到來：在服務宣告之前，本節只列出名稱，不顯示無法儲存的控件。',
+        pendingInstruction: '服務宣告 instruction 槽位後，即可依角色附加指令資產。',
+        pendingSkill: '服務宣告 skill 槽位後，即可依角色啟用技能。',
+        pendingMcp: '服務宣告 MCP 槽位後，即可依角色啟用 MCP server。',
+        pendingPermission: '服務宣告 permission 槽位後，即可在此編輯權限規則。',
+        credentialsNote: '憑據掛在該角色指向的 provider/model 記錄上（見「模型」）；依角色的憑據引用等待服務。',
+        unsupportedSlot: (slot: string) => '該 harness 不支援此項：{slot}'.replace('{slot}', slot),
       zonesTitle: '角色將承載什麼',
       zones: ['指令（資產引用與文本本身）', '模型槽（取自 provider/model 記錄）', '憑據或帳號引用', '技能、MCP 與 hook（依角色啟用）', '權限規則', '服務宣告的進階執行上限'],
       zonesPending: '編輯能力隨擁有這些記錄的服務一起到來：在服務宣告之前，本頁只列出分區，不顯示無法儲存的控件。',

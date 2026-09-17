@@ -1954,6 +1954,23 @@ export interface Translations {
     agentBoxServiceOffline: string
     agentBoxValuePending: string
     roleSettings: {
+      roleNav: {
+        basics: string
+        harness: string
+        model: string
+        credentials: string
+        instruction: string
+        skill: string
+        mcp: string
+        permission: string
+      }
+      unsupportedSlot: (slot: string) => string
+      pendingRecords: string
+      pendingInstruction: string
+      pendingSkill: string
+      pendingMcp: string
+      pendingPermission: string
+      credentialsNote: string
       zonesTitle: string
       zones: readonly string[]
       zonesPending: string

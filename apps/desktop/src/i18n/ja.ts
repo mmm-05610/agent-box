@@ -1818,7 +1818,25 @@ export const ja = defineLocale({
     agentBoxServiceOffline: 'Pacthold サービスはオフラインです — プロファイルと設定に必要です',
     agentBoxCapabilitiesNotDeclared: 'サービスはこのプロファイルの機能を宣言していません',
     agentBoxValuePending: 'サービス未宣言',
+
     roleSettings: {
+        roleNav: {
+          basics: '基本',
+          harness: 'ハーネス',
+          model: 'モデル',
+          credentials: '資格情報/アカウント',
+          instruction: '指示',
+          skill: 'スキル',
+          mcp: 'MCP',
+          permission: '権限ルール'
+        },
+        pendingRecords: '編集はこれらのレコードを所有するサービスと共に届きます。宣言されるまで、保存できないコントロールではなく区分名を表示します。',
+        pendingInstruction: 'サービスが instruction スロットを宣言すれば、プロファイルごとに指示資産を添付できます。',
+        pendingSkill: 'サービスが skill スロットを宣言すれば、プロファイルごとにスキルを有効化できます。',
+        pendingMcp: 'サービスが MCP スロットを宣言すれば、プロファイルごとに MCP サーバーを有効化できます。',
+        pendingPermission: 'サービスが permission スロットを宣言すれば、ここで権限ルールを編集できます。',
+        credentialsNote: '資格情報はこのプロファイルが指す provider/model レコードに添付されます（「モデル」を参照）。プロファイル単位の参照はサービス待ちです。',
+        unsupportedSlot: (slot: string) => 'このハーネスはサポートしていません: {slot}'.replace('{slot}', slot),
       zonesTitle: 'プロファイルが担うもの',
       zones: ['指示（資産参照と本文）', 'モデルスロット（provider/model レコード由来）', '資格情報またはアカウント参照', 'スキル・MCP・フック（プロファイル単位で有効化）', '権限ルール', 'サービスが宣言する実行上限'],
       zonesPending: '編集はこれらのレコードを所有するサービスと共に届きます。サービスが宣言するまでは、保存できないコントロールではなく区分を表示します。',
