@@ -374,3 +374,26 @@ ProviderModelConfigRecord = {
   `latestUsage`；pi 全链门（c10）在工件在位时 exit 0，真实 usage.updated 帧通过前端
   严格 schema。
 - **不动的**：28 方法集、wire/1、既有 9 个事件 kind 与载荷、既有方法语义——纯新增面。
+
+
+## Order 52 B/D — `thought.delta` / `plan.updated` / `mode.updated`（2026-09-17，env-provider）
+
+- **动机**：ACP 的 sessionUpdate 词汇早已覆盖思考/计划/模式（`agent_thought_chunk`、`plan`、
+  `current_mode_update`），而桥也已在内部处理（todos、message parts 的 reasoning/tool）——
+  缺口只在 Server 的 `_forward()` 把它们丢弃。本单把四类事实映射为中立事件并落到账本与
+  wire（工具生命周期复用既有 `tool.update`，无新 kind）。
+- **新增事件 kind**（WireEvent oneOf 新成员，均严格）：
+  - `thought.delta {sessionId, text}`——harness 自身的 reasoning 流；
+  - `plan.updated {sessionId, entries: [{id, content, status, priority?}]}`——计划快照；
+  - `mode.updated {sessionId, currentModeId}`——harness 选定的交互模式。
+- **映射位置**：Server `_forward()` 的 `acp_notification` 分支（上游通知原样可达该层）；
+  `tool_call`/`tool_call_update` 映射到既有 `tool.update`（无新 kind）。账本由
+  `_native_event` 落（thought 文本、工具生命周期、计划快照、模式 id）。
+- **两仓摘要（前端 HEAD b1f44a23，分支 feature/agentbox-desktop-product）**：
+  TS 合同 sha256 `8ff6d183732b20979d9226c5abe84ea47eaa952c2feef701e2f87fdeed968f83`；
+  生成工件 sha256 `0cdc459cd8b8a5bc34d86fe61595bcbd7aea7648be9ef974020f6b5616c348a7`
+  （证据副本：`docs/server-round1/fullstack/generated/wire-v1.schema.json`，13 个事件 kind）。
+- **严格校验**：`AGENT_BOX_WIRE_SCHEMA=<工件>` 下 test_wire_v1 **37 passed**——
+  FRAME_COVERAGE 新增三条 produced 条目（thought/plan/mode），声明-观测对照平衡。
+- **不动的**：28 方法、wire/1、既有事件 kind 与载荷——纯新增面（52 D 与 51 D 本计划共享
+  一次重锁，51 先行落地后 52 的三 kind 为追加的一次小重锁，如实记录）。

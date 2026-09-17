@@ -327,6 +327,28 @@ class SidecarExecutionBackend:
                 "state": "failed", "tool_call_id": "harness", "tool": None,
                 "summary": str(data.get("code") or "HARNESS_FAILED"),
             })
+        elif kind == "thought.delta":
+            text = str(data.get("text") or "")
+            if text:
+                self.records.append_turn_event(turn_id, "thought.delta", {"text": text})
+        elif kind == "tool.update":
+            # The real tool lifecycle from the harness (Order 52): recorded as
+            # facts, arguments and outputs trimmed and scanned by the same
+            # rules that guard every stored event.
+            self.records.append_turn_event(turn_id, "tool.update", {
+                "tool_call_id": str(data.get("tool_call_id") or "tool"),
+                "tool": data.get("tool"),
+                "state": str(data.get("state") or "requested"),
+                **({"summary": str(data["summary"])[:512]} if data.get("summary") else {}),
+            })
+        elif kind == "plan.updated":
+            self.records.append_turn_event(turn_id, "plan.updated", {
+                "entries": data.get("entries") if isinstance(data.get("entries"), list) else [],
+            })
+        elif kind == "mode.updated":
+            self.records.append_turn_event(turn_id, "mode.updated", {
+                "currentModeId": str(data.get("currentModeId") or ""),
+            })
         self.on_event()
 
     def decide_approval(self, approval_id: str, decision: str, scope: Mapping[str, Any]) -> None:

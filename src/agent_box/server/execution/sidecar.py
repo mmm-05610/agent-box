@@ -1330,6 +1330,42 @@ class SidecarHarnessPort:
                         execution_id, "stream", True, "sidecar.event.message.delta",
                     )
                     self.on_event(execution_id, "message.delta", {"text": text})
+            elif update.get("sessionUpdate") == "agent_thought_chunk":
+                # Order 52: the harness's own reasoning, as a neutral fact. The
+                # live/replay exclusion matches the message chunk above.
+                text = ((update.get("content") or {}).get("text") or "")
+                if text and execution_id in self._prompted:
+                    self._record_observation(
+                        execution_id, "thoughts", True, "sidecar.event.thought.delta",
+                    )
+                    self.on_event(execution_id, "thought.delta", {"text": text})
+            elif update.get("sessionUpdate") in {"tool_call", "tool_call_update"}:
+                status = str(update.get("status") or "in_progress")
+                tool_name = update.get("_meta", {}).get("toolName") if isinstance(update.get("_meta"), dict) else None
+                self._record_observation(
+                    execution_id, "tool_calls", True, "sidecar.event.tool.update",
+                )
+                self.on_event(execution_id, "tool.update", {
+                    "tool_call_id": str(update.get("toolCallId") or "tool"),
+                    "tool": tool_name if tool_name is not None else update.get("title"),
+                    "state": {"in_progress": "running", "failed": "failed"}.get(status, status),
+                    **({"summary": str(update["title"])} if update.get("title") else {}),
+                })
+            elif update.get("sessionUpdate") == "plan":
+                entries = update.get("entries")
+                self._record_observation(
+                    execution_id, "plans", True, "sidecar.event.plan.updated",
+                )
+                self.on_event(execution_id, "plan.updated", {
+                    "entries": entries if isinstance(entries, list) else [],
+                })
+            elif update.get("sessionUpdate") == "current_mode_update":
+                self._record_observation(
+                    execution_id, "modes", True, "sidecar.event.mode.updated",
+                )
+                self.on_event(execution_id, "mode.updated", {
+                    "currentModeId": str(update.get("currentModeId") or ""),
+                })
         elif event == "message_delta":
             # A deployment-declared native driver reports the same product fact
             # as an ACP message chunk. The event name is the driver contract's,

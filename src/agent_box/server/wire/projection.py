@@ -19,6 +19,9 @@ WIRE_EVENT_KINDS = frozenset({
     "message.delta",
     "message.final",
     "usage.updated",
+    "thought.delta",
+    "plan.updated",
+    "mode.updated",
     "tool.update",
     "approval.requested",
     "approval.settled",
@@ -36,6 +39,9 @@ _EVENT_KIND_MAP = {
     "message.delta": "message.delta",
     "message.final": "message.final",
     "usage.updated": "usage.updated",
+    "thought.delta": "thought.delta",
+    "plan.updated": "plan.updated",
+    "mode.updated": "mode.updated",
     "tool.update": "tool.update",
     "approval.requested": "approval.requested",
     "approval.settled": "approval.settled",
@@ -227,6 +233,22 @@ def _event_body(kind: str, row: Mapping[str, Any], data: Mapping[str, Any]) -> d
             },
         }
         return body
+    if kind == "thought.delta":
+        return {
+            "kind": kind, "sessionId": session_id, "text": str(data.get("text") or ""),
+        }
+    if kind == "plan.updated":
+        entries = data.get("entries") if isinstance(data.get("entries"), list) else []
+        return {
+            "kind": kind, "sessionId": session_id,
+            "entries": [dict(entry) if isinstance(entry, Mapping) else {}
+                        for entry in entries],
+        }
+    if kind == "mode.updated":
+        return {
+            "kind": kind, "sessionId": session_id,
+            "currentModeId": str(data.get("currentModeId") or ""),
+        }
     if kind == "tool.update":
         return {
             "kind": kind,
