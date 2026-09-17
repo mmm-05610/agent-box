@@ -60,3 +60,67 @@
 - 后端（60）负责：记录扩展、权限求解、归属纠正、克隆、换绑定连续性；本单只做交互与呈现。
 - **不做**子代理（那是 profile 调用 profile，单独一单）；**不做** wire 变更（只消费 60 的面）；
   **不做**就地换家族（产品决定：只能克隆）。
+
+## 修订（2026-09-17，用户要求重新设计 profile 配置）
+
+### 问题：现在是"一堆堆在一起"
+
+`ProfileRoleSettings`（`profile-role-settings.tsx`，66 行）把所有内容塞进一个 `<section>`，
+没有导航、没有分页、没有按 harness 区分支持范围。用户要求：**页面不能堆在一起，交互逻辑要清晰**。
+
+### 设计：按注册表声明的槽位驱动，分区导航
+
+**数据源**：注册表 `harnesses.toml` 的 `slots` 字段——每家 harness 声明它支持哪些配置维度：
+
+| harness | slots |
+| --- | --- |
+| codex | provider, permission, instruction, mcp, skill |
+| claude-code | instruction, mcp, skill, permission |
+| opencode | provider, instruction, mcp, skill |
+| hermes | instruction, mcp, skill |
+| pi | instruction, mcp, skill |
+
+**profile 设置页结构**（左侧导航 + 右侧面板，不是单页堆砌）：
+
+```text
+Profile: <角色名>
+├── 基本信息     名称 / 描述 / 图标
+├── Harness      <绑定的家族>（不可换，只能克隆，60 的裁定）
+├── 模型         provider/model 槽（P08/55）
+├── 凭据/账号    credential 或 account 引用（P12）
+├── 指令         instruction 资产引用（60）
+├── 技能         已启用的 skill 列表（58）
+├── MCP          已启用的 server 列表（58）
+├── 权限规则     逐工具 ask/allow/deny（60）
+├── Hooks        逐家族 hook 配置（59）
+├── 记忆         记忆查看（只读，后端需提供面）
+└── 高级         该 harness 独有的选项（Codex: approval_policy/sandbox_mode/reasoning_effort；
+                 OpenCode: temperature/top_p/steps；Claude Code: permissionMode/maxTurns）
+```
+
+**规则**：
+- 每个 section **只在注册表声明该槽位时显示**——hermes 没有 provider 槽 → 模型区不出现，
+  显示"该 harness 不支持 provider 配置"；
+- **不堆砌**：左侧是 profile 的 section 导航，右侧只渲染当前选中的 section——
+  一次只看一个维度，不把所有配置堆在一页里滚动；
+- **每个 section 的可见性由注册表驱动**，不是硬编码——新 harness 加入时自动出现。
+
+### 各 harness 配置面清点（需执行者用 `agent-config-inventory` skill 或手动查文档补全）
+
+| 维度 | codex | claude-code | opencode | hermes | pi |
+| --- | --- | --- | --- | --- | --- |
+| 系统提示词 | AGENTS.md | CLAUDE.md | prompt 文件 | ? | ? |
+| 记忆 | AGENTS.md | CLAUDE.md + memory | ? | ? | ? |
+| Hooks | 受管 hooks | settings.json hooks | JS 插件 | ? | ? |
+| 权限 | approval_policy + sandbox_mode | permissionMode + allow/deny | permission ask/allow/deny | ? | ? |
+| MCP | mcp_servers (TOML) | mcpServers (JSON) | mcp (JSON) | ? | ? |
+| 技能 | ? | skills | ? | ? | ? |
+
+（`?` = 待执行者用 `agent-config-inventory` skill 或查文档补全；**查不到就显示"该 harness 不支持此项"**，不猜。）
+
+### 额外要求
+
+- **记忆查看**：新面——每个 profile 的记忆文件/目录（CLAUDE.md、AGENTS.md 等）**可查看内容**（只读或可编辑），
+  这是用户明确要求的；**数据面**需要后端配合（可从原生 home 读取，属 45 的只读投影范围）。
+- **高级选项**：每家 harness 独有的选项（如 Codex 的 `approval_policy`/`sandbox_mode`/`model_reasoning_effort`，
+  OpenCode 的 `temperature`/`top_p`/`steps`）放在"高级"里，**只在该家支持时显示**。
