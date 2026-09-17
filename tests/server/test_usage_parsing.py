@@ -7,6 +7,7 @@ is substituted, and an unregistered format is a typed refusal.
 from __future__ import annotations
 
 import json
+import time
 import pathlib
 import tempfile
 
