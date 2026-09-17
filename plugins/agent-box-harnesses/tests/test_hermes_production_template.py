@@ -181,7 +181,8 @@ def test_deployment_document_declares_the_managed_chain():
         "target": "/runtime/artifacts/hermes-runtime",
         "treeDigest": "sha256:" + "a" * 64,
     }]
-    assert harness["stateProjection"] == {"target": "/runtime/home/.hermes"}
+    assert harness["stateProjection"] == {"target": "/runtime/home/.hermes/sessions"}
+    assert harness["sessionStore"] == {"kind": "sessions-subtree"}
     assert harness["stateProjection"]["target"] == production.STATE_TARGET
     assert harness["projectionFiles"] == [
         {"source": "deploy/hermes/config.yaml", "target": "/runtime/home/.hermes/config.yaml"},
@@ -190,8 +191,8 @@ def test_deployment_document_declares_the_managed_chain():
     # path Hermes reads it from, and is therefore a protected state path: the
     # read-only file is not state and never reaches a checkpoint.
     assert harness["projectionFiles"][0]["target"] == production.CONFIG_TARGET
-    assert Path(harness["projectionFiles"][0]["target"]).parent == Path(production.STATE_TARGET)
-    assert production.STATE_TARGET == production.AGENT_HOME
+    assert Path(harness["projectionFiles"][0]["target"]).parent == Path(production.AGENT_HOME)
+    assert production.STATE_TARGET == f"{production.AGENT_HOME}/sessions"
     adapter = harness["adapter"]
     assert adapter["command"] == "/usr/bin/python3"
     assert adapter["args"] == ["-m", "hermes_cli.main", "acp"]
@@ -250,13 +251,13 @@ def test_a_model_control_can_only_be_declared_explicitly_for_a_gate():
 def test_projection_and_overlay_files_exist_next_to_the_deployment_template():
     for projection in production.projection_files():
         assert (production.PLUGIN_ROOT / projection["source"]).is_file()
-        assert Path(projection["target"]).parent == Path(production.STATE_TARGET)
+        assert Path(projection["target"]).parent == Path(production.AGENT_HOME)
     assert production.CONFIG_TEMPLATE.is_file()
     assert production.LOOPBACK_GUARD.is_file()
     # The gate's guard goes into the same protected home: it is a read-only
     # projection for this run only, never part of the production deployment.
     assert production.LOOPBACK_GUARD_TARGET == f"{production.AGENT_HOME}/sitecustomize.py"
-    assert production.LOOPBACK_GUARD_TARGET.startswith(production.STATE_TARGET + "/")
+    assert production.LOOPBACK_GUARD_TARGET.startswith(production.AGENT_HOME + "/")
     assert production.LOOPBACK_GUARD_TARGET not in json.dumps(production.projection_files())
     assert (DEPLOY / "bootstrap.py").is_file()
     assert (DEPLOY / "sitecustomize.py").is_file()
@@ -268,11 +269,10 @@ def test_projection_and_overlay_files_exist_next_to_the_deployment_template():
 def test_the_guest_home_is_the_one_isolated_root_and_both_paths_converge():
     """One home root: `HERMES_HOME` and `$HOME/.hermes` are the same directory."""
     assert production.AGENT_HOME == "/runtime/home/.hermes"
-    assert production.STATE_TARGET == production.AGENT_HOME
-    assert production.ADAPTER_ENVIRONMENT["HERMES_HOME"] == production.STATE_TARGET
+    assert production.STATE_TARGET == f"{production.AGENT_HOME}/sessions"
     guest_home = "/runtime/home"
     assert production.AGENT_HOME == f"{guest_home}/.hermes"
-    assert production.CONFIG_TARGET == f"{production.STATE_TARGET}/config.yaml"
+    assert production.CONFIG_TARGET == f"{production.AGENT_HOME}/config.yaml"
 
 
 def test_deployment_document_refuses_an_invalid_artifact_declaration():

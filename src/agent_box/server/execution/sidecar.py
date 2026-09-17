@@ -279,6 +279,8 @@ class WorkerSidecarLauncher:
         protected_state_paths: Sequence[str] = (),
         timeout_ms: int = 120_000,
         sandbox_port: "SandboxPort | None" = None,
+        session_store_harness: str | None = None,
+        session_store_target: str | None = None,
     ) -> None:
         self.connector = connector
         self.workspace = dict(workspace)
@@ -316,6 +318,14 @@ class WorkerSidecarLauncher:
         #: states the demand; this object translates it. A missing port is a
         #: typed refusal at launch, never a silent run without isolation.
         self.sandbox_port = sandbox_port
+        #: §14: when set, this Harness's session subtree lives in the per-harness
+        #: session library on the target machine (shared by every profile of the
+        #: family) instead of inside the profile's native home. The declared
+        #: state target is then the session subtree's guest path.
+        self.session_store_harness = session_store_harness
+        #: The declared session-subtree guest path the store binds at (the
+        #: deployment's state target when the family split its store out).
+        self.session_store_target = session_store_target
 
     def launch(self, environment: Mapping[str, str]):
         from agent_box.extensions.runtime_composition.sandbox_port import (
@@ -385,7 +395,18 @@ class WorkerSidecarLauncher:
                                "nativeHome": self.native_home},
                     **({"window": self.audit_window} if self.audit_window else {}),
                 })["path"]
-                if self.audit_window and self.audit_window != self.native_home:
+                if self.session_store_harness:
+                    # §14: the declared state target is the session subtree, and
+                    # its host side is the per-harness library (no profile
+                    # marker: the library is harness-scoped). The room binds the
+                    # library at that deeper target, so it wins over the profile
+                    # home's own subtree by the existing depth ordering.
+                    window_host = client.request("home.prepare", {
+                        "locator": self.session_store_harness,
+                        "harness": self.session_store_harness,
+                        "kind": "session-store",
+                    })["path"]
+                elif self.audit_window and self.audit_window != self.native_home:
                     # The prepared path ends with the locator's segments, so the
                     # role directory it belongs to is the prefix above the
                     # native home; the window hangs off that role directory.
@@ -409,15 +430,25 @@ class WorkerSidecarLauncher:
                 state_target=f"/runtime/home/{self.native_home}" if home_path else None,
                 state_window_source=window_host,
                 state_window_target=(
-                    f"/runtime/home/{self.audit_window}" if window_host else None
+                    self.session_store_target if self.session_store_harness
+                    else (f"/runtime/home/{self.audit_window}" if window_host else None)
                 ),
                 state_ephemeral_paths=tuple(self.state_ephemeral_paths),
             ))
             argv = list(room.argv)
+            if self.session_store_harness:
+                # §14: the audited tree is the per-harness store; the credential
+                # rule's delete walks the same locator.
+                store_locator = f"_sessions/{self.session_store_harness}"
+                channels_kwargs = {"home_locator": store_locator, "audit_window": None,
+                                   "audit_whole_home": True}
+            else:
+                channels_kwargs = {"home_locator": self.home_locator,
+                                   "audit_window": self.audit_window}
             channels = _WorkerChannels(
                 client, attempt_id, 1, view_id,
                 secret_frame_id if secret is not None else None,
-                home_locator=self.home_locator, audit_window=self.audit_window,
+                **channels_kwargs,
                 protected_state_paths=self.protected_state_paths,
                 state_ephemeral_paths=self.state_ephemeral_paths,
                 forbidden_content=(credential_material or b"").strip(),
@@ -456,6 +487,7 @@ class _WorkerChannels:
         self, client, attempt_id: str, generation: int, view_id: str,
         secret_frame_id: str | None = None,
         home_locator: str = "", audit_window: str | None = None,
+        audit_whole_home: bool = False,
         protected_state_paths: Sequence[str] = (),
         state_ephemeral_paths: Sequence[str] = (),
         forbidden_content: bytes = b"",
@@ -467,6 +499,10 @@ class _WorkerChannels:
         self.secret_frame_id = secret_frame_id
         self.home_locator = home_locator
         self.audit_window = audit_window
+        #: §14 session library: the audited tree *is* the store root (the
+        #: locator already names it), so the walk starts at the root instead of
+        #: at a role-relative window inside it.
+        self.audit_whole_home = bool(audit_whole_home)
         #: Read-only configuration that lives *inside* the audited window. It
         #: is not state: it must not enter the audit manifest.
         self.protected_state_paths = frozenset(protected_state_paths)
@@ -588,7 +624,7 @@ class _WorkerChannels:
         scan must look at. The manifest that comes out is a *record* of what
         the home looks like, not a copy of it.
         """
-        if not self.home_locator or self.audit_window is None:
+        if not self.home_locator or (self.audit_window is None and not self.audit_whole_home):
             return {
                 "files": [], "skipped": 0,
                 "truncated": {"entries": 0, "bytes": 0, "oversize": 0},
@@ -599,7 +635,8 @@ class _WorkerChannels:
         # walk stays bounded by the Worker's audit caps but takes longer than
         # the default RPC window, so the audit carries its own generous one.
         result = self.client.request("home.list", {
-            "locator": self.home_locator, "relative": self.audit_window,
+            "locator": self.home_locator,
+            **({"relative": self.audit_window} if self.audit_window else {}),
         }, timeout=120.0)
         try:
             return audit_snapshot(

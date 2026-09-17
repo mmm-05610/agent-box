@@ -53,7 +53,13 @@ class RuntimeCompositionCoordinator:
     @staticmethod
     def _capability_value(component: object, name: str) -> object:
         caps = getattr(component, "capabilities", None)
-        values = getattr(caps, "values", caps)
+        # A capability table is either a `CapabilitySet` (its `.values` is a
+        # mapping) or a plain mapping. `getattr(caps, "values", caps)` was
+        # wrong for the plain-mapping case: a dict's `.values` is a *method*,
+        # so every dict-declaring component read as undeclared. The old
+        # `None`-passes branch hid this; Order 47's explicit refusal exposed it.
+        inner = getattr(caps, "values", None)
+        values = inner if isinstance(inner, Mapping) else caps
         return values.get(name) if isinstance(values, Mapping) else None
 
     def preflight(self, binding: RuntimeBinding, resolved: ResolvedComposition | None = None) -> CompositionPreflightReceipt:
@@ -67,9 +73,9 @@ class RuntimeCompositionCoordinator:
         for component, capability in ((resolved.host, "process.spawn.typed@1"), (resolved.sandbox, "isolation.wrap@1"), (resolved.terminal, "terminal.run@1")):
             value = self._capability_value(component, capability)
             if value is None:
-                return CompositionPreflightReceipt(digest(binding), digest((capability, "undeclared")), False, binding.runtime_host_ref.affinity, "CAPABILITY_UNDECLARED")
+                return CompositionPreflightReceipt(digest(binding), digest((capability, "undeclared")), False, binding.runtime_host_ref.affinity, "CAPABILITY_UNDECLARED", capability)
             if value not in (CapabilityStatus.SUPPORTED, "supported"):
-                return CompositionPreflightReceipt(digest(binding), digest((capability, value)), False, binding.runtime_host_ref.affinity, "CAPABILITY_UNSUPPORTED")
+                return CompositionPreflightReceipt(digest(binding), digest((capability, value)), False, binding.runtime_host_ref.affinity, "CAPABILITY_UNSUPPORTED", capability)
         return CompositionPreflightReceipt(digest(binding), digest((binding, "accepted")), True, binding.runtime_host_ref.affinity)
 
     def start(self, binding: RuntimeBinding, command: HarnessCommandSpec, *, execution_id: str, dispatch_id: str) -> TerminalRunHandle:
@@ -79,7 +85,10 @@ class RuntimeCompositionCoordinator:
             raise CompositionRejected(CompositionErrorCode.CAPABILITY_UNSUPPORTED, "CONTROL_PLANE_NETWORK_REQUIRED")
         preflight = self.preflight(binding, resolved)
         if not preflight.accepted:
-            raise CompositionRejected(CompositionErrorCode.AFFINITY_MISMATCH if preflight.rejection_code == "AFFINITY_MISMATCH" else CompositionErrorCode.CAPABILITY_UNSUPPORTED, preflight.rejection_code or "")
+            detail = preflight.rejection_code or ""
+            if getattr(preflight, "rejection_capability", None):
+                detail = f"{detail}:{preflight.rejection_capability}"
+            raise CompositionRejected(CompositionErrorCode.AFFINITY_MISMATCH if preflight.rejection_code == "AFFINITY_MISMATCH" else CompositionErrorCode.CAPABILITY_UNSUPPORTED, detail)
         bundle = self._bundle_factory(resolved.host, command, execution_id, dispatch_id)
         stage = getattr(resolved.host, "stage", None)
         if callable(stage):

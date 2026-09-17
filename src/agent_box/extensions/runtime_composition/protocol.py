@@ -453,6 +453,9 @@ class CompositionPreflightReceipt:
     accepted: bool
     affinity: str
     rejection_code: str | None = None
+    #: The semantic capability the refusal is about (`isolation.wrap@1`, ...),
+    #: so a rejection says *which* requirement failed, not only that one did.
+    rejection_capability: str | None = None
 
 
 @dataclass(frozen=True)

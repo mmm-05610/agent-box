@@ -92,7 +92,7 @@ AGENT_HOME = "/runtime/home"
 CODEX_HOME = f"{AGENT_HOME}/.codex"
 CONFIG_TARGET = f"{CODEX_HOME}/config.toml"
 MODELS_TARGET = f"{CODEX_HOME}/models.json"
-STATE_TARGET = CODEX_HOME
+STATE_TARGET = f"{CODEX_HOME}/sessions"
 
 #: 生产 adapter 环境。每一项都有理由：
 #: * `CODEX_HOME` 把原生状态根固定到隔离投影（也是适配器传给 app-server 子进程的
@@ -318,6 +318,9 @@ def harness_deployment(
             "target": STATE_TARGET,
             "ephemeralPaths": [".tmp", "shell_snapshots"],
         },
+        # §14: this family's session subtree is splittable from the rest
+        # of its home, so it lives in the per-harness session store.
+        "sessionStore": {"kind": "sessions-subtree"},
         "adapter": {
             "command": "/usr/bin/node",
             "args": [ADAPTER_ARTIFACT_ENTRY],

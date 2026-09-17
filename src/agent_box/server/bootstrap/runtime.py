@@ -541,6 +541,22 @@ def build_runtime_from_sidecar_deployment(
         ):
             raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
         state_projection = item.get("stateProjection")
+        # §14 (session library independent of the profile home): a family whose
+        # session subtree can be split from the rest of its home declares
+        # `sessionStore.kind = "sessions-subtree"`; the declared state target is
+        # then the *session subtree* inside the guest home and is bound to the
+        # per-harness store on the host. The default ("profile-home") keeps the
+        # pre-§14 binding byte for byte - shared-DB families (the library holds
+        # credential/account tables next to its session tables) must stay there.
+        session_store = item.get("sessionStore")
+        session_store_kind = "profile-home"
+        if session_store is not None:
+            if (not isinstance(session_store, dict)
+                    or not set(session_store) <= {"kind"}
+                    or not isinstance(session_store.get("kind"), str)
+                    or session_store["kind"] not in {"profile-home", "sessions-subtree"}):
+                raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
+            session_store_kind = session_store["kind"]
         state_target: str | None = None
         state_ephemeral_paths: tuple[str, ...] = ()
         if state_projection is not None:
@@ -571,10 +587,13 @@ def build_runtime_from_sidecar_deployment(
         deployment["_protected_state_paths"] = _protected_state_paths(
             tuple(projection_targets), state_target,
         )
+        if session_store_kind == "sessions-subtree" and state_target is None:
+            raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
         if state_target is not None:
             deployment["_state_target"] = state_target
         else:
             deployment["_state_target"] = None
+        deployment["_session_store"] = session_store_kind
         deployment["_state_ephemeral_paths"] = state_ephemeral_paths
         deployments[harness_id] = deployment
         # 能力声明是部署座位上的唯一入口：canonical id + 真 bool，其它一律类型化拒绝。
@@ -697,6 +716,14 @@ def build_runtime_from_sidecar_deployment(
                     protected_state_paths=deployment["_protected_state_paths"],
                     timeout_ms=deployment["_timeout_ms"],
                     sandbox_port=sandbox_port,
+                    session_store_harness=(
+                        context["harness_type"]
+                        if deployment["_session_store"] == "sessions-subtree" else None
+                    ),
+                    session_store_target=(
+                        deployment["_state_target"]
+                        if deployment["_session_store"] == "sessions-subtree" else None
+                    ),
                 )
             else:
                 launcher = LocalSidecarLauncher(
@@ -713,6 +740,14 @@ def build_runtime_from_sidecar_deployment(
                     state_ephemeral_paths=deployment["_state_ephemeral_paths"],
                     protected_state_paths=deployment["_protected_state_paths"],
                     sandbox_port=sandbox_port,
+                    session_store_harness=(
+                        context["harness_type"]
+                        if deployment["_session_store"] == "sessions-subtree" else None
+                    ),
+                    session_store_target=(
+                        deployment["_state_target"]
+                        if deployment["_session_store"] == "sessions-subtree" else None
+                    ),
                 )
             capability_documents, capability_grants, authorized, binding = (
                 _capability_material(context, deployment)

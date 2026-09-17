@@ -89,7 +89,7 @@ class LocalHome:
 
     def __init__(self, home_root: str | Path, locator: str, *,
                  profile_id: str, harness_type: str, native_home: str,
-                 window: str = "") -> None:
+                 window: str = "", store: str | None = None) -> None:
         segments = home_locator_segments(locator)
         self.root = Path(home_root)
         self.role_dir = self.root.joinpath(*segments[:1])
@@ -100,6 +100,9 @@ class LocalHome:
         self.native_home = native_home
         self.marker = self.role_dir / ".agentbox-profile.json"
         self.window = _safe_relative(window) if window else ""
+        #: §14: the per-harness session library (host side). When present it is
+        #: the audited tree - the store root itself, not a role-relative window.
+        self.store = (self.root / "_sessions" / store) if store else None
 
     def prepare(self) -> Path:
         """Create the home, write or verify the marker, open the window.
@@ -112,6 +115,13 @@ class LocalHome:
         resolved = self.dir.resolve()
         if not resolved.is_relative_to(self.root.resolve()):
             raise LocalChannelError("HOME_OUTSIDE_ROOT", "home escapes the home root")
+        if self.store is not None:
+            self.store.mkdir(parents=True, exist_ok=True)
+            resolved_store = self.store.resolve()
+            if not resolved_store.is_relative_to(self.root.resolve()):
+                raise LocalChannelError(
+                    "HOME_OUTSIDE_ROOT", "session store escapes the home root",
+                )
         facts = {"profileId": self.profile_id, "harnessType": self.harness_type,
                  "nativeHome": self.native_home}
         if self.marker.exists():
@@ -185,18 +195,24 @@ class LocalHome:
             audit["files"].append({"path": relative, "size": info.st_size})
             audit["bytes"] += info.st_size
 
+    def _audit_base(self) -> Path:
+        """The audited tree: the session store when declared, else the window."""
+        if self.store is not None:
+            return self.store
+        return self.role_dir / self.window if self.window else self.dir
+
     def audit_facts(self) -> tuple[list[dict[str, Any]], dict[str, int], int]:
         facts: dict[str, Any] = {
             "files": [], "bytes": 0, "skipped": 0, "visited": 0,
             "truncated": {"entries": 0, "bytes": 0, "oversize": 0},
         }
-        base = self.role_dir / self.window if self.window else self.dir
+        base = self._audit_base()
         self._relative_entries(base, "", facts)
         return facts["files"], facts["truncated"], facts["skipped"]
 
     def read(self, relative: str) -> tuple[bytes, str]:
         relative = _safe_relative(relative)
-        base = self.role_dir / self.window if self.window else self.dir
+        base = self._audit_base()
         target = (base / relative).resolve()
         if not target.is_relative_to(base.resolve()):
             raise StateCaptureError("SIDECAR_STATE_PATH_INVALID", "state path escapes the window")
@@ -217,7 +233,8 @@ class LocalHome:
 
     def delete(self, relative: str) -> None:
         relative = _safe_relative(relative)
-        target = self.role_dir / self.window / relative if self.window else self.dir / relative
+        base = self._audit_base()
+        target = base / relative
         info = os.lstat(target)
         if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode):
             raise LocalChannelError("HOME_IO", "only a regular file may be removed from a home")
@@ -238,6 +255,8 @@ class LocalSidecarLauncher:
         state_ephemeral_paths: Sequence[str] = (),
         protected_state_paths: Sequence[str] = (),
         sandbox_port: "object | None" = None,
+        session_store_harness: str | None = None,
+        session_store_target: str | None = None,
     ) -> None:
         if len(bundle) > MAX_BUNDLE_FILES or sum(map(len, bundle.values())) > MAX_BUNDLE_BYTES:
             raise ValueError("LOCAL_CHANNEL_BUNDLE_OUTSIDE_BOUNDS")
@@ -257,9 +276,12 @@ class LocalSidecarLauncher:
         self.home = (
             LocalHome(home_root, home_locator, profile_id=profile_id,
                       harness_type=harness_type, native_home=self.native_home,
-                      window=_window_of(state_target, self.native_home))
+                      window=_window_of(state_target, self.native_home),
+                      store=session_store_harness)
             if home_root is not None and home_locator else None
         )
+        self.session_store_harness = session_store_harness
+        self.session_store_target = session_store_target
         self.state_target = state_target
         self.state_ephemeral_paths = tuple(state_ephemeral_paths)
         self.protected_state_paths = tuple(protected_state_paths)
@@ -300,9 +322,17 @@ class LocalSidecarLauncher:
             # when the deployment declared a window elsewhere — the window at
             # its own guest target.
             native_bind_target = f"/runtime/home/{self.native_home}"
-            if self.home.window and self.home.window != self.native_home:
+            if self.session_store_harness is not None and self.home.store is not None:
+                # §14: the session library replaces the in-home session subtree;
+                # the profile home still binds whole, and the deeper store bind
+                # wins by the existing depth ordering.
+                window_host = str(self.home.store)
+            elif self.home.window and self.home.window != self.native_home:
                 window_host = str(self.home.role_dir / self.home.window)
-        window_target = self.state_target if window_host else None
+        window_target = (
+            self.session_store_target if self.session_store_harness is not None
+            else (self.state_target if window_host else None)
+        )
         room = self.sandbox_port.compose_sidecar_room(SidecarRoomRequest(
             workspace=self.workspace_path, staged_view=str(view), secret=secret_path,
             base_environment=environment, executable_mounts=tuple(self.executable_mounts),

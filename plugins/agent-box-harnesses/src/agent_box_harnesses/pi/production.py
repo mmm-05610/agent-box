@@ -217,6 +217,9 @@ def harness_deployment(
             if projection_files_override is not None else projection_files()
         )],
         "stateProjection": {"target": STATE_TARGET},
+        # §14: this family's session subtree is splittable from the rest
+        # of its home, so it lives in the per-harness session store.
+        "sessionStore": {"kind": "sessions-subtree"},
         "adapter": {
             "command": "/usr/bin/node",
             "args": [ADAPTER_ARTIFACT_ENTRY],

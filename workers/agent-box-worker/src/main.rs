@@ -1803,6 +1803,11 @@ fn handle_secret(
 /// Server is the side that translates this into its own
 /// `PROFILE_HOME_CONFLICT` wording.
 const HOME_MARKER_FILE: &str = ".agentbox-profile.json";
+/// The per-harness session store lives here, inside the home root so the
+/// bwrap bind authorization already covers it. Reserved: a profile locator
+/// may not use this first segment (the store is harness-scoped, not
+/// profile-scoped, and the two must never collide).
+const SESSION_STORE_DIR: &str = "_sessions";
 /// Audit bounds. They mirror the state-capture bounds the channels already
 /// had: 1024 audited files, 8 MiB per digested file, 64 MiB digested in
 /// total, 4096 visited entries per walk. Everything beyond a bound is a
@@ -1935,6 +1940,28 @@ fn handle_home(
             Ok(json!({"deleted": value_string(args, "path")?}))
         }
         "home.prepare" => {
+            if args.get("kind").and_then(Value::as_str) == Some("session-store") {
+                // The per-harness session library: one directory per harness
+                // family, shared by every profile of that family on this
+                // machine. It has no profile identity, so no profile marker is
+                // written or checked here; the harness segment alone names it.
+                let harness = value_string(args, "harness")?;
+                let segments = home_locator(harness)?;
+                if segments.len() != 1 {
+                    return Err((
+                        "HOME_LOCATOR_INVALID",
+                        "a session store names exactly one harness",
+                    ));
+                }
+                let dir = home_root.join(SESSION_STORE_DIR).join(&segments[0]);
+                let created = !dir.exists();
+                fs::create_dir_all(&dir)
+                    .map_err(|_| ("HOME_IO", "session store creation failed"))?;
+                ensure_inside_home_root(home_root, &dir)?;
+                return Ok(json!({
+                    "path": dir, "created": created, "markerState": "session-store",
+                }));
+            }
             let marker: HomeMarker =
                 serde_json::from_value(args.get("marker").cloned().unwrap_or(Value::Null))
                     .map_err(|_| ("HOME_LOCATOR_INVALID", "home marker is invalid"))?;
@@ -1952,8 +1979,15 @@ fn handle_home(
             // create it.
             fs::create_dir_all(&dir).map_err(|_| ("HOME_IO", "home directory creation failed"))?;
             ensure_inside_home_root(home_root, &dir)?;
+            let role_segment = home_locator(locator)?[0].clone();
+            if role_segment == SESSION_STORE_DIR {
+                return Err((
+                    "HOME_LOCATOR_INVALID",
+                    "the session store directory is reserved",
+                ));
+            }
             let marker_path = home_root
-                .join(home_locator(locator)?[0].clone())
+                .join(role_segment)
                 .join(HOME_MARKER_FILE);
             let (created, marker_state) = match read_home_marker(&marker_path)? {
                 None => {
@@ -2747,6 +2781,53 @@ mod home_tests {
         )
         .unwrap_err();
         assert_eq!(missing.0, "VIEW_MISSING");
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_session_store_is_one_directory_per_harness_with_no_profile_marker() {
+        let root = scratch("session-store");
+        let prepared = handle_home(
+            &root,
+            "home.prepare",
+            &json!({"locator": "codex", "harness": "codex", "kind": "session-store"}),
+        )
+        .unwrap();
+        let store = root.join("_sessions").join("codex");
+        assert_eq!(prepared["markerState"], "session-store");
+        assert!(store.is_dir());
+        assert!(!store.join(HOME_MARKER_FILE).exists(), "no profile marker on a store");
+        // Idempotent: preparing twice reports created=false and keeps the files.
+        std::fs::write(store.join("session.jsonl"), b"{}\n").unwrap();
+        let again = handle_home(
+            &root,
+            "home.prepare",
+            &json!({"locator": "codex", "harness": "codex", "kind": "session-store"}),
+        )
+        .unwrap();
+        assert_eq!(again["created"], false);
+        assert!(store.join("session.jsonl").exists());
+        // The store is readable through the ordinary home ops by locator.
+        let listed = handle_home(
+            &root,
+            "home.list",
+            &json!({"locator": "_sessions/codex"}),
+        )
+        .unwrap();
+        assert!(!listed["files"].as_array().unwrap().is_empty());
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_profile_locator_may_not_claim_the_reserved_store_segment() {
+        let root = scratch("store-reserved");
+        let refused = handle_home(
+            &root,
+            "home.prepare",
+            &json!({"locator": "_sessions/codex", "marker": marker()}),
+        )
+        .unwrap_err();
+        assert_eq!(refused.0, "HOME_LOCATOR_INVALID");
         let _ = fs::remove_dir_all(&root);
     }
 

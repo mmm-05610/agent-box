@@ -43,6 +43,7 @@ class TmuxSession:
         self.binary = str(binary or shutil.which("tmux") or "tmux")
         self._runner = runner or self._real_runner
         self.capabilities = CapabilitySet({
+            "terminal.run@1": CapabilityStatus.SUPPORTED,
             "pty": CapabilityStatus.SUPPORTED, "persistence": CapabilityStatus.SUPPORTED,
             "detach_attach": CapabilityStatus.SUPPORTED, "scrollback": CapabilityStatus.SUPPORTED,
             "resize": CapabilityStatus.SUPPORTED, "signal_terminate": CapabilityStatus.SUPPORTED,

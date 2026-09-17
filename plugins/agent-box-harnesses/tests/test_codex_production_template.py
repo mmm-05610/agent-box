@@ -197,9 +197,13 @@ def test_the_deployment_document_declares_the_managed_chain():
         "treeDigest": "sha256:" + "a" * 64,
     }]
     assert harness["stateProjection"] == {
-        "target": "/runtime/home/.codex",
+        # §14: the declared state target is the *session subtree*; the rest
+        # of $CODEX_HOME stays in the profile home and the ephemeral paths are
+        # anchored on that home (see the room's ephemeral_anchor).
+        "target": "/runtime/home/.codex/sessions",
         "ephemeralPaths": [".tmp", "shell_snapshots"],
     }
+    assert harness["sessionStore"] == {"kind": "sessions-subtree"}
     assert harness["projectionFiles"] == [
         {"source": "deploy/codex/config.toml", "target": "/runtime/home/.codex/config.toml"},
         {"source": "deploy/codex/models.json", "target": "/runtime/home/.codex/models.json"},
@@ -229,12 +233,12 @@ def test_the_projected_files_exist_and_the_state_target_shares_the_home_root():
         assert projection["target"].startswith(f"{production.AGENT_HOME}/")
     # The explicit variable and the $HOME-derived default name the same directory.
     assert production.CODEX_HOME == f"{production.AGENT_HOME}/.codex"
-    assert production.STATE_TARGET == production.CODEX_HOME
+    assert production.STATE_TARGET == f"{production.CODEX_HOME}/sessions"
     assert production.ADAPTER_ENVIRONMENT["CODEX_HOME"] == production.CODEX_HOME
     # Both read-only files live *inside* the writable state subtree; the Server
     # and bwrap derive them as protected state paths from this declaration alone.
     for projection in production.projection_files():
-        assert projection["target"].startswith(production.STATE_TARGET + "/")
+        assert projection["target"].startswith(production.CODEX_HOME + "/")
 
 
 def test_the_deployment_document_refuses_invalid_artifact_declarations():

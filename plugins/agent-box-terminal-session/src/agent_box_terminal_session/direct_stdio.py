@@ -19,6 +19,11 @@ class DirectStdioSession:
         self.ref = ref
         self.transport = transport
         self.capabilities = CapabilitySet({
+            # The semantic slot the coordinator asks for (Order 47): an
+            # undeclared capability is now a refusal, and this provider really
+            # does provide terminal execution. The short names below stay as
+            # this component's own detail vocabulary.
+            "terminal.run@1": CapabilityStatus.SUPPORTED,
             "pty": CapabilityStatus.SUPPORTED,
             "persistence": CapabilityStatus.CONDITIONAL,
             "detach_attach": CapabilityStatus.UNSUPPORTED,

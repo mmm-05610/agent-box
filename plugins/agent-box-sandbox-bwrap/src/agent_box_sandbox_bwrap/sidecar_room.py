@@ -85,10 +85,11 @@ def compose_sidecar_room(
     ephemeral path is still tmpfs-shadowed after both.
     """
     environment = guest_environment(base_environment)
-    #: Ephemeral paths are declared relative to the audit window (the
-    #: deployment's `stateProjection.target`), which is the window bind's guest
-    #: target when one is declared, and the native home's bind otherwise.
-    ephemeral_anchor = state_window_target or state_target
+    #: Ephemeral paths are declared relative to the Harness's own home target:
+    #: that is where a Harness writes them (`$CODEX_HOME/.tmp`), and §14's
+    #: session store binds at a *deeper* target (`.codex/sessions`) than the
+    #: home, so anchoring on the window would shadow the wrong tree.
+    ephemeral_anchor = state_target
     writable_state_mount = (
         (str(state_home_source), str(state_target))
         if state_home_source is not None and state_target is not None
