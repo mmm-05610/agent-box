@@ -181,8 +181,8 @@ def test_deployment_document_declares_the_managed_chain():
         "target": "/runtime/artifacts/hermes-runtime",
         "treeDigest": "sha256:" + "a" * 64,
     }]
-    assert harness["stateProjection"] == {"target": "/runtime/home/.hermes/sessions"}
-    assert harness["sessionStore"] == {"kind": "sessions-subtree"}
+    assert harness["stateProjection"] == {"target": "/runtime/home/.hermes"}
+    assert "sessionStore" not in harness  # shared-DB family: library stays in the home
     assert harness["stateProjection"]["target"] == production.STATE_TARGET
     assert harness["projectionFiles"] == [
         {"source": "deploy/hermes/config.yaml", "target": "/runtime/home/.hermes/config.yaml"},
@@ -192,7 +192,7 @@ def test_deployment_document_declares_the_managed_chain():
     # read-only file is not state and never reaches a checkpoint.
     assert harness["projectionFiles"][0]["target"] == production.CONFIG_TARGET
     assert Path(harness["projectionFiles"][0]["target"]).parent == Path(production.AGENT_HOME)
-    assert production.STATE_TARGET == f"{production.AGENT_HOME}/sessions"
+    assert production.STATE_TARGET == production.AGENT_HOME
     adapter = harness["adapter"]
     assert adapter["command"] == "/usr/bin/python3"
     assert adapter["args"] == ["-m", "hermes_cli.main", "acp"]
@@ -269,10 +269,10 @@ def test_projection_and_overlay_files_exist_next_to_the_deployment_template():
 def test_the_guest_home_is_the_one_isolated_root_and_both_paths_converge():
     """One home root: `HERMES_HOME` and `$HOME/.hermes` are the same directory."""
     assert production.AGENT_HOME == "/runtime/home/.hermes"
-    assert production.STATE_TARGET == f"{production.AGENT_HOME}/sessions"
+    assert production.STATE_TARGET == production.AGENT_HOME
     guest_home = "/runtime/home"
     assert production.AGENT_HOME == f"{guest_home}/.hermes"
-    assert production.CONFIG_TARGET == f"{production.AGENT_HOME}/config.yaml"
+    assert production.CONFIG_TARGET == f"{production.STATE_TARGET}/config.yaml"
 
 
 def test_deployment_document_refuses_an_invalid_artifact_declaration():

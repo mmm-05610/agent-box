@@ -160,7 +160,10 @@ CONFIG_TARGET = f"{AGENT_HOME}/{CONFIG_NAME}"
 #: back. The reviewed `config.yaml` is projected read-only *inside* it and is
 #: therefore a protected state path (see the module docstring): it is not state
 #: and never reaches or comes from a checkpoint.
-STATE_TARGET = f"{AGENT_HOME}/sessions"
+# The authoritative session database is $HERMES_HOME/state.db: sessions and
+# other state share one SQLite file, so this family is the shared-DB shape
+# of s14.2 and its library stays in the profile home (kind: profile-home).
+STATE_TARGET = AGENT_HOME
 #: The artifact's own `sitecustomize.py` runs the deployment verifier
 #: (`agentbox_hermes_bootstrap`) before Hermes reads any configuration; the two
 #: names are what the builder publishes and what it looks for.
@@ -424,9 +427,6 @@ def harness_deployment(
             if projection_files_override is not None else projection_files()
         )],
         "stateProjection": {"target": STATE_TARGET},
-        # §14: this family's session subtree is splittable from the rest
-        # of its home, so it lives in the per-harness session store.
-        "sessionStore": {"kind": "sessions-subtree"},
         "adapter": {
             "command": ADAPTER_COMMAND,
             "args": list(ADAPTER_ARGS),

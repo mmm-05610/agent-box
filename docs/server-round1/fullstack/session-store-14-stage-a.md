@@ -8,13 +8,22 @@
 | 家族 | 当前 `STATE_TARGET`（注册表声明） | 真实布局（一级条目） | 定性 | §14 处理 |
 | --- | --- | --- | --- | --- |
 | codex | 整个 `/runtime/home/.codex`（= `CODEX_HOME`） | `.codex/`：`sessions/` + `cache/ sqlite/ log/ skills/ memories/ plugins/ rules/ shell_snapshots/ thread-writer-locks/ tmp/`；认证走 `ephemeral` 不落盘 | **可切分** | 收窄为 `.codex/sessions`，迁 `sessions/codex/` |
-| hermes | 整个 `/runtime/home/.hermes` | `.hermes/`：`sessions/` + `skills/ lsp/ cache/ audio_cache/ image_cache/ sandboxes/ plugins/ memories/ logs/ cron/ hooks/ bin/ hermes-agent/ dispatch/ pairing/ pastes/ desktop-plugins/ scripts/`（迁移实测 ~114k 文件 / 2GB+） | **可切分** | 收窄为 `.hermes/sessions`，迁 `sessions/hermes/` |
+| hermes | 整个 `/runtime/home/.hermes` | `.hermes/`：`state.db`（18.6MB SQLite，**权威会话库**）+ `sessions/`（`request_dump_*.json` 调试转储）+ `skills/ lsp/ cache/ …`（迁移实测 ~114k 文件 / 2GB+） | **共享 DB 式**（复查更正，见下） | §14.2(a)：库留 profile home，换 profile 原生重启 |
 | pi | 整个 `/runtime/home/.pi/agent` | `.pi/agent/`：`auth.json`（**登录态**）+ `models-store.json` + `sessions/` | **可切分**（必须收窄） | 收窄为 `.pi/agent/sessions`；`auth.json` 留在 profile home |
 | claude-code | `/runtime/home/.claude/projects` | `.claude/`：`projects/`（会话）+ `agents/ skills/ cache/ sessions/ plugins/ session-env/ commands/ …`；凭据在 `~/.claude.json`（home 根） | **已是可切分子树** | 迁 `sessions/claude-code/`（路径形态不变） |
 | dsh | `/runtime/home/.dsh/sessions` | `.dsh/`：`sessions/` + `storages/ attachments/ llm-deepseek/ profiles/` | **已是可切分子树** | 迁 `sessions/dsh/` |
 | qwen | `/runtime/home/.qwen/projects` | 用户机器上**无实例**（20 个迁移 profile 中无 qwen）——上游布局待验证 | **待验证**（按 qwen-code 的 projects 形态暂归可切分） | 实现按可切分做，验证留给有实例时；门（假端点）覆盖机制 |
 | opencode | 整个 `/runtime/home/.local/share/opencode` | `opencode.db`（2.27MB SQLite）+ `auth.json`（同目录）+ `snapshot/ repos/ log/` | **共享 DB 式** | §14.2(a)：库留 profile home，换 profile 原生重启 |
 | kilo | 整个 `/runtime/home/.local/share/kilo` | `kilo.db`（307KB SQLite）+ `storage/ repos/ log/ telemetry-id` | **共享 DB 式** | §14.2(a)：同上 |
+
+### 更正记录（2026-09-17，实现期复查）
+
+hermes 的初判（"可切分，收窄为 `.hermes/sessions`"）**有误**，实现期由门的第一手失败
+（`HERMES_HOME '/runtime/home/.hermes/sessions' is not the harness home`）与源码注释
+（"its authoritative session database at `$HERMES_HOME/state.db`"）共同暴露：
+`.hermes/sessions/` 只是调试转储，**权威会话在 `state.db`（与其它状态同库）**。
+判定改为**共享 DB 式 §14.2(a)**：`STATE_TARGET` 回退为整个 `.hermes`，不声明
+`sessionStore`。本表上文对应行已按更正后的结论改写。
 
 ## §14.2(a)/(b) 的选择与第一手理由（opencode / kilo）
 
