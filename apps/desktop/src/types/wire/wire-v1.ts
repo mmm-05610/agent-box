@@ -681,6 +681,28 @@ export const ProviderModelsCreateParamsSchema = ProviderModelWriteFieldsSchema.e
   requestId: RequestIdSchema,
   provenance: ProviderProvenanceSchema.optional()
 })
+
+/** Order 55: one bounded outbound probe of the declared endpoint. */
+export const ProviderModelsProbeModelsParamsSchema = z.strictObject({
+  requestId: RequestIdSchema,
+  baseUrl: z.string().min(1),
+  credentialId: WireIdSchema.nullable().optional()
+})
+export const ProviderModelsProbeModelsResultSchema = z.strictObject({
+  status: z.enum(['ok', 'failed']),
+  models: z.array(z.string().min(1)),
+  code: z.string().optional()
+})
+export const ProviderModelsProbeConnectionParamsSchema = z.strictObject({
+  requestId: RequestIdSchema,
+  baseUrl: z.string().min(1),
+  credentialId: WireIdSchema.nullable().optional()
+})
+export const ProviderModelsProbeConnectionResultSchema = z.strictObject({
+  status: z.enum(['reachable', 'unreachable', 'failed']),
+  code: z.string().optional(),
+  detail: z.string().optional()
+})
 export type ProviderModelsCreateParams = z.infer<typeof ProviderModelsCreateParamsSchema>
 export const ProviderModelsCreateResultSchema = z.strictObject({
   providerModel: ProviderModelConfigRecordSchema
@@ -966,6 +988,8 @@ export const WireMethods = {
   'providerModels.create': [ProviderModelsCreateParamsSchema, ProviderModelsCreateResultSchema],
   'providerModels.update': [ProviderModelsUpdateParamsSchema, ProviderModelsUpdateResultSchema],
   'providerModels.archive': [ProviderModelsArchiveParamsSchema, ProviderModelsArchiveResultSchema],
+  'providerModels.probeModels': [ProviderModelsProbeModelsParamsSchema, ProviderModelsProbeModelsResultSchema],
+  'providerModels.probeConnection': [ProviderModelsProbeConnectionParamsSchema, ProviderModelsProbeConnectionResultSchema],
   'config.describe': [ConfigDescribeParamsSchema, ConfigDescribeResultSchema],
   'config.resolve': [ConfigResolveParamsSchema, ConfigResolveResultSchema],
   'sessions.list': [SessionsListParamsSchema, SessionsListResultSchema],
