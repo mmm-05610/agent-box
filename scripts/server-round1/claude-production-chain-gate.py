@@ -575,7 +575,10 @@ def main() -> int:
     except GateFailure as failure:
         primary = failure
     except BaseException as error:  # an unexpected crash is a failure too
+        import traceback as _traceback
+
         primary = GateFailure("CLAUDE_GATE_UNEXPECTED", f"{type(error).__name__}: {error}")
+        REPORT["unexpectedTraceback"] = _traceback.format_exc()[-4000:]
     finally:
         if endpoint is not None:
             endpoint.stop()
@@ -687,8 +690,12 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production,
     events: list[dict] = []
     state_directory = temporary / "sidecar-state"
     state_directory.mkdir(exist_ok=True)
+    # A gate-local role name: the reopen phase must not collide with the
+    # Profile the Server created in the turn-chain phase (same home root,
+    # different profile identity -> HOME_MARKER_CONFLICT).
+    home_locator = f"claude-gate/.claude"
 
-    def port_for(resume_native_id=None, restored_state=None):
+    def port_for(resume_native_id=None):
         launcher = WslSidecarLauncher(
             DirectWorkerConnector(temporary, worker, workspace),
             workspace={"distribution": "Ubuntu", "remote_user": os.environ["USER"],
@@ -705,14 +712,13 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production,
                 + ([] if live or guard is None else [
                     ("agentbox-sidecar/deployment/claude/egress-guard.so", production.EGRESS_GUARD_TARGET)])
             ),
-            state_bundle_prefix="agentbox-sidecar/deployment/claude/native-state",
-            state_target=production.STATE_TARGET, restored_state=restored_state,
+            home_locator=home_locator, native_home=".claude",
+            profile_id="profile-claude-gate", harness_type="claude-code",
+            audit_window=".claude/projects",
+            session_store_harness="claude",
+            session_store_target=production.STATE_TARGET,
             timeout_ms=120_000,
             sandbox_port=_gate_sandbox_port(),
-        # §14: the gate's own reopen phase must drive the same
-        # session-library shape the product path uses.
-        session_store_harness="claude",
-        session_store_target=production.STATE_TARGET,
         )
         return SidecarHarnessPort(
             launcher, environment={"AGENTBOX_SIDECAR_ISOLATED": "1"}, profile="claude-code",
@@ -742,7 +748,7 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production,
         finally:
             first.stop()
         events.clear()
-        second = port_for(resume_native_id=native, restored_state=state)
+        second = port_for(resume_native_id=native)
         try:
             reopened = second.open_execution("reopen-round-2")
             during_reopen = list(events)
@@ -830,7 +836,9 @@ def run_chain(temporary, workspace, worker, artifact, digest, endpoint, producti
 
     guard = None if live else compile_guard(temporary, REPORT)
     document = production.deployment_document(
-        artifact_source=str(artifact), tree_digest=digest,
+        # The token-mount contract (orders 44/45): the deployment names a
+        # --mount token, never a host path; the gate binds it below.
+        artifact_token=f"{production.ARTIFACT_NAME}", tree_digest=digest,
         adapter_environment=(
             dict(production.ADAPTER_ENVIRONMENT) if live else {
                 **production.ADAPTER_ENVIRONMENT,
@@ -871,17 +879,21 @@ def run_chain(temporary, workspace, worker, artifact, digest, endpoint, producti
         temporary, worker, workspace)
     original_file = runtime_module._sidecar_deployment_file
 
-    def deployment_file(root, value, relative):
+    def deployment_file(root, relative):
+        # The current `_sidecar_deployment_file(root, relative)` contract (the
+        # token-source era): the gate only serves the two generated files.
         if relative == production.SETTINGS_SOURCE:
             return settings_bytes
         if relative == GUARD_DEPLOY_SOURCE:
             return guard.read_bytes()
-        return original_file(root, value, relative)
+        return original_file(root, relative)
 
     runtime_module._sidecar_deployment_file = deployment_file
     store = MemorySecretStore(values={})
     runtime = build_runtime_from_sidecar_deployment(
         temporary / "server", deployment, secret_store=store,
+        plugin_root=PLUGIN,
+        mount_bindings={production.ARTIFACT_NAME: str(artifact)},
     )
     result: dict = {"rounds": {}}
     try:
