@@ -86,7 +86,7 @@
         "tests-js/**"
       ],
       "requires_approved_contract": true,
-      "note": "Subscriptions as first-class credentials, alongside API keys: an account list showing family, account identity, status and last verification, binding a profile to an account or an API key record, a manual login guide for the execution side, and honest status (valid, expired, unknown). The login state itself lives in that profile's native home because the harness writes and refreshes it there, which is exactly the order-45 model; it is never moved into the SecretStore and nothing is written back per run, so there is no per-run token plumbing. Multiple accounts means multiple profiles - one home, one account, no hot swapping. Credentials are never displayed, filled in or scraped, and the host's own login state stays untouched. The account-state probes come from backend order 56."
+      "note": "Subscriptions as first-class credentials, managed apart from the native home and hot switched per the user ruling: the login state is a managed asset held by the control plane (backend order 56), materialised into the profile home per turn as a writable working copy and reclaimed at the end, so changing the bound account takes effect on the NEXT turn - which is what hot means here, not a mid-turn swap. Because every turn is a fresh process reading a freshly materialised home, no CLI restart is involved. The UI shows family, account identity, status and last verification, binds a profile default plus an optional override, and keeps credentials out of every surface: never displayed, filled in or scraped, with the host login state untouched."
     },
     {
       "id": "P08",
