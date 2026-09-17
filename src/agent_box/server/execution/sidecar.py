@@ -16,6 +16,7 @@ import hashlib
 from pathlib import Path, PurePosixPath
 import queue
 import subprocess
+import sys
 import threading
 import time
 from typing import Any, Callable, Mapping, Protocol, Sequence
@@ -281,6 +282,7 @@ class WorkerSidecarLauncher:
         sandbox_port: "SandboxPort | None" = None,
         session_store_harness: str | None = None,
         session_store_target: str | None = None,
+        usage_probe: dict[str, str] | None = None,
     ) -> None:
         self.connector = connector
         self.workspace = dict(workspace)
@@ -326,6 +328,9 @@ class WorkerSidecarLauncher:
         #: The declared session-subtree guest path the store binds at (the
         #: deployment's state target when the family split its store out).
         self.session_store_target = session_store_target
+        #: Order 51: a declared usage probe turns the audited journal into the
+        #: neutral usage fact after the attempt (tokens only, no estimates).
+        self.usage_probe = dict(usage_probe) if usage_probe else None
 
     def launch(self, environment: Mapping[str, str]):
         from agent_box.extensions.runtime_composition.sandbox_port import (
@@ -453,6 +458,7 @@ class WorkerSidecarLauncher:
                 protected_state_paths=self.protected_state_paths,
                 state_ephemeral_paths=self.state_ephemeral_paths,
                 forbidden_content=(credential_material or b"").strip(),
+                usage_probe=self.usage_probe,
             )
             channels.subscribe()
             client.request(
@@ -489,6 +495,7 @@ class _WorkerChannels:
         secret_frame_id: str | None = None,
         home_locator: str = "", audit_window: str | None = None,
         audit_whole_home: bool = False,
+        usage_probe: Mapping[str, str] | None = None,
         protected_state_paths: Sequence[str] = (),
         state_ephemeral_paths: Sequence[str] = (),
         forbidden_content: bytes = b"",
@@ -504,6 +511,9 @@ class _WorkerChannels:
         #: locator already names it), so the walk starts at the root instead of
         #: at a role-relative window inside it.
         self.audit_whole_home = bool(audit_whole_home)
+        #: Order 51: the declared usage probe (journal suffix + format), used
+        #: after the attempt to read the family's own numbers.
+        self.usage_probe = dict(usage_probe) if usage_probe else None
         #: Read-only configuration that lives *inside* the audited window. It
         #: is not state: it must not enter the audit manifest.
         self.protected_state_paths = frozenset(protected_state_paths)
@@ -655,6 +665,57 @@ class _WorkerChannels:
             failure = SidecarError(error.code, str(error))
             failure.path = getattr(error, "path", None)
             raise failure from error
+
+    def read_usage(
+        self, usage_probe: Mapping[str, str] | None,
+    ) -> dict[str, int] | None:
+        """Read the declared journal via home.get and parse the usage fact.
+
+        Nothing here estimates: the parser copies the family's own numbers, a
+        family that reports nothing leaves every column NULL, and the read
+        rides the same audited, bounded home channel the capture uses.
+        """
+        from agent_box.server.execution.usage import parse_usage
+
+        if not usage_probe or not self.home_locator:
+            return None
+        suffix = usage_probe.get("journalSuffix")
+        usage_format = usage_probe.get("format")
+        if not suffix or not usage_format:
+            return None
+        listing = self.client.request("home.list", {
+            "locator": self.home_locator,
+            **({"relative": self.audit_window} if self.audit_window else {}),
+        }, timeout=60.0)
+        candidates = [
+            entry["path"] for entry in listing.get("files", ())
+            if str(entry.get("path", "")).endswith(suffix)
+        ]
+        if not candidates:
+            return None
+        path = max(candidates)  # journal names carry the newest timestamp last
+        full = f"{self.audit_window}/{path}" if self.audit_window else path
+        chunks = bytearray()
+        while True:
+            item = self.client.request("home.get", {
+                "locator": self.home_locator, "path": full,
+                # The Worker's own fetch bound is 32 KiB per response; asking
+                # for more is a typed range refusal, not a shorter answer.
+                "offset": len(chunks), "maxLength": 32 * 1024,
+            })
+            if not isinstance(item.get("data"), str):
+                raise SidecarError("SIDECAR_STATE_INVALID", "home fetch data is invalid")
+            chunks.extend(base64.b64decode(item["data"], validate=True))
+            if item.get("eof") is True:
+                break
+            nxt = item.get("nextOffset")
+            if not isinstance(nxt, int) or nxt <= len(chunks):
+                raise SidecarError("SIDECAR_STATE_INVALID", "home fetch made no progress")
+            if len(chunks) > 4 * 1024 * 1024:
+                raise SidecarError(
+                    "SIDECAR_STATE_OUTSIDE_BOUNDS", "usage journal exceeds the read bound",
+                )
+        return parse_usage(usage_format, bytes(chunks))
 
     def delete_state_file(self, relative: str) -> None:
         """Remove exactly one home file - the credential rule's clean-up."""
@@ -826,6 +887,18 @@ class SidecarEnvelope:
                         "truncated": {"entries": 0, "bytes": 0, "oversize": 0}},
         }
 
+    def read_usage(self, usage_probe: Mapping[str, str] | None) -> dict[str, int] | None:
+        """Read and parse the declared journal into the neutral usage fact.
+
+        The journal is one of the files the audit already listed (same
+        locator, same bounds, same refusal rules); the parse is the only
+        place a family's field names appear.
+        """
+        read = getattr(self._channels, "read_usage", None)
+        if not callable(read):
+            return None
+        return read(usage_probe)
+
     def delete_state_file(self, relative: str) -> None:
         delete = getattr(self._channels, "delete_state_file", None)
         if callable(delete):
@@ -912,6 +985,7 @@ class SidecarHarnessPort:
         capability_grants: "tuple[Any, ...] | None" = None,
         capability_authorized_providers: "tuple[str, ...] | None" = None,
         capability_binding: str | None = None,
+        usage_probe: dict[str, str] | None = None,
     ) -> None:
         self.launcher = launcher
         self.environment = dict(environment)
@@ -951,6 +1025,9 @@ class SidecarHarnessPort:
             capability_authorized_providers or ()
         )
         self.capability_binding: str | None = capability_binding
+        #: Order 51: the declared usage probe; the completion boundary reads
+        #: the journal through the audited channel and records the tokens.
+        self.usage_probe = dict(usage_probe) if usage_probe else None
         # 本次执行的原生观测与观测来源；observed 只反映这一次执行，绝不回写静态声明。
         self._observed: dict[str, dict[str, bool | None]] = {}
         self._evidence: dict[str, dict[str, str]] = {}
@@ -1025,6 +1102,18 @@ class SidecarHarnessPort:
             "nativeSessionId": native, "provenance": registered.get("provenance"),
         })
         return native
+
+    def read_usage(
+        self, execution_id: str, usage_probe: Mapping[str, str] | None,
+    ) -> dict[str, int] | None:
+        """Read and parse the declared journal into the neutral usage fact.
+
+        The completion boundary calls this once the audit is done; the read
+        rides the execution's own audited channel and the parse is the only
+        place a family's field names appear.
+        """
+        envelope = self._require(execution_id)
+        return envelope.read_usage(usage_probe)
 
     def capture_execution(self, execution_id: str) -> tuple[dict[str, Any], bool]:
         """Flush the adapter, then audit the declared home window.

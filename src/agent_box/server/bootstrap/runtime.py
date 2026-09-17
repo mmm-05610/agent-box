@@ -593,6 +593,23 @@ def build_runtime_from_sidecar_deployment(
             deployment["_state_target"] = state_target
         else:
             deployment["_state_target"] = None
+        usage_probe = item.get("usageProbe")
+        if usage_probe is not None:
+            if (not isinstance(usage_probe, dict)
+                    or not set(usage_probe) <= {"journalSuffix", "format"}
+                    or not isinstance(usage_probe.get("journalSuffix"), str)
+                    or not isinstance(usage_probe.get("format"), str)):
+                raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
+            from agent_box.server.execution.usage import FORMATS
+
+            if usage_probe["format"] not in FORMATS:
+                raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
+            deployment["_usage_probe"] = {
+                "journalSuffix": usage_probe["journalSuffix"],
+                "format": usage_probe["format"],
+            }
+        else:
+            deployment["_usage_probe"] = None
         deployment["_session_store"] = session_store_kind
         deployment["_state_ephemeral_paths"] = state_ephemeral_paths
         deployments[harness_id] = deployment
@@ -729,6 +746,7 @@ def build_runtime_from_sidecar_deployment(
                         deployment["_state_target"]
                         if deployment["_session_store"] == "sessions-subtree" else None
                     ),
+                    usage_probe=deployment["_usage_probe"],
                 )
             else:
                 launcher = LocalSidecarLauncher(
@@ -753,6 +771,7 @@ def build_runtime_from_sidecar_deployment(
                         deployment["_state_target"]
                         if deployment["_session_store"] == "sessions-subtree" else None
                     ),
+                    usage_probe=deployment["_usage_probe"],
                 )
             capability_documents, capability_grants, authorized, binding = (
                 _capability_material(context, deployment)
@@ -792,6 +811,7 @@ def build_runtime_from_sidecar_deployment(
                 home_locator=home_locator,
                 # 静态上限只能来自已校验的注册声明（不依赖 port 的默认值）。
                 declared_capabilities=descriptor.capability_claims,
+                usage_probe=deployment["_usage_probe"],
                 on_event=on_event,
             )
 

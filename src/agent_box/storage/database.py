@@ -8,7 +8,7 @@ import threading
 from typing import Iterator
 
 
-PRODUCT_SCHEMA_VERSION = 6
+PRODUCT_SCHEMA_VERSION = 7
 
 
 class FutureSchemaError(RuntimeError):
@@ -80,6 +80,7 @@ CREATE TABLE IF NOT EXISTS server_sessions (
     checkpoint_native_id TEXT,
     native_platform TEXT,
     home_locator TEXT,
+    latest_usage TEXT,
     status TEXT NOT NULL DEFAULT 'ready',
     display_name TEXT,
     pinned INTEGER NOT NULL DEFAULT 0,
@@ -105,6 +106,10 @@ CREATE TABLE IF NOT EXISTS server_turns (
     dispatch_id TEXT,
     result_object_digest TEXT,
     error_code TEXT,
+    usage_input_tokens INTEGER,
+    usage_output_tokens INTEGER,
+    usage_total_tokens INTEGER,
+    usage_source TEXT,
     stop_requested_at TEXT,
     terminal_reason TEXT,
     created_at TEXT NOT NULL,
@@ -239,6 +244,25 @@ def _add_columns(conn: sqlite3.Connection, table: str, additions: dict[str, str]
     for name, declaration in additions.items():
         if name not in columns:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {declaration}")
+
+
+def _migrate_6_to_7(conn: sqlite3.Connection) -> None:
+    """Order 51: the usage fact, recorded as optional turn columns.
+
+    Tokens only, straight from what a family's native store reported - no
+    estimates, no per-char stand-ins, and a family that reports nothing keeps
+    every column NULL. `usage_source` names the format that produced the
+    numbers so the numbers stay auditable.
+    """
+    _add_columns(conn, "server_sessions", {
+        "latest_usage": "TEXT",
+    })
+    _add_columns(conn, "server_turns", {
+        "usage_input_tokens": "INTEGER",
+        "usage_output_tokens": "INTEGER",
+        "usage_total_tokens": "INTEGER",
+        "usage_source": "TEXT",
+    })
 
 
 def _migrate_5_to_6(conn: sqlite3.Connection) -> None:
@@ -388,6 +412,8 @@ class Database:
                 _migrate_4_to_5(conn)
             if current in (1, 2, 3, 4, 5):
                 _migrate_5_to_6(conn)
+            if current in (1, 2, 3, 4, 5, 6):
+                _migrate_6_to_7(conn)
             conn.executescript(_SCHEMA)
             conn.execute(
                 "INSERT OR IGNORE INTO agentbox_product_schema(singleton, version, applied_at) "

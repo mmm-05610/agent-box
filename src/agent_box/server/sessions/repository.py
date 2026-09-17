@@ -607,6 +607,7 @@ class SessionRecords:
         self, turn_id: str, *, checkpoint_object_digest: str,
         checkpoint_native_id: str, result_object_digest: str, queue_records=None,
         native_platform: str | None = None, home_locator: str | None = None,
+        usage: dict[str, Any] | None = None, usage_source: str | None = None,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         with self.database.transaction() as conn:
             row = conn.execute("SELECT * FROM server_turns WHERE id=?", (turn_id,)).fetchone()
@@ -621,15 +622,34 @@ class SessionRecords:
             if row["state"] not in {"running", "capturing"}:
                 raise ServerError("TURN_STATE_CONFLICT", "Turn cannot complete from its current state", status=409)
             timestamp = now()
+            # Order 51: the usage fact, tokens only, exactly as the family's
+            # own store reported them. Absent stays absent (NULL): no zeroes,
+            # no estimates, no per-character stand-ins.
+            usage_columns = ""
+            usage_values: list[Any] = []
+            if usage:
+                usage_columns = (",usage_input_tokens=?,usage_output_tokens=?,"
+                                 "usage_total_tokens=?,usage_source=?")
+                usage_values = [
+                    usage.get("inputTokens"), usage.get("outputTokens"),
+                    usage.get("totalTokens"), usage_source,
+                ]
             conn.execute(
-                "UPDATE server_turns SET state='completed',capture_state='captured',cleanup_state='pending',result_object_digest=?,updated_at=? WHERE id=?",
-                (result_object_digest, timestamp, turn_id),
+                "UPDATE server_turns SET state='completed',capture_state='captured',cleanup_state='pending',result_object_digest=?,updated_at=?"
+                + usage_columns + " WHERE id=?",
+                [result_object_digest, timestamp, *usage_values, turn_id],
             )
+            latest_usage = None
+            if usage:
+                latest_usage = json.dumps({
+                    "turnId": turn_id, "usageSource": usage_source, **usage,
+                }, sort_keys=True, separators=(",", ":"))
             conn.execute(
                 "UPDATE server_sessions SET status='ready',checkpoint_object_digest=?,checkpoint_native_id=?,"
-                "native_platform=COALESCE(?,native_platform),home_locator=COALESCE(?,home_locator),updated_at=? WHERE id=?",
+                "native_platform=COALESCE(?,native_platform),home_locator=COALESCE(?,home_locator),"
+                "latest_usage=COALESCE(?,latest_usage),updated_at=? WHERE id=?",
                 (checkpoint_object_digest, checkpoint_native_id, native_platform, home_locator,
-                 timestamp, row["session_id"]),
+                 latest_usage, timestamp, row["session_id"]),
             )
             updated_profile = conn.execute(
                 "UPDATE server_profiles SET run_state='idle',native_generation=native_generation+1,"

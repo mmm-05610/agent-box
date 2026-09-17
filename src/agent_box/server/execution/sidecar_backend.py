@@ -38,6 +38,10 @@ class _Run:
     cancel_confirmed: bool = False
     result: Mapping[str, Any] | None = None
     error: BaseException | None = None
+    #: Order 51: the neutral usage fact, read while the channel lived; None
+    #: means unknown (and the ledger must keep it unknown, never estimate).
+    usage_fact: dict[str, int] | None = None
+    usage_source: str | None = None
     #: The worker that persists the durable turn result. It outlives the prompt
     #: worker by design, so a runtime is only really stopped once it is done:
     #: the Work Core connection is shared and is not safe to use after shutdown.
@@ -415,11 +419,16 @@ class SidecarExecutionBackend:
                 ),
                 native_refs=(Ref(RefType.SESSION, self.provider.provider_id, run.native_id),),
             ))
+            # Order 51: the usage fact was read while the channel lived
+            # (see _audited_home); absent stays absent in the ledger.
+            usage = getattr(run, "usage_fact", None)
+            usage_source = getattr(run, "usage_source", None)
             completed, _event = self.records.complete_turn(
                 run.turn_id, checkpoint_object_digest=checkpoint.digest,
                 checkpoint_native_id=run.native_id, result_object_digest=result.digest,
                 queue_records=self.queue,
                 native_platform=audit["nativePlatform"], home_locator=audit["homeLocator"],
+                usage=usage, usage_source=usage_source,
             )
             next_execution_id = completed.get("next_execution_id")
             self.work_service.complete_work(run.work_id, "Turn completed through Harness sidecar")
@@ -562,7 +571,25 @@ def _audited_home(run: "_Run") -> tuple[dict[str, Any], bool]:
     with a secret sitting in a durable directory.
     """
     try:
-        return run.port.capture_execution(run.turn_id)
+        audit, resumable = run.port.capture_execution(run.turn_id)
+        # Order 51: read the declared usage journal while the execution's own
+        # channel is still alive (after the final state, the sidecar is gone
+        # and a read would arrive too late). The result rides on the run.
+        usage_probe = getattr(run.port, "usage_probe", None)
+        if usage_probe:
+            try:
+                run.usage_fact = run.port.read_usage(run.turn_id, usage_probe)
+                run.usage_source = usage_probe.get("format")
+            except BaseException as read_error:
+                # A failed usage read must not fail the turn: the fact simply
+                # stays unknown, and the reason is logged for the report.
+                logging.getLogger(__name__).warning(
+                    "turn %s: usage read failed (%s); usage stays unknown",
+                    run.turn_id, read_error,
+                )
+                run.usage_fact = None
+                run.usage_source = None
+        return audit, resumable
     except BaseException as exc:
         if getattr(exc, "code", None) == "SIDECAR_STATE_CONTAINS_SECRET":
             relative = getattr(exc, "path", None)

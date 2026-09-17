@@ -220,6 +220,10 @@ def harness_deployment(
         # §14: this family's session subtree is splittable from the rest
         # of its home, so it lives in the per-harness session store.
         "sessionStore": {"kind": "sessions-subtree"},
+        # Order 51: the per-turn usage is read back from this family's own
+         # session journal (first-hand: assistant rows carry usage with
+         # input/output/cacheRead/cacheWrite/reasoning/totalTokens).
+        "usageProbe": {"journalSuffix": ".jsonl", "format": "pi-acp-journal"},
         "adapter": {
             "command": "/usr/bin/node",
             "args": [ADAPTER_ARTIFACT_ENTRY],
