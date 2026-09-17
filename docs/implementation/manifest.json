@@ -930,6 +930,118 @@
     "/home/maoqh/projects/agent-box-harness-expansion"
    ],
    "note": "Harness programs become product objects: an installed set per family (version, tree digest, source, size, entry count, install time), a catalog of available versions synced into the control plane so the UI paints immediately, and install, update and rollback as explicit user actions. Versions live in content-addressed directories with the active one held as a reference, so updating adds a directory and moves the reference - running sessions are unaffected and rollback is just moving it back. Fetches and builds happen on the execution side, bounded and cancellable, and the tree digest is always re-derived; a signature is verified when one exists and the weaker 'digest pinned only' fact is recorded when it does not. No automatic updates, no silent source switching, failures never land (atomic replacement keeps the previous version), and the profile home's cross-version compatibility stays the harness's business but must be reported honestly rather than papered over. The references were gathered this round: Applite's catalog-first, asynchronously annotated package UI is the reusable pattern, Ollama's repository tree hints at version-pin plus manifest plus content-addressed blobs without documenting it, and two negatives matter as much - claude-squad makes users update the CLI themselves and vibe-kanban assumes installed agents and is sunsetting, so this class has no existing implementation to copy. Stage A must establish per family which official source exists, whether it is signed, and whether the harness self-updates, since a self-updating harness has to be handled by treating our installed tree as authoritative."
+  },
+  {
+   "id": "58",
+   "document": "work-orders/58-asset-hubs.md",
+   "baseline": "50/57 checkpoint",
+   "worktree": "/home/maoqh/projects/agent-box-env-provider",
+   "branch": "feature/env-provider-v1",
+   "depends_on": [
+    "45",
+    "50"
+   ],
+   "dependency_condition": "Folds into the same wire relock as 51/52/53/55/56/57; it builds on order 45's read-only projection model and on the registry slots already declared per family.",
+   "exclusive_group": "backend-driver-resources",
+   "stages": [
+    "A-format-and-store",
+    "B-per-family-materialisation",
+    "C-binding",
+    "D-source-sync",
+    "E-probe-and-parity"
+   ],
+   "write_paths": [
+    "src/agent_box/**",
+    "plugins/**",
+    "tests/**",
+    "scripts/server-round1/**",
+    "docs/server-round1/**",
+    "docs/implementation/status.md"
+   ],
+   "forbidden_write_roots": [
+    "/home/maoqh/projects/agent-box",
+    "/home/maoqh/projects/agent-box-studio",
+    "/home/maoqh/projects/agent-box-desktop-next",
+    "/home/maoqh/projects/agent-box-desktop-next-wsl-round1",
+    "/home/maoqh/projects/agent-box-server-round1",
+    "/home/maoqh/projects/agent-box-harness-expansion"
+   ],
+   "note": "The asset layer that the storage design already called for, now with a converged format: skills are stored as Agent Skills (a directory per skill with SKILL.md, frontmatter name and description, resources alongside - the repo carries the spec and points at agentskills.io), and MCP servers as the standard definition (stdio command/args/env or remote url/headers). Storage is content addressed with tree digests and revisions, materialisation reuses the existing read-only projection and runtime-artifact machinery driven by each family's declared slot (slots, skill_target, per-family mcp location and key spelling), and binding is a profile reference with per-turn effect, so switching takes effect on the next turn like everything else. Credentials stay references injected through the existing one-shot projection, an MCP handshake probe is bounded and cancellable and writes nothing, and external sources (skill repositories, community catalogs) sync into the local store catalog-first without silent source switching or automatic updates. The iron rule is no write-back to the user's own configuration files - every write lands in our projections and our store - and a family that does not declare a slot says so instead of faking a materialisation."
+  },
+  {
+   "id": "59",
+   "document": "work-orders/59-hook-models.md",
+   "baseline": "58 checkpoint",
+   "worktree": "/home/maoqh/projects/agent-box-env-provider",
+   "branch": "feature/env-provider-v1",
+   "depends_on": [
+    "45",
+    "50"
+   ],
+   "dependency_condition": "Folds into the same wire relock as 51/52/53/55/56/57/58; the trigger facts share order 52's bounded capture and scan rules.",
+   "exclusive_group": "backend-driver-resources",
+   "stages": [
+    "A-per-family-schema-observation",
+    "B-store-and-validate",
+    "C-materialisation",
+    "D-trigger-facts",
+    "E-regression"
+   ],
+   "write_paths": [
+    "src/agent_box/**",
+    "plugins/**",
+    "tests/**",
+    "scripts/server-round1/**",
+    "docs/server-round1/**",
+    "docs/implementation/status.md"
+   ],
+   "forbidden_write_roots": [
+    "/home/maoqh/projects/agent-box",
+    "/home/maoqh/projects/agent-box-studio",
+    "/home/maoqh/projects/agent-box-desktop-next",
+    "/home/maoqh/projects/agent-box-desktop-next-wsl-round1",
+    "/home/maoqh/projects/agent-box-server-round1",
+    "/home/maoqh/projects/agent-box-harness-expansion"
+   ],
+   "note": "Hooks are three different kinds of thing and this order refuses to flatten them: Claude Code is declarative (event to matcher group to handlers, with a large event catalog, five handler types, per-event timeouts, stdin JSON in and exit-code plus JSON out, and a read-only /hooks menu of its own); Codex exposes only a managed-hooks-only switch in the documentation reachable this round, so stage A must establish its event model by observation; OpenCode hooks are JS/TS plugins that mutate input/output and can register tools, which is code rather than configuration, so they are treated as code assets the user supplies with a digest and a preview instead of being assembled from form fields. One UI shell, per-family models validated against a declared schema, materialised into the read-only projection the harness already receives, with a typed refusal for an event the family does not support. Hooks stay disabled until the user enables them and can see the full command; they run inside the sandbox with that execution's isolation and network posture; trigger facts (id, event, time, exit code, bounded output summary) land in the ledger, and a blocking exit code is reported as blocking rather than as an ordinary success."
+  },
+  {
+   "id": "60",
+   "document": "work-orders/60-profile-settings.md",
+   "baseline": "58/59 checkpoint",
+   "worktree": "/home/maoqh/projects/agent-box-env-provider",
+   "branch": "feature/env-provider-v1",
+   "depends_on": [
+    "55",
+    "58"
+   ],
+   "dependency_condition": "Folds into the same wire relock as 51-59; needs the provider/model records (55) and the asset layer (58) to have surfaces before the profile can bind them.",
+   "exclusive_group": "backend-driver-resources",
+   "stages": [
+    "A-record-fields",
+    "B-permission-resolution",
+    "C-ownership-correction",
+    "D-clone",
+    "E-switch-continuity",
+    "F-regression"
+   ],
+   "write_paths": [
+    "src/agent_box/**",
+    "plugins/**",
+    "tests/**",
+    "scripts/server-round1/**",
+    "docs/server-round1/**",
+    "docs/implementation/status.md"
+   ],
+   "forbidden_write_roots": [
+    "/home/maoqh/projects/agent-box",
+    "/home/maoqh/projects/agent-box-studio",
+    "/home/maoqh/projects/agent-box-desktop-next",
+    "/home/maoqh/projects/agent-box-desktop-next-wsl-round1",
+    "/home/maoqh/projects/agent-box-server-round1",
+    "/home/maoqh/projects/agent-box-harness-expansion"
+   ],
+   "note": "The profile becomes the single binding point for every asset - model slot, credential or account reference, skills, MCP servers, hooks, an instruction asset, and per-tool permission rules - with the per-tool rule vocabulary taken from the reference: read/edit/bash/task/external_directory/webfetch/skill and friends each set to ask, allow or deny, with glob to action maps and last matching rule winning, ask implemented by the approvals round trip that already exists, and full access, default and plan existing only as presets that per-tool rules override. Resolution may only ever tighten what a tool could already do. Two semantic corrections ride along: a session is not owned by a profile - it belongs to the workspace and the product, the profile is the current binding, and attribution is per turn, which the schema already does via server_turns.profile_id, profile_revision and native_generation - and a family is strongly bound to a profile, so switching harness in place is not offered; the only path is cloning into a new profile of another family, copying and translating as much as each family allows, never migrating session-type assets, and never pretending the clone inherited the old native session. Switching the binding within the same harness is allowed and honest per the family's storage shape: file-per-session journals let the session's own native files move into the new home with an auditable record, while shared-database families restart natively and say so."
   }
  ],
  "authority": "docs/implementation",
