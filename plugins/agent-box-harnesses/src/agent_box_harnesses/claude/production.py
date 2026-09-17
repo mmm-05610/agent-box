@@ -208,6 +208,7 @@ def harness_deployment(
             if projection_files_override is not None else projection_files()
         )],
         "stateProjection": {"target": STATE_TARGET},
+        "usageProbe": {"journalSuffix": ".jsonl", "format": "claude-projects-line"},
         "adapter": {
             "command": "/usr/bin/node",
             "args": [ADAPTER_ARTIFACT_ENTRY],

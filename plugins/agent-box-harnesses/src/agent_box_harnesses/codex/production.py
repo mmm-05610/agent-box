@@ -318,6 +318,7 @@ def harness_deployment(
             "target": STATE_TARGET,
             "ephemeralPaths": [".tmp", "shell_snapshots"],
         },
+        "usageProbe": {"journalSuffix": ".jsonl", "format": "codex-rollout"},
         # §14: this family's session subtree is splittable from the rest
         # of its home, so it lives in the per-harness session store.
         "sessionStore": {"kind": "sessions-subtree"},

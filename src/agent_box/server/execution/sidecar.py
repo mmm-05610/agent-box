@@ -708,9 +708,6 @@ class _WorkerChannels:
             chunks.extend(base64.b64decode(item["data"], validate=True))
             if item.get("eof") is True:
                 break
-            nxt = item.get("nextOffset")
-            if not isinstance(nxt, int) or nxt <= len(chunks):
-                raise SidecarError("SIDECAR_STATE_INVALID", "home fetch made no progress")
             if len(chunks) > 4 * 1024 * 1024:
                 raise SidecarError(
                     "SIDECAR_STATE_OUTSIDE_BOUNDS", "usage journal exceeds the read bound",

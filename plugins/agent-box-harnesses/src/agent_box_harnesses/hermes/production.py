@@ -427,6 +427,7 @@ def harness_deployment(
             if projection_files_override is not None else projection_files()
         )],
         "stateProjection": {"target": STATE_TARGET},
+        "usageProbe": {"journalSuffix": "state.db", "format": "hermes-state-db"},
         "adapter": {
             "command": ADAPTER_COMMAND,
             "args": list(ADAPTER_ARGS),

@@ -10,6 +10,8 @@ refusal, not a silent fallback.
 from __future__ import annotations
 
 import json
+import os
+from pathlib import Path
 from typing import Any
 
 
@@ -81,10 +83,125 @@ def parse_pi_acp_journal(content: bytes) -> dict[str, Any] | None:
     return fact
 
 
+def parse_codex_rollout(content: bytes) -> dict[str, Any] | None:
+    """The Codex rollout journal: one JSON object per line.
+
+    Lines carry the harness's own cumulative counters (``total_token_usage``
+    with ``input_tokens`` / ``output_tokens`` / ``total_tokens``). The parser
+    returns the *last* counters it saw — the harness's own session-to-date
+    numbers, copied verbatim; deriving per-turn deltas is the ledger's call,
+    not the parser's invention.
+    """
+    fact: dict[str, int] | None = None
+    for line in content.decode("utf-8", errors="replace").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(row, dict):
+            continue
+        # First-hand shape: the counters live at
+        # payload.info.total_token_usage — nested, not top-level.
+        payload = row.get("payload")
+        info = payload.get("info") if isinstance(payload, dict) else None
+        usage = info.get("total_token_usage") if isinstance(info, dict) else None
+        if not isinstance(usage, dict):
+            continue
+        candidate = _neutral(
+            input_tokens=usage.get("input_tokens"),
+            output_tokens=usage.get("output_tokens"),
+            total_tokens=usage.get("total_tokens"),
+        )
+        if candidate:
+            fact = candidate
+    return fact
+
+
+def parse_claude_projects_line(content: bytes) -> dict[str, Any] | None:
+    """The Claude project journal: one JSON object per line.
+
+    Assistant rows carry ``message.usage`` with ``input_tokens``,
+    ``output_tokens`` and the cache-token fields. The parser returns the last
+    row whose usage was reported.
+    """
+    fact: dict[str, int] | None = None
+    for line in content.decode("utf-8", errors="replace").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(row, dict):
+            continue
+        message = row.get("message")
+        usage = message.get("usage") if isinstance(message, dict) else None
+        if not isinstance(usage, dict):
+            continue
+        candidate = _neutral(
+            input_tokens=usage.get("input_tokens"),
+            output_tokens=usage.get("output_tokens"),
+            cache_read_tokens=usage.get("cache_read_input_tokens"),
+            cache_write_tokens=usage.get("cache_creation_input_tokens"),
+        )
+        if candidate:
+            fact = candidate
+    return fact
+
+
+def parse_hermes_state_db(content: bytes) -> dict[str, Any] | None:
+    """The Hermes session database (SQLite) opened from the fetched bytes.
+
+    ``sessions`` carries the family's own per-session counters
+    (``input_tokens`` / ``output_tokens`` / ``cache_read_tokens`` /
+    ``cache_write_tokens`` / ``reasoning_tokens``). The parser opens the bytes
+    as a read-only scratch database, takes the newest row by the store's own
+    ordering (last rowid), and copies exactly the reported fields.
+    """
+    import sqlite3
+    import tempfile
+
+    scratch = Path(tempfile.gettempdir()) / f"agentbox-usage-{os.getpid()}-{id(content)}.db"
+    try:
+        scratch.write_bytes(content)
+        connection = sqlite3.connect(f"file:{scratch}?mode=ro", uri=True)
+        try:
+            columns = [row[1] for row in connection.execute("PRAGMA table_info(sessions)")]
+            wanted = [name for name in (
+                "input_tokens", "output_tokens", "cache_read_tokens",
+                "cache_write_tokens", "reasoning_tokens",
+            ) if name in columns]
+            if not wanted:
+                return None
+            selection = ", ".join(wanted)
+            row = connection.execute(
+                f"SELECT {selection} FROM sessions ORDER BY rowid DESC LIMIT 1"
+            ).fetchone()
+        finally:
+            connection.close()
+    except sqlite3.Error:
+        return None
+    finally:
+        try:
+            scratch.unlink()
+        except OSError:
+            pass
+    if row is None:
+        return None
+    return _neutral(**{name: value for name, value in zip(wanted, row)})
+
+
 #: The registered formats. A deployment may only declare one of these names;
 #: anything else is a deployment refusal.
 FORMATS = {
     "pi-acp-journal": parse_pi_acp_journal,
+    "codex-rollout": parse_codex_rollout,
+    "claude-projects-line": parse_claude_projects_line,
+    "hermes-state-db": parse_hermes_state_db,
 }
 
 

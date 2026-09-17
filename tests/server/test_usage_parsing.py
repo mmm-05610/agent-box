@@ -7,6 +7,8 @@ is substituted, and an unregistered format is a typed refusal.
 from __future__ import annotations
 
 import json
+import pathlib
+import tempfile
 
 import pytest
 
@@ -71,11 +73,91 @@ def test_malformed_lines_are_skipped_not_fatal():
 
 
 def test_an_unregistered_format_is_a_typed_refusal():
+    # codex-rollout is registered now (order 51's per-family parsers); the
+    # refusal check uses a name that no parser claims.
     with pytest.raises(UsageParseError) as refusal:
-        parse_usage("codex-rollout", b"{}")
+        parse_usage("made-up-format", b"{}")
     assert refusal.value.code == "USAGE_FORMAT_UNREGISTERED"
 
 
 def test_the_registered_parser_is_reachable_by_name():
     fact = parse_usage("pi-acp-journal", _journal(ASSISTANT))
     assert fact is not None and fact["totalTokens"] == 18
+
+
+def test_codex_rollout_copies_the_cumulative_counters():
+    """First-hand shape (stage A): rollout lines carry the harness's own
+    session-to-date counters — copied verbatim, not re-derived."""
+    from agent_box.server.execution.usage import parse_codex_rollout
+
+    # The real nesting (first-hand): payload.info.total_token_usage.
+    content = _journal(
+        {"timestamp": "2026-09-17T09:00:00Z", "type": "session_meta"},
+        {"type": "event_msg", "payload": {"type": "token_count", "info": {
+            "total_token_usage": {"input_tokens": 120, "output_tokens": 45,
+                                  "total_tokens": 165}}}},
+        {"type": "event_msg", "payload": {"type": "token_count", "info": {
+            "total_token_usage": {"input_tokens": 200, "output_tokens": 90,
+                                  "total_tokens": 290}}}},
+    )
+    fact = parse_codex_rollout(content)
+    assert fact == {"inputTokens": 200, "outputTokens": 90, "totalTokens": 290}
+    assert parse_codex_rollout(b'{"type": "session_meta"}\n') is None
+
+
+def test_claude_projects_line_maps_the_message_usage():
+    """First-hand shape (stage A): assistant rows carry message.usage with the
+    Anthropic token names, including the two cache fields."""
+    from agent_box.server.execution.usage import parse_claude_projects_line
+
+    content = _journal(
+        {"type": "user", "message": {"role": "user", "content": "hi"}},
+        {"type": "assistant", "message": {"role": "assistant", "content": [], "usage": {
+            "input_tokens": 9, "output_tokens": 3,
+            "cache_creation_input_tokens": 100, "cache_read_input_tokens": 7,
+        }}},
+    )
+    fact = parse_claude_projects_line(content)
+    assert fact == {"inputTokens": 9, "outputTokens": 3,
+                    "cacheReadTokens": 7, "cacheWriteTokens": 100}
+
+
+def test_hermes_state_db_reads_the_newest_session_row(tmp_path):
+    """First-hand shape (stage A): the hermes store carries the fullest
+    breakdown in its sessions table."""
+    import sqlite3
+
+    db = tmp_path / "state.db"
+    connection = sqlite3.connect(db)
+    connection.execute(
+        "CREATE TABLE sessions (id TEXT PRIMARY KEY, input_tokens INTEGER, "
+        "output_tokens INTEGER, cache_read_tokens INTEGER, "
+        "cache_write_tokens INTEGER, reasoning_tokens INTEGER)"
+    )
+    connection.execute(
+        "INSERT INTO sessions VALUES ('older', 1, 1, 0, 0, 0)"
+    )
+    connection.execute(
+        "INSERT INTO sessions VALUES ('newest', 300, 40, 12, 5, 9)"
+    )
+    connection.commit()
+    connection.close()
+
+    from agent_box.server.execution.usage import parse_hermes_state_db
+
+    fact = parse_hermes_state_db(db.read_bytes())
+    assert fact == {"inputTokens": 300, "outputTokens": 40, "cacheReadTokens": 12,
+                    "cacheWriteTokens": 5, "reasoningTokens": 9}
+
+
+def test_hermes_db_without_the_sessions_table_is_a_none_not_a_guess(tmp_path):
+    from agent_box.server.execution.usage import parse_hermes_state_db
+    import sqlite3
+
+    db = tmp_path / "state.db"
+    connection = sqlite3.connect(db)
+    connection.execute("CREATE TABLE unrelated (x INTEGER)")
+    connection.commit()
+    connection.close()
+    assert parse_hermes_state_db(db.read_bytes()) is None
+    db.unlink()
