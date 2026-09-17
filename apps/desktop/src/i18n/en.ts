@@ -506,6 +506,20 @@ export const en: Translations = {
         testConnection: 'Test connection',
         capabilityUnavailable: 'Unavailable: the service declares no method for this yet.',
       },
+      accounts: {
+        title: 'Accounts',
+        description: 'Subscriptions and API keys this Desktop holds. Both are references: a record carries an opaque id, never material.',
+        empty: 'No account records yet',
+        emptyDescription: 'Add an API key here, or finish an official login on the execution side — this app never collects login details itself.',
+        kindSubscription: 'Subscription (official login)',
+        kindApiKey: 'API key',
+        statusUnknown: 'Status unknown',
+        statusUnknownTitle: 'No service surface can probe accounts yet',
+        lastVerified: 'Last verified',
+        unknown: 'unknown',
+        loginGuidance: 'Sign in on the execution side with the harness’s own login flow. This app never asks for account credentials, never reads a native login state, and never copies a token.',
+        hotSwitchNote: 'Switching the account for a profile takes effect on the next turn — each turn materializes its own process, so nothing has to be restarted and a running turn keeps the account it started with.'
+      },
       resources: {
         title: 'Skills & MCP',
         description: 'Manage a shared resource library, then explicitly select resources on each Profile.',

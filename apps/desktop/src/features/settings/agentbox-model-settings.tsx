@@ -27,6 +27,8 @@ import {
 } from '@/store/agentbox-service'
 import type { ProviderModelConfigRecord } from '@/types/wire/wire-v1'
 
+import { AccountList } from './account-list'
+
 import { CUSTOM_HARNESS, CUSTOM_PROVIDER, harnessOptions, knownModelIds, providerOptions } from './provider-presets'
 
 type ModelsCopy = Translations['settings']['product']['models']
@@ -342,6 +344,9 @@ export function AgentBoxModelSettings({ credentials, maintenance }: AgentBoxMode
           />
         ))}
       </SettingsSection>
+      {/* P12: the records seen as accounts — subscription and key as peers,
+          status unknown until a service surface can probe them. */}
+      <AccountList records={credentialRecords} />
       {adding && (
         <SettingsSection icon={Plus} title={copy.credentialAdd}>
           <div className="grid gap-2">

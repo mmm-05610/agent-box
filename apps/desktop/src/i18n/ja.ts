@@ -388,6 +388,20 @@ export const ja = defineLocale({
         testConnection: '接続テスト',
         capabilityUnavailable: '利用不可：サービスはまだ対応するメソッドを宣言していません。',
       },
+      accounts: {
+        title: 'アカウント',
+        description: 'この Desktop が保持するサブスクリプションと API キー。いずれも参照のみで、記録には不透明な id だけが入ります。',
+        empty: 'アカウント記録はまだありません',
+        emptyDescription: 'ここで API キーを追加するか、実行側で公式ログインを完了してください。本アプリはログイン情報を収集しません。',
+        kindSubscription: 'サブスクリプション（公式ログイン）',
+        kindApiKey: 'API キー',
+        statusUnknown: '状態不明',
+        statusUnknownTitle: 'アカウントを調査できるサービス面はまだありません',
+        lastVerified: '最終確認',
+        unknown: '不明',
+        loginGuidance: '実行側で harness 自身のログインフローを使ってサインインしてください。本アプリはアカウント資格情報を求めず、ネイティブログイン状態を読まず、トークンを複製しません。',
+        hotSwitchNote: 'プロファイルのアカウント切替は**次のターン**から有効です。ターンごとにプロセスを物化するため再起動は不要で、実行中のターンは開始時のアカウントを使い続けます。'
+      },
       resources: {
         title: 'Skills と MCP',
         description: '共有リソースライブラリを管理し、各 Profile で明示的に選択します。',

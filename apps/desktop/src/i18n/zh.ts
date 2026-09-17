@@ -491,6 +491,20 @@ export const zh: Translations = {
         testConnection: '测试连接',
         capabilityUnavailable: '不可用：服务尚未声明对应方法。',
       },
+      accounts: {
+        title: '账号',
+        description: '本机持有的订阅与 API key。两者都只是引用：记录里只有不透明 id，绝不含材料。',
+        empty: '暂无账号记录',
+        emptyDescription: '在此添加 API key，或在执行侧完成官方登录——本应用绝不代收登录信息。',
+        kindSubscription: '订阅（官方登录）',
+        kindApiKey: 'API key',
+        statusUnknown: '状态未知',
+        statusUnknownTitle: '服务尚未提供账号探测面',
+        lastVerified: '上次验证',
+        unknown: '未知',
+        loginGuidance: '请在执行侧用该 harness 自己的登录流程完成登录。本应用绝不索取账号凭据、不读取原生登录态、也不复制令牌。',
+        hotSwitchNote: '为角色切换账号在下一轮生效——每轮各自物化进程，因此无需重启，运行中的一轮继续使用它开始时使用的账号。'
+      },
       resources: {
         title: 'Skills 与 MCP',
         description: '管理共享资源库，再由每个 Profile 明确选择资源。',

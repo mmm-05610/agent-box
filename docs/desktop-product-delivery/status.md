@@ -1280,3 +1280,14 @@ typecheck 当场暴露；新测试 4 条 ESLint warning 收口为 0。
 - 参照决定（LibreChat `modelSpecs` / cc-switch 的学与不学）逐条记入 evidence §2，含「写 live 配置文件=其缺陷，我们按轮物化」。
 - 下一步按派工表执行 **P12**（订阅账号）。writer_lease 继续 ACTIVE。
 
+## P12 收口（2026-09-17）：订阅/账号 — `P12_GREEN — ACCOUNTS_CLIENT_READY`
+
+- **门结果**（完整证据 `evidence/P12.md`）：
+  - **G1 两类并列成立**：`subscription` 与 `api-key` 同一条记录形状承载（kind 为数据；未知 kind 原样显示），都只被引用、都不内联。
+  - **G2 状态诚实成立**：状态与「最后验证」恒为**未知**并写明“服务尚未提供探测面”；用例断言页面不出现 valid/active/expired 占位。
+  - **G3 零泄漏成立**：只渲染 id/kind/label；反例断言无密钥形状与 `Bearer` 文本；`credentials.add` 仍是唯一、单向上行的入口。
+  - **G4 不越界成立**：无登录实现（不代填/不抓取/不读原生登录态）；**“下一轮生效”的热切换语义在界面可见**（用例锁定）。
+  - **G5 不退化成立**：settings+i18n **47 files / 412 tests 全通过，exit 0**；`tsc -p . --noEmit` exit 0；改动文件 ESLint 0/0。
+- **等待项**：状态探测/最后验证（后端 56）、归属家族字段、按家族的具体登录命令、并行各轮各号的服务侧物化。
+- 下一步按派工表执行 **P13**（harness 程序管理器）。writer_lease 继续 ACTIVE。
+

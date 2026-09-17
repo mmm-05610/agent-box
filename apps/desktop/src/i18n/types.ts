@@ -451,6 +451,20 @@ export interface Translations {
         testConnection: string
         capabilityUnavailable: string
       }
+      accounts: {
+        title: string
+        description: string
+        empty: string
+        emptyDescription: string
+        kindSubscription: string
+        kindApiKey: string
+        statusUnknown: string
+        statusUnknownTitle: string
+        lastVerified: string
+        unknown: string
+        loginGuidance: string
+        hotSwitchNote: string
+      }
       resources: { title: string; description: string; boundary: string }
       identities: { title: string; description: string; boundary: string }
       harnesses: { title: string; description: string; boundary: string }

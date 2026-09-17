@@ -380,6 +380,20 @@ export const zhHant = defineLocale({
         testConnection: '測試連線',
         capabilityUnavailable: '不可用：服務尚未宣告對應方法。',
       },
+      accounts: {
+        title: '帳號',
+        description: '本機持有的訂閱與 API key。兩者都只是引用：記錄裡只有不透明 id，絕不含材料。',
+        empty: '尚無帳號記錄',
+        emptyDescription: '在此新增 API key，或在執行側完成官方登入——本應用絕不代收登入資訊。',
+        kindSubscription: '訂閱（官方登入）',
+        kindApiKey: 'API key',
+        statusUnknown: '狀態未知',
+        statusUnknownTitle: '服務尚未提供帳號探測面',
+        lastVerified: '上次驗證',
+        unknown: '未知',
+        loginGuidance: '請在執行側用該 harness 自己的登入流程完成登入。本應用絕不索取帳號憑據、不讀取原生登入態、也不複製權杖。',
+        hotSwitchNote: '為角色切換帳號在下一輪生效——每輪各自物化程序，因此無需重啟，執行中的一輪繼續使用它開始時使用的帳號。'
+      },
       resources: {
         title: 'Skills 與 MCP',
         description: '管理共享資源庫，再由每個 Profile 明確選擇資源。',
