@@ -353,6 +353,17 @@ export type ConfigOverride = z.infer<typeof ConfigOverrideSchema>
 /** Reusable Provider/Model configuration. Credentials stay in the Server
  *  SecretStore: only an opaque record id crosses this wire. Harness/provider
  *  values are adapter data and never client-side dispatch keys. */
+/** Order 55: where the provider's endpoint facts came from — the honest
+ *  answers are a preset catalogue, a pulled model list, or the user's own
+ *  hand entry. Fields a source did not supply stay absent: unknown, never a
+ *  guessed default. */
+export const ProviderProvenanceSchema = z.strictObject({
+  baseUrl: z.string().optional(),
+  authStyle: z.enum(['api_key', 'oauth', 'none']).optional(),
+  wireApi: z.enum(['chat_completions', 'responses']).optional(),
+  fieldsSource: z.enum(['preset', 'pulled', 'manual']).optional()
+})
+
 export const ProviderModelConfigRecordSchema = z.strictObject({
   id: WireIdSchema,
   version: RecordVersionSchema,
@@ -370,6 +381,7 @@ export const ProviderModelConfigRecordSchema = z.strictObject({
     })
   ),
   archivedAt: WireTimestampSchema.nullable(),
+  provenance: ProviderProvenanceSchema.nullable().optional(),
   createdAt: WireTimestampSchema,
   updatedAt: WireTimestampSchema
 })
@@ -665,7 +677,10 @@ const ProviderModelWriteFieldsSchema = z.strictObject({
   models: ProviderModelConfigRecordSchema.shape.models
 })
 
-export const ProviderModelsCreateParamsSchema = ProviderModelWriteFieldsSchema.extend({ requestId: RequestIdSchema })
+export const ProviderModelsCreateParamsSchema = ProviderModelWriteFieldsSchema.extend({
+  requestId: RequestIdSchema,
+  provenance: ProviderProvenanceSchema.optional()
+})
 export type ProviderModelsCreateParams = z.infer<typeof ProviderModelsCreateParamsSchema>
 export const ProviderModelsCreateResultSchema = z.strictObject({
   providerModel: ProviderModelConfigRecordSchema
