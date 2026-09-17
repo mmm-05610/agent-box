@@ -2823,7 +2823,7 @@ export const zh: Translations = {
     },
     serviceUnreachable: '无法连接到 Pacthold 服务',
     workspaceMissing: '为这次对话选择项目',
-    disabledPlaceholder: '发送已暂停——见输入框上方的说明',
+    disabledPlaceholder: '发送已暂停——请先选择项目（和角色）',
     modelSelector: '模型',
     modelSelectorSearch: '搜索模型…',
     modelSelectorEmpty: '暂无可用模型',

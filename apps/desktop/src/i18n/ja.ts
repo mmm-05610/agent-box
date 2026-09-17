@@ -2299,7 +2299,7 @@ export const ja = defineLocale({
     },
     serviceUnreachable: 'Pacthold サービスに接続できません',
     workspaceMissing: 'このチャットのプロジェクトを選んでください',
-    disabledPlaceholder: '送信は保留中です — 入力欄の上の案内をご覧ください',
+    disabledPlaceholder: '送信は保留中です — プロジェクト（とロール）を選択してください',
     modelSelector: 'モデル',
     modelSelectorSearch: 'モデルを検索…',
     modelSelectorEmpty: '利用可能なモデルがありません',

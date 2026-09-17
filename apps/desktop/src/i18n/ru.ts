@@ -2608,7 +2608,7 @@ export const ru = defineLocale({
     },
     serviceUnreachable: 'Сервис Ordessa недоступен',
     workspaceMissing: 'Выберите проект для этого чата',
-    disabledPlaceholder: 'Отправка приостановлена — см. пояснение над полем ввода',
+    disabledPlaceholder: 'Отправка приостановлена — выберите проект (и роль), чтобы начать',
     modelSelector: 'Модель',
     modelSelectorSearch: 'Поиск моделей…',
     modelSelectorEmpty: 'Нет доступных моделей',

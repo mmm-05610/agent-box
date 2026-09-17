@@ -2239,7 +2239,7 @@ export const zhHant = defineLocale({
     },
     serviceUnreachable: '無法連線到 Pacthold 服務',
     workspaceMissing: '為這次對話選擇專案',
-    disabledPlaceholder: '傳送已暫停——見輸入框上方的說明',
+    disabledPlaceholder: '傳送已暫停——請先選擇專案（和角色）',
     modelSelector: '模型',
     modelSelectorSearch: '搜尋模型…',
     modelSelectorEmpty: '暫無可用模型',

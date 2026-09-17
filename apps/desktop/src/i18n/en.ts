@@ -2666,7 +2666,7 @@ export const en: Translations = {
     },
     serviceUnreachable: 'The Pacthold service is not reachable',
     workspaceMissing: 'Choose a project for this chat',
-    disabledPlaceholder: 'Sending is on hold — see the note above the input',
+    disabledPlaceholder: 'Sending is on hold — choose a project (and a role) to start',
     modelSelector: 'Model',
     modelSelectorSearch: 'Search models…',
     modelSelectorEmpty: 'No models available',

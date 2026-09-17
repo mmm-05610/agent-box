@@ -1911,7 +1911,7 @@ export const ar = defineLocale({
     },
     serviceUnreachable: 'تعذّر الوصول إلى خدمة Pacthold',
     workspaceMissing: 'اختر مشروعًا لهذه المحادثة',
-    disabledPlaceholder: 'الإرسال متوقف — راجع الملاحظة أعلى حقل الإدخال',
+    disabledPlaceholder: 'الإرسال متوقف — اختر مشروعًا (ودورًا) للبدء',
     modelSelector: 'النموذج',
     modelSelectorSearch: 'ابحث في النماذج…',
     modelSelectorEmpty: 'لا توجد نماذج متاحة',
