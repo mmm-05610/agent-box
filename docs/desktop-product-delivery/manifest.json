@@ -186,6 +186,29 @@
       "note": "The role page becomes the single binding point - instruction asset, model slot, credential or account, skill/MCP/hook selection, and a per-tool permission table replacing the single mode chip, with ask/allow/deny, glob maps, last-match-wins stated in the UI, presets that per-tool rules override, and ask explained as the approvals round trip it already is. Every section is editable; a family that does not support a slot says so instead of showing a dead control. The order also carries the user's ownership correction: a session belongs to the workspace, never to a profile, so no surface may say 'this profile's sessions' - the current binding and the per-turn attribution are what get shown, and rebinding is an action on the session. Consequences are stated before the action, not after: within one harness the family's storage shape decides whether the native session moves along (file-per-session journals) or restarts (shared databases), and changing family is only offered as cloning into a new profile, listing what migrates and what cannot, with session-type assets explicitly excluded and no claim of inheriting the old native session."
     },
     {
+      "id": "P18",
+      "file": "work-orders/P18-ordessa-rebrand.md",
+      "depends_on": [
+        "P17"
+      ],
+      "exclusive_group": "desktop-product",
+      "scope": [
+        "docs/branding/**",
+        "apps/desktop/src/**",
+        "apps/desktop/electron/**",
+        "apps/desktop/package.json",
+        "package-lock.json",
+        "apps/desktop/public/**",
+        "apps/desktop/assets/**",
+        "apps/desktop/e2e/**",
+        "tests-js/**",
+        "scripts/**",
+        "README.md"
+      ],
+      "requires_approved_contract": false,
+      "note": "Route (a) per the user: the rename queues behind this worktree's current orders and is not urgent. The app becomes Ordessa while the service it connects to stays Pacthold - backend errors and service names are not relabelled Ordessa - and Workspace, Session and Profile keep their product meaning, with no new governance navigation and no workflow rewrite. The audit is already in hand and its sharpest finding is that the identity layer is still upstream: name hermes, productName Hermes, author Nous Research, appId com.nousresearch.hermes, executableName Hermes, artifactName Hermes-*, and a registered hermes:// scheme. Changing appId therefore starts a fresh desktop userData while the Server's data root - which holds profiles, sessions and credentials - is unaffected, and that trade is stated before the change rather than discovered after it. There is no auto-update channel at all (no electron-updater, --publish never), so the order reports that instead of inventing a feed. Hard gates: AGENTBOX_SERVER_ROOT, AGENTBOX_SERVER_PORT, secrets/http-token, port 8732, IPC channels and existing storage keys stay untouched with ORDESSA_* only as aliases, the wire digests stay byte-identical, and verification ends with a real launch smoke running the app under its new name against Pacthold for one no-model turn. No migration of old data, no push, no remote rename, no release, no paid calls."
+    },
+    {
       "id": "P08",
       "file": "work-orders/P08-composer-input-bar.md",
       "depends_on": [
