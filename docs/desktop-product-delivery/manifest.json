@@ -209,6 +209,24 @@
       "note": "Route (a) per the user: the rename queues behind this worktree's current orders and is not urgent. The app becomes Ordessa while the service it connects to stays Pacthold - backend errors and service names are not relabelled Ordessa - and Workspace, Session and Profile keep their product meaning, with no new governance navigation and no workflow rewrite. The audit is already in hand and its sharpest finding is that the identity layer is still upstream: name hermes, productName Hermes, author Nous Research, appId com.nousresearch.hermes, executableName Hermes, artifactName Hermes-*, and a registered hermes:// scheme. Changing appId therefore starts a fresh desktop userData while the Server's data root - which holds profiles, sessions and credentials - is unaffected, and that trade is stated before the change rather than discovered after it. There is no auto-update channel at all (no electron-updater, --publish never), so the order reports that instead of inventing a feed. Hard gates: AGENTBOX_SERVER_ROOT, AGENTBOX_SERVER_PORT, secrets/http-token, port 8732, IPC channels and existing storage keys stay untouched with ORDESSA_* only as aliases, the wire digests stay byte-identical, and verification ends with a real launch smoke running the app under its new name against Pacthold for one no-model turn. No migration of old data, no push, no remote rename, no release, no paid calls."
     },
     {
+      "id": "P19",
+      "file": "work-orders/P19-composer-sidebar-density.md",
+      "depends_on": [
+        "P18"
+      ],
+      "exclusive_group": "desktop-product",
+      "scope": [
+        "docs/desktop-product-delivery/**",
+        "apps/desktop/src/features/chat/**",
+        "apps/desktop/src/components/assistant-ui/**",
+        "apps/desktop/src/i18n/**",
+        "apps/desktop/e2e/**",
+        "tests-js/**"
+      ],
+      "requires_approved_contract": false,
+      "note": "Density and control-placement alignment to the user's reference shots, not a rewrite. The transcript keeps the plain Hermes style per the user's ruling - the AI Elements re-skin is demoted to optional per-component adoption. The composer keeps its single-container anatomy (text above, one control row below) with the access chip on the left next to +, the context ring, model chip and send on the right, and the disabled state must show its reason visibly instead of pointing at a note that does not render. The sidebar tightens to the reference density - action row, group switch, dense two-level project-to-session list with relative time and status dots - while P10's existing behaviours and tests stay. Stage A seeds a session over the wire and measures the populated state against the reference before any styling changes."
+    },
+    {
       "id": "P08",
       "file": "work-orders/P08-composer-input-bar.md",
       "depends_on": [
