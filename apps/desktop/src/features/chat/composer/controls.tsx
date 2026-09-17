@@ -54,11 +54,9 @@ export function ComposerControls({
       {!hudMode && state.profile ? (
         <>
           <ComposerProfileControls profile={state.profile} />
-          <ComposerModelSelector profile={state.profile} />
-          {/* The wire carries no usage fact today (P08 evidence: zero hits in
-              the locked schema and the Server), so the composition passes no
-              data and the pill reads "unknown" — never an estimate. */}
+          {/* Reference order: the usage ring reads before the model chip. */}
           <ContextUsagePill percent={null} />
+          <ComposerModelSelector profile={state.profile} />
         </>
       ) : null}
       {minimal || state.model.hidden ? null : (

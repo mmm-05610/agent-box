@@ -1351,6 +1351,9 @@ export function ChatBar({
                   >
                     <div className="flex translate-y-[3px] items-start gap-(--composer-control-gap) self-start [grid-area:menu]">
                       {contextMenu}
+                      {agentBoxAuthority && state.profile ? (
+                        <ComposerAccessChip profile={state.profile} />
+                      ) : null}
                       <ContribSlot area={COMPOSER_AREAS.leading} />
                     </div>
                     <div className="min-w-0 [grid-area:input]">{input}</div>
