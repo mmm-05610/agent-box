@@ -69,6 +69,26 @@
       "note": "Provider/model configuration interaction rework: choose a provider preset (endpoint, auth style, wire style, credential reference) with explicit overrides instead of free-text fields, pick models from a fetched list or by hand, each carrying display name, context window and capability toggles with their provenance, test the connection, then bind the record plus model to a profile's model slot. Credentials stay references and never appear in any surface. Fields without a source show unknown. The fetch and test buttons must render as unavailable until the backend order 55 provides them - no fake buttons."
     },
     {
+      "id": "P12",
+      "file": "work-orders/P12-subscription-accounts.md",
+      "depends_on": [
+        "P11"
+      ],
+      "exclusive_group": "desktop-product",
+      "scope": [
+        "docs/desktop-product-delivery/**",
+        "apps/desktop/src/features/settings/**",
+        "apps/desktop/src/features/profiles/**",
+        "apps/desktop/src/api/**",
+        "apps/desktop/src/types/**",
+        "apps/desktop/src/i18n/**",
+        "apps/desktop/e2e/**",
+        "tests-js/**"
+      ],
+      "requires_approved_contract": true,
+      "note": "Subscriptions as first-class credentials, alongside API keys: an account list showing family, account identity, status and last verification, binding a profile to an account or an API key record, a manual login guide for the execution side, and honest status (valid, expired, unknown). The login state itself lives in that profile's native home because the harness writes and refreshes it there, which is exactly the order-45 model; it is never moved into the SecretStore and nothing is written back per run, so there is no per-run token plumbing. Multiple accounts means multiple profiles - one home, one account, no hot swapping. Credentials are never displayed, filled in or scraped, and the host's own login state stays untouched. The account-state probes come from backend order 56."
+    },
+    {
       "id": "P08",
       "file": "work-orders/P08-composer-input-bar.md",
       "depends_on": [
