@@ -31,12 +31,12 @@
  "deploymentDocument": {
   "hostPaths": false,
   "note": "the same document runs both placements; placement is chosen per open",
-  "path": "/tmp/agentbox-ssh-env-gate-pu9yqx0k/deployment.json",
+  "path": "/tmp/agentbox-ssh-env-gate-44ks2s4b/deployment.json",
   "sha256": "sha256:6026b906712d97d4c75cad56ba896dad3fd3923cb1667282ff994eabf4387266"
  },
  "executionIds": [
-  "execution_5b9b63cac07c4b038b1c4c8f19be01bd",
-  "execution_f258b211a53e4b8c96025564998ef956"
+  "execution_421bed7d8e814f87bc09d137133467e5",
+  "execution_fc3d16edbc95415f9b98cc52b51e94b5"
  ],
  "model": {
   "endpoint": "none; the peer answers from a fixed script",
@@ -71,7 +71,7 @@
   ],
   "deltas": 1,
   "state": "completed",
-  "turnId": "execution_5b9b63cac07c4b038b1c4c8f19be01bd"
+  "turnId": "execution_421bed7d8e814f87bc09d137133467e5"
  },
  "roundTwo": {
   "captureEvents": [
@@ -88,7 +88,7 @@
   ],
   "deltas": 1,
   "state": "completed",
-  "turnId": "execution_f258b211a53e4b8c96025564998ef956"
+  "turnId": "execution_fc3d16edbc95415f9b98cc52b51e94b5"
  },
  "script": "scripts/server-round1/env-provider-gate.py",
  "ssh": {
@@ -99,7 +99,7 @@
   "user": "root",
   "workspace": "/root/agentbox-env-gate/run"
  },
- "temporaryRoot": "/tmp/agentbox-ssh-env-gate-pu9yqx0k",
+ "temporaryRoot": "/tmp/agentbox-ssh-env-gate-44ks2s4b",
  "temporaryRootRemoved": true,
  "workspace": {
   "created": true,
@@ -108,7 +108,7 @@
    "kind": "ssh",
    "user": "root"
   },
-  "id": "ws_3caa438edf694600ab074f8bd2c00135",
+  "id": "ws_6b96e74e9d2c4e8d9e83bf22b11158c4",
   "normalizedPath": "/root/agentbox-env-gate/run"
  }
 }

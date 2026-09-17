@@ -181,3 +181,14 @@ PYTHONPATH=src:plugins/*/src python3 scripts/server-round1/env-provider-gate.py 
 - SSH 远端多用户/多租户、跳板机、密钥托管（§3.6 明示不做）。
 - `experimental` 置换：无。三条未放宽：只读配置 / tmpfs 遮蔽 / 受保护路径原样保留；
   两条门没有为通过而放宽任何断言。
+
+## 7. 追记（2026-09-17，工单 46 收口复跑）
+
+- 45-A 把 Worker 控制协议升到 **4**（双向拒绝按设计生效）。上文记录的
+  `sha256:163e6d3e…` 是 44 期协议 3 构建；46 收口复跑 ssh 门时远端旧二进制以
+  `PROTOCOL_VERSION_UNSUPPORTED: client bootstrap 4 != worker 3` 拒绝握手
+  （`WORKER_DISCONNECTED`），属预期行为而非回归。
+- 处置：以当前源码重建 musl 静态 bundle（`cargo build --release --target
+  x86_64-unknown-linux-musl`），`.acceptance-bundle-musl/manifest.json` 固定新摘要
+  `sha256:49086425498f561cb4905b8b4894fccc5a213a812e52f8d9f951aa32b67bfb9b`，
+  重部署远端后 ssh 门复跑 `SSH_ENV_GATE_OK / exit 0`（详见 46 证据文档 F46-3）。

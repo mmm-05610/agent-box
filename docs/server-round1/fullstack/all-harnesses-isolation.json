@@ -1,0 +1,60 @@
+{
+ "credentialInjection": {
+  "control": "the launcher journals each room's credential as sha256+length at spawn; values never touch a home",
+  "profileA": {
+   "digestMatchesSource": true,
+   "environment": "DEEPSEEK_API_KEY",
+   "valueWrittenToHome": false
+  },
+  "profileB": {
+   "digestMatchesSource": true,
+   "environment": "HERMES_API_KEY",
+   "valueWrittenToHome": false
+  }
+ },
+ "crossCredential": {
+  "profileAHomesValueByteHits": 0,
+  "profileBAuditClean": true,
+  "profileBEventsClean": true,
+  "profileBHomeHits": 0,
+  "profileBRoomCredentialSha256": "ba0eebe942a9c4c4aec5f6d754ca953d0ec47d6a13294dd259bb5b42b5cb452c"
+ },
+ "homeA": [
+  ".agentbox-profile.json",
+  ".pi/sessions/pi/c3RhdGVmdWwtMTM.json"
+ ],
+ "homeB": [
+  ".agentbox-profile.json",
+  ".hermes/sessions/hermes/c3RhdGVmdWwtMTM.json"
+ ],
+ "homesDistinct": true,
+ "model": {
+  "cost": {
+   "authorizedRealModelCalls": 0,
+   "estimatedCny": 0
+  },
+  "mode": "no-model-fixture",
+  "realModelRequests": 0
+ },
+ "reportPath": "docs/server-round1/fullstack/all-harnesses-isolation.json",
+ "result": "ISOLATION_GATE_OK",
+ "roomInjection": [
+  {
+   "credentialBytes": 30,
+   "credentialSha256": "a648a0022a04482250f56047bdf6f1386082b29b4f80803db80aceeae880f831",
+   "harnessType": "pi",
+   "homeLocator": "isolation-pi/.pi",
+   "nativeHome": ".pi"
+  },
+  {
+   "credentialBytes": 34,
+   "credentialSha256": "ba0eebe942a9c4c4aec5f6d754ca953d0ec47d6a13294dd259bb5b42b5cb452c",
+   "harnessType": "hermes",
+   "homeLocator": "isolation-hermes/.hermes",
+   "nativeHome": ".hermes"
+  }
+ ],
+ "script": "scripts/server-round1/all-harnesses-isolation-gate.py",
+ "temporaryRoot": "/tmp/agentbox-isolation-gate-qwe2zdje",
+ "temporaryRootRemoved": true
+}

@@ -1,7 +1,7 @@
 {
  "cleanup": {
   "homePreservedOutsideAttempts": true,
-  "temporaryRoot": "/tmp/agentbox-native-home-gate-34m1rtx7"
+  "temporaryRoot": "/tmp/agentbox-native-home-gate-w0s2o22a"
  },
  "cost": {
   "authorizedRealModelCalls": 0,
@@ -31,8 +31,8 @@
   "nativePlatform": "local",
   "schemaVersion": 3,
   "truncated": {
-   "bytes": 0,
-   "entries": 0,
+   "bytes": 107,
+   "entries": 1,
    "oversize": 0
   }
  },
@@ -91,6 +91,6 @@
  "reportPath": "docs/server-round1/fullstack/native-home-gate.json",
  "result": "NATIVE_HOME_GATE_OK",
  "script": "scripts/server-round1/native-home-gate.py",
- "temporaryRoot": "/tmp/agentbox-native-home-gate-34m1rtx7",
+ "temporaryRoot": "/tmp/agentbox-native-home-gate-w0s2o22a",
  "temporaryRootRemoved": true
 }

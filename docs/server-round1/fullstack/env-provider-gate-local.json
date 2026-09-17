@@ -7,7 +7,7 @@
  ],
  "browse": {
   "entries": 0,
-  "path": "/tmp/agentbox-local-env-gate-c3x4z1yu/project"
+  "path": "/tmp/agentbox-local-env-gate-s719w7_b/project"
  },
  "capability": {
   "sessionsSend": {
@@ -45,12 +45,12 @@
  "deploymentDocument": {
   "hostPaths": false,
   "note": "the same document runs both placements; placement is chosen per open",
-  "path": "/tmp/agentbox-local-env-gate-c3x4z1yu/deployment.json",
+  "path": "/tmp/agentbox-local-env-gate-s719w7_b/deployment.json",
   "sha256": "sha256:6026b906712d97d4c75cad56ba896dad3fd3923cb1667282ff994eabf4387266"
  },
  "executionIds": [
-  "execution_941cded320ee4abe92b837f3a6a0ecdf",
-  "execution_5c5520b795e243ccac96054402b87351"
+  "execution_79bf22c34744405d94e36a72210ec291",
+  "execution_5062dfc8f04044b7b5ee0c710ad51972"
  ],
  "model": {
   "endpoint": "none; the peer answers from a fixed script",
@@ -85,7 +85,7 @@
   ],
   "deltas": 1,
   "state": "completed",
-  "turnId": "execution_941cded320ee4abe92b837f3a6a0ecdf"
+  "turnId": "execution_79bf22c34744405d94e36a72210ec291"
  },
  "roundTwo": {
   "captureEvents": [
@@ -102,10 +102,10 @@
   ],
   "deltas": 1,
   "state": "completed",
-  "turnId": "execution_5c5520b795e243ccac96054402b87351"
+  "turnId": "execution_5062dfc8f04044b7b5ee0c710ad51972"
  },
  "script": "scripts/server-round1/env-provider-gate.py",
- "temporaryRoot": "/tmp/agentbox-local-env-gate-c3x4z1yu",
+ "temporaryRoot": "/tmp/agentbox-local-env-gate-s719w7_b",
  "temporaryRootRemoved": true,
  "workspace": {
   "created": true,
@@ -114,7 +114,7 @@
    "kind": "local",
    "user": null
   },
-  "id": "ws_ab5c04d833e846108261bbab316697a4",
-  "normalizedPath": "/tmp/agentbox-local-env-gate-c3x4z1yu/project"
+  "id": "ws_b0805816a6ea432aad04b52be28970e0",
+  "normalizedPath": "/tmp/agentbox-local-env-gate-s719w7_b/project"
  }
 }
