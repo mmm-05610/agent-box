@@ -452,6 +452,23 @@ export const WireEventSchema = z.discriminatedUnion('kind', [
     kind: z.literal('message.delta'), sessionId: WireIdSchema, messageId: WireIdSchema,
     role: z.literal('assistant'), text: z.string()
   }),
+  /** Order 52: the harness's own reasoning, streamed as the model produces it. */
+  z.strictObject({
+    kind: z.literal('thought.delta'), sessionId: WireIdSchema, text: z.string()
+  }),
+  /** Order 52: the harness's plan (a full snapshot of its entries). */
+  z.strictObject({
+    kind: z.literal('plan.updated'), sessionId: WireIdSchema,
+    entries: z.array(z.strictObject({
+      id: z.string(), content: z.string(),
+      status: z.string(), priority: z.string().optional()
+    }))
+  }),
+  /** Order 52: the harness's selected interaction mode. */
+  z.strictObject({
+    kind: z.literal('mode.updated'), sessionId: WireIdSchema,
+    currentModeId: z.string()
+  }),
   /** Order 51: the usage a family's own native store reported for one turn.
    *  Fields the family did not report are absent — never zero, never
    *  estimated. Emitted once per completed turn that has a fact. */
