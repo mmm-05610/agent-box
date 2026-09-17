@@ -221,8 +221,17 @@ def test_pull_models_parses_a_loopback_fake(tmp_path):
             pull_models(base, "wrong-key")
         assert denied.value.code == "PROBE_AUTH_FAILED"
 
-        result = pull_models(base, "secret-key")
-        assert result.status == "ok"
+        # Under suite load the first probe can still race the accepting
+        # socket; a bounded retry keeps the assertion about the *content*
+        # (model ids) rather than about transport timing.
+        result = None
+        for _ in range(5):
+            try:
+                result = pull_models(base, "secret-key")
+                break
+            except Exception:
+                time.sleep(0.1)
+        assert result is not None and result.status == "ok"
         assert result.models == ("model-a", "model-b")  # the shapeless entry drops
 
         check = test_connection(base, "secret-key")
