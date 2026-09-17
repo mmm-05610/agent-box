@@ -145,6 +145,26 @@
       "note": "Settings pruning plus the two asset hubs. Every existing settings section gets a ledger row saying which product capability it serves and a keep, merge or delete verdict, where delete means the code and entry point go away rather than being hidden - the criterion being whether it relates to our Server plus Profile/Session plus family plus assets semantics. Skill Hub lists assets by name, description, source, digest and revision with install, update and delete as user actions, reusing P13's catalog-first pattern, and a family whose registry slot does not support skills says so instead of offering a switch that does nothing. MCP Hub manages stdio and remote servers with credential references only, a test connection that writes nothing, and per-profile enablement. Hooks get no management surface because the convergence does not exist, and commands are described as two different things - our command palette versus text sent to the model - so the UI cannot confuse them."
     },
     {
+      "id": "P16",
+      "file": "work-orders/P16-hook-manager.md",
+      "depends_on": [
+        "P15"
+      ],
+      "exclusive_group": "desktop-product",
+      "scope": [
+        "docs/desktop-product-delivery/**",
+        "apps/desktop/src/features/settings/**",
+        "apps/desktop/src/features/**",
+        "apps/desktop/src/api/**",
+        "apps/desktop/src/types/**",
+        "apps/desktop/src/i18n/**",
+        "apps/desktop/e2e/**",
+        "tests-js/**"
+      ],
+      "requires_approved_contract": true,
+      "note": "Hook management: one shell with a family selector whose form is rebuilt per family from the backend's declared schema, because the three models are genuinely different kinds - Claude Code declarative events and matchers and handlers with official default timeouts, OpenCode user-supplied plugin source treated as a code asset with digest and preview rather than assembled from form fields, and Codex rendered only after backend order 59's stage A observes its event model instead of guessing. Hooks stay disabled until the user enables them and can see the full command; the UI states they run inside the sandbox with that execution's isolation and network posture. Trigger records show name, event, time, exit code and a bounded output summary, and a blocking exit code is labelled as blocking rather than shown as an ordinary success. Two standing rules from the user: every setting must be editable - a family that genuinely cannot accept something says so instead of showing a dead control - and credentials appear only as reference state, never as content."
+    },
+    {
       "id": "P08",
       "file": "work-orders/P08-composer-input-bar.md",
       "depends_on": [
