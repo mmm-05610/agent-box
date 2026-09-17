@@ -9,7 +9,7 @@
 
 | 家族 | native 会话载体 | 用量痕迹（第一手） | 分母（上下文窗口）来源 | 协议层（ACP/driver） |
 | --- | --- | --- | --- | --- |
-| codex | `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` | rollout 行含 **`total_token_usage`** 键（样本计数 ≥1/文件）✓ | `$CODEX_HOME` 内模型目录（部署携带的 models.json 有窗口值） | codex-acp 适配器未透传 usage（ACP 无该字段） |
+| codex | `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` | rollout 行含 **`total_token_usage`** 键（样本计数 ≥1/文件）✓ | `$CODEX_HOME` 内模型目录（部署携带的 models.json 有窗口值） | codex-acp 适配器未透传 usage（见下 ACP 更正） |
 | hermes | `~/.hermes/state.db`（SQLite） | **最完整**：`sessions.input_tokens / output_tokens / cache_read_tokens / cache_write_tokens / reasoning_tokens` + `session_model_usage.{input,output,cache_read,cache_write}_tokens` + `messages.token_count` ✓ | Hermes 内建表/回退值（42 记录过 128K 回退） | 同上 |
 | claude-code | `~/.claude/projects/*/<uuid>.jsonl` | 行含 `input_tokens` / `output_tokens` / `cache_creation_input_tokens` 键（样本值 0，键存在）✓ | Anthropic 模型目录（各模型窗口不同，需按模型 id 查） | 同上 |
 | pi | `~/.pi/agent/sessions/<project>/*.jsonl` | 本机该项目目录为空（无样本）；载体是逐项目 jsonl | pi 的 models-store.json（模型条目） | pi-acp 是 ACP over stdio——ACP schema **无 usage/contextWindow 字段**（工单撰写时已核 vendored 定义） |
@@ -20,10 +20,13 @@
 
 ## 结论（阶段 A 的产出）
 
-1. **ACP 家族的协议层确认无用量**：vendored ACP schema 没有 usage/contextWindow 字段
-   （工单撰写时核实；本轮复核引用）。对 ACP 家族，"用量"只能来自 **native state 的
-   回读**（codex 的 rollout、hermes 的 state.db、claude 的 projects jsonl）——这是
-   阶段 B 的"neutral fact"必须面对的来源差异：协议面给不了，native 回读给得了。
+1. **ACP 结论更正（2026-09-17，按工单 §1 的自我更正）**：早先"ACP 协议无 usage"的说法
+   **是错的**（grep 路径不存在、错误被吞）。按 vendored schema 第一手核对：
+   `PromptResponse.usage` **存在**，标 UNSTABLE/optional/可 null。⇒ 协议位置有，但
+   各家 adapter **是否真的填**仍是阶段 A 的第一手问题。**实现期第一手（pi 门，
+   c10，假端点响应注入 usage 11/7/18）**：pi-acp 把它**记进自己的 journal**
+   （assistant 行 `message.usage`，数值与注入一致），但**未在 ACP 事件流中播发**——
+   即 pi 的用量路径是 native 回读（51 B/C 已按此实现）。其余 ACP 家族待同法观测。
 2. **来源三分**：
    - native state 内有结构化用量：codex / hermes / claude-code（各自字段名不同，
      hermes 最完整——含缓存与 reasoning 细分）；
