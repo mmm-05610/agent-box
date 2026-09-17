@@ -2206,8 +2206,6 @@ def test_process_facts_land_in_the_ledger_and_wire(tmp_path):
             session = runtime.repository.get_session(first["session"]["id"])
         assert session["turns"][0]["state"] == "completed", session["turns"][0]
 
-        print("TURN STATE BEFORE HISTORY:", session["turns"][0]["state"],
-              "capture:", session["turns"][0]["capture_state"])
         frames = _wire_post(client, runtime.token, "history.snapshot", {
             "sessionId": first["session"]["id"],
         })["frames"]
