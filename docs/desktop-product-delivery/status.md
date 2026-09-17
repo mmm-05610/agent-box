@@ -1518,3 +1518,9 @@ Appearance（8 套主题 + 语言 + UI Scale + 终端字体）与 Keyboard Short
 - **契约测试修正**：`wire-v1.test.ts` 冻结计数 28→实际 33（usage/probe/artifacts 增量面）改为
   "锁定核心 28 方法必须在 + 每个方法 params/result 齐全"，移除 change-detector。
 - 提交：见 git log（P20 系列）。
+
+## 派单表复查（2026-09-18 最终）
+
+- **派单表状态**：P00–P20 全部有结论，**无 P21+ 新增**。P19、P20 本 goal 内收口（见上两节）。
+- writer_lease = **RELEASED**（队列耗尽，本 goal 停止写入）。
+- 工作树干净；HEAD `5de44668`；分支 `feature/agentbox-desktop-product`（未碰 main，未 merge，未 push）。
