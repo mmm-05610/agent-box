@@ -1470,7 +1470,7 @@ Appearance（8 套主题 + 语言 + UI Scale + 终端字体）与 Keyboard Short
   - DISABLED 占位文案自含化（不再指向可能不存在的 note）
   - 角色设置重设计：左导航 + 右面板、分区由 `profile-slots.ts` 注册表 slots 驱动、不支持维度明说
   - access chip 尝试后因组件缺失移除断引用（等后端声明权限控制项）
-- **门**：全量 UI **805/806 通过**（唯一失败 `cron-prompt.test.ts` POSIX sh 环境基线）；`tsc --noEmit` exit 0
+- **门**：全量 UI **806 files / 807 tests, 805 passed / 1 environmental baseline**（唯一失败 `cron-prompt.test.ts` POSIX sh 环境基线）；`tsc --noEmit` exit 0
 - **未做**：种子截图对照（G2 需运行中服务）；access chip 等后端声明
 - **证据**：`evidence/P19-density-and-role-nav.md`
 
