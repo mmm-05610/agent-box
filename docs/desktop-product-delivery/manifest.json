@@ -109,6 +109,22 @@
       "note": "Harness program management: one row per family showing the current version, other installed versions, size, source, install time and digest, an update badge that comes from the backend rather than being inferred, and one-click install, update, rollback and set-current with visible progress and readable errors. Modelled on Applite's pattern verified this round - paint the catalog from local data immediately, annotate installed and outdated state asynchronously, never block the list on a slow backend call - while importing only our own records and never the host's configuration. Two negative findings recorded in backend order 57 are why there is no UI to copy: claude-squad tells users to update the underlying program themselves, and vibe-kanban assumes installed agents and is sunsetting."
     },
     {
+      "id": "P14",
+      "file": "work-orders/P14-empty-state-and-semantics.md",
+      "depends_on": [
+        "P08"
+      ],
+      "exclusive_group": "desktop-product",
+      "scope": [
+        "docs/desktop-product-delivery/**",
+        "apps/desktop/src/**",
+        "apps/desktop/e2e/**",
+        "tests-js/**"
+      ],
+      "requires_approved_contract": false,
+      "note": "Four surfaces, one root cause behind two of them. The empty state becomes branding plus greeting plus the same composer as P08 (never a second implementation) plus suggestion chips that must actually work. The bare 'Unavailable' and the 'Gateway offline' row share their origin: the readiness and connection model was inherited from the Hermes desktop line (runtime-readiness.ts derives 'unavailable' from provider_configured and a runtime check, while our facts are the Server lifecycle connection with its typed reasons, hello and whether a workspace is chosen), so both are re-derived from our facts with a reason and a next step, never a bare word - and if nothing in our product corresponds to the gateway object, the row and its popover are deleted rather than left half-dead. Finally the branding sweep: 222 non-test source files mention Hermes and the locales have many more, so the rule is split - user-visible text must be product-neutral, internal identifiers are not bundled, and the harness family named hermes stays exactly as it is, because that word denotes a family rather than the product."
+    },
+    {
       "id": "P08",
       "file": "work-orders/P08-composer-input-bar.md",
       "depends_on": [
