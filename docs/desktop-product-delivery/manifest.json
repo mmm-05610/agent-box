@@ -10,6 +10,26 @@
   "default_execution": "serial; capability-level progress may bypass waiting subitems",
   "orders": [
     {
+      "id": "P09",
+      "file": "work-orders/P09-transcript-process-view.md",
+      "depends_on": [
+        "P08"
+      ],
+      "exclusive_group": "desktop-product",
+      "scope": [
+        "docs/desktop-product-delivery/**",
+        "apps/desktop/src/components/assistant-ui/**",
+        "apps/desktop/src/features/chat/**",
+        "apps/desktop/src/i18n/**",
+        "apps/desktop/e2e/**",
+        "tests-js/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "requires_approved_contract": false,
+      "note": "Transcript process view (thought rows with duration, tool rows with lifecycle and grouped summaries, streaming status tail, worked-for timer) built from external copy-in components. Lights up only the facts that exist today - message stream, tool failure rows, status tail, elapsed time from event timestamps - and waits for the backend's shared wire relock (orders 51 and 52) before showing thoughts, tool lifecycles, plans and usage. Nothing is faked for waiting data, and durations come from event timestamps rather than estimates."
+    },
+    {
       "id": "P08",
       "file": "work-orders/P08-composer-input-bar.md",
       "depends_on": [
