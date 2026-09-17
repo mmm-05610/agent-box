@@ -22,7 +22,7 @@ export async function refreshAgentBoxProviderModelCatalog(
 
     const capability = hello
       ? wireCapability(hello, 'providerModels.list')
-      : { supported: false, reason: 'AgentBox service has not completed hello' }
+      : { supported: false, reason: 'Pacthold service has not completed hello' }
 
     if (!capability.supported) {
       throw new Error(capability.reason || 'providerModels.list is unavailable')

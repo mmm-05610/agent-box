@@ -67,22 +67,39 @@ const defaultIo: ConnectionIo = {
 export function resolveAgentBoxServerRoot(
   env: Record<string, string | undefined> = process.env
 ): null | string {
-  const configured = env.AGENTBOX_SERVER_ROOT
+  // The name pair this Desktop speaks with the Server is a CROSS-REPO
+  // contract: `AGENTBOX_SERVER_ROOT` is what existing installs set, and the
+  // product's own name (`ORDESSA_SERVER_ROOT`) is accepted as an alias that
+  // WINS when both are present. Neither is removed by a rename.
+  const configured = firstConfigured(env, ['ORDESSA_SERVER_ROOT', 'AGENTBOX_SERVER_ROOT'])
 
-  if (typeof configured !== 'string' || configured.length === 0) {
+  if (configured === null) {
     return null
   }
 
   return path.resolve(configured)
 }
 
+/** The first non-empty value among names, in precedence order. */
+function firstConfigured(env: Record<string, string | undefined>, names: readonly string[]): null | string {
+  for (const name of names) {
+    const value = env[name]
+
+    if (typeof value === 'string' && value.length > 0) {
+      return value
+    }
+  }
+
+  return null
+}
+
 /** The configured loopback port, or null when it is absent or not a port. */
 export function resolveAgentBoxServerPort(
   env: Record<string, string | undefined> = process.env
 ): null | number {
-  const configured = env.AGENTBOX_SERVER_PORT
+  const configured = firstConfigured(env, ['ORDESSA_SERVER_PORT', 'AGENTBOX_SERVER_PORT'])
 
-  if (configured === undefined || configured === '') {
+  if (configured === null) {
     return DEFAULT_AGENTBOX_SERVER_PORT
   }
 

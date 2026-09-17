@@ -49,7 +49,7 @@ export class McpOAuthCancelled extends Error {
 }
 
 const defaultSleep = (milliseconds: number) => new Promise<void>(resolve => window.setTimeout(resolve, milliseconds))
-const UPDATE_BACKEND = 'Update the AgentBox service to support Desktop MCP OAuth callbacks.'
+const UPDATE_BACKEND = 'Update the Pacthold service to support Desktop MCP OAuth callbacks.'
 
 /**
  * Bind every OAuth RPC of one flow to the (connection, profile) that was active

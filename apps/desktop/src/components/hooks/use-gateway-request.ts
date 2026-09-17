@@ -82,7 +82,7 @@ export function useGatewayRequest() {
         const conn = await withTimeout(
           desktop.getConnection($activeGatewayProfile.get()),
           RECONNECT_ATTEMPT_TIMEOUT_MS,
-          'Timed out reconnecting to the AgentBox service'
+          'Timed out reconnecting to the Pacthold service'
         )
 
         connectionRef.current = conn

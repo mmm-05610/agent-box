@@ -353,7 +353,7 @@ export function useGatewayBoot({
         const conn = await withTimeout(
           desktop.getConnection(),
           RECONNECT_ATTEMPT_TIMEOUT_MS,
-          'Timed out reconnecting to the AgentBox service'
+          'Timed out reconnecting to the Pacthold service'
         )
 
         setPrimaryGatewayConnection(conn)
@@ -641,7 +641,7 @@ export function useGatewayBoot({
         const conn = await withTimeout(
           desktop.getConnection(windowProfileOverride() ?? undefined),
           BACKEND_BOOT_WAIT_TIMEOUT_MS,
-          'Timed out reconnecting to the AgentBox service'
+          'Timed out reconnecting to the Pacthold service'
         )
 
         if (!ownsSwitch()) {
@@ -1064,7 +1064,7 @@ export function useGatewayBoot({
         const conn = await withTimeout(
           desktop.getConnection(windowProfileOverride() ?? undefined),
           BACKEND_BOOT_WAIT_TIMEOUT_MS,
-          'Timed out connecting to the AgentBox service'
+          'Timed out connecting to the Pacthold service'
         )
 
         if (cancelled) {

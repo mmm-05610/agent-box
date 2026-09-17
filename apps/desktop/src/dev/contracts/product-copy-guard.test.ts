@@ -16,7 +16,8 @@ import { describe, expect, it } from 'vitest'
  *     not a vocabulary ban: "Not available: the service declares no method for
  *     this yet." passes.)
  *
- *  2. **No product-brand claim under the wrong name.** The product is AgentBox;
+ *  2. **No product-brand claim under the wrong name.** The product is Ordessa (the service it
+ *     talks to is Pacthold);
  *     `hermes` is a HARNESS FAMILY and keeps its name where it appears as one.
  *     This rule judges the copy this round actually owns (the sections below).
  *     The rest of `composer.*` and `profiles.*` still carries legacy sentences
@@ -44,6 +45,8 @@ const BARE_WORDS = new Set(['unavailable', 'not available', 'offline', 'not conn
  *
  *  Everything else is a product-brand claim and must read AgentBox. */
 const FAMILY_PATH = /harness|family|家族|家系|ファミリー|المجموعة|семейств/i
+/** The retired product names. A catalog VALUE may not carry either one — the
+ *  only exceptions are the family slot and the legacy-absence sentences. */
 const LEGACY_ABSENCE = /legacy|old runtime|旧版|舊版|旧线|従来|القديمة|старой/i
 
 interface Entry {
@@ -131,7 +134,7 @@ describe('catalog copy guards', () => {
 
     for (const [catalog, source] of catalogs) {
       for (const entry of catalogEntries(source)) {
-        if (!/\bHermes\b/.test(entry.value)) {
+        if (!/\b(Hermes|AgentBox)\b/.test(entry.value)) {
           continue
         }
 

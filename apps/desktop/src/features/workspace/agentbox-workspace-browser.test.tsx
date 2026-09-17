@@ -328,7 +328,7 @@ describe('AgentBoxWorkspaceBrowser', () => {
 
     renderBrowser({ port: port(browse) })
 
-    expect(await screen.findByText(/AgentBox directory browsing is unavailable/)).toBeTruthy()
+    expect(await screen.findByText(/Ordessa directory browsing is unavailable/)).toBeTruthy()
     expect(screen.getByText(/CAPABILITY_NOT_DECLARED/)).toBeTruthy()
     expect(screen.queryByText('No subdirectories here')).toBeNull()
     expect(chooseButton().hasAttribute('disabled')).toBe(true)

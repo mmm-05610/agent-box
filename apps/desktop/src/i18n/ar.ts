@@ -3,7 +3,7 @@ import { defineLocale } from './define-locale'
 export const ar = defineLocale({
   sessionImport: {
     title: 'المتابعة من تطبيق آخر',
-    subtitle: 'انقل محادثة إلى AgentBox وتابع من حيث توقفت.',
+    subtitle: 'انقل محادثة إلى Ordessa وتابع من حيث توقفت.',
     action: 'استيراد جلسة',
     readingFrom: 'القراءة من',
     connectedComputer: 'الكمبيوتر المتصل',
@@ -21,17 +21,17 @@ export const ar = defineLocale({
     more: 'تحميل المزيد من الجلسات',
     messages: 'رسائل',
     choose: 'محادثة تستحق المتابعة',
-    chooseHelp: 'اختر جلسة لقراءة سجلها قبل نقلها إلى AgentBox.',
+    chooseHelp: 'اختر جلسة لقراءة سجلها قبل نقلها إلى Ordessa.',
     previewLoading: 'جارٍ فتح المعاينة',
     previewError: 'المعاينة غير متاحة',
     previewHelp: 'ربما تم نقل الملف الأصلي أو تغييره. حدّث القائمة وحاول مرة أخرى.',
     previewLimit: 'تم اختصار المعاينة لتسهيل القراءة. يتم استيراد المحادثة كاملة.',
     you: 'أنت',
-    snapshot: 'هذه المحادثة موجودة بالفعل في AgentBox. افتح نسختك الحالية للمتابعة.',
+    snapshot: 'هذه المحادثة موجودة بالفعل في Ordessa. افتح نسختك الحالية للمتابعة.',
     copyNotice: 'ينسخ نص المحادثة دون تغيير الملفات الأصلية. لا يشمل مخرجات الأدوات أو الاستدلال.',
     importing: 'جارٍ الاستيراد…',
-    open: 'فتح في AgentBox',
-    continue: 'المتابعة في AgentBox',
+    open: 'فتح في Ordessa',
+    continue: 'المتابعة في Ordessa',
     importError: 'تعذر استيراد هذه المحادثة.'
   },
   sendDiagnostics: {
@@ -113,19 +113,19 @@ export const ar = defineLocale({
     pathCopied: 'تم نسخ المسار'
   },
   boot: {
-    ready: 'AgentBox Desktop جاهز',
+    ready: 'Ordessa جاهز',
     desktopBootFailedWithMessage: message => `فشل تشغيل سطح المكتب: ${message}`,
     steps: {
       connectingGateway: 'جار الاتصال ببوابة سطح المكتب',
-      loadingSettings: 'جار تحميل إعدادات AgentBox',
+      loadingSettings: 'جار تحميل إعدادات Ordessa',
       loadingSessions: 'جار تحميل الجلسات الأخيرة',
-      retryingRemoteBackend: 'جارٍ إعادة الاتصال بخادم AgentBox البعيد…',
+      retryingRemoteBackend: 'جارٍ إعادة الاتصال بخادم Pacthold البعيد…',
       startingDesktopConnection: 'جار بدء اتصال سطح المكتب',
-      startingHermesDesktop: 'جار تشغيل AgentBox Desktop...'
+      startingHermesDesktop: 'جار تشغيل Ordessa...'
     },
     errors: {
-      backgroundExited: 'خرجت عملية AgentBox الخلفية.',
-      backgroundExitedDuringStartup: 'خرجت عملية AgentBox الخلفية أثناء بدء التشغيل.',
+      backgroundExited: 'خرجت عملية Ordessa الخلفية.',
+      backgroundExitedDuringStartup: 'خرجت عملية Ordessa الخلفية أثناء بدء التشغيل.',
       backendStopped: 'توقف الخلفية',
       desktopBootFailed: 'فشل تشغيل سطح المكتب',
       gatewayConnectionLost: 'انقطع الاتصال بالبوابة',
@@ -135,7 +135,7 @@ export const ar = defineLocale({
       ipcBridgeUnavailable: 'جسر IPC لسطح المكتب غير متاح.'
     },
     failure: {
-      title: 'تعذر تشغيل AgentBox',
+      title: 'تعذر تشغيل Ordessa',
       description: 'لم تعمل البوابة الخلفية. جرب إحدى خطوات الاسترداد أدناه. لن يحذف ذلك محادثاتك أو إعداداتك.',
       remoteTitle: 'تسجيل الدخول للبوابة البعيدة مطلوب',
       remoteDescription: 'انتهت جلسة البوابة البعيدة. سجل الدخول مرة أخرى لإعادة الاتصال.',
@@ -148,11 +148,11 @@ export const ar = defineLocale({
       cloudDownHint: 'تفتح الأزرار أدناه بوابة Nous (حالة المثيل وعناصر التحكم) أو Discord للحصول على الدعم.',
       cloudDownCheckPortal: 'التحقق من حالة البوابة',
       cloudDownDiscord: 'الحصول على مساعدة عبر Discord',
-      notFoundTitle: 'لم يتم العثور على AgentBox',
+      notFoundTitle: 'لم يتم العثور على Ordessa',
       notFoundDescription:
-        'تعذّر على التطبيق العثور على بيئة تشغيل AgentBox لتشغيلها. يبحث التطبيق عن الأمر hermes في PATH أو عن تثبيت يديره بنفسه. ثبّت AgentBox ثم أعد المحاولة — لن تؤدي هذه الإجراءات إلى حذف محادثاتك أو إعداداتك.',
+        'تعذّر على التطبيق العثور على بيئة تشغيل Ordessa لتشغيلها. يبحث التطبيق عن الأمر hermes في PATH أو عن تثبيت يديره بنفسه. ثبّت Ordessa ثم أعد المحاولة — لن تؤدي هذه الإجراءات إلى حذف محادثاتك أو إعداداتك.',
       notFoundHint:
-        'يشغّل «إصلاح التثبيت» مثبّت AgentBox، ويعيد «إعادة المحاولة» البحث عنه بعد توفّره.',
+        'يشغّل «إصلاح التثبيت» مثبّت Ordessa، ويعيد «إعادة المحاولة» البحث عنه بعد توفّره.',
       openLogs: 'فتح السجلات',
       dismiss: 'تجاهل',
       repairHint: 'يعيد الإصلاح تشغيل المثبت وقد يستغرق بضع دقائق على جهاز جديد.',
@@ -182,8 +182,8 @@ export const ar = defineLocale({
     copyDetail: 'نسخ التفاصيل',
     copyDetailFailed: 'تعذر نسخ تفاصيل الإشعار',
     backendOutOfDateTitle: 'الخلفية قديمة',
-    backendOutOfDateMessage: 'خلفية AgentBox أقدم من إصدار سطح المكتب الحالي وقد لا تعمل كما يجب. حدثهما ليتوافقا.',
-    updateHermes: 'تحديث AgentBox',
+    backendOutOfDateMessage: 'خلفية Ordessa أقدم من إصدار سطح المكتب الحالي وقد لا تعمل كما يجب. حدثهما ليتوافقا.',
+    updateHermes: 'تحديث Ordessa',
     updateReadyTitle: 'التحديث جاهز',
     updateReadyMessage: count => `${count} تغيير جديد متاح.`,
     updateReadyMessageUnknown: 'يتوفر تحديث جديد.',
@@ -200,7 +200,7 @@ export const ar = defineLocale({
       elevenLabsNeedsKey: 'يتطلب ElevenLabs STT المفتاح ELEVENLABS_API_KEY.',
       elevenLabsRejectedKey: 'رفض ElevenLabs مفتاح API (401).',
       diskFull: 'القرص ممتلئ — حرّر مساحة ثم أعد المحاولة.',
-      methodNotAllowed: 'رفضت خلفية سطح المكتب هذا الطلب (405 Method Not Allowed). جرب إعادة تشغيل AgentBox Desktop.',
+      methodNotAllowed: 'رفضت خلفية سطح المكتب هذا الطلب (405 Method Not Allowed). جرب إعادة تشغيل Ordessa.',
       microphonePermission: 'تم رفض إذن الميكروفون.',
       openaiRejectedApiKey: 'رفض OpenAI مفتاح API.',
       openaiRejectedApiKeyWithStatus: status => `رفض OpenAI مفتاح API (${status} invalid_api_key).`,
@@ -224,8 +224,8 @@ export const ar = defineLocale({
       approveAction: 'موافقة',
       rejectAction: 'رفض',
       inputTitle: 'مطلوب إدخال',
-      inputBody: 'ينتظر AgentBox ردّك.',
-      turnDoneTitle: 'أنهى AgentBox',
+      inputBody: 'ينتظر Ordessa ردّك.',
+      turnDoneTitle: 'أنهى Ordessa',
       turnDoneBody: '',
       turnErrorTitle: 'فشلت الجولة',
       backgroundDoneTitle: 'انتهت المهمة في الخلفية',
@@ -377,7 +377,7 @@ export const ar = defineLocale({
     exportConfig: 'تصدير الإعدادات',
     importConfig: 'استيراد الإعدادات',
     resetToDefaults: 'إعادة الافتراضيات',
-    resetConfirm: 'هل تريد إعادة كل الإعدادات إلى افتراضيات AgentBox؟',
+    resetConfirm: 'هل تريد إعادة كل الإعدادات إلى افتراضيات Ordessa؟',
     exportFailed: 'فشل التصدير',
     resetFailed: 'فشلت إعادة الضبط',
     nav: {
@@ -398,14 +398,14 @@ export const ar = defineLocale({
     product: {
       unavailable: 'غير متاح بعد',
       unavailableDescription:
-        'تظهر عناصر التحكم فقط عندما تعلن خدمة AgentBox عن الإمكانية المطابقة. لا يعود Desktop إلى إعدادات Hermes القديمة ولا يدّعي حفظ تغيير محلي.',
+        'تظهر عناصر التحكم فقط عندما تعلن خدمة Pacthold عن الإمكانية المطابقة. لا يعود Desktop إلى إعدادات Hermes القديمة ولا يدّعي حفظ تغيير محلي.',
       scope: 'نطاق المنتج',
       boundary: 'حدود الأمان',
       models: {
         title: 'النماذج',
         description: 'إعداد القيم الافتراضية وفتحات النماذج التي تصفها الخدمة.',
         boundary: 'حقول النماذج مصدرها وصف الخدمة؛ ولا يثبّت Desktop خيارات المزوّد أو Harness.',
-        serviceBoundary: 'لم تعلن خدمة AgentBox عن إدارة النماذج بعد.',
+        serviceBoundary: 'لم تعلن خدمة Pacthold عن إدارة النماذج بعد.',
         unavailableDescription: 'تظهر عناصر التحكم فقط عندما تكون الخدمة جاهزة وتعلن كل عمليات النماذج.',
         add: 'إضافة إعداد نموذج',
         loading: 'جارٍ تحميل إعدادات النماذج…',
@@ -466,7 +466,7 @@ export const ar = defineLocale({
       },
       identities: {
         title: 'الهويات',
-        description: 'إدارة تسجيلات الدخول المسماة وهويات مفاتيح API دون اشتراط حساب AgentBox للاستخدام المحلي.',
+        description: 'إدارة تسجيلات الدخول المسماة وهويات مفاتيح API دون اشتراط حساب Ordessa للاستخدام المحلي.',
         boundary: 'تبقى بيانات الاعتماد مملوكة للخدمة ومستبعدة من الإعدادات والنسخ الاحتياطية العادية.'
       },
       hooks: {
@@ -495,7 +495,7 @@ export const ar = defineLocale({
     plugins: {
       title: 'إضافات سطح المكتب',
       blurb:
-        'امتدادات واجهة تُحمّل داخل هذا التطبيق — إما مضمّنة مع البناء، أو موضوعة في مجلد desktop-plugins (بما فيها التي يكتبها AgentBox). تعطيل الإضافة يفرغها مباشرة ويبقى بعد إعادة التشغيل.',
+        'امتدادات واجهة تُحمّل داخل هذا التطبيق — إما مضمّنة مع البناء، أو موضوعة في مجلد desktop-plugins (بما فيها التي يكتبها Ordessa). تعطيل الإضافة يفرغها مباشرة ويبقى بعد إعادة التشغيل.',
       count: n => `${n} مثبتة`,
       openFolder: 'فتح مجلد الإضافات',
       rescan: 'إعادة الفحص',
@@ -512,7 +512,7 @@ export const ar = defineLocale({
         'إشعارات سطح المكتب الأصلية، منفصلة عن التنبيهات داخل التطبيق. هذه محلية على الجهاز — كل حاسوب يحتفظ بإعداداته الخاصة.',
       enableAll: 'تفعيل الإشعارات',
       enableAllDesc: 'إيقافه يصمت كل الإشعارات أدناه.',
-      focusedHint: 'تنبيهات الاكتمال تظهر فقط عندما يكون AgentBox في الخلفية.',
+      focusedHint: 'تنبيهات الاكتمال تظهر فقط عندما يكون Ordessa في الخلفية.',
       kinds: {
         approval: {
           label: 'يلزم الموافقة',
@@ -520,11 +520,11 @@ export const ar = defineLocale({
         },
         input: {
           label: 'يلزم إدخال',
-          description: 'طرح AgentBox سؤالا أو يحتاج إلى كلمة مرور أو سر.'
+          description: 'طرح Ordessa سؤالا أو يحتاج إلى كلمة مرور أو سر.'
         },
         turnDone: {
           label: 'الرد جاهز',
-          description: 'انتهى دور بينما كان AgentBox في الخلفية.'
+          description: 'انتهى دور بينما كان Ordessa في الخلفية.'
         },
         turnError: {
           label: 'فشل الدور',
@@ -536,7 +536,7 @@ export const ar = defineLocale({
         }
       },
       test: 'إرسال إشعار تجريبي',
-      testTitle: 'AgentBox',
+      testTitle: 'Ordessa',
       testBody: 'الإشعارات تعمل.',
       testSent: 'تم إرسال التجربة. إذا لم يظهر شيء، تحقق من أذونات الإشعارات في نظام التشغيل ووضع التركيز/عدم الإزعاج.',
       testUnsupported: 'هذا النظام لا يدعم الإشعارات الأصلية.',
@@ -555,7 +555,7 @@ export const ar = defineLocale({
       advanced: 'متقدم'
     },
     searchPlaceholder: {
-      about: 'حول AgentBox Desktop',
+      about: 'حول Ordessa',
       config: 'ابحث في الإعدادات...',
       gateway: 'اتصال البوابة...',
       keys: 'ابحث في مفاتيح API...',
@@ -578,7 +578,7 @@ export const ar = defineLocale({
     },
     appearance: {
       title: 'المظهر',
-      intro: 'خصص مظهر AgentBox Desktop.',
+      intro: 'خصص مظهر Ordessa.',
       colorMode: 'نمط الألوان',
       colorModeDesc: 'اختر الوضع الفاتح أو الداكن أو اتبع النظام.',
       toolViewTitle: 'عرض الأدوات',
@@ -605,19 +605,19 @@ export const ar = defineLocale({
         sidebar: 'الشريط الجانبي فقط'
       },
       backdropTitle: 'خلفية النافذة',
-      backdropDesc: 'اختيار مقدار مزج خلفية سطح المكتب مع سطح AgentBox.',
+      backdropDesc: 'اختيار مقدار مزج خلفية سطح المكتب مع سطح Ordessa.',
       userBubbleTitle: 'فقاعة الرسالة',
       userBubbleDesc: 'مدى شفافية رسائلك. معتمة عند 0؛ يبقى الإطار فقط عند 100.',
       introSplashTitle: 'شاشة المقدمة',
       introSplashDesc: 'الشعار النصي والعبارة التمهيدية في محادثة فارغة.',
       reactionsTitle: 'تفاعلات الرسائل',
-      reactionsDesc: 'تفاعلات إيموجي بأسلوب iMessage — تفاعل مع الرسائل، ويمكن لـ AgentBox التفاعل مع رسائلك.',
+      reactionsDesc: 'تفاعلات إيموجي بأسلوب iMessage — تفاعل مع الرسائل، ويمكن لـ Ordessa التفاعل مع رسائلك.',
       tipsTitle: 'نصائح داخل التطبيق',
       tipsDesc:
-        'فقاعة صغيرة تشير إلى جزء من التطبيق، تظهر أحيانًا أثناء الخمول ومن AgentBox عند الحاجة. إغلاق نصيحة يزيلها نهائيًا.',
+        'فقاعة صغيرة تشير إلى جزء من التطبيق، تظهر أحيانًا أثناء الخمول ومن Ordessa عند الحاجة. إغلاق نصيحة يزيلها نهائيًا.',
       tipsReset: count => `استعادة ${count} نصيحة مغلقة`,
       toursTitle: 'جولات إرشادية',
-      toursDesc: 'دع AgentBox يرشدك في التطبيق، مع تعتيم الشاشة وإبراز كل خطوة.',
+      toursDesc: 'دع Ordessa يرشدك في التطبيق، مع تعتيم الشاشة وإبراز كل خطوة.',
       composerPopoutTitle: 'محرر عائم',
       composerPopoutDesc: 'السماح بسحب محرر الرسائل خارج موضعه. عطّل هذا الخيار لإبقائه مثبتًا في الأسفل.',
       vibeHeartsTitle: 'قلوب المزاج',
@@ -650,9 +650,9 @@ export const ar = defineLocale({
       pet: {
         title: 'حيوان أليف',
         intro:
-          'تبنَّ تعويذة petdex متحركة تطفو فوق التطبيق وتتفاعل مع ما يفعله AgentBox — تجري أثناء تنفيذ الأدوات، وتحتفل عند النجاح، وتعبس عند الأخطاء.',
+          'تبنَّ تعويذة petdex متحركة تطفو فوق التطبيق وتتفاعل مع ما يفعله Ordessa — تجري أثناء تنفيذ الأدوات، وتحتفل عند النجاح، وتعبس عند الأخطاء.',
         restartHint:
-          'تحتاج الحيوانات الأليفة إلى إعادة تشغيل سريعة — بدأ التطبيق العامل قبل إضافة هذه الميزة. أغلق AgentBox وأعد فتحه، ثم ارجع إلى هنا.',
+          'تحتاج الحيوانات الأليفة إلى إعادة تشغيل سريعة — بدأ التطبيق العامل قبل إضافة هذه الميزة. أغلق Ordessa وأعد فتحه، ثم ارجع إلى هنا.',
         on: 'تشغيل',
         off: 'إيقاف',
         scaleTitle: 'الحجم',
@@ -779,9 +779,9 @@ export const ar = defineLocale({
       fallbackProviders: 'إدخالات احتياطية بصيغة provider:model لتجربتها إذا فشل النموذج الافتراضي.',
       'display.personality': 'أسلوب المساعد الافتراضي للجلسات الجديدة.',
       'display.showReasoning': 'يعرض أقسام التفكير عندما توفرها الخلفية.',
-      timezone: 'تستخدم عندما يحتاج AgentBox إلى سياق الوقت المحلي. اتركها فارغة لاستخدام منطقة النظام.',
+      timezone: 'تستخدم عندما يحتاج Ordessa إلى سياق الوقت المحلي. اتركها فارغة لاستخدام منطقة النظام.',
       'agent.imageInputMode': 'يتحكم في طريقة إرسال مرفقات الصور إلى النموذج.',
-      'agent.maxTurns': 'الحد الأعلى لدورات استدعاء الأدوات قبل أن يوقف AgentBox التشغيل.',
+      'agent.maxTurns': 'الحد الأعلى لدورات استدعاء الأدوات قبل أن يوقف Ordessa التشغيل.',
       'terminal.cwd': 'مجلد المشروع الافتراضي لعمل الأدوات والطرفية.',
       'terminal.persistentShell': 'يحافظ على حالة الصدفة بين الأوامر عندما تدعمها الخلفية.',
       'terminal.envPassthrough': 'متغيرات البيئة التي تمرر إلى تنفيذ الأدوات.',
@@ -790,8 +790,8 @@ export const ar = defineLocale({
       'terminal.modalImage': 'الصورة المستخدمة عند اختيار Modal.',
       'terminal.daytonaImage': 'الصورة المستخدمة عند اختيار Daytona.',
       'codeExecution.mode': 'مدى تقييد تنفيذ الكود بالمشروع الحالي.',
-      fileReadMaxChars: 'أقصى عدد أحرف يستطيع AgentBox قراءته من ملف واحد في الطلب.',
-      'approvals.mode': 'كيف يتعامل AgentBox مع الأوامر التي تحتاج موافقة صريحة.',
+      fileReadMaxChars: 'أقصى عدد أحرف يستطيع Ordessa قراءته من ملف واحد في الطلب.',
+      'approvals.mode': 'كيف يتعامل Ordessa مع الأوامر التي تحتاج موافقة صريحة.',
       'approvals.timeout': 'مدة انتظار طلبات الموافقة قبل انتهاء المهلة.',
       'security.redactSecrets': 'يخفي الأسرار المكتشفة من المحتوى المرئي للنموذج قدر الإمكان.',
       'checkpoints.enabled': 'ينشئ لقطات رجوع قبل تعديلات الملفات.',
@@ -806,20 +806,20 @@ export const ar = defineLocale({
       'stt.enabled': 'يفعل التفريغ الصوتي المحلي أو عبر مزود.',
       'stt.elevenlabs.languageCode': 'رمز لغة ISO-639-3 اختياري. اتركه فارغاً للاكتشاف التلقائي.',
       'updates.nonInteractiveLocalChanges':
-        'عندما يحدّث AgentBox نفسه من التطبيق دون موجه طرفية، احتفظ بتعديلات المصدر المحلية أو تجاهلها.'
+        'عندما يحدّث Ordessa نفسه من التطبيق دون موجه طرفية، احتفظ بتعديلات المصدر المحلية أو تجاهلها.'
     },
     about: {
-      heading: 'حول AgentBox',
+      heading: 'حول Ordessa',
       version: value => `الإصدار ${value}`,
       versionUnavailable: 'الإصدار غير متاح',
       bundleOutOfSync: 'إصدار التطبيق قديم',
       bundleOutOfSyncDesc:
-        'تم تحديث وقت تشغيل AgentBox، لكن تطبيق سطح المكتب نفسه لا يزال إصدارًا قديمًا — لن تظهر ميزات الواجهة الجديدة (مثل Bot Mode) حتى يتم تحديث التطبيق. شغّل التحديث أدناه لإعادة بناء التطبيق. إذا لم يختفِ هذا التحذير، فأعد التثبيت من أحدث مثبّت لسطح المكتب.',
+        'تم تحديث وقت تشغيل Ordessa، لكن تطبيق سطح المكتب نفسه لا يزال إصدارًا قديمًا — لن تظهر ميزات الواجهة الجديدة (مثل Bot Mode) حتى يتم تحديث التطبيق. شغّل التحديث أدناه لإعادة بناء التطبيق. إذا لم يختفِ هذا التحذير، فأعد التثبيت من أحدث مثبّت لسطح المكتب.',
       bundleOutOfSyncAction: 'الحصول على المثبّت',
       bundleSwapPending: 'أعد التشغيل لإكمال التحديث',
       bundleSwapPendingDesc:
-        'تم تثبيت التطبيق المحدَّث بالفعل — يكفي إعادة تشغيل AgentBox لتحميله. لن تتأثر المحادثات أو الإعدادات.',
-      bundleSwapPendingAction: 'إعادة تشغيل AgentBox',
+        'تم تثبيت التطبيق المحدَّث بالفعل — يكفي إعادة تشغيل Ordessa لتحميله. لن تتأثر المحادثات أو الإعدادات.',
+      bundleSwapPendingAction: 'إعادة تشغيل Ordessa',
       updates: 'التحديثات',
       checkNow: 'التحقق الآن',
       checking: 'جار التحقق...',
@@ -836,7 +836,7 @@ export const ar = defineLocale({
       lastChecked: age => `آخر تحقق ${age}`,
       justNowSuffix: 'الآن',
       automaticUpdates: 'التحديثات التلقائية',
-      automaticUpdatesDesc: 'اسمح لـ AgentBox بالتحقق من التحديثات وتثبيتها.',
+      automaticUpdatesDesc: 'اسمح لـ Ordessa بالتحقق من التحديثات وتثبيتها.',
       branchCommit: (branch, commit) => `${branch} عند ${commit}`,
       never: 'أبدا',
       justNow: 'الآن',
@@ -852,7 +852,7 @@ export const ar = defineLocale({
       searchPlaceholder: 'بحث…',
       noResults: 'لا توجد نتائج',
       systemDefault: 'إعداد النظام الافتراضي',
-      loading: 'جار تحميل إعدادات AgentBox...',
+      loading: 'جار تحميل إعدادات Ordessa...',
       emptyTitle: 'لا توجد إعدادات',
       emptyDesc: 'لا يحتوي هذا القسم على إعدادات قابلة للتعديل.',
       failedLoad: 'فشل تحميل الإعدادات',
@@ -862,7 +862,7 @@ export const ar = defineLocale({
     },
     quickEntry: {
       enabledTitle: 'الإدخال السريع',
-      enabledDesc: 'استدعِ محرّرا صغيرا من أي مكان باختصار عام وأرسل طلبا دون فتح AgentBox.',
+      enabledDesc: 'استدعِ محرّرا صغيرا من أي مكان باختصار عام وأرسل طلبا دون فتح Ordessa.',
       shortcutTitle: 'اختصار الإدخال السريع',
       shortcutDesc: 'يحتاج إلى مفتاح تعديل واحد على الأقل، مثل CommandOrControl+Shift+Space.',
       active: 'الاختصار مفعّل.',
@@ -895,14 +895,14 @@ export const ar = defineLocale({
       title: 'اتصال البوابة',
       envOverride: 'تجاوز من البيئة',
       intro:
-        'يشغّل AgentBox Desktop بوابة محلية خاصة افتراضياً. استخدم بوابة بعيدة عندما تريد أن يتحكم هذا التطبيق بخلفية AgentBox تعمل مسبقاً على جهاز آخر أو خلف وكيل موثوق. اتصالات البوابة إعداد على مستوى الجهاز؛ ويتم اكتشاف الملفات الشخصية من البوابات المتصلة.',
+        'يشغّل Ordessa بوابة محلية خاصة افتراضياً. استخدم بوابة بعيدة عندما تريد أن يتحكم هذا التطبيق بخلفية Ordessa تعمل مسبقاً على جهاز آخر أو خلف وكيل موثوق. اتصالات البوابة إعداد على مستوى الجهاز؛ ويتم اكتشاف الملفات الشخصية من البوابات المتصلة.',
       envOverrideTitle: 'متغيرات البيئة تتحكم في جلسة سطح المكتب هذه.',
       envOverrideDesc: 'أزل HERMES_DESKTOP_REMOTE_URL و HERMES_DESKTOP_REMOTE_TOKEN لاستخدام الإعداد المحفوظ أدناه.',
       localTitle: 'بوابة محلية',
-      localDesc: 'تشغيل خلفية AgentBox خاصة على localhost. هذا هو الافتراضي ويعمل دون اتصال.',
+      localDesc: 'تشغيل خلفية Ordessa خاصة على localhost. هذا هو الافتراضي ويعمل دون اتصال.',
       remoteTitle: 'بوابة بعيدة',
       remoteDesc:
-        'صل واجهة سطح المكتب هذه بخلفية AgentBox بعيدة. البوابات المستضافة تستخدم OAuth أو اسم مستخدم وكلمة مرور، والبوابات الذاتية قد تستخدم رمز جلسة.',
+        'صل واجهة سطح المكتب هذه بخلفية Ordessa بعيدة. البوابات المستضافة تستخدم OAuth أو اسم مستخدم وكلمة مرور، والبوابات الذاتية قد تستخدم رمز جلسة.',
       remoteUrlTitle: 'رابط البوابة البعيدة',
       remoteUrlDesc: 'الرابط الأساسي لخلفية لوحة التحكم البعيدة. يمكن استخدام بادئات مسار مثل /hermes.',
       probing: 'جار فحص طريقة مصادقة هذه البوابة...',
@@ -939,7 +939,7 @@ export const ar = defineLocale({
       enterUrlFirst: 'أدخل رابط البوابة البعيدة أولاً.',
       restartingTitle: 'جار إعادة تشغيل اتصال البوابة',
       savedTitle: 'تم حفظ إعدادات البوابة',
-      restartingMessage: 'سيعيد AgentBox Desktop الاتصال باستخدام الإعدادات المحفوظة.',
+      restartingMessage: 'سيعيد Ordessa الاتصال باستخدام الإعدادات المحفوظة.',
       savedMessage: 'تم الحفظ للتشغيل القادم.',
       connectedTo: (baseUrl, version) => `متصل بـ ${baseUrl}${version ? ` · Hermes ${version}` : ''}`,
       reachableTitle: 'البوابة البعيدة قابلة للوصول',
@@ -990,7 +990,7 @@ export const ar = defineLocale({
       saveServer: 'حفظ الخادم',
       deepLinkTitle: 'إضافة خادم MCP؟',
       deepLinkDescription:
-        'طلب رابط إضافة خادم MCP هذا إلى AgentBox. راجع الإعدادات الكاملة أدناه — فهي قادمة من الرابط وليست من AgentBox.',
+        'طلب رابط إضافة خادم MCP هذا إلى Ordessa. راجع الإعدادات الكاملة أدناه — فهي قادمة من الرابط وليست من Ordessa.',
       deepLinkStdioWarning:
         'سيشغّل هذا الخادم عملية محلية على جهازك بالأمر الموضح أدناه. لا تتابع إلا إذا كنت تثق بمصدره.',
       deepLinkConfirm: 'إضافة الخادم',
@@ -1063,7 +1063,7 @@ export const ar = defineLocale({
     providers: {
       connectAccount: 'ربط حساب',
       haveApiKey: 'لديك مفتاح API بدلاً من ذلك؟',
-      intro: 'سجل الدخول باشتراكك دون نسخ مفتاح API. يشغّل AgentBox تسجيل الدخول من المتصفح لك داخل التطبيق.',
+      intro: 'سجل الدخول باشتراكك دون نسخ مفتاح API. يشغّل Ordessa تسجيل الدخول من المتصفح لك داخل التطبيق.',
       connected: 'متصل',
       collapse: 'طي',
       connectAnother: 'ربط مزود آخر',
@@ -1235,7 +1235,7 @@ export const ar = defineLocale({
       placeholder: 'البحث في الحيوانات الأليفة...',
       loading: 'جار تحميل معرض petdex...',
       error: 'تعذّر الوصول إلى معرض petdex.',
-      staleBackend: 'أعد تشغيل AgentBox لاستخدام الحيوانات الأليفة — الخادم الخلفي أقدم من هذه الميزة.',
+      staleBackend: 'أعد تشغيل Ordessa لاستخدام الحيوانات الأليفة — الخادم الخلفي أقدم من هذه الميزة.',
       empty: 'لا توجد حيوانات أليفة مطابقة.',
       turnOff: 'إيقاف التشغيل',
       turnOn: 'تشغيل',
@@ -1262,8 +1262,8 @@ export const ar = defineLocale({
       hatchComposing: 'جار تجميع الأجزاء...',
       hatchSaving: 'أوشكنا على الانتهاء...',
       namePlaceholder: 'سمِّ حيوانك الأليف',
-      staleBackend: 'حدّث AgentBox لتوليد الحيوانات الأليفة.',
-      backgroundHint: 'يمكنك إغلاق هذا — سيُعلِمك AgentBox عند الانتهاء.',
+      staleBackend: 'حدّث Ordessa لتوليد الحيوانات الأليفة.',
+      backgroundHint: 'يمكنك إغلاق هذا — سيُعلِمك Ordessa عند الانتهاء.',
       slowProviderHint: 'قد يستغرق هذا عدة دقائق',
       remix: 'إعادة مزج',
       remixConfirmTitle: 'إعادة مزج هذا المظهر؟',
@@ -1299,8 +1299,8 @@ export const ar = defineLocale({
       system: 'الحالة والسجلات وإجراءات النظام',
       usage: 'نشاط الرموز والتكلفة والمهارات عبر الزمن'
     },
-    agentBoxUnavailableTitle: 'لا يوفّر AgentBox هذه الواجهة',
-    agentBoxUnavailableBody: 'تنتمي لوحات النظام والاستخدام والصيانة إلى بيئة Hermes القديمة، ولا يستدعيها AgentBox.',
+    agentBoxUnavailableTitle: 'لا يوفّر Ordessa هذه الواجهة',
+    agentBoxUnavailableBody: 'تنتمي لوحات النظام والاستخدام والصيانة إلى بيئة Hermes القديمة، ولا يستدعيها Ordessa.',
     nav: {
       newChat: {
         title: 'جلسة جديدة',
@@ -1308,7 +1308,7 @@ export const ar = defineLocale({
       },
       settings: {
         title: 'الإعدادات',
-        detail: 'تكوين AgentBox desktop'
+        detail: 'تكوين Ordessa desktop'
       },
       skills: {
         title: 'المهارات والأدوات',
@@ -1345,11 +1345,11 @@ export const ar = defineLocale({
     noSessions: 'لا توجد جلسات',
     gatewayRunning: 'البوابة تعمل',
     gatewayStopped: 'البوابة متوقفة',
-    hermesActiveSessions: (version, count) => `AgentBox ${version} لديه ${count} جلسة نشطة`,
+    hermesActiveSessions: (version, count) => `Ordessa ${version} لديه ${count} جلسة نشطة`,
     restartGateway: 'إعادة تشغيل البوابة',
     openBrowser: 'فتح المتصفح',
     gatewayRestartFailed: 'فشل إعادة تشغيل البوابة.',
-    updateHermes: 'تحديث AgentBox',
+    updateHermes: 'تحديث Ordessa',
     reloadWindow: 'إعادة تحميل النافذة',
     actionRunning: 'الإجراء قيد التشغيل',
     actionDone: 'اكتمل الإجراء',
@@ -1401,7 +1401,7 @@ export const ar = defineLocale({
       menuItem: 'الاتصال بمضيف بعيد…',
       badge: (host: string) => `يعمل على ${host}`,
       title: (profile: string) => `ربط ${profile} بمضيف بعيد`,
-      description: 'ستعمل جلسات هذا الملف الشخصي على خادم AgentBox البعيد الذي تحدده، بدلاً من هذا الجهاز.',
+      description: 'ستعمل جلسات هذا الملف الشخصي على خادم Pacthold البعيد الذي تحدده، بدلاً من هذا الجهاز.',
       urlLabel: 'العنوان البعيد',
       urlPlaceholder: 'https://hermes.example.com',
       urlInvalid: 'أدخل عنواناً كاملاً يبدأ بـ http:// أو https://',
@@ -1497,7 +1497,7 @@ export const ar = defineLocale({
     agentBoxCapabilities: 'الإمكانات',
     agentBoxAvailable: 'متاح',
     agentBoxServiceNoReason: 'لم تذكر الخدمة سببًا',
-    agentBoxServiceOffline: 'خدمة AgentBox غير متصلة — الملفات والإعدادات تحتاجها',
+    agentBoxServiceOffline: 'خدمة Pacthold غير متصلة — الملفات والإعدادات تحتاجها',
     agentBoxCapabilitiesNotDeclared: 'لم تعلن الخدمة أي قدرة لهذا الملف الشخصي',
     agentBoxValuePending: 'لم تعلنها الخدمة',
     roleSettings: {
@@ -1538,7 +1538,7 @@ export const ar = defineLocale({
         `${count} من المهام المجدولة غير المثبتة ستواصل العمل على النموذج الذي أُنشئت به. ثبّتها أو اضبط cron.model لنقلها.`,
       detailMore: (names, remaining) => `${names} و${remaining} أخرى`,
       review: 'مراجعة المهام المجدولة',
-      saveFailed: 'لم يحفظ AgentBox تغيير النموذج هذا.',
+      saveFailed: 'لم يحفظ Ordessa تغيير النموذج هذا.',
       confirmTitle: 'تحذير اختيار النموذج',
       confirmDetail: 'أكّد فقط إذا كنت تقبل هذه المقايضة.',
       confirmAction: 'تأكيد',
@@ -1598,7 +1598,7 @@ export const ar = defineLocale({
     topOfHour: 'في بداية كل ساعة',
     everyHourAt: minute => `كل ساعة عند :${minute}`,
     newCron: 'مهمة مجدولة جديدة',
-    emptyDescNew: 'أنشئ مهمة مجدولة لتشغيل AgentBox تلقائيا.',
+    emptyDescNew: 'أنشئ مهمة مجدولة لتشغيل Ordessa تلقائيا.',
     emptyDescSearch: 'لا توجد مهام تطابق البحث.',
     emptyTitleNew: 'لا توجد مهام مجدولة',
     emptyTitleSearch: 'لا توجد نتائج',
@@ -1635,11 +1635,11 @@ export const ar = defineLocale({
     editTitle: 'تحرير المهمة المجدولة',
     createTitle: 'إنشاء مهمة مجدولة',
     editDesc: 'عدل الجدول والرسالة.',
-    createDesc: 'اضبط مهمة يشغلها AgentBox تلقائيا.',
+    createDesc: 'اضبط مهمة يشغلها Ordessa تلقائيا.',
     nameLabel: 'الاسم',
     namePlaceholder: 'مثال: الملخص الصباحي',
     promptLabel: 'الرسالة',
-    promptPlaceholder: 'ماذا تريد من AgentBox أن يفعل؟',
+    promptPlaceholder: 'ماذا تريد من Ordessa أن يفعل؟',
     frequencyLabel: 'التكرار',
     deliverLabel: 'التسليم',
     customScheduleLabel: 'جدول مخصص',
@@ -1676,25 +1676,25 @@ export const ar = defineLocale({
       search: 'بحث'
     },
     agentBoxArchive: {
-      action: 'أرشفة في AgentBox',
-      title: name => `أرشفة «${name}» في AgentBox؟`,
+      action: 'أرشفة في Ordessa',
+      title: name => `أرشفة «${name}» في Ordessa؟`,
       desc: 'تؤرشف سجل مساحة العمل في الخدمة فقط. يبقى مدخل الشريط الجانبي والملفات وSession والسجل كما هي، ولا تُوقف المهام الجارية.',
       failed: 'تعذر أرشفة مساحة العمل'
     },
     agentBoxSession: {
       loading: 'جارٍ تحميل الجلسات…',
-      empty: 'لا توجد جلسات AgentBox هنا بعد.',
-      unavailable: 'خدمة AgentBox غير متاحة.',
+      empty: 'لا توجد جلسات Ordessa هنا بعد.',
+      unavailable: 'خدمة Pacthold غير متاحة.',
       unavailableReasonFallback: 'لم تُبلّغ الخدمة عن سبب.',
-      archivedEmpty: 'لا توجد جلسات مؤرشفة في AgentBox.',
+      archivedEmpty: 'لا توجد جلسات مؤرشفة في Ordessa.',
       loadFailed: 'تعذر تحميل الجلسات المؤرشفة',
-      listUnsupported: 'لا تدعم خدمة AgentBox هذه سرد الجلسات.',
-      workspaceNotProvided: 'لا توجد جلسات AgentBox متاحة لمساحة العمل هذه.',
+      listUnsupported: 'لا تدعم خدمة Pacthold هذه سرد الجلسات.',
+      workspaceNotProvided: 'لا توجد جلسات Ordessa متاحة لمساحة العمل هذه.',
       menuActions: 'إجراءات Session',
       menuRename: 'إعادة تسمية…',
       menuPin: 'تثبيت',
       menuUnpin: 'إلغاء التثبيت',
-      menuArchive: 'أرشفة في AgentBox',
+      menuArchive: 'أرشفة في Ordessa',
       running: 'قيد التشغيل',
       unreadLocal: 'غير مقروء — هذه النافذة',
       pinned: 'مثبتة',
@@ -1702,7 +1702,7 @@ export const ar = defineLocale({
       renameFailed: 'تعذرت إعادة تسمية Session',
       pinFailed: 'تعذر تثبيت Session',
       unpinFailed: 'تعذر إلغاء تثبيت Session',
-      archiveTitle: name => `أرشفة «${name}» في AgentBox؟`,
+      archiveTitle: name => `أرشفة «${name}» في Ordessa؟`,
       archiveDesc: 'تؤرشف سجل Session في الخدمة فقط. يبقى السجل محفوظًا، ولا تُوقف أي مهام جارية، ولا تُمس أي ملفات.',
       archiveFailed: 'تعذر أرشفة Session'
     },
@@ -1780,14 +1780,14 @@ export const ar = defineLocale({
       copyPath: 'نسخ المسار',
       removeFromSidebar: 'إخفاء من الشريط الجانبي',
       createFailed: 'تعذّر إنشاء المشروع',
-      deleteConfirm: 'هذا يزيل المشروع المحفوظ من AgentBox. تبقى الملفات ومستودعات git وأشجار العمل دون تغيير.',
+      deleteConfirm: 'هذا يزيل المشروع المحفوظ من Ordessa. تبقى الملفات ومستودعات git وأشجار العمل دون تغيير.',
       startWork: 'شجرة عمل جديدة',
       newWorktreeTitle: 'شجرة عمل جديدة',
       newWorktreeDesc: 'سمِّ الفرع لشجرة العمل هذه.',
       branchPlaceholder: 'مثال: my-feature',
       startWorkFailed: 'تعذّر إنشاء شجرة العمل',
       worktreeStaleBackend:
-        'حدِّث خادم AgentBox لإنشاء أشجار العمل عبر هذا الاتصال البعيد — فهو أقدم من واجهة git worktree.',
+        'حدِّث خادم Pacthold لإنشاء أشجار العمل عبر هذا الاتصال البعيد — فهو أقدم من واجهة git worktree.',
       worktreeProjectLabel: 'المشروع',
       worktreeProjectPlaceholder: 'ابحث في المشاريع…',
       worktreeProjectNone: 'لا توجد مشاريع بمجلد',
@@ -1888,10 +1888,10 @@ export const ar = defineLocale({
       greeting: 'ماذا نبنيه اليوم؟',
       subtitle: 'اكتب بكلماتك — حقل الإدخال أدناه هو نفسه الذي ستستمر في استخدامه.',
       starters: ['لخّص تغييرات هذا الأسبوع', 'أصلح اختبارًا فاشلًا', 'اشرح هذا المشروع'],
-      waiting: 'بانتظار خدمة AgentBox…',
+      waiting: 'بانتظار خدمة Pacthold…',
       blocked: 'اختر مشروعًا (وملفًا شخصيًا) للبدء — سيظهر السبب في حقل الإدخال أدناه.'
     },
-    serviceUnreachable: 'تعذّر الوصول إلى خدمة AgentBox',
+    serviceUnreachable: 'تعذّر الوصول إلى خدمة Pacthold',
     workspaceMissing: 'اختر مشروعًا لهذه المحادثة',
     disabledPlaceholder: 'الإرسال متوقف — راجع الملاحظة أعلى حقل الإدخال',
     modelSelector: 'النموذج',
@@ -1901,10 +1901,10 @@ export const ar = defineLocale({
     contextUsage: 'استخدام السياق',
     contextUsageUnknown: 'غير معروف',
     wakingProfile: profile => `جار إيقاظ ${profile}`,
-    placeholderStarting: 'جار بدء AgentBox...',
+    placeholderStarting: 'جار بدء Ordessa...',
     placeholderReconnecting: 'جار إعادة الاتصال...',
     placeholderFollowUp: 'اكتب متابعة...',
-    newSessionPlaceholders: ['اسأل AgentBox عن شيء...', 'اطلب من AgentBox تنفيذ مهمة...', 'ابدأ محادثة جديدة...'],
+    newSessionPlaceholders: ['اسأل Ordessa عن شيء...', 'اطلب من Ordessa تنفيذ مهمة...', 'ابدأ محادثة جديدة...'],
     followUpPlaceholders: ['اكتب متابعة...', 'أضف توجيها...', 'اسأل سؤالا آخر...'],
     openDirective: 'فتح',
     queueMessage: 'إضافة الرسالة للطابور',
@@ -1939,7 +1939,7 @@ export const ar = defineLocale({
     attachUrlTitle: 'إرفاق رابط',
     attachUrlDesc: 'أضف رابطا إلى الرسالة.',
     urlPlaceholder: 'https://example.com',
-    urlHintPre: 'سيقرأ AgentBox الرابط ضمن السياق.',
+    urlHintPre: 'سيقرأ Ordessa الرابط ضمن السياق.',
     attach: 'إرفاق',
     queued: count => `${count} في الطابور`,
     attachmentOnly: 'إرفاق فقط',
@@ -2133,7 +2133,7 @@ export const ar = defineLocale({
       createPr: 'إنشاء PR',
       openPr: 'فتح PR',
       ghMissing: 'ثبّت GitHub CLI (gh) وسجّل الدخول لفتح طلبات السحب',
-      agentShip: 'اطلب من AgentBox فتح PR',
+      agentShip: 'اطلب من Ordessa فتح PR',
       agentShipUnavailable: 'المحادثة التي تملك هذه التغييرات ليست على الشاشة.',
       agentShipPrompt: 'راجع التغييرات الحالية، وأودعها برسالة إيداع تقليدية واضحة، وادفع الفرع، وافتح طلب سحب.',
       newBranch: 'فرع جديد',
@@ -2150,9 +2150,9 @@ export const ar = defineLocale({
       fetch: 'جار التنزيل...',
       pull: 'أوشكنا على الانتهاء...',
       pydeps: 'جار الإنهاء...',
-      update: 'جار تحديث AgentBox...',
+      update: 'جار تحديث Ordessa...',
       rebuild: 'جار إعادة بناء تطبيق سطح المكتب...',
-      restart: 'جار إعادة تشغيل AgentBox...',
+      restart: 'جار إعادة تشغيل Ordessa...',
       done: 'اكتمل التحديث',
       manual: 'التحديث من الطرفية',
       guiSkew: 'تحديث تطبيق سطح المكتب',
@@ -2162,42 +2162,42 @@ export const ar = defineLocale({
     checkFailedTitle: 'تعذّر التحقق من التحديثات',
     tryAgain: 'إعادة المحاولة',
     notAvailableTitle: 'التحديث غير متاح',
-    unsupportedMessage: 'لا يمكن لهذا الإصدار من AgentBox تحديث نفسه من داخل التطبيق.',
+    unsupportedMessage: 'لا يمكن لهذا الإصدار من Ordessa تحديث نفسه من داخل التطبيق.',
     connectionRetry: 'تحقق من اتصالك وأعد المحاولة.',
     latestBody: 'أنت تستخدم أحدث إصدار.',
     latestBodyBackend: 'الواجهة الخلفية تعمل بأحدث إصدار.',
     allSetTitle: 'كل شيء جاهز',
     availableTitle: 'يتوفر تحديث جديد',
-    availableBody: 'إصدار جديد من AgentBox جاهز للتثبيت.',
+    availableBody: 'إصدار جديد من Ordessa جاهز للتثبيت.',
     availableTitleBackend: 'يتوفر تحديث للواجهة الخلفية',
-    availableBodyBackend: 'إصدار أحدث من واجهة AgentBox الخلفية المتصلة جاهز للتثبيت.',
+    availableBodyBackend: 'إصدار أحدث من واجهة Ordessa الخلفية المتصلة جاهز للتثبيت.',
     availableBodyNoChangelog: 'إصدار أحدث جاهز. ملاحظات الإصدار غير متاحة لنوع التثبيت هذا.',
     updateNow: 'التحديث الآن',
     maybeLater: 'ربما لاحقا',
     moreChanges: count => `+ ${count} تغيير${count === 1 ? '' : 'ات'} إضافي مُضمَّن.`,
     manualTitle: 'التحديث من الطرفية',
-    manualBody: 'لقد ثبّتت AgentBox من سطر الأوامر، لذا تُجرى التحديثات من هناك أيضا. الصق هذا في طرفيتك:',
-    manualPickedUp: 'سيلتقط AgentBox الإصدار الجديد في المرة التالية التي تشغّله فيها.',
+    manualBody: 'لقد ثبّتت Ordessa من سطر الأوامر، لذا تُجرى التحديثات من هناك أيضا. الصق هذا في طرفيتك:',
+    manualPickedUp: 'سيلتقط Ordessa الإصدار الجديد في المرة التالية التي تشغّله فيها.',
     guiSkewTitle: 'تحديث تطبيق سطح المكتب',
     guiSkewBody:
-      'تم تحديث الواجهة الخلفية، لكن حزمة تطبيق سطح المكتب هذه لم تتغير. حدّث أو أعد تثبيت تطبيق AgentBox لسطح المكتب (ملف AppImage / ‎.deb / ‎.rpm) لمطابقته.',
+      'تم تحديث الواجهة الخلفية، لكن حزمة تطبيق سطح المكتب هذه لم تتغير. حدّث أو أعد تثبيت تطبيق Ordessa لسطح المكتب (ملف AppImage / ‎.deb / ‎.rpm) لمطابقته.',
     copy: 'نسخ',
     copied: 'تم النسخ',
     done: 'تم',
     applyingBody:
-      'يتولّى مُحدِّث AgentBox المهمة في نافذته الخاصة ويعيد فتح AgentBox تلقائيا عند الانتهاء. الرجاء عدم إعادة فتح AgentBox بنفسك أثناء التحديث.',
+      'يتولّى مُحدِّث Ordessa المهمة في نافذته الخاصة ويعيد فتح Ordessa تلقائيا عند الانتهاء. الرجاء عدم إعادة فتح Ordessa بنفسك أثناء التحديث.',
     applyingBodyBackend:
-      'تطبّق الواجهة الخلفية البعيدة التحديث وستعيد التشغيل. يعيد AgentBox الاتصال تلقائيا عند عودتها.',
-    applyingClose: 'ستُغلق هذه النافذة أثناء تشغيل التحديث، ثم يعيد AgentBox فتح نفسه تلقائيا.',
+      'تطبّق الواجهة الخلفية البعيدة التحديث وستعيد التشغيل. يعيد Ordessa الاتصال تلقائيا عند عودتها.',
+    applyingClose: 'ستُغلق هذه النافذة أثناء تشغيل التحديث، ثم يعيد Ordessa فتح نفسه تلقائيا.',
     errorTitle: 'لم يكتمل التحديث',
     errorBody: 'لا داعي للقلق — لم يُفقد شيء. يمكنك إعادة المحاولة الآن.',
-    blockerTitle: 'إغلاق المعاينات المحلية لتحديث AgentBox؟',
-    blockerBody: 'يحتاج AgentBox إلى إيقاف هذه المعاينات المحلية قبل التحديث. لن يؤدي ذلك إلى تعديل ملفاتك أو حذفها.',
-    foreignBlockerTitle: 'أغلق العمليات الأخرى لتحديث AgentBox',
+    blockerTitle: 'إغلاق المعاينات المحلية لتحديث Ordessa؟',
+    blockerBody: 'يحتاج Ordessa إلى إيقاف هذه المعاينات المحلية قبل التحديث. لن يؤدي ذلك إلى تعديل ملفاتك أو حذفها.',
+    foreignBlockerTitle: 'أغلق العمليات الأخرى لتحديث Ordessa',
     foreignBlockerBody:
-      'لا يمكن لـ AgentBox إغلاق هذه العمليات تلقائيًا بأمان. أغلق التطبيق أو الطرفية أو الخدمة التي تشغّل كل عملية، ثم حاول التحديث مرة أخرى.',
+      'لا يمكن لـ Ordessa إغلاق هذه العمليات تلقائيًا بأمان. أغلق التطبيق أو الطرفية أو الخدمة التي تشغّل كل عملية، ثم حاول التحديث مرة أخرى.',
     mixedBlockerBody:
-      'يمكن لـ AgentBox إغلاق المعاينات المحلية المدرجة أدناه. يجب إغلاق العمليات الأخرى يدويًا قبل متابعة التحديث.',
+      'يمكن لـ Ordessa إغلاق المعاينات المحلية المدرجة أدناه. يجب إغلاق العمليات الأخرى يدويًا قبل متابعة التحديث.',
     closePreviewsAndUpdate: 'إغلاق المعاينات والتحديث',
     closePreviewsAndCheckAgain: 'إغلاق المعاينات والتحقق مجددًا',
     localPreview: 'معاينة محلية',
@@ -2230,7 +2230,7 @@ export const ar = defineLocale({
       skipped: 'تم التخطي',
       failed: 'فشل'
     },
-    oneTimeTitle: 'يحتاج AgentBox إلى تثبيت لمرة واحدة',
+    oneTimeTitle: 'يحتاج Ordessa إلى تثبيت لمرة واحدة',
     unsupportedDesc: platform =>
       `التثبيت التلقائي عند أول تشغيل غير متاح على ${platform} بعد. افتح الطرفية وشغّل الأمر أدناه، ثم أعد تشغيل هذا التطبيق. ستتخطى عمليات التشغيل اللاحقة هذه الخطوة.`,
     installCommand: 'أمر التثبيت',
@@ -2239,12 +2239,12 @@ export const ar = defineLocale({
     installTo: 'سيتم التثبيت في',
     retryAfterRun: 'لقد شغّلته -- إعادة المحاولة',
     failedTitle: 'فشل التثبيت',
-    settingUpTitle: 'جار إعداد وكيل AgentBox',
+    settingUpTitle: 'جار إعداد وكيل Ordessa',
     finishingTitle: 'جار الإنهاء',
     failedDesc:
-      'فشلت إحدى خطوات التثبيت. على Windows، قد يحدث هذا إذا كان هناك نسخة أخرى من AgentBox CLI أو تطبيق سطح المكتب قيد التشغيل. أوقف أي نسخ AgentBox قيد التشغيل، ثم أعد المحاولة. تحقق من التفاصيل أدناه أو من سجل سطح المكتب للحصول على النص الكامل.',
+      'فشلت إحدى خطوات التثبيت. على Windows، قد يحدث هذا إذا كان هناك نسخة أخرى من Ordessa CLI أو تطبيق سطح المكتب قيد التشغيل. أوقف أي نسخ Ordessa قيد التشغيل، ثم أعد المحاولة. تحقق من التفاصيل أدناه أو من سجل سطح المكتب للحصول على النص الكامل.',
     activeDesc:
-      'هذا إعداد لمرة واحدة. يقوم مثبّت AgentBox بتنزيل التبعيات وتهيئة جهازك. ستتخطى عمليات التشغيل اللاحقة هذه الخطوة.',
+      'هذا إعداد لمرة واحدة. يقوم مثبّت Ordessa بتنزيل التبعيات وتهيئة جهازك. ستتخطى عمليات التشغيل اللاحقة هذه الخطوة.',
     progress: (completed, total) => `اكتملت ${completed} من ${total} خطوة`,
     currentStage: stage => ` -- الآن: ${stage}`,
     fetchingManifest: 'جار جلب بيان المثبّت...',
@@ -2261,10 +2261,10 @@ export const ar = defineLocale({
     reloadRetry: 'إعادة التحميل وإعادة المحاولة'
   },
   onboarding: {
-    headerTitle: 'لنُعِدّ لك AgentBox Agent',
+    headerTitle: 'لنُعِدّ لك Ordessa Agent',
     headerDesc: 'اربط مزوّد نماذج لبدء المحادثة. معظم الخيارات تتطلب نقرة واحدة.',
-    preparingInstall: 'يُكمل AgentBox التثبيت. عادة ما يستغرق ذلك أقل من دقيقة في أول تشغيل.',
-    starting: 'جار بدء AgentBox...',
+    preparingInstall: 'يُكمل Ordessa التثبيت. عادة ما يستغرق ذلك أقل من دقيقة في أول تشغيل.',
+    starting: 'جار بدء Ordessa...',
     lookingUpProviders: 'جار البحث عن المزوّدين...',
     collapse: 'طي',
     otherProviders: 'مزودون آخرون',
@@ -2272,7 +2272,7 @@ export const ar = defineLocale({
     chooseLater: 'سأختار مزوّدا لاحقا',
     recommended: 'موصى به',
     connected: 'متصل',
-    featuredPitch: 'اشتراك واحد، أكثر من 300 نموذج متقدم — الطريقة الموصى بها لتشغيل AgentBox',
+    featuredPitch: 'اشتراك واحد، أكثر من 300 نموذج متقدم — الطريقة الموصى بها لتشغيل Ordessa',
     fireworksPitch: 'نماذج مفتوحة سريعة مع استضافة Fireworks.',
     openRouterPitch: 'مفتاح واحد لمئات النماذج — خيار افتراضي جيد',
     apiKeyOptions: {
@@ -2295,7 +2295,7 @@ export const ar = defineLocale({
       local: {
         short: 'مستضاف ذاتيا',
         description:
-          'وجّه AgentBox إلى نقطة نهاية محلية أو مستضافة ذاتيا متوافقة مع OpenAI (vLLM، llama.cpp، Ollama، إلخ).'
+          'وجّه Ordessa إلى نقطة نهاية محلية أو مستضافة ذاتيا متوافقة مع OpenAI (vLLM، llama.cpp، Ollama، إلخ).'
       }
     },
     backToSignIn: 'العودة إلى تسجيل الدخول',
@@ -2308,8 +2308,8 @@ export const ar = defineLocale({
     update: 'تحديث',
     flowSubtitles: {
       pkce: 'يفتح المتصفح لتسجيل الدخول ثم يتابع هنا',
-      device_code: 'يفتح صفحة تحقق في المتصفح — يتصل AgentBox تلقائياً',
-      loopback: 'يفتح المتصفح لتسجيل الدخول — يتصل AgentBox تلقائياً',
+      device_code: 'يفتح صفحة تحقق في المتصفح — يتصل Ordessa تلقائياً',
+      loopback: 'يفتح المتصفح لتسجيل الدخول — يتصل Ordessa تلقائياً',
       external: 'سجل الدخول مرة واحدة في الطرفية ثم عد إلى المحادثة'
     },
     startingSignIn: provider => `جار بدء تسجيل الدخول لـ ${provider}...`,
@@ -2322,11 +2322,11 @@ export const ar = defineLocale({
     pickDifferentProvider: 'اختر مزوداً آخر',
     signInWith: provider => `تسجيل الدخول عبر ${provider}`,
     openedBrowser: provider => `فتحنا ${provider} في المتصفح.`,
-    authorizeThere: 'صرّح لـ AgentBox هناك.',
+    authorizeThere: 'صرّح لـ Ordessa هناك.',
     copyAuthCode: 'انسخ رمز التفويض وألصقه أدناه.',
     pasteAuthCode: 'ألصق رمز التفويض',
     reopenAuthPage: 'إعادة فتح صفحة التفويض',
-    autoBrowser: provider => `فتحنا ${provider} في المتصفح. صرّح لـ AgentBox هناك وسيتم الاتصال تلقائياً دون نسخ أو لصق.`,
+    autoBrowser: provider => `فتحنا ${provider} في المتصفح. صرّح لـ Ordessa هناك وسيتم الاتصال تلقائياً دون نسخ أو لصق.`,
     reopenSignInPage: 'إعادة فتح صفحة تسجيل الدخول',
     waitingAuthorize: 'بانتظار التفويض...',
     externalPending: provider =>
@@ -2506,7 +2506,7 @@ export const ar = defineLocale({
     binaryTitle: 'يبدو هذا ملفا ثنائيا',
     binaryBody: label => `قد تعرض معاينة ${label} نصا غير قابل للقراءة.`,
     largeTitle: 'هذا الملف كبير',
-    largeBody: (label, size) => `حجم ${label} هو ${size}. سيعرض AgentBox أول 512 KB فقط.`,
+    largeBody: (label, size) => `حجم ${label} هو ${size}. سيعرض Ordessa أول 512 KB فقط.`,
     previewAnyway: 'معاينة على أي حال',
     truncated: 'عرض أول 512 KB.',
     noInlineTitle: 'لا توجد معاينة مضمّنة',
@@ -2546,11 +2546,11 @@ export const ar = defineLocale({
         'يشير هذا العنوان إلى الجهاز الذي يشغّل الوكيل، وليس هذا الجهاز. تحمّل لوحة المتصفح الصفحات محليًا، لذا يحتاج خادم التطوير البعيد إلى إعادة توجيه منفذ أو اسم مضيف يمكن الوصول إليه.',
       failedToLoad: 'فشل تحميل المعاينة',
       tryAgain: 'إعادة المحاولة',
-      restarting: 'جار إعادة تشغيل AgentBox...',
-      askRestart: 'اطلب من AgentBox إعادة تشغيل الخادم',
-      lookingRestart: taskId => `يبحث AgentBox عن خادم معاينة لإعادة تشغيله (${taskId})`,
+      restarting: 'جار إعادة تشغيل Ordessa...',
+      askRestart: 'اطلب من Ordessa إعادة تشغيل الخادم',
+      lookingRestart: taskId => `يبحث Ordessa عن خادم معاينة لإعادة تشغيله (${taskId})`,
       restartingTitle: 'جار إعادة تشغيل خادم المعاينة',
-      restartingMessage: 'يعمل AgentBox في الخلفية. راقب كونسول المعاينة لمتابعة التقدم.',
+      restartingMessage: 'يعمل Ordessa في الخلفية. راقب كونسول المعاينة لمتابعة التقدم.',
       startRestartFailed: message => `تعذّر بدء إعادة تشغيل الخادم: ${message}`,
       restartFailed: 'فشلت إعادة تشغيل الخادم',
       hideConsole: 'إخفاء كونسول المعاينة',
@@ -2562,16 +2562,16 @@ export const ar = defineLocale({
       reload: 'إعادة تحميل الصفحة',
       address: 'العنوان',
       addressPlaceholder: 'أدخل العنوان',
-      blankPageBody: 'اكتب عنوانًا في الأعلى للتصفح، أو اطلب من AgentBox فتح صفحة.',
-      finishedRestarting: message => `أنهى AgentBox إعادة تشغيل خادم المعاينة${message ? `: ${message}` : ''}`,
+      blankPageBody: 'اكتب عنوانًا في الأعلى للتصفح، أو اطلب من Ordessa فتح صفحة.',
+      finishedRestarting: message => `أنهى Ordessa إعادة تشغيل خادم المعاينة${message ? `: ${message}` : ''}`,
       failedRestarting: message => `فشلت إعادة تشغيل الخادم: ${message}`,
       unknownError: 'خطأ غير معروف',
       restartedTitle: 'تمت إعادة تشغيل خادم المعاينة',
       reloadingNow: 'جار إعادة تحميل المعاينة الآن.',
       restartFailedTitle: 'فشلت إعادة تشغيل المعاينة',
-      restartFailedMessage: 'تعذّر على AgentBox إعادة تشغيل الخادم.',
+      restartFailedMessage: 'تعذّر على Ordessa إعادة تشغيل الخادم.',
       stillWorking:
-        'لا يزال AgentBox يعمل، لكن لم تصل نتيجة إعادة التشغيل بعد. قد يكون أمر الخادم قيد التشغيل في المقدمة.',
+        'لا يزال Ordessa يعمل، لكن لم تصل نتيجة إعادة التشغيل بعد. قد يكون أمر الخادم قيد التشغيل في المقدمة.',
       workspaceReloading: 'تغيّرت مساحة العمل، جار إعادة تحميل المعاينة',
       fileChanged: url => `تغيّر الملف، جار إعادة تحميل المعاينة: ${url}`,
       filesChanged: (count, url) => `${count} تغييرات ملفات، جار إعادة تحميل المعاينة: ${url}`,
@@ -3008,10 +3008,10 @@ export const ar = defineLocale({
       },
       skills: {
         title: 'علّمه مرة واحدة',
-        text: 'المهارات مجلدات من التعليمات يحمّلها AgentBox عندما يقتضي العمل ذلك.'
+        text: 'المهارات مجلدات من التعليمات يحمّلها Ordessa عندما يقتضي العمل ذلك.'
       },
       artifacts: {
-        title: 'كل ما صنعه AgentBox',
+        title: 'كل ما صنعه Ordessa',
         text: 'الصور والملفات والروابط من كل الجلسات، مفهرسة في مكان واحد.'
       },
       cron: {
@@ -3024,7 +3024,7 @@ export const ar = defineLocale({
       },
       profiles: {
         title: 'الملفات الشخصية منفصلة',
-        text: 'كل واحد منها AgentBox مستقل — مفاتيحه وذاكرته وجلساته الخاصة.'
+        text: 'كل واحد منها Ordessa مستقل — مفاتيحه وذاكرته وجلساته الخاصة.'
       },
       'composer-mentions': {
         title: 'المرفقات والأوامر',
@@ -3059,7 +3059,7 @@ export const ar = defineLocale({
     }
   },
   wslWorkspace: {
-    browseUnavailable: 'تصفح الدلائل في AgentBox غير متاح',
+    browseUnavailable: 'تصفح الدلائل في Ordessa غير متاح',
     readOnly: 'للقراءة فقط',
     cannotOpen: 'تعذر الفتح',
     kindFile: 'ملف',

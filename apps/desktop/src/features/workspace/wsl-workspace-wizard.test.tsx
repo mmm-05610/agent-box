@@ -133,7 +133,7 @@ describe('WSL wizard directory browsing through the service', () => {
 
     render(<WslWorkspaceWizard />)
 
-    const reason = await screen.findByText(/AgentBox directory browsing is unavailable/)
+    const reason = await screen.findByText(/Ordessa directory browsing is unavailable/)
     expect(reason.textContent).toContain('service starting')
 
     const connectButton = screen.getByRole('button', { name: 'Connect' })
@@ -153,7 +153,7 @@ describe('WSL wizard directory browsing through the service', () => {
 
     render(<WslWorkspaceWizard />)
 
-    expect((await screen.findByText(/AgentBox directory browsing is unavailable/)).textContent).toContain(
+    expect((await screen.findByText(/Ordessa directory browsing is unavailable/)).textContent).toContain(
       'NOT_IMPLEMENTED'
     )
     expect(mocks.browse).not.toHaveBeenCalled()

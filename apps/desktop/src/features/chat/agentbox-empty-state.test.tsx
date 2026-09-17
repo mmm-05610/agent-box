@@ -39,7 +39,7 @@ describe('AgentBoxEmptyState', () => {
   it('waits for the service rather than claiming the setup is wrong', () => {
     const { container } = renderState({ canSend: false, waiting: true })
 
-    expect(container.querySelector('[data-agentbox-empty-blocked]')?.textContent).toContain('Waiting for the AgentBox service')
+    expect(container.querySelector('[data-agentbox-empty-blocked]')?.textContent).toContain('Waiting for the Pacthold service')
   })
 
   it('renders only the product brand and its own copy — no legacy surface', () => {

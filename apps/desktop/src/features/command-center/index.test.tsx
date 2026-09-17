@@ -126,7 +126,7 @@ afterEach(() => {
   $sessions.set([])
 })
 
-describe('CommandCenterView — AgentBox authority never touches the legacy data plane', () => {
+describe('CommandCenterView — Ordessa authority never touches the legacy data plane', () => {
   it.each(['sessions', 'system', 'usage', 'maintenance'] as const)(
     'makes no legacy API call when the %s section is opened',
     async section => {
@@ -145,7 +145,7 @@ describe('CommandCenterView — AgentBox authority never touches the legacy data
     section => {
       renderCenter('agentbox', { initialUrl: `/command-center?section=${section}` })
 
-      expect(screen.getByText('AgentBox does not provide this surface')).toBeTruthy()
+      expect(screen.getByText('Ordessa does not provide this surface')).toBeTruthy()
       expect(screen.getByText(/legacy Hermes runtime/)).toBeTruthy()
       expect(screen.queryByText(/LEGACY_RUNTIME_DISABLED_FOR_PRODUCT/)).toBeNull()
     }
@@ -154,7 +154,7 @@ describe('CommandCenterView — AgentBox authority never touches the legacy data
   it('honours the initialSection prop with the same unavailable panel', () => {
     renderCenter('agentbox', { initialSection: 'usage' })
 
-    expect(screen.getByText('AgentBox does not provide this surface')).toBeTruthy()
+    expect(screen.getByText('Ordessa does not provide this surface')).toBeTruthy()
     expect(screen.queryByText(/LEGACY_RUNTIME_DISABLED_FOR_PRODUCT/)).toBeNull()
   })
 

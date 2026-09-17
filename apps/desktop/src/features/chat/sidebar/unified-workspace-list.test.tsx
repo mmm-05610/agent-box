@@ -213,7 +213,7 @@ describe('unified workspace list (round 36R)', () => {
   })
 })
 
-describe('AgentBox workspace archive in the unified list', () => {
+describe('Ordessa workspace archive in the unified list', () => {
   const serviceWorkspace = (overrides: Partial<WorkspaceRecord> = {}): WorkspaceRecord => ({
     accessibility: { executableForRole: null, readable: true, reasons: [], writable: true },
     archivedAt: null,
@@ -288,7 +288,7 @@ describe('AgentBox workspace archive in the unified list', () => {
     const dialog = await screen.findByRole('dialog')
 
     await act(async () => {
-      fireEvent.click(within(dialog).getByRole('button', { name: 'Archive in AgentBox' }))
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Archive in Ordessa' }))
     })
   }
 
@@ -309,12 +309,12 @@ describe('AgentBox workspace archive in the unified list', () => {
     $workspaceViewSelectedId.set(null)
   })
 
-  it('offers the AgentBox archive on a local row that matches a service Workspace', async () => {
+  it('offers the Ordessa archive on a local row that matches a service Workspace', async () => {
     renderListWith([localRow('C:/work/app')])
 
     openLocalMenu()
 
-    expect(await screen.findByRole('menuitem', { name: 'Archive in AgentBox' })).toBeTruthy()
+    expect(await screen.findByRole('menuitem', { name: 'Archive in Ordessa' })).toBeTruthy()
     // The legacy hide is still there, as its own action.
     expect(screen.getByRole('menuitem', { name: 'Hide from sidebar' })).toBeTruthy()
   })
@@ -334,7 +334,7 @@ describe('AgentBox workspace archive in the unified list', () => {
 
     // Same distro and path, different user: not this row's Workspace.
     expect(await screen.findByRole('menuitem', { name: 'Remove from sidebar' })).toBeTruthy()
-    expect(screen.queryByRole('menuitem', { name: 'Archive in AgentBox' })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: 'Archive in Ordessa' })).toBeNull()
 
     cleanup()
 
@@ -349,7 +349,7 @@ describe('AgentBox workspace archive in the unified list', () => {
     renderListWith([])
     openWslMenu()
 
-    expect(await screen.findByRole('menuitem', { name: 'Archive in AgentBox' })).toBeTruthy()
+    expect(await screen.findByRole('menuitem', { name: 'Archive in Ordessa' })).toBeTruthy()
   })
 
   it('offers nothing for Home, a folderless project, or a location the service does not know', async () => {
@@ -364,7 +364,7 @@ describe('AgentBox workspace archive in the unified list', () => {
     renderListWith([localRow(null)])
     openLocalMenu()
     expect(await screen.findByRole('menuitem', { name: 'Hide from sidebar' })).toBeTruthy()
-    expect(screen.queryByRole('menuitem', { name: 'Archive in AgentBox' })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: 'Archive in Ordessa' })).toBeNull()
 
     cleanup()
 
@@ -372,7 +372,7 @@ describe('AgentBox workspace archive in the unified list', () => {
     renderListWith([localRow('C:/somewhere/else')])
     openLocalMenu()
     expect(await screen.findByRole('menuitem', { name: 'Hide from sidebar' })).toBeTruthy()
-    expect(screen.queryByRole('menuitem', { name: 'Archive in AgentBox' })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: 'Archive in Ordessa' })).toBeNull()
 
     expect(agentBoxMocks.archive).not.toHaveBeenCalled()
   })
@@ -383,7 +383,7 @@ describe('AgentBox workspace archive in the unified list', () => {
 
     openLocalMenu()
     expect(await screen.findByRole('menuitem', { name: 'Hide from sidebar' })).toBeTruthy()
-    expect(screen.queryByRole('menuitem', { name: 'Archive in AgentBox' })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: 'Archive in Ordessa' })).toBeNull()
     cleanup()
 
     $agentBoxHello.set(hello())
@@ -392,7 +392,7 @@ describe('AgentBox workspace archive in the unified list', () => {
 
     openLocalMenu()
     expect(await screen.findByRole('menuitem', { name: 'Hide from sidebar' })).toBeTruthy()
-    expect(screen.queryByRole('menuitem', { name: 'Archive in AgentBox' })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: 'Archive in Ordessa' })).toBeNull()
     expect(agentBoxMocks.archive).not.toHaveBeenCalled()
   })
 
@@ -404,7 +404,7 @@ describe('AgentBox workspace archive in the unified list', () => {
 
     openLocalMenu()
     expect(await screen.findByRole('menuitem', { name: 'Hide from sidebar' })).toBeTruthy()
-    expect(screen.queryByRole('menuitem', { name: 'Archive in AgentBox' })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: 'Archive in Ordessa' })).toBeNull()
     cleanup()
 
     setWslWorkspaces([wslRecord()])
@@ -418,7 +418,7 @@ describe('AgentBox workspace archive in the unified list', () => {
     renderListWith([])
     openWslMenu()
     expect(await screen.findByRole('menuitem', { name: 'Remove from sidebar' })).toBeTruthy()
-    expect(screen.queryByRole('menuitem', { name: 'Archive in AgentBox' })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: 'Archive in Ordessa' })).toBeNull()
     expect(agentBoxMocks.archive).not.toHaveBeenCalled()
 
     // The same callable service brings it back — nothing else changed.
@@ -426,7 +426,7 @@ describe('AgentBox workspace archive in the unified list', () => {
       $agentBoxService.set({ detail: null, phase: 'ready' })
     })
 
-    expect(await screen.findByRole('menuitem', { name: 'Archive in AgentBox' })).toBeTruthy()
+    expect(await screen.findByRole('menuitem', { name: 'Archive in Ordessa' })).toBeTruthy()
   })
 
   it('archives with the service id and version, then adopts the returned record and clears the selection first', async () => {
@@ -440,7 +440,7 @@ describe('AgentBox workspace archive in the unified list', () => {
       const { container } = renderListWith([localRow('C:/work/app')])
 
       openLocalMenu()
-      fireEvent.click(await screen.findByRole('menuitem', { name: 'Archive in AgentBox' }))
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Archive in Ordessa' }))
       await confirmArchive()
 
       expect(agentBoxMocks.archive).toHaveBeenCalledWith(
@@ -474,7 +474,7 @@ describe('AgentBox workspace archive in the unified list', () => {
 
     // Archive the FIRST row while the second one is selected.
     openLocalMenu(0)
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Archive in AgentBox' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Archive in Ordessa' }))
     await confirmArchive()
 
     expect(agentBoxMocks.archive).toHaveBeenCalledWith(
@@ -492,7 +492,7 @@ describe('AgentBox workspace archive in the unified list', () => {
     renderListWith([localRow('C:/work/app')])
 
     openLocalMenu()
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Archive in AgentBox' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Archive in Ordessa' }))
     await confirmArchive()
 
     const dialog = await screen.findByRole('dialog')
@@ -516,10 +516,10 @@ describe('AgentBox workspace archive in the unified list', () => {
     renderListWith([localRow('C:/work/app')])
 
     openLocalMenu()
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Archive in AgentBox' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Archive in Ordessa' }))
 
     const dialog = await screen.findByRole('dialog')
-    const confirm = within(dialog).getByRole('button', { name: 'Archive in AgentBox' })
+    const confirm = within(dialog).getByRole('button', { name: 'Archive in Ordessa' })
 
     await act(async () => {
       fireEvent.click(confirm)
@@ -546,7 +546,7 @@ describe('AgentBox workspace archive in the unified list', () => {
     renderListWith([localRow('C:/work/app')])
 
     openLocalMenu()
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Archive in AgentBox' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Archive in Ordessa' }))
     await confirmArchive()
 
     // The service's answer is authoritative: an unarchived record stays.
@@ -555,7 +555,7 @@ describe('AgentBox workspace archive in the unified list', () => {
   })
 })
 
-describe('AgentBox sessions in the unified workspace list', () => {
+describe('Ordessa sessions in the unified workspace list', () => {
   const serviceWorkspace = (overrides: Partial<WorkspaceRecord> = {}): WorkspaceRecord => ({
     accessibility: { executableForRole: null, readable: true, reasons: [], writable: true },
     archivedAt: null,
@@ -632,7 +632,7 @@ describe('AgentBox sessions in the unified workspace list', () => {
     $agentBoxCatalogReadiness.set({ sessions: false, workspaces: false })
   })
 
-  it('a matched LOCAL workspace owns the expansion: its AgentBox rows render, legacy previews do not', () => {
+  it('a matched LOCAL workspace owns the expansion: its Ordessa rows render, legacy previews do not', () => {
     $agentBoxSessions.set({ 'session-1': agentBoxSession() })
 
     const { container } = renderWith()
@@ -645,7 +645,7 @@ describe('AgentBox sessions in the unified workspace list', () => {
     expect(container.querySelector('[data-legacy-preview="proj-1"]')).toBeNull()
   })
 
-  it('a matched WSL workspace shows its AgentBox sessions instead of the unavailable prompt', () => {
+  it('a matched WSL workspace shows its Ordessa sessions instead of the unavailable prompt', () => {
     setWslWorkspaces([wslRecord()])
     $agentBoxWorkspaces.set([
       serviceWorkspace({
@@ -713,7 +713,7 @@ describe('AgentBox sessions in the unified workspace list', () => {
     const { container } = renderWith()
 
     expect(container.querySelector('[data-agentbox-sessions-empty="workspace-1"]')?.textContent).toContain(
-      'No AgentBox sessions'
+      'No Ordessa sessions'
     )
     expect(container.querySelector('[data-legacy-preview="proj-1"]')).toBeNull()
   })
@@ -736,7 +736,7 @@ describe('AgentBox sessions in the unified workspace list', () => {
     expect(container.querySelector('[data-legacy-preview="proj-1"]')).toBeTruthy()
   })
 
-  it('under AgentBox authority an UNMATCHED local row shows the neutral state instead of the legacy preview', () => {
+  it('under Ordessa authority an UNMATCHED local row shows the neutral state instead of the legacy preview', () => {
     // Product runtime: the service has no Workspace for this folder, so there
     // are no service sessions to show — legacy Hermes previews are not rendered
     // and no row is invented.
@@ -756,7 +756,7 @@ describe('AgentBox sessions in the unified workspace list', () => {
 
     expect(container.querySelector('[data-legacy-preview="proj-1"]')).toBeNull()
     expect(container.querySelector('[data-agentbox-workspace-unavailable="proj-1"]')?.textContent).toContain(
-      'No AgentBox sessions are available for this workspace.'
+      'No Ordessa sessions are available for this workspace.'
     )
   })
 })
@@ -765,7 +765,7 @@ describe('AgentBox sessions in the unified workspace list', () => {
 // shows, and it is read from the cache. The service phase changes what the row
 // can do and what honest status it carries — never whether the matched
 // workspace's own sessions are shown, and never a fallback to legacy Hermes.
-describe('AgentBox sessions — service state boundary in the unified list', () => {
+describe('Ordessa sessions — service state boundary in the unified list', () => {
   const serviceWorkspace = (overrides: Partial<WorkspaceRecord> = {}): WorkspaceRecord => ({
     accessibility: { executableForRole: null, readable: true, reasons: [], writable: true },
     archivedAt: null,
@@ -853,7 +853,7 @@ describe('AgentBox sessions — service state boundary in the unified list', () 
     $workspaceViewSelectedId.set(null)
   })
 
-  it('a matched LOCAL row keeps its cached AgentBox rows when the service goes unavailable', async () => {
+  it('a matched LOCAL row keeps its cached Ordessa rows when the service goes unavailable', async () => {
     $agentBoxSessions.set({ 'session-1': agentBoxSession() })
 
     const { container } = renderWith()
@@ -881,7 +881,7 @@ describe('AgentBox sessions — service state boundary in the unified list', () 
     expect($workspaceViewSelectedId.get()).toBe('proj-1')
   })
 
-  it('a matched WSL row shows its cached AgentBox rows while unavailable, not the old sessions prompt', async () => {
+  it('a matched WSL row shows its cached Ordessa rows while unavailable, not the old sessions prompt', async () => {
     setWslWorkspaces([wslRecord()])
     $agentBoxWorkspaces.set([wslServiceWorkspace()])
     $agentBoxSessions.set({

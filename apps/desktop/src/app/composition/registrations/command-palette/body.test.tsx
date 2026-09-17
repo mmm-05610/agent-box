@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 //
-// The command palette's session rows come from the AgentBox service cache and
+// The command palette's session rows come from the Pacthold service cache and'
 // nothing else. The legacy enumeration the palette used to run on open is
 // mocked (and WOULD answer with a row if asked) so these tests fail here —
 // loudly, on the call count — if that query path ever comes back, instead of
@@ -112,7 +112,7 @@ afterEach(() => {
   $commandPaletteSeed.set(null)
 })
 
-describe('CommandPaletteBody — sessions come from the AgentBox service', () => {
+describe('CommandPaletteBody — sessions come from the Pacthold service', () => {
   it('opens without enumerating legacy sessions', async () => {
     $agentBoxSessions.set({ 'session-1': session({ displayName: 'Alpha', id: 'session-1' }) })
 
@@ -166,12 +166,12 @@ describe('CommandPaletteBody — sessions come from the AgentBox service', () =>
 })
 
 describe('CommandPaletteBody — legacy Hermes shortcuts follow the authority', () => {
-  it('renders no system/usage/restart/update rows and calls neither action under AgentBox authority', async () => {
+  it('renders no system/usage/restart/update rows and calls neither action under Ordessa authority', async () => {
     renderPalette('agentbox')
     await act(async () => {})
 
     expect(screen.queryByRole('option', { name: /Restart gateway/ })).toBeNull()
-    expect(screen.queryByRole('option', { name: /Update AgentBox/ })).toBeNull()
+    expect(screen.queryByRole('option', { name: /Update Ordessa/ })).toBeNull()
     expect(screen.queryByRole('option', { name: 'System' })).toBeNull()
     expect(screen.queryByRole('option', { name: 'Usage' })).toBeNull()
 
@@ -179,7 +179,7 @@ describe('CommandPaletteBody — legacy Hermes shortcuts follow the authority', 
     expect(vi.mocked(updatesModule.requestActiveUpdate)).not.toHaveBeenCalled()
   })
 
-  it('still opens an AgentBox service session under AgentBox authority', async () => {
+  it('still opens an Pacthold service session under Ordessa authority', async () => {
     $agentBoxSessions.set({
       'session-alpha': session({ displayName: 'Alpha Product Notes', id: 'session-alpha' })
     })
@@ -201,7 +201,7 @@ describe('CommandPaletteBody — legacy Hermes shortcuts follow the authority', 
     renderPalette('hermes')
     await act(async () => {})
 
-    expect(screen.getByRole('option', { name: /Update AgentBox/ })).toBeTruthy()
+    expect(screen.getByRole('option', { name: /Update Ordessa/ })).toBeTruthy()
     expect(screen.getByRole('option', { name: 'System' })).toBeTruthy()
     expect(screen.getByRole('option', { name: 'Usage' })).toBeTruthy()
 
@@ -236,7 +236,7 @@ describe('CommandPaletteBody — contributed legacy shortcuts follow the authori
     }
   })
 
-  it('drops the legacy logs shortcut under AgentBox authority but keeps a plugin row', async () => {
+  it('drops the legacy logs shortcut under Ordessa authority but keeps a plugin row', async () => {
     contribute('logs.toggle', 'Toggle logs')
     contribute('kanban.open', 'Kanban: Open board')
 
@@ -256,7 +256,7 @@ describe('CommandPaletteBody — contributed legacy shortcuts follow the authori
     expect(screen.getByRole('option', { name: 'Toggle logs' })).toBeTruthy()
   })
 
-  it('offers no profile share row under AgentBox authority, even by search', async () => {
+  it('offers no profile share row under Ordessa authority, even by search', async () => {
     const exportRun = contribute('profile.export', 'Export profile…')
     const importRun = contribute('profile.import', 'Import profile…')
 
@@ -274,7 +274,7 @@ describe('CommandPaletteBody — contributed legacy shortcuts follow the authori
     expect(importRun).not.toHaveBeenCalled()
   })
 
-  it('keeps the profile manager navigation row under AgentBox authority', async () => {
+  it('keeps the profile manager navigation row under Ordessa authority', async () => {
     // The capability the share rows are not allowed to stand in for — managing
     // profiles — still has its own door.
     renderPalette('agentbox')
@@ -303,14 +303,14 @@ describe('CommandPaletteBody — contributed legacy shortcuts follow the authori
 // The built-in "go to" rows for views the AgentBox product does not mount. A
 // navigation row is the main way a user reaches them, so the authority has to
 // decide here too — the views behind them read the legacy Hermes REST plane.
-describe('CommandPaletteBody — views AgentBox does not mount follow the authority', () => {
+describe('CommandPaletteBody — views Ordessa does not mount follow the authority', () => {
   const unmountedViewRows = [
     { label: /^Spawn tree$/, query: 'spawn' },
     { label: /^Cron$/, query: 'cron' },
     { label: /^Memory Graph$/, query: 'memory' }
   ] as const
 
-  it('offers no Agents/Cron/Starmap row under AgentBox authority', async () => {
+  it('offers no Agents/Cron/Starmap row under Ordessa authority', async () => {
     renderPalette('agentbox')
 
     for (const { label, query } of unmountedViewRows) {

@@ -37,7 +37,7 @@ export class WireProtocolError extends Error {
 export class WireUnavailableError extends Error {
   readonly code = 'UNAVAILABLE' as const
 
-  constructor(message = 'AgentBox service is unavailable', readonly cause?: unknown) {
+  constructor(message = 'Pacthold service is unavailable', readonly cause?: unknown) {
     super(message)
     this.name = 'WireUnavailableError'
   }

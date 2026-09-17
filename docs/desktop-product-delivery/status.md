@@ -1366,5 +1366,35 @@ typecheck 当场暴露；新测试 4 条 ESLint warning 收口为 0。
   另把 `profiles.remoteOverride.description` 的「this profile's sessions」改为绑定措辞，并新增 **ownership 文案守卫**
   （六语言 + 非空对照）。门：G2/G6（文案半）成立，G1/G3–G5/G7–G9 属 60（如实标注）；新增 5+2 例，
   profiles+settings+i18n+contracts **36 files / 338 tests passed, exit 0**；`tsc -p . --noEmit` exit 0。
-- **下一步**：P18（Ordessa 品牌落地，派单表明确排在 P17 之后；**不得插队**）。writer_lease 继续 ACTIVE。
+- **下一步**：P18（Ordessa 品牌落地，排在 P17 之后）。writer_lease 继续 ACTIVE。
+
+## P18 收口（2026-09-17）：Ordessa 品牌落地 — `P18_GREEN — ORDESSA_IDENTITY_LANDED`（启动冒烟部分达成）
+
+- **落地**（完整报告 `docs/branding/REBRANDING_REPORT.md` + `docs/branding/NAMING.md`，映射/保留/兼容三节）：
+  - **身份**：`name: ordessa`、`productName: Ordessa`、`description: Native desktop client for Pacthold.`、
+    `build.appId: com.ordessa.app`、`executableName/artifactName: Ordessa…`、协议 `ordessa://`（不再与上游 `hermes://` 抢注册）；
+    lockfile 工作区条目同步；Windows 树补建 `node_modules/ordessa` 链接。`author`/`repository` 保留为上游署名。
+  - **跨仓契约零变化**：`AGENTBOX_SERVER_ROOT/PORT` 保留，`ORDESSA_SERVER_ROOT/PORT` 为**优先别名**（两者都设置时新名胜出），
+    `agentbox-server-connection.test.ts` 覆盖优先级；`secrets/http-token`、端口 8732、IPC channel、存储键不动；
+    wire 摘要未触碰。
+  - **文案**：六语言 catalog 值级 `AgentBox=0`；服务名映射为 Pacthold（服务短语逐语言映射）；源码产品路径硬编码
+    名称清理（status aria/intro/gateway 超时/slash 描述/两个窗口 title）；`index.html` title=Ordessa；
+    README 换 Ordessa 锁版横幅与「powered by Pacthold」描述，Licence 段保留上游署名并注明派生关系。
+  - **资产**：`assets/icon.png|.ico|.icns` ← Ordessa 图标集；`public/apple-touch-icon.png` 由 256 位图重采样 180×180；
+    应用内徽章改绘 `ordessa-mark.svg`；`public/` 中上游图形（nous-girl.jpg、hermes.png、hermes-sprite.png、
+    hermes-frames/）**移除**（删除前经全仓引用核查为零），`ds-assets/`（Backdrop 在用）保留——逐条见报告 §6。
+  - **身份变更代价（已写进报告 §3）**：userData 从零开始；Profile/Session/凭据在服务数据根，不受影响；无迁移、不删旧数据。
+- **门**：
+  - **G1** 映射与保留清单齐全（`NAMING.md` + 报告 §1）；
+  - **G2** 新名可见：构建日志头 `ordessa@0.17.2`、窗口标题、README 锁版、验收截图（`evidence/P18-ordessa/` 7 张）；
+  - **G3** 身份与旧数据处理按 §3-D 执行（不改迁移、保留旧数据、不占用用户原生配置）；
+  - **G4 启动冒烟部分达成**：P06 验收驱动以新身份跑通 **28/28 PASS、allOk=true**（隔离沙箱、无服务、
+    无 legacy REST、退出无孤儿、日志无令牌；证据 `evidence/P18-ordessa/`）；**「连上 Pacthold + 一轮 no-model」
+    未执行**（需要运行中的服务），如实留待联调Owner，命令已给出；
+  - **G5** 家族名/原生协议/第三方署名未误改（README Licence 段改写保留署名并注明派生）；
+  - **G6** **UI 805/806 通过**（唯一失败 `plugins/hermes-bots/cron-prompt.test.ts`：`spawnSync('sh')` 在 Windows
+    无 POSIX shell → 环境基线，文件无改动）；tests-js **8 files passed**；electron 项目在 Windows 上有**既有**
+    POSIX 环境失败集（ssh/symlink/`/bin/sh`/EBUSY/EPERM，均与命名无关，未逐一修），如实登记为 Windows 基线。
+- **未做项（不冒充）**：连服务的一轮 no-model 冒烟；平台安装测试（未跑，构建产物名证据代替）；远端仓库名/发版/数据迁移（工单边界）。
+- **派单表状态**：P00–P18 全部有结论。writer_lease = **RELEASED**（队列耗尽，本 goal 停止写入）。
 

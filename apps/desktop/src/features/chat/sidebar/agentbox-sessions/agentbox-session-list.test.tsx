@@ -4,7 +4,7 @@
 // behavior: open (select shell row → session route, nothing else), rename and
 // pin over `sessions.update` version CAS, archive over `sessions.archive`
 // version CAS, and the honest loading/empty states. The real
-// `updateAgentBoxSession`/`archiveAgentBoxSession` seams run — only the wire
+// `updateOrdessaSession`/`archiveOrdessaSession` seams run — only the wire
 // client is fake — so every assertion below is the exact payload that would
 // cross the wire.
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
@@ -145,7 +145,7 @@ afterEach(() => {
   $notifications.set([])
 })
 
-describe('AgentBox session list — honest states', () => {
+describe('Ordessa session list — honest states', () => {
   it('shows an honest loading state before the session catalog is ready', () => {
     $agentBoxService.set({ detail: null, phase: 'loading' })
     const first = renderList([])
@@ -168,12 +168,12 @@ describe('AgentBox session list — honest states', () => {
     const { container } = renderList([])
 
     expect(container.querySelector('[data-agentbox-sessions-empty="workspace-1"]')?.textContent).toContain(
-      'No AgentBox sessions'
+      'No Ordessa sessions'
     )
   })
 })
 
-describe('AgentBox session list — open an existing session', () => {
+describe('Ordessa session list — open an existing session', () => {
   it('selects the shell row first, then navigates the session route — and nothing else', async () => {
     $agentBoxSessions.set({
       'session-live': session({ id: 'session-live', updatedAt: '2026-09-14T09:00:00.000Z' })
@@ -217,7 +217,7 @@ describe('AgentBox session list — open an existing session', () => {
   })
 })
 
-describe('AgentBox session list — rename via sessions.update', () => {
+describe('Ordessa session list — rename via sessions.update', () => {
   it('sends the exact CAS of the record the row showed, then adopts the returned record', async () => {
     $agentBoxSessions.set({ 'session-1': session({ displayName: 'Old name', version: 3 }) })
     wireClient.call.mockResolvedValue({
@@ -349,7 +349,7 @@ describe('AgentBox session list — rename via sessions.update', () => {
   })
 })
 
-describe('AgentBox session list — pin via sessions.update', () => {
+describe('Ordessa session list — pin via sessions.update', () => {
   const pinItem = async () => {
     openRowMenu()
 
@@ -458,20 +458,20 @@ describe('AgentBox session list — pin via sessions.update', () => {
   })
 })
 
-describe('AgentBox session list — archive via sessions.archive', () => {
+describe('Ordessa session list — archive via sessions.archive', () => {
   // Archive needs its OWN declared capability; update is irrelevant to it.
   const archiveHello = () => hello(['sessions.archive', 'sessions.update'])
 
   const openArchiveDialog = async () => {
     openRowMenu()
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Archive in AgentBox' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Archive in Ordessa' }))
 
     return screen.findByRole('dialog')
   }
 
   const clickConfirm = async (dialog: HTMLElement) => {
     await act(async () => {
-      fireEvent.click(within(dialog).getByRole('button', { name: 'Archive in AgentBox' }))
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Archive in Ordessa' }))
     })
   }
 
@@ -536,7 +536,7 @@ describe('AgentBox session list — archive via sessions.archive', () => {
 
     const dialog = await openArchiveDialog()
     // The label swaps to the busy copy while saving, so hold the node itself.
-    const confirmButton = within(dialog).getByRole('button', { name: 'Archive in AgentBox' })
+    const confirmButton = within(dialog).getByRole('button', { name: 'Archive in Ordessa' })
 
     await act(async () => {
       fireEvent.click(confirmButton)
@@ -638,7 +638,7 @@ describe('AgentBox session list — archive via sessions.archive', () => {
     openRowMenu()
     expect(await screen.findByRole('menuitem', { name: 'Rename…' })).toBeTruthy()
     expect(screen.getByRole('menuitem', { name: 'Pin' })).toBeTruthy()
-    expect(screen.queryByRole('menuitem', { name: 'Archive in AgentBox' })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: 'Archive in Ordessa' })).toBeNull()
 
     cleanup()
 
@@ -646,7 +646,7 @@ describe('AgentBox session list — archive via sessions.archive', () => {
     $agentBoxHello.set(hello(['sessions.archive']))
     renderList([])
     openRowMenu()
-    expect(await screen.findByRole('menuitem', { name: 'Archive in AgentBox' })).toBeTruthy()
+    expect(await screen.findByRole('menuitem', { name: 'Archive in Ordessa' })).toBeTruthy()
     expect(screen.queryByRole('menuitem', { name: 'Rename…' })).toBeNull()
     expect(screen.queryByRole('menuitem', { name: 'Pin' })).toBeNull()
 
@@ -658,7 +658,7 @@ describe('AgentBox session list — archive via sessions.archive', () => {
     openRowMenu()
     expect(await screen.findByRole('menuitem', { name: 'Rename…' })).toBeTruthy()
     expect(screen.getByRole('menuitem', { name: 'Pin' })).toBeTruthy()
-    expect(screen.getByRole('menuitem', { name: 'Archive in AgentBox' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: 'Archive in Ordessa' })).toBeTruthy()
 
     // neither is the existing "affordance-free" case: no menu exists at all,
     // so no entry and no wire call can happen.
@@ -697,7 +697,7 @@ describe('AgentBox session list — archive via sessions.archive', () => {
     // Projection order is newest first: [session-1, session-2] — aim at the
     // second row's own menu.
     openRowMenu(1)
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Archive in AgentBox' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Archive in Ordessa' }))
 
     const dialog = await screen.findByRole('dialog')
 
@@ -724,7 +724,7 @@ describe('AgentBox session list — archive via sessions.archive', () => {
 // what the service phase changes is only what the rows can do next. A service
 // that goes away must never erase its own sessions, hand the row back to the
 // legacy Hermes list, or accept maintenance intents it cannot honor.
-describe('AgentBox session list — service state boundary', () => {
+describe('Ordessa session list — service state boundary', () => {
   const unavailableDetail = 'connect ECONNREFUSED 127.0.0.1:8732'
 
   const rows = (container: HTMLElement) => container.querySelectorAll('[data-agentbox-session-row]')

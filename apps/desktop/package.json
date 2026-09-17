@@ -1,9 +1,9 @@
 {
-  "name": "hermes",
-  "productName": "Hermes",
+  "name": "ordessa",
+  "productName": "Ordessa",
   "private": true,
   "version": "0.17.2",
-  "description": "Native desktop shell for Hermes Agent.",
+  "description": "Native desktop client for Pacthold.",
   "author": "Nous Research",
   "repository": {
     "type": "git",
@@ -188,18 +188,18 @@
   },
   "build": {
     "electronVersion": "40.10.2",
-    "appId": "com.nousresearch.hermes",
-    "productName": "Hermes",
-    "executableName": "Hermes",
+    "appId": "com.ordessa.app",
+    "productName": "Ordessa",
+    "executableName": "Ordessa",
     "protocols": [
       {
-        "name": "Hermes Protocol",
+        "name": "Ordessa Protocol",
         "schemes": [
-          "hermes"
+          "ordessa"
         ]
       }
     ],
-    "artifactName": "Hermes-${version}-${os}-${arch}.${ext}",
+    "artifactName": "Ordessa-${version}-${os}-${arch}.${ext}",
     "icon": "assets/icon",
     "directories": {
       "output": "release"

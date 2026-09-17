@@ -131,7 +131,7 @@ describe('Desktop MCP client callback lifecycle', () => {
     if (outcome === 'cancel') {
       await expect(action).rejects.toBeInstanceOf(McpOAuthCancelled)
     } else {
-      await expect(action).rejects.toThrow('Update the AgentBox service')
+      await expect(action).rejects.toThrow('Update the Pacthold service')
     }
 
     expect(openExternal).not.toHaveBeenCalled()
