@@ -703,6 +703,41 @@ export const ProviderModelsProbeConnectionResultSchema = z.strictObject({
   code: z.string().optional(),
   detail: z.string().optional()
 })
+
+/** Order 57: harness runtime artifact management. Install stages the source
+ *  the execution side prepared (under the store's incoming area) and roll-
+ *  back/`current` are pointer moves — running sessions are never touched. */
+export const ProviderArtifactsListParamsSchema = z.strictObject({
+  harness: z.string().min(1)
+})
+export const ProviderArtifactsInstallParamsSchema = z.strictObject({
+  requestId: RequestIdSchema,
+  harness: z.string().min(1),
+  version: z.string().min(1),
+  sourceToken: z.string().min(1),
+  digest: z.string().regex(/^sha256:[0-9a-f]{64}$/)
+})
+export const ProviderArtifactsRollbackParamsSchema = z.strictObject({
+  requestId: RequestIdSchema,
+  harness: z.string().min(1),
+  version: z.string().min(1)
+})
+export const ProviderArtifactsListResultSchema = z.strictObject({
+  harness: z.string().min(1),
+  versions: z.array(z.strictObject({
+    version: z.string().min(1),
+    entries: z.number().int().nonnegative(),
+    bytes: z.number().int().nonnegative()
+  })),
+  current: z.string().nullable()
+})
+export const ProviderArtifactsMutateResultSchema = z.strictObject({
+  harness: z.string().min(1),
+  current: z.string().nullable().optional(),
+  version: z.string().optional(),
+  digest: z.string().optional(),
+  entries: z.number().int().nonnegative().optional()
+})
 export type ProviderModelsCreateParams = z.infer<typeof ProviderModelsCreateParamsSchema>
 export const ProviderModelsCreateResultSchema = z.strictObject({
   providerModel: ProviderModelConfigRecordSchema
@@ -990,6 +1025,9 @@ export const WireMethods = {
   'providerModels.archive': [ProviderModelsArchiveParamsSchema, ProviderModelsArchiveResultSchema],
   'providerModels.probeModels': [ProviderModelsProbeModelsParamsSchema, ProviderModelsProbeModelsResultSchema],
   'providerModels.probeConnection': [ProviderModelsProbeConnectionParamsSchema, ProviderModelsProbeConnectionResultSchema],
+  'providerArtifacts.list': [ProviderArtifactsListParamsSchema, ProviderArtifactsListResultSchema],
+  'providerArtifacts.install': [ProviderArtifactsInstallParamsSchema, ProviderArtifactsMutateResultSchema],
+  'providerArtifacts.rollback': [ProviderArtifactsRollbackParamsSchema, ProviderArtifactsMutateResultSchema],
   'config.describe': [ConfigDescribeParamsSchema, ConfigDescribeResultSchema],
   'config.resolve': [ConfigResolveParamsSchema, ConfigResolveResultSchema],
   'sessions.list': [SessionsListParamsSchema, SessionsListResultSchema],
