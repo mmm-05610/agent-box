@@ -397,3 +397,22 @@ ProviderModelConfigRecord = {
   FRAME_COVERAGE 新增三条 produced 条目（thought/plan/mode），声明-观测对照平衡。
 - **不动的**：28 方法、wire/1、既有事件 kind 与载荷——纯新增面（52 D 与 51 D 本计划共享
   一次重锁，51 先行落地后 52 的三 kind 为追加的一次小重锁，如实记录）。
+
+## Order 55 G1 — provider-model provenance（2026-09-17，env-provider）
+
+- **记录扩展**（schema 8）：`server_provider_models` 增 `base_url / auth_style /
+  wire_api / fields_source` 四列（全部可选；旧记录 NULL = 未知，不阻塞既有路径）。
+  迁移同批非破坏加列；"新字段落库并有迁移"由 schema 8 满足。
+- **wire 面（新增可选参数/字段，不改既有语义）**：`providerModels.create/update`
+  的 params 增可选 `provenance {baseUrl?, authStyle?, wireApi?, fieldsSource?}`；
+  providerModel 投影增 `provenance`（四字段全空则投影为 null = unknown）。
+- **枚举**：authStyle = api_key/oauth/none；wireApi = chat_completions/responses；
+  fieldsSource = preset/pulled/manual。未知值/未知字段类型化拒绝。
+- **两仓摘要（前端合同提交 73ea5d59）**：TS
+  `182e7adb0be6d8ec07426433f2ad38e58230089b516e575a9927daa2f57d253b`；
+  生成工件 `ec37b9623e8a9dba335f75ffb9cc245f581daa85db123885a5ea4990b6e888ba`
+  （后端证据副本：`docs/server-round1/fullstack/generated/wire-v1.schema.json`）。
+- **严格校验**：`AGENT_BOX_WIRE_SCHEMA=<工件>` 下 test_wire_v1 **47 passed**
+  （含 usage/进程事实与 provenance 的全部严格帧）。
+- **探测（models.list / connection.test）**：G2–G3 的有界探测与 SSRF 防护为
+  本单的下一切片（wire 两个新动作与后端探测器），未开始——如实记录。
