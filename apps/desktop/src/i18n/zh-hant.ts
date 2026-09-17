@@ -2206,6 +2206,24 @@ export const zhHant = defineLocale({
     }
   },
 
+  workStatus: {
+    closePanel: '關閉工作狀態',
+    openPanel: '開啟工作狀態',
+    processCard: '處理程序',
+    queuedCount: count => `佇列：${count}`,
+    stateLabel: state =>
+      ({
+        queued: '排隊中',
+        dispatched: '已分發',
+        running: '執行中',
+        stopping: '正在停止',
+        stopped: '已停止',
+        completed: '已完成',
+        failed: '失敗',
+        unknown: '未知'
+      })[state] ?? state
+  },
+
   composer: {
     message: '訊息',
     profile: '角色',

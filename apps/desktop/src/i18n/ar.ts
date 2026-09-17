@@ -1878,6 +1878,24 @@ export const ar = defineLocale({
       ageMin: 'دقيقة'
     }
   },
+  workStatus: {
+    closePanel: 'إغلاق حالة العمل',
+    openPanel: 'فتح حالة العمل',
+    processCard: 'العملية',
+    queuedCount: count => `القائمة: ${count}`,
+    stateLabel: state =>
+      ({
+        queued: 'في القائمة',
+        dispatched: 'أُرسل',
+        running: 'قيد التشغيل',
+        stopping: 'جارٍ الإيقاف',
+        stopped: 'توقف',
+        completed: 'اكتمل',
+        failed: 'فشل',
+        unknown: 'غير معروف'
+      })[state] ?? state
+  },
+
   composer: {
     message: 'الرسالة',
     profile: 'الملف الشخصي',

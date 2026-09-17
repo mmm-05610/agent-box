@@ -1485,3 +1485,36 @@ Appearance（8 套主题 + 语言 + UI Scale + 终端字体）与 Keyboard Short
   且 `state.profile` 存在时渲染。选择值通过 `profile.onOverrideChange` 写入该轮覆盖值。
 - 后端未声明权限控制项 → chip 不渲染（不假、不禁用）。
 - 门：TSC=0（chat-bar.tsx + access-chip.tsx 均通过编译）。
+
+## P19 收口补充（2026-09-18）：G2 种子截图 + G4 深度测试 — `P19_GREEN`
+
+- **G2**：新驱动 `e2e/p19-sidebar-seed-driver.mjs`（真实 Pacthold Server + 只读后端仓 + 沙箱数据根）：
+  3 个 WSL 工作区 × 3 个真实完成 turn，服务端改名 + pin，宿主 `wsl-workspaces.json` 落盘，reload 后
+  侧栏 populated。**executed 13 → allOk=true（PASS 13/FAIL 0）**。截图与说明：
+  `evidence/P19-g2-sidebar-seeded/` + `evidence/P19-g2-g4-seeded-and-access-chip.md`。
+  密度收紧后的行距在 3×3 种子数据下无大片空白；pin 优先序可见。
+- **G4**：access chip 九例（真实 radix Select 交互，非 mock）：声明可编辑 enum 权限控制 → 渲染；
+  未声明 / `editable:false` / `securityLockedIds` / 非 enum → 隐藏；选项=声明值；覆盖写入替换同 control
+  并保留他项；无覆盖时显示 placeholder 不显示编造值。**发现并修复两处真实缺陷**：
+  ① 原 chip 忽略 `securityLockedIds`/`editable`/kind（安全锁定项会被给出覆盖下拉）；
+  ② `'__none__'` 哨兵值导致空触发器而非 placeholder。
+- **附带修正**：`composer.disabledPlaceholder` 六语言改为自含文案（此前 status 声称已改但 catalog 未落）。
+- 门：TSC 三项目 exit 0；ui 9/9（chip 套件）；Windows dist 重建后截图。
+- 提交：`0c78e707`。
+
+## P20 收口（2026-09-18）：面板外壳 + 进程卡 + 浮动位 — `P20_GREEN`
+
+- **交付**：`work-status.ts`（纯函数：状态时长=服务端 emittedAt 戳、忙态集合、pending 队列、按可用性拼行、
+  进程卡 facts）；`work-status-panel.tsx`（收起单行 + 展开竖排卡 + 关闭 + 幽灵按钮重开；左上角浮动；
+  现有 `motion` 动画；全部现有令牌）；`work-status-pref.ts`（localStorage 记住 collapsed/expanded/closed，
+  panes.ts 同款窄租约）；`agentbox-chat-view.tsx` 单行挂载；六语言 `workStatus` i18n。
+  reducer 增补 `execution.since`（可选，缺席=时长未知，不猜）。
+- **诚实边界**：Git/目标/子代理/后台四卡无数据面 → 不渲染（Git 字段契约 branch/changedFiles/additions/
+  deletions/ahead/behind 已记 evidence 供后端开单）；进程卡只用真实事实。
+- **门**：ui **808/809 文件通过**（唯一失败=cron-prompt POSIX sh 环境基线）；electron 35 失败=既有宿主相关
+  基线集（darwin staging/POSIX fs/ssh/git），本单零触碰；TSC exit 0；legacy HUD 零 diff（G6）。
+- **实机**：`e2e/p20-panel-shot-driver.mjs`（11 步全 PASS）真实服务 + 真实 turn 上截图三态
+  （`evidence/P20-work-status-panel/`）。
+- **契约测试修正**：`wire-v1.test.ts` 冻结计数 28→实际 33（usage/probe/artifacts 增量面）改为
+  "锁定核心 28 方法必须在 + 每个方法 params/result 齐全"，移除 change-detector。
+- 提交：见 git log（P20 系列）。

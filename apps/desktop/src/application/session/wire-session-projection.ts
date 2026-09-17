@@ -16,6 +16,10 @@ export interface WireSessionProjection {
     executionId: string
     reason: null | string
     state: Extract<WireEvent, { kind: 'execution.state' }>['state']
+    /** The service's own emittedAt for the frame that entered the CURRENT
+     *  state — the only honest duration source. Absent (e.g. a local
+     *  optimistic state) means the duration is unknown and is never guessed. */
+    since?: string
   }
   lastSeq: null | number
   messageOrder: string[]
@@ -82,10 +86,10 @@ export function applyWireEventFrame(
     resumeCursor: frame.cursor
   }
 
-  return { outcome: 'applied', projection: reduceWireEvent(next, frame.event) }
+  return { outcome: 'applied', projection: reduceWireEvent(next, frame.event, frame.emittedAt) }
 }
 
-function reduceWireEvent(projection: WireSessionProjection, event: WireEvent): WireSessionProjection {
+function reduceWireEvent(projection: WireSessionProjection, event: WireEvent, emittedAt: string): WireSessionProjection {
   if (event.kind === 'message.delta') {
     const current = projection.messages[event.messageId]
 
@@ -125,7 +129,12 @@ function reduceWireEvent(projection: WireSessionProjection, event: WireEvent): W
   if (event.kind === 'execution.state') {
     return {
       ...projection,
-      execution: { executionId: event.executionId, reason: event.reason ?? null, state: event.state }
+      execution: {
+        executionId: event.executionId,
+        reason: event.reason ?? null,
+        state: event.state,
+        since: emittedAt
+      }
     }
   }
 

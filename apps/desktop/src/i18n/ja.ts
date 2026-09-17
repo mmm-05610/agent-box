@@ -2266,6 +2266,24 @@ export const ja = defineLocale({
     }
   },
 
+  workStatus: {
+    closePanel: '作業状態を閉じる',
+    openPanel: '作業状態を開く',
+    processCard: 'プロセス',
+    queuedCount: count => `キュー：${count}`,
+    stateLabel: state =>
+      ({
+        queued: '待機中',
+        dispatched: 'ディスパッチ済み',
+        running: '実行中',
+        stopping: '停止中',
+        stopped: '停止',
+        completed: '完了',
+        failed: '失敗',
+        unknown: '不明'
+      })[state] ?? state
+  },
+
   composer: {
     message: 'メッセージ',
     profile: 'プロファイル',

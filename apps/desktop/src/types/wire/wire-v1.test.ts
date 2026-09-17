@@ -85,10 +85,49 @@ describe('wire v1 envelope', () => {
     expect(WireRequestSchema.safeParse({ jsonrpc: '2.0', id: 't-1', method: 'server.hello', params: {}, extra: true }).success).toBe(false)
   })
 
-  it('every registered method exposes params and result schemas', () => {
+  it('every registered method exposes params and result schemas, and the locked core survives', () => {
     const names = Object.keys(WireMethods)
 
-    expect(names.length).toBe(28)
+    // The locked wire/1 core at relock — 28 methods. Additive faces (usage
+    // events, provider probes, artifacts) may grow the registry without
+    // touching this set; a REMOVED core method fails here and forces a
+    // protocol review. The generated schema JSON remains the count authority.
+    const core = [
+      'server.hello',
+      'workspaces.open',
+      'workspaces.list',
+      'workspaces.browse',
+      'workspaces.archive',
+      'profiles.list',
+      'profiles.create',
+      'profiles.update',
+      'profiles.archive',
+      'profiles.updateConfig',
+      'config.describe',
+      'config.resolve',
+      'sessions.list',
+      'sessions.update',
+      'sessions.archive',
+      'sessions.switchProfile',
+      'sessions.createAndSend',
+      'sessions.send',
+      'queue.get',
+      'queue.withdraw',
+      'runs.stop',
+      'approvals.decide',
+      'history.snapshot',
+      'providerModels.list',
+      'providerModels.create',
+      'providerModels.update',
+      'providerModels.archive',
+      'sendOutcome.query'
+    ]
+
+    for (const method of core) {
+      expect(names, `locked core method ${method}`).toContain(method)
+    }
+
+    expect(names.length).toBeGreaterThanOrEqual(core.length)
 
     for (const [name, [params, result]] of Object.entries(WireMethods)) {
       expect(params, `${name} params`).toBeDefined()

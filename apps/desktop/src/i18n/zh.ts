@@ -2790,6 +2790,24 @@ export const zh: Translations = {
     markAllRead: '全部标记为已读'
   },
 
+  workStatus: {
+    closePanel: '关闭工作状态',
+    openPanel: '打开工作状态',
+    processCard: '进程',
+    queuedCount: count => `队列：${count}`,
+    stateLabel: state =>
+      ({
+        queued: '排队中',
+        dispatched: '已分发',
+        running: '运行中',
+        stopping: '正在停止',
+        stopped: '已停止',
+        completed: '已完成',
+        failed: '失败',
+        unknown: '未知'
+      })[state] ?? state
+  },
+
   composer: {
     message: '消息',
     profile: '角色',

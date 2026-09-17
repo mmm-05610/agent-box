@@ -2356,6 +2356,14 @@ export interface Translations {
     markAllRead: string
   }
 
+  workStatus: {
+    closePanel: string
+    openPanel: string
+    processCard: string
+    queuedCount: (count: number) => string
+    stateLabel: (state: string) => string
+  }
+
   composer: {
     message: string
     profile: string

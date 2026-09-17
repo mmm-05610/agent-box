@@ -2575,6 +2575,24 @@ export const ru = defineLocale({
     },
     markAllRead: 'Отметить все как прочитанные'
   },
+  workStatus: {
+    closePanel: 'Закрыть статус работы',
+    openPanel: 'Открыть статус работы',
+    processCard: 'Процесс',
+    queuedCount: count => `Очередь: ${count}`,
+    stateLabel: state =>
+      ({
+        queued: 'В очереди',
+        dispatched: 'Отправлено',
+        running: 'Выполняется',
+        stopping: 'Останавливается',
+        stopped: 'Остановлено',
+        completed: 'Завершено',
+        failed: 'Сбой',
+        unknown: 'Неизвестно'
+      })[state] ?? state
+  },
+
   composer: {
     message: 'Сообщение',
     profile: 'Профиль',

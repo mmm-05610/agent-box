@@ -18,6 +18,7 @@ import { ChatBar, ChatBarFallback } from './composer'
 import { AgentBoxApprovalPanel } from './composer/agentbox-approval-panel'
 import { AgentBoxQueuePanel } from './composer/agentbox-queue-panel'
 import { useComposerProfile } from './composer/hooks/use-composer-profile'
+import { WorkStatusPanel } from './work-status-panel'
 
 export function agentBoxProjectionMessages(
   projection: WireSessionProjection | undefined,
@@ -200,6 +201,7 @@ export function AgentBoxChatView({ maxVoiceRecordingSeconds }: { maxVoiceRecordi
 
       <AgentBoxThreadRuntime binding={binding} messages={messages}>
         <div className="relative min-h-0 flex-1 overflow-hidden bg-(--ui-chat-surface-background)" data-slot="composer-bounds">
+          <WorkStatusPanel execution={binding.projection?.execution ?? null} queue={binding.queue} />
           <Thread
             clampToComposer
             cwd={binding.workspace?.normalizedPath ?? null}

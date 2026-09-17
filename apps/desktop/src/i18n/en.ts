@@ -2633,6 +2633,24 @@ export const en: Translations = {
     markAllRead: 'Mark all as read'
   },
 
+  workStatus: {
+    closePanel: 'Close work status',
+    openPanel: 'Open work status',
+    processCard: 'Process',
+    queuedCount: count => `Queue: ${count}`,
+    stateLabel: state =>
+      ({
+        queued: 'Queued',
+        dispatched: 'Dispatched',
+        running: 'Running',
+        stopping: 'Stopping',
+        stopped: 'Stopped',
+        completed: 'Completed',
+        failed: 'Failed',
+        unknown: 'Unknown'
+      })[state] ?? state
+  },
+
   composer: {
     message: 'Message',
     profile: 'Profile',
