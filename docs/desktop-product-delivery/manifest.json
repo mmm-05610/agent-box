@@ -30,6 +30,25 @@
       "note": "Transcript process view (thought rows with duration, tool rows with lifecycle and grouped summaries, streaming status tail, worked-for timer) built from external copy-in components. Lights up only the facts that exist today - message stream, tool failure rows, status tail, elapsed time from event timestamps - and waits for the backend's shared wire relock (orders 51 and 52) before showing thoughts, tool lifecycles, plans and usage. Nothing is faked for waiting data, and durations come from event timestamps rather than estimates."
     },
     {
+      "id": "P10",
+      "file": "work-orders/P10-sidebar-restructure.md",
+      "depends_on": [
+        "P07"
+      ],
+      "exclusive_group": "desktop-product",
+      "scope": [
+        "docs/desktop-product-delivery/**",
+        "apps/desktop/src/features/chat/sidebar/**",
+        "apps/desktop/src/features/chat/index.tsx",
+        "apps/desktop/src/store/**",
+        "apps/desktop/src/i18n/**",
+        "apps/desktop/e2e/**",
+        "tests-js/**"
+      ],
+      "requires_approved_contract": false,
+      "note": "Sidebar restructure: an action row (new task, search via the existing command palette), a group-by switch limited to dimensions that have real data (project, recent), and a two-level project-to-session list with per-row relative time and a status dot. Built from existing shadcn/radix and repository components - no new dependency, since a sidebar is not a conversational component. Existing behaviour (reorder, drag, load more, filter menu, context menu, profile and connection switching) is preserved with its tests. Unread uses a client-local cursor and is labelled as local visibility rather than a server fact; the plugin market from the reference is not built because no backend surface exists."
+    },
+    {
       "id": "P08",
       "file": "work-orders/P08-composer-input-bar.md",
       "depends_on": [
