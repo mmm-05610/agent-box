@@ -2281,6 +2281,12 @@ export interface Translations {
     configEffectiveValue: string
     configEffectiveServiceConfirmed: string
     configFixesOnAccept: string
+    modelSelector: string
+    modelSelectorSearch: string
+    modelSelectorEmpty: string
+    modelSelectorDefault: string
+    contextUsage: string
+    contextUsageUnknown: string
     wakingProfile: (profile: string) => string
     placeholderStarting: string
     placeholderReconnecting: string

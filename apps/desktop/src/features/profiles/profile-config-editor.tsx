@@ -1,8 +1,7 @@
+import { useMemo } from 'react'
+
 import { choicesFromModels } from '@/application/provider-model/wire-provider-model-catalog'
-import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Switch } from '@/components/ui/switch'
-import { Textarea } from '@/components/ui/textarea'
+import { choiceFromRef, type ModelSlotControl } from '@/features/profiles/model-slot'
 import { useI18n } from '@/i18n'
 import type { Translations } from '@/i18n'
 import type { ComposerProviderModelChoice } from '@/lib/composer/types'
@@ -14,10 +13,10 @@ import type {
   ProviderModelRef
 } from '@/types/wire/wire-v1'
 
-/** Selecting this in a dropdown means "no value": the control is omitted from
- *  the saved configuration and the service decides its default. */
-const UNSET_VALUE = '__agentbox_profile_config_default__'
+import { ConfigControlInput, controlLabel } from './config-control-input'
 
+/** Selecting "no value" in a dropdown omits the control from the saved
+ *  configuration, and the service decides its default. */
 export interface ProfileModelRefValue {
   modelId: string
   providerId: string
@@ -34,12 +33,6 @@ export interface ProfileConfigDraft {
 }
 
 export const emptyProfileConfigDraft = (): ProfileConfigDraft => ({ clearedIds: [], edits: [] })
-
-const controlLabel = (controlId: string): string =>
-  controlId
-    .replace(/[_-]+/g, ' ')
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
-    .replace(/^./, head => head.toUpperCase())
 
 const modelRefValue = (ref: ProviderModelRef | null): ProfileModelRefValue | undefined =>
   ref ? { modelId: ref.modelId, providerId: ref.providerId } : undefined
@@ -237,181 +230,65 @@ interface ProfileConfigInputProps {
   onChange: (draft: ProfileConfigDraft) => void
 }
 
-/** One service-described control kind → one of the app's existing limited
- *  controls. An unknown kind renders nothing rather than an invented field. */
+/** The Profiles page's declared controls, painted by the same shared control
+ *  renderer the composer's temporary-config popover uses — one set of kinds
+ *  and constraints, two value semantics (whole-Profile replacement here,
+ *  per-turn overrides in the composer). */
 function ProfileConfigInput({ control, draft, editable, harness, label, models, onChange }: ProfileConfigInputProps) {
   const copy = useI18n().t.profiles
   const value = draftValue(control, draft)
 
-  if (control.kind === 'boolean') {
-    return (
-      <div className="flex h-7 items-center justify-end">
-        <Switch
-          aria-label={label}
-          checked={Boolean(value)}
-          disabled={!editable}
-          onCheckedChange={checked => onChange(withEdit(draft, control.controlId, checked))}
-          size="xs"
-        />
-      </div>
-    )
-  }
+  const choices = useMemo(() => {
+    if (control.kind !== 'model_slot') {
+      return []
+    }
 
-  if (control.kind === 'string') {
-    const text = typeof value === 'string' ? value : ''
+    const catalog = profileConfigModelChoices(models, harness)
+    const ref = asModelRefValue(value)
+    const known = ref !== null && catalog.some(choice => sameRef(choice, ref))
 
-    return control.multiline ? (
-      <Textarea
-        aria-label={label}
-        disabled={!editable}
-        onChange={event => onChange(withEdit(draft, control.controlId, event.currentTarget.value))}
-        rows={3}
-        size="sm"
-        value={text}
-      />
-    ) : (
-      <Input
-        aria-label={label}
-        disabled={!editable}
-        onChange={event => onChange(withEdit(draft, control.controlId, event.currentTarget.value))}
-        size="sm"
-        value={text}
-      />
-    )
-  }
+    return ref === null || known ? catalog : [...catalog, declaredChoiceFromRef(control, ref)]
+  }, [control, harness, models, value])
 
-  if (control.kind === 'model_slot') {
-    return (
-      <ModelSlotSelect
-        control={control}
-        draft={draft}
-        editable={editable}
-        harness={harness}
-        label={label}
-        models={models}
-        onChange={onChange}
-      />
-    )
-  }
-
-  if (control.kind === 'enum') {
-    return (
-      <Select
-        disabled={!editable}
-        onValueChange={next =>
-          onChange(
-            next === UNSET_VALUE ? withCleared(draft, control.controlId) : withEdit(draft, control.controlId, next)
-          )
-        }
-        value={typeof value === 'string' && value ? value : UNSET_VALUE}
-      >
-        <SelectTrigger aria-label={label} className="w-full" size="sm">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={UNSET_VALUE}>{copy.notSet}</SelectItem>
-          {control.values.map(candidate => (
-            <SelectItem key={candidate} value={candidate}>
-              {candidate}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    )
-  }
-
-  return null
-}
-
-interface ModelSlotSelectProps {
-  control: Extract<ConfigControl, { kind: 'model_slot' }>
-  draft: ProfileConfigDraft
-  editable: boolean
-  harness: string
-  label: string
-  models: readonly ProviderModelConfigRecord[]
-  onChange: (draft: ProfileConfigDraft) => void
-}
-
-function ModelSlotSelect({ control, draft, editable, harness, label, models, onChange }: ModelSlotSelectProps) {
-  const copy = useI18n().t.profiles
-  const value = asModelRefValue(draftValue(control, draft))
-  const catalog = profileConfigModelChoices(models, harness)
-
-  const known =
-    value !== null && catalog.some(choice => choice.providerId === value.providerId && choice.modelId === value.modelId)
-
-  // The service's current reference stays selectable and visible even when the
-  // directory no longer offers it — the client displays data, it never decides
-  // that a model stopped existing.
-  const current = value !== null && !known ? modelChoiceFromRef(control, value) : null
-  const choices = current ? [...catalog, current] : catalog
-
-  const selected =
-    value === null
-      ? null
-      : (choices.find(choice => choice.providerId === value.providerId && choice.modelId === value.modelId) ?? null)
+  const ref = control.kind === 'model_slot' ? asModelRefValue(value) : null
+  const modelValue = ref ? (choices.find(choice => sameRef(choice, ref)) ?? null) : null
 
   return (
-    <Select
+    <ConfigControlInput
+      choices={control.kind === 'model_slot' ? choices : undefined}
+      control={control}
       disabled={!editable}
-      onValueChange={next => {
-        if (next === UNSET_VALUE) {
-          onChange(withCleared(draft, control.controlId))
-
-          return
-        }
-
-        const choice = choices.find(candidate => modelChoiceKey(candidate) === next)
-
-        if (choice && choice.availability !== 'unavailable') {
-          onChange(withEdit(draft, control.controlId, { modelId: choice.modelId, providerId: choice.providerId }))
-        }
-      }}
-      value={selected ? modelChoiceKey(selected) : UNSET_VALUE}
-    >
-      <SelectTrigger aria-label={label} className="w-full" size="sm">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value={UNSET_VALUE}>{copy.notSet}</SelectItem>
-        {choices.map(choice => (
-          <SelectItem
-            disabled={choice.availability === 'unavailable'}
-            key={modelChoiceKey(choice)}
-            title={choice.unavailableReason || undefined}
-            value={modelChoiceKey(choice)}
-          >
-            {modelChoiceLabel(choice, copy)}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+      label={label}
+      modelValue={control.kind === 'model_slot' ? modelValue : undefined}
+      onValueChange={next =>
+        onChange(next === undefined ? withCleared(draft, control.controlId) : withEdit(draft, control.controlId, next))
+      }
+      renderModelItemLabel={choice => modelChoiceLabel(choice, copy)}
+      unsetLabel={copy.notSet}
+      value={value}
+    />
   )
 }
 
-const modelChoiceKey = (choice: Pick<ComposerProviderModelChoice, 'modelId' | 'providerId'>): string =>
-  JSON.stringify([choice.providerId, choice.modelId])
+const sameRef = (choice: Pick<ComposerProviderModelChoice, 'modelId' | 'providerId'>, ref: ProfileModelRefValue) =>
+  choice.providerId === ref.providerId && choice.modelId === ref.modelId
 
-const modelChoiceFromRef = (
-  control: Extract<ConfigControl, { kind: 'model_slot' }>,
-  value: ProfileModelRefValue
+/** A current reference the directory no longer lists keeps the availability
+ *  its declared slot carries, so the row still shows the service's reason. */
+const declaredChoiceFromRef = (
+  control: ModelSlotControl,
+  ref: ProfileModelRefValue
 ): ComposerProviderModelChoice => {
   const declared = control.slots
     .flatMap(slot => (slot.model ? [slot.model] : []))
-    .find(model => model.providerId === value.providerId && model.modelId === value.modelId)
+    .find(model => model.providerId === ref.providerId && model.modelId === ref.modelId)
 
-  return {
-    availability: declared?.availability ?? 'unknown',
-    displayName: value.modelId,
-    modelId: value.modelId,
-    providerDisplayName: value.providerId,
-    providerId: value.providerId,
-    unavailableReason: declared?.unavailableReason ?? null
-  }
+  return declared
+    ? choiceFromRef(declared)
+    : choiceFromRef({ availability: 'unknown', modelId: ref.modelId, providerId: ref.providerId, unavailableReason: null })
 }
 
-const modelChoiceLabel = (choice: ComposerProviderModelChoice, copy: ProfileConfigCopy): string => {
+const modelChoiceLabel = (choice: ComposerProviderModelChoice, copy: Translations['profiles']): string => {
   const base = `${choice.providerDisplayName}: ${choice.displayName}`
 
   if (choice.availability === 'unavailable') {
@@ -420,5 +297,3 @@ const modelChoiceLabel = (choice: ComposerProviderModelChoice, copy: ProfileConf
 
   return choice.availability === 'unknown' ? `${base} — ${copy.agentBoxConfigModelUnverified}` : base
 }
-
-type ProfileConfigCopy = Translations['profiles']

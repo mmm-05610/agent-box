@@ -9,6 +9,8 @@ import { iconSize, Layers3 } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import { $hudMode, closeHud, resetHudLayout } from '@/store/hud'
 
+import { ComposerModelSelector } from './composer-model-selector'
+import { ContextUsagePill } from './context-usage'
 import { GHOST_ICON_BTN, PRIMARY_ICON_BTN } from './control-classes'
 import { ModelPill } from './model-pill'
 import { ComposerProfileControls } from './profile-controls'
@@ -49,7 +51,16 @@ export function ComposerControls({
 
   return (
     <div className="ml-auto flex min-w-0 shrink items-center gap-(--composer-control-gap)">
-      {!hudMode && state.profile ? <ComposerProfileControls profile={state.profile} /> : null}
+      {!hudMode && state.profile ? (
+        <>
+          <ComposerProfileControls profile={state.profile} />
+          <ComposerModelSelector profile={state.profile} />
+          {/* The wire carries no usage fact today (P08 evidence: zero hits in
+              the locked schema and the Server), so the composition passes no
+              data and the pill reads "unknown" — never an estimate. */}
+          <ContextUsagePill percent={null} />
+        </>
+      ) : null}
       {minimal || state.model.hidden ? null : (
         <ModelPill compact={compactModelPill} disabled={disabled} model={state.model} />
       )}

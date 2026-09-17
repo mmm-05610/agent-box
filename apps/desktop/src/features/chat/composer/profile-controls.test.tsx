@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { stubMenuDomApis, stubResizeObserver } from '@/dev/test/jsdom'
 import type { ComposerProfileState } from '@/lib/composer/types'
-import { asWireId } from '@/types/wire/wire-v1'
+import { asWireId, type ConfigControl } from '@/types/wire/wire-v1'
 
 import { ComposerProfileControls } from './profile-controls'
 
@@ -400,5 +400,56 @@ describe('ComposerProfileControls service config preview', () => {
     await openPreview()
 
     expect(screen.getByText('Checking this configuration with the service…')).toBeTruthy()
+  })
+})
+
+// Only the service decides what is configurable (core v1 §5): a permission
+// control appears the moment the backend declares one, and never before.
+describe('ComposerProfileControls declared permission control', () => {
+  const withControls = (controls: ConfigControl[]): ComposerProfileState =>
+    profileState({
+      configDescriptor: {
+        controls,
+        effectTiming: 'next_send',
+        profileId: asWireId('profile-reviewer'),
+        securityLockedIds: [],
+        workspaceId: asWireId('workspace-a')
+      }
+    })
+
+  const openControls = async () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Temporary settings' }))
+
+    return screen.findByText('Temporary settings')
+  }
+
+  it('renders a permission control the moment the service declares one', async () => {
+    render(
+      <ComposerProfileControls
+        profile={withControls([
+          {
+            controlId: 'permission_mode',
+            currentValue: 'default',
+            editable: true,
+            kind: 'enum',
+            values: ['default', 'acceptEdits', 'bypassPermissions']
+          }
+        ])}
+      />
+    )
+
+    await openControls()
+
+    expect(screen.getByRole('combobox', { name: 'Permission mode' })).toBeTruthy()
+  })
+
+  it('shows no permission control while the service declares none', async () => {
+    render(<ComposerProfileControls profile={withControls([{ controlId: 'allow_network', currentValue: false, editable: true, kind: 'boolean' }])} />)
+
+    await openControls()
+
+    expect(screen.queryByRole('combobox', { name: /permission/i })).toBeNull()
+    expect(screen.queryByText(/permission/i)).toBeNull()
+    expect(screen.queryByRole('switch', { name: /permission/i })).toBeNull()
   })
 })

@@ -1196,3 +1196,29 @@ typecheck 当场暴露；新测试 4 条 ESLint warning 收口为 0。
 - P08-A 代码事实：config.describe 只接 profileId/workspaceId，控制集合由 Harness 声明与 Profile 配置决定，不随临时 provider/model 选择变化；停掉 provider 动态集合子项，不伪造。config.resolve 接收 overrides 并返回该模型槽生效值，运行态实测尚待完成。权限档位、用量数据仍待后端声明/合同。
 - 当前 P08/P09 均 **IN_PROGRESS**，不继承旧全绿结论，不运行付费模型。
 
+## P08 收口（2026-09-17）：输入条改造完成 — `P08_GREEN — COMPOSER_INPUT_BAR_CLIENT_READY`
+
+- **门结果**（完整证据 `evidence/P08.md`）：
+  - **G1 形状成立**：三段 grid 与 profile 选择条保留；新增 provider/model 选条（AI Elements copy-in 形状，
+    本仓 popover/command 原语承载），分组/搜索/选择/清除/不可用禁用 8 例定向用例通过。
+  - **G2 动态性如实收窄**：控制项集合随 Profile 变化、**不随临时 provider/model 变化（后端事实，停该项不伪造）**；
+    模型槽生效值随选择经 `config.resolve` 立即反映（受控链路用例锁定）；运行态复测归全栈联调。
+  - **G3 只渲染已声明成立**：无 model_slot 描述/声明 → 选条不渲染；未声明权限控制 → 无 permission 元素（反例）；
+    声明 `permission_mode` 后自动出现（正例）。
+  - **G4 用量诚实成立**：无数据 → 本地化「Unknown」，容器内零数字零百分号（正则锁死）；NaN/∞ → 未知；
+    有精确值才显示。组合传 `percent={null}`（wire 零用量事实）。
+  - **G5 不退化成立**：基线 34/34（controls 10、profile-controls 12、use-composer-profile 7、model-pill 5，
+    Windows 树实跑）→ 终门 **55 files / 405 tests 全通过**（composer+profiles 全目录、wire-composer-profile、
+    profile-maintenance-port、agentbox-composer、wire-provider-model-catalog、agentbox-main-chat、agentbox-chat-view）；
+    三项目 typecheck exit 0；改动 20 文件 ESLint 0/0；`git diff --check` 干净；保护路径与后端仓零改动；e2e 计数不变。
+- **实现要点**：copy-in `components/assistant-ui/model-selector.tsx`（Apache-2.0 © Vercel, Inc.，commit
+  `6a9d5b1`，许可已核实并记录；未引入 AI SDK 运行时/传输层，远程 logo 部件弃用）；共享渲染器
+  `features/profiles/config-control-input.tsx` 被 composer 临时配置面板与 Profiles 页编辑器共用
+  （同一套 kind/样式约束，两套值语义）；纯函数 `features/profiles/model-slot.ts`；i18n 6 键 ×6 语言。
+- **等待项（如实）**：①权限档位控制项待后端声明（声明即自动出现）；②上下文用量真实数据面在后端工单 51
+  （本单只交付诚实容器）；③resolve 运行态即时性待真实 Server 联调；④e2e 未新增（无 AgentBox 输入条 harness，
+  以定向 Vitest 满足门要求）。
+- **状态标记 `P08_GREEN — COMPOSER_INPUT_BAR_CLIENT_READY`**（客户端实现就绪，不含真实服务联调）。
+  调度方追加的 P10–P15 派单提交已复查；其中 `2b7dce49` 把本执行者已写的接管节一并提交（内容逐字保留）。
+  下一步按派工表执行 **P09**（writer_lease 继续 ACTIVE，按单切换写集）。
+

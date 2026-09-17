@@ -131,3 +131,24 @@ describe('model presentation', () => {
     expect(screen.getByTestId('model-pill')).toBeTruthy()
   })
 })
+
+// The AgentBox row carries the new P08 surfaces: the provider/model selector
+// appears only once the service declares a model slot control, and the context
+// usage pill reads "unknown" until the backend supplies a real fact.
+describe('AgentBox control row additions', () => {
+  it('shows the unknown context usage and no undeclared model selector', () => {
+    const { container } = renderControls({ state: { ...state, model: { ...state.model, hidden: true }, profile } })
+
+    const usage = container.querySelector('[data-slot="composer-context-usage"]')
+
+    expect(usage?.getAttribute('data-context-usage')).toBe('unknown')
+    expect(container.querySelector('[data-slot="composer-model-selector-trigger"]')).toBeNull()
+  })
+
+  it('shows neither addition on a surface without profile state', () => {
+    const { container } = renderControls()
+
+    expect(container.querySelector('[data-slot="composer-context-usage"]')).toBeNull()
+    expect(container.querySelector('[data-slot="composer-model-selector-trigger"]')).toBeNull()
+  })
+})
