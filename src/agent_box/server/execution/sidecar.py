@@ -856,6 +856,10 @@ class SidecarHarnessPort:
         declared_capabilities: Mapping[str, bool] | None = None,
         native_platform: str | None = None,
         home_locator: str | None = None,
+        capability_documents: "tuple[Any, ...] | None" = None,
+        capability_grants: "tuple[Any, ...] | None" = None,
+        capability_authorized_providers: "tuple[str, ...] | None" = None,
+        capability_binding: str | None = None,
     ) -> None:
         self.launcher = launcher
         self.environment = dict(environment)
@@ -886,6 +890,15 @@ class SidecarHarnessPort:
         self._native_sessions: dict[str, str] = {}
         self._approvals: dict[str, tuple[str, str]] = {}
         self._native_closed: set[str] = set()
+        # 中立能力材料：由装配边界（bootstrap port_factory）逐执行注入——声明文档、
+        # 锁定政策 grant、授权提供者集与本次执行的环境绑定。业务层只消费，不解释
+        # deployment、不按品牌分支；缺失即 fail-closed（门在 _start_run 内联）。
+        self.capability_documents: tuple[Any, ...] = tuple(capability_documents or ())
+        self.capability_grants: tuple[Any, ...] = tuple(capability_grants or ())
+        self.capability_authorized_providers: tuple[str, ...] = tuple(
+            capability_authorized_providers or ()
+        )
+        self.capability_binding: str | None = capability_binding
         # 本次执行的原生观测与观测来源；observed 只反映这一次执行，绝不回写静态声明。
         self._observed: dict[str, dict[str, bool | None]] = {}
         self._evidence: dict[str, dict[str, str]] = {}

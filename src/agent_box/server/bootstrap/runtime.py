@@ -16,9 +16,11 @@ from pathlib import Path, PurePosixPath
 import re
 import secrets
 import subprocess
+import time
 from typing import Any, Mapping
 from uuid import uuid4
 
+from agent_box.extensions import capability
 from agent_box.server.approvals import ApprovalRecords
 from agent_box.server.credentials import CredentialRecords
 from agent_box.server.events import EventNotifier
@@ -671,10 +673,17 @@ def build_runtime_from_sidecar_deployment(
                     state_ephemeral_paths=deployment["_state_ephemeral_paths"],
                     protected_state_paths=deployment["_protected_state_paths"],
                 )
+            capability_documents, capability_grants, authorized, binding = (
+                _capability_material(context, deployment)
+            )
             return SidecarHarnessPort(
                 launcher, environment={"AGENTBOX_SIDECAR_ISOLATED": "1"},
                 profile=context["harness_type"], adapter=deployment["adapter"],
                 model=execution.get("model"),
+                capability_documents=capability_documents,
+                capability_grants=capability_grants,
+                capability_authorized_providers=authorized,
+                capability_binding=binding,
                 credential_environment=(
                     descriptor.credential_environment if credential is not None else None
                 ),
@@ -714,6 +723,79 @@ def build_runtime_from_sidecar_deployment(
                             secret_store=secret_store)
     runtime.declared_credentials = tuple(declared_credentials)
     return runtime
+
+
+#: 装配边界自有锁定允许映射：只有显式批准的能力声明提供者才能进入选择。
+#: "已安装/已加载"本身不构成授权——声明文档的 provider 必须与这里的身份逐字相符。
+_APPROVED_CAPABILITY_DECLARERS = frozenset({"sandbox-bwrap"})
+
+
+def _capability_binding(context: Mapping[str, Any]) -> str:
+    """本次执行的中立环境身份（canonical 串）：分发/连接/远端路径三元组。
+
+    声明文档与匹配上下文都用这一处派生结果，保证声明、授权、需求与环境绑定
+    绑定在同一次执行上；绑定不含品牌词，业务层与公共层不需要解释它。
+    """
+    return "|".join((
+        str(context.get("distribution", "")),
+        str(context.get("connection_id", "")),
+        str(context.get("remote_path", "")),
+    ))
+
+
+def _capability_material(
+    context: Mapping[str, Any], deployment: Mapping[str, Any],
+) -> tuple[tuple[Any, ...], tuple[Any, ...], tuple[str, ...], str]:
+    """Build the neutral injectables for one execution at the assembly boundary.
+
+    返回 (declaration documents, grants, authorized providers, binding)：
+    * documents 由插件以本次部署派生的 targets 逐执行构造（与 launcher 同源）；
+      插件拒绝或 provider 不在批准映射内时返回空集——门随后 fail-closed 拒绝；
+    * grants 来自部署文档的显式授权字段（独立推导路径），provenance 锁定政策；
+    * authorized providers 来自本模块常量映射，不取自声明文档自身。
+    """
+    binding = _capability_binding(context)
+    executable_targets = tuple(
+        target for _source, target in deployment.get("_executable_mounts", ())
+    )
+    projection_targets = tuple(
+        target for _source, target in deployment.get("_projection_mounts", ())
+    )
+    artifact_targets = tuple(
+        target for _source, target in deployment.get("_runtime_artifact_mounts", ())
+    )
+    state_target = deployment.get("_state_target")
+    grants = capability.sidecar_grants(
+        deployment_executable_targets=executable_targets,
+        deployment_projection_targets=projection_targets,
+        deployment_artifact_targets=artifact_targets,
+        deployment_state_target=state_target,
+    )
+    documents: tuple[Any, ...] = ()
+    try:
+        from agent_box_sandbox_bwrap.declarations import sandbox_declaration_document
+        from agent_box_sandbox_bwrap.plugin import create_plugin
+        from agent_box_sandbox_bwrap.provider import ProjectionRejected
+
+        # 身份独立核对：实际安装插件的 descriptor id 与声明自报的 provider 必须
+        # 一致，且两者都落在本模块的锁定批准映射内。"已安装/已加载"本身不构成
+        # 授权——descriptor 只是待比对的身份，批准集才是授权来源。
+        descriptor_id = create_plugin().descriptor().id
+        document = sandbox_declaration_document(
+            readonly_targets=executable_targets + projection_targets + artifact_targets,
+            writable_targets=((state_target,) if state_target else ()),
+            environment_binding=binding,
+            observed_at=int(time.time()),
+        )
+        if (
+            descriptor_id in _APPROVED_CAPABILITY_DECLARERS
+            and document.provider in _APPROVED_CAPABILITY_DECLARERS
+            and document.provider == descriptor_id
+        ):
+            documents = (document,)
+    except ProjectionRejected:
+        documents = ()
+    return documents, grants, tuple(sorted(_APPROVED_CAPABILITY_DECLARERS)), binding
 
 
 #: The exact keys one credential declaration may use. `sourcePath` is a *path*;

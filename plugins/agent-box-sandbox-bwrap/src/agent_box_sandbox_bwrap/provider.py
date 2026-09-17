@@ -22,6 +22,15 @@ from .home_projection import (
 )
 
 PROVIDER_ID = "bwrap-sandbox"
+# Cross-template union of the provider's declared abilities, not a per-template
+# claim: `_minimal_rootfs_argv(network_mode="none")` really does emit
+# --unshare-net for the bwrap-offline / safe-default templates, while the
+# Worker-hosted sidecar template (compile_remote_sidecar_bwrap_argv) does not.
+# The per-execution truth for that template is built by
+# `agent_box_sandbox_bwrap.declarations.sandbox_declaration_document`
+# (network.inherit@1 supported, network.none@1 unavailable, anchored on the
+# argv block that lacks the flag); the capability gate consumes that document,
+# so the union here never becomes the sidecar execution's promise.
 _CAPS = ("filesystem.mounts@1", "filesystem.readonly@1", "filesystem.writable@1", "filesystem.tmpfs@1", "filesystem.symlink-safe@1", "network.none@1", "network.inherit@1", "env.bounded@1", "home.workspace@1", "digest.read-back@1")
 _ENV_KEY = re.compile(r"^[A-Z_][A-Z0-9_]{0,63}$")
 _UNSAFE_RW = {"/", "/usr", "/etc", "/bin", "/lib", "/lib64", "/proc", "/dev"}

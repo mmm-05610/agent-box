@@ -95,6 +95,33 @@ def test_sidecar_reports_registered_profiles_and_provenance(tmp_path):
         envelope.close()
 
 
+def _fixture_capability_material(context):
+    """Neutral capability material for test-local port factories (bootstrap parity).
+
+    Production port_factory always injects a binding and declaration candidates
+    before `_start_run`'s capability gate runs; the fixture launchers carry no
+    mount faces, so an empty-faced neutral document satisfies the (empty) demand
+    set. Tests that need the gate to refuse pass material explicitly instead.
+
+    (Placed before the first skipif-decorated test, not between a decorator and
+    its test: the source branch inserted it below `@pytest.mark.skipif`,
+    silently detaching that skip guard from its test - fixed in this replay.)
+    """
+    from agent_box.extensions import capability as capability_api
+
+    binding = f"fixture|{context.get('harness_type', '')}|{context.get('remote_path', '')}"
+    document = capability_api.SandboxDeclarationDocument(
+        provider="fixture", revision=1, environment_binding=binding,
+        declarations=(), digest="0" * 64,
+    )
+    return {
+        "capability_documents": (document,),
+        "capability_grants": (),
+        "capability_authorized_providers": ("fixture",),
+        "capability_binding": binding,
+    }
+
+
 @pytest.mark.skipif(not SIDEcar_ENTRY.is_file(), reason="sidecar entry not built")
 def test_harness_port_streams_pre_terminal_deltas_before_completion(tmp_path):
     """A delta must be observable while the turn is still running."""
@@ -913,6 +940,7 @@ def _local_sidecar_runtime(tmp_path, *, provider_model=False):
                 adapter={"command": "node", "args": [str(FAKE_PEER)]},
                 state_directory=str(tmp_path / "state"), directory=str(tmp_path),
                 on_event=on_event,
+                **_fixture_capability_material(context),
             )
         return SidecarExecutionBackend(
             records, objects, approvals, port_factory=port_factory, on_event=notifier.notify,
@@ -954,6 +982,159 @@ def _queue_setup(client, runtime, tmp_path, first_text):
     })
     assert second["executionId"] is None and second["queueItemId"]
     return profile, first, second
+
+
+def test_public_post_open_error_with_the_same_code_keeps_ambiguous_semantics(tmp_path):
+    """D-R3-001: 同名码的 post-open 错误在公开路径上必须保持 ambiguous。
+
+    能力门先通过（端口带齐中立材料），open_execution 抛出普通 SidecarError，
+    code 与能力门拒绝相同（模拟 sidecar 响应错误）：公开 wire→accept→dispatch
+    之后，Core 账本必须记录 ExecutionDispatchAmbiguous（而非 Failed），turn 的
+    error_code 不得被误导为 CAPABILITY_REQUIREMENT_UNSATISFIED，且 open_execution
+    确已到达（与本测试的对照——门拒绝测试——形成 pre/post 两条路径对照）。
+    """
+    registry = HarnessRegistry()
+    registry.register(HarnessDescriptor("pi", capability_claims={"stream": True}))
+
+    class Connector:
+        def distributions(self): return [{"name": "Ubuntu"}]
+        def probe(self, distribution, user):
+            return {"probe_id": "probe", "distribution": distribution, "user": user}
+        def browse(self, probe_id, path):
+            return {"path": path, "directories": [], "files": []}
+        def open_workspace(self, probe_id, path):
+            return {"connection_id": "connection", "distribution": "Ubuntu",
+                    "user": os.environ["USER"], "path": str(tmp_path)}
+
+    class ImpostorPort(SidecarHarnessPort):
+        def open_execution(self, execution_id):
+            raise SidecarError(
+                "CAPABILITY_REQUIREMENT_UNSATISFIED",
+                "post-open impostor with reused code",
+            )
+
+    def execution_factory(records, objects, approvals, notifier, _connector, _credentials, _secrets):
+        def port_factory(context, on_event):
+            return ImpostorPort(
+                LocalProcessLauncher(["node", str(SIDEcar_ENTRY)], cwd=str(PLUGIN)),
+                environment=sidecar_environment(tmp_path), profile=context["harness_type"],
+                adapter={"command": "node", "args": [str(FAKE_PEER)]},
+                state_directory=str(tmp_path / "state"), directory=str(tmp_path),
+                on_event=on_event,
+                **_fixture_capability_material(context),
+            )
+        return SidecarExecutionBackend(
+            records, objects, approvals, port_factory=port_factory, on_event=notifier.notify,
+        )
+
+    runtime = build_runtime(
+        tmp_path / "server", harnesses=registry,
+        execution_factory=execution_factory, connector=Connector(),
+    )
+    with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
+        opened = _wire_post(client, runtime.token, "workspaces.open", {
+            "requestId": "impostor-open", "path": str(tmp_path),
+            "environment": {"kind": "wsl", "host": "Ubuntu", "user": None},
+        })["workspace"]
+        profile = client.post("/api/v1/profiles", headers={
+            "Authorization": f"Bearer {runtime.token}", "Idempotency-Key": "impostor-profile",
+        }, json={"name": "impostor", "harness_type": "pi",
+                 "configuration": {"model": "initial"}, "credential_id": None}).json()
+        accepted = _wire_post(client, runtime.token, "sessions.createAndSend", {
+            "requestId": "impostor-first", "workspaceId": opened["id"],
+            "profileId": profile["profile_id"], "overrides": [],
+            "message": {"text": "impostor", "attachments": []},
+        })
+        session_id = accepted["session"]["id"]
+        deadline = time.monotonic() + 8
+        session = runtime.repository.get_session(session_id)
+        while time.monotonic() < deadline and session["turns"][0]["state"] == "running":
+            time.sleep(0.02)
+            session = runtime.repository.get_session(session_id)
+        assert session["turns"][0]["state"] == "failed", session
+        # 同名码未被还原：post-open 路径的归一化保持基线语义。
+        assert session["turns"][0]["error_code"] == "EXECUTION_FAILED", session
+        with runtime.database.read() as conn:
+            ledger = [
+                (row["type"], json.loads(row["data_json"]))
+                for row in conn.execute(
+                    "SELECT type,data_json FROM core_events WHERE type IN (?,?) "
+                    "ORDER BY occurred_at,id",
+                    (EventType.EXECUTION_DISPATCH_AMBIGUOUS.value,
+                     EventType.EXECUTION_DISPATCH_FAILED.value),
+                )
+            ]
+        ambiguous = [data for kind, data in ledger if kind == "ExecutionDispatchAmbiguous"]
+        failed = [kind for kind, _data in ledger if kind == "ExecutionDispatchFailed"]
+        assert failed == [], ledger
+        assert len(ambiguous) == 1 and "impostor" in ambiguous[0]["error"], ledger
+
+
+def test_public_dispatch_records_capability_refusal_as_a_failed_start(tmp_path):
+    """D-002: 公开 wire→accept→dispatch 路径上的能力门拒绝证据。
+
+    专用端口工厂**不注入**能力材料（装配边界未注入的情形），门必须在任何原生接触
+    前拒绝：Work Core 记 failed（非 ambiguous），fail_turn 保留
+    CAPABILITY_REQUIREMENT_UNSATISFIED；端口一旦被 open_execution 到达即抛
+    AssertionError（其归一化错误码不可能是本原因码），断言因此同时证明零启动。
+    """
+    registry = HarnessRegistry()
+    registry.register(HarnessDescriptor("pi", capability_claims={"stream": True}))
+
+    class Connector:
+        def distributions(self): return [{"name": "Ubuntu"}]
+        def probe(self, distribution, user):
+            return {"probe_id": "probe", "distribution": distribution, "user": user}
+        def browse(self, probe_id, path):
+            return {"path": path, "directories": [], "files": []}
+        def open_workspace(self, probe_id, path):
+            return {"connection_id": "connection", "distribution": "Ubuntu",
+                    "user": os.environ["USER"], "path": str(tmp_path)}
+
+    class NeverOpenedPort(SidecarHarnessPort):
+        def open_execution(self, execution_id):  # pragma: no cover - must never run
+            raise AssertionError("the capability gate must refuse before open_execution")
+
+    def execution_factory(records, objects, approvals, notifier, _connector, _credentials, _secrets):
+        def port_factory(context, on_event):
+            return NeverOpenedPort(
+                LocalProcessLauncher(["node", str(SIDEcar_ENTRY)], cwd=str(PLUGIN)),
+                environment=sidecar_environment(tmp_path), profile=context["harness_type"],
+                adapter={"command": "node", "args": [str(FAKE_PEER)]},
+                state_directory=str(tmp_path / "state"), directory=str(tmp_path),
+                on_event=on_event,
+            )  # 刻意不带 capability_* 材料：模拟装配边界未注入
+        return SidecarExecutionBackend(
+            records, objects, approvals, port_factory=port_factory, on_event=notifier.notify,
+        )
+
+    runtime = build_runtime(
+        tmp_path / "server", harnesses=registry,
+        execution_factory=execution_factory,
+        connector=Connector(),
+    )
+    with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
+        opened = _wire_post(client, runtime.token, "workspaces.open", {
+            "requestId": "gate-open", "path": str(tmp_path),
+            "environment": {"kind": "wsl", "host": "Ubuntu", "user": None},
+        })["workspace"]
+        profile = client.post("/api/v1/profiles", headers={
+            "Authorization": f"Bearer {runtime.token}", "Idempotency-Key": "gate-profile",
+        }, json={"name": "gate", "harness_type": "pi",
+                 "configuration": {"model": "initial"}, "credential_id": None}).json()
+        accepted = _wire_post(client, runtime.token, "sessions.createAndSend", {
+            "requestId": "gate-first", "workspaceId": opened["id"],
+            "profileId": profile["profile_id"], "overrides": [],
+            "message": {"text": "gate", "attachments": []},
+        })
+        session_id = accepted["session"]["id"]
+        deadline = time.monotonic() + 8
+        session = runtime.repository.get_session(session_id)
+        while time.monotonic() < deadline and session["turns"][0]["state"] == "running":
+            time.sleep(0.02)
+            session = runtime.repository.get_session(session_id)
+        assert session["turns"][0]["state"] == "failed", session
+        assert session["turns"][0]["error_code"] == "CAPABILITY_REQUIREMENT_UNSATISFIED", session
 
 
 def test_success_dispatches_queued_turn_with_frozen_effective_configuration(tmp_path):
@@ -1098,6 +1279,7 @@ def test_sidecar_permission_round_trip_uses_server_approval_store(tmp_path):
                 adapter={"command": "node", "args": [str(FAKE_PEER)]},
                 state_directory=str(tmp_path / "state"), directory=str(tmp_path),
                 on_event=on_event,
+                **_fixture_capability_material(context),
             )
         return SidecarExecutionBackend(
             records, objects, approvals, port_factory=port_factory, on_event=notifier.notify,

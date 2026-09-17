@@ -12,12 +12,14 @@ import time
 from pathlib import PurePosixPath
 from typing import Any, Callable, Mapping
 
+from agent_box.extensions import capability
 from agent_box.resource_contracts import AgentBoxProfileV1, PromptFragmentV1, WorkspaceV1
 from agent_box.server.execution.sidecar import SidecarError, SidecarHarnessPort
 from agent_box.work_core import (
     ExecutionFinalizationRequest, ExecutionProjection, ExecutionStartReceipt,
     Freshness, Outcome, Phase, ProviderDescriptor, Ref, RefType,
 )
+from agent_box.work_core.errors import ExecutionStartRejected
 from agent_box.work_core.registry import ExtensionRegistry
 from agent_box.work_core.repository import CoreRepository
 from agent_box.work_core.services import ExecutionService, WorkService
@@ -109,11 +111,21 @@ class _CoreSidecarProvider:
 
     def start(self, request):
         values = {item.contract_id: item.value for item in request.resolved_inputs}
-        run = self.backend._start_run(
-            request.execution_id, request.dispatch_id,
-            values[WorkspaceV1.contract_id], values[PromptFragmentV1.contract_id],
-            values[AgentBoxProfileV1.contract_id],
-        )
+        try:
+            run = self.backend._start_run(
+                request.execution_id, request.dispatch_id,
+                values[WorkspaceV1.contract_id], values[PromptFragmentV1.contract_id],
+                values[AgentBoxProfileV1.contract_id],
+            )
+        except CapabilityGateRefusal as refusal:
+            # 能力门紧邻 open_execution 之前拒绝（专用类型，来源隔离）：已证明原生
+            # 启动未发生，按 Core 既有 ExecutionStartRejected 语义记录为 failed
+            # （而非 ambiguous），并把原因码挂在异常上供 Server 映射还原。
+            # post-open 的任何 SidecarError（即使同名错误码）不经此转换，保持
+            # 既有歧义语义。
+            rejection = ExecutionStartRejected(str(refusal))
+            rejection.code = refusal.code
+            raise rejection from refusal
         self._handles[request.dispatch_id] = run
         return ExecutionStartReceipt(
             request.execution_id, request.dispatch_id, request.inputs_digest,
@@ -256,6 +268,9 @@ class SidecarExecutionBackend:
         # 类型化拒绝，而不是打开一个原生会话再静默丢弃附件。
         stored = json.loads(self.objects.read(context["input_object_digest"]))
         attachments, file_refs = _sidecar_attachments(self.objects, stored)
+        # 实际副作用（client.start()/spawn）前的唯一强制门：需求来自 launcher 当前
+        # 计划，授权/声明/绑定来自装配边界注入；不满足即类型化拒绝，零 launcher/spawn。
+        _capability_gate(port, turn_id)
         native_id = port.open_execution(turn_id)
         if attachments and not _effective_attachment_support(port, turn_id):
             # 拒绝时不留一个没有归属的原生会话（否则 _complete 永远不会回收它）。
@@ -559,7 +574,87 @@ def _audited_home(run: "_Run") -> tuple[dict[str, Any], bool]:
         raise
 
 
+class CapabilityGateRefusal(SidecarError):
+    """Raised only by :func:`_capability_gate`, before any native contact.
+
+    单独的类型是来源隔离：只有这个类能携带“启动前拒绝”语义进入
+    ``_CoreSidecarProvider.start`` 的转换分支；post-open 阶段的 sidecar 响应错误
+    即使返回同名错误码（SidecarError 基类），也绝不会被误标为启动前拒绝。
+    """
+
+    def __init__(self, reason: str) -> None:
+        super().__init__("CAPABILITY_REQUIREMENT_UNSATISFIED", reason)
+
+
+def _capability_gate(port: SidecarHarnessPort, turn_id: str) -> None:
+    """Refuse an execution whose slice capabilities are not provably satisfied.
+
+    demand 取 launcher 本次将实际执行的挂载面（executable/projection/artifact
+    的 target 与 state target）；grant/声明/授权集/环境绑定由装配边界注入。
+    选择为确定性单候选（authorized_providers 限定）；任何缺失或不满足都在
+    ``open_execution`` 之前抛出，调用方沿既有 fail_turn 路径持久化，零 spawn。
+    """
+    launcher = getattr(port, "launcher", None)
+    documents = getattr(port, "capability_documents", ())
+    grants = getattr(port, "capability_grants", ())
+    authorized = getattr(port, "capability_authorized_providers", ())
+    binding = getattr(port, "capability_binding", None)
+    if binding is None or not documents or not authorized:
+        # 绑定、候选声明与授权提供者集是“装配边界已为本次执行注入材料”的最低
+        # 标志；任一缺失即 fail-closed 拒绝（空面部署的合法空 grant 集不是缺失，
+        # 但空的授权集不是“不限制”，而是未注入——不得改写为放行）。
+        raise CapabilityGateRefusal(
+            "capability material incomplete for this execution: "
+            "binding/documents/authorized required",
+        )
+    executable_targets = tuple(
+        target for _source, target in getattr(launcher, "executable_mounts", ())
+    )
+    projection_targets = tuple(
+        target for _source, target in getattr(launcher, "projection_mounts", ())
+    )
+    artifact_targets = tuple(
+        target for _source, target in getattr(launcher, "runtime_artifact_mounts", ())
+    )
+    state_target = getattr(launcher, "state_target", None)
+    requirements = capability.sidecar_requirements(
+        executable_targets=executable_targets,
+        projection_targets=projection_targets,
+        artifact_targets=artifact_targets,
+        state_target=state_target,
+    )
+    context = capability.MatchContext(environment_binding=binding, now=int(time.time()))
+    record = capability.select_declaration(
+        requirements, grants, (), tuple(documents),
+        context=context, binding=f"turn:{turn_id}",
+        authorized_providers=tuple(authorized),
+    )
+    if record.selected is not None and record.outcome is not None and record.outcome.satisfied:
+        return
+    if record.rejected:
+        _provider, _revision, reason = record.rejected[0]
+    elif record.outcome is not None and record.outcome.refusals:
+        reason = record.outcome.refusals[0].reason
+    else:
+        reason = "no authorized candidate satisfied the requirements"
+    raise CapabilityGateRefusal(
+        f"capability requirements unsatisfied for this execution: {reason}",
+    )
+
+
 def _safe_code(exc: BaseException) -> str:
+    # 先沿异常链寻找由 provider 显式标注的「启动未发生」拒绝码（gate 在
+    # open_execution 前抛出的 ExecutionStartRejected 会带上原因码）；只有这一类
+    # 带码的 ExecutionStartRejected 参与还原，其他包装/运行期异常保持既有归一化。
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(current, ExecutionStartRejected):
+            explicit = getattr(current, "code", None)
+            if isinstance(explicit, str) and re.fullmatch(r"[A-Z][A-Z0-9_]{2,127}", explicit):
+                return explicit
+        current = current.__cause__ or current.__context__
     explicit = getattr(exc, "code", None)
     value = str(explicit or exc).strip().upper()
     if re.fullmatch(r"[A-Z][A-Z0-9_]{2,127}", value):
