@@ -1,8 +1,13 @@
 {
- "beforeRooms": [],
+ "beforeRooms": [
+  "agentbox-local-channel-6naah_df",
+  "agentbox-local-channel-g__y050e",
+  "agentbox-local-channel-q63aka81",
+  "agentbox-local-channel-rd1pw_lf"
+ ],
  "browse": {
   "entries": 0,
-  "path": "/tmp/agentbox-local-env-gate-qwyu1qyl/project"
+  "path": "/tmp/agentbox-local-env-gate-c3x4z1yu/project"
  },
  "capability": {
   "sessionsSend": {
@@ -15,13 +20,20 @@
   }
  },
  "checkpoint": {
-  "files": [],
+  "files": [
+   "pi/ZmFrZS1uYXRpdmUtMTMtMQ.json"
+  ],
   "nativeId": "fake-native-13-1",
-  "resumable": false
+  "resumable": true
  },
  "cleanup": {
   "leftoverLocalChannelRoots": [],
-  "preexistingRootsIgnored": [],
+  "preexistingRootsIgnored": [
+   "agentbox-local-channel-6naah_df",
+   "agentbox-local-channel-g__y050e",
+   "agentbox-local-channel-q63aka81",
+   "agentbox-local-channel-rd1pw_lf"
+  ],
   "workspaceFilesKept": [
    "note.txt"
   ]
@@ -33,12 +45,12 @@
  "deploymentDocument": {
   "hostPaths": false,
   "note": "the same document runs both placements; placement is chosen per open",
-  "path": "/tmp/agentbox-local-env-gate-qwyu1qyl/deployment.json",
+  "path": "/tmp/agentbox-local-env-gate-c3x4z1yu/deployment.json",
   "sha256": "sha256:6026b906712d97d4c75cad56ba896dad3fd3923cb1667282ff994eabf4387266"
  },
  "executionIds": [
-  "execution_52b67943f97a49248cf0da1cd8e0c8ff",
-  "execution_6d2d4e1b406645a482c92350aedf25ec"
+  "execution_941cded320ee4abe92b837f3a6a0ecdf",
+  "execution_5c5520b795e243ccac96054402b87351"
  ],
  "model": {
   "endpoint": "none; the peer answers from a fixed script",
@@ -73,7 +85,7 @@
   ],
   "deltas": 1,
   "state": "completed",
-  "turnId": "execution_52b67943f97a49248cf0da1cd8e0c8ff"
+  "turnId": "execution_941cded320ee4abe92b837f3a6a0ecdf"
  },
  "roundTwo": {
   "captureEvents": [
@@ -90,10 +102,10 @@
   ],
   "deltas": 1,
   "state": "completed",
-  "turnId": "execution_6d2d4e1b406645a482c92350aedf25ec"
+  "turnId": "execution_5c5520b795e243ccac96054402b87351"
  },
  "script": "scripts/server-round1/env-provider-gate.py",
- "temporaryRoot": "/tmp/agentbox-local-env-gate-qwyu1qyl",
+ "temporaryRoot": "/tmp/agentbox-local-env-gate-c3x4z1yu",
  "temporaryRootRemoved": true,
  "workspace": {
   "created": true,
@@ -102,7 +114,7 @@
    "kind": "local",
    "user": null
   },
-  "id": "ws_eb0db5b3ba564e35aad9d968b467bdc3",
-  "normalizedPath": "/tmp/agentbox-local-env-gate-qwyu1qyl/project"
+  "id": "ws_ab5c04d833e846108261bbab316697a4",
+  "normalizedPath": "/tmp/agentbox-local-env-gate-c3x4z1yu/project"
  }
 }
