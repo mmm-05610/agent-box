@@ -3319,7 +3319,7 @@ export const en: Translations = {
       gatewayUnavailable: 'inference unavailable',
       gatewayChecking: 'checking',
       gatewayConnecting: 'connecting',
-      gatewayOffline: 'not connected',
+      gatewayOffline: 'Gateway is not connected',
       gatewayRestarting: 'restarting…',
       gatewayTitle: 'Service',
       customizeTitle: 'Show in status bar',
