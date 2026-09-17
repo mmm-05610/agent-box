@@ -76,6 +76,16 @@ git -C $P rev-parse HEAD   # 记进你的提交信息：文档来源 = 父工作
    （`wire/handlers.py:716-730`），`get_session()` 里的 `checkpoint` 字典**不出现在 wire 上**。
 7. 全量基线（撰写时）：`886 passed / 6 skipped`；四家假端点门 + Windows r4 用 **c8** 通过。
 
+## §1b 修订（2026-09-16，用户提议并采纳）
+
+**session 子树不再住 profile home**：改为**每个 harness 一族一个公共 session 库**
+（只放会话子树，按注册表声明的 session target 绑进 guest）。因此本单的实现要按
+[落地设计 §14](../../server-round1/native-home-storage-landing.md) 走：
+非会话状态仍落 `profiles/<角色名>/home/<native_home>/…`，**会话子树落 `sessions/<harness>/…`**；
+审计与凭据扫描**按会话归属**，不得假设"该目录只被一个 profile 写过"。
+**共享 DB 式的家族**（会话与其它状态同库）**无法按目录切分** → 阶段 A 逐家定性，二选一
+（库留 profile home = 换 profile 原生重启；整库进公共库 = 共享但一并共享库内其它状态），**如实声明**。
+
 ## §2 本单要做的事（范围）
 
 1. **Worker 新增 home 操作族**（Rust）：`home.prepare` / `home.list` / `home.get`。
