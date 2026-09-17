@@ -39,3 +39,21 @@
   → 原子入 `<工件根>/<family>/<version>/`。hermes/dsh：builder 重跑产出。
 - **版本钉住的兼容性**：换钉住的版本时受审配置（models/settings/config.yaml）须按该
   版本重审——deployment 的版本钉住字段如实携带"最近一次生效版本"。
+
+
+## 阶段 D 真机证据（2026-09-18 补记）
+
+两类工件取得均在真机完成（ArtifactStore，提交 2052743 语义）：
+
+- **本地构建闭包（hermes）**：源=builder 发布的 `~/.agentbox-all-harnesses/artifacts/hermes`
+  （tree digest `sha256:3ffa9ee4…`，manifest 记录）。`install("hermes","0.19.0",…)` →
+  重推导摘要匹配 → staged rename 落位；`.current` 引用置 0.19.0。首跑暴露
+  **只读源目录使 staged rename 被拒**（EACCES）——store 修复为 staged 目录树规范化
+  owner-write（digest 不含 modes，非内容变更），并留代码注释。
+- **发布物取得（pi-acp 0.9.1 tarball）**：npm registry 下载，SHA-1 与 `dist.shasum`
+  逐字一致（`e0fac82d…`）；解包树的 tree digest 由同源参考实现重推导后安装成功。
+  阶段 A 观察中的"扁平假设"在真数据上被纠正（usage 在 `message.usage`），解析器
+  已按真实形状修正并通过 10 项测试。
+
+**结论**：两类取得路径（发布物 / 本地构建）的安装—引用—回滚均在真机走通，
+`ORDER_57_STAGE_D_OK`；"摘要不符零落地"由反例测试锁定。

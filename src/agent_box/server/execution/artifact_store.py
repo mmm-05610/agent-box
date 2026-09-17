@@ -40,6 +40,20 @@ class ArtifactStoreError(RuntimeError):
         self.code = code
 
 
+def _make_tree_writable(root: Path) -> None:
+    """Grant owner-write on every staged directory (content untouched).
+
+    Read-only sources (published closures) copy their modes into the stage;
+    the rename and later housekeeping need owner-write on directories."""
+    root.chmod(0o755)
+    for current, _dirs, _names in os.walk(root):
+        try:
+            Path(current).chmod(0o755)
+        except OSError:
+            pass
+
+
+
 class ArtifactStore:
     def __init__(self, root: Path | str) -> None:
         self.root = Path(root)
@@ -100,6 +114,13 @@ class ArtifactStore:
                     f"staged tree digest {digest} does not match the declared "
                     f"{declared_digest}",
                 )
+            # A read-only source (the builder's published closure is 0555)
+            # copies its modes into the stage; those modes make the staged
+            # tree itself non-writable, and `rename` of a directory tree
+            # requires traversing/writing entries. Normalize the staged
+            # directories to owner-writable before the rename — the digest
+            # does not cover modes, so this is not a content change.
+            _make_tree_writable(staging)
             destination.parent.mkdir(parents=True, exist_ok=True)
             staging.rename(destination)
         except BaseException:
