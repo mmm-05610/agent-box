@@ -7,6 +7,8 @@ behavior lives here: this module is the contract's edge.
 from __future__ import annotations
 
 import json
+from pathlib import Path
+import shutil
 import mimetypes
 from pathlib import PurePosixPath
 from typing import Any, Callable, Mapping
@@ -85,6 +87,15 @@ _PARAM_SHAPES = {
     ),
     "providerModels.probeConnection": (
         {"requestId", "baseUrl", "credentialId"}, set(),
+    ),
+    "providerArtifacts.list": (
+        {"harness"}, set(),
+    ),
+    "providerArtifacts.install": (
+        {"requestId", "harness", "version", "sourceToken"}, set(),
+    ),
+    "providerArtifacts.rollback": (
+        {"requestId", "harness", "version"}, set(),
     ),
     "config.describe": ({"profileId", "workspaceId"}, set()),
     "config.resolve": ({"profileId", "workspaceId", "overrides"}, set()),
@@ -196,6 +207,7 @@ class WireService:
         queue, approvals, harnesses, objects, execution, cursor_secret: bytes,
         model_configs=None,
         token_required: bool = True,
+        artifact_store=None,
     ) -> None:
         self._server_id_provider = server_id_provider
         self.workspaces = workspaces
@@ -207,6 +219,9 @@ class WireService:
         self.objects = objects
         self.execution = execution
         self.model_configs = model_configs
+        #: Order 57: the family-runtime artifact store; None means this
+        #: composition has no artifact management face (typed UNAVAILABLE).
+        self.artifact_store = artifact_store
         self.codec = CursorCodec(cursor_secret)
         self.token_required = token_required
         self._handlers: dict[str, Callable[[Mapping[str, Any]], Any]] = {
@@ -226,6 +241,9 @@ class WireService:
             "providerModels.archive": self.provider_models_archive,
             "providerModels.probeModels": self.provider_models_probe_models,
             "providerModels.probeConnection": self.provider_models_probe_connection,
+            "providerArtifacts.list": self.provider_artifacts_list,
+            "providerArtifacts.install": self.provider_artifacts_install,
+            "providerArtifacts.rollback": self.provider_artifacts_rollback,
             "config.describe": self.config_describe,
             "config.resolve": self.config_resolve,
             "sessions.list": self.sessions_list,
@@ -448,6 +466,50 @@ class WireService:
         body.update(self._provenance(params) or {})
         record = self.model_configs.create(_request_id(params["requestId"]), body)
         return {"providerModel": record}
+
+    # -- Order 57: harness runtime artifact management ---------------------
+
+    def _artifact_store(self):
+        if self.artifact_store is None:
+            raise WireError(
+                "ARTIFACT_STORE_UNAVAILABLE",
+                "this composition has no artifact management face",
+            )
+        return self.artifact_store
+
+    def provider_artifacts_list(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        harness = _bounded(params["harness"], "harness", 64)
+        store = self._artifact_store()
+        versions = store.installed(harness)
+        return {
+            "harness": harness,
+            "versions": [
+                {"version": version, **store.summary(harness, version)}
+                for version in versions
+            ],
+            "current": store.current_reference(harness),
+        }
+
+    def provider_artifacts_install(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        """Install a version the execution side has staged under the store's
+        incoming area. The digest is re-derived from the staged copy before
+        anything is visible; the declared digest must match."""
+        harness = _bounded(params["harness"], "harness", 64)
+        version = _bounded(params["version"], "version", 64)
+        token = _bounded(params["sourceToken"], "sourceToken")
+        store = self._artifact_store()
+        source = store.incoming_dir(token)
+        receipt = store.install(harness, version, source, params["digest"])
+        shutil.rmtree(source, ignore_errors=True)
+        return {"harness": harness, "version": version,
+                "digest": receipt["digest"], "entries": receipt["entries"]}
+
+    def provider_artifacts_rollback(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        harness = _bounded(params["harness"], "harness", 64)
+        version = _bounded(params["version"], "version", 64)
+        store = self._artifact_store()
+        store.rollback(harness, version)
+        return {"harness": harness, "current": store.current_reference(harness)}
 
     def provider_models_probe_models(self, params: Mapping[str, Any]) -> dict[str, Any]:
         self._require_model_configs()

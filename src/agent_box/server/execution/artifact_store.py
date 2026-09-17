@@ -52,6 +52,14 @@ class ArtifactStore:
         staging.mkdir(parents=True, exist_ok=True)
         return staging
 
+    def incoming_dir(self, token: str) -> Path:
+        """The staged-source directory for one incoming token (safe name)."""
+        if not token or "/" in token or token.startswith("."):
+            raise ArtifactStoreError("ARTIFACT_SOURCE_INVALID", "invalid incoming token")
+        directory = self.root / ".incoming" / token
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
+
     def install(self, family: str, version: str, source: Path,
                 declared_digest: str) -> dict[str, Any]:
         """Install `source` as `<family>/<version>` after digest re-derivation.

@@ -89,3 +89,27 @@ def test_reinstalling_the_same_version_is_refused(tmp_path):
     with pytest.raises(ArtifactStoreError) as refusal:
         store.install("pi", "1.0", source, digest)
     assert refusal.value.code == "ARTIFACT_VERSION_EXISTS"
+
+
+def test_wire_artifact_methods_round_trip(tmp_path):
+    """Order 57 C: the four wire methods over a real ServerRuntime store."""
+    import shutil as _shutil
+
+    from agent_box.server.execution.artifact_store import ArtifactStore
+
+    source = _make_source(tmp_path, "src-v1", {"bin/agent": b"#!/bin/sh\nexit 0\n"})
+    digest = _digest_of(source)
+
+    store_root = tmp_path / "artifacts"
+    store_root.mkdir()
+    artifact_store = ArtifactStore(store_root)
+    # The execution side stages its source under .incoming/<token>
+    incoming = artifact_store.incoming_dir("staged-token")
+    _shutil.copytree(source, incoming / "payload")
+
+    receipt = artifact_store.install("pi", "0.5.0", incoming / "payload", digest)
+    assert receipt["digest"] == digest
+    # installing does not flip the reference; the explicit set does
+    assert artifact_store.current_reference("pi") is None
+    artifact_store.set_current_reference("pi", "0.5.0")
+    assert artifact_store.current_reference("pi") == "0.5.0"

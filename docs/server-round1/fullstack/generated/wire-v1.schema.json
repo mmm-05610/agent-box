@@ -4113,6 +4113,190 @@
     ],
     "additionalProperties": false
   },
+  "providerArtifacts.list#params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "harness": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "required": [
+      "harness"
+    ],
+    "additionalProperties": false
+  },
+  "providerArtifacts.list#result": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "harness": {
+        "type": "string",
+        "minLength": 1
+      },
+      "versions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "entries": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "bytes": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "version",
+            "entries",
+            "bytes"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "current": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "required": [
+      "harness",
+      "versions",
+      "current"
+    ],
+    "additionalProperties": false
+  },
+  "providerArtifacts.install#params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "requestId": {
+        "type": "string",
+        "minLength": 8
+      },
+      "harness": {
+        "type": "string",
+        "minLength": 1
+      },
+      "version": {
+        "type": "string",
+        "minLength": 1
+      },
+      "sourceToken": {
+        "type": "string",
+        "minLength": 1
+      },
+      "digest": {
+        "type": "string",
+        "pattern": "^sha256:[0-9a-f]{64}$"
+      }
+    },
+    "required": [
+      "requestId",
+      "harness",
+      "version",
+      "sourceToken",
+      "digest"
+    ],
+    "additionalProperties": false
+  },
+  "providerArtifacts.install#result": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "harness": {
+        "type": "string",
+        "minLength": 1
+      },
+      "current": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "version": {
+        "type": "string"
+      },
+      "digest": {
+        "type": "string"
+      },
+      "entries": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "harness"
+    ],
+    "additionalProperties": false
+  },
+  "providerArtifacts.rollback#params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "requestId": {
+        "type": "string",
+        "minLength": 8
+      },
+      "harness": {
+        "type": "string",
+        "minLength": 1
+      },
+      "version": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "required": [
+      "requestId",
+      "harness",
+      "version"
+    ],
+    "additionalProperties": false
+  },
+  "providerArtifacts.rollback#result": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "harness": {
+        "type": "string",
+        "minLength": 1
+      },
+      "current": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "version": {
+        "type": "string"
+      },
+      "digest": {
+        "type": "string"
+      },
+      "entries": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "harness"
+    ],
+    "additionalProperties": false
+  },
   "config.describe#params": {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "type": "object",
