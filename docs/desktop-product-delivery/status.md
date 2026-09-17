@@ -1186,3 +1186,13 @@ typecheck 当场暴露；新测试 4 条 ESLint warning 收口为 0。
   拒绝保留草稿的 UI 路径未验）与**最大未覆盖：真实 UI 控件路径**（发送走产品 renderer 传输，
   未驱动输入框/发送按钮/审批弹窗）。
 - 最终状态：**`FULLSTACK_CORE_PARTIAL`**（不用无模型全绿冒充真实模型门，也不把后端门当 UI 门）。
+
+## 接管（2026-09-17）：P08 / P09 前端增量
+
+- writer_lease = **ACTIVE — P08/P09 frontend scoped writer**。依据本次用户持续交付授权及新增工单重新划分写集；只写两单前端范围，不接管后端或全栈运行环境。
+- 起点 `d3d612e1`，分支 `feature/agentbox-desktop-product`，工作树 clean；P09 在恢复后的查派工中发现并完整阅读，按 P08 → P09 串行推进。
+- Windows 单槽：使用现有 `C:\Users\maoqh\agentbox-wsl-round1`，无该树 node/electron 进程。另有 `C:\agentbox-uigate46` 的用户 Electron 进程，保持原样、不停止、不读取其数据。
+- P08 基线：Windows Vitest 控制条四文件 **34/34 PASS**（controls 10、profile-controls 12、use-composer-profile 7、model-pill 5）；四个生产源文件与本工作树 SHA-256 相同。WSL 缺 node_modules，首次测试未启动（ERR_MODULE_NOT_FOUND: vitest），不记通过；不另装依赖。
+- P08-A 代码事实：config.describe 只接 profileId/workspaceId，控制集合由 Harness 声明与 Profile 配置决定，不随临时 provider/model 选择变化；停掉 provider 动态集合子项，不伪造。config.resolve 接收 overrides 并返回该模型槽生效值，运行态实测尚待完成。权限档位、用量数据仍待后端声明/合同。
+- 当前 P08/P09 均 **IN_PROGRESS**，不继承旧全绿结论，不运行付费模型。
+
