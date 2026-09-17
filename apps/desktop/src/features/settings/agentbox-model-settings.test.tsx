@@ -83,18 +83,22 @@ describe('AgentBoxModelSettings', () => {
     expect(await screen.findByText('Model A (model-a)')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Add model configuration' }))
 
-    const fields = screen.getAllByRole('textbox')
-
-    ;['New model', 'h', 'p', 'model-b', 'Model B'].forEach((value, index) =>
-      fireEvent.change(fields[index]!, { target: { value } })
-    )
+    fireEvent.change(screen.getByRole('textbox', { name: 'Display name' }), { target: { value: 'New model' } })
+    // The harness comes from the directory the service itself populated…
+    fireEvent.change(screen.getByRole('combobox', { name: 'Harness' }), { target: { value: 'opaque-harness' } })
+    // …and the provider from the preset catalog.
+    fireEvent.change(screen.getByRole('combobox', { name: 'Provider' }), { target: { value: 'deepseek' } })
+    fireEvent.change(screen.getByLabelText('Model ID'), { target: { value: 'model-b' } })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Model name' }), { target: { value: 'Model B' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() =>
       expect(create).toHaveBeenCalledWith(
         expect.objectContaining({
           credentialId: null,
           configuration: [],
-          models: [{ modelId: 'model-b', displayName: 'Model B', availability: 'unknown', unavailableReason: null }]
+          harness: 'opaque-harness',
+          models: [{ modelId: 'model-b', displayName: 'Model B', availability: 'unknown', unavailableReason: null }],
+          provider: 'deepseek'
         })
       )
     )
@@ -168,15 +172,18 @@ describe('AgentBoxModelSettings', () => {
     renderPage(port)
     fireEvent.click(screen.getByRole('button', { name: 'Add model configuration' }))
 
-    const fields = screen.getAllByRole('textbox')
-
-    ;['New', 'h', 'p', ' model-a ', 'Model A'].forEach((value, index) =>
-      fireEvent.change(fields[index]!, { target: { value } })
-    )
+    fireEvent.change(screen.getByRole('textbox', { name: 'Display name' }), { target: { value: 'New' } })
+    // An empty directory leaves no declared harness, so the explicit override
+    // is what a first-run install legitimately uses.
+    fireEvent.change(screen.getByRole('combobox', { name: 'Harness' }), { target: { value: '__custom_harness__' } })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Harness name' }), { target: { value: 'h' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Provider' }), { target: { value: '__custom_provider__' } })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Provider id' }), { target: { value: 'p' } })
+    fireEvent.change(screen.getByLabelText('Model ID'), { target: { value: ' model-a ' } })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Model name' }), { target: { value: 'Model A' } })
     fireEvent.click(screen.getByRole('button', { name: 'Add model' }))
-    const modelFields = screen.getAllByRole('textbox')
-    fireEvent.change(modelFields[5]!, { target: { value: 'model-b' } })
-    fireEvent.change(modelFields[6]!, { target: { value: 'Model B' } })
+    fireEvent.change(screen.getAllByLabelText('Model ID')[1]!, { target: { value: 'model-b' } })
+    fireEvent.change(screen.getAllByRole('textbox', { name: 'Model name' })[1]!, { target: { value: 'Model B' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(create).toHaveBeenCalledTimes(1))
     const call = create.mock.calls[0]
@@ -253,9 +260,13 @@ describe('AgentBoxModelSettings', () => {
     renderPage(port)
     fireEvent.click(screen.getByRole('button', { name: 'Add model configuration' }))
 
-    const fields = screen.getAllByRole('textbox')
-
-    ;['New', 'h', 'p', 'model-a', 'Model A'].forEach((value, index) => fireEvent.change(fields[index]!, { target: { value } }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'Display name' }), { target: { value: 'New' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Harness' }), { target: { value: '__custom_harness__' } })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Harness name' }), { target: { value: 'h' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Provider' }), { target: { value: '__custom_provider__' } })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Provider id' }), { target: { value: 'p' } })
+    fireEvent.change(screen.getByLabelText('Model ID'), { target: { value: 'model-a' } })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Model name' }), { target: { value: 'Model A' } })
     const save = screen.getByRole('button', { name: 'Save' })
     fireEvent.click(save)
     fireEvent.click(save)
@@ -344,5 +355,70 @@ describe('AgentBoxModelSettings credentials', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(add).toHaveBeenCalledTimes(2))
     expect(add.mock.calls[1][0]).toEqual({ kind: 'api-key', label: 'Work key', secret: 'typed-secret' })
+  })
+})
+
+// P11: the connection facts the service has not declared are shown as unknown,
+// the two service-side actions are disabled WITH their reason, and the only
+// credential fact on screen is a reference.
+describe('AgentBox model settings honesty', () => {
+  it('marks context window and capabilities unknown instead of filling in defaults', async () => {
+    const port = {
+      list: vi.fn(async () => ({ items: [record()], nextCursor: null })),
+      create: vi.fn(),
+      update: vi.fn(),
+      archive: vi.fn()
+    } as unknown as ProviderModelMaintenancePort
+
+    const { container } = renderPage(port)
+
+    expect(await screen.findByText('Model A (model-a)')).toBeTruthy()
+    const meta = container.querySelectorAll('[data-model-meta="unknown"]')
+
+    expect(meta.length).toBeGreaterThan(0)
+    expect(meta[0]?.textContent).toBe('Context window and capabilities: unknown')
+    expect(meta[0]?.getAttribute('title')).toBe('The service has not declared these for this model')
+  })
+
+  it('renders the service-side actions disabled with the reason, never as buttons that pretend', async () => {
+    const port = {
+      list: vi.fn(async () => ({ items: [record()], nextCursor: null })),
+      create: vi.fn(),
+      update: vi.fn(),
+      archive: vi.fn()
+    } as unknown as ProviderModelMaintenancePort
+
+    const { container } = renderPage(port)
+
+    await screen.findByText('Model A (model-a)')
+
+    const capabilities = container.querySelector('[data-model-capabilities]')
+
+    expect(capabilities).toBeTruthy()
+    for (const name of ['Refresh from provider', 'Test connection']) {
+      const button = screen.getByRole('button', { name }) as HTMLButtonElement
+
+      expect(button.disabled).toBe(true)
+      expect(button.getAttribute('title')).toBe('Unavailable: the service declares no method for this yet.')
+    }
+    expect(capabilities?.textContent).toContain('Unavailable: the service declares no method for this yet.')
+  })
+
+  it('never renders credential material: the row carries a reference and its presence only', async () => {
+    const port = {
+      list: vi.fn(async () => ({ items: [record({ credentialId: asWireId('cred-1') })], nextCursor: null })),
+      create: vi.fn(),
+      update: vi.fn(),
+      archive: vi.fn()
+    } as unknown as ProviderModelMaintenancePort
+
+    const { container } = renderPage(port)
+
+    await screen.findByText('Model A (model-a)')
+
+    expect(container.textContent).toContain('Credential')
+    expect(container.textContent).toContain('present')
+    // The record itself never carried material; assert nothing secret-shaped rendered.
+    expect(container.textContent).not.toMatch(/sk-[A-Za-z0-9]{8,}/)
   })
 })

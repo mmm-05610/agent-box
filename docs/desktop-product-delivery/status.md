@@ -1265,3 +1265,18 @@ typecheck 当场暴露；新测试 4 条 ESLint warning 收口为 0。
   因反斜杠路径**空转**（A/B 证明与本单无关）→ 统一 `srcRelative()` 归一，反向对照恢复真实。
 - 下一步按派工表执行 **P11**（provider/model 配置交互改造）。writer_lease 继续 ACTIVE。
 
+## P11 收口（2026-09-17）：供应商/模型配置交互 — `P11_GREEN — PROVIDER_MODEL_CONFIG_CLIENT_READY`
+
+- **门结果**（完整证据 `evidence/P11.md`）：
+  - **G1 无自由文本关键项（按 wire 事实收窄）**：harness/provider 改为**数据驱动选择**（服务自身记录的 harness；
+  预设目录 + 目录在用的 provider）+ 显式覆盖；**端点/认证/协议在锁定 wire 上没有字段**（后端 55）→ 表单不收集、不发明。
+  - **G2 凭据只引用**：只有 `credentialId`；界面只显示 label 与 present/absent；用例断言无密钥形状文本。
+  - **G3 无来源即未知**：模型行 `data-model-meta="unknown"` + 来源缺失说明；不填默认值。
+  - **G4 不做假按钮**：拉取模型/测试连接**禁用 + 原因**，用例逐项断言。
+  - **G5 不退化**：settings+profiles+provider-model+i18n **52 files / 463 tests 全通过，exit 0**；`tsc -p . --noEmit` exit 0；
+    改动文件 ESLint 0/0；`git diff --check` 干净；wire 与既有消费路径未动。
+  - **G6 热切换（客户端半，第一手）**：新用例断言「下一轮发送带新 overrides、整条路径无任何重启/生命周期动词、
+    运行中会话投影逐字节不变、reject 时零发送」；**服务侧物化属后端 55/56，不声称**。
+- 参照决定（LibreChat `modelSpecs` / cc-switch 的学与不学）逐条记入 evidence §2，含「写 live 配置文件=其缺陷，我们按轮物化」。
+- 下一步按派工表执行 **P12**（订阅账号）。writer_lease 继续 ACTIVE。
+

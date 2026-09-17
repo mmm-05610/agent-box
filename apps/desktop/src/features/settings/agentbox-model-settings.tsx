@@ -27,6 +27,8 @@ import {
 } from '@/store/agentbox-service'
 import type { ProviderModelConfigRecord } from '@/types/wire/wire-v1'
 
+import { CUSTOM_HARNESS, CUSTOM_PROVIDER, harnessOptions, knownModelIds, providerOptions } from './provider-presets'
+
 type ModelsCopy = Translations['settings']['product']['models']
 
 export interface DesktopCredentialsPort {
@@ -75,6 +77,29 @@ function CredentialPicker({
         </option>
       ))}
     </select>
+  )
+}
+
+/** The datalist id the model-id field suggests from (the directory's own ids). */
+const MODEL_ID_SUGGESTIONS = 'agentbox-model-id-suggestions'
+
+/**
+ * What the service has NOT declared about a model: context window and
+ * capabilities have no field on the locked wire (backend 53/55 own them), so
+ * the row says unknown and names where the fact would come from — it never
+ * fills in a default that would read as a service declaration. The context
+ * window is also the denominator the composer's usage pill is still waiting
+ * for.
+ */
+function ModelMetaLine({ copy }: { copy: ModelsCopy }) {
+  return (
+    <div
+      className="text-[0.6875rem] leading-4 text-muted-foreground"
+      data-model-meta="unknown"
+      title={copy.modelMetaUnknownTitle}
+    >
+      {copy.modelMetaUnknown}
+    </div>
   )
 }
 
@@ -262,6 +287,19 @@ export function AgentBoxModelSettings({ credentials, maintenance }: AgentBoxMode
         title={copy.title}
       >
         <p className="mb-3 text-sm text-muted-foreground">{copy.description}</p>
+        {/* Two actions the reference flow has and this wire does not: pulling a
+            provider's model list and probing a connection both need a service
+            method (backend 55). They render disabled WITH the reason — never a
+            button that pretends to have run. */}
+        <div className="mb-3 flex flex-wrap items-center gap-2" data-model-capabilities="">
+          <Button disabled size="sm" title={copy.capabilityUnavailable} variant="outline">
+            {copy.refreshModels}
+          </Button>
+          <Button disabled size="sm" title={copy.capabilityUnavailable} variant="outline">
+            {copy.testConnection}
+          </Button>
+          <span className="text-[0.6875rem] leading-4 text-muted-foreground">{copy.capabilityUnavailable}</span>
+        </div>
         {state === 'loading' && (
           <ListRow description={<Loader2 className="size-4 animate-spin" />} title={copy.loading} wide />
         )}
@@ -347,6 +385,7 @@ export function AgentBoxModelSettings({ credentials, maintenance }: AgentBoxMode
         <CreateForm
           copy={copy}
           credentials={credentialRecords}
+          directory={records}
           onCancel={() => setCreating(false)}
           onCreate={async (...args) => {
             try {
@@ -511,9 +550,12 @@ function ModelRow({
                   />
                 </>
               ) : (
-                <span>
-                  {model.displayName} ({model.modelId})
-                </span>
+                <>
+                  <span>
+                    {model.displayName} ({model.modelId})
+                  </span>
+                  <ModelMetaLine copy={copy} />
+                </>
               )}
               {editing && models.length > 1 && (
                 <Button
@@ -578,11 +620,15 @@ function ModelRow({
 function CreateForm({
   copy,
   credentials,
+  directory,
   onCancel,
   onCreate
 }: {
   copy: ModelsCopy
   credentials: DesktopCredentialRecord[]
+  /** The service's own records: their harness/provider values and model ids are
+   *  the only directory this client has, so they feed the choices below. */
+  directory: readonly ProviderModelConfigRecord[]
   onCancel: () => void
   onCreate: (
     displayName: string,
@@ -592,17 +638,25 @@ function CreateForm({
     credentialId: string | null
   ) => Promise<void>
 }) {
-  const [values, setValues] = useState(['', '', '', ''])
+  const [values, setValues] = useState(['', '', ''])
+  const [customHarness, setCustomHarness] = useState(false)
+  const [customProvider, setCustomProvider] = useState(false)
   const [models, setModels] = useState([newModel()])
   const [credentialId, setCredentialId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
   const valid = Boolean(
-    values.slice(0, 3).every(value => value.trim()) &&
+    values.every(value => value.trim()) &&
       models.length > 0 &&
       models.every(model => model.modelId.trim() && model.displayName.trim())
   )
 
+  const harnesses = harnessOptions(
+    directory.map(record => record.harness),
+    values[1]
+  )
+  const providerChoices = providerOptions(directory.map(record => record.provider))
+  const providerSuggestions = knownModelIds(directory, values[2])
   const set = (index: number) => (event: ChangeEvent<HTMLInputElement>) =>
     setValues(current => current.map((value, item) => (item === index ? event.target.value : value)))
 
@@ -610,8 +664,97 @@ function CreateForm({
     <SettingsSection icon={Plus} title={copy.add}>
       <div className="grid gap-2">
         <Input aria-label={copy.displayName} disabled={saving} onChange={set(0)} placeholder={copy.displayName} value={values[0]} />
-        <Input aria-label={copy.harness} disabled={saving} onChange={set(1)} placeholder={copy.harness} value={values[1]} />
-        <Input aria-label={copy.provider} disabled={saving} onChange={set(2)} placeholder={copy.provider} value={values[2]} />
+        {/* Harness families come from the service's own records; provider ids
+            from the preset catalog plus whatever the directory already uses.
+            Neither is a hand-typed string any more, and neither is invented:
+            an empty directory leaves an empty, honest choice. */}
+        <select
+          aria-label={copy.harness}
+          className={controlVariants({ size: 'sm' })}
+          disabled={saving}
+          onChange={event => {
+            const next = event.target.value
+
+            if (next === CUSTOM_HARNESS) {
+              setCustomHarness(true)
+              setValues(current => current.map((value, item) => (item === 1 ? '' : value)))
+
+              return
+            }
+
+            setCustomHarness(false)
+            setValues(current => current.map((value, item) => (item === 1 ? next : value)))
+          }}
+          value={customHarness ? CUSTOM_HARNESS : values[1]}
+        >
+          <option value="">{copy.harness}</option>
+          {harnesses.map(harness => (
+            <option key={harness} value={harness}>
+              {harness}
+            </option>
+          ))}
+          <option value={CUSTOM_HARNESS}>{copy.harnessCustom}</option>
+        </select>
+        {customHarness ? (
+          <Input
+            aria-label={copy.harnessCustomPlaceholder}
+            disabled={saving}
+            onChange={set(1)}
+            placeholder={copy.harnessCustomPlaceholder}
+            value={values[1]}
+          />
+        ) : null}
+        <select
+          aria-label={copy.provider}
+          className={controlVariants({ size: 'sm' })}
+          disabled={saving}
+          onChange={event => {
+            const next = event.target.value
+
+            if (next === CUSTOM_PROVIDER) {
+              setCustomProvider(true)
+              setValues(current => current.map((value, item) => (item === 2 ? '' : value)))
+
+              return
+            }
+
+            setCustomProvider(false)
+            setValues(current => current.map((value, item) => (item === 2 ? next : value)))
+          }}
+          value={customProvider ? CUSTOM_PROVIDER : values[2]}
+        >
+          <option value="">{copy.provider}</option>
+          <optgroup label={copy.providerPresets}>
+            {providerChoices
+              .filter(choice => !choice.inUse)
+              .map(choice => (
+                <option key={choice.id} value={choice.id}>
+                  {choice.label}
+                </option>
+              ))}
+          </optgroup>
+          {providerChoices.some(choice => choice.inUse) ? (
+            <optgroup label={copy.providerInUse}>
+              {providerChoices
+                .filter(choice => choice.inUse)
+                .map(choice => (
+                  <option key={choice.id} value={choice.id}>
+                    {choice.label}
+                  </option>
+                ))}
+            </optgroup>
+          ) : null}
+          <option value={CUSTOM_PROVIDER}>{copy.providerCustom}</option>
+        </select>
+        {customProvider ? (
+          <Input
+            aria-label={copy.providerCustomPlaceholder}
+            disabled={saving}
+            onChange={set(2)}
+            placeholder={copy.providerCustomPlaceholder}
+            value={values[2]}
+          />
+        ) : null}
         <CredentialPicker
           copy={copy}
           disabled={saving}
@@ -624,6 +767,7 @@ function CreateForm({
             <Input
               aria-label={copy.modelId}
               disabled={saving}
+              list={MODEL_ID_SUGGESTIONS}
               onChange={event =>
                 setModels(current =>
                   current.map((item, itemIndex) =>
@@ -660,6 +804,12 @@ function CreateForm({
             )}
           </div>
         ))}
+        <datalist id={MODEL_ID_SUGGESTIONS}>
+          {providerSuggestions.map(modelId => (
+            <option key={modelId} value={modelId} />
+          ))}
+        </datalist>
+        <ModelMetaLine copy={copy} />
         <Button
           aria-label={copy.addModel}
           disabled={saving}

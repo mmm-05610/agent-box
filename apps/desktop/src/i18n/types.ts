@@ -439,6 +439,17 @@ export interface Translations {
         addModel: string
         removeModel: string
         availability: { available: string; unknown: string; unavailable: string }
+        providerPresets: string
+        providerInUse: string
+        providerCustom: string
+        providerCustomPlaceholder: string
+        harnessCustom: string
+        harnessCustomPlaceholder: string
+        modelMetaUnknown: string
+        modelMetaUnknownTitle: string
+        refreshModels: string
+        testConnection: string
+        capabilityUnavailable: string
       }
       resources: { title: string; description: string; boundary: string }
       identities: { title: string; description: string; boundary: string }
