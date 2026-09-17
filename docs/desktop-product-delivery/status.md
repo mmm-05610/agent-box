@@ -1388,9 +1388,12 @@ typecheck 当场暴露；新测试 4 条 ESLint warning 收口为 0。
   - **G1** 映射与保留清单齐全（`NAMING.md` + 报告 §1）；
   - **G2** 新名可见：构建日志头 `ordessa@0.17.2`、窗口标题、README 锁版、验收截图（`evidence/P18-ordessa/` 7 张）；
   - **G3** 身份与旧数据处理按 §3-D 执行（不改迁移、保留旧数据、不占用用户原生配置）；
-  - **G4 启动冒烟部分达成**：P06 验收驱动以新身份跑通 **28/28 PASS、allOk=true**（隔离沙箱、无服务、
-    无 legacy REST、退出无孤儿、日志无令牌；证据 `evidence/P18-ordessa/`）；**「连上 Pacthold + 一轮 no-model」
-    未执行**（需要运行中的服务），如实留待联调Owner，命令已给出；
+  - **G4 启动冒烟达成**：(a) P06 驱动以新身份 28/28 PASS；(b) **连上运行中的 Pacthold 并完成一轮完整
+    no-model 冒烟**：`p42-fullstack-integration-driver` **executed 22 → allOk=true**（server.hello wire/1、
+    workspace、profile/model、config.resolve、完整 turn 持久化、幂等重放、队列撤回、stop、历史分页、
+    维护、改名/置顶/切换确认、send outcome、附件投递、审批往返、resync、archive、干净关停）。
+    证据 `evidence/P18-ordessa/p42/`；驱动维护说明（服务端 CLI 现要求 `--plugin-root` 且文档不得携带
+    host path → 驱动已同步）见该目录 G4-NOTE.md；
   - **G5** 家族名/原生协议/第三方署名未误改（README Licence 段改写保留署名并注明派生）；
   - **G6** **UI 805/806 通过**（唯一失败 `plugins/hermes-bots/cron-prompt.test.ts`：`spawnSync('sh')` 在 Windows
     无 POSIX shell → 环境基线，文件无改动）；tests-js **8 files passed**；electron 项目在 Windows 上有**既有**

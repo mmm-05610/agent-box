@@ -243,9 +243,12 @@ async function main() {
     `workspace=${workspaceLinux}; fixture=${projected}`
   )
 
+  // The document names NO host path: `pluginRoot` is supplied on the Server's
+  // command line below (a document that carries it is refused —
+  // SIDECAR_DEPLOYMENT_HOST_PATH — which is what keeps the file runnable on
+  // any machine).
   const deployment = {
     schemaVersion: 1,
-    pluginRoot: path.join(BACKEND_WINDOWS_ROOT, 'plugins/agent-box-harnesses'),
     harnesses: [
       {
         // A third Harness whose fixture asks for permission when the prompt
@@ -320,7 +323,11 @@ async function main() {
       '--port',
       String(SERVER_PORT),
       '--sidecar-deployment',
-      deploymentPath
+      deploymentPath,
+      // The Server's current CLI requires the plugin root alongside a sidecar
+      // deployment; it is the same directory the deployment already names.
+      '--plugin-root',
+      path.join(BACKEND_WINDOWS_ROOT, 'plugins/agent-box-harnesses')
     ],
     { env: serverEnv, stdio: ['ignore', serverLogFd, serverLogFd] }
   )
