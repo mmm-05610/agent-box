@@ -1453,3 +1453,11 @@ Appearance（8 套主题 + 语言 + UI Scale + 终端字体）与 Keyboard Short
 
 **未覆盖**：命令面板/快捷键（走查只支持按标签点击，不能按键）、悬停与过渡态、`03-open-remote-folder`
 那一步因浮层遮挡被跳过（脚本按设计跳过并仍截图）。租约用后即释。
+
+## P19 执行快照（2026-09-17）：密度收紧 + 输入条对齐 — `P19_PARTIAL`
+
+- **已实施**：`row-geometry.ts` 密度收紧（min-h/label/card 各降一档）；`controls.tsx` 用量 pill 移至模型 chip 前；
+  `chat-bar.tsx` DISABLED 占位文案自含化；access chip 尝试后因组件缺失移除断引用（等后端声明权限控制项）。
+- **门**：UI 805/806 通过（唯一失败 POSIX sh 环境基线）；TSC 0；改动文件同步。
+- **未做**：种子截图对照（G2）、差距表截图（需运行中的服务与种子数据）。
+- **下一步**：P20。
