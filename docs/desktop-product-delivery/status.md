@@ -1474,9 +1474,10 @@ Appearance（8 套主题 + 语言 + UI Scale + 终端字体）与 Keyboard Short
 - **未做**：种子截图对照（G2 需运行中服务）；access chip 等后端声明
 - **证据**：`evidence/P19-density-and-role-nav.md`
 
-## P20 状态 — `P20_NOT_STARTED`
+## P20 状态 — `P20_PARTIAL`
 
-- G1 四栏表已写为诚实占位（`evidence/P20-work-status-panel.md`）；面板组件**未开始**（需要新组件开发）。
+- WorkStatusLine + ComposerAccessChip 组件已实施并提交；WorkStatusPanel 组件（收起态单行 + 展开态详情区）已实施（`a991860d`）。
+- G1 四栏表见 `evidence/P20-work-status-panel.md`；后端 59/52 落地后接入 Git/目标/子代理/后台卡。
 
 ## P19-B 追加（2026-09-18）：access chip 挂载 — `d2090a86`
 
