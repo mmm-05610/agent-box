@@ -742,6 +742,82 @@
     "/home/maoqh/projects/agent-box-harness-expansion"
    ],
    "note": "The process facts a ZCode/Codex-style transcript needs already exist upstream and are being dropped: the ACP schema's sessionUpdate vocabulary is agent_message_chunk, agent_thought_chunk, tool_call, tool_call_update, plan_update, plan_removed and current_mode_update, while the bridge and the Server's _forward() know only agent_message_chunk. This order maps thoughts, the tool lifecycle, plans and mode changes into neutral events, derives durations from the existing event timestamps instead of adding estimated fields, and shares ONE wire relock with order 51 (usage) to avoid two contract churns. Tool arguments and outputs are trimmed and scanned before they enter the ledger. No fake progress: a family that emits nothing shows nothing."
+  },
+  {
+   "id": "53",
+   "document": "work-orders/53-usage-aggregation.md",
+   "baseline": "51 checkpoint",
+   "worktree": "/home/maoqh/projects/agent-box-env-provider",
+   "branch": "feature/env-provider-v1",
+   "depends_on": [
+    "51"
+   ],
+   "dependency_condition": "Needs order 51's usage facts in the ledger; the query surface may ride the same wire relock as 51 and 52 if the timing allows.",
+   "exclusive_group": "backend-driver-resources",
+   "stages": [
+    "A-query-and-aggregate",
+    "B-cost-source-decision",
+    "C-export",
+    "D-contract-if-needed",
+    "E-regression"
+   ],
+   "write_paths": [
+    "src/agent_box/**",
+    "plugins/**",
+    "workers/**",
+    "protocols/**",
+    "tests/**",
+    "scripts/server-round1/**",
+    "docs/server-round1/**",
+    "docs/implementation/status.md"
+   ],
+   "forbidden_write_roots": [
+    "/home/maoqh/projects/agent-box",
+    "/home/maoqh/projects/agent-box-studio",
+    "/home/maoqh/projects/agent-box-desktop-next",
+    "/home/maoqh/projects/agent-box-desktop-next-wsl-round1",
+    "/home/maoqh/projects/agent-box-server-round1",
+    "/home/maoqh/projects/agent-box-harness-expansion"
+   ],
+   "note": "Generic statistics over the ledger: token usage aggregated by model, session and time range, with export. Cost is optional and only appears when a real, auditable unit-price source exists - no built-in price tables, no estimation, unknown stays unknown, and an export that never contains credential content. Depends only on the usage facts plus control-plane records, so it involves neither profile nor multi-harness concepts."
+  },
+  {
+   "id": "54",
+   "document": "work-orders/54-turn-file-change-set.md",
+   "baseline": "50 checkpoint",
+   "worktree": "/home/maoqh/projects/agent-box-env-provider",
+   "branch": "feature/env-provider-v1",
+   "depends_on": [
+    "50"
+   ],
+   "dependency_condition": "Stages B-D touch the same channel files as 47 and 48, so the executor serializes them.",
+   "exclusive_group": "backend-driver-resources",
+   "stages": [
+    "A-snapshot",
+    "B-diff",
+    "C-record",
+    "D-contract-if-needed",
+    "E-regression"
+   ],
+   "write_paths": [
+    "src/agent_box/**",
+    "plugins/**",
+    "workers/**",
+    "protocols/**",
+    "tests/**",
+    "scripts/server-round1/**",
+    "docs/server-round1/**",
+    "docs/implementation/status.md"
+   ],
+   "forbidden_write_roots": [
+    "/home/maoqh/projects/agent-box",
+    "/home/maoqh/projects/agent-box-studio",
+    "/home/maoqh/projects/agent-box-desktop-next",
+    "/home/maoqh/projects/agent-box-desktop-next-wsl-round1",
+    "/home/maoqh/projects/agent-box-server-round1",
+    "/home/maoqh/projects/agent-box-harness-expansion"
+   ],
+   "note": "The per-turn file change set (which files changed, with +N/-M) - the data behind the diff card on the desktop. Deliberately harness-independent: it is computed from a bounded before/after manifest of the declared workspace on the execution side rather than by parsing any harness's tool payloads, which is exactly what makes it uniform across families and auditable. Bounded with honest truncation facts, no symlink following, no special files, no credentials in the change set or the evidence, and a per-turn binding that still explains failed and cancelled turns."
   }
  ],
  "authority": "docs/implementation",
