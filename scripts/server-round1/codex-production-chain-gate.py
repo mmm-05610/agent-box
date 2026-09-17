@@ -1456,9 +1456,13 @@ def run_chain(temporary, workspace, worker, artifact, digest, endpoint, producti
                 "nativeSessionId": checkpoint.get("nativeSessionId"),
                 "files": state_files[:64], "fileCount": len(state_files),
             }
-            if not any(path.startswith("sessions/") and path.endswith(".jsonl") for path in state_files):
+            # s14: the audited tree is the per-harness session library, whose
+            # root IS the sessions directory, so a rollout is any jsonl under
+            # the store (the old "sessions/" prefix belonged to the in-home
+            # window this family no longer uses).
+            if not any(path.endswith(".jsonl") for path in state_files):
                 fail("CODEX_GATE_NATIVE_ROLLOUT_NOT_CAPTURED",
-                     "no Codex rollout was captured from the isolated CODEX_HOME")
+                     "no Codex rollout was captured from the session library")
 
             second = wire_post(client, runtime.token, "sessions.send", {
                 "requestId": "codex-gate-round-2", "sessionId": session_id,
@@ -2191,6 +2195,10 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production, t
                 protected_state_paths=protected_state_paths(production),
                 timeout_ms=120_000,
                 sandbox_port=_gate_sandbox_port(),
+        # §14: the gate's own reopen phase must drive the same
+        # session-library shape the product path uses.
+        session_store_harness="codex",
+        session_store_target=production.STATE_TARGET,
             )
             return SidecarHarnessPort(
                 launcher, environment={"AGENTBOX_SIDECAR_ISOLATED": "1"}, profile="codex",

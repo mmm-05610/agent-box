@@ -685,6 +685,10 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production,
             audit_window=".pi/agent/sessions",
             timeout_ms=120_000,
             sandbox_port=_gate_sandbox_port(),
+        # §14: the gate's own reopen phase must drive the same
+        # session-library shape the product path uses.
+        session_store_harness="pi",
+        session_store_target=production.STATE_TARGET,
         )
         return SidecarHarnessPort(
             launcher, resume_native_id=resume_native_id,
