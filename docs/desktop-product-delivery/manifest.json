@@ -227,6 +227,25 @@
       "note": "Density and control-placement alignment to the user's reference shots, not a rewrite. The transcript keeps the plain Hermes style per the user's ruling - the AI Elements re-skin is demoted to optional per-component adoption. The composer keeps its single-container anatomy (text above, one control row below) with the access chip on the left next to +, the context ring, model chip and send on the right, and the disabled state must show its reason visibly instead of pointing at a note that does not render. The sidebar tightens to the reference density - action row, group switch, dense two-level project-to-session list with relative time and status dots - while P10's existing behaviours and tests stay. Stage A seeds a session over the wire and measures the populated state against the reference before any styling changes."
     },
     {
+      "id": "P20",
+      "file": "work-orders/P20-work-status-panel.md",
+      "depends_on": [
+        "P19"
+      ],
+      "exclusive_group": "desktop-product",
+      "scope": [
+        "docs/desktop-product-delivery/**",
+        "apps/desktop/src/app/**",
+        "apps/desktop/src/components/**",
+        "apps/desktop/src/features/chat/**",
+        "apps/desktop/src/i18n/**",
+        "apps/desktop/e2e/**",
+        "tests-js/**"
+      ],
+      "requires_approved_contract": false,
+      "note": "A new floating work-status panel: collapsed to one line by default, expanding into stacked cards for Git, goals, processes, subagents and background programs. Two rules bound it. Visually it must belong - the user's requirement is consistency with the rest of the app, not a specific style, so it reuses the existing primitives and tokens with no new dependency and no new visual language, and a side-by-side screenshot is the gate. Interaction-wise only the logic is borrowed, with the sources recorded: Goose's GitBranchIndicator for the branch chip that refreshes on window focus with a searchable dropdown and a check on the current branch plus an uncommitted-changes warning; OpenHands' budget progress bar for a thin clamped bar that turns red past eighty percent and only renders numbers it is given; and claudecodeui's SubagentPanel for the shape of grouping subagent activity out of the main transcript - that repository is AGPL, so form only, never code. No reference project's code appears in ours. Cards without facts do not render rather than showing empty shells, and the Git card's field set is declared here for a future backend surface."
+    },
+    {
       "id": "P08",
       "file": "work-orders/P08-composer-input-bar.md",
       "depends_on": [
