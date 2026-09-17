@@ -315,7 +315,7 @@ $deployment = [ordered]@{
         # It exists to prove that an attempt quiet for longer than the Worker's
         # five second lease still finishes, with no override of the lease.
         [ordered]@{
-            id = "omp"
+            id = "kilo"
             capabilityClaims = [ordered]@{ stream = $true }
             modelControlId = "model"
             controlOptions = [ordered]@{ model = @("fixture-model") }
@@ -336,7 +336,7 @@ if ($null -eq $statefulHarness -or $statefulHarness.Contains("credentialKind") -
     $statefulHarness.stateProjection.target -ne "/runtime/home/sessions") {
     throw "The native-state fixture Harness must declare no credential, no model control and a bounded state projection"
 }
-$leaseSilenceHarness = $deployment.harnesses | Where-Object { $_.id -eq "omp" }
+$leaseSilenceHarness = $deployment.harnesses | Where-Object { $_.id -eq "kilo" }
 if ($null -eq $leaseSilenceHarness -or
     $leaseSilenceHarness.Contains("credentialKind") -or
     $leaseSilenceHarness.Contains("credentialEnvironment") -or
@@ -391,7 +391,7 @@ function Invoke-Wire {
         params = $Params
     }
     $answer = Invoke-RestMethod -Method Post -Uri "$baseUrl/wire/v1/$Method" `
-        -Headers $Headers -ContentType "application/json" `
+        -Headers $Headers -ContentType "application/json; charset=utf-8" `
         -Body ($body | ConvertTo-Json -Depth 14 -Compress)
     if ($null -ne $answer.error) {
         throw "wire method $Method failed: $($answer.error.code)"
@@ -470,16 +470,23 @@ function Assert-R4Checkpoint {
     # Windows DataRoot actually holds. The checkpoint is only read here; nothing
     # in this script rewrites it, so a passing gate is evidence about the value
     # the Server produced.
-    param([string]$Digest, [string]$NativeId, [string]$HarnessType, [string]$Label)
+    param([string]$Digest, [string]$NativeId, [string]$HarnessType, [string]$Label,
+        [Parameter(Mandatory = $true)][string]$WindowSegment)
     $bytes = Read-DataRootObject -Digest $Digest
     $manifest = [Text.Encoding]::UTF8.GetString($bytes) | ConvertFrom-Json
-    if ($manifest.schema_version -ne 2) { throw "$Label checkpoint schema_version is not 2" }
+    # Order 45 stage C moved the audit manifest to schema_version 3, which adds
+    # the native home reference (nativePlatform/homeLocator) to the identity
+    # fields this gate already checked under schema 2.
+    if ($manifest.schema_version -ne 3) { throw "$Label checkpoint schema_version is not 3" }
     if ($manifest.resumable -ne $true) { throw "$Label checkpoint is not resumable" }
     if ($manifest.harnessType -ne $HarnessType) {
         throw "$Label checkpoint harnessType $($manifest.harnessType) crossed Profile scope"
     }
     if ($manifest.nativeSessionId -ne $NativeId) {
         throw "$Label checkpoint does not bind the reported native session id"
+    }
+    if (-not $manifest.homeLocator -or -not $manifest.nativePlatform) {
+        throw "$Label checkpoint is missing the 45 native home reference"
     }
     $files = @($manifest.files)
     if ($files.Count -eq 0) { throw "$Label checkpoint carries no native state files" }
@@ -498,19 +505,36 @@ function Assert-R4Checkpoint {
         if ($file.size -le 0 -or $file.size -gt 8388608) {
             throw "$Label checkpoint carries an out-of-bounds state size: $($file.size)"
         }
-        $content = Read-DataRootObject -Digest $file.digest
-        if ($content.Length -ne $file.size) {
-            throw "$Label checkpoint size does not match the stored object: $($file.path)"
+        # Order 45 made the audit a record, not a copy: per-file digests are
+        # facts about the durable home, and the bytes stay in the home. The
+        # recorded paths are audit-window-relative, so the durable file is
+        # <role>/<audit window>/<path>; homeLocator names the registry native
+        # home, which is not necessarily the window the projection binds.
+        $roleDir = $manifest.homeLocator.Split("/")[0]
+        $homeFile = "/home/maoqh/.agent-box/profiles/" + $roleDir + "/" + $WindowSegment + "/" + $file.path
+        & wsl.exe --distribution Ubuntu --exec /usr/bin/sha256sum -- $homeFile > $null
+        if ($LASTEXITCODE -ne 0) {
+            throw "$Label checkpoint file is missing from the durable home: $($file.path)"
+        }
+        $summed = (& wsl.exe --distribution Ubuntu --exec /usr/bin/sha256sum -- $homeFile)
+        $homeDigest = "sha256:" + $summed.Split(" ")[0].Trim()
+        if ($homeDigest -ne $file.digest) {
+            throw "$Label checkpoint digest does not match the durable home: $($file.path)"
         }
     }
     return $manifest
 }
 
 function Get-R4StateFile {
+    # Order 45 made the audit a record, not a copy: read the journaled file
+    # from the durable home (window-relative under the profile's role directory).
     param([object]$Manifest, [string]$Path)
     $entry = @($Manifest.files | Where-Object { $_.path -eq $Path })
     if ($entry.Count -ne 1) { throw "Native state file $Path is missing from the checkpoint" }
-    return [Text.Encoding]::UTF8.GetString((Read-DataRootObject -Digest $entry[0].digest))
+    $roleDir = $Manifest.homeLocator.Split("/")[0]
+    $homeFile = "/home/maoqh/.agent-box/profiles/" + $roleDir + "/sessions/" + $Path
+    $content = & wsl.exe --distribution Ubuntu --exec /usr/bin/cat -- $homeFile
+    return ($content -join "`n")
 }
 
 function Get-R4ReopenMethods {
@@ -801,7 +825,7 @@ try {
     $silenceProvider = Invoke-Wire -Method "providerModels.create" -Headers $auth -Params @{
         requestId = "accept-e-silence-provider"
         displayName = "Silent fixture provider"
-        harness = "omp"
+        harness = "kilo"
         provider = "fixture"
         credentialId = $null
         configuration = @()
@@ -813,7 +837,7 @@ try {
     $silenceProfile = Invoke-Wire -Method "profiles.create" -Headers $auth -Params @{
         requestId = "accept-e-silence-profile"
         displayName = "Windows lease silence fixture"
-        harness = "omp"
+        harness = "kilo"
     }
     $null = Invoke-Wire -Method "profiles.updateConfig" -Headers $auth -Params @{
         requestId = "accept-e-silence-config"
@@ -886,7 +910,8 @@ try {
         throw "Server did not return a native-state checkpoint after the first round"
     }
     $roundOneManifest = Assert-R4Checkpoint -Digest $r4Before.checkpoint.object_digest `
-        -NativeId $r4Before.checkpoint.native_id -HarnessType "hermes" -Label "first-round"
+        -NativeId $r4Before.checkpoint.native_id -HarnessType "hermes" -Label "first-round" `
+        -WindowSegment "sessions"
     # sourceExecutionId binds the checkpoint to the Core execution, which is the
     # identity the Session turn row records for it.
     if ($roundOneManifest.sourceExecutionId -ne $r4Before.turns[0].execution_id) {
@@ -936,7 +961,8 @@ try {
         throw "Second round did not keep the first-round native session identity"
     }
     $roundTwoManifest = Assert-R4Checkpoint -Digest $r4After.checkpoint.object_digest `
-        -NativeId $nativeSessionId -HarnessType "hermes" -Label "second-round"
+        -NativeId $nativeSessionId -HarnessType "hermes" -Label "second-round" `
+        -WindowSegment "sessions"
     if ($roundTwoManifest.nativeSessionId -ne $nativeSessionId) {
         throw "Second-round checkpoint created a different native session"
     }
@@ -981,7 +1007,7 @@ try {
         fixture = "explicit no-model ACP peer"
         lease_silence = [ordered]@{
             fixture = "plugins/agent-box-harnesses/tests/harness_remote/fake_acp_peer.mjs"
-            harness = "omp"
+            harness = "kilo"
             declared_silence_ms = 8000
             lease_ms = 5000
             lease_override = $false

@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import base64
 import json
+import logging
 import re
 import threading
 import time
@@ -409,6 +410,8 @@ class SidecarExecutionBackend:
             self.work_service.complete_work(run.work_id, "Turn completed through Harness sidecar")
         except BaseException as exc:
             code = _safe_code(exc)
+            if code != "TURN_CANCELLED":
+                logging.getLogger(__name__).exception("turn %s failed as %s", run.turn_id, code)
             if code == "TURN_CANCELLED":
                 self.records.finish_cancelled(run.turn_id, queue_records=self.queue)
             else:
@@ -559,4 +562,10 @@ def _audited_home(run: "_Run") -> tuple[dict[str, Any], bool]:
 def _safe_code(exc: BaseException) -> str:
     explicit = getattr(exc, "code", None)
     value = str(explicit or exc).strip().upper()
-    return value if re.fullmatch(r"[A-Z][A-Z0-9_]{2,127}", value) else "EXECUTION_FAILED"
+    if re.fullmatch(r"[A-Z][A-Z0-9_]{2,127}", value):
+        return value
+    # The typed event can only carry a code; keep the underlying cause visible
+    # on the server log or a generic EXECUTION_FAILED hides it entirely.
+    logging.getLogger(__name__).error(
+        "execution failed without a typed code", exc_info=exc)
+    return "EXECUTION_FAILED"

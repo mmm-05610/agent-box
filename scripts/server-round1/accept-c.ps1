@@ -19,6 +19,8 @@ if ($ServerPid -le 0 -or $null -eq (Get-Process -Id $ServerPid -ErrorAction Sile
 
 function Invoke-JsonPost {
     param([string]$Path, [string]$Key, [hashtable]$Body)
+    # charset=utf-8 matters: without it PowerShell 5.1 encodes the body with
+    # the ANSI codepage and mangles non-ASCII values before they reach the API.
     return Invoke-RestMethod -Method Post -Uri ($BaseUrl + $Path) `
         -Headers @{ Authorization = "Bearer $token"; "Idempotency-Key" = $Key } `
         -ContentType "application/json; charset=utf-8" `
@@ -75,15 +77,43 @@ function Wait-TurnEvents {
 }
 
 $ready = Invoke-RestMethod -Uri "$BaseUrl/api/v1/readiness" -Headers $headers
-if (-not $ready.capabilities.codex) { throw "Codex execution capability is unavailable" }
+# The readiness surface reports per-Harness entries since the
+# deployment-composed registry; "available" already folds in execution.
+if (-not $ready.capabilities.harnesses.codex.available) { throw "Codex execution capability is unavailable" }
 $probe = Invoke-JsonPost -Path "/api/v1/connections/probe" -Key ("accept-c-" + $runKey + "-probe") `
     -Body @{ kind = "wsl"; distribution = $Distribution }
 $workspace = Invoke-JsonPost -Path "/api/v1/workspaces" -Key ("accept-c-" + $runKey + "-workspace") `
     -Body @{ probe_id = $probe.probe_id; path = $WorkspaceLinuxPath }
+# Since the Provider/Model contract tightened, the role's model control must
+# select a Provider/Model configuration: create that record over the locked
+# wire surface first, then reference it from the REST profile body.
+$providerRequestId = "accept-c-" + $runKey + "-provider"
+$providerBody = @{
+    jsonrpc = "2.0"; id = $providerRequestId; method = "providerModels.create"
+    params = @{
+        requestId = $providerRequestId
+        harness = "codex"
+        provider = "deepseek"
+        displayName = "deepseek official"
+        configuration = @()
+        models = @(@{
+            modelId = $Model; displayName = $Model
+            availability = "available"; unavailableReason = $null
+        })
+        credentialId = $CredentialId
+    }
+} | ConvertTo-Json -Depth 8 -Compress
+$providerAnswer = Invoke-RestMethod -Method Post -Uri "$baseUrl/wire/v1/providerModels.create" `
+    -Headers @{ Authorization = "Bearer $token" } `
+    -ContentType "application/json; charset=utf-8" -Body $providerBody
+if ($providerAnswer.error) { throw "providerModels.create failed: $($providerAnswer.error.code)" }
+$providerModelId = [string]$providerAnswer.result.providerModel.id
+if (-not $providerModelId) { throw "providerModels.create returned no provider model id" }
+
 $profile = Invoke-JsonPost -Path "/api/v1/profiles" -Key ("accept-c-" + $runKey + "-profile") -Body @{
     name = "Codex C acceptance"
     harness_type = "codex"
-    configuration = @{ model = $Model; provider = "deepseek"; reasoning_effort = "high" }
+    configuration = @{ model = @{ modelId = $Model; providerId = $providerModelId } }
     credential_id = $CredentialId
 }
 $session = Invoke-JsonPost -Path "/api/v1/sessions" -Key ("accept-c-" + $runKey + "-session") -Body @{
@@ -111,8 +141,9 @@ $turnTwo = Invoke-JsonPost -Path "/api/v1/sessions/$($session.session_id)/turns"
 $secondEvents = Wait-TurnEvents -SessionId $session.session_id -TurnId $turnTwo.turn_id `
     -After $firstEvents.cursor
 if ($secondEvents.state -ne "completed") { throw "Second Codex Turn ended as $($secondEvents.state)" }
-if (([string]::Join("`n", $secondEvents.messages)) -notmatch [regex]::Escape($nonce)) {
-    throw "Second Turn did not recall the nonce"
+if (([string]::Join("", $secondEvents.messages)) -notmatch [regex]::Escape($nonce)) {
+    $secondText = [string]::Join("", $secondEvents.messages)
+    throw ("Second Turn did not recall the nonce; expected {0}; got {1}" -f $nonce, $secondText.Substring(0, [Math]::Min(200, $secondText.Length)))
 }
 $afterSecond = Invoke-RestMethod -Uri "$BaseUrl/api/v1/sessions/$($session.session_id)" -Headers $headers
 if ($afterSecond.checkpoint.native_id -ne $firstNativeId) {

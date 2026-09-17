@@ -4,6 +4,12 @@ param(
     [int]$Port = 18732,
     [string]$PythonExe = "py.exe",
     [string]$PythonPrefix = "-3.12",
+    # Since the deployment-composed registry (orders 44-46) the plain runtime
+    # registers no Harness at all, so stage A needs the same document the
+    # product runs: a non-secret deployment plus its machine-local bindings.
+    [Parameter(Mandatory = $true)][string]$DeploymentPath,
+    [Parameter(Mandatory = $true)][string]$PluginRoot,
+    [string[]]$Mount = @(),
     [switch]$Cleanup
 )
 
@@ -13,7 +19,9 @@ if (Test-Path -LiteralPath $DataRoot) {
 }
 
 $env:PYTHONPATH = (Join-Path $SourceRoot "src") + ";" + `
-    (Join-Path $SourceRoot "plugins/agent-box-harnesses/src")
+    (Join-Path $SourceRoot "plugins/agent-box-harnesses/src") + ";" + `
+    (Join-Path $SourceRoot "plugins/agent-box-runtime-wsl/src") + ";" + `
+    (Join-Path $SourceRoot "plugins/agent-box-sandbox-bwrap/src")
 $baseUrl = "http://127.0.0.1:$Port"
 $logStem = Join-Path ([IO.Path]::GetTempPath()) ("agentbox-server-a-" + [guid]::NewGuid().ToString("N"))
 $stdoutPath = $logStem + ".stdout.log"
@@ -22,7 +30,14 @@ $process = $null
 
 function Start-AgentBoxServer {
     $quotedRoot = '"' + $DataRoot + '"'
-    $arguments = (($PythonPrefix + " -m agent_box.server --data-root $quotedRoot --port $Port").Trim())
+    $quotedDeployment = '"' + $DeploymentPath + '"'
+    $quotedPluginRoot = '"' + $PluginRoot + '"'
+    $mountArguments = ""
+    foreach ($binding in $Mount) {
+        $mountArguments = ($mountArguments + " --mount `"" + $binding + "`"").Trim()
+    }
+    $arguments = (($PythonPrefix + " -m agent_box.server --data-root $quotedRoot --port $Port " + `
+        "--sidecar-deployment $quotedDeployment --plugin-root $quotedPluginRoot $mountArguments").Trim())
     return Start-Process -FilePath $PythonExe -ArgumentList $arguments -PassThru `
         -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
 }

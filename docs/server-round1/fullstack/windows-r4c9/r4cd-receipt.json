@@ -1,0 +1,13 @@
+﻿{
+    "schema_version":  1,
+    "result":  "SERVER_CODEX_R1_C_WINDOWS_OK",
+    "session_id":  "session_a7af35e669094083a75e00ec8919b847",
+    "profile_id":  "profile_2fcc7432eee04cd79a976cad105c69e1",
+    "workspace_id":  "ws_13c40eb2e5e34b9594f8ef16b047fd08",
+    "event_cursor":  68,
+    "native_id":  "01a0ad49-d630-79d1-98e9-69c9607fc8f3",
+    "nonce":  "ABR1-e2d463dedd8c4bc5b842c369f21dd934",
+    "model":  "deepseek-flash",
+    "real_model_requests":  2,
+    "server_pid":  7928
+}

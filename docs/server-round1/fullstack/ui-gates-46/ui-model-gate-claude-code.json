@@ -1,0 +1,66 @@
+{
+  "allOk": true,
+  "counts": {
+    "PASS": 8,
+    "FAIL": 0,
+    "SKIP": 0,
+    "PENDING": 0
+  },
+  "executed": 8,
+  "unknownStatuses": [],
+  "detail": [
+    {
+      "detail": "family=claude-code; sandbox=C:\\Users\\maoqh\\agentbox-uigate46-claude-code; model=deepseek-flash",
+      "id": "driver-target",
+      "status": "PASS",
+      "step": "driver target"
+    },
+    {
+      "detail": "harnesses=[\"codex\",\"claude-code\",\"opencode\",\"hermes\",\"dsh\",\"qwen\",\"kilo\",\"pi\"]",
+      "id": "server-started-with-real-harness",
+      "status": "PASS",
+      "step": "the Server is live with the family-s production deployment"
+    },
+    {
+      "detail": "serverId=server_5e9f1d2d0a214af1861304f654d57181",
+      "id": "lifecycle-connection-installed",
+      "status": "PASS",
+      "step": "the product reached the Server through its own lifecycle connection"
+    },
+    {
+      "detail": "credentialId=credential_58198ef4adee4ee2a48aa960ad165754",
+      "id": "credential-added-through-the-app",
+      "status": "PASS",
+      "step": "the interface-s own entry path imported the credential and recorded its id"
+    },
+    {
+      "detail": "providerModel=provider_d2e4a437bb2d46f4ac3083573d743492 credentialAttached=true",
+      "id": "provider-model-and-role-created",
+      "status": "PASS",
+      "step": "the model configuration carries the credential and the role selects it"
+    },
+    {
+      "detail": "answerChars=10 nonceRecalled=true terminal=true deltas=\"P42-1F4A9C\" final=\"P42-1F4A9C\"",
+      "id": "first-turn-answered-by-the-real-model",
+      "status": "PASS",
+      "step": "the first turn was answered by the real model and streamed before it finished"
+    },
+    {
+      "detail": "answerChars=685 nonceOccurrences=3 answer=\"P42-1F4A9CThe directory is empty — I owe you a correction.\\n\\n**You asked me to remember: `P42-1F4A9C`**\\n\\nBut I only echoed it back last turn; I didn't actually p\"",
+      "id": "second-turn-carries-the-first",
+      "status": "PASS",
+      "step": "the second turn-s answer recalls the first turn-s content"
+    },
+    {
+      "detail": "portFree=true recordsFile=present (records only)",
+      "id": "clean-shutdown",
+      "status": "PASS",
+      "step": "the app and the Server stop, and no credential material was written to the evidence"
+    }
+  ],
+  "family": "claude-code",
+  "model": "deepseek-flash",
+  "notes": [],
+  "sandbox": "C:\\Users\\maoqh\\agentbox-uigate46-claude-code",
+  "serverPort": 18761
+}

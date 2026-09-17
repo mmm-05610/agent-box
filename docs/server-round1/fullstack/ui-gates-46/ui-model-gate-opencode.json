@@ -1,0 +1,66 @@
+{
+  "allOk": true,
+  "counts": {
+    "PASS": 8,
+    "FAIL": 0,
+    "SKIP": 0,
+    "PENDING": 0
+  },
+  "executed": 8,
+  "unknownStatuses": [],
+  "detail": [
+    {
+      "detail": "family=opencode; sandbox=C:\\Users\\maoqh\\agentbox-uigate46-opencode; model=deepseek-flash",
+      "id": "driver-target",
+      "status": "PASS",
+      "step": "driver target"
+    },
+    {
+      "detail": "harnesses=[\"codex\",\"claude-code\",\"opencode\",\"hermes\",\"dsh\",\"qwen\",\"kilo\",\"pi\"]",
+      "id": "server-started-with-real-harness",
+      "status": "PASS",
+      "step": "the Server is live with the family-s production deployment"
+    },
+    {
+      "detail": "serverId=server_727fbccfc07d4a07902156358a33d090",
+      "id": "lifecycle-connection-installed",
+      "status": "PASS",
+      "step": "the product reached the Server through its own lifecycle connection"
+    },
+    {
+      "detail": "credentialId=credential_811fbf2bbe544df494a5a5ad996d5826",
+      "id": "credential-added-through-the-app",
+      "status": "PASS",
+      "step": "the interface-s own entry path imported the credential and recorded its id"
+    },
+    {
+      "detail": "providerModel=provider_41fd5d7d592f47cd94818f08485c3381 credentialAttached=true",
+      "id": "provider-model-and-role-created",
+      "status": "PASS",
+      "step": "the model configuration carries the credential and the role selects it"
+    },
+    {
+      "detail": "answerChars=10 nonceRecalled=true terminal=true deltas=\"P42-1F4A9C\" final=\"P42-1F4A9C\"",
+      "id": "first-turn-answered-by-the-real-model",
+      "status": "PASS",
+      "step": "the first turn was answered by the real model and streamed before it finished"
+    },
+    {
+      "detail": "answerChars=20 nonceOccurrences=2 answer=\"P42-1F4A9CP42-1F4A9C\"",
+      "id": "second-turn-carries-the-first",
+      "status": "PASS",
+      "step": "the second turn-s answer recalls the first turn-s content"
+    },
+    {
+      "detail": "portFree=true recordsFile=present (records only)",
+      "id": "clean-shutdown",
+      "status": "PASS",
+      "step": "the app and the Server stop, and no credential material was written to the evidence"
+    }
+  ],
+  "family": "opencode",
+  "model": "deepseek-flash",
+  "notes": [],
+  "sandbox": "C:\\Users\\maoqh\\agentbox-uigate46-opencode",
+  "serverPort": 18761
+}

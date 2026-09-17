@@ -160,3 +160,46 @@ port 层第一手异常为 SidecarError: SIDECAR_OP_FAILED: Harness session not 
    （native-home-gate.py），被 G2 的续接语义问题阻塞在同一脚本内；
    定向层（audit_snapshot 反例、LocalHome 审计）已有单元级覆盖。
 5. **资产层抽离、Windows 原生放置、配额策略**——设计文档明示不在本单。
+
+## 8. 追记（2026-09-17）：Windows 腿补跑完成——G5 的 r4(c9) 项闭合
+
+判断修正：本单此前把"无 Windows 实机"记为外部资源缺席。实为 WSL2 互操作
+（`powershell.exe`/`py.exe`/`wsl.exe` 均可从本会话直接驱动）——46 单 G3 的真实 UI 门
+正是用这条路径跑通的，r4 复跑同路径补齐。
+
+**不退化复跑结果（新 bundle c9，digest `d93300e4…`，逐阶段 exit 0）**：
+
+| 阶段 | 结果 |
+| --- | --- |
+| A Server + 本地持久化 | `SERVER_HTTP_R1_A_WINDOWS_OK`（[证据](windows-r4c9/r4a.json)） |
+| B HTTP → 真实 WSL Worker | `SERVER_WSL_R1_B_WINDOWS_HTTP_OK`，worker digest 逐字节校验，Unicode+空格路径经真实 Worker 浏览（[证据](windows-r4c9/r4b.json)） |
+| C 两轮真实 Codex（HTTP/SSE） | `SERVER_CODEX_R1_C_WINDOWS_OK`，2 次真实请求，次轮真召回 nonce，native id 在档（[证据](windows-r4c9/r4c.json)） |
+| D 正常停止 + 原生冷续接 | `SERVER_CODEX_R1_D_WINDOWS_OK`，重启后同 native id 续接、再召回，累计 3 次真实请求（[证据](windows-r4c9/r4d.json)、[收据](windows-r4c9/r4cd-receipt.json)） |
+| E wire 面 + 崩溃重启续接 + 租约静默 | `BACKEND_41_E_WINDOWS_WSL_WIRE_OK`：`tree_terminate` 强杀后 `session/resume` 同 native id；8 秒静默 > 5 秒租约的 attempt 如实完成；审计 manifest schema 3 逐文件对着 durable home 校验 digest；7 项清理守卫全部按设计拒绝（[证据](windows-r4c9/r4e.json)） |
+| PostCheck（独立进程） | `BACKEND_41_E_WINDOWS_POSTCHECK_CLEAN`：data root/workspace/端口/进程/worker 视图零残留（[证据](windows-r4c9/r4-postcheck.json)） |
+
+**随之修正的验收栈缺口（均为本仓文件）**：
+
+1. `accept-a.ps1` 仍假设"无部署也内置 Harness 注册表"——44/46 之后注册表只由部署文档
+   组合；已改为携带 `--sidecar-deployment/--plugin-root/--mount`。
+2. 各 accept 脚本的 JSON 请求体按 PowerShell 5.1 默认 ANSI 编码发出，非 ASCII 路径
+   到 Server 已成 `?`；统一改 `charset=utf-8`（B 阶段的 Unicode 断言因此才真正生效）。
+3. `accept-c.ps1` 的 readiness 断言与 Provider/Model 合同过期；已对齐现行面
+   （`capabilities.harnesses.<f>.available` + providerModels.create 引用形配置）。
+4. delta 断言用换行 join 把 codex 的碎片 delta 逐行拆开，nonce 永不连续命中；
+   改为直接拼接（delta 本就是同一文本的碎片）。
+5. `accept-e.ps1`：fixture 家族 "omp" 无注册表 native home（45 规则下按设计拒绝），
+   改用已注册的 kilo 家族承载同一租约静默 fixture；checkpoint 断言从 schema 2 升到
+   schema 3 并新增 nativePlatform/homeLocator 断言；文件校验从"读 ObjectStore 拷贝"
+   改为"对 durable home 现物 sha256"（45 的审计本就是记录非拷贝）。
+6. `_protect_token` 在 `PYTHONUTF8=1` 的 zh-CN Windows 上按 UTF-8 解码 `whoami.exe`
+   的 GBK 输出直接崩（读线程异常）；SID 是纯 ASCII，解码改为容错，并给无类型码的
+   执行失败补了 stderr 日志（此前只剩一个无信息的 EXECUTION_FAILED）。
+
+**G7（人手 UI 路径）部分第一手**：真实 Electron 应用里的第二轮上下文（先问后召回）
+已由 46-G3 的 8 家 8/8 真实模型门覆盖（[ui-gates-46](ui-gates-46/)）；应用驱动的
+停止/重启续接未单独立跑，但同一能力已有 r4 C/D（REST/SSE 层）与 E（wire 层）
+两层第一手证据。按 §8 如实记账：G7 记"部分覆盖"，不记全过。
+
+**仍未决**：G3 并行双轮（产品语义裁决；现行行为是类型化拒绝 TURN_CONCURRENCY_CONFLICT，
+满足"绝不静默换地方"的底线，但"两轮都完成"的完整断言未达成）。

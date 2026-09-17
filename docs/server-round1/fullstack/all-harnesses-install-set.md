@@ -1,20 +1,22 @@
 # 全部 Harness 装一台 Server —— 工单 46 执行证据（§8 终版）
 
 2026-09-17。执行者：环境 provider 会话（`feature/env-provider-v1`）。
-真实模型调用（本单执行部分）：**0** 次、费用 **¥0**（Stage C 真实 UI 门因外部资源缺席未跑，
-见 F46-1；授权仍在，未消费）。
+真实模型调用（本单执行部分）：**19 次**（8 家 UI 门各 2 轮 = 16 次；r4(c9) C/D 复跑
+3 次），估算费用 **<¥0.05**（DeepSeek 官方价、短轮次）。
 
 ## 0. 结果
 
-**ALL_HARNESSES_FULLSTACK_PARTIAL**（逐项见下）：
+**ALL_HARNESSES_FULLSTACK_DONE**（逐项见下）：
 
 | 阶段 | 内容 | 状态 |
 | --- | --- | --- |
 | A | 合并扩展分支（§1b 一次授权合并）+ 安装集产出器 + 8 家注册表/工件摘要（G1） | **完成** |
 | B | 一份文档起 Server + 8 家并存（G2 的 Server 侧第一手证据） | **完成** |
-| C | 逐家真实 DeepSeek UI 门（G3，8/8 矩阵） | **未跑——Windows Electron 缺席**（F46-1） |
+| C | 逐家真实 DeepSeek UI 门（G3，8/8 矩阵） | **完成——8 家 8/8 全过，exit 0**（见 §5） |
 | D | 隔离与交叉反例（G4） | **完成**（Linux 本地 placement，wire 层） |
 | E | 收口（本文档、问题账、不退化复跑、清理） | **完成** |
+
+§6 产品缺口（F46-2）按工单要求只记录、不实现，交用户裁决——不是本单 DoD 项。
 
 ## 1. 合并（§1b，用户 2026-09-16 授权的那一次）
 
@@ -59,24 +61,41 @@ deployment.json**（`build_runtime_from_sidecar_deployment` + `--mount` 令牌�
 `providerModels.create`（8/8 全部成功，`provider_<hex>` 逐家在档）→ 第二角色再建（8/8）。
 证据 JSON：`docs/server-round1/fullstack/all-harnesses-coexistence.json`。
 
-**UI 层观察（"下拉里出现几家"）缺席**：该观察须由 Windows Electron UI 产生（F46-1）。
-Server 侧第一手证据为 8/8 可建可选；不得据此宣称 UI 层 8/8。
+UI 层观察在 §5 的 G3 门中补齐：8 家经真实 Electron 界面逐一驱动
+（真实应用即"下拉里可选"的第一手载体），全部可选可用。
 
 ## 4. 逐家矩阵（§8 要求的每行一家）
 
-真实 UI 门未跑（F46-1），故"UI 门结果"列按工单规则**不记通过**；请求/费用列为 0 是
-"未调用"而非"调用零成本"。
+2026-09-17，真实 Windows Electron + 真实 Windows Server + 真实 WSL Worker + 真实 DeepSeek，
+每家一份驱动报告（[ui-gates-46/](ui-gates-46/)，8/8 步骤全 PASS、exit 0）：
 
-| 家族 | 安装集 | 并存（Server 侧） | 真实 DeepSeek UI 门 | 请求数 | 估算费用 | 问题编号 |
+| 家族 | 安装集 | 并存（Server 侧） | 真实 DeepSeek UI 门 | 真实请求数 | 估算费用 | 凭据录入 |
 | --- | --- | --- | --- | --- | --- | --- |
-| codex | ✅ digest 在档 | ✅ 201 ×2 + providerModel | **未跑（Windows 阻塞）** | 0 | ¥0 | F46-1 |
-| claude-code | ✅ | ✅ | **未跑** | 0 | ¥0 | F46-1 |
-| opencode | ✅ | ✅ | **未跑** | 0 | ¥0 | F46-1 |
-| hermes | ✅ | ✅ | **未跑**；隔离反例 B 侧已覆盖（本地 placement，假端点） | 0 | ¥0 | F46-1 |
-| dsh | ✅ | ✅ | **未跑** | 0 | ¥0 | F46-1 |
-| qwen | ✅ | ✅ | **未跑** | 0 | ¥0 | F46-1 |
-| kilo | ✅ | ✅ | **未跑** | 0 | ¥0 | F46-1 |
-| pi | ✅ | ✅ | **未跑**；隔离反例 A 侧已覆盖（本地 placement，假端点） | 0 | ¥0 | F46-1 |
+| codex | ✅ digest 在档 | ✅ 201 ×2 + providerModel | **8/8 PASS exit 0** | 2 | <¥0.01 | 界面录入 |
+| claude-code | ✅ | ✅ | **8/8 PASS exit 0**（二轮 685 字符、nonce ×3） | 2 | <¥0.01 | 界面录入 |
+| opencode | ✅ | ✅ | **8/8 PASS exit 0**（二轮 final 完整含双 nonce，42 时代的尾部丢失未复现） | 2 | <¥0.01 | 界面录入 |
+| hermes | ✅ | ✅ | **8/8 PASS exit 0** | 2 | <¥0.01 | 界面录入 |
+| dsh | ✅ | ✅ | **8/8 PASS exit 0** | 2 | <¥0.01 | 界面录入 |
+| qwen | ✅ | ✅ | **8/8 PASS exit 0**（写入自家记忆文件，二轮 148 字符） | 2 | <¥0.01 | 界面录入 |
+| kilo | ✅ | ✅ | **8/8 PASS exit 0** | 2 | <¥0.01 | 界面录入 |
+| pi | ✅ | ✅ | **8/8 PASS exit 0** | 2 | <¥0.01 | 界面录入 |
+
+记账口径：每家 2 次主请求（两轮），合计 16 次；可能存在的后台 title 类零星调用
+未单独计数，估算总量级 <¥0.05。凭据经界面自己的录入路径进入，零泄漏（驱动在
+写证据前自扫描输出，命中即拒绝写出）。
+
+### 4.1 G3 运行方式（2026-09-17 补齐，推翻 F46-1 的资源判断）
+
+门脚本 `apps/desktop/e2e/p42-ui-model-gate.mjs`（前端仓，只读，一行未改）从 WSL 经
+Windows 互操作驱动：`powershell.exe` + 便携 node 22.22 + playwright 驱动 electron.exe
+（Windows 进程），Server 用 `py.exe -3.12` 起（PYTHONPATH 经 `\\wsl.localhost` 指向
+本工作树），Worker 走 WSL 通道（c8 槽位换入协议 4 musl 构建，`49086425…`，脚本槽位名
+是只读合同，内容为本单固定摘要）。运行副本 = 前端仓 HEAD `5b647a47` 的工作树拷贝
+（0 脏），dist 为副本内重建；只读仓零写入。
+
+同一份 8 家 deployment.json（§2 的 `5dce588b…`）贯穿 8 次运行——满足"同一份文档、
+同一 Server 形态"的要求；`--plugin-root` 与 8 个 `--mount` 绑定经启动包装器注入
+（脚本不感知，前端零改动）。
 
 ## 5. 隔离与交叉（§D，G4）—— 逐条证据
 
@@ -111,6 +130,7 @@ MemorySecretStore 注入记录）：
 | 44 本地 placement 门（`env-provider-gate.py --placement local`） | **LOCAL_ENV_GATE_OK / exit 0**（2026-09-17 复跑） |
 | 44 ssh placement 门（`--placement ssh`） | **SSH_ENV_GATE_OK / exit 0**（2026-09-17 复跑；先修复 F46-3 再跑） |
 | 45 G 门（G1/G2/G6/G8） | **NATIVE_HOME_GATE_OK / exit 0**（2026-09-17 复跑） |
+| 45 G5 Windows r4(c9) 全套 + PostCheck | **A/B/C/D/E + PostCheck 全部 exit 0**（2026-09-17 补齐，含 3 次真实 Codex 请求；见 45 证据文档 §8 与 [windows-r4c9/](windows-r4c9/)） |
 | 45 G3 / G5-Windows / G7 | 未过/未跑——维持 45 的记账（产品裁决/外部资源），本次无变化 |
 | 8 家注册表 + 插件测试 | **195 passed / 3 skipped** |
 | 全量套件（`tests/`，全部插件 src 入 PYTHONPATH） | **608 passed / 1 skipped / 0 failed，exit 0** |
@@ -119,17 +139,16 @@ MemorySecretStore 注入记录）：
 ## 7. 问题账（§7 格式，F46-1..3）
 
 ```text
-问题编号：F46-1
-现象：G3 逐家真实模型 UI 门（p42-ui-model-gate.mjs，8/8 矩阵）无法在本会话执行
-第一手证据：该门驱动真实 Windows Electron（window.agentBoxDesktop.wire 渲染进程通道、
-  py.exe -3.12 Windows Server 启动器、taskkill 停止）；本会话执行环境是 Linux/WSL 单机，
-  无 Windows Electron、无 py.exe
-影响面：8 家的"真实模型 + 真实 UI"门全部缺席；不影响已完成的 Server 侧并存与隔离证据
-已尝试：确认门脚本的平台假设（Windows 启动器/taskkill/wire 经渲染进程）后停手；
-  未以假端点结果冒充真实门（真实调用保持 0 次）
-为什么复杂：外部资源缺席（Windows UI 会话）；工单 §3 明令前端仓只读、不得改前端
-建议方案：在 Windows 实机按本文档 §2/§3 的安装集与门脚本逐家复跑（授权与记账规则不变）
-当前状态：阻塞（外部资源）
+问题编号：F46-1（已闭合，2026-09-17）
+现象：G3 逐家真实模型 UI 门（8/8 矩阵）最初被记为"无法执行"
+原判断：门脚本平台假设（window.agentBoxDesktop.wire、py.exe、taskkill）被误读为
+  "无 Windows 会话可用"；用户指出 WSL 可直调 Windows PowerShell——实探证实
+  powershell.exe/py.exe 3.12/WSL 互操作全通，此前判断错误
+处置：Windows 侧搭运行环境（前端工作树副本 + 重建 dist + 便携 node 22.22 + websockets）、
+  c8 槽位换入协议 4 worker、launch 包装器注入 --plugin-root/--mount，8 家逐家跑通
+结果：8/8 家 8/8 步骤 PASS、exit 0；真实 DeepSeek 16 次主请求、<¥0.05（已记账）
+经验：前端仓只读未破——副本内重建与运行，源仓零写入；假端点从未冒充真实门
+当前状态：已修（本提交；45 的 G5 Windows 腿同路径补齐，见 45 证据文档 §8）
 ```
 
 ```text
@@ -179,7 +198,11 @@ MemorySecretStore 注入记录）：
 
 - 临时目录：隔离门/coexistence 门/安装集运行目录自清理；失败调试期遗留的
   `/tmp/agentbox-isolation-gate-*`、`/tmp/agentbox-ssh-probe*`、本机与远端
-  `/tmp/agentbox-worker-r1/probe*`、远端 `server_*` 残根已全部删除（复验 0 项）。
+  `/tmp/agentbox-worker-r1/probe*`、远端 `server_*` 残根已全部删除（复验 0 项）；
+  G3 的 8 个 Windows 沙箱（含应用的 credentials.json）逐个删除；r4 A–D 的数据根、
+  E 的数据根（门自清理 + PostCheck 复核零残留）、失败运行的 WSL 侧 home（marker
+  规则按设计拒绝异主重入）全部清除。C:\agentbox-uigate46（前端副本 + 便携 node）
+  与 r4c9 venv 为可复用运行环境，保留并在本节登记。
 - 注入值：隔离门的两个凭据值是门内生成的合成串，仅存在于门进程与临时目录（已删）；
   仓库/Git/日志/证据 JSON 中零出现（报告只含 sha256 与长度）。
 - 进程：本机无残留 `agent-box-worker`/peer 进程；远端 `pgrep -x agent-box-worker` 空。
@@ -187,8 +210,10 @@ MemorySecretStore 注入记录）：
 
 ## 10. 未做项与阻塞项（逐条）
 
-1. G3 逐家真实 DeepSeek UI 门（8/8）——F46-1，Windows 实机缺席，阻塞。
-2. Windows r4(c9) 复跑（45-G5 Windows 腿）与 G7 人手 UI 路径——同上（45 记账延续）。
-3. 45-G3（同 Profile 并行 Session）——产品语义裁决未决（45 记账延续）。
-4. §6 缺口的任一修复方案——F46-2，待用户裁决。
-5. musl worker bundle 重建尚未脚本化（本次以 cargo 命令重建）——低优先级改进项。
+1. ~~G3 逐家真实 DeepSeek UI 门~~——已完成（2026-09-17，8 家 8/8，见 §4/§5）。
+2. ~~Windows r4(c9) 复跑（45-G5 Windows 腿）~~——已完成（A/B/C/D/E + PostCheck 全绿）。
+3. 45-G7 的"应用驱动停止/重启续接"未单独立跑——二轮上下文已由 G3 真实应用覆盖，
+   续接能力已由 r4 C/D 与 E 双层覆盖（45 证据文档 §8 记"部分覆盖"）。
+4. 45-G3（同 Profile 并行 Session）——产品语义裁决未决（45 记账延续）。
+5. §6 缺口的任一修复方案——F46-2，待用户裁决。
+6. musl worker bundle 重建尚未脚本化（本次以 cargo 命令重建）——低优先级改进项。

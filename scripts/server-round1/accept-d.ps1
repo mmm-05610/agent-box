@@ -78,7 +78,7 @@ $turn = Invoke-JsonPost -Path "/api/v1/sessions/$($receipt.session_id)/turns" `
 $events = Wait-TurnEvents -SessionId $receipt.session_id -TurnId $turn.turn_id `
     -After ([int]$receipt.event_cursor)
 if ($events.state -ne "completed") { throw "Cold-resume Turn ended as $($events.state)" }
-if (([string]::Join("`n", $events.messages)) -notmatch [regex]::Escape($receipt.nonce)) {
+if (([string]::Join("", $events.messages)) -notmatch [regex]::Escape($receipt.nonce)) {
     throw "Cold-resume Turn did not recall the Stage C nonce"
 }
 $after = Invoke-RestMethod -Uri "$BaseUrl/api/v1/sessions/$($receipt.session_id)" -Headers $headers

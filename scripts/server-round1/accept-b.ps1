@@ -62,8 +62,9 @@ function Wait-Liveness {
 
 function Invoke-JsonPost {
     param([string]$Path, [hashtable]$Headers, [hashtable]$Body)
+    $json = [Text.Encoding]::UTF8.GetBytes(($Body | ConvertTo-Json -Depth 6 -Compress))
     return Invoke-RestMethod -Method Post -Uri ($baseUrl + $Path) -Headers $Headers `
-        -ContentType "application/json" -Body ($Body | ConvertTo-Json -Depth 6 -Compress)
+        -ContentType "application/json; charset=utf-8" -Body $json
 }
 
 try {

@@ -116,9 +116,13 @@ def _protect_token(path: Path) -> None:
     if os.name != "nt":
         os.chmod(path, 0o600)
         return
+    # whoami/icacls answer in the console codepage (GBK on zh-CN hosts); the
+    # only bytes this code reads back are the ASCII SID, so a lossy decode is
+    # strictly better than dying on a localized machine or user name -
+    # especially under PYTHONUTF8, where the default decode is always utf-8.
     identity = subprocess.run(
         ["whoami.exe", "/user", "/fo", "csv", "/nh"],
-        check=True, capture_output=True, text=True, timeout=5,
+        check=True, capture_output=True, text=True, errors="replace", timeout=5,
     )
     rows = list(csv.reader(io.StringIO(identity.stdout)))
     if len(rows) != 1 or len(rows[0]) < 2 or not rows[0][1].startswith("S-"):
@@ -126,7 +130,7 @@ def _protect_token(path: Path) -> None:
     sid = rows[0][1]
     subprocess.run(
         ["icacls.exe", str(path), "/inheritance:r", "/grant:r", f"*{sid}:(F)"],
-        check=True, capture_output=True, text=True, timeout=5,
+        check=True, capture_output=True, text=True, errors="replace", timeout=5,
     )
 
 
