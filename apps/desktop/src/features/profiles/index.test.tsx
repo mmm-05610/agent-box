@@ -181,7 +181,7 @@ describe('AgentBox ProfilesView', () => {
     expect(await screen.findByRole('heading', { name: 'Reviewer' })).toBeTruthy()
     expect(screen.getAllByText('opaque-alpha').length).toBeGreaterThan(0)
     expect(screen.getByText('native_memory · Available')).toBeTruthy()
-    expect(screen.getByText('resume · Unavailable')).toBeTruthy()
+    expect(screen.getByText('resume · not declared')).toBeTruthy()
     expect(screen.getByText('Profile maintenance is unavailable')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'New profile' })).toBeNull()
     expect(await screen.findByText('balanced')).toBeTruthy()

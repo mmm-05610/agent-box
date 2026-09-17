@@ -223,7 +223,7 @@ export const ru = defineLocale({
       transcriptionFailed: 'Не удалось расшифровать речь',
       transcriptionUnavailable: 'Расшифровка речи пока недоступна.',
       tryRecordingAgain: 'Попробуйте записать ещё раз.',
-      unavailable: 'Голос недоступен'
+      unavailable: 'Ожидается объявление сервиса'
     },
     native: {
       approvalTitle: 'Требуется одобрение',
@@ -467,7 +467,7 @@ export const ru = defineLocale({
         archive: 'Архивировать',
         addModel: 'Добавить модель',
         removeModel: 'Удалить модель',
-        availability: { available: 'Доступна', unknown: 'Неизвестно', unavailable: 'Недоступна' },
+        availability: { available: 'Доступна', unknown: 'Неизвестно', unavailable: 'Недоступно — причина не указана' },
         providerPresets: 'Шаблоны',
         providerInUse: 'Уже используется',
         providerCustom: 'Свой провайдер (явное переопределение)',
@@ -2134,7 +2134,11 @@ export const ru = defineLocale({
     agentBoxVersion: 'Версия',
     agentBoxCapabilities: 'Возможности',
     agentBoxAvailable: 'Доступно',
-    agentBoxUnavailable: 'Недоступно',
+    agentBoxServiceNoReason: 'сервис не назвал причину',
+    agentBoxServiceOffline: 'Сервис AgentBox отключён — он нужен профилям и настройкам',
+    agentBoxCapabilitiesNotDeclared: 'Сервис не объявил возможностей для этого профиля',
+    agentBoxValuePending: 'Сервис не объявил',
+    agentBoxCapabilityAbsent: 'не объявлено',
     agentBoxMaintenanceUnavailable: 'Управление профилями недоступно',
     agentBoxMaintenanceUnavailableDesc:
       'Сервис может перечислять профили, но не объявил создание, изменение, архивирование или управление встроенной памятью.',
@@ -2552,6 +2556,16 @@ export const ru = defineLocale({
     configEffectiveValue: 'Действует',
     configEffectiveServiceConfirmed: 'Значение, подтверждённое сервисом',
     configFixesOnAccept: 'Рабочая конфигурация фиксируется только тогда, когда сервис принимает отправку.',
+    emptyState: {
+      greeting: 'Что будем делать?',
+      subtitle: 'Сформулируйте своими словами — поле ниже то же, которым вы будете пользоваться дальше.',
+      starters: ['Суммируй изменения за неделю', 'Почини падающий тест', 'Объясни этот код'],
+      waiting: 'Ожидание сервиса AgentBox…',
+      blocked: 'Выберите проект (и профиль), чтобы начать — причина видна в поле ниже.'
+    },
+    serviceUnreachable: 'Сервис AgentBox недоступен',
+    workspaceMissing: 'Выберите проект для этого чата',
+    disabledPlaceholder: 'Отправка приостановлена — см. пояснение над полем ввода',
     modelSelector: 'Модель',
     modelSelectorSearch: 'Поиск моделей…',
     modelSelectorEmpty: 'Нет доступных моделей',
@@ -3146,7 +3160,7 @@ export const ru = defineLocale({
       gateway: 'Шлюз',
       connected: 'Подключён',
       connecting: 'Подключение',
-      offline: 'Недоступен',
+      offline: 'Нет соединения с сервисом',
       inferenceReady: 'Инференс готов',
       inferenceNotReady: 'Инференс не готов',
       checkingInference: 'Проверка инференса',
@@ -3195,7 +3209,7 @@ export const ru = defineLocale({
       gatewayNeedsSetup: 'нужна настройка',
       gatewayChecking: 'проверка',
       gatewayConnecting: 'подключение',
-      gatewayOffline: 'недоступен',
+      gatewayOffline: 'нет соединения с сервисом',
       gatewayRestarting: 'перезапуск…',
       gatewayTitle: 'Шлюз',
       customizeTitle: 'Показывать в статус-баре',
@@ -3465,9 +3479,9 @@ export const ru = defineLocale({
   },
   assistant: {
     thread: {
-      loadingSession: 'Загрузка сеанса',
+      loadingSession: 'Загрузка этого чата',
       showEarlier: 'Показать ранние сообщения',
-      loadingResponse: 'Hermes загружает ответ',
+      loadingResponse: 'Загрузка ответа',
       resumeWhenBackgroundDone: count =>
         count === 1
           ? 'Продолжится, когда фоновая задача завершится'

@@ -399,9 +399,9 @@ describe('AgentBox model settings honesty', () => {
       const button = screen.getByRole('button', { name }) as HTMLButtonElement
 
       expect(button.disabled).toBe(true)
-      expect(button.getAttribute('title')).toBe('Unavailable: the service declares no method for this yet.')
+      expect(button.getAttribute('title')).toBe('Not available: the service declares no method for this yet.')
     }
-    expect(capabilities?.textContent).toContain('Unavailable: the service declares no method for this yet.')
+    expect(capabilities?.textContent).toContain('Not available: the service declares no method for this yet.')
   })
 
   it('never renders credential material: the row carries a reference and its presence only', async () => {

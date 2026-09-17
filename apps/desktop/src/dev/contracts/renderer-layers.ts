@@ -25,6 +25,11 @@ import { fileURLToPath } from 'node:url'
 
 export const SRC_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
 
+/** `src/`-relative, forward-slashed: the ledger and the rank table are
+ *  written that way, and a Windows checkout would otherwise compare
+ *  `plugins\\x` against `plugins/x` and judge an empty graph. */
+export const srcRelative = (absolute: string): string => relative(SRC_DIR, absolute).replaceAll('\\', '/')
+
 export interface LayerRule {
   /** Directory under `src/`, as it appears in a path relative to `src/`. */
   zone: string
@@ -159,7 +164,7 @@ export function resolveSpecifier(from: string, specifier: string, known: Readonl
   }
 
   for (const candidate of [base, `${base}.ts`, `${base}.tsx`, join(base, 'index.ts'), join(base, 'index.tsx')]) {
-    const path = relative(SRC_DIR, candidate)
+    const path = srcRelative(candidate)
 
     if (known.has(path)) {
       return path
@@ -193,7 +198,7 @@ export function collectModules(root: string = SRC_DIR): Module[] {
     })
 
   return collect(root)
-    .map(full => relative(SRC_DIR, full))
+    .map(full => srcRelative(full))
     .filter(path => !isExcluded(path))
     .map(path => ({ path, source: readFileSync(join(SRC_DIR, path), 'utf8') }))
 }

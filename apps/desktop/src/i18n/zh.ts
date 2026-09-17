@@ -207,7 +207,7 @@ export const zh: Translations = {
       transcriptionFailed: '语音转写失败',
       transcriptionUnavailable: '语音转写暂不可用。',
       tryRecordingAgain: '请再录一次。',
-      unavailable: '语音不可用'
+      unavailable: '等待服务能力声明'
     },
     native: {
       approvalTitle: '需要批准',
@@ -478,7 +478,7 @@ export const zh: Translations = {
         archive: '归档',
         addModel: '添加模型',
         removeModel: '移除模型',
-        availability: { available: '可用', unknown: '未知', unavailable: '不可用' },
+        availability: { available: '可用', unknown: '未知', unavailable: '不可用——未给出原因' },
         providerPresets: '预设',
         providerInUse: '已在用',
         providerCustom: '自定义供应商（显式覆盖）',
@@ -489,7 +489,7 @@ export const zh: Translations = {
         modelMetaUnknownTitle: '服务尚未为该模型声明这些信息',
         refreshModels: '从供应商拉取',
         testConnection: '测试连接',
-        capabilityUnavailable: '不可用：服务尚未声明对应方法。',
+        capabilityUnavailable: '尚不可用：服务尚未声明对应方法。',
       },
       accounts: {
         title: '账号',
@@ -1695,7 +1695,7 @@ export const zh: Translations = {
         failedLoad: '无法加载终端后端',
         ready: '就绪',
         needsSetup: '需要设置',
-        unavailable: '不可用',
+        unavailable: '服务未提供',
         inUse: '使用中',
         selectedTitle: '已选择后端',
         selectedMessage: backend => `终端命令现在通过 ${backend} 运行。将应用于新会话。`,
@@ -2314,7 +2314,11 @@ export const zh: Translations = {
     agentBoxVersion: '版本',
     agentBoxCapabilities: '能力',
     agentBoxAvailable: '可用',
-    agentBoxUnavailable: '不可用',
+    agentBoxServiceNoReason: '服务未给出原因',
+    agentBoxServiceOffline: 'AgentBox 服务离线——角色与设置需要它',
+    agentBoxCapabilitiesNotDeclared: '服务尚未为该角色声明任何能力',
+    agentBoxValuePending: '服务未声明',
+    agentBoxCapabilityAbsent: '未声明',
     agentBoxMaintenanceUnavailable: '角色维护当前不可用',
     agentBoxMaintenanceUnavailableDesc: '服务可以列出角色，但尚未声明创建、编辑、归档或原生记忆控制能力。',
     agentBoxRuntimeConfig: '运行配置',
@@ -2767,6 +2771,16 @@ export const zh: Translations = {
     configEffectiveValue: '生效',
     configEffectiveServiceConfirmed: '服务已确认的值',
     configFixesOnAccept: '实际运行配置只在服务接受发送时才固定。',
+    emptyState: {
+      greeting: '今天要做什么？',
+      subtitle: '用你自己的话描述即可——下方输入条就是之后一直用的那一个。',
+      starters: ['总结本周的改动', '修复失败的测试', '解释一下这个代码库'],
+      waiting: '正在等待 AgentBox 服务…',
+      blocked: '先选择项目（与角色）即可开始——下方输入条会写明原因。'
+    },
+    serviceUnreachable: '无法连接到 AgentBox 服务',
+    workspaceMissing: '为这次对话选择项目',
+    disabledPlaceholder: '发送已暂停——见输入框上方的说明',
     modelSelector: '模型',
     modelSelectorSearch: '搜索模型…',
     modelSelectorEmpty: '暂无可用模型',
@@ -3353,7 +3367,7 @@ export const zh: Translations = {
       gateway: '网关',
       connected: '已连接',
       connecting: '连接中',
-      offline: '离线',
+      offline: '未连接到服务',
       inferenceReady: '推理已就绪',
       inferenceNotReady: '推理未就绪',
       checkingInference: '正在检查推理',
@@ -3403,7 +3417,7 @@ export const zh: Translations = {
       gatewayUnavailable: '推理不可用',
       gatewayChecking: '检查中',
       gatewayConnecting: '连接中',
-      gatewayOffline: '离线',
+      gatewayOffline: '无服务连接',
       gatewayRestarting: '重启中…',
       gatewayTitle: '网关',
       customizeTitle: '在状态栏中显示',
@@ -3694,9 +3708,9 @@ export const zh: Translations = {
 
   assistant: {
     thread: {
-      loadingSession: '正在加载会话',
+      loadingSession: '正在加载此会话',
       showEarlier: '显示更早的消息',
-      loadingResponse: 'Hermes 正在加载回复',
+      loadingResponse: '正在加载回复',
       loadingLocalModel: model => `正在将 ${model} 载入内存`,
       processingPrompt: '正在处理提示词',
       resumeWhenBackgroundDone: count =>

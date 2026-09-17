@@ -13,6 +13,7 @@ import type { ChatBarState } from '@/lib/composer/types'
 import { useIncrementalExternalStoreRuntime } from '@/lib/incremental-external-store-runtime'
 import { titlebarHeaderBaseClass, titlebarHeaderTitleClass } from '@/lib/titlebar'
 
+import { AgentBoxEmptyState } from './agentbox-empty-state'
 import { ChatBar, ChatBarFallback } from './composer'
 import { AgentBoxApprovalPanel } from './composer/agentbox-approval-panel'
 import { AgentBoxQueuePanel } from './composer/agentbox-queue-panel'
@@ -173,12 +174,12 @@ export function AgentBoxChatView({ maxVoiceRecordingSeconds }: { maxVoiceRecordi
 
   const unavailableReason =
     binding.service.phase === 'unavailable'
-      ? binding.service.detail || t.profiles.agentBoxUnavailable
+      ? binding.service.detail || t.composer.serviceUnreachable
       : binding.catalogReady && !binding.workspace
         ? registrationReason(
             binding.workspaceOpen,
             { opening: t.composer.workspaceOpening, unavailable: t.composer.workspaceUnavailable },
-            t.profiles.agentBoxUnavailable
+            t.composer.workspaceMissing
           )
         : binding.catalogReady && !binding.session && !binding.profileId
           ? t.composer.profileRequired
@@ -202,6 +203,18 @@ export function AgentBoxChatView({ maxVoiceRecordingSeconds }: { maxVoiceRecordi
           <Thread
             clampToComposer
             cwd={binding.workspace?.normalizedPath ?? null}
+            emptyState={
+              messages.length === 0 ? (
+                /* P14: the draft screen is the product's own — brand, one
+                   greeting, and starters only while a send is possible. The
+                   composer below is the same one, not a second input. */
+                <AgentBoxEmptyState
+                  canSend={binding.sendAvailable}
+                  onPick={text => void binding.onSubmit(text)}
+                  waiting={binding.service.phase !== 'ready'}
+                />
+              ) : undefined
+            }
             gateway={null}
             onCancel={binding.onCancel}
             sessionId={binding.sessionId}

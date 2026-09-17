@@ -399,7 +399,7 @@ export function ChatBar({
 
   const placeholder = agentBoxAuthority
     ? disabled
-      ? t.profiles.agentBoxUnavailable
+      ? t.composer.disabledPlaceholder
       : sessionId
         ? t.composer.placeholderFollowUp
         : t.composer.message

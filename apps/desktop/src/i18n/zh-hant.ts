@@ -207,7 +207,7 @@ export const zhHant = defineLocale({
       transcriptionFailed: '語音轉寫失敗',
       transcriptionUnavailable: '語音轉寫暫不可用。',
       tryRecordingAgain: '請再錄製一次。',
-      unavailable: '語音不可用'
+      unavailable: '等待服務能力宣告'
     },
     native: {
       approvalTitle: '需要核准',
@@ -367,7 +367,7 @@ export const zhHant = defineLocale({
         archive: '封存',
         addModel: '新增模型',
         removeModel: '移除模型',
-        availability: { available: '可用', unknown: '未知', unavailable: '不可用' },
+        availability: { available: '可用', unknown: '未知', unavailable: '不可用——未給出原因' },
         providerPresets: '預設',
         providerInUse: '已在用',
         providerCustom: '自訂供應商（顯式覆寫）',
@@ -378,7 +378,7 @@ export const zhHant = defineLocale({
         modelMetaUnknownTitle: '服務尚未為該模型宣告這些資訊',
         refreshModels: '從供應商拉取',
         testConnection: '測試連線',
-        capabilityUnavailable: '不可用：服務尚未宣告對應方法。',
+        capabilityUnavailable: '尚不可用：服務尚未宣告對應方法。',
       },
       accounts: {
         title: '帳號',
@@ -1342,7 +1342,7 @@ export const zhHant = defineLocale({
         failedLoad: '無法載入終端後端',
         ready: '就緒',
         needsSetup: '需要設定',
-        unavailable: '不可用',
+        unavailable: '服務未提供',
         inUse: '使用中',
         selectedTitle: '已選擇後端',
         selectedMessage: backend => `終端命令現在透過 ${backend} 執行。將套用於新工作階段。`,
@@ -1744,7 +1744,11 @@ export const zhHant = defineLocale({
     agentBoxVersion: '版本',
     agentBoxCapabilities: '能力',
     agentBoxAvailable: '可用',
-    agentBoxUnavailable: '無法使用',
+    agentBoxServiceNoReason: '服務未給出原因',
+    agentBoxServiceOffline: 'AgentBox 服務離線——角色與設定需要它',
+    agentBoxCapabilitiesNotDeclared: '服務尚未為該角色宣告任何能力',
+    agentBoxValuePending: '服務未宣告',
+    agentBoxCapabilityAbsent: '未宣告',
     agentBoxMaintenanceUnavailable: '角色維護目前無法使用',
     agentBoxMaintenanceUnavailableDesc: '服務可以列出角色，但尚未宣告建立、編輯、封存或原生記憶控制能力。',
     agentBoxRuntimeConfig: '執行設定',
@@ -2183,6 +2187,16 @@ export const zhHant = defineLocale({
     configEffectiveValue: '生效',
     configEffectiveServiceConfirmed: '服務已確認的值',
     configFixesOnAccept: '實際執行設定只在服務接受傳送時才固定。',
+    emptyState: {
+      greeting: '今天要做什麼？',
+      subtitle: '用你自己的話描述即可——下方輸入列就是之後一直用的那一個。',
+      starters: ['總結本週的變更', '修復失敗的測試', '解釋這個程式庫'],
+      waiting: '正在等待 AgentBox 服務…',
+      blocked: '先選擇專案（與角色）即可開始——下方輸入列會寫明原因。'
+    },
+    serviceUnreachable: '無法連線到 AgentBox 服務',
+    workspaceMissing: '為這次對話選擇專案',
+    disabledPlaceholder: '傳送已暫停——見輸入框上方的說明',
     modelSelector: '模型',
     modelSelectorSearch: '搜尋模型…',
     modelSelectorEmpty: '暫無可用模型',
@@ -2730,7 +2744,7 @@ export const zhHant = defineLocale({
       gateway: '閘道',
       connected: '已連線',
       connecting: '連線中',
-      offline: '離線',
+      offline: '未連線到服務',
       inferenceReady: '推論已就緒',
       inferenceNotReady: '推論未就緒',
       checkingInference: '正在檢查推論',
@@ -2780,7 +2794,7 @@ export const zhHant = defineLocale({
       gatewayUnavailable: '推論不可用',
       gatewayChecking: '檢查中',
       gatewayConnecting: '連線中',
-      gatewayOffline: '離線',
+      gatewayOffline: '無服務連線',
       gatewayRestarting: '重新啟動中…',
       gatewayTitle: '閘道',
       agents: '代理',
@@ -3040,9 +3054,9 @@ export const zhHant = defineLocale({
 
   assistant: {
     thread: {
-      loadingSession: '正在載入工作階段',
+      loadingSession: '正在載入此工作階段',
       showEarlier: '顯示較早的訊息',
-      loadingResponse: 'Hermes 正在載入回覆',
+      loadingResponse: '正在載入回覆',
       resumeWhenBackgroundDone: count =>
         count === 1 ? '背景工作完成後將自動繼續' : `${count} 個背景工作完成後將自動繼續`,
       thinking: '思考中',

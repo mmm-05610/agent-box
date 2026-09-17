@@ -217,7 +217,7 @@ export const ar = defineLocale({
       transcriptionFailed: 'فشل التفريغ النصي',
       transcriptionUnavailable: 'التفريغ النصي غير متاح.',
       tryRecordingAgain: 'حاول التسجيل مرة أخرى.',
-      unavailable: 'الصوت غير متاح'
+      unavailable: 'بانتظار إعلان الخدمة'
     },
     native: {
       approvalTitle: 'مطلوب موافقة',
@@ -427,7 +427,7 @@ export const ar = defineLocale({
         archive: 'أرشفة',
         addModel: 'إضافة نموذج',
         removeModel: 'إزالة نموذج',
-        availability: { available: 'متاح', unknown: 'غير معروف', unavailable: 'غير متاح' },
+        availability: { available: 'متاح', unknown: 'غير معروف', unavailable: 'غير متاح — دون ذكر سبب' },
         providerPresets: 'إعدادات جاهزة',
         providerInUse: 'قيد الاستخدام',
         providerCustom: 'مزود مخصص (تجاوز صريح)',
@@ -1482,7 +1482,11 @@ export const ar = defineLocale({
     agentBoxVersion: 'الإصدار',
     agentBoxCapabilities: 'الإمكانات',
     agentBoxAvailable: 'متاح',
-    agentBoxUnavailable: 'غير متاح',
+    agentBoxServiceNoReason: 'لم تذكر الخدمة سببًا',
+    agentBoxServiceOffline: 'خدمة AgentBox غير متصلة — الملفات والإعدادات تحتاجها',
+    agentBoxCapabilitiesNotDeclared: 'لم تعلن الخدمة أي قدرة لهذا الملف الشخصي',
+    agentBoxValuePending: 'لم تعلنها الخدمة',
+    agentBoxCapabilityAbsent: 'غير معلنة',
     agentBoxMaintenanceUnavailable: 'إدارة الملفات الشخصية غير متاحة',
     agentBoxMaintenanceUnavailableDesc:
       'يمكن للخدمة سرد الملفات الشخصية، لكنها لم تعلن إمكانات الإنشاء أو التحرير أو الأرشفة أو الذاكرة الأصلية.',
@@ -1855,6 +1859,16 @@ export const ar = defineLocale({
     configEffectiveValue: 'الساري',
     configEffectiveServiceConfirmed: 'قيمة أكدتها الخدمة',
     configFixesOnAccept: 'لا يُثبَّت إعداد التشغيل الفعلي إلا عندما تقبل الخدمة الإرسال.',
+    emptyState: {
+      greeting: 'ماذا نبنيه اليوم؟',
+      subtitle: 'اكتب بكلماتك — حقل الإدخال أدناه هو نفسه الذي ستستمر في استخدامه.',
+      starters: ['لخّص تغييرات هذا الأسبوع', 'أصلح اختبارًا فاشلًا', 'اشرح هذا المشروع'],
+      waiting: 'بانتظار خدمة AgentBox…',
+      blocked: 'اختر مشروعًا (وملفًا شخصيًا) للبدء — سيظهر السبب في حقل الإدخال أدناه.'
+    },
+    serviceUnreachable: 'تعذّر الوصول إلى خدمة AgentBox',
+    workspaceMissing: 'اختر مشروعًا لهذه المحادثة',
+    disabledPlaceholder: 'الإرسال متوقف — راجع الملاحظة أعلى حقل الإدخال',
     modelSelector: 'النموذج',
     modelSelectorSearch: 'ابحث في النماذج…',
     modelSelectorEmpty: 'لا توجد نماذج متاحة',
@@ -2355,7 +2369,7 @@ export const ar = defineLocale({
       gateway: 'البوابة',
       connected: 'متصل',
       connecting: 'جار الاتصال',
-      offline: 'غير متصل',
+      offline: 'لا اتصال بالخدمة',
       inferenceReady: 'الاستدلال جاهز',
       inferenceNotReady: 'الاستدلال غير جاهز',
       checkingInference: 'جار فحص الاستدلال',
@@ -2389,7 +2403,7 @@ export const ar = defineLocale({
       gatewayUnavailable: 'الاستدلال غير متاح',
       gatewayChecking: 'جار فحص البوابة',
       gatewayConnecting: 'جار اتصال البوابة',
-      gatewayOffline: 'البوابة غير متصلة',
+      gatewayOffline: 'لا اتصال بالخدمة',
       gatewayRestarting: 'جار إعادة التشغيل...',
       gatewayTitle: 'البوابة',
       agents: 'الوكلاء',
@@ -2617,9 +2631,9 @@ export const ar = defineLocale({
   },
   assistant: {
     thread: {
-      loadingSession: 'جار تحميل الجلسة...',
+      loadingSession: 'جارٍ تحميل هذه المحادثة',
       showEarlier: 'عرض الرسائل الأقدم',
-      loadingResponse: 'جار تحميل الرد...',
+      loadingResponse: 'جارٍ تحميل الرد',
       resumeWhenBackgroundDone: count =>
         count === 1 ? 'سيُستأنف عند انتهاء المهمة الخلفية' : `سيُستأنف عند انتهاء ${count} مهام خلفية`,
       thinking: 'يفكر...',

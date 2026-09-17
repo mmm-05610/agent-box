@@ -213,7 +213,7 @@ export const en: Translations = {
       transcriptionFailed: 'Voice transcription failed',
       transcriptionUnavailable: 'Voice transcription is not available yet.',
       tryRecordingAgain: 'Try recording again.',
-      unavailable: 'Voice unavailable'
+      unavailable: 'Awaiting a service capability'
     },
     native: {
       approvalTitle: 'Approval needed',
@@ -493,7 +493,7 @@ export const en: Translations = {
         archive: 'Archive',
         addModel: 'Add model',
         removeModel: 'Remove model',
-        availability: { available: 'Available', unknown: 'Unknown', unavailable: 'Unavailable' },
+        availability: { available: 'Available', unknown: 'Unknown', unavailable: 'Not available — no reason given' },
         providerPresets: 'Presets',
         providerInUse: 'Already in use',
         providerCustom: 'Custom provider (explicit override)',
@@ -504,7 +504,7 @@ export const en: Translations = {
         modelMetaUnknownTitle: 'The service has not declared these for this model',
         refreshModels: 'Refresh from provider',
         testConnection: 'Test connection',
-        capabilityUnavailable: 'Unavailable: the service declares no method for this yet.',
+        capabilityUnavailable: 'Not available: the service declares no method for this yet.',
       },
       accounts: {
         title: 'Accounts',
@@ -1524,7 +1524,7 @@ export const en: Translations = {
         failedLoad: 'Could not load terminal backends',
         ready: 'Ready',
         needsSetup: 'Needs setup',
-        unavailable: 'Unavailable',
+        unavailable: 'Not available from the service',
         inUse: 'In use',
         selectedTitle: 'Backend selected',
         selectedMessage: backend => `Terminal commands now run via ${backend}. Applies to new sessions.`,
@@ -2150,7 +2150,11 @@ export const en: Translations = {
     agentBoxVersion: 'Version',
     agentBoxCapabilities: 'Capabilities',
     agentBoxAvailable: 'Available',
-    agentBoxUnavailable: 'Unavailable',
+    agentBoxServiceNoReason: 'the service gave no reason',
+    agentBoxServiceOffline: 'The AgentBox service is offline — roles and settings need it',
+    agentBoxCapabilitiesNotDeclared: 'The service has not declared any capability for this role',
+    agentBoxValuePending: 'Not declared by the service',
+    agentBoxCapabilityAbsent: 'not declared',
     agentBoxMaintenanceUnavailable: 'Profile maintenance is unavailable',
     agentBoxMaintenanceUnavailableDesc:
       'The service can list profiles, but has not declared create, edit, archive, or native-memory controls.',
@@ -2610,6 +2614,16 @@ export const en: Translations = {
     configEffectiveValue: 'Effective',
     configEffectiveServiceConfirmed: 'Service-confirmed value',
     configFixesOnAccept: 'The running configuration is fixed only when the service accepts a send.',
+    emptyState: {
+      greeting: 'What are we building?',
+      subtitle: 'Ask in your own words — the composer below is the same one you will keep using.',
+      starters: ['Summarize this week’s changes', 'Fix a failing test', 'Explain this codebase'],
+      waiting: 'Waiting for the AgentBox service…',
+      blocked: 'Choose a project (and a role) to start — the composer below shows why.'
+    },
+    serviceUnreachable: 'The AgentBox service is not reachable',
+    workspaceMissing: 'Choose a project for this chat',
+    disabledPlaceholder: 'Sending is on hold — see the note above the input',
     modelSelector: 'Model',
     modelSelectorSearch: 'Search models…',
     modelSelectorEmpty: 'No models available',
@@ -3212,7 +3226,7 @@ export const en: Translations = {
       gateway: 'Gateway',
       connected: 'Connected',
       connecting: 'Connecting',
-      offline: 'Offline',
+      offline: 'No connection to the service',
       inferenceReady: 'Inference ready',
       inferenceNotReady: 'Inference not ready',
       checkingInference: 'Checking inference',
@@ -3262,7 +3276,7 @@ export const en: Translations = {
       gatewayUnavailable: 'inference unavailable',
       gatewayChecking: 'checking',
       gatewayConnecting: 'connecting',
-      gatewayOffline: 'offline',
+      gatewayOffline: 'no service connection',
       gatewayRestarting: 'restarting…',
       gatewayTitle: 'Gateway',
       customizeTitle: 'Show in status bar',
@@ -3556,9 +3570,9 @@ export const en: Translations = {
 
   assistant: {
     thread: {
-      loadingSession: 'Loading session',
+      loadingSession: 'Loading this chat',
       showEarlier: 'Show earlier messages',
-      loadingResponse: 'Hermes is loading a response',
+      loadingResponse: 'Loading a response',
       loadingLocalModel: model => `Loading ${model} into memory`,
       processingPrompt: 'Processing prompt',
       resumeWhenBackgroundDone: count =>

@@ -292,7 +292,7 @@ const modelChoiceLabel = (choice: ComposerProviderModelChoice, copy: Translation
   const base = `${choice.providerDisplayName}: ${choice.displayName}`
 
   if (choice.availability === 'unavailable') {
-    return choice.unavailableReason ? `${base} — ${choice.unavailableReason}` : `${base} — ${copy.agentBoxUnavailable}`
+    return choice.unavailableReason ? `${base} — ${choice.unavailableReason}` : `${base} — ${copy.agentBoxServiceNoReason}`
   }
 
   return choice.availability === 'unknown' ? `${base} — ${copy.agentBoxConfigModelUnverified}` : base

@@ -1925,7 +1925,11 @@ export interface Translations {
     agentBoxVersion: string
     agentBoxCapabilities: string
     agentBoxAvailable: string
-    agentBoxUnavailable: string
+    agentBoxCapabilitiesNotDeclared: string
+    agentBoxServiceNoReason: string
+    agentBoxServiceOffline: string
+    agentBoxValuePending: string
+    agentBoxCapabilityAbsent: string
     agentBoxMaintenanceUnavailable: string
     agentBoxMaintenanceUnavailableDesc: string
     agentBoxRuntimeConfig: string
@@ -2324,6 +2328,16 @@ export interface Translations {
     configEffectiveValue: string
     configEffectiveServiceConfirmed: string
     configFixesOnAccept: string
+    emptyState: {
+      greeting: string
+      subtitle: string
+      starters: readonly string[]
+      waiting: string
+      blocked: string
+    }
+    serviceUnreachable: string
+    workspaceMissing: string
+    disabledPlaceholder: string
     modelSelector: string
     modelSelectorSearch: string
     modelSelectorEmpty: string

@@ -291,9 +291,9 @@ function ProfileDetail({ maintenance, profile, serviceOffline }: ProfileDetailPr
         status: 'ready'
       }
     } catch (reason) {
-      return { detail: reason instanceof Error ? reason.message : copy.agentBoxUnavailable, status: 'unavailable' }
+      return { detail: reason instanceof Error ? reason.message : copy.agentBoxServiceNoReason, status: 'unavailable' }
     }
-  }, [copy.agentBoxUnavailable, profile.id])
+  }, [copy.agentBoxServiceNoReason, profile.id])
 
   useEffect(() => {
     let current = true
@@ -428,7 +428,7 @@ function ProfileDetail({ maintenance, profile, serviceOffline }: ProfileDetailPr
 
       {serviceOffline ? (
         <div className="rounded bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-          {copy.agentBoxUnavailable}
+          {copy.agentBoxServiceOffline}
         </div>
       ) : null}
 
@@ -469,14 +469,14 @@ function ProfileCapabilities({ capabilities }: { capabilities: Record<string, bo
   const entries = Object.entries(capabilities)
 
   if (entries.length === 0) {
-    return <span className="text-muted-foreground">{copy.agentBoxUnavailable}</span>
+    return <span className="text-muted-foreground">{copy.agentBoxCapabilitiesNotDeclared}</span>
   }
 
   return (
     <span className="flex flex-wrap gap-1">
       {entries.map(([id, available]) => (
         <PanelPill key={id} tone={available ? 'good' : 'muted'}>
-          {id} · {available ? copy.agentBoxAvailable : copy.agentBoxUnavailable}
+          {id} · {available ? copy.agentBoxAvailable : copy.agentBoxCapabilityAbsent}
         </PanelPill>
       ))}
     </span>

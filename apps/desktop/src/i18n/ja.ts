@@ -214,7 +214,7 @@ export const ja = defineLocale({
       transcriptionFailed: '音声文字起こしに失敗しました',
       transcriptionUnavailable: '音声文字起こしはまだ利用できません。',
       tryRecordingAgain: 'もう一度録音してください。',
-      unavailable: '音声は利用できません'
+      unavailable: 'サービスの対応宣言待ち'
     },
     native: {
       approvalTitle: '承認が必要です',
@@ -375,7 +375,7 @@ export const ja = defineLocale({
         archive: 'アーカイブ',
         addModel: 'モデルを追加',
         removeModel: 'モデルを削除',
-        availability: { available: '利用可能', unknown: '不明', unavailable: '利用不可' },
+        availability: { available: '利用可能', unknown: '不明', unavailable: '利用不可 — 理由は示されていません' },
         providerPresets: 'プリセット',
         providerInUse: '使用中',
         providerCustom: 'カスタムプロバイダー（明示的な上書き）',
@@ -386,7 +386,7 @@ export const ja = defineLocale({
         modelMetaUnknownTitle: 'サービスはこのモデルについてこれらを宣言していません',
         refreshModels: 'プロバイダーから取得',
         testConnection: '接続テスト',
-        capabilityUnavailable: '利用不可：サービスはまだ対応するメソッドを宣言していません。',
+        capabilityUnavailable: '利用できません：サービスはまだ対応するメソッドを宣言していません。',
       },
       accounts: {
         title: 'アカウント',
@@ -1393,7 +1393,7 @@ export const ja = defineLocale({
         failedLoad: 'ターミナルバックエンドの読み込みに失敗しました',
         ready: '準備完了',
         needsSetup: 'セットアップが必要',
-        unavailable: '利用不可',
+        unavailable: 'サービスでは利用できません',
         inUse: '使用中',
         selectedTitle: 'バックエンドを選択しました',
         selectedMessage: backend => `ターミナルコマンドは ${backend} で実行されます。新しいセッションに適用されます。`,
@@ -1800,7 +1800,11 @@ export const ja = defineLocale({
     agentBoxVersion: 'バージョン',
     agentBoxCapabilities: '機能',
     agentBoxAvailable: '利用可能',
-    agentBoxUnavailable: '利用不可',
+    agentBoxServiceNoReason: 'サービスは理由を示していません',
+    agentBoxServiceOffline: 'AgentBox サービスはオフラインです — プロファイルと設定に必要です',
+    agentBoxCapabilitiesNotDeclared: 'サービスはこのプロファイルの機能を宣言していません',
+    agentBoxValuePending: 'サービス未宣言',
+    agentBoxCapabilityAbsent: '未宣言',
     agentBoxMaintenanceUnavailable: 'プロファイルの管理を利用できません',
     agentBoxMaintenanceUnavailableDesc:
       'サービスはプロファイルを一覧できますが、作成、編集、アーカイブ、ネイティブメモリ操作を宣言していません。',
@@ -2243,6 +2247,16 @@ export const ja = defineLocale({
     configEffectiveValue: '有効値',
     configEffectiveServiceConfirmed: 'サービスが確認した値',
     configFixesOnAccept: '実際の実行設定は、サービスが送信を受け付けた時点で確定します。',
+    emptyState: {
+      greeting: '何を作りましょうか？',
+      subtitle: '自分の言葉でどうぞ — 下の入力欄はこの後もずっと使うものです。',
+      starters: ['今週の変更をまとめる', '失敗したテストを直す', 'このコードベースを説明する'],
+      waiting: 'AgentBox サービスを待っています…',
+      blocked: 'プロジェクト（とプロファイル）を選ぶと開始できます — 理由は下の入力欄に表示されます。'
+    },
+    serviceUnreachable: 'AgentBox サービスに接続できません',
+    workspaceMissing: 'このチャットのプロジェクトを選んでください',
+    disabledPlaceholder: '送信は保留中です — 入力欄の上の案内をご覧ください',
     modelSelector: 'モデル',
     modelSelectorSearch: 'モデルを検索…',
     modelSelectorEmpty: '利用可能なモデルがありません',
@@ -2812,7 +2826,7 @@ export const ja = defineLocale({
       gateway: 'ゲートウェイ',
       connected: '接続済み',
       connecting: '接続中',
-      offline: 'オフライン',
+      offline: 'サービスに接続されていません',
       inferenceReady: '推論準備完了',
       inferenceNotReady: '推論準備未完了',
       checkingInference: '推論を確認中',
@@ -2862,7 +2876,7 @@ export const ja = defineLocale({
       gatewayUnavailable: '推論を利用できません',
       gatewayChecking: '確認中',
       gatewayConnecting: '接続中',
-      gatewayOffline: 'オフライン',
+      gatewayOffline: 'サービス未接続',
       gatewayRestarting: '再起動中…',
       gatewayTitle: 'ゲートウェイ',
       agents: 'エージェント',
@@ -3126,9 +3140,9 @@ export const ja = defineLocale({
 
   assistant: {
     thread: {
-      loadingSession: 'セッションを読み込み中',
+      loadingSession: 'このチャットを読み込み中',
       showEarlier: '以前のメッセージを表示',
-      loadingResponse: 'Hermes が応答を読み込み中',
+      loadingResponse: '応答を読み込み中',
       resumeWhenBackgroundDone: count =>
         count === 1
           ? 'バックグラウンドタスクの完了後に再開します'

@@ -86,7 +86,7 @@ export function findBotModeEntries(texts) {
  *  accepts either language because the sandbox's system locale is not ours to
  *  choose, and it never accepts a fabricated row in place of this copy. */
 export const UNAVAILABLE_COPY_PATTERN =
-  /unavailable|not available|not connected|no service|not provided|offline|不可用|未连接|未能|无法|尚未|没有可用/i
+  /unavailable|not available|not connected|no service|not provided|offline|awaiting|not reachable|not declared|has not declared|不可用|未连接|未能|无法|尚未|没有可用|等待|未声明/i
 
 export function statesUnavailable(text) {
   return UNAVAILABLE_COPY_PATTERN.test(String(text || ''))

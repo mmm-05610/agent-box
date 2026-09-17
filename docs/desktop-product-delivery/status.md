@@ -1304,3 +1304,27 @@ typecheck 当场暴露；新测试 4 条 ESLint warning 收口为 0。
 - **交付**：`harnesses` 视图列出“程序行将携带的 7 个字段”+ 缺源声明 + 下一轮生效说明（不做列表/徽标/动作）。
 - 下一步按派工表执行 **P14**（空状态 + 状态语义 + Hermes 品牌清理）。writer_lease 继续 ACTIVE。
 
+## P14 收口（2026-09-17）：空状态 + 状态语义完成、品牌清理部分完成 —
+## `P14_PARTIAL — EMPTY_STATE_AND_SEMANTICS_DONE / BRAND_SWEEP_IN_PROGRESS`
+
+- **门结果**（完整证据 `evidence/P14.md`）：
+  - **A 空状态达成**：`AgentBoxEmptyState`（品牌问候 + 一句话 + 起步项）；**与 P08 是同一个 composer**
+    （`Thread.emptyState` 插槽，输入条本体未动）；起步项**只在 `sendAvailable` 时出现**，点击走**同一条 submit seam**
+    （真的建会话并发出那一轮）；不可发送时显示原因而非陈设。
+  - **B 状态语义达成**：逐处诊断后把裸 `'Unavailable'` 全部换成**带原因**的产品事实文案（服务不可达/未选项目/
+    发送暂停（见横幅）/等待能力声明/服务未给出原因/服务离线/能力未声明/模型可用性“未给出原因”）；
+    正常态**不出现任何横幅或 pill**。**G5** 由新守卫 `dev/contracts/product-copy-guard.test.ts` 锁定
+    （深度感知 catalog 解析 + 六语言扫描，禁止恰好等于 unavailable/not available/offline/not connected/n/a/na 的取值）；
+    P06 Windows 驱动的 `UNAVAILABLE_COPY_PATTERN` 同步扩展并仍要求页面说明不可用事实。
+  - **C Gateway 台账达成**：产品 surface 侧**删除**（`LEGACY_STATUSBAR_ITEM_IDS` 含 `gateway-switcher`，
+    `visibleStatusbarItems(..., 'agentbox')` 丢弃，既有用例断言）；台账记录 401 个仍命名 gateway 的生产文件
+    均为 legacy data plane，产品面不渲染该词、无孤儿引用。
+  - **D 品牌清理部分完成**：产品自有段落（`settings.product.*`、`sidebar.agentBox*`、P08 的 `composer.*` 键、
+    `assistant.thread.loadingResponse/loadingSession`）清零并由守卫锁定；六语言 catalog 余量如实计数
+    （en 175 / zh 183 / zh-hant 158 / ja 153 / ar 123 / ru 165），多为家族名与 legacy 句子。
+    **G9 未达成**（逐句判别未完成）；**G10 达成**（i18n 组与边界用例通过）；**G11 达成**（两条字符串守卫）。
+  - **顺带**：`renderer-layers` 守卫在 Windows 上同因（反斜杠路径）空转，已与 store 守卫同法修复。
+  - 宽面终门 **346 files / 3228 tests passed，exit 0**；`tsc -p . --noEmit` exit 0；改动文件 ESLint 0/0。
+- **下一步**：P15（Settings 剪枝 + skill/MCP 中枢）**尚未开始**；P14-D 的余量已量化并留给下一轮（守卫会随段落转换扩展）。
+  writer_lease 继续 ACTIVE。
+

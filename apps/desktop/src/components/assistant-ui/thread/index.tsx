@@ -1,4 +1,13 @@
-import { createContext, memo, useCallback, useContext, useMemo, useRef, useState } from 'react'
+import {
+  createContext,
+  memo,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useMemo,
+  useRef,
+  useState
+} from 'react'
 
 import type { HermesGateway } from '@/api/client'
 import { ChatEmptySlot } from '@/components/assistant-ui/chat-empty-slot'
@@ -38,6 +47,10 @@ interface ThreadProps {
   cwd?: string | null
   gateway?: HermesGateway | null
   intro?: IntroProps
+  /** A product-owned draft screen. Rendered only when there is no legacy
+   *  intro and no session yet — a session with an empty transcript is the
+   *  plugin slot's, not this one's. */
+  emptyState?: ReactNode
   loading?: ThreadLoadingState
   onBranchInNewChat?: (messageId: string) => void
   onCancel?: () => Promise<void> | void
@@ -58,6 +71,7 @@ export const Thread = memo(function Thread({
   clampToComposer = false,
   cwd = null,
   gateway = null,
+  emptyState,
   intro,
   loading,
   onBranchInNewChat,
@@ -152,7 +166,13 @@ export const Thread = memo(function Thread({
   // nothing in it yet gets whichever plugin owns it. The slot often renders
   // nothing, which costs an empty container — harmless, since there is no
   // content to lay out until the first message swaps this branch out.
-  const emptyBody = intro ? <Intro {...intro} /> : sessionId ? <ChatEmptySlot sessionId={sessionId} /> : null
+  const emptyBody = intro ? (
+    <Intro {...intro} />
+  ) : sessionId ? (
+    <ChatEmptySlot sessionId={sessionId} />
+  ) : (
+    emptyState ?? null
+  )
 
   const emptyPlaceholder = emptyBody ? (
     <div className="flex min-h-0 w-full flex-col items-center justify-center pt-[var(--composer-measured-height)]">
