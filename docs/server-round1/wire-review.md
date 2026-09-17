@@ -416,3 +416,24 @@ ProviderModelConfigRecord = {
   （含 usage/进程事实与 provenance 的全部严格帧）。
 - **探测（models.list / connection.test）**：G2–G3 的有界探测与 SSRF 防护为
   本单的下一切片（wire 两个新动作与后端探测器），未开始——如实记录。
+
+## Order 55 G2 — 两个有界探测的 wire 面（2026-09-17，env-provider）
+
+- **新方法**（WireMethods 新条目，28→30 方法集；纯新增面，既有 28 方法语义不动）：
+  - `providerModels.probeModels {requestId, baseUrl, credentialId?} →
+     {status: ok|failed, models: string[], code?}`——一次有界 GET `{baseUrl}/models`，
+     解析 data[].id（条目上限 512、响应上限 1 MiB、连接/总超时 10s/30s）；
+  - `providerModels.probeConnection {requestId, baseUrl, credentialId?} →
+     {status: reachable|unreachable|failed, code?, detail?}`——轻量可达性检查。
+- **边界**（后端 probe.py）：https-only（loopback http 例外）；非 loopback 私网地址
+  类型化拒绝（`PROBE_ENDPOINT_BLOCKED`）；凭据仅在调用时经 SecretStore 读入请求头
+  （内存内、零 argv/零日志/零事件——错误消息只引用状态码）；响应超限
+  `PROBE_RESPONSE_TOO_LARGE`；格式不符 `PROBE_FORMAT_INVALID`；认证失败
+  `PROBE_AUTH_FAILED`；超时 `PROBE_TIMEOUT`；不可达 `PROBE_UNREACHABLE`。
+  **探测结果不写任何记录/配置**（由用户确认后另写）——工单 G3。
+- **两仓摘要（前端提交 b284f70c）**：TS
+  `64dc99610b15360d4d114cb377b9034efeab127d5d15a34da5b7db8f42d8e08f`；
+  工件 `42a164a47697f7481f4e5a224e7e2f5241719c1fa3fa476fa54f824c2096433d`
+  （后端证据副本：`docs/server-round1/fullstack/generated/wire-v1.schema.json`）。
+- **定向测试**：13 项（探测器反例：SSRF 三形态拒绝、loopback 假端点的
+  认证失败/成功/可达、超大响应上限、格式不符）——`tests/server/test_usage_parsing.py`。

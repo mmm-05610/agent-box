@@ -4001,6 +4001,118 @@
     ],
     "additionalProperties": false
   },
+  "providerModels.probeModels#params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "requestId": {
+        "type": "string",
+        "minLength": 8
+      },
+      "baseUrl": {
+        "type": "string",
+        "minLength": 1
+      },
+      "credentialId": {
+        "anyOf": [
+          {
+            "type": "string",
+            "minLength": 1
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "required": [
+      "requestId",
+      "baseUrl"
+    ],
+    "additionalProperties": false
+  },
+  "providerModels.probeModels#result": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "status": {
+        "type": "string",
+        "enum": [
+          "ok",
+          "failed"
+        ]
+      },
+      "models": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "code": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "status",
+      "models"
+    ],
+    "additionalProperties": false
+  },
+  "providerModels.probeConnection#params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "requestId": {
+        "type": "string",
+        "minLength": 8
+      },
+      "baseUrl": {
+        "type": "string",
+        "minLength": 1
+      },
+      "credentialId": {
+        "anyOf": [
+          {
+            "type": "string",
+            "minLength": 1
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "required": [
+      "requestId",
+      "baseUrl"
+    ],
+    "additionalProperties": false
+  },
+  "providerModels.probeConnection#result": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "status": {
+        "type": "string",
+        "enum": [
+          "reachable",
+          "unreachable",
+          "failed"
+        ]
+      },
+      "code": {
+        "type": "string"
+      },
+      "detail": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "status"
+    ],
+    "additionalProperties": false
+  },
   "config.describe#params": {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "type": "object",
