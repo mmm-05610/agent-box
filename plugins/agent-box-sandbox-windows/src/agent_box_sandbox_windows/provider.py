@@ -146,6 +146,14 @@ class WindowsSandboxPort:
                     "WINDOWS_PROJECTION_MISSING", f"projection source is absent: {source}",
                 )
             destination.parent.mkdir(parents=True, exist_ok=True)
+            if destination.exists():
+                # A previous attempt marked it read-only; both clean-up and the
+                # next attempt must be able to replace it (first-hand failure:
+                # copyfile onto a read-only destination is EACCES on Windows).
+                try:
+                    os.chmod(destination, 0o644)
+                except OSError:
+                    pass
             shutil.copyfile(source_path, destination)
             _mark_read_only(destination)
 

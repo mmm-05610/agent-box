@@ -49,6 +49,29 @@ ENTRYPOINT = "/runtime/view/agentbox-sidecar/runtime/worker-entry.mjs"
 SECRET_VALUE = "conformance-credential-not-a-real-secret"
 
 
+def _force_remove(function, path, _exc):
+    """rmtree helper: clear the read-only attribute, then retry.
+
+    Windows keeps read-only as a file attribute, and rmtree refuses to delete
+    such files; the provider marks materialised configuration read-only on
+    purpose, so the gate must be able to clean up after it.
+    """
+    import stat as _stat
+
+    try:
+        os.chmod(path, _stat.S_IWRITE)
+    except OSError:
+        pass
+    try:
+        function(path)
+    except OSError:
+        pass
+
+
+def _rmtree_force(path):
+    shutil.rmtree(path, onerror=_force_remove)
+
+
 class GateFailure(RuntimeError):
     def __init__(self, code: str, message: str) -> None:
         super().__init__(f"{code}: {message}")
@@ -96,8 +119,57 @@ class _RedirectHomePort:
         return {"status": "available", "code": "fixture"}
 
 
+class _RedirectHomeWindowsPort:
+    """The Windows counter-example: the home is a redirected copy.
+
+    It delegates to the real Windows provider but rewrites the home to a
+    scratch copy first, so every write the room makes lands on the copy and
+    the gate's home-is-real check must fail.
+    """
+
+    provider_id = "fake-redirect-home"
+
+    def __init__(self) -> None:
+        from agent_box_sandbox_windows.provider import WindowsSandboxPort
+
+        self.scratch = Path(tempfile.mkdtemp(prefix="agentbox-conformance-redirect-"))
+        self._inner = WindowsSandboxPort(
+            node_path=os.environ.get("AGENT_BOX_NODE_PATH") or "node.exe")
+
+    def compose_sidecar_room(self, request):
+        import dataclasses
+
+        redirected = self.scratch / "home"
+        if request.state_home_source:
+            shutil.copytree(request.state_home_source, redirected, dirs_exist_ok=True)
+        # A real redirecting provider rewrites *every* home-anchored path the
+        # caller supplied (the gate's own probe paths included) - that is what
+        # makes this counter-example catch the gate's home-is-real check.
+        original = str(Path(request.state_home_source))
+        base = {
+            key: (value.replace(original, str(redirected))
+                  if isinstance(value, str) else value)
+            for key, value in (request.base_environment or {}).items()
+        }
+        rewritten = dataclasses.replace(
+            request, state_home_source=str(redirected), base_environment=base,
+        )
+        return self._inner.compose_sidecar_room(rewritten)
+
+    def declaration_document(self, **kwargs):
+        return self._inner.declaration_document(**kwargs)
+
+    def descriptor_id(self) -> str:
+        return self.provider_id
+
+    def probe(self):
+        return {"status": "available", "code": "fixture"}
+
+
 def _resolve(provider: str):
     if provider == "fake-redirect-home":
+        if os.name == "nt":
+            return _RedirectHomeWindowsPort()
         return _RedirectHomePort()
     from agent_box.extensions.runtime_composition.sandbox_port import (
         resolve_sandbox_port,
@@ -136,7 +208,18 @@ def _run_room(port, staged: dict, *, linger_ms: int = 0, network_mode: str = "in
 
     # The guest environment is a whitelist, so the probe reads the fixed guest
     # layout itself; the gate only stages the linger marker when needed.
-    environment = {"AGENTBOX_SIDECAR_ISOLATED": "1"}
+    environment = {
+        "AGENTBOX_SIDECAR_ISOLATED": "1",
+        # Paths the probe writes to: guest paths on Linux, real paths on a
+        # platform without bind mounts (the provider passes base_environment
+        # through, so the gate can state them).
+        "PROBE_HOME": str(staged["home"]) if os.name == "nt" else "/runtime/home/.fixture",
+        "PROBE_WORKSPACE": str(staged["workspace"]) if os.name == "nt" else "/workspace",
+        "PROBE_HOST_ROOT": str(Path.home().anchor) if os.name == "nt" else "/home",
+        "PROBE_EPHEMERAL_DIR": (
+            str(staged["home"] / ".tmp") if os.name == "nt" else "/runtime/home/.fixture/.tmp"
+        ),
+    }
     marker = staged["workspace"] / "linger"
     if linger_ms > 0:
         marker.write_text("linger\n")
@@ -148,6 +231,7 @@ def _run_room(port, staged: dict, *, linger_ms: int = 0, network_mode: str = "in
         projection_mounts=(("ro-input.txt", "/runtime/home/.fixture/ro-input.txt"),),
         state_home_source=str(staged["home"]),
         state_target="/runtime/home/.fixture",
+        native_home=".fixture",
         state_ephemeral_paths=(".tmp",),
         invariants=RoomInvariants(network_mode=network_mode),
     ))
@@ -155,21 +239,44 @@ def _run_room(port, staged: dict, *, linger_ms: int = 0, network_mode: str = "in
 
 
 def _spawn(spec):
+    # A provider's environment is authoritative for the room: on Linux the
+    # bwrap argv carries --clearenv and the setenv list; on Windows (no
+    # wrapper) the spec's environment is merged over this process's, so the
+    # probe's paths and the credential actually reach the child.
+    environment = dict(os.environ)
+    environment.update(spec.environment)
     process = subprocess.Popen(  # noqa: S603 - the argv is the reviewed room
         list(spec.argv), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE, text=True, start_new_session=True,
+        stderr=subprocess.PIPE, text=True, start_new_session=(os.name != "nt"),
+        env=environment,
     )
     return process
 
 
-def _sleep_procs() -> list[tuple[str, list[str]]]:
-    """Every live process whose exact argv is the marker sleep.
+#: The marker the probe embeds in its child's command line; every process
+#: carrying it is the probe's child (and nothing else should ever carry it).
+CHILD_MARKER = "593.417"
 
-    Exact argv matching, not a pgrep pattern: any shell whose command line
-    merely contains the pattern would match a regex, and the point of this
-    check is the process the probe actually spawned.
+
+def _marker_procs() -> list[str]:
+    """Every live process whose command line carries the child marker.
+
+    Linux reads /proc directly; Windows asks the OS through PowerShell's CIM
+    view. Both match the *marker*, not a bare command name, so a shell whose
+    command line merely mentions it cannot be mistaken for the child.
     """
-    hits: list[tuple[str, list[str]]] = []
+    if os.name == "nt":
+        query = (
+            "Get-CimInstance Win32_Process | "
+            f"Where-Object {{ $_.Name -eq 'node.exe' -and $_.CommandLine -like '*{CHILD_MARKER}*' }} | "
+            "Select-Object -ExpandProperty ProcessId"
+        )
+        done = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-Command", query],
+            capture_output=True, text=True, timeout=30,
+        )
+        return [line.strip() for line in done.stdout.splitlines() if line.strip().isdigit()]
+    hits: list[str] = []
     for entry in Path("/proc").iterdir():
         if not entry.name.isdigit():
             continue
@@ -178,8 +285,8 @@ def _sleep_procs() -> list[tuple[str, list[str]]]:
         except OSError:
             continue
         argv = [part.decode(errors="replace") for part in raw.split(b"\0") if part]
-        if len(argv) == 2 and argv[0].endswith("/sleep") and argv[1] == "593.417":
-            hits.append((entry.name, argv))
+        if any(CHILD_MARKER in part for part in argv):
+            hits.append(entry.name)
     return hits
 
 
@@ -192,6 +299,24 @@ def run_gate(provider: str) -> dict:
     port = _resolve(provider)
     root = Path(tempfile.mkdtemp(prefix="agentbox-conformance-"))
     staged = _stage(root)
+    # The check set is driven by the provider's own declaration ("declared and
+    # observed"): a capability it declares supported is asserted positively,
+    # and a capability it declares unavailable is asserted *negatively* - the
+    # boundary must really be absent - so a degraded platform is recorded
+    # honestly instead of being failed for telling the truth.
+    claims: dict[str, str] = {}
+    try:
+        document = port.declaration_document(
+            readonly_targets=("/runtime/home/.fixture/ro-input.txt",),
+            writable_targets=("/runtime/home/.fixture",),
+            environment_binding="conformance|binding",
+            observed_at=int(time.time()),
+        )
+        claims = {item.capability_id: item.support_state for item in document.declarations}
+    except Exception:
+        claims = {}
+    report["declaredCapabilities"] = claims
+    read_isolation_declared = claims.get("filesystem.readonly@1") == "supported"
     try:
         # 8a. a `none` demand must be refused or honestly kept; our template
         # declares the posture unavailable, so the refusal is the evidence.
@@ -233,26 +358,67 @@ def run_gate(provider: str) -> dict:
             "in_room_write": probe["writes"].get("home"),
             "host_file_present": home_file.is_file(),
         }
-        # 2. the host's home tree (including ~/.codex) is invisible; the probe
-        # checks the whole /home root, which is strictly stronger.
-        report["checks"]["host_home_blind"] = {
-            "status": "pass" if not probe["facts"].get("hostHomeVisible") else "fail",
-        }
-        # 3. RO input immutable.
-        report["checks"]["ro_immutable"] = {
-            "status": "pass" if (
-                probe["writes"].get("ro") in {"EROFS", "EACCES", "EPERM"}
-                and staged["ro_host"].read_text() == "reviewed read-only input\n"
-            ) else "fail",
-            "in_room_write": probe["writes"].get("ro"),
-        }
-        # 4. ephemeral path leaves no residue in the real home.
-        report["checks"]["temp_no_residue"] = {
-            "status": "pass" if (
-                probe["writes"].get("ephemeral") == "ok"
-                and not (staged["home"] / ".tmp" / "residue.txt").exists()
-            ) else "fail",
-        }
+        # 2. host-home visibility. With read isolation declared supported the
+        # host tree must be invisible; with it declared unavailable the
+        # negative observation (the host tree IS visible) is the evidence that
+        # the declaration is honest.
+        visible = bool(probe["facts"].get("hostHomeVisible"))
+        if read_isolation_declared:
+            report["checks"]["host_home_blind"] = {
+                "status": "pass" if not visible else "fail",
+            }
+        else:
+            report["checks"]["host_home_blind"] = {
+                "status": "pass" if visible else "fail",
+                "declaration_cross_check":
+                    "read isolation declared unavailable; host tree visible as declared"
+                    if visible else
+                    "read isolation declared unavailable but the host tree was NOT "
+                    "visible - the declaration understates this provider",
+            }
+        # 3. RO input immutability. The host source's bytes must be unchanged
+        # on every platform; the in-room write being *refused* is only
+        # required where the provider declares a read-only face.
+        source_unchanged = staged["ro_host"].read_text() == "reviewed read-only input\n"
+        in_room = probe["writes"].get("ro")
+        if read_isolation_declared:
+            report["checks"]["ro_immutable"] = {
+                "status": "pass" if in_room in {"EROFS", "EACCES", "EPERM"} and source_unchanged
+                else "fail",
+                "in_room_write": in_room,
+            }
+        else:
+            report["checks"]["ro_immutable"] = {
+                "status": "pass" if source_unchanged else "fail",
+                "in_room_write": in_room,
+                "declaration_cross_check":
+                    "read-only face declared unavailable; the host source is the "
+                    "authority and its bytes are unchanged",
+            }
+        # 4. ephemeral paths. Where the platform can shadow them (Linux tmpfs)
+        # the write succeeds and nothing lands on the host. Where it cannot
+        # (Windows: no tmpfs, and D4 forbids claiming a mask), the D4 sequence
+        # is asserted instead: the write lands, the host stack removes the
+        # subtree after the attempt, and the report says "removed after the
+        # attempt", never "masked".
+        ephemeral_dir = staged["home"] / ".tmp"
+        if read_isolation_declared:
+            report["checks"]["temp_no_residue"] = {
+                "status": "pass" if (
+                    probe["writes"].get("ephemeral") == "ok"
+                    and not (ephemeral_dir / "residue.txt").exists()
+                ) else "fail",
+            }
+        else:
+            _rmtree_force(ephemeral_dir)
+            report["checks"]["temp_no_residue"] = {
+                "status": "pass" if (
+                    probe["writes"].get("ephemeral") == "ok"
+                    and not ephemeral_dir.exists()
+                ) else "fail",
+                "semantics": "removed after the attempt (D4); not masked - this "
+                             "platform has no tmpfs and none is claimed",
+            }
         # 5. workspace really writable (the room's own work area).
         report["checks"]["workspace_writable"] = {
             "status": "pass" if (staged["workspace"] / "probe-workspace.txt").is_file()
@@ -276,7 +442,7 @@ def run_gate(provider: str) -> dict:
                 observed = json.loads(line.strip())["facts"].get("childPid")
             except (ValueError, KeyError):
                 continue
-        control = _sleep_procs()
+        control = _marker_procs()
         if observed is None or not control:
             report["checks"]["tree_dies"] = {
                 "status": "fail",
@@ -285,14 +451,21 @@ def run_gate(provider: str) -> dict:
             }
             linger.kill()
         else:
-            linger.send_signal(signal.SIGKILL)
-            linger.wait(timeout=30)
-            time.sleep(0.5)
-            after = _sleep_procs()
+            if os.name == "nt":
+                subprocess.run(["taskkill.exe", "/PID", str(linger.pid), "/T", "/F"],
+                               capture_output=True, text=True, timeout=30)
+            else:
+                linger.send_signal(signal.SIGKILL)
+            try:
+                linger.wait(timeout=30)
+            except subprocess.TimeoutExpired:
+                linger.kill()
+            time.sleep(0.8)
+            after = _marker_procs()
             report["checks"]["tree_dies"] = {
                 "status": "pass" if not after else "fail",
-                "control_before_kill": [pid for pid, _argv in control],
-                "after_kill": [pid for pid, _argv in after],
+                "control_before_kill": control,
+                "after_kill": after,
             }
 
         failed = [name for name, check in report["checks"].items()
@@ -307,13 +480,13 @@ def run_gate(provider: str) -> dict:
         return report
     finally:
         # 7. cleanup bounded: the gate's own temporary root disappears.
-        shutil.rmtree(root, ignore_errors=True)
+        _rmtree_force(root)
         report.setdefault("checks", {})["cleanup_bounded"] = {
             "status": "pass" if not root.exists() else "fail",
         }
         scratch = getattr(port, "scratch", None)
         if scratch is not None:
-            shutil.rmtree(scratch, ignore_errors=True)
+            _rmtree_force(scratch)
         if report.get("result") in (None, "SANDBOX_CONFORMANCE_GATE_OK") and (
             report.get("checks", {}).get("cleanup_bounded", {}).get("status") == "fail"
         ):

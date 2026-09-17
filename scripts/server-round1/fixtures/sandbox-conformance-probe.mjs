@@ -9,7 +9,12 @@
 import fs from 'node:fs'
 import { spawn } from 'node:child_process'
 
-const HOME = '/runtime/home/.fixture'
+// Guest paths by default (the Linux shape); a platform without bind mounts
+// passes its real paths through the environment instead.
+const HOME = process.env.PROBE_HOME || '/runtime/home/.fixture'
+const WORKSPACE = process.env.PROBE_WORKSPACE || '/workspace'
+const HOST_ROOT = process.env.PROBE_HOST_ROOT || '/home'
+const CHILD_MARKER = process.env.PROBE_CHILD_MARKER || '593.417'
 const result = { writes: {}, facts: {} }
 
 const write = (target, text) => {
@@ -18,7 +23,7 @@ const write = (target, text) => {
   fs.writeFileSync(target, text)
 }
 
-try { write('/workspace/probe-workspace.txt', 'workspace-ok'); result.writes.workspace = 'ok' }
+try { write(`${WORKSPACE}/probe-workspace.txt`, 'workspace-ok'); result.writes.workspace = 'ok' }
 catch (error) { result.writes.workspace = String(error.code || error) }
 
 try { write(`${HOME}/ro-input.txt`, 'tampered'); result.writes.ro = 'unexpected' }
@@ -30,18 +35,21 @@ catch (error) { result.writes.home = String(error.code || error) }
 try { write(`${HOME}/.tmp/residue.txt`, 'ephemeral'); result.writes.ephemeral = 'ok' }
 catch (error) { result.writes.ephemeral = String(error.code || error) }
 
-result.facts.hostHomeVisible = fs.existsSync('/home')
+result.facts.hostHomeVisible = fs.existsSync(HOST_ROOT)
 result.facts.cwd = process.cwd()
 
-const linger = fs.existsSync('/workspace/linger')
+const linger = fs.existsSync(`${WORKSPACE}/linger`)
 if (linger) {
   // A unique argv: the child lives in the room's PID namespace, so the host
   // identifies it by this argument, not by any pid the probe could report.
-  const child = spawn('/usr/bin/sleep', ['593.417'], { stdio: 'ignore' })
+  // The Android/Windows portability note: the child is node itself.
+  const child = spawn(process.execPath, ['-e', `setTimeout(()=>{}, 600000); // ${CHILD_MARKER}`], { stdio: 'ignore' })
   result.facts.childPid = child.pid
 }
 
-process.stdout.write(JSON.stringify(result) + '\n')
+// A pipe is block-buffered for node; a lingering probe would never flush
+// its report, and the gate's reader would time out waiting for it.
+fs.writeSync(1, JSON.stringify(result) + '\n')
 if (linger) {
   setInterval(() => {}, 1000)
 } else {
