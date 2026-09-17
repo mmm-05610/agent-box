@@ -111,3 +111,47 @@ describe('ProductSettings skill and MCP hubs', () => {
     expect(container.textContent).not.toMatch(/sha256|sk-[A-Za-z0-9]{6,}/i)
   })
 })
+
+// P16: hooks are per family and live in the service (59). Until it declares
+// the schema and ledger, the surface names each family's real shape and the
+// safety rule, and renders no control at all — a read-only shell would be
+// exactly the dead control the order forbids.
+describe('ProductSettings hook plan', () => {
+  it('names each family' + "'" + 's own model, including the one still to be measured', () => {
+    const { container } = render(<ProductSettings view="hooks" />)
+
+    const families = container.querySelector('[data-hook-families]')?.textContent ?? ''
+
+    expect(families).toContain('Claude Code — declarative')
+    expect(families).toContain('OpenCode — a code asset')
+    expect(families).toContain('Codex — shape pending measurement')
+    expect(container.querySelector('[data-hook-plan]')?.textContent).toContain('Editing is not available yet')
+  })
+
+  it('states default-off, sandbox execution and the confirmation before enabling', () => {
+    const { container } = render(<ProductSettings view="hooks" />)
+
+    const safety = container.querySelector('[data-hook-safety]')?.textContent ?? ''
+
+    expect(safety).toContain('off by default')
+    expect(safety).toContain('inside that execution’s sandbox')
+    expect(safety).toContain('never directly on this machine')
+  })
+
+  it('names the trigger ledger and its blocking semantics', () => {
+    const { container } = render(<ProductSettings view="hooks" />)
+
+    const ledger = container.querySelector('[data-hook-ledger]')?.textContent ?? ''
+
+    expect(ledger).toContain('Exit code')
+    expect(ledger).toContain('Blocking, named as such')
+  })
+
+  it('renders no switch, field or button: nothing dead to press', () => {
+    const { container } = render(<ProductSettings view="hooks" />)
+
+    expect(screen.queryByRole('button')).toBeNull()
+    expect(screen.queryByRole('switch')).toBeNull()
+    expect(screen.queryByRole('textbox')).toBeNull()
+  })
+})

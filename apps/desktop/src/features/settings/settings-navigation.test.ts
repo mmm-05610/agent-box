@@ -9,6 +9,7 @@ describe('AgentBox settings navigation', () => {
       'product:resources',
       'product:identities',
       'product:harnesses',
+      'product:hooks',
       'product:data',
       'appearance',
       'notifications',

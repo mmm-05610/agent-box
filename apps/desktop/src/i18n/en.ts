@@ -535,6 +535,15 @@ export const en: Translations = {
         description: 'Manage named logins and API-key identities without requiring an AgentBox account for local use.',
         boundary: 'Credentials remain service-owned and are excluded from ordinary configuration and backups.'
       },
+      hooks: {
+        title: 'Hooks',
+        description: 'Run a command when an event fires — declared per family, edited in one shell.',
+        boundary: 'Hooks never become a single abstraction: each family keeps its own model, and a family that supports no hooks says so instead of offering a switch.',
+        families: ['Claude Code — declarative: event, optional matcher, handler (command/http), timeout, async, status message', 'OpenCode — a code asset: the plugin source itself, with its digest and a preview, placed where that family loads it', 'Codex — shape pending measurement: no form is shown until that family’s real shape is measured'],
+        familiesPending: 'Editing is not available yet: the per-family schema, storage and trigger ledger belong to the service, which has not declared them. Nothing is faked in the meantime — no editable form, no switch, no dead control.',
+        safety: 'Hooks are off by default. Enabling one shows the full command and the event it is bound to, and asks for confirmation: it runs inside that execution’s sandbox with that execution’s isolation and network posture, never directly on this machine.',
+        ledgerFields: ['Hook name and event', 'When it ran', 'Exit code', 'A bounded output summary', 'Blocking, named as such — a hook that stopped the tool call must not read as an ordinary success']
+      },
       harnesses: {
         title: 'Harnesses',
         description: 'Install and update supported Harnesses on this computer only.',

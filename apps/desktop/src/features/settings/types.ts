@@ -17,7 +17,7 @@ export type SettingsView =
   | 'plugins'
   | 'providers'
   | 'sessions'
-  | `product:${'data' | 'harnesses' | 'identities' | 'models' | 'resources'}`
+  | `product:${'data' | 'harnesses' | 'hooks' | 'identities' | 'models' | 'resources'}`
   | `config:${string}`
 export type EnvPatch = Partial<Pick<EnvVarInfo, 'is_set' | 'redacted_value'>>
 

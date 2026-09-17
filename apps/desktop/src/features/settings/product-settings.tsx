@@ -1,6 +1,6 @@
 import { ListRow, Pill, SettingsContent, SettingsSection } from '@/components/settings/primitives'
 import { useI18n } from '@/i18n'
-import { Archive, Cpu, Package, Users, Wrench } from '@/lib/icons'
+import { Archive, Cpu, Package, Zap, Users, Wrench } from '@/lib/icons'
 
 import { AgentBoxModelSettings } from './agentbox-model-settings'
 import type { ProductSettingsView } from './settings-navigation'
@@ -8,6 +8,7 @@ import type { ProductSettingsView } from './settings-navigation'
 const PRODUCT_ICONS = {
   data: Archive,
   harnesses: Wrench,
+  hooks: Zap,
   identities: Users,
   models: Cpu,
   resources: Package
@@ -45,6 +46,30 @@ export function ProductSettings({ view }: { view: ProductSettingsView }) {
               ))}
             </ul>
             <div data-harness-version-next-turn="">{copy.harnesses.nextTurn}</div>
+          </div>
+        )}
+        {view === 'hooks' && (
+          /* P16: the hook model lives in the service (59) — per-family schema,
+             storage, materialization and the trigger ledger. Until it declares
+             them this surface names each family's real shape, states what is
+             missing, and renders NOTHING that could be pressed: a read-only
+             shell here would be a dead control, and the order's top discipline
+             is that a control which cannot act is not shown at all. */
+          <div className="space-y-3 px-3 py-2 text-xs text-muted-foreground" data-hook-plan="">
+            <div>{copy.hooks.familiesPending}</div>
+            <ul className="list-disc space-y-0.5 pl-4" data-hook-families="">
+              {copy.hooks.families.map(family => (
+                <li key={family}>{family}</li>
+              ))}
+            </ul>
+            <div data-hook-safety="">{copy.hooks.safety}</div>
+            <div className="space-y-1" data-hook-ledger="">
+              <ul className="list-disc space-y-0.5 pl-4">
+                {copy.hooks.ledgerFields.map(field => (
+                  <li key={field}>{field}</li>
+                ))}
+              </ul>
+            </div>
           </div>
         )}
         {view === 'resources' && (

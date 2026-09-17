@@ -1352,5 +1352,11 @@ typecheck 当场暴露；新测试 4 条 ESLint warning 收口为 0。
   （测试连接与启用都要等 58）；凭据只引用不显示内容；「无槽位的家族会说明而不是给一个无效开关」写在界面上。
   门：G5/G6 成立（当前形态）、G4/G7 不适用（三态与失败可读性属 58）；新增 4 例，settings+i18n+contracts
   **31 files / 279 tests passed, exit 0**；`tsc -p . --noEmit` exit 0。
-- **下一步**：P16（Hook 管理器）。writer_lease 继续 ACTIVE。
+- **P16 收口：`P16_GREEN — HOOK_VIEW_CLIENT_READY`**（诚实占位，零可点控件）：
+  新增设置视图 `product:hooks`（侧栏可见）；逐家列出真实模型（Claude Code 声明式字段 / OpenCode 代码资产 /
+  **Codex 待实测**）、默认关闭 + **沙箱内执行** + 启用前确认、触发账本字段（含「阻断要如实标注」）；
+  **不渲染任何表单/开关/按钮**（任何一个都无法生效 → 不摆死控件）；零凭据字段。
+  门：G3/G4/G5 成立（当前形态），G1/G2/G6/G7 不适用（属 59）；新增 4 例 + 导航清单同步，
+  settings+i18n+contracts+app **120 files / 1147 tests passed, exit 0**；`tsc -p . --noEmit` exit 0。
+- **下一步**：P17（Profile 设置）。writer_lease 继续 ACTIVE。
 

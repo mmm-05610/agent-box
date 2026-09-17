@@ -1,12 +1,13 @@
 import type { SettingsView } from './types'
 
-export type ProductSettingsView = 'data' | 'harnesses' | 'identities' | 'models' | 'resources'
+export type ProductSettingsView = 'data' | 'harnesses' | 'hooks' | 'identities' | 'models' | 'resources'
 
 export const ACTIVE_SETTINGS_VIEWS = [
   'product:models',
   'product:resources',
   'product:identities',
   'product:harnesses',
+  'product:hooks',
   'product:data',
   'appearance',
   'notifications',

@@ -8,7 +8,7 @@ import { KbdCombo } from '@/components/ui/kbd'
 import { typeToFocusChar } from '@/features/chat/composer/focus-keys'
 import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
-import { Archive, Bell, Cpu, Info, Keyboard, Package, Palette, Search, Users, Wrench } from '@/lib/icons'
+import { Archive, Bell, Cpu, Info, Keyboard, Package, Palette, Zap, Search, Users, Wrench } from '@/lib/icons'
 import { isEditableTarget } from '@/lib/keybinds/combo'
 import { cn } from '@/lib/utils'
 import { $commandPaletteOpen, openCommandPalettePage } from '@/store/command-palette'
@@ -30,6 +30,7 @@ import type { SettingsPageProps, SettingsView as SettingsViewId } from './types'
 const SETTINGS_ICONS = {
   'product:data': Archive,
   'product:harnesses': Wrench,
+  'product:hooks': Zap,
   'product:identities': Users,
   'product:models': Cpu,
   'product:resources': Package
@@ -53,7 +54,16 @@ export function SettingsView({ authority, onClose }: SettingsPageProps) {
 
   const navGroups: OverlayNavGroup[] = useMemo(
     () => [
-      ...(['product:models', 'product:resources', 'product:identities', 'product:harnesses', 'product:data'] as const).map(
+      ...(
+        [
+          'product:models',
+          'product:resources',
+          'product:identities',
+          'product:harnesses',
+          'product:hooks',
+          'product:data'
+        ] as const
+      ).map(
         view => ({
           active: activeView === view,
           icon: SETTINGS_ICONS[view],

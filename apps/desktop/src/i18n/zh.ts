@@ -520,6 +520,15 @@ export const zh: Translations = {
         description: '管理命名登录与 API Key 身份；本地使用不要求 AgentBox 账号。',
         boundary: '凭据由服务管理，并排除在普通配置与备份之外。'
       },
+      hooks: {
+        title: 'Hooks',
+        description: '事件触发时执行命令——按家族各自声明，在一个外壳里编辑。',
+        boundary: 'Hook 不会被压成一个抽象：每家保留自己的模型；不支持 hook 的家族会如实说明，而不是给一个开关。',
+        families: ['Claude Code——声明式：事件、可选匹配器、处理器（command/http）、timeout、async、状态文案', 'OpenCode——代码资产：插件源码本身，附摘要与预览，放在该家加载它的位置', 'Codex——形态待实测：在实测出该家真实形态之前不显示表单'],
+        familiesPending: '尚不可编辑：逐家 schema、存储与触发账本属于服务，而服务尚未声明这些能力。在此之前不做任何假替——没有可编辑表单、没有开关、没有点了不动的控件。',
+        safety: 'Hook 默认关闭。启用时会显示完整命令与它所绑定的事件并要求确认：它在当次执行的沙箱内、用当次执行的隔离与网络姿态运行，绝不在本机直跑。',
+        ledgerFields: ['Hook 名称与事件', '何时运行', '退出码', '有界的输出摘要', '阻断要如实标注——拦下工具调用的 hook 不得显示成普通成功']
+      },
       harnesses: {
         title: 'Harness',
         description: '只在这台电脑上安装和更新受支持的 Harness。',

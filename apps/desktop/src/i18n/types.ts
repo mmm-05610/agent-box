@@ -479,6 +479,18 @@ export interface Translations {
         enablement: string
       }
       identities: { title: string; description: string; boundary: string }
+      hooks: {
+        title: string
+        description: string
+        boundary: string
+        /** One row per family model — the shapes are genuinely different. */
+        families: readonly string[]
+        familiesPending: string
+        /** Default-off and sandbox execution: stated before anything can run. */
+        safety: string
+        /** What a trigger record will carry, blocking semantics included. */
+        ledgerFields: readonly string[]
+      }
       harnesses: {
         title: string
         description: string

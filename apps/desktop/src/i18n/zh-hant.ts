@@ -409,6 +409,15 @@ export const zhHant = defineLocale({
         description: '管理具名登入與 API Key 身分；本機使用不要求 AgentBox 帳號。',
         boundary: '憑證由服務管理，且不進入一般設定與備份。'
       },
+      hooks: {
+        title: 'Hooks',
+        description: '事件觸發時執行命令——依家族各自宣告，在一個外殼裡編輯。',
+        boundary: 'Hook 不會被壓成一個抽象：每家保留自己的模型；不支援 hook 的家族會如實說明，而不是給一個開關。',
+        families: ['Claude Code——宣告式：事件、可選比對器、處理器（command/http）、timeout、async、狀態文案', 'OpenCode——程式碼資產：外掛原始碼本身，附摘要與預覽，放在該家載入它的位置', 'Codex——形態待實測：在實測出該家真實形態之前不顯示表單'],
+        familiesPending: '尚不可編輯：逐家 schema、儲存與觸發帳本屬於服務，而服務尚未宣告這些能力。在此之前不做任何假替——沒有可編輯表單、沒有開關、沒有點了不動的控件。',
+        safety: 'Hook 預設關閉。啟用時會顯示完整命令與它所綁定的事件並要求確認：它在當次執行的沙箱內、用當次執行的隔離與網路姿態執行，絕不在本機直跑。',
+        ledgerFields: ['Hook 名稱與事件', '何時執行', '結束碼', '有界的輸出摘要', '阻斷要如實標註——攔下工具呼叫的 hook 不得顯示成普通成功']
+      },
       harnesses: {
         title: 'Harness',
         description: '只在這台電腦上安裝與更新支援的 Harness。',
