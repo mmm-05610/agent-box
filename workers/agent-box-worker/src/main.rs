@@ -331,6 +331,23 @@ async fn serve(
                             Err((code, message)) => write_error_for(&mut output, sequence, &request.request_id, code, message).await?,
                         }
                     }
+                    "workspace.list" => {
+                        let Some(workspace_path) = workspace.as_ref() else {
+                            let error = json!({
+                                "code": "WORKSPACE_NOT_FOUND",
+                                "message": "no workspace was authorized at bootstrap",
+                            });
+                            write_error_for(&mut output, sequence, &request.request_id,
+                                            "WORKSPACE_NOT_FOUND",
+                                            "no workspace was authorized at bootstrap").await?;
+                            let _ = error;
+                            continue;
+                        };
+                        match handle_workspace_list(workspace_path, &request.arguments) {
+                            Ok(value) => write_response(&mut output, sequence, &request.request_id, value).await?,
+                            Err((code, message)) => write_error_for(&mut output, sequence, &request.request_id, code, message).await?,
+                        }
+                    }
                     "home.prepare" | "home.list" | "home.get" | "home.delete" => {
                         match handle_home(&home_root, &request.op, &request.arguments) {
                             Ok(value) => write_response(&mut output, sequence, &request.request_id, value).await?,
@@ -2112,6 +2129,30 @@ struct HomeAudit {
     truncated_bytes: u64,
     oversize: u64,
     visited: usize,
+}
+
+/// Order 54: a bounded, link-free listing of the *declared workspace* —
+/// the same descent and truncation rules as the home audit, rooted at the
+/// workspace the bootstrap authorized. Entries carry relative path, size and
+/// digest; symlinks and special files are skip facts; the entry cap is the
+/// home audit's own bound.
+fn handle_workspace_list(
+    workspace: &Path,
+    _args: &serde_json::Value,
+) -> Result<serde_json::Value, (&'static str, &'static str)> {
+    let workspace_dir = canonical_directory(workspace)
+        .map_err(|_| ("WORKSPACE_NOT_FOUND", "workspace does not exist"))?;
+    let dir_fd = fs::File::open(&workspace_dir)
+        .map_err(|_| ("WORKSPACE_NOT_FOUND", "workspace does not exist"))?;
+    let mut audit = HomeAudit::default();
+    audit_home_files(dir_fd.as_raw_fd(), "", &mut audit)
+        .map_err(|(code, message)| (code, message))?;
+    Ok(json!({
+        "files": audit.files,
+        "truncated": {"entries": audit.truncated_entries, "bytes": audit.truncated_bytes,
+                      "oversize": audit.oversize},
+        "skipped": audit.skipped,
+    }))
 }
 
 fn audit_home_files(

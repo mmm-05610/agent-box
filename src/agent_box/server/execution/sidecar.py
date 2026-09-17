@@ -387,6 +387,19 @@ class WorkerSidecarLauncher:
                     "attemptId": attempt_id, "frameId": secret_frame_id,
                     "data": base64.b64encode(credential_material).decode(),
                 })["path"]
+            # Order 54: the launcher's before-snapshot of the declared
+            # workspace, taken while the room's files do not exist yet — the
+            # audit's after listing diffs against this.
+            before_snapshot = None
+            try:
+                listing = client.request("workspace.list", {}, timeout=60.0)
+                before_snapshot = {
+                    entry.get("path"): entry
+                    for entry in listing.get("files", ())
+                    if entry.get("path")
+                }
+            except SidecarError:
+                before_snapshot = None
             # The home is prepared before the room exists: the Worker creates
             # (or marker-verifies) the Profile's directory and the declared
             # audit window, and answers with the host path that the room will
@@ -459,6 +472,7 @@ class WorkerSidecarLauncher:
                 state_ephemeral_paths=self.state_ephemeral_paths,
                 forbidden_content=(credential_material or b"").strip(),
                 usage_probe=self.usage_probe,
+                workspace_before_snapshot=before_snapshot,
             )
             channels.subscribe()
             client.request(
@@ -496,6 +510,7 @@ class _WorkerChannels:
         home_locator: str = "", audit_window: str | None = None,
         audit_whole_home: bool = False,
         usage_probe: Mapping[str, str] | None = None,
+        workspace_before_snapshot: Mapping[str, Any] | None = None,
         protected_state_paths: Sequence[str] = (),
         state_ephemeral_paths: Sequence[str] = (),
         forbidden_content: bytes = b"",
@@ -514,6 +529,12 @@ class _WorkerChannels:
         #: Order 51: the declared usage probe (journal suffix + format), used
         #: after the attempt to read the family's own numbers.
         self.usage_probe = dict(usage_probe) if usage_probe else None
+        #: Order 54: the launcher's before-snapshot of the declared workspace
+        #: (path -> {size, digest}); the after listing comes from
+        #: `workspace.list` over the same root.
+        self.workspace_before_snapshot = (
+            dict(workspace_before_snapshot) if workspace_before_snapshot else None
+        )
         #: Read-only configuration that lives *inside* the audited window. It
         #: is not state: it must not enter the audit manifest.
         self.protected_state_paths = frozenset(protected_state_paths)
@@ -713,6 +734,44 @@ class _WorkerChannels:
                     "SIDECAR_STATE_OUTSIDE_BOUNDS", "usage journal exceeds the read bound",
                 )
         return parse_usage(usage_format, bytes(chunks))
+
+    def workspace_change_set(self) -> dict[str, Any] | None:
+        """Order 54: diff the workspace against the launcher's before-snapshot.
+
+        The after listing comes from the Worker's `workspace.list` op (same
+        bounded, link-free walk as the home audit). Line counts are not
+        available on this channel: the Worker reports path/size/digest only,
+        and no content copies cross the wire — the fact records that honestly.
+        """
+        if self.workspace_before_snapshot is None:
+            return None
+        listing = self.client.request("workspace.list", {}, timeout=120.0)
+        before = self.workspace_before_snapshot
+        after = {}
+        for entry in listing.get("files", ()):
+            path = entry.get("path")
+            if path:
+                after[path] = {"size": entry.get("size"), "digest": entry.get("digest")}
+        added, modified, removed = [], [], []
+        for path in sorted(set(before) | set(after)):
+            b, a = before.get(path), after.get(path)
+            bd = b.get("digest") if isinstance(b, dict) else None
+            ad = a.get("digest") if isinstance(a, dict) else None
+            entry = {"path": path,
+                     "sizeBefore": b.get("size") if isinstance(b, dict) else None,
+                     "sizeAfter": a.get("size") if isinstance(a, dict) else None}
+            if b is None and a is not None:
+                added.append({**entry, "kind": "added"})
+            elif b is not None and a is None:
+                removed.append({**entry, "kind": "removed"})
+            elif isinstance(b, dict) and isinstance(a, dict) and bd != ad:
+                modified.append({**entry, "kind": "modified"})
+        return {"added": added, "modified": modified, "removed": removed,
+                "addedLines": None, "removedLines": None,
+                "facts": {"truncatedEntries": (after.get("truncated") or {}).get("entries", 0)
+                          + (before.get("truncated") or {}).get("entries", 0)},
+                "note": "line counts require content copies; the Worker channel "
+                        "reports file-level changes with digests"}
 
     def delete_state_file(self, relative: str) -> None:
         """Remove exactly one home file - the credential rule's clean-up."""

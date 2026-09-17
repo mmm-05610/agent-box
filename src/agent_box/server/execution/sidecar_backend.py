@@ -449,7 +449,7 @@ class SidecarExecutionBackend:
             # object (a fact document, never harness tool load).
             change_set_digest = None
             try:
-                change_set = run.port.workspace_change_set(run.core_execution_id)
+                change_set = run.port.workspace_change_set(run.turn_id)
             except BaseException as read_error:
                 logging.getLogger(__name__).warning(
                     "turn %s: change set read failed (%s); the turn's change set "
