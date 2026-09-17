@@ -1082,6 +1082,150 @@
     "/home/maoqh/projects/agent-box-harness-expansion"
    ],
    "note": "The infrastructure repo becomes Pacthold, and the bar is not 'no old strings remain' but that a user sees Pacthold and a developer integrates Pacthold while stored data and cross-component contracts survive untouched. The audit already separates the layers: the agent_box import path and entry-point group are not the brand and are not force-renamed, the three CLI entry points are exactly the ones to alias (pacthold, pacthold-server, pacthold-server-credential added, the old three kept as aliases with identical behaviour), and archived docs, upstream licences and real harness names stay as they are. Hard gates: the wire digests stay byte-identical, every compatibility identifier is untouched with new names only as aliases, a real launch smoke runs the new CLI to start the Server and lets the desktop connect, and nothing is pushed, renamed remotely, released or paid for. Paired with the desktop's P18, and both repos must carry the same mapping."
+  },
+  {
+   "baseline": "60 checkpoint",
+   "worktree": "/home/maoqh/projects/agent-box-env-provider",
+   "branch": "feature/env-provider-v1",
+   "depends_on": [
+    "50"
+   ],
+   "dependency_condition": "Folds into the same wire relock as 51-60; stage A observation may run any time.",
+   "exclusive_group": "backend-driver-resources",
+   "write_paths": [
+    "src/agent_box/**",
+    "plugins/**",
+    "workers/**",
+    "tests/**",
+    "scripts/server-round1/**",
+    "docs/server-round1/**",
+    "docs/implementation/status.md"
+   ],
+   "forbidden_write_roots": [
+    "/home/maoqh/projects/agent-box",
+    "/home/maoqh/projects/agent-box-studio",
+    "/home/maoqh/projects/agent-box-desktop-next",
+    "/home/maoqh/projects/agent-box-desktop-next-wsl-round1",
+    "/home/maoqh/projects/agent-box-server-round1",
+    "/home/maoqh/projects/agent-box-harness-expansion"
+   ],
+   "id": "62",
+   "document": "work-orders/62-workspace-git-status.md",
+   "stages": [
+    "A-shape",
+    "B-exec-side-query",
+    "C-contract-shared-relock",
+    "D-regression"
+   ],
+   "note": "A read-only workspace git status surface for the work-status panel's Git card: branch, changed files, additions, deletions, ahead and behind, each nullable so 'not available' is never rendered as zero. Bounded with typed refusals for a missing repository, a timeout or an output cap; parsing reads a machine-readable format only and a parse failure is typed rather than guessed; the query runs on the side that owns the workspace through the existing WSL channel or a local subprocess, so the Worker protocol stays untouched. Read-only is a gate: the workspace must be byte-identical before and after. Distinct from order 54, which reports what one turn changed."
+  },
+  {
+   "baseline": "60 checkpoint",
+   "worktree": "/home/maoqh/projects/agent-box-env-provider",
+   "branch": "feature/env-provider-v1",
+   "depends_on": [
+    "50"
+   ],
+   "dependency_condition": "Folds into the same wire relock as 51-60; stage A observation may run any time.",
+   "exclusive_group": "backend-driver-resources",
+   "write_paths": [
+    "src/agent_box/**",
+    "plugins/**",
+    "workers/**",
+    "tests/**",
+    "scripts/server-round1/**",
+    "docs/server-round1/**",
+    "docs/implementation/status.md"
+   ],
+   "forbidden_write_roots": [
+    "/home/maoqh/projects/agent-box",
+    "/home/maoqh/projects/agent-box-studio",
+    "/home/maoqh/projects/agent-box-desktop-next",
+    "/home/maoqh/projects/agent-box-desktop-next-wsl-round1",
+    "/home/maoqh/projects/agent-box-server-round1",
+    "/home/maoqh/projects/agent-box-harness-expansion"
+   ],
+   "id": "63",
+   "document": "work-orders/63-profile-memory-read.md",
+   "stages": [
+    "A-per-family-paths",
+    "B-read-surface",
+    "C-contract-shared-relock",
+    "D-regression"
+   ],
+   "note": "A read-only surface for a profile's memory files - the ones the harness maintains itself, such as CLAUDE.md or AGENTS.md - so the profile page can show them. Paths are declared per family in the registry with no brand branches, established by observation in stage A, and a family that declares none simply hides the section; only declared paths are read, never a walk of the home. Bounded with typed failures, credential-scanned under order 45's rules so a hit refuses that file, symlinks not followed, and no host path in any record. Memory is kept distinct from the instruction asset: instructions are projected by us, memory is written by the harness, and the UI keeps them as separate sections."
+  },
+  {
+   "id": "64",
+   "document": "work-orders/64-execution-inventory.md",
+   "baseline": "60 checkpoint",
+   "worktree": "/home/maoqh/projects/agent-box-env-provider",
+   "branch": "feature/env-provider-v1",
+   "depends_on": [
+    "50"
+   ],
+   "dependency_condition": "Folds into the same wire relock as 51-63.",
+   "exclusive_group": "backend-driver-resources",
+   "stages": [
+    "A-ledger-read",
+    "B-exec-side-pid",
+    "C-contract-shared-relock",
+    "D-regression"
+   ],
+   "write_paths": [
+    "src/agent_box/**",
+    "plugins/**",
+    "tests/**",
+    "scripts/server-round1/**",
+    "docs/server-round1/**",
+    "docs/implementation/status.md"
+   ],
+   "forbidden_write_roots": [
+    "/home/maoqh/projects/agent-box",
+    "/home/maoqh/projects/agent-box-studio",
+    "/home/maoqh/projects/agent-box-desktop-next",
+    "/home/maoqh/projects/agent-box-desktop-next-wsl-round1",
+    "/home/maoqh/projects/agent-box-server-round1",
+    "/home/maoqh/projects/agent-box-harness-expansion"
+   ],
+   "note": "The data surface behind the work-status panel's background-programs card, scoped to what can be stated honestly: only executions we started, never a machine-wide process list. The backbone fields already exist in the Server's execution ledger - execution, turn and session ids, profile, harness, placement from resolve_placement, state, start time and elapsed, and the workspace by id rather than by host path. The one exec-side field, the process id, is reported only when actually available: the local channel already has it, while the WSL side reports null with a typed reason unless the Worker already passes it through, so no Worker or Rust change is involved. Bounded with a typed failure past the cap, read-only with no interference in any execution, and no shadow state beside the ledger."
+  },
+  {
+   "id": "65",
+   "document": "work-orders/65-profile-as-subagent.md",
+   "baseline": "58/60 checkpoint",
+   "worktree": "/home/maoqh/projects/agent-box-env-provider",
+   "branch": "feature/env-provider-v1",
+   "depends_on": [
+    "58",
+    "60"
+   ],
+   "dependency_condition": "Needs the MCP materialisation of 58 and the profile authorisation and permission rules of 60; folds into the same wire relock as 51-64.",
+   "exclusive_group": "backend-driver-resources",
+   "stages": [
+    "A-authorisation",
+    "B-tool-bridge",
+    "C-execution-attribution",
+    "D-contract-shared-relock",
+    "E-regression"
+   ],
+   "write_paths": [
+    "src/agent_box/**",
+    "plugins/**",
+    "tests/**",
+    "scripts/server-round1/**",
+    "docs/server-round1/**",
+    "docs/implementation/status.md"
+   ],
+   "forbidden_write_roots": [
+    "/home/maoqh/projects/agent-box",
+    "/home/maoqh/projects/agent-box-studio",
+    "/home/maoqh/projects/agent-box-desktop-next",
+    "/home/maoqh/projects/agent-box-desktop-next-wsl-round1",
+    "/home/maoqh/projects/agent-box-server-round1",
+    "/home/maoqh/projects/agent-box-harness-expansion"
+   ],
+   "note": "A profile can call another profile as a subagent through two fixed MCP tools. The contract is copied from the convergent shape of native subagent invocation, established first-hand on 2026-09-17: the majority (Claude Code Task {subagent_type, prompt, description}, OpenCode task {description, prompt, subagent_type, task_id?} in packages/opencode/src/tool/task.ts with its task.txt description template, Roo new_task) is one generic dispatch tool whose description carries the roster, returning the child's single final summary; Cline's per-agent dynamic tools (use_subagent_<sanitized> in SubagentToolName.ts, agents from YAML frontmatter in AgentConfigLoader.ts) are the minority shape and were rejected because the tool table would change with authorisation and descriptions would sit permanently in the parent's prompt. So run_subagent takes subagent, a three-to-five word description and a self-contained prompt, plus optional narrowing knobs; list_subagents gives full detail; the roster digest lives in the tool description so one call suffices, and neither tool is materialised when the authorised edge set is empty. The words ask/ask_profile are dropped: asking for an answer is a different act from dispatching work that runs autonomously and returns a summary. Inheritance follows OpenCode's deriveSubagentSessionPermission: the child inherits the parent's deny rules and external-directory restrictions while its allow set comes from its own profile, and run_subagent is denied by default for a child unless that child's own authorisation grants it, so depth is a default deny rather than only a counter (the per-turn and depth counters stay as a second layer). task_id resumes the same child native session, a handle rather than a profile-owned object, and cross-family resume is a typed refusal that never silently starts a fresh stint. The Server runs the child as a normal execution with its own sandbox, home, model slot and permission rules, so context is not inherited, the child's result is not shown to the user and the parent must relay it, usage and cost roll into the calling turn, approvals surface as interruptions, cancelling the parent cancels the children, and concurrent invocation is supported (at most four per turn) on the same no-clobber guarantee as order 45. Optional parameters may only tighten, a single call is capped at ten minutes, cycles are typed refusals, and authorisation edges are explicit and default empty. Background mode (OpenCode's background=true with completion notification) is explicitly not done because it would need a new event kind and the wire is locked; permission bypass is never a default, the opposite of claude-code-mcp's --dangerously-skip-permissions."
   }
  ],
  "authority": "docs/implementation",
