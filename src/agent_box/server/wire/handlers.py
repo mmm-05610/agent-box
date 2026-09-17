@@ -97,6 +97,12 @@ _PARAM_SHAPES = {
     "providerArtifacts.rollback": (
         {"requestId", "harness", "version"}, set(),
     ),
+    "usage.aggregate": (
+        {"sessions"}, {"since", "until"},
+    ),
+    "usage.export": (
+        {"sessions"}, {"format"},
+    ),
     "config.describe": ({"profileId", "workspaceId"}, set()),
     "config.resolve": ({"profileId", "workspaceId", "overrides"}, set()),
     "sessions.list": ({"includeArchived"}, {"workspaceId", "page"}),
@@ -208,8 +214,11 @@ class WireService:
         model_configs=None,
         token_required: bool = True,
         artifact_store=None,
+        usage_aggregator=None,
     ) -> None:
         self._server_id_provider = server_id_provider
+        self.artifact_store = artifact_store
+        self.usage_aggregator = usage_aggregator
         self.workspaces = workspaces
         self.profiles = profiles
         self.sessions = sessions
@@ -219,9 +228,6 @@ class WireService:
         self.objects = objects
         self.execution = execution
         self.model_configs = model_configs
-        #: Order 57: the family-runtime artifact store; None means this
-        #: composition has no artifact management face (typed UNAVAILABLE).
-        self.artifact_store = artifact_store
         self.codec = CursorCodec(cursor_secret)
         self.token_required = token_required
         self._handlers: dict[str, Callable[[Mapping[str, Any]], Any]] = {
@@ -244,6 +250,8 @@ class WireService:
             "providerArtifacts.list": self.provider_artifacts_list,
             "providerArtifacts.install": self.provider_artifacts_install,
             "providerArtifacts.rollback": self.provider_artifacts_rollback,
+            "usage.aggregate": self.usage_aggregate,
+            "usage.export": self.usage_export,
             "config.describe": self.config_describe,
             "config.resolve": self.config_resolve,
             "sessions.list": self.sessions_list,
@@ -510,6 +518,32 @@ class WireService:
         store = self._artifact_store()
         store.rollback(harness, version)
         return {"harness": harness, "current": store.current_reference(harness)}
+
+    def usage_aggregate(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        """Order 53: per-session usage aggregation over the ledger.
+
+        Read-only: sums only what the families' own stores reported, with an
+        explicit unknown-turn count for everything else. No estimation, no
+        cross-session leakage.
+        """
+        if self.usage_aggregator is None:
+            raise WireError(
+                "USAGE_AGGREGATOR_UNAVAILABLE",
+                "this composition exposes no usage-aggregation face",
+            )
+        session_ids = params.get("sessions") or []
+        if not isinstance(session_ids, list) or not all(
+            isinstance(item, str) for item in session_ids
+        ):
+            raise WireError("INVALID_REQUEST", "sessions must be a list of ids")
+        result = self.usage_aggregator.aggregate_by_session(session_ids)
+        return {"sessions": [
+            {"sessionId": sid, **entry} for sid, entry in result.items()
+        ]}
+
+    def usage_export(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        """Order 53: export the same aggregate as a JSON document."""
+        return self.usage_aggregate(params)
 
     def provider_models_probe_models(self, params: Mapping[str, Any]) -> dict[str, Any]:
         self._require_model_configs()
