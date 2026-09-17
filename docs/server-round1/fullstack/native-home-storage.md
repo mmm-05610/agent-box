@@ -203,3 +203,36 @@ port 层第一手异常为 SidecarError: SIDECAR_OP_FAILED: Harness session not 
 
 **仍未决**：G3 并行双轮（产品语义裁决；现行行为是类型化拒绝 TURN_CONCURRENCY_CONFLICT，
 满足"绝不静默换地方"的底线，但"两轮都完成"的完整断言未达成）。
+
+## 9. 追记（2026-09-17）：§1b / 落地设计 §14 —— session 库独立于 profile home
+
+按父侧修订（45 §1b，用户 2026-09-16 采纳）实现并逐家定性：
+
+- **机制**（提交 717a643）：Worker 新增 session-store 模式
+  （`home.prepare {locator, harness, kind:"session-store"}` → `<home-root>/_sessions/<harness>`，
+  无 profile marker；保留段 `_sessions` 对 profile locator 类型化拒绝；Rust 测试 +2）；
+  房间把库绑到部署声明的会话子树 guest 路径（深度序在 profile home 之上生效）；
+  审计改走库根（whole-locator listing）；ephemeral 锚钉在 native home（codex 的
+  `.tmp`/`shell_snapshots` 遮蔽不因收窄而失效）；部署文档新增可选
+  `sessionStore.kind`（缺省 profile-home = §14 前逐字节不变）。
+- **逐家定性**（[stage A 证据](session-store-14-stage-a.md)，只列目录名/表名）：
+  codex（`.codex/sessions` 是 rollout journal，`.codex/sqlite` 只是 goals 功能）与
+  pi（`.pi/agent/sessions` 纯 journal）**声明 split 且门在 c10 全绿**；
+  hermes 复查更正为**共享 DB 式**（权威会话在 `$HERMES_HOME/state.db`，
+  `.hermes/sessions` 只是调试转储）→ 库留 profile home（§14.2(a)）；
+  opencode/kilo 共享 DB（两库含 credential/account 表，排除整库共享）→ (a)；
+  claude-code/dsh/qwen **声明撤回**：各自的门自 45 起未在 Linux 复跑，本轮修复三层接口漂移
+  （token 前签名、host-path artifact_source、45 前 reopen 参数）后仍卡
+  `HOME_MARKER_CONFLICT`（根因未定位，见下）——门证明前不声明。
+- **门证据**（c10 = `sha256:d92c6716…`，45 后首次 Worker 重建）：
+  pi `PI_PRODUCTION_CHAIN_GATE_OK`、codex `CODEX_PRODUCTION_CHAIN_GATE_OK`、
+  hermes `HERMES_PRODUCTION_CHAIN_GATE_OK`、opencode `OPENCODE_PRODUCTION_CHAIN_PREPARED`
+  （后两家按 profile-home 语义，回归无退化）。另修两处真实缺陷：
+  `_capability_value` 对 dict 能力表的 `.values` 方法误读（旧 `None` 通过分支掩盖）、
+  terminal provider 从不声明 `terminal.run@1`。
+- **回归**：全量 **1085 passed / 3 skipped**（含真 bwrap integration）；插件套件 331。
+- **已知阻塞（交由维护）**：claude/dsh/kilo/qwen 的 Linux 假端点门在 turn chain 内
+  报 `HOME_MARKER_CONFLICT`（同一门内多相位间 profile 身份冲突，根因未定位）；
+  这些门自 44/45 起从未在 Linux 复跑，属 43 代门的维护债。产品路径不受影响
+  （port_factory 的 home 准备/审计由全量套件覆盖）。
+- 费用：真实模型调用 0 次（全部假端点）。
