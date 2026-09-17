@@ -1246,3 +1246,22 @@ typecheck 当场暴露；新测试 4 条 ESLint warning 收口为 0。
   状态尾品牌文案属 P14。
 - 下一步按派工表执行 **P10**（侧栏重构；`depends_on: P07`，排序在 P08/P09 之后）。writer_lease 继续 ACTIVE。
 
+## P10 收口（2026-09-17）：侧栏重构 — `P10_GREEN — SIDEBAR_RESTRUCTURE_CLIENT_READY`
+
+- **门结果**（完整证据 `evidence/P10.md`）：
+  - **G1 三栏表成立**：参考元素 → 实现方式 → 数据来源逐项齐全；无数据来源的两项（自动化 cron 段、插件市场）
+    明确「不实现」及理由（cron 段当前未挂载任何面、数据来自 legacy `@/api/cron`，产品下被硬门拒绝 → 等 wire 能力）。
+  - **G2 无新库成立**：零新增依赖，`package.json`/`package-lock.json` 未改。
+  - **G3 数据不发明成立**：运行中来自服务 `execution.state`（与 composer busy 门同一集合）；未读为**本机游标**
+    并在标签写明 "this window"，从未打开过的不标未读；归档行不标运行/未读；无投影即无点（反例用例）。
+  - **G4 行为保留成立**：`src/features/chat/sidebar` 全目录 **33 files / 268 tests 全通过**（重排/拖拽/加载更多/过滤/
+    右键/存档/搜索/profile 与 connection 切换既有用例未动）。
+  - **G5 不退化成立**：宽面 `src/features/chat` + `src/store` + `src/i18n` **234 files / 2280 tests 全通过，exit 0**；
+    `tsc -p . --noEmit` exit 0；改动文件 ESLint 0/0；`git diff --check` 干净；保护路径与后端仓零改动。
+- **实现**：动作区（新建任务=既有新建会话路径，搜索=既有命令面板）+ 行内状态点（服务 running、本机 unread）；
+  相对时间与分组控件为**既有能力**（本单只补用例锁定，不重造、不新增第三维度）。
+- **本轮修掉两个自身/守卫缺陷**：①动作区最初挂在由 legacy 会话 store 计算的 `showSessionSections` 下
+  （产品只有服务会话时会被藏）→ 改为仅按 authority 挂载并以集成用例锁定；②三个 store 边界守卫在 Windows 上
+  因反斜杠路径**空转**（A/B 证明与本单无关）→ 统一 `srcRelative()` 归一，反向对照恢复真实。
+- 下一步按派工表执行 **P11**（provider/model 配置交互改造）。writer_lease 继续 ACTIVE。
+

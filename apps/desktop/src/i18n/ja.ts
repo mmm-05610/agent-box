@@ -1963,6 +1963,10 @@ export const ja = defineLocale({
   },
 
   sidebar: {
+    agentBoxActions: {
+      newTask: '新しいタスク',
+      search: '検索'
+    },
 
     agentBoxArchive: {
 
@@ -2002,6 +2006,8 @@ export const ja = defineLocale({
       menuUnpin: 'ピン留めを解除',
 
       menuArchive: 'AgentBox でアーカイブ',
+      running: '実行中',
+      unreadLocal: '未読（このウィンドウ）',
 
       pinned: 'ピン留め済み',
 

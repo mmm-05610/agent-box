@@ -22,6 +22,10 @@ export interface AgentBoxSessionRowLabels {
   menuRename: string
   menuUnpin: string
   pinned: string
+  /** The service has an execution in flight for this row. */
+  running: string
+  /** Local visibility, not service truth — the label says so. */
+  unreadLocal: string
 }
 
 export interface AgentBoxSessionRowProps {
@@ -39,7 +43,11 @@ export interface AgentBoxSessionRowProps {
   onRename?: () => void
   /** This row's own maintenance is waiting on the service: menu locks. */
   pending?: boolean
+  /** The service projection says this session has work in flight. */
+  running?: boolean
   session: SessionRecord
+  /** This window has not opened this record since it last changed. */
+  unread?: boolean
 }
 
 /**
@@ -56,7 +64,9 @@ export function AgentBoxSessionRow({
   onPin,
   onRename,
   pending = false,
-  session
+  running = false,
+  session,
+  unread = false
 }: AgentBoxSessionRowProps) {
   const kebab = onRename || onPin || onArchive
     ? (
@@ -104,7 +114,19 @@ export function AgentBoxSessionRow({
       >
         <SidebarRowLead>
           <SidebarRowLeadGlyph>
-            {session.pinned ? (
+            {running ? (
+              // The service's execution state, painted where the row's leading
+              // glyph lives. Not a spinner: it says "this session has work in
+              // flight", the same fact the composer's busy gate reads.
+              <Tip label={labels.running}>
+                <span
+                  aria-label={labels.running}
+                  className="block size-1.5 rounded-full bg-(--ui-accent)"
+                  data-agentbox-session-running=""
+                  role="img"
+                />
+              </Tip>
+            ) : session.pinned ? (
               <Tip label={labels.pinned}>
                 <Codicon className="text-(--ui-text-secondary)" name="pinned" size="0.75rem" />
               </Tip>
@@ -114,6 +136,17 @@ export function AgentBoxSessionRow({
           </SidebarRowLeadGlyph>
         </SidebarRowLead>
         <span className="min-w-0 flex-1 truncate text-xs leading-4">{session.displayName}</span>
+        {unread ? (
+          // This window has not opened the record since it last changed. The
+          // label says "this window" because the wire has no read fact: the
+          // dot is local visibility, never a claim about the service.
+          <span
+            aria-label={labels.unreadLocal}
+            className="size-1.5 shrink-0 rounded-full bg-(--ui-accent)"
+            data-agentbox-session-unread=""
+            role="img"
+          />
+        ) : null}
         {meta ? <span className="text-[0.625rem] leading-none text-(--ui-text-quaternary)">{meta}</span> : null}
       </SidebarRowBody>
     </SidebarRowShell>

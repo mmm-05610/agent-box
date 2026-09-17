@@ -1903,6 +1903,10 @@ export const zhHant = defineLocale({
   },
 
   sidebar: {
+    agentBoxActions: {
+      newTask: '新增任務',
+      search: '搜尋'
+    },
 
     agentBoxArchive: {
 
@@ -1942,6 +1946,8 @@ export const zhHant = defineLocale({
       menuUnpin: '取消置頂',
 
       menuArchive: '在 AgentBox 中封存',
+      running: '執行中',
+      unreadLocal: '未讀（本機）',
 
       pinned: '已置頂',
 

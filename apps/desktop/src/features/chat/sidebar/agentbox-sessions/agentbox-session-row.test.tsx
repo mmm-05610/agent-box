@@ -11,7 +11,9 @@ const labels = {
   menuPin: 'Pin',
   menuRename: 'Rename…',
   menuUnpin: 'Unpin',
-  pinned: 'Pinned'
+  pinned: 'Pinned',
+  running: 'Running',
+  unreadLocal: 'Unread — this window'
 }
 
 const session = (overrides: Partial<SessionRecord> = {}): SessionRecord => ({
@@ -47,7 +49,9 @@ const renderRow = (overrides: Partial<Parameters<typeof AgentBoxSessionRow>[0]> 
       onPin={overrides.onPin}
       onRename={overrides.onRename}
       pending={overrides.pending}
+      running={overrides.running}
       session={overrides.session ?? session()}
+      unread={overrides.unread}
     />
   )
 
@@ -170,5 +174,38 @@ describe('AgentBoxSessionRow', () => {
     expect(onRename).not.toHaveBeenCalled()
     expect(onPin).not.toHaveBeenCalled()
     expect(onArchive).not.toHaveBeenCalled()
+  })
+
+  it('shows the running mark only when the service says work is in flight', () => {
+    const { container, rerender } = renderRow({ running: true })
+
+    expect(container.querySelector('[data-agentbox-session-running]')).toBeTruthy()
+    expect(screen.getByLabelText('Running')).toBeTruthy()
+
+    rerender(
+      <AgentBoxSessionRow
+        labels={labels}
+        meta="2h ago"
+        onOpen={vi.fn()}
+        running={false}
+        session={session()}
+      />
+    )
+
+    expect(container.querySelector('[data-agentbox-session-running]')).toBeNull()
+    expect(screen.queryByLabelText('Running')).toBeNull()
+  })
+
+  it('labels the unread mark as this window own visibility', () => {
+    const { container } = renderRow({ unread: true })
+
+    expect(container.querySelector('[data-agentbox-session-unread]')).toBeTruthy()
+    expect(screen.getByLabelText('Unread — this window')).toBeTruthy()
+  })
+
+  it('never shows an unread mark on a row that is not unread', () => {
+    const { container } = renderRow({ unread: false })
+
+    expect(container.querySelector('[data-agentbox-session-unread]')).toBeNull()
   })
 })

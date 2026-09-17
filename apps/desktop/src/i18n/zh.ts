@@ -2473,6 +2473,10 @@ export const zh: Translations = {
   },
 
   sidebar: {
+    agentBoxActions: {
+      newTask: '新建任务',
+      search: '搜索'
+    },
 
     agentBoxArchive: {
 
@@ -2512,6 +2516,8 @@ export const zh: Translations = {
       menuUnpin: '取消置顶',
 
       menuArchive: '在 AgentBox 中归档',
+      running: '运行中',
+      unreadLocal: '未读（本机）',
 
       pinned: '已置顶',
 

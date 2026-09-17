@@ -15,12 +15,15 @@ import {
   $agentBoxSessions,
   agentBoxCapabilitySupported
 } from '@/store/agentbox-service'
+import { $agentBoxSessionProjections } from '@/store/agentbox-runtime'
+import { $agentBoxSessionSeenAt, markAgentBoxSessionSeen } from '@/store/agentbox-session-unread'
 import { readableError } from '@/store/notifications'
 import type { SessionRecord } from '@/types/wire/wire-v1'
 
 import { SidebarSectionHeader } from '../sessions-section'
 
 import { AgentBoxSessionRow } from './agentbox-session-row'
+import { agentBoxSessionStatus } from './agentbox-session-status'
 
 export type AgentBoxGlobalMode = 'archived' | 'search'
 
@@ -103,6 +106,8 @@ export function AgentBoxGlobalSessions({ mode, query }: { mode: AgentBoxGlobalMo
   const service = useStore($agentBoxService)
   const hello = useStore($agentBoxHello)
   const sessions = useStore($agentBoxSessions)
+  const projections = useStore($agentBoxSessionProjections)
+  const seenAt = useStore($agentBoxSessionSeenAt)
   const [loadFailure, setLoadFailure] = useState<null | { detail?: string; message: string }>(null)
   // At most ONE archived fetch per mount: entering Archived asks the service
   // once, when it can answer — never on every render, and never as a delayed
@@ -196,25 +201,41 @@ export function AgentBoxGlobalSessions({ mode, query }: { mode: AgentBoxGlobalMo
     records.length > 0 ? (
       <div className="flex flex-col gap-px pb-1.5" data-agentbox-global={mode}>
         {statusLine}
-        {records.map(session => (
-          <AgentBoxSessionRow
-            key={session.id}
-            labels={{
-              menuActions: copy.menuActions,
-              menuArchive: copy.menuArchive,
-              menuPin: copy.menuPin,
-              menuRename: copy.menuRename,
-              menuUnpin: copy.menuUnpin,
-              pinned: copy.pinned
-            }}
-            meta={formatAgo(Date.parse(session.updatedAt), ageLabels)}
-            // Opening is the row's only action: the service session id goes
-            // through the one "open this session" door, and no legacy
-            // pin/archive/delete/branch handler is ever injected here.
-            onOpen={() => openSession(session.id, navigate, 'in-place')}
-            session={session}
-          />
-        ))}
+        {records.map(session => {
+          const rowStatus = agentBoxSessionStatus({
+            projection: projections[session.id],
+            seenAt: seenAt[session.id],
+            session
+          })
+
+          return (
+            <AgentBoxSessionRow
+              key={session.id}
+              labels={{
+                menuActions: copy.menuActions,
+                menuArchive: copy.menuArchive,
+                menuPin: copy.menuPin,
+                menuRename: copy.menuRename,
+                menuUnpin: copy.menuUnpin,
+                pinned: copy.pinned,
+                running: copy.running,
+                unreadLocal: copy.unreadLocal
+              }}
+              meta={formatAgo(Date.parse(session.updatedAt), ageLabels)}
+              // Opening is the row's only action: the service session id goes
+              // through the one "open this session" door, and no legacy
+              // pin/archive/delete/branch handler is ever injected here. The
+              // local read cursor records the revision the user has now seen.
+              onOpen={() => {
+                markAgentBoxSessionSeen(session.id, session.updatedAt)
+                openSession(session.id, navigate, 'in-place')
+              }}
+              running={rowStatus.running}
+              session={session}
+              unread={rowStatus.unread}
+            />
+          )
+        })}
       </div>
     ) : statusLine ? (
       <div data-agentbox-global={mode}>{statusLine}</div>

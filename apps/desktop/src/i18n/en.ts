@@ -2311,6 +2311,10 @@ export const en: Translations = {
   },
 
   sidebar: {
+    agentBoxActions: {
+      newTask: 'New task',
+      search: 'Search'
+    },
 
     agentBoxArchive: {
 
@@ -2351,6 +2355,8 @@ export const en: Translations = {
       menuUnpin: 'Unpin',
 
       menuArchive: 'Archive in AgentBox',
+      running: 'Running',
+      unreadLocal: 'Unread — this window',
 
       pinned: 'Pinned',
 

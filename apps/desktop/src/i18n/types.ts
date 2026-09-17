@@ -2038,6 +2038,11 @@ export interface Translations {
   }
 
   sidebar: {
+    /** The product sidebar's action area: two doors, both existing paths. */
+    agentBoxActions: {
+      newTask: string
+      search: string
+    }
     /** AgentBox service actions on a workspace row — distinct from the local
      *  "Remove from sidebar" hide and the WSL host's own remove. */
     agentBoxArchive: {
@@ -2073,6 +2078,10 @@ export interface Translations {
       /** The `sessions.archive` menu entry on a session row. */
       menuArchive: string
       pinned: string
+      /** The service has an execution in flight for this session. */
+      running: string
+      /** Local visibility, not service truth — the label says so. */
+      unreadLocal: string
       renameTitle: (name: string) => string
       renameFailed: string
       pinFailed: string

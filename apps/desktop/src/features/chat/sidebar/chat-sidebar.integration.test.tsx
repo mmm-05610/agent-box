@@ -10,6 +10,7 @@ import { makeCwdSession, makeSessionInfo } from '@/dev/test/session-info'
 import { registry } from '@/lib/contributions'
 import { group, split } from '@/lib/pane-tree'
 import { $agentBoxHello, $agentBoxService, $agentBoxSessions } from '@/store/agentbox-service'
+import { $commandPaletteOpen } from '@/store/command-palette'
 import { $pinnedSessionIds, setSidebarShowArchived } from '@/store/layout'
 import { $layoutTree, noteActiveTreeGroup } from '@/store/pane-shell/tree'
 import { $gatewayState, $selectedStoredSessionId, $sessions, $sessionsLoading } from '@/store/session'
@@ -511,5 +512,64 @@ describe('ChatSidebar filter menu authority', () => {
 
     expect(openFilterMenu()).toBe(true)
     expect(screen.getByText('Import profile…')).toBeTruthy()
+  })
+})
+
+// P10: the product action area. Two doors, both existing paths — the
+// new-session route and the command palette — and neither in the legacy
+// authority, which owns its own chrome.
+describe('AgentBox sidebar action area', () => {
+  const renderAgentBoxSidebar = (onNewSessionInWorkspace: () => void) =>
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <SidebarProvider>
+          <ChatSidebar
+            currentView="chat"
+            onArchiveSession={noop}
+            onBranchSession={noop}
+            onDeleteSession={noop}
+            onLoadMoreSessions={noop}
+            onNavigate={noop}
+            onNewSessionInWorkspace={onNewSessionInWorkspace}
+            onNewSessionSplit={noop}
+            onResumeSession={noop}
+            sessionAuthority="agentbox"
+          />
+        </SidebarProvider>
+      </MemoryRouter>
+    )
+
+  it('offers New task and Search, wired to the existing paths', () => {
+    const onNewSessionInWorkspace = vi.fn()
+    // The action area lives with the session sections: seed one service record
+    // so the sidebar is in its session mode, not the blank state.
+    $agentBoxSessions.set({
+      'agentbox-action': {
+        archivedAt: null,
+        createdAt: '2026-09-14T00:00:00.000Z',
+        displayName: 'AgentBox action row',
+        id: asWireId('agentbox-action'),
+        pinned: false,
+        profileId: null,
+        updatedAt: '2026-09-14T00:00:00.000Z',
+        version: 1,
+        workspaceId: asWireId('workspace-1')
+      }
+    })
+    renderAgentBoxSidebar(onNewSessionInWorkspace)
+
+    fireEvent.click(screen.getByRole('button', { name: 'New task' }))
+    expect(onNewSessionInWorkspace).toHaveBeenCalledWith(null)
+
+    $commandPaletteOpen.set(false)
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }))
+    expect($commandPaletteOpen.get()).toBe(true)
+  })
+
+  it('keeps the action area out of the legacy authority', () => {
+    $sessions.set([makeSessionInfo({ id: 'legacy-1', last_active: 2, profile: 'default', started_at: 1, title: 'legacy' })])
+    renderSidebar('/', 'chat', 'hermes')
+
+    expect(screen.queryByRole('button', { name: 'New task' })).toBeNull()
   })
 })

@@ -38,7 +38,12 @@ const STORE_DIR = dirname(fileURLToPath(import.meta.url))
 const SRC_DIR = resolve(STORE_DIR, '..')
 /** This file names every forbidden specifier on purpose — it is not a module
  *  the app loads, and its fixtures are the point. */
-const SELF = relative(SRC_DIR, fileURLToPath(import.meta.url))
+/** `src/`-relative, forward-slashed: the pinned ledgers below are written
+ *  that way, and a Windows checkout would otherwise hand back `store\\x.ts`
+ *  and make every lookup miss. */
+const srcRelative = (absolute: string): string => relative(SRC_DIR, absolute).replaceAll('\\', '/')
+
+const SELF = srcRelative(fileURLToPath(import.meta.url))
 
 /** The session store's public entry point and the two modules it is built from
  *  that a renderer surface must be able to import without dragging in the API. */
@@ -151,7 +156,7 @@ function resolveSpecifier(from: string, specifier: string, known: Set<string>): 
   }
 
   for (const candidate of [base, `${base}.ts`, `${base}.tsx`, join(base, 'index.ts'), join(base, 'index.tsx')]) {
-    const path = relative(SRC_DIR, candidate)
+    const path = srcRelative(candidate)
 
     if (known.has(path)) {
       return path
@@ -249,7 +254,7 @@ function modulesUnder(dir: string): Module[] {
     })
 
   return collect(dir)
-    .map(full => relative(SRC_DIR, full))
+    .map(full => srcRelative(full))
     .filter(path => path !== SELF)
     .map(path => ({ path, source: readFileSync(join(SRC_DIR, path), 'utf8') }))
 }

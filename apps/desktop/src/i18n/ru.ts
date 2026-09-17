@@ -2289,6 +2289,10 @@ export const ru = defineLocale({
     missingBody: 'Этот артефакт больше нет в локальном реестре.'
   },
   sidebar: {
+    agentBoxActions: {
+      newTask: 'Новая задача',
+      search: 'Поиск'
+    },
     agentBoxArchive: {
       action: 'Архивировать в AgentBox',
       title: name => `Архивировать «${name}» в AgentBox?`,
@@ -2309,6 +2313,8 @@ export const ru = defineLocale({
       menuPin: 'Закрепить',
       menuUnpin: 'Открепить',
       menuArchive: 'Архивировать в AgentBox',
+      running: 'Выполняется',
+      unreadLocal: 'Непрочитано — это окно',
       pinned: 'Закреплена',
       renameTitle: name => `Переименовать «${name}»`,
       renameFailed: 'Не удалось переименовать сессию',

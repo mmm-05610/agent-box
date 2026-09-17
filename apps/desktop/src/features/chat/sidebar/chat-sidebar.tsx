@@ -33,6 +33,7 @@ import { WslWorkspaceWizard } from '@/features/workspace/wsl-workspace-wizard'
 import { useI18n } from '@/i18n'
 import { sessionMatchesSearch } from '@/lib/session-search'
 import { cn } from '@/lib/utils'
+import { openCommandPalette } from '@/store/command-palette'
 import { $activeConnectionId } from '@/store/connections'
 import {
   $dismissedAutoProjectIds,
@@ -120,6 +121,7 @@ import { $wslWorkspaces, openWslWorkspaceWizard } from '@/store/wsl-workspace'
 import { type SessionInfo, type SessionSearchResult } from '@/types/hermes'
 import { type WorkspaceListItem } from '@/types/workspace'
 
+import { AgentBoxActionsRow } from './agentbox-sessions/agentbox-actions-row'
 import { AgentBoxGlobalSessions } from './agentbox-sessions/agentbox-global-sessions'
 import { SidebarSectionAddButton } from './chrome'
 import { SidebarFilterMenu } from './filter-menu'
@@ -1297,6 +1299,23 @@ export function ChatSidebar({
     >
       <SidebarContent className="gap-0 overflow-hidden bg-transparent px-2.5">
         <SidebarNavMenu currentView={currentView} onNavigate={onNavigate} pathname={pathname} s={s} />
+
+        {sessionAuthority === 'agentbox' && (
+          /* The product action area: the two doors the reference sidebar opens
+             with. Both reuse existing paths — the new-session route the
+             workspace "+" walks, and the command palette; the field below is
+             still the session filter, not a second search.
+
+             Deliberately NOT gated on `showSessionSections`: that flag is
+             computed from the legacy session store, so gating on it would hide
+             these doors exactly in the product state they exist for (a service
+             with sessions but no legacy rows). */
+          <AgentBoxActionsRow
+            labels={{ newTask: s.agentBoxActions.newTask, search: s.agentBoxActions.search }}
+            onNewTask={() => onNewSessionInWorkspace(enteredProject?.path ?? null)}
+            onSearch={openCommandPalette}
+          />
+        )}
 
         {showSessionSections && (
           <div className="shrink-0 px-2 pb-1 pt-1">

@@ -21,11 +21,14 @@ import {
   $agentBoxSessions,
   agentBoxCapabilitySupported
 } from '@/store/agentbox-service'
+import { $agentBoxSessionProjections } from '@/store/agentbox-runtime'
+import { $agentBoxSessionSeenAt, markAgentBoxSessionSeen } from '@/store/agentbox-session-unread'
 import { notifyError, readableError } from '@/store/notifications'
 import { selectWorkspaceView } from '@/store/workspace-view'
 import type { SessionRecord, WorkspaceRecord } from '@/types/wire/wire-v1'
 
 import { AgentBoxSessionRow } from './agentbox-session-row'
+import { agentBoxSessionStatus } from './agentbox-session-status'
 
 interface RenameTarget {
   displayName: string
@@ -64,6 +67,8 @@ export function AgentBoxSessionList({ shellId, workspace }: { shellId: string; w
   const readiness = useStore($agentBoxCatalogReadiness)
   const sessions = useStore($agentBoxSessions)
   const hello = useStore($agentBoxHello)
+  const projections = useStore($agentBoxSessionProjections)
+  const seenAt = useStore($agentBoxSessionSeenAt)
 
   // Rename/pin exist only when the service is ready AND hello explicitly
   // declares `sessions.update`; archive needs `sessions.archive`. The two
@@ -91,7 +96,9 @@ export function AgentBoxSessionList({ shellId, workspace }: { shellId: string; w
   const openSession = (session: SessionRecord) => {
     // Opening an existing session: select the shell row it lives in, then
     // navigate to its route. Registration (workspaces.open), sends and
-    // harness starts are not part of opening a record.
+    // harness starts are not part of opening a record. The local read cursor
+    // records the revision the user has now seen.
+    markAgentBoxSessionSeen(session.id, session.updatedAt)
     selectWorkspaceView(shellId)
     navigate(sessionRoute(session.id))
   }
@@ -260,26 +267,38 @@ export function AgentBoxSessionList({ shellId, workspace }: { shellId: string; w
                 what the service can currently do, above them, never instead of
                 them. */}
             {statusLine}
-            {records.map(session => (
-              <AgentBoxSessionRow
-                key={session.id}
-                labels={{
-                  menuActions: copy.menuActions,
-                  menuArchive: copy.menuArchive,
-                  menuPin: copy.menuPin,
-                  menuRename: copy.menuRename,
-                  menuUnpin: copy.menuUnpin,
-                  pinned: copy.pinned
-                }}
-                meta={formatAgo(Date.parse(session.updatedAt), ageLabels)}
-                onArchive={archiveAvailable ? () => archive(session) : undefined}
-                onOpen={() => openSession(session)}
-                onPin={maintenanceAvailable ? () => void togglePin(session) : undefined}
-                onRename={maintenanceAvailable ? () => rename(session) : undefined}
-                pending={pinPendingId === session.id}
-                session={session}
-              />
-            ))}
+            {records.map(session => {
+              const rowStatus = agentBoxSessionStatus({
+                projection: projections[session.id],
+                seenAt: seenAt[session.id],
+                session
+              })
+
+              return (
+                <AgentBoxSessionRow
+                  key={session.id}
+                  labels={{
+                    menuActions: copy.menuActions,
+                    menuArchive: copy.menuArchive,
+                    menuPin: copy.menuPin,
+                    menuRename: copy.menuRename,
+                    menuUnpin: copy.menuUnpin,
+                    pinned: copy.pinned,
+                    running: copy.running,
+                    unreadLocal: copy.unreadLocal
+                  }}
+                  meta={formatAgo(Date.parse(session.updatedAt), ageLabels)}
+                  onArchive={archiveAvailable ? () => archive(session) : undefined}
+                  onOpen={() => openSession(session)}
+                  onPin={maintenanceAvailable ? () => void togglePin(session) : undefined}
+                  onRename={maintenanceAvailable ? () => rename(session) : undefined}
+                  pending={pinPendingId === session.id}
+                  running={rowStatus.running}
+                  session={session}
+                  unread={rowStatus.unread}
+                />
+              )
+            })}
 
             {renameTarget && (
               <AgentBoxSessionRenameDialog

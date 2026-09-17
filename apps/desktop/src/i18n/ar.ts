@@ -1614,6 +1614,10 @@ export const ar = defineLocale({
     missingBody: 'لم يعد هذا الناتج موجودًا في السجل المحلي.'
   },
   sidebar: {
+    agentBoxActions: {
+      newTask: 'مهمة جديدة',
+      search: 'بحث'
+    },
     agentBoxArchive: {
       action: 'أرشفة في AgentBox',
       title: name => `أرشفة «${name}» في AgentBox؟`,
@@ -1634,6 +1638,8 @@ export const ar = defineLocale({
       menuPin: 'تثبيت',
       menuUnpin: 'إلغاء التثبيت',
       menuArchive: 'أرشفة في AgentBox',
+      running: 'قيد التشغيل',
+      unreadLocal: 'غير مقروء — هذه النافذة',
       pinned: 'مثبتة',
       renameTitle: name => `إعادة تسمية «${name}»`,
       renameFailed: 'تعذرت إعادة تسمية Session',
