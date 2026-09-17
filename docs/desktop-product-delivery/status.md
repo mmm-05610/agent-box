@@ -1461,3 +1461,19 @@ Appearance（8 套主题 + 语言 + UI Scale + 终端字体）与 Keyboard Short
 - **门**：UI 805/806 通过（唯一失败 POSIX sh 环境基线）；TSC 0；改动文件同步。
 - **未做**：种子截图对照（G2）、差距表截图（需运行中的服务与种子数据）。
 - **下一步**：P20。
+
+## P19 收口（2026-09-17）：密度/输入条/角色重设计 — `P19_PARTIAL`
+
+- **已实施并提交**（`31f2a67c`→`7bd5e9da`）：
+  - 侧栏密度收紧（row-geometry 单一来源：min-h 1.625→1.5rem、label 0.8125→text-xs、card 3.375→3.125rem）
+  - 输入条用量 pill 移至模型 chip 前（参考稿顺序 ◦环→模型→发送）
+  - DISABLED 占位文案自含化（不再指向可能不存在的 note）
+  - 角色设置重设计：左导航 + 右面板、分区由 `profile-slots.ts` 注册表 slots 驱动、不支持维度明说
+  - access chip 尝试后因组件缺失移除断引用（等后端声明权限控制项）
+- **门**：全量 UI **805/806 通过**（唯一失败 `cron-prompt.test.ts` POSIX sh 环境基线）；`tsc --noEmit` exit 0
+- **未做**：种子截图对照（G2 需运行中服务）；access chip 等后端声明
+- **证据**：`evidence/P19-density-and-role-nav.md`
+
+## P20 状态 — `P20_NOT_STARTED`
+
+- G1 四栏表已写为诚实占位（`evidence/P20-work-status-panel.md`）；面板组件**未开始**（需要新组件开发）。
