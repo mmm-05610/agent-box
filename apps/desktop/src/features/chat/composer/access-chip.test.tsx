@@ -12,9 +12,9 @@ afterEach(cleanup)
 const baseDescriptor = (controls: { controlId: string; editable: boolean; kind: 'enum'; values: string[] }[]) => ({
   controls,
   effectTiming: 'next_send' as const,
-  profileId: asWireId('profile-1') as unknown as string,
+  profileId: asWireId('profile-1'),
   securityLockedIds: [] as string[],
-  workspaceId: asWireId('workspace-1') as unknown as string
+  workspaceId: asWireId('workspace-1')
 })
 
 describe('ComposerAccessChip', () => {
