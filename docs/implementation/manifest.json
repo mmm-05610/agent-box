@@ -379,13 +379,14 @@
   {
    "id": "45",
    "document": "work-orders/45-native-home-storage.md",
-   "baseline": "85404f7919914690ccf621654139698f1a3a973d",
+   "baseline": "44 checkpoint",
    "worktree": "/home/maoqh/projects/agent-box-env-provider",
    "branch": "feature/env-provider-v1",
    "depends_on": [
     "44"
    ],
-   "dependency_condition": "44 reached its DoD first; both orders run in this worktree, serialized by one executor.",
+   "dependency_condition": "Runs in the 44 worktree, after 44 reaches its DoD, serialized by one executor. 44 and 45 share almost every write path (src/agent_box, workers, the runtime/sandbox plugins, scripts, tests, status), so one worktree and one executor keeps them from colliding. The docs for 45 live on the parent branch at f870730/dd174d6 and are copied into that worktree read-only.",
+   "merge_back": "feature/env-provider-v1 -> feature/server-harness-extension-v1 is a separate, user-decided step; never performed by the order itself.",
    "stages": [
     "A-worker-protocol",
     "B-channel-room",
@@ -416,7 +417,7 @@
     "/home/maoqh/projects/agent-box-desktop-next-wsl-round1",
     "/home/maoqh/projects/agent-box-server-round1"
    ],
-   "note": "Native home as the single source of truth: the profile's native state lives in a persistent directory on the machine that runs it (wsl: $HOME/.agent-box/profiles, local: <data_root>/profiles), bound RW into the sandbox; the control plane keeps records plus a reference (native_platform, home_locator, native session id, audit manifest digest) and never the native bytes. Wire stays locked (28 methods, wire/1, no new event kinds); the Worker control protocol goes 3 to 4 with bidirectional rejection and a new bundle c9. No migration of old checkpoints; no real model calls (fake endpoints only). ssh placement belongs to 44. Gates G1-G8, with G1-G5 mandatory and G8 covering F4 (a cancelled turn no longer loses what the harness had already written). Work order and design landing copied from the parent worktree at c28d4f6a189edcbcc65683951cd55e3ec6ad21f0."
+   "note": "Native home as the single source of truth: the profile's native state lives in a persistent directory on the machine that runs it (wsl: $HOME/.agent-box/profiles, local: <data_root>/profiles), bound RW into the sandbox; the control plane keeps records plus a reference (native_platform, home_locator, native session id, audit manifest digest) and never the native bytes. Wire stays locked (28 methods, wire/1, no new event kinds); the Worker control protocol goes 3 to 4 with bidirectional rejection and a new bundle c9. No migration of old checkpoints; no real model calls (fake endpoints only). ssh placement belongs to 44. Gates G1-G8, with G1-G5 mandatory and G8 covering F4 (a cancelled turn no longer loses what the harness had already written). Schedule: 44 first, then 45, in the 44 worktree."
   },
   {
    "id": "46",
@@ -818,6 +819,79 @@
     "/home/maoqh/projects/agent-box-harness-expansion"
    ],
    "note": "The per-turn file change set (which files changed, with +N/-M) - the data behind the diff card on the desktop. Deliberately harness-independent: it is computed from a bounded before/after manifest of the declared workspace on the execution side rather than by parsing any harness's tool payloads, which is exactly what makes it uniform across families and auditable. Bounded with honest truncation facts, no symlink following, no special files, no credentials in the change set or the evidence, and a per-turn binding that still explains failed and cancelled turns."
+  },
+  {
+   "id": "55",
+   "document": "work-orders/55-provider-model-record-and-probe.md",
+   "baseline": "50 checkpoint",
+   "worktree": "/home/maoqh/projects/agent-box-env-provider",
+   "branch": "feature/env-provider-v1",
+   "depends_on": [
+    "50"
+   ],
+   "dependency_condition": "Folds into the same wire relock as 51/52/53; stages B and later serialize with 47/48 on the shared files.",
+   "exclusive_group": "backend-driver-resources",
+   "stages": [
+    "A-record-fields",
+    "B-bounded-probe",
+    "C-contract-shared-relock",
+    "D-regression",
+    "E-handoff"
+   ],
+   "write_paths": [
+    "src/agent_box/**",
+    "plugins/**",
+    "tests/**",
+    "scripts/server-round1/**",
+    "docs/server-round1/**",
+    "docs/implementation/status.md"
+   ],
+   "forbidden_write_roots": [
+    "/home/maoqh/projects/agent-box",
+    "/home/maoqh/projects/agent-box-studio",
+    "/home/maoqh/projects/agent-box-desktop-next",
+    "/home/maoqh/projects/agent-box-desktop-next-wsl-round1",
+    "/home/maoqh/projects/agent-box-server-round1",
+    "/home/maoqh/projects/agent-box-harness-expansion"
+   ],
+   "note": "Provider and model records become facts instead of three hand-typed strings: base URL, auth style, wire style, and per-model context window plus capability toggles, each field storing its provenance so the UI can show whether it came from a preset, a fetch, or the user. Two bounded probes arrive with it - fetch the model list and test the connection - both restricted to the declared endpoint over https (loopback excepted for tests), bounded in time and response size, cancellable, with the credential read from the SecretStore into memory and request headers only, never into logs, argv, events or evidence. Neither probe writes configuration; the user confirms before anything is stored. No pricing, no completion calls, no invented defaults: a field without a source stays unknown. Pairs with frontend order P11, whose fetch and test buttons must stay visibly unavailable until this lands."
+  },
+  {
+   "id": "56",
+   "document": "work-orders/56-subscription-credentials.md",
+   "baseline": "45/50 checkpoint",
+   "worktree": "/home/maoqh/projects/agent-box-env-provider",
+   "branch": "feature/env-provider-v1",
+   "depends_on": [
+    "45",
+    "50"
+   ],
+   "dependency_condition": "Folds into the same wire relock as 51/52/53/55; it relies on order 45's native-home-as-authority model, so it lands after that.",
+   "exclusive_group": "backend-driver-resources",
+   "stages": [
+    "A-credential-kind",
+    "B-probe",
+    "C-contract-shared-relock",
+    "D-scan-boundary-note",
+    "E-regression"
+   ],
+   "write_paths": [
+    "src/agent_box/**",
+    "plugins/**",
+    "tests/**",
+    "scripts/server-round1/**",
+    "docs/server-round1/**",
+    "docs/implementation/status.md"
+   ],
+   "forbidden_write_roots": [
+    "/home/maoqh/projects/agent-box",
+    "/home/maoqh/projects/agent-box-studio",
+    "/home/maoqh/projects/agent-box-desktop-next",
+    "/home/maoqh/projects/agent-box-desktop-next-wsl-round1",
+    "/home/maoqh/projects/agent-box-server-round1",
+    "/home/maoqh/projects/agent-box-harness-expansion"
+   ],
+   "note": "Subscriptions become a credential kind beside api-key, but the login state is NOT kept in the native home: it is a managed asset in the control plane (encrypted in the SecretStore), materialised into the profile home per turn as a writable working copy and reclaimed at the end, which makes hot switching fall out for free - the next turn is a fresh process reading a freshly materialised home, so changing the bound account needs no CLI restart. This introduces the first write-back path in the product, so it is bounded and explicit: only the declared files are reclaimed, over-limit is a typed failure that keeps the previous asset, one lock per account serialises concurrent turns, a lost lock is a typed conflict rather than a silent overwrite, and writes are atomic with the digest recorded. Tokens never reach logs, argv, events or evidence; the host's own login state is never read; nothing is filled in or scraped. Stage A must establish per family where the login state lives, whether it is a single file, whether it is machine bound, and whether the harness rewrites it - any family that fails one of those is declared unsupported for subscriptions rather than faked. Order 45's credential scan matches only the injected per-run value, so the materialised working copy is not a leak, and that note goes into code and tests."
   }
  ],
  "authority": "docs/implementation",
