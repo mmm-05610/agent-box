@@ -6,7 +6,9 @@ use thiserror::Error;
 pub const MAGIC: [u8; 4] = *b"ABW1";
 pub const VERSION: u16 = 1;
 pub const HEADER_LEN: usize = 60;
-pub const MAX_PAYLOAD: usize = 64 * 1024;
+// Real homes produce large audit listings (the Worker still caps entries
+// and bytes honestly); 1 MiB keeps one bounded listing inside one frame.
+pub const MAX_PAYLOAD: usize = 1024 * 1024;
 /// Control-protocol generation. Version 2 added bidirectional stdin writes and
 /// pre-terminal stdout/stderr events for long-lived attempts. Version 3 adds
 /// digest-pinned runtime artifact trees to the bootstrap, which the Worker

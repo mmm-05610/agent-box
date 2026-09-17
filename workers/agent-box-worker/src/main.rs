@@ -2090,9 +2090,17 @@ fn audit_home_files(
     {
         let entry = entry.map_err(|_| ("VIEW_IO", "home listing failed"))?;
         let name = entry.file_name();
-        let metadata = entry
-            .metadata()
-            .map_err(|_| ("VIEW_IO", "home metadata failed"))?;
+        // A live Harness churns its own home: a file that vanishes between
+        // listing and stat is churn, reported as a truncation fact - the same
+        // rule the Server's local channel applies - never a failed audit.
+        let metadata = match entry.metadata() {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                audit.truncated_entries += 1;
+                continue;
+            }
+            Err(_) => return Err(("VIEW_IO", "home metadata failed")),
+        };
         audit.visited += 1;
         if audit.visited > MAX_VIEW_TRAVERSAL_ENTRIES {
             // The walk is cut here: at least this entry was not audited, and

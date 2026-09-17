@@ -581,9 +581,12 @@ class _WorkerChannels:
                 "audited": {"files": 0, "bytes": 0,
                             "truncated": {"entries": 0, "bytes": 0, "oversize": 0}},
             }
+        # Real homes can be large (hundreds of MB, thousands of files); the
+        # walk stays bounded by the Worker's audit caps but takes longer than
+        # the default RPC window, so the audit carries its own generous one.
         result = self.client.request("home.list", {
             "locator": self.home_locator, "relative": self.audit_window,
-        })
+        }, timeout=120.0)
         try:
             return audit_snapshot(
                 result.get("files", ()), self._home_bytes,
