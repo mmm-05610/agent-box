@@ -3,6 +3,7 @@ import { cleanup, render } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { I18nProvider } from '@/i18n'
+import { asWireId } from '@/types/wire/wire-v1'
 
 import { ComposerAccessChip } from './access-chip'
 
@@ -11,9 +12,9 @@ afterEach(cleanup)
 const baseDescriptor = (controls: { controlId: string; editable: boolean; kind: 'enum'; values: string[] }[]) => ({
   controls,
   effectTiming: 'next_send' as const,
-  profileId: 'profile-1',
+  profileId: asWireId('profile-1') as unknown as string,
   securityLockedIds: [] as string[],
-  workspaceId: 'workspace-1'
+  workspaceId: asWireId('workspace-1') as unknown as string
 })
 
 describe('ComposerAccessChip', () => {
