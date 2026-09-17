@@ -69,11 +69,13 @@ _PARAM_SHAPES = {
     "providerModels.list": ({"includeArchived"}, set()),
     "providerModels.create": (
         {"requestId", "displayName", "harness", "provider", "credentialId",
-         "configuration", "models"}, set(),
+         "configuration", "models"},
+        {"provenance"},
     ),
     "providerModels.update": (
         {"requestId", "providerModelId", "expectedVersion", "displayName", "credentialId",
-         "configuration", "models"}, set(),
+         "configuration", "models"},
+        {"provenance"},
     ),
     "providerModels.archive": (
         {"requestId", "providerModelId", "expectedVersion"}, set(),
@@ -435,6 +437,7 @@ class WireService:
     def provider_models_create(self, params: Mapping[str, Any]) -> dict[str, Any]:
         self._require_model_configs()
         body = self._provider_model_body(params, creating=True)
+        body.update(self._provenance(params) or {})
         record = self.model_configs.create(_request_id(params["requestId"]), body)
         return {"providerModel": record}
 
@@ -442,10 +445,12 @@ class WireService:
         self._require_model_configs()
         record_id = _bounded(params["providerModelId"], "providerModelId")
         try:
+            body = self._provider_model_body(params, creating=False)
+            body.update(self._provenance(params) or {})
             record = self.model_configs.update(
                 record_id, _version(params["expectedVersion"]),
                 _request_id(params["requestId"]),
-                self._provider_model_body(params, creating=False),
+                body,
             )
         except ServerError as exc:
             error = WireError.from_server_error(exc)
@@ -469,6 +474,44 @@ class WireService:
                 error.details["referenceIds"] = list(references)
             raise error from exc
         return {"providerModel": record}
+
+    #: Order 55: where the endpoint facts came from. `fieldsSource` is one of
+    #: the three honest answers (a preset catalogue, a pulled model list, or
+    #: the user's own hand entry); the endpoint fields themselves are optional
+    #: and stay absent when their source does not supply them.
+    _PROVENANCE_ENUMS = {
+        "authStyle": {"api_key", "oauth", "none"},
+        "wireApi": {"chat_completions", "responses"},
+        "fieldsSource": {"preset", "pulled", "manual"},
+    }
+    _PROVENANCE_COLUMNS = {
+        "authStyle": "auth_style",
+        "wireApi": "wire_api",
+        "fieldsSource": "fields_source",
+        "baseUrl": "base_url",
+    }
+
+    @staticmethod
+    def _provenance(params: Mapping[str, Any]) -> dict[str, str] | None:
+        raw = params.get("provenance")
+        if raw is None:
+            return None
+        if (not isinstance(raw, Mapping)
+                or not set(raw) <= set(_PROVENANCE_COLUMNS)):
+            raise WireError("INVALID_PARAMS", "provenance carries unknown fields")
+        provenance: dict[str, str] = {}
+        for field, column in _PROVENANCE_COLUMNS.items():
+            value = raw.get(field)
+            if value is None:
+                continue
+            value = _bounded(str(value), f"provenance.{field}", 512)
+            allowed = _PROVENANCE_ENUMS.get(field)
+            if allowed is not None and value not in allowed:
+                raise WireError(
+                    "INVALID_PARAMS", f"provenance.{field} is not a known value",
+                )
+            provenance[column] = value
+        return provenance or None
 
     def _provider_model_body(
         self, params: Mapping[str, Any], *, creating: bool,

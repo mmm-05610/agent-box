@@ -35,6 +35,8 @@ class ProviderModelRecords:
         self, *, key: str, request_digest: str, display_name: str,
         harness_type: str, provider_type: str, credential_id: str | None,
         config_digest: str, models_digest: str,
+        base_url: str | None = None, auth_style: str | None = None,
+        wire_api: str | None = None, fields_source: str | None = None,
     ) -> tuple[int, dict[str, Any]]:
         scope = "providerModels.create"
         with self.database.transaction() as conn:
@@ -50,9 +52,11 @@ class ProviderModelRecords:
             conn.execute(
                 "INSERT INTO server_provider_models(id,version,display_name,harness_type,"
                 "provider_type,credential_id,config_object_digest,models_object_digest,"
-                "created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                "base_url,auth_style,wire_api,fields_source,"
+                "created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (record_id, 1, display_name, harness_type, provider_type, credential_id,
-                 config_digest, models_digest, timestamp, timestamp),
+                 config_digest, models_digest, base_url, auth_style, wire_api,
+                 fields_source, timestamp, timestamp),
             )
             body = {"providerModelId": record_id}
             self.idempotency.insert(conn, scope, key, request_digest, 201, body)
@@ -61,6 +65,8 @@ class ProviderModelRecords:
     def update(
         self, *, record_id: str, expected_version: int, key: str, request_digest: str,
         display_name: str, credential_id: str | None, config_digest: str, models_digest: str,
+        base_url: str | None = None, auth_style: str | None = None,
+        wire_api: str | None = None, fields_source: str | None = None,
     ) -> tuple[int, dict[str, Any]]:
         scope = f"providerModels.update:{record_id}"
         with self.database.transaction() as conn:
@@ -75,9 +81,13 @@ class ProviderModelRecords:
                 raise ServerError("CREDENTIAL_NOT_FOUND", "Credential was not found", status=404)
             conn.execute(
                 "UPDATE server_provider_models SET display_name=?,credential_id=?,"
-                "config_object_digest=?,models_object_digest=?,version=version+1,updated_at=? "
+                "config_object_digest=?,models_object_digest=?,"
+                "base_url=COALESCE(?,base_url),auth_style=COALESCE(?,auth_style),"
+                "wire_api=COALESCE(?,wire_api),fields_source=COALESCE(?,fields_source),"
+                "version=version+1,updated_at=? "
                 "WHERE id=?",
-                (display_name, credential_id, config_digest, models_digest, now(), record_id),
+                (display_name, credential_id, config_digest, models_digest,
+                 base_url, auth_style, wire_api, fields_source, now(), record_id),
             )
             body = {"providerModelId": record_id}
             self.idempotency.insert(conn, scope, key, request_digest, 200, body)

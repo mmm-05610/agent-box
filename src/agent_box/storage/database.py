@@ -8,7 +8,7 @@ import threading
 from typing import Iterator
 
 
-PRODUCT_SCHEMA_VERSION = 7
+PRODUCT_SCHEMA_VERSION = 8
 
 
 class FutureSchemaError(RuntimeError):
@@ -68,6 +68,10 @@ CREATE TABLE IF NOT EXISTS server_provider_models (
     credential_id TEXT REFERENCES server_credentials(id),
     config_object_digest TEXT NOT NULL,
     models_object_digest TEXT NOT NULL,
+    base_url TEXT,
+    auth_style TEXT,
+    wire_api TEXT,
+    fields_source TEXT,
     archived_at TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
@@ -246,6 +250,23 @@ def _add_columns(conn: sqlite3.Connection, table: str, additions: dict[str, str]
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {declaration}")
 
 
+def _migrate_7_to_8(conn: sqlite3.Connection) -> None:
+    """Order 55: provenance fields on the provider/model record.
+
+    `base_url` / `auth_style` / `wire_api` name the endpoint facts the record
+    carries, `fields_source` says where those fields came from
+    (preset/pulled/manual). Every column is optional: an old record keeps
+    working with all of them NULL, which the product renders as "unknown" —
+    never a guessed default.
+    """
+    _add_columns(conn, "server_provider_models", {
+        "base_url": "TEXT",
+        "auth_style": "TEXT",
+        "wire_api": "TEXT",
+        "fields_source": "TEXT",
+    })
+
+
 def _migrate_6_to_7(conn: sqlite3.Connection) -> None:
     """Order 51: the usage fact, recorded as optional turn columns.
 
@@ -414,6 +435,8 @@ class Database:
                 _migrate_5_to_6(conn)
             if current in (1, 2, 3, 4, 5, 6):
                 _migrate_6_to_7(conn)
+            if current in (1, 2, 3, 4, 5, 6, 7):
+                _migrate_7_to_8(conn)
             conn.executescript(_SCHEMA)
             conn.execute(
                 "INSERT OR IGNORE INTO agentbox_product_schema(singleton, version, applied_at) "

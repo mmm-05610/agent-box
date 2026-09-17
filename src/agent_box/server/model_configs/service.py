@@ -32,6 +32,8 @@ class ProviderModelService:
             harness_type=body["harness"], provider_type=body["provider"],
             credential_id=body.get("credentialId"), config_digest=config.digest,
             models_digest=models.digest,
+            base_url=body.get("baseUrl"), auth_style=body.get("authStyle"),
+            wire_api=body.get("wireApi"), fields_source=body.get("fieldsSource"),
         )
         return self.project(self.records.get(result["providerModelId"]))
 
@@ -52,6 +54,8 @@ class ProviderModelService:
             request_digest=digest(body), display_name=body["displayName"],
             credential_id=body.get("credentialId"), config_digest=config.digest,
             models_digest=models.digest,
+            base_url=body.get("baseUrl"), auth_style=body.get("authStyle"),
+            wire_api=body.get("wireApi"), fields_source=body.get("fieldsSource"),
         )
         return self.project(self.records.get(result["providerModelId"]))
 
@@ -161,6 +165,13 @@ class ProviderModelService:
                 for key, value in sorted(dict(config.get("configuration") or {}).items())
             ],
             "models": self._models(row), "archivedAt": row["archived_at"],
+            # Order 55: the endpoint facts and where they came from; absent
+            # means unknown, never a guessed default.
+            "provenance": ({"baseUrl": row["base_url"],
+                            "authStyle": row["auth_style"], "wireApi": row["wire_api"],
+                            "fieldsSource": row["fields_source"]}
+                           if row["base_url"] or row["auth_style"] or row["wire_api"]
+                           or row["fields_source"] else None),
             "createdAt": row["created_at"], "updatedAt": row["updated_at"],
         }
 
