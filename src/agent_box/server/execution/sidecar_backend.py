@@ -445,12 +445,30 @@ class SidecarExecutionBackend:
             # (see _audited_home); absent stays absent in the ledger.
             usage = getattr(run, "usage_fact", None)
             usage_source = getattr(run, "usage_source", None)
+            # Order 54: the workspace change set, published as a record
+            # object (a fact document, never harness tool load).
+            change_set_digest = None
+            try:
+                change_set = run.port.workspace_change_set(run.core_execution_id)
+            except BaseException as read_error:
+                logging.getLogger(__name__).warning(
+                    "turn %s: change set read failed (%s); the turn's change set "
+                    "stays unknown", run.turn_id, read_error,
+                )
+                change_set = None
+            if change_set is not None:
+                change_set_checkpoint = self.objects.publish(json.dumps(
+                    {"schema_version": 1, "changeSet": change_set},
+                    sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+                ).encode())
+                change_set_digest = change_set_checkpoint.digest
             completed, _event = self.records.complete_turn(
                 run.turn_id, checkpoint_object_digest=checkpoint.digest,
                 checkpoint_native_id=run.native_id, result_object_digest=result.digest,
                 queue_records=self.queue,
                 native_platform=audit["nativePlatform"], home_locator=audit["homeLocator"],
                 usage=usage, usage_source=usage_source,
+                change_set_object_digest=change_set_digest,
             )
             next_execution_id = completed.get("next_execution_id")
             self.work_service.complete_work(run.work_id, "Turn completed through Harness sidecar")

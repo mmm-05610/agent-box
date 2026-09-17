@@ -608,6 +608,7 @@ class SessionRecords:
         checkpoint_native_id: str, result_object_digest: str, queue_records=None,
         native_platform: str | None = None, home_locator: str | None = None,
         usage: dict[str, Any] | None = None, usage_source: str | None = None,
+        change_set_object_digest: str | None = None,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         with self.database.transaction() as conn:
             row = conn.execute("SELECT * FROM server_turns WHERE id=?", (turn_id,)).fetchone()
@@ -627,6 +628,11 @@ class SessionRecords:
             # no estimates, no per-character stand-ins.
             usage_columns = ""
             usage_values: list[Any] = []
+            change_set_column = ""
+            change_set_values: list[Any] = []
+            if change_set_object_digest:
+                change_set_column = ",change_set_object_digest=?"
+                change_set_values = [change_set_object_digest]
             if usage:
                 usage_columns = (",usage_input_tokens=?,usage_output_tokens=?,"
                                  "usage_total_tokens=?,usage_source=?")
@@ -636,8 +642,8 @@ class SessionRecords:
                 ]
             conn.execute(
                 "UPDATE server_turns SET state='completed',capture_state='captured',cleanup_state='pending',result_object_digest=?,updated_at=?"
-                + usage_columns + " WHERE id=?",
-                [result_object_digest, timestamp, *usage_values, turn_id],
+                + usage_columns + change_set_column + " WHERE id=?",
+                [result_object_digest, timestamp, *usage_values, *change_set_values, turn_id],
             )
             latest_usage = None
             if usage:

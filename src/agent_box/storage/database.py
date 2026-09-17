@@ -8,7 +8,7 @@ import threading
 from typing import Iterator
 
 
-PRODUCT_SCHEMA_VERSION = 8
+PRODUCT_SCHEMA_VERSION = 9
 
 
 class FutureSchemaError(RuntimeError):
@@ -110,6 +110,7 @@ CREATE TABLE IF NOT EXISTS server_turns (
     dispatch_id TEXT,
     result_object_digest TEXT,
     error_code TEXT,
+    change_set_object_digest TEXT,
     usage_input_tokens INTEGER,
     usage_output_tokens INTEGER,
     usage_total_tokens INTEGER,
@@ -248,6 +249,18 @@ def _add_columns(conn: sqlite3.Connection, table: str, additions: dict[str, str]
     for name, declaration in additions.items():
         if name not in columns:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {declaration}")
+
+
+def _migrate_8_to_9(conn: sqlite3.Connection) -> None:
+    """Order 54: the per-turn change set, published as a record object.
+
+    `change_set_object_digest` references the diff document (added/modified/
+    removed with honest line accounting and truncation facts). Optional: a
+    turn without a workspace change set keeps NULL.
+    """
+    _add_columns(conn, "server_turns", {
+        "change_set_object_digest": "TEXT",
+    })
 
 
 def _migrate_7_to_8(conn: sqlite3.Connection) -> None:
@@ -437,6 +450,8 @@ class Database:
                 _migrate_6_to_7(conn)
             if current in (1, 2, 3, 4, 5, 6, 7):
                 _migrate_7_to_8(conn)
+            if current in (1, 2, 3, 4, 5, 6, 7, 8):
+                _migrate_8_to_9(conn)
             conn.executescript(_SCHEMA)
             conn.execute(
                 "INSERT OR IGNORE INTO agentbox_product_schema(singleton, version, applied_at) "

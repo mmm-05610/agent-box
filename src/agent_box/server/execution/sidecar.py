@@ -1100,6 +1100,16 @@ class SidecarHarnessPort:
         })
         return native
 
+    def workspace_change_set(self, execution_id: str) -> dict[str, Any] | None:
+        """Order 54: the declared workspace's per-turn change set.
+
+        Delegates to the execution's own channel; a channel without the
+        capability answers None (honest unknown).
+        """
+        envelope = self._require(execution_id)
+        read = getattr(envelope, "workspace_change_set", None)
+        return read() if callable(read) else None
+
     def read_usage(
         self, execution_id: str, usage_probe: Mapping[str, str] | None,
     ) -> dict[str, int] | None:

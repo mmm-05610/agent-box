@@ -353,6 +353,12 @@ class LocalSidecarLauncher:
         # one thing that kills the whole tree (Order 48, D3). On POSIX the
         # session + killpg path stays exactly as it was.
         job = _new_process_job() if os.name == "nt" else None
+        # Order 54: the before-snapshot of the declared workspace (bounded,
+        # with content copies for the later line diff). Taken before the room
+        # starts; the after-walk happens when the channels are audited.
+        from agent_box.server.execution.change_set import snapshot_with_copies
+
+        before_snapshot = snapshot_with_copies(self.workspace_path, root / "before-copy")
         try:
             process = subprocess.Popen(  # noqa: S603 - the argv is the reviewed room
                 list(room.argv), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
@@ -370,7 +376,7 @@ class LocalSidecarLauncher:
         return _LocalChannels(
             process, root=root, view=view, stderr_path=stderr_path,
             credential=(self.credential or b'').strip(),
-            home=self.home, job=job,
+            home=self.home, before_snapshot=before_snapshot, job=job,
             protected_state_paths=self.protected_state_paths,
             state_ephemeral_paths=self.state_ephemeral_paths,
         )
@@ -384,8 +390,14 @@ class _LocalChannels:
         credential: bytes, home: LocalHome | None,
         protected_state_paths: Sequence[str], state_ephemeral_paths: Sequence[str],
         job: "object | None" = None,
+        before_snapshot: dict | None = None,
+        workspace_root: "Path | None" = None,
     ) -> None:
         self.process = process
+        #: Order 54: the attempt's before-snapshot of the declared workspace;
+        #: the after-walk and the diff happen at the audit boundary.
+        self.before_snapshot = before_snapshot
+        self.workspace_root = workspace_root
         #: The Job Object that owns this child's tree on Windows; None on POSIX
         #: (there the session + killpg pair does the same work).
         self.job = job
@@ -458,6 +470,24 @@ class _LocalChannels:
                 shutil.rmtree(self.root, ignore_errors=True)
 
     # -- audit -------------------------------------------------------------
+    def workspace_change_set(self) -> dict[str, Any] | None:
+        """Order 54: the per-turn change set of the declared workspace.
+
+        The after-walk uses the same bounds as the before-walk; the diff is
+        the neutral per-turn fact (added/modified/removed with honest line
+        accounting). None when the workspace root is not a directory.
+        """
+        from agent_box.server.execution.change_set import diff_snapshots, snapshot_with_copies
+
+        if self.workspace_root is None or not Path(self.workspace_root).is_dir():
+            return None
+        after = snapshot_with_copies(
+            Path(self.workspace_root), Path(self.root) / "after-copy")
+        before = self.before_snapshot or {"files": {}, "skipped": 0,
+                                          "truncated_entries": 0, "truncated_bytes": 0,
+                                          "oversize_files": 0, "symlinks": 0, "special": 0}
+        return diff_snapshots(before, after)
+
     def audit_state(self) -> dict[str, Any]:
         """Audit the declared home window under the shared audit rules."""
         if self.home is None:

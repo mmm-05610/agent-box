@@ -202,7 +202,12 @@ def test_pull_models_parses_a_loopback_fake(tmp_path):
         def log_message(self, *args):
             pass
 
-    server = HTTPServer(("127.0.0.1", 0), Handler)
+    class Server(HTTPServer):
+        # Under a full-suite run the accepting thread can lag; a deeper
+        # listen backlog removes the connect-refused race.
+        request_queue_size = 128
+
+    server = Server(("127.0.0.1", 0), Handler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     try:
         from agent_box.server.model_configs.probe import (
