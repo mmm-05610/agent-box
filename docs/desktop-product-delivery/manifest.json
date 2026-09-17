@@ -89,6 +89,26 @@
       "note": "Subscriptions as first-class credentials, managed apart from the native home and hot switched per the user ruling: the login state is a managed asset held by the control plane (backend order 56), materialised into the profile home per turn as a writable working copy and reclaimed at the end, so changing the bound account takes effect on the NEXT turn - which is what hot means here, not a mid-turn swap. Because every turn is a fresh process reading a freshly materialised home, no CLI restart is involved. The UI shows family, account identity, status and last verification, binds a profile default plus an optional override, and keeps credentials out of every surface: never displayed, filled in or scraped, with the host login state untouched."
     },
     {
+      "id": "P13",
+      "file": "work-orders/P13-harness-program-manager.md",
+      "depends_on": [
+        "P12"
+      ],
+      "exclusive_group": "desktop-product",
+      "scope": [
+        "docs/desktop-product-delivery/**",
+        "apps/desktop/src/features/settings/**",
+        "apps/desktop/src/features/profiles/**",
+        "apps/desktop/src/api/**",
+        "apps/desktop/src/types/**",
+        "apps/desktop/src/i18n/**",
+        "apps/desktop/e2e/**",
+        "tests-js/**"
+      ],
+      "requires_approved_contract": true,
+      "note": "Harness program management: one row per family showing the current version, other installed versions, size, source, install time and digest, an update badge that comes from the backend rather than being inferred, and one-click install, update, rollback and set-current with visible progress and readable errors. Modelled on Applite's pattern verified this round - paint the catalog from local data immediately, annotate installed and outdated state asynchronously, never block the list on a slow backend call - while importing only our own records and never the host's configuration. Two negative findings recorded in backend order 57 are why there is no UI to copy: claude-squad tells users to update the underlying program themselves, and vibe-kanban assumes installed agents and is sunsetting."
+    },
+    {
       "id": "P08",
       "file": "work-orders/P08-composer-input-bar.md",
       "depends_on": [
