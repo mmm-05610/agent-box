@@ -49,9 +49,24 @@ localStorage/IndexedDB 键、URL scheme 的**既有注册**、数据目录、凭
 - **E 保真第三方身份**：Hermes 作为真实 Harness 名及其可执行文件、原生目录、依赖、API、Profile 语义
   **不改**；只改本应用过时的"官方 Hermes Desktop"自我介绍；**保留上游 LICENSE/版权/NOTICE/来源说明**，
   不把上游成果写成本项目原创。
-- **F Logo/视觉**：本轮**只做清单**（README banner、应用/托盘图标、favicon、安装器图标、启动页资源的
-  路径与引用），**不制作、不宣称**已获批的新 Logo；必要时移除带旧品牌 banner 或用中性文字占位，
-  但**不能因缺 Logo 导致构建失败**，也不把占位当正式视觉验收完成。
+- **F Logo/视觉（资产已就绪，2026-09-17 用户提供设计稿）**：资产包在
+  `/home/maoqh/projects/agent-box-brand/`（见 `KIT.md`：mark 的**自动描摹 SVG**（含 `currentColor` 版）、
+  图标集 16–1024、**多尺寸 ICO**、**8 条目 ICNS**、方形 `favicon.svg`、字标、锁版、黑底圆角应用瓦片）。
+  **放置**（逐条来自审计）：
+  1. `apps/desktop/assets/icon.png|icon.ico|icon.icns` ← `ordessa/icon/ordessa-256.png` / `ordessa.ico` / `ordessa.icns`
+     （`package.json` 的 `build.icon = "assets/icon"` 按扩展名取用）；
+  2. `apps/desktop/index.html` 里 `apple-touch-icon` / `shortcut icon` 指向的
+     `public/apple-touch-icon.png` ← 由 `ordessa-256.png` 生成 180×180；
+  3. **`apps/desktop/src/components/brand-mark.tsx` 当前用的是 `nous-girl.jpg`——上游 Nous 的品牌图形**
+     （注释原文 "Brand badge: nous-girl mark on a white tile"）← 换成 Ordessa mark（这是本轮最能体现"不再自称上游"的一处）；
+  4. `public/` 里的 `hermes-sprite.png`、`hermes-frames/`、`hermes.png`、`nous-girl.jpg`：
+     按本单 §2 的分类**替换或移除**，并在报告里逐条说明（不得静默删除仍被引用的资源）；
+  5. `src/components/onboarding/providers.tsx` 把 `apple-touch-icon.png` 当 **provider 头像**用 →
+     **需要决定**：用 Ordessa mark 还是换中性图标（provider 头像不该是我们的品牌）；
+  6. README 使用 `ordessa/lockup/ordessa-lockup.png`。
+  **保真**：mark 的 SVG 是自动描摹（源约 200px），字标/标语是文本栅格（未放大）；
+  **16px 忠实原比例会偏细**，若需更锐利的极小尺寸，请设计方出简化版；
+  **不能因缺资源导致构建失败**，也不把临时占位当正式视觉验收完成。
 
 ## §4 硬门（违反即返工）
 
