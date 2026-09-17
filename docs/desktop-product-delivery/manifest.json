@@ -125,6 +125,26 @@
       "note": "Four surfaces, one root cause behind two of them. The empty state becomes branding plus greeting plus the same composer as P08 (never a second implementation) plus suggestion chips that must actually work. The bare 'Unavailable' and the 'Gateway offline' row share their origin: the readiness and connection model was inherited from the Hermes desktop line (runtime-readiness.ts derives 'unavailable' from provider_configured and a runtime check, while our facts are the Server lifecycle connection with its typed reasons, hello and whether a workspace is chosen), so both are re-derived from our facts with a reason and a next step, never a bare word - and if nothing in our product corresponds to the gateway object, the row and its popover are deleted rather than left half-dead. Finally the branding sweep: 222 non-test source files mention Hermes and the locales have many more, so the rule is split - user-visible text must be product-neutral, internal identifiers are not bundled, and the harness family named hermes stays exactly as it is, because that word denotes a family rather than the product."
     },
     {
+      "id": "P15",
+      "file": "work-orders/P15-skill-mcp-hubs-and-settings-prune.md",
+      "depends_on": [
+        "P14"
+      ],
+      "exclusive_group": "desktop-product",
+      "scope": [
+        "docs/desktop-product-delivery/**",
+        "apps/desktop/src/features/settings/**",
+        "apps/desktop/src/features/**",
+        "apps/desktop/src/api/**",
+        "apps/desktop/src/types/**",
+        "apps/desktop/src/i18n/**",
+        "apps/desktop/e2e/**",
+        "tests-js/**"
+      ],
+      "requires_approved_contract": true,
+      "note": "Settings pruning plus the two asset hubs. Every existing settings section gets a ledger row saying which product capability it serves and a keep, merge or delete verdict, where delete means the code and entry point go away rather than being hidden - the criterion being whether it relates to our Server plus Profile/Session plus family plus assets semantics. Skill Hub lists assets by name, description, source, digest and revision with install, update and delete as user actions, reusing P13's catalog-first pattern, and a family whose registry slot does not support skills says so instead of offering a switch that does nothing. MCP Hub manages stdio and remote servers with credential references only, a test connection that writes nothing, and per-profile enablement. Hooks get no management surface because the convergence does not exist, and commands are described as two different things - our command palette versus text sent to the model - so the UI cannot confuse them."
+    },
+    {
       "id": "P08",
       "file": "work-orders/P08-composer-input-bar.md",
       "depends_on": [
