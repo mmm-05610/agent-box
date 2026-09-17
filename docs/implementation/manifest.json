@@ -1042,6 +1042,46 @@
     "/home/maoqh/projects/agent-box-harness-expansion"
    ],
    "note": "The profile becomes the single binding point for every asset - model slot, credential or account reference, skills, MCP servers, hooks, an instruction asset, and per-tool permission rules - with the per-tool rule vocabulary taken from the reference: read/edit/bash/task/external_directory/webfetch/skill and friends each set to ask, allow or deny, with glob to action maps and last matching rule winning, ask implemented by the approvals round trip that already exists, and full access, default and plan existing only as presets that per-tool rules override. Resolution may only ever tighten what a tool could already do. Two semantic corrections ride along: a session is not owned by a profile - it belongs to the workspace and the product, the profile is the current binding, and attribution is per turn, which the schema already does via server_turns.profile_id, profile_revision and native_generation - and a family is strongly bound to a profile, so switching harness in place is not offered; the only path is cloning into a new profile of another family, copying and translating as much as each family allows, never migrating session-type assets, and never pretending the clone inherited the old native session. Switching the binding within the same harness is allowed and honest per the family's storage shape: file-per-session journals let the session's own native files move into the new home with an auditable record, while shared-database families restart natively and say so."
+  },
+  {
+   "id": "61",
+   "document": "work-orders/61-pacthold-rebrand.md",
+   "baseline": "60 checkpoint",
+   "worktree": "/home/maoqh/projects/agent-box-env-provider",
+   "branch": "feature/env-provider-v1",
+   "depends_on": [
+    "60"
+   ],
+   "dependency_condition": "Route (a) per the user's ruling on 2026-09-16: the rename is queued behind the current queue and is not urgent. It touches README, pyproject, CLI entry points and src, which the 44-60 write set also covers, so it runs strictly after 60 in the same worktree.",
+   "exclusive_group": "backend-driver-resources",
+   "stages": [
+    "A-mapping-and-keep-list",
+    "B-display-and-docs",
+    "C-cli",
+    "D-packaging-metadata",
+    "E-cross-repo-boundary",
+    "F-verification"
+   ],
+   "write_paths": [
+    "pyproject.toml",
+    "src/agent_box/**",
+    "plugins/**",
+    "tests/**",
+    "scripts/**",
+    "docs/**",
+    "README.md",
+    "README_CN.md",
+    "docs/implementation/status.md"
+   ],
+   "forbidden_write_roots": [
+    "/home/maoqh/projects/agent-box",
+    "/home/maoqh/projects/agent-box-studio",
+    "/home/maoqh/projects/agent-box-desktop-next",
+    "/home/maoqh/projects/agent-box-desktop-next-wsl-round1",
+    "/home/maoqh/projects/agent-box-server-round1",
+    "/home/maoqh/projects/agent-box-harness-expansion"
+   ],
+   "note": "The infrastructure repo becomes Pacthold, and the bar is not 'no old strings remain' but that a user sees Pacthold and a developer integrates Pacthold while stored data and cross-component contracts survive untouched. The audit already separates the layers: the agent_box import path and entry-point group are not the brand and are not force-renamed, the three CLI entry points are exactly the ones to alias (pacthold, pacthold-server, pacthold-server-credential added, the old three kept as aliases with identical behaviour), and archived docs, upstream licences and real harness names stay as they are. Hard gates: the wire digests stay byte-identical, every compatibility identifier is untouched with new names only as aliases, a real launch smoke runs the new CLI to start the Server and lets the desktop connect, and nothing is pushed, renamed remotely, released or paid for. Paired with the desktop's P18, and both repos must carry the same mapping."
   }
  ],
  "authority": "docs/implementation",
