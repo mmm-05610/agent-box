@@ -349,6 +349,7 @@ def build_runtime(
     provider_model_service = ProviderModelService(
         provider_model_records, objects, harnesses=registry,
         credentials=credentials, profiles=profile_records,
+        secret_store=secret_store,
     )
     profile_service.bind_model_configs(provider_model_service)
     session_service = SessionService(session_records, idempotency, objects,

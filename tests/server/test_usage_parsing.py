@@ -161,3 +161,125 @@ def test_hermes_db_without_the_sessions_table_is_a_none_not_a_guess(tmp_path):
     connection.close()
     assert parse_hermes_state_db(db.read_bytes()) is None
     db.unlink()
+
+
+def test_probe_validates_the_endpoint_before_any_network_call():
+    """SSRF/Order-55 §2: only https (loopback http exempt), no private nets."""
+    from agent_box.server.model_configs.probe import ProbeError, pull_models
+
+    with pytest.raises(ProbeError) as blocked:
+        pull_models("http://10.1.2.3/v1", None)
+    assert blocked.value.code == "PROBE_ENDPOINT_BLOCKED"
+    with pytest.raises(ProbeError) as blocked:
+        pull_models("ftp://example.com", None)
+    assert blocked.value.code == "PROBE_ENDPOINT_BLOCKED"
+    with pytest.raises(ProbeError) as blocked:
+        pull_models("https://192.168.1.9/v1", None)
+    assert blocked.value.code == "PROBE_ENDPOINT_BLOCKED"
+
+
+def test_pull_models_parses_a_loopback_fake(tmp_path):
+    """A loopback fake endpoint answers the OpenAI shape; the parser maps ids."""
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    body = json.dumps({"data": [{"id": "model-a"}, {"id": "model-b"},
+                                {"no_id": True}]}).encode()
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            if self.headers.get("Authorization") != "Bearer secret-key":
+                self.send_response(401)
+                self.end_headers()
+                self.wfile.write(b"denied")
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    server = HTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        from agent_box.server.model_configs.probe import (
+            ProbeError,
+            pull_models,
+            test_connection,
+        )
+
+        base = f"http://127.0.0.1:{server.server_port}"
+        with pytest.raises(ProbeError) as denied:
+            pull_models(base, "wrong-key")
+        assert denied.value.code == "PROBE_AUTH_FAILED"
+
+        result = pull_models(base, "secret-key")
+        assert result.status == "ok"
+        assert result.models == ("model-a", "model-b")  # the shapeless entry drops
+
+        check = test_connection(base, "secret-key")
+        assert check.status == "reachable"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_pull_models_rejects_oversized_and_shapeless_responses():
+    """Bounded and honest: too-large and wrong-shaped responses are typed
+    refusals, never truncated-then-trusted."""
+    from agent_box.server.model_configs.probe import (
+        MAX_RESPONSE_BYTES,
+        ProbeError,
+        pull_models,
+    )
+
+    class FakeResponse:
+        def __init__(self, content):
+            self._content = content
+
+        def read(self, limit):
+            return self._content[:limit]
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    content = b'{"data": ["x" * 10]}'
+    oversized = content + b" " * (MAX_RESPONSE_BYTES + 1)
+
+    import agent_box.server.model_configs.probe as probe_module
+
+    original = probe_module.urllib.request.urlopen
+
+    class _FakeUrlopen:
+        def __init__(self, content):
+            self._content = content
+
+        def __call__(self, request, timeout):
+            return FakeResponse(self._content)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    probe_module.urllib.request.urlopen = _FakeUrlopen(oversized)
+    try:
+        with pytest.raises(ProbeError) as too_large:
+            pull_models("https://models.example.com/v1", "key")
+        assert too_large.value.code == "PROBE_RESPONSE_TOO_LARGE"
+    finally:
+        probe_module.urllib.request.urlopen = original
+
+    probe_module.urllib.request.urlopen = _FakeUrlopen(b'{"nope": true}')
+    try:
+        with pytest.raises(ProbeError) as shapeless:
+            pull_models("https://models.example.com/v1", "key")
+        assert shapeless.value.code == "PROBE_FORMAT_INVALID"
+    finally:
+        probe_module.urllib.request.urlopen = original

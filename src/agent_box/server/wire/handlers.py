@@ -80,6 +80,12 @@ _PARAM_SHAPES = {
     "providerModels.archive": (
         {"requestId", "providerModelId", "expectedVersion"}, set(),
     ),
+    "providerModels.probeModels": (
+        {"requestId", "baseUrl", "credentialId"}, {"provenance"},
+    ),
+    "providerModels.probeConnection": (
+        {"requestId", "baseUrl", "credentialId"}, set(),
+    ),
     "config.describe": ({"profileId", "workspaceId"}, set()),
     "config.resolve": ({"profileId", "workspaceId", "overrides"}, set()),
     "sessions.list": ({"includeArchived"}, {"workspaceId", "page"}),
@@ -218,6 +224,8 @@ class WireService:
             "providerModels.create": self.provider_models_create,
             "providerModels.update": self.provider_models_update,
             "providerModels.archive": self.provider_models_archive,
+            "providerModels.probeModels": self.provider_models_probe_models,
+            "providerModels.probeConnection": self.provider_models_probe_connection,
             "config.describe": self.config_describe,
             "config.resolve": self.config_resolve,
             "sessions.list": self.sessions_list,
@@ -440,6 +448,22 @@ class WireService:
         body.update(self._provenance(params) or {})
         record = self.model_configs.create(_request_id(params["requestId"]), body)
         return {"providerModel": record}
+
+    def provider_models_probe_models(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        self._require_model_configs()
+        self._provenance(params)  # validate the optional provenance, if given
+        return self.model_configs.probe_models({
+            "baseUrl": _bounded(params["baseUrl"], "baseUrl", 512),
+            "credentialId": params.get("credentialId"),
+        })
+
+    def provider_models_probe_connection(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        self._require_model_configs()
+        self._provenance(params)
+        return self.model_configs.probe_connection({
+            "baseUrl": _bounded(params["baseUrl"], "baseUrl", 512),
+            "credentialId": params.get("credentialId"),
+        })
 
     def provider_models_update(self, params: Mapping[str, Any]) -> dict[str, Any]:
         self._require_model_configs()

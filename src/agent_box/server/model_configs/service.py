@@ -9,12 +9,44 @@ from agent_box.server.records import canonical, digest, reject_sensitive_keys
 
 
 class ProviderModelService:
-    def __init__(self, records, objects, *, harnesses, credentials, profiles) -> None:
+    def __init__(self, records, objects, *, harnesses, credentials, profiles,
+                 secret_store=None) -> None:
         self.records = records
         self.objects = objects
         self.harnesses = harnesses
         self.credentials = credentials
         self.profiles = profiles
+        #: Order 55: the probes pull the credential through the store at call
+        #: time; the value lives only inside the probe call (memory/header).
+        self.secret_store = secret_store
+
+    def _probe_credential(self, credential_id: str | None) -> str | None:
+        if credential_id is None or self.secret_store is None:
+            return None
+        row = self.credentials.get(credential_id)
+        return self.secret_store.read(row["secret_locator"]).decode("utf-8").strip()
+
+    def probe_models(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        """Order 55: one bounded outbound GET of the declared /models."""
+        from agent_box.server.model_configs.probe import ProbeError, pull_models
+
+        try:
+            api_key = self._probe_credential(params.get("credentialId"))
+            result = pull_models(str(params["baseUrl"]), api_key)
+        except ProbeError as error:
+            return {"status": "failed", "code": error.code, "models": []}
+        return {"status": "ok", "models": list(result.models)}
+
+    def probe_connection(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        """Order 55: one bounded reachability check of the declared endpoint."""
+        from agent_box.server.model_configs.probe import probe_connection
+
+        try:
+            api_key = self._probe_credential(params.get("credentialId"))
+            result = probe_connection(str(params["baseUrl"]), api_key)
+        except ProbeError as error:
+            return {"status": "failed", "code": error.code}
+        return {"status": result.status, "detail": result.detail}
 
     def list(self, *, include_archived: bool = False) -> list[dict[str, Any]]:
         return [self.project(row) for row in self.records.list(include_archived=include_archived)]
