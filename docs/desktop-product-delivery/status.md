@@ -16,7 +16,7 @@
   `evidence/P06.md`、`evidence/DESKTOP_IMPLEMENTATION_HANDOFF.md`）
 - `REAL_FLOW_VERIFIED = 否`（无真实 Server/Harness/模型链路证据）
 - `AGENTBOX_DESKTOP_PRODUCT_GREEN = 否 / 待全栈`（整体产品需外围能力矩阵另验，核心联调 GREEN 不等于产品 GREEN）
-- **`writer_lease = RELEASED`** —— 前端 goal 已停止全部写入（含文档）。
+- **`writer_lease = RELEASED（验收小修完成，2026-09-17）`** —— 前端 goal 已停止全部写入（含文档）。
   **后端执行者可按 `docs/desktop-product-delivery/handoff-policy.md` 的 42 双门规则接管全栈**：
   读取本文件与 `evidence/DESKTOP_IMPLEMENTATION_HANDOFF.md`，核对分支/HEAD/摘要/可运行性，
   确认无新前端 writer、无子代理、无未交接修改后，在正式派单指定的工作树记录
@@ -1398,6 +1398,24 @@ typecheck 当场暴露；新测试 4 条 ESLint warning 收口为 0。
   - **G6** **UI 805/806 通过**（唯一失败 `plugins/hermes-bots/cron-prompt.test.ts`：`spawnSync('sh')` 在 Windows
     无 POSIX shell → 环境基线，文件无改动）；tests-js **8 files passed**；electron 项目在 Windows 上有**既有**
     POSIX 环境失败集（ssh/symlink/`/bin/sh`/EBUSY/EPERM，均与命名无关，未逐一修），如实登记为 Windows 基线。
-- **未做项（不冒充）**：连服务的一轮 no-model 冒烟；平台安装测试（未跑，构建产物名证据代替）；远端仓库名/发版/数据迁移（工单边界）。
+- **未做项（不冒充）**：平台安装测试（未跑，以构建产物名 + G4 启动冒烟证据代替；~~连服务的一轮 no-model 冒烟~~ 已由 G4 完成，见上）；远端仓库名/发版/数据迁移（工单边界）。
 - **派单表状态**：P00–P18 全部有结论。writer_lease = **RELEASED**（队列耗尽，本 goal 停止写入）。
 
+
+## 验收小修（2026-09-17，后端调度维护者执行；租约 2026-09-17 20:58 取用）
+
+用户验收前端时确认的三处小修 + 一处遗留台账：
+
+1. **左下角 Gateway 标签**：六语言 `shell/gatewayMenu` 的 `gateway`/`gatewayTitle` 纯标签值
+   Gateway/网关/閘道/ゲートウェイ/Шлюз/البوابة → **Service/服务/服務/サービス/Сервис/الخدمة**；
+   `gatewayOffline` 去冗余（no service connection → not connected/未连接…）。
+   **遗留（P14-C 台账，非本修范围）**：复合文案（'网关错误'、'ゲートウェイ接続…'、ru 'Шлюзы' 设置区、
+   远程登录/恢复面板）仍属 gateway 子系统——它是**真实功能面**，映射或删除需要产品决策，见 P14 §C。
+2. **status.md P18 段自相矛盾更正**：「未做项：连服务的一轮 no-model 冒烟」与 G4 证据
+   （executed 22/allOk）矛盾 → 已由 G4 完成，未做项只保留平台安装测试与远端/发版/迁移。
+3. **`contracts/wire-v1/README.md` 摘要过期**：`11e3b3e7…`/`5d4fa3bf…` → 实测当前
+   `774640498429ca9f…`（wire-v1.ts）/`14f7f73605bb6f04…`（生成工件），并注明重锁时点。
+
+验证：六语言值级 gateway 残留 0；`git diff` 逐行目检（纯引号内等结构替换）；
+被改键无测试断言（grep 为空）。**未复跑** Windows 侧全量（环境：UNC+cmd 限制），此前计数仍以
+P18 报告为准。租约用后即释。
