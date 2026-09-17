@@ -66,6 +66,7 @@ import { useTheme } from '@/themes'
 
 import { AttachmentList } from './attachments'
 import { ContextMenu } from './context-menu'
+import { ComposerAccessChip } from './access-chip'
 import { ComposerControls } from './controls'
 import { HelpHint } from './help-hint'
 import { useComposerBranch } from './hooks/use-composer-branch'
@@ -1351,6 +1352,7 @@ export function ChatBar({
                   >
                     <div className="flex translate-y-[3px] items-start gap-(--composer-control-gap) self-start [grid-area:menu]">
                       {contextMenu}
+                      {agentBoxAuthority && state.profile ? <ComposerAccessChip profile={state.profile} /> : null}
                       <ContribSlot area={COMPOSER_AREAS.leading} />
                     </div>
                     <div className="min-w-0 [grid-area:input]">{input}</div>
