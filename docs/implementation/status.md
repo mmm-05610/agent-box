@@ -642,7 +642,7 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 | 63 | PROFILE_MEMORY_READ_DONE（本机侧完整；注册表 memory_paths、只读+有界+扫描、profiles.memory wire；4 条测试） | WSL 侧读；P17 同步与重锁 | 本轮 |
 | 62 | WORKSPACE_GIT_STATUS_DONE（本机侧完整 + WSL 接线；6 条测试含只读性证明） | WSL 真机轮；P20 同步与重锁 | 本轮 |
 | 61 | PACTHOLD_REBRAND_DONE（基础设施侧）：A 审计/映射/保留清单、B README×2+品牌说明+banner/favicon、C 六条 CLI（新名+旧别名同源）、D wheel 元数据 `Name: pacthold`、E 服务发现未坏（新名起 Server+hello/readiness 冒烟）、合同零变化 | 插件分发名改名为后续单；发布/远端改名/数据迁移不做；P18 一致性归桌面工作树 | 本轮 |
-| 60 | PROFILE_SETTINGS_PARTIAL：A/B（schema 16、冻结进轮）、C 归属、D 克隆+迁移表、E 分档、F 收口、**资产重绑写路径 + setPermissions wire**；10 条测试 | 权限姿态逐家翻译与 ask↔审批端到端、P17 同步与重锁 | f8ed9d2 + 03c210d + 8b73c7d + 本轮 |
+| 60 | PROFILE_SETTINGS_PARTIAL：A/B/C/D/E/F＋资产重绑＋setPermissions wire＋**姿态逐家翻译**（claude/codex，只收紧或拒绝；2 条测试） | 翻译产物写入配置文档待逐家钉死设置键；ask↔审批端到端；P17 同步与重锁 | f8ed9d2…本轮 |
 | 59 | HOOK_MODELS_PARTIAL：A 观测、逐家 schema、账本、物化 G3、触发账本 G5、hooks.* wire（+6）、**代码资产 publishPlugin（+1，逐字存储+有界预览）**；10 条测试 | 触发事实生产端未接、P16 同步与重锁、G4 端到端、OpenCode 插件物化槽位（未钉死）、Windows 差异 | 0babb42 + 5801556 + 3179535 + 本轮 |
 | 58 | ASSET_HUBS_PARTIAL：A 槽位观测、skill/MCP 存储、逐家渲染、目录+绑定（schema 13）、物化进执行、**G7 目录式来源**（快照/安装/失败不落地）、**G6 MCP 有界探测**、assets.* wire（+10 方法）；15 条测试 | 凭据注入逐家钉死、P15 前端同步与重锁、commands/hooks 声明 | bddbba5…本轮 |
 | 56 | SUBSCRIPTION_CREDENTIALS_PARTIAL：资产存储+锁+乐观摘要、物化/回收本机端到端、schema 12、accounts.* wire 面（+4 方法）、codex 声明、45 补节；8 条测试 | **前端 P12 同步与两仓重锁**、Worker 侧物化（home.put）、其余家登录文件路径（需真机登录轮）、G2/G4 真机登录轮 | 1299275 + 本轮 |

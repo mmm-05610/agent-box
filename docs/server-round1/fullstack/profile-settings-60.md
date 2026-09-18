@@ -92,3 +92,28 @@
 **补记（同日后半）：两项已补做**——`profiles.setPermissions` wire 方法已接入（合法写入 +
 非法规则带码拒绝，测试覆盖）；克隆的**资产重绑写路径**已接线（`AssetRecords.copy_bindings`
 只复制 `migration` 报告标记为迁移的条目，回执 `reboundAssets` 与报告同源，测试断言两者一致）。
+
+## 附：姿态逐家翻译的一手证据与设计（2026-09-18，待实现）
+
+**取证（钉住工件 strings，只读）**：
+
+| 家 | 原生词汇（一手计数） | 可表达的姿态 | 不可表达的部分 |
+| --- | --- | --- | --- |
+| claude-code | 工具名：`Bash`(25)/`Edit`(19)/`Read`(21)/`Write`(20)/`Glob`(8)/`Grep`(9)/`Task`(8)/`WebFetch`(7)/`WebSearch`(7)/`NotebookEdit`(7)；`allowed-tools`(43)/`disallowedTools`(59) | 逐工具 allow/deny（工具名 + 模式串）；`ask` 走既有审批 | 无 `external_directory` 的原生名词（用目录权限近似） |
+| codex | `sandbox_mode`(44) 取值 `read-only`(82)/`workspace-write`(28)/`danger-full-access`(36)；审批策略 `untrusted`(62)/`on-request`(33)/`on-failure`(9)/`never`(183)；工具 `shell`(230)/`apply_patch`(75)/`unified_exec`(53)；`request_permissions`(69) | 沙箱模式 + 审批策略的**粗粒度**姿态 | **逐工具 deny**：只能靠模式收紧；细粒度差异不可表达 |
+
+**设计（实现时照此，且必须类型化）**：
+1. 每家在注册表声明**翻译表**（新字段 `permission_translation`）：键→该家名词/映射函数名；
+2. 翻译规则：**只收紧**——codex 的 `sandbox_mode` 取"我方姿态所需的最严格模式"；
+   `ask` 一律映射为"需要审批"（claude 走 allowed 中的 ask 语义、codex 用 `on-request`）；
+3. **不可表达且会放宽** ⇒ 类型化拒绝 `PERMISSION_POSTURE_UNEXPRESSIBLE`（不静默降级）；
+   可表达但更严格 ⇒ 允许并**在渲染产物里注明近似**（"不静默"）；
+4. 测试：两家各一条正例（姿态渲染进各自配置文档）+ 各自的"会放宽即拒绝"反例。
+
+**实现落地（同日后半，模块级）**：`server/profiles/posture_translation.py` ——
+`translate_claude`（工具名表 → `allowedTools`/`disallowedTools`；`ask` 映射为该家自己的审批往返；
+**无工具名的键在 deny/ask 下类型化拒绝**，allow 下注明"家族默认生效"）与
+`translate_codex`（`sandboxMode` 取最严格模式 + `approvalPolicy`；**bash/webfetch/skill/task 的
+deny 不可表达 ⇒ 拒绝**）；两条规则一致：**只收紧或拒绝，laxer 永不静默**。2 条测试（正例 + 各自反例）。
+**未接渲染**：把翻译产物写进各家配置文档需要逐家确认设置键（`permissions`/`sandbox_mode` 的具体
+文件位置与键形），未在本轮钉死 ⇒ **不写入**，留作后续（避免把未验证的键拼进真 harness 配置）。
