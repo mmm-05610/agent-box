@@ -1629,3 +1629,32 @@ Appearance（8 套主题 + 语言 + UI Scale + 终端字体）与 Keyboard Short
 - **lint 顺带修的既有问题**：`features/profiles/profile-role-settings.tsx` 原有两处未使用导入
   （`declaredSlots`、`useI18n`）随本单 `eslint --fix` 清掉（这些行本就在本单写权内且被本单触碰）。
 - 提交：`P21 stage 3`（pathspec）。
+
+## P21 阶段 4（2026-09-18）：四项检查真跑 + 反例演练 — `P21_STAGE4_CHECKS`
+
+完整证据（含命令原文、逐文件清单、工具链版本）：`evidence/P21-stage4-gates.md`。
+
+| 项 | 命令 | 退出码 | 计数 |
+| --- | --- | --- | --- |
+| tsc（renderer+electron+e2e） | `npm run --workspace apps/desktop typecheck` | **0** | 三个项目全过 |
+| tsc（shared） | `npm run --workspace apps/shared typecheck` | **0** | — |
+| eslint（全树） | `npm run --workspace apps/desktop lint` | **1** | 16 errors / 181 warnings，**全在 P21 未触碰的 12 个文件**（与改动清单交集=∅），既有基线 |
+| eslint（本单改动文件） | `npx eslint $(…P21 diff…)` | 0 | **0 errors** / 26 warnings（jsdom 测试里的 `document`，既有写法） |
+| build | `npm run --workspace apps/desktop build` | **0** | dist 产出 + electron bundle + native deps staged |
+| vitest（apps/desktop 全量两项目） | `npm run --workspace apps/desktop test` | **1** | **985 文件：978 passed / 5 failed / 2 skipped；10205 用例：10195 passed / 4 failed / 6 skipped**；失败全在 `\|electron\|` 项目且为宿主基线（electron 二进制未下载 3 个 0-test 文件 + 回环监听 3 条 + live 重试 1 条），`\|ui\|` **全绿** |
+| vitest（tests-js） | `npm test --prefix tests-js` | **0** | 8 文件 / 47 用例全过 |
+
+P21 五个测试文件：`wire-v1.test.ts` 28（+11）、`work-status.test.ts` 16（+4）、
+`work-status-panel.test.tsx` 10（+4）、`profile-read-facts.test.ts` 9（新）、
+`profile-role-settings.test.tsx` 7（+4）。
+
+- **G1 反例演练**：拿旧摘要 `774640498429ca9f…`（`d7464166` 时代）或用后端登记值
+  `64dc9961…` 当"当前值"都会被现在的权威哈希否掉（`6e8ae84a…`/`f5d27269…`）；
+  README 里旧值只作"曾落后"的历史行，不作当前值。
+- **G2 反例演练**：六字段全 null ⇒ 逐字段 `Not obtainable (GIT_UNAVAILABLE)` 且文本不含
+  `Additions0`；`available:false` ⇒ 分区与导航项都不渲染；`pid:null` ⇒
+  `Not reported (PID_NOT_REPORTED)` 且不含 `PID: 0`。
+- **G3 反例演练**：四个面的写方法引用 grep 零命中（退出码 1）；读路径只调四个读方法。
+- **未跑/未验**：未对真实后端做端到端联调（不授权真实调用，且本机没有跑 58–64 的服务进程）；
+  未跑 Playwright e2e（未改 e2e，且需要真实服务）。→ 合并后或后端重锁后的集成检查项。
+- 提交：`P21 stage 4`（pathspec）。
