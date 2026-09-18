@@ -133,3 +133,30 @@ git diff --check && git status --short
   `docs/server-round1/model-settings-two-layer-design.md`（主树）。
 - pi 的逐模型 thinking 映射表**不要**照抄成我们的表：那是 pi 自己的语义；钉不死就类型化拒绝。
 - 需要人拍的事 → 本树 status §Questions；契约问题交回调度者。
+
+---
+
+## 修订 v2（2026-09-19，用户批准 AQ-0001：把"思考"真正打开）
+
+用户批准：**逐家打开思考并按档位可配**（审批队列 `AQ-0001`）。本单原范围是"声明旋钮 + 动态取值域 + 落盘"，
+现追加**让思考真的产生**这一条——否则前端接好了 `thought.delta` 也没有数据（实测：pi 轮次里一个 thought 事件都没有）。
+
+### 追加 Scope
+
+| From | To / action | Reason |
+| --- | --- | --- |
+| `deploy/pi/models.json` 的 `reasoning:false` + `samplingParams.thinking.type="disabled"` | 改为**由旋钮决定**：profile 未设时按 §默认值规则；设了就用设的值 | 现在写死关闭 |
+| `deploy/dsh/settings.yaml` 的 `thinking:"disabled"` | 同上（接入 dsh 的 `thinking`/`reasoningEffort` 键） | 同上 |
+| 其余家（codex `model_reasoning_effort`、claude 思考预算、opencode/kilo per-model `options.reasoningEffort`、hermes `extra_body.thinking`） | 按本单原有的"钉死键或类型化拒绝"纪律逐个接 | 统一到同一旋钮语义 |
+| 模型事实 | 模型声明 `reasoning:false` 或**没有** reasoning 能力 ⇒ 该旋钮**不声明/不可开**（如实显示"该模型不支持思考"） | 不假装 |
+
+**默认值规则（本单定稿，可由用户一句话改）**：模型事实声明支持推理（`reasoning:true`）且该家方言钉死 ⇒
+**默认开**，档位取该家方言的**中间档**（例如 `low/medium/high` 取 `medium`）；模型不支持 ⇒ 不声明该旋钮。
+理由：用户要"像成熟 harness 客户端一样看到思考"，默认关就等于永远看不到；同时档位可关、可调，成本可控。
+
+**门与反例（追加）**：
+
+| Gate | Assertion | Counter-example (required) | Absent / unknown ⇒ |
+| --- | --- | --- | --- |
+| G6 思考真的产生 | 支持推理的模型 + 默认档 ⇒ 一轮里出现 `thought.delta` 事件（假端点可给出 thought 块） | 关掉旋钮后仍出现 `thought.delta` 必须门红 | 模型不支持 ⇒ 无 `thought.delta` 且旋钮不显示 |
+| G7 不越界 | 成本相关：默认档**不是**最高档；关掉即完全不产生思考 | 默认给最高档必须门红（说明理由或改档） | fail (typed) |
