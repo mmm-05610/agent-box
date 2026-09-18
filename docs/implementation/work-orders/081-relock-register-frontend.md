@@ -70,3 +70,22 @@ git diff --stat -- src plugins tests && git diff --check && git status --short
 ## Acceptance
 
 - 绿：`RELOCK_REGISTERED_DONE`；否则 `RELOCK_REGISTERED_PARTIAL` + 差异原文
+
+---
+
+## 修订（2026-09-19，调度者：两仓重锁的权威对已由调度者第一手复现）
+
+调度者按用户指示（"统一一下然后分别跟两边说明"）**亲自复跑**了严格校验，结论与要登记的一对如下：
+
+- **前端 TS 权威**：`apps/desktop/src/types/wire/wire-v1.ts`
+  → `sha256:1019b38b069899137440f22f0e8cebedefb7b13b8e95784651b96189ad977556`
+- **前端生成工件**：`docs/desktop-product-delivery/contracts/wire-v1/generated/wire-v1.schema.json`
+  → `sha256:1a3604ee9dd543eedacc4be33af8e87b44f8ed3aaa7d395484c28973b6d8e5be`（**64 方法**）
+- **后端严格校验**（调度者实跑，命令与结果）：
+  `AGENT_BOX_WIRE_SCHEMA=<上述工件> PYTHONPATH=src:plugins/... python3 -m pytest tests/server/test_wire_v1.py -q`
+  → **37 passed**（100.68s）。即：**后端 handler 与前端当前工件逐方法一致**。
+
+**本单剩余动作（收口 081 的 PARTIAL）**：
+1. 在 `docs/server-round1/wire-review.md` 追记一节：登记上面**同一对摘要** + 方法数 64 + 上面这条命令与 37 passed 的实测结果；
+2. 明确写"两端接受同一对摘要 ⇒ `WIRE_LOCKED_FOR_IMPLEMENTATION` 成立"（081 此前的 PARTIAL 理由随之关闭）；
+3. 若执行者复跑得到不同结果（例如前端又动了合同），**以第一手为准**并把差异写进该节，不要照抄本修订的数字。
