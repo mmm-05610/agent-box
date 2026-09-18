@@ -1917,3 +1917,59 @@ P21 五个测试文件：`wire-v1.test.ts` 28（+11）、`work-status.test.ts` 1
   改用 `npm ci` 一次成功，并按需重新解出 electron 二进制。**仓库文件、提交、tag 未受影响**（`node_modules` 不入库）。
 - 提交：`P22 stage 4`（pathspec）。
 
+## P22 收口（2026-09-18）：五处写路径产品面 — `CONTRACT_FACES_DONE`
+
+- **阶段**：1 合同/类型化码核对（`254ce3bf`）→ 2 角色页写路径（`45cf8162`）→ 3 资产/账号/hook 写路径（`1114176f`）
+  → 4 四项真跑 + 反例 + 真实服务写路径（`1aadf3a0`）。
+- **交付（五处，全部真调合同方法）**：
+  1. **克隆**：角色页按钮 → `CloneProfileDialog` → `profiles.clone`，对话框内显示逐项迁移报告与来源（真实服务 2 migrated / 3 refused）。
+  2. **权限规则**：`ProfilePermissionEditor` → `profiles.setPermissions`（顺序原样、CAS 版本、类型化拒绝保留草稿）。
+  3. **资产绑定/解绑/发布**：`product:resources` 真目录 + `assets.bind/unbind/publishSkill/publishPlugin/publishMcp`。
+  4. **订阅账号**：`product:identities` 服务账号列表 + `accounts.create/importAsset/bind`（零 token 零 locator）。
+  5. **hook 管理**：`product:hooks` 列表（逐条命令）+ `hooks.setEnabled/create/delete/triggers`（删除显示连带触发行数）。
+- **G2（不画假开关）**：三面读失败 ⇒ 全部写控件禁用 + 服务原话；测试逐个点击后断言写方法调用数为 0。
+- **验收**：`Acceptance` 绿条件满足（五处都有调用点、参数按合同、单测 + **真实服务转录**双重证据）。
+- **未验（如实登记）**：① 点击级 UI 验收（组件测试与 wire 转录合起来的那一次）属 Q2 计划的**真实模型 UI 门**；
+  ② `hooks.create` 在真实服务上只拿到类型化拒绝（该部署 opencode 未声明 hook 模型）；③ 真实模型调用 0 次。
+
+## CHECKPOINT Q2 [DONE]
+
+**1 现在能试什么**
+
+| 入口 | 命令 / 位置 | 期望看到什么 |
+| --- | --- | --- |
+| 合同与摘要 | `contracts/wire-v1/README.md` | 59 方法、后端登记值 vs 本树当前值、未锁定的原因 |
+| 四项检查 | `npm run --workspace apps/desktop typecheck` / `lint` / `build` / `test` | 0 / 1（11 既有 error，未触碰文件）/ 0 / 986 passed（4 条 electron 宿主基线） |
+| 真实服务写路径 | `AGENTBOX_SERVER_SOURCE_ROOT=<env-provider> node e2e/p22-write-faces-driver.mjs <sandbox> <out> --port 18760`（Linux 加 `xvfb-run -a`） | 13/13 PASS：五处写路径真实回答（含两条类型化拒绝） |
+| 只读面（Q1） | `node e2e/p21-read-faces-driver.mjs …` / `p21-built-app-smoke.mjs …` | 13/13 · 7/7 PASS |
+| 界面 | 设置 → Assets / Subscription accounts / Hooks；角色页 → Clone / Permission rules | 服务在线可写；离线全部灰显并给原因 |
+
+**2 要你拍的**
+
+| # | 问题 | 选项与代价 | 我的建议 | 不拍的后果 |
+| --- | --- | --- | --- | --- |
+| ① | 合并回主树（`checkpoint/Q1`、`checkpoint/Q2` 两个 sha） | 合 = 主树重跑门并重算摘要 | 按 tag sha 依次合 | 六处面与合同停在子树 |
+| ② | 后端 `providerArtifacts.install` 参数表与 handler 不一致（P21 登记） | 需后端改 | 转后端修 | 该方法永远调用不成功 |
+| ③ | 后端 `server.hello` 能力表落后于 `_handlers`（P22 新登记） | 后端补表 | 后端补表 | 该表继续误导按它门控的客户端 |
+| ④ | 两仓摘要仍未锁定（本树已交出工件本体） | 后端按工件重新登记 | 调度者转交 | "锁定"不成立 |
+| ⑤ | 全树 11 个既有 eslint error（7 个未触碰文件） | 单开 lint 卫生单 | 单开小单 | lint 门长期红 |
+| ⑥ | 真实模型 UI 门（R-0011 已授权） | 需宿主侧点击级验收 + 真实 DeepSeek | 下一张单 | 界面与真实模型的组合未验 |
+
+**3 花了什么**
+
+- 真实模型调用 **0 次**（本单不需要），费用 0；本地命令 ≈120 次；跨仓写 0 次。
+- 清理：`/tmp/p22-write`、`/tmp/p21-*` 为沙箱与日志；工作树 committed & clean。
+- 请求数未被环境导出，以提交数代记：**5 个提交**（含收口）。
+
+**4 恢复点**
+
+- 下一单：**`P24-sidebar-row-and-remote-icon`**（调度者已投递，batch Q2）——队列**不空**，故本批**不写** `QUEUE_EMPTY_AT`。
+- baseline：建议更新为 `checkpoint/Q2` 所在提交；分支 `feature/agentbox-desktop-product`。
+- 未提交改动：无。
+
+**5 不含糊**
+
+- **未跑**：点击级真实模型 UI 门；`hooks.create` 的成功路径（真实服务只给拒绝）。
+- **基线红照实记**：eslint 全树 11 errors（未触碰文件）、electron 4 条宿主基线失败。
+- Q1 的只读边界在 P22 被**有意**解除（那是 P22 的题目），"不可用时点不出请求"仍全绿（G2）。
+
