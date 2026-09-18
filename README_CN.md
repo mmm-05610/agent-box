@@ -1,6 +1,8 @@
-# Agent-Box 2.0.0a1 Developer Preview
+![Pacthold](docs/branding/pacthold-lockup.png)
 
-Agent-Box 是面向 AI coding agent 的执行治理层：解析精确的外部资源，将其冻结为
+# Pacthold 2.0.0a1 Developer Preview
+
+Pacthold 是面向 AI coding agent 的执行治理层：解析精确的外部资源，将其冻结为
 Execution Binding，调度原生 Harness，并在多次执行之间保留输出与证据。
 
 这是 Developer Preview / Experimental API，不是生产稳定版，也不是完整的
@@ -14,13 +16,13 @@ sandbox。
 下载 release 的全部 assets 到同一目录后执行：
 
 ```bash
-pip install --pre --find-links . "agent-box-cli[preview]==2.0.0a1"
+pip install --pre --find-links . "pacthold[preview]==2.0.0a1"
 
 Preview bundle 包含官方 `agent-box-skills` immutable 本地 Agent Skills provider；
 只支持显式本地导入，不扫描 HOME，也不远程下载。
-agent-box doctor --json
-agent-box plugins list --json
-agent-box launch
+pacthold doctor --json
+pacthold plugins list --json
+pacthold launch
 ```
 
 ### Source checkout
@@ -42,3 +44,10 @@ Freeze、Dispatch、打开或复制 provider 生成的 terminal attach 命令，
 官方 Harness 统一由一个 registry wheel 提供，包含 Codex、Claude Code、OpenCode、Hermes 与 Pi；Profile provider 统一为 `harness-profile`。旧 1.x fixed workflow、Profile/session 数据库、TUI、PyWebView 和浏览器 shell 均已
 退休。详见 [docs/README.md](docs/README.md) 与
 [当前 Phase 6 RC 证据](docs/validation/current/REPOSITORY_RESTRUCTURE_PHASE_6_RELEASE_CANDIDATE.md)，以及[五 Harness 合并报告](docs/validation/current/FIVE_HARNESS_REGISTRY_CONSOLIDATION.md)。
+
+## 品牌
+
+本项目现名 **Pacthold**（原名 Agent-Box）。历史 `agent-box*` 命令行入口保留为**别名**（同一实现）；
+兼容面——`agent_box` import 路径、`agent_box.plugins` 插件组、`wire/1`、`agent-box.*@1` 合同与
+`AGENTBOX_*` 环境变量——一律不变。改名映射与兼容保留清单见
+[docs/branding/REBRANDING_REPORT.md](docs/branding/REBRANDING_REPORT.md)。

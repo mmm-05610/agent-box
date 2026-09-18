@@ -637,6 +637,7 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 | --- | --- | --- |
 | 51 | USAGE_FACT_DONE：pi/codex/hermes/claude 门级观测轮全部产出事实（hermes (11,7)/(22,14)、claude (11,7)，source=声明格式）；WAL 侧车根因修复；六家解析器就绪 | kilo/opencode/dsh/qwen 模板未声明 usageProbe（解析器已备，未启用；kilo/opencode 启用时读共享库，走 66 只读规则） |
 | 52 | B/D+E 完成：thought/plan/mode 三新 wire kind + 四类映射入账本 + process-facts 端到端 | 真 harness 观测轮（假 peer 已定向验证，真 harness 轮待跑） |
+| 61 | PACTFOLD_REBRAND_DONE（基础设施侧）：A 审计/映射/保留清单、B README×2+品牌说明+banner/favicon、C 六条 CLI（新名+旧别名同源）、D wheel 元数据 `Name: pacthold`、E 服务发现未坏（新名起 Server+hello/readiness 冒烟）、合同零变化 | 插件分发名改名为后续单；发布/远端改名/数据迁移不做；P18 一致性归桌面工作树 | 本轮 |
 | 60 | PROFILE_SETTINGS_PARTIAL：A/B（schema 16、冻结进轮）、C 归属、D 克隆+迁移表、E 分档、F 收口、**资产重绑写路径 + setPermissions wire**；10 条测试 | 权限姿态逐家翻译与 ask↔审批端到端、P17 同步与重锁 | f8ed9d2 + 03c210d + 8b73c7d + 本轮 |
 | 59 | HOOK_MODELS_PARTIAL：A 观测、逐家 schema、账本、物化 G3、触发账本 G5、hooks.* wire（+6）、**代码资产 publishPlugin（+1，逐字存储+有界预览）**；10 条测试 | 触发事实生产端未接、P16 同步与重锁、G4 端到端、OpenCode 插件物化槽位（未钉死）、Windows 差异 | 0babb42 + 5801556 + 3179535 + 本轮 |
 | 58 | ASSET_HUBS_PARTIAL：A 槽位观测、skill/MCP 存储、逐家渲染、目录+绑定（schema 13）、物化进执行、**G7 目录式来源**（快照/安装/失败不落地）、**G6 MCP 有界探测**、assets.* wire（+10 方法）；15 条测试 | 凭据注入逐家钉死、P15 前端同步与重锁、commands/hooks 声明 | bddbba5…本轮 |

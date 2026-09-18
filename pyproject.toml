@@ -3,9 +3,9 @@ requires = ["setuptools>=61,<77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "agent-box-cli"
+name = "pacthold"
 version = "2.0.0a1"
-description = "Execution governance kernel and plugin SDK for coding agents"
+description = "Pacthold: execution governance kernel and plugin SDK for coding agents"
 readme = "README.md"
 requires-python = ">=3.9"
 license = {text = "MIT"}
@@ -50,6 +50,11 @@ server = [
 ]
 
 [project.scripts]
+# Pacthold is the product name; the historical `agent-box*` entry points stay
+# as aliases to the same mains (order 61: new name first, old name falls back).
+pacthold = "agent_box.cli:main"
+pacthold-server = "agent_box.server.__main__:main"
+pacthold-server-credential = "agent_box.server.credential_cli:main"
 agent-box = "agent_box.cli:main"
 agent-box-server = "agent_box.server.__main__:main"
 agent-box-server-credential = "agent_box.server.credential_cli:main"

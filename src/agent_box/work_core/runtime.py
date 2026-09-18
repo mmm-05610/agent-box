@@ -5,7 +5,11 @@ import os
 from pathlib import Path
 
 AGENT_BOX_HOME_ENV = "AGENT_BOX_HOME"
-DISPLAY_NAME = "agent-box"
+#: The product's display name (order 61). It is what help text and version
+#: output show; the historical `agent-box` entry points stay as aliases and no
+#: compatibility surface (import path, contracts, environment variables, data
+#: directories) is derived from this string.
+DISPLAY_NAME = "pacthold"
 
 
 def agent_box_home() -> Path:

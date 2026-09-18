@@ -1,6 +1,8 @@
-# Agent-Box 2.0.0a1 Developer Preview
+![Pacthold](docs/branding/pacthold-lockup.png)
 
-Agent-Box is an execution governance layer for AI coding agents. It resolves
+# Pacthold 2.0.0a1 Developer Preview
+
+Pacthold is an execution governance layer for AI coding agents. It resolves
 exact external resources, freezes them into an Execution Binding, dispatches a
 native Harness, and preserves outputs and evidence across executions.
 
@@ -15,14 +17,14 @@ scheduler, router, retry system, or production sandbox.
 Download all release assets into one directory, then run:
 
 ```bash
-pip install --pre --find-links . "agent-box-cli[preview]==2.0.0a1"
+pip install --pre --find-links . "pacthold[preview]==2.0.0a1"
 
 The preview bundle includes the official `agent-box-skills` immutable local
 Agent Skills provider. Import is explicit and local; no HOME scan or remote
 fetch is performed.
-agent-box doctor --json
-agent-box plugins list --json
-agent-box launch
+pacthold doctor --json
+pacthold plugins list --json
+pacthold launch
 ```
 
 ### Source checkout
@@ -53,3 +55,12 @@ is part of the supported path. See [docs/README.md](docs/README.md), the
 [migration record](docs/plans/archive/PHASE_6_LEGACY_DELETION_LEDGER.md), and
 the [current release evidence](docs/validation/current/REPOSITORY_RESTRUCTURE_PHASE_6_RELEASE_CANDIDATE.md),
 and the [five-Harness consolidation report](docs/validation/current/FIVE_HARNESS_REGISTRY_CONSOLIDATION.md).
+
+## Brand
+
+This project is **Pacthold** (formerly Agent-Box). The historical `agent-box*`
+command-line entry points remain as aliases to the same programs, and the
+compatibility surfaces users depend on - the `agent_box` import path, the
+`agent_box.plugins` plugin group, `wire/1`, the `agent-box.*@1` contracts and
+the `AGENTBOX_*` environment variables - are unchanged. The rename and its
+preservation list live in [docs/branding/REBRANDING_REPORT.md](docs/branding/REBRANDING_REPORT.md).

@@ -8,7 +8,7 @@ the provider-neutral Agent-Box extension registry.
 Install it with the root CLI convenience extra:
 
 ```bash
-pip install 'agent-box-cli[preview]'
+pip install 'pacthold[preview]'
 agent-box web
 ```
 

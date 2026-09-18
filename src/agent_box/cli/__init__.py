@@ -72,8 +72,8 @@ def cmd_web(args: argparse.Namespace) -> int:
     except ModuleNotFoundError as exc:
         if exc.name == "agent_box_web" or (exc.name and exc.name.startswith("agent_box_web.")):
             print(
-                "agent-box web: Web Host is not installed; install with "
-                "`pip install 'agent-box-cli[web]'` or `pip install agent-box-web`.",
+                "pacthold web: Web Host is not installed; install with "
+                "`pip install 'pacthold[web]'` or `pip install agent-box-web`.",
                 file=sys.stderr,
             )
             return 1
@@ -86,7 +86,7 @@ def cmd_launch(args: argparse.Namespace) -> int:
         from agent_box_web.cli import run
     except ModuleNotFoundError as exc:
         if exc.name == "agent_box_web" or (exc.name and exc.name.startswith("agent_box_web.")):
-            print("agent-box launch: Web Host is not installed; install with `pip install 'agent-box-cli[web]'` or `pip install agent-box-web`.", file=sys.stderr)
+            print("pacthold launch: Web Host is not installed; install with `pip install 'pacthold[web]'` or `pip install agent-box-web`.", file=sys.stderr)
             return 1
         raise
     return run(host=args.host, port=args.port, open_browser=True, initial_route="/quick-launch")

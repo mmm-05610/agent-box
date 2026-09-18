@@ -10,7 +10,7 @@ requires-python = ">=3.10"
 # No sandbox dependency: this package stages bytes and runs a command it is
 # handed. Which isolation tool produces that command is the sandbox layer's
 # decision, made where the room is composed.
-dependencies = ["agent-box-cli==2.0.0a1"]
+dependencies = ["pacthold==2.0.0a1"]
 
 [project.entry-points."agent_box.plugins"]
 runtime-wsl = "agent_box_runtime_wsl.registration:create_connector"
