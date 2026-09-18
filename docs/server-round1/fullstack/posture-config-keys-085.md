@@ -214,7 +214,10 @@ config.toml 顶层   <   <CODEX_HOME>/<profile>.config.toml （由 -p/--profile 
   2. ~~codex `on-request` vs `on-failure` 不可区分（§1.2）~~ ⇒ 已由 §6.3 **实测关闭**（归一后逐字相同），
      `on-failure` 因此留在**不可写**词汇表里，理由从推断变成测量；
   3. 内嵌文档只列 4 个 `defaultMode`，doctor 收 6 个 ⇒ 采 doctor，差集未向官方文档二次核对（离线，不外发）；
-  4. 除 claude/codex 外的家（pi/hermes/opencode/kilo/dsh/qwen）**没有姿态键**可钉 ⇒ 阶段 4 走类型化拒绝。
+  4. ~~除 claude/codex 外的家（pi/hermes/opencode/kilo/dsh/qwen）**没有姿态键**可钉 ⇒ 阶段 4 走类型化拒绝~~
+     ⇒ 已由 §7 落地：拒绝名单**从注册表派生**，不手写。
+
+上面四条之外本单不再留"看起来已验"的余地：阶段 4 的临时件删除见 §7 与账行。
 
 ## 6 阶段 2/3 落地后的真实工件快照对比（DoD-3，实测）
 
@@ -267,3 +270,107 @@ python3 -m pytest -q tests/server -k posture      # 36 passed（G1 键有据 / G
 其中两条是本节结论的密封对应物：`…_reports_one_change_per_path_from_the_file_as_it_stood`
 （快照每路径一条、`before` 是文件原样）与 `…_does_not_report_a_rule_it_did_not_add`
 （姿态已被满足 ⇒ `changes==[]` 且**字节不变**，不趁机重排既有规则顺序）。
+
+> **§6.4 的口径更正（阶段 4 一手复核，见 §7.6）**：这里的 **36 是 Validation 命令选中面的计数**，
+> 其中本单文件当时 **31** 条 + 五**先前既有**的同名姿态测试。阶段 2/3 提交信息里"whole order 36"
+> 按此读，不是本单文件的条数。
+
+## 7 阶段 4：未钉死的家类型化拒绝 + 60 收口
+
+### 7.1 拒绝面来自注册表，不是家名的抄本（实测）
+
+一手事实：`agent_box_harnesses.registry.loader.load_builtin_registry().all()` 在本基线上给出 **8** 个
+`harness_type` ⇒ `claude-code, codex, dsh, hermes, kilo, opencode, pi, qwen`。
+`PINNED_FAMILIES = ("claude-code", "codex")`，`RENDERERS` 与之相等（由
+`test_posture_write_pinned_families_are_all_registered_harnesses` 钉住），
+所以**未钉死的家 = 注册表 − 钉死集**，派生出 `[dsh, hermes, kilo, opencode, pi, qwen]` 六个参数。
+
+每家一条：目标文件先落成 `unchanged` ⇒ 调用后 `code == POSTURE_CONFIG_UNPINNED_HARNESS`
+**且目标字节未变**。另加一条"名字根本不在注册表里"（`not-a-harness`）同样类型化拒绝
+⇒ 拼错家名不会被静默读成"这家没有姿态可写"。
+
+"缺席即失败"落在派生本身：手写名单会把拒绝面写成**过去的事实**，而注册表是**当前的**。
+哪天有人给某家加了渲染器却没钉键，参数集会少一个（该家不再被拒），同时
+`set(RENDERERS) == set(PINNED_FAMILIES)` 与 `set(PINNED_FAMILIES) <= registered` 会指出断言动过哪一侧。
+
+### 7.2 一条容易搞错的轴：注册表的 `permissions` 能力 ≠ 能否物化配置（实测）
+
+| harness_type | capabilities（逐字） |
+| --- | --- |
+| `claude-code` | `stream, start, native_continuation, observe, finish` |
+| `codex` | `stream, **permissions**, start, native_continuation, observe, finish, attach` |
+| 其余 6 家 | 不含 `permissions`（`pi` 多一个 `attach`） |
+
+从这张表推导写入面会**同时得到两个错结论**：`claude-code` 被判"不可写"——而阶段 1 已一手证明它的
+`settings.json › permissions.ask/deny` 是钉得住的落点（§1.1、§6.1）；6 个未钉死的家被判"可写"——而本单一
+个键都为它们钉不出来。`permissions` 说的是"**运行时会不会应答权限请求**"，本单写的是"**姿态能否落进受审配
+置文件**"。这条区分由 `test_posture_write_pinning_is_not_the_same_axis_as_the_runtime_permission_capability`
+钉住，写给后来的读者（093 的执行者尤其：那张表的写法很容易被当成写入面）。
+
+### 7.3 DoD 逐条对账
+
+1. 两家写入 ⇒ `render_posture_config` + `write_posture_config`（mkstemp + `os.replace`，`changes==[]` 时不落盘）。
+2. G2/G3 反例 ⇒ G2 有两半（放宽即拒 / 已被满足则字节不变，§6.4）；G3 有六半：未知键、未知动作、坏 base
+   形状、内联 `[profiles.*]`、未钉死的家、不在注册表的名字。
+3. 真实环境配置快照对比 ⇒ §6。
+4. 回归计数 ⇒ 见 §7.5 末尾与账行。
+5. 零调用账务 ⇒ 阶段 4 新增断言全部密封（读注册表 toml，不启动任何 harness 二进制），**0 次 / ¥0**。
+6. 账 ⇒ 本文件 + `docs/implementation/status.md` 的 60 行与本单终态行。
+
+### 7.4 60 的收口（本单不改 60 的契约，只把它的剩余收窄）
+
+60 账行原写"翻译产物写进各家配置文档待逐家钉死"。本单后：**claude/codex 已按钉死的键物化，其余家类型化拒
+绝**，该条遗留因此收窄成三条，且都不在 085 的 Scope / write_paths 里：
+
+1. **生产接线**：`posture_config.py` 目前**没有调用方**——本单 Scope 明写"不碰 wire"。谁在什么时机对哪个
+   文件写、写完如何进冻结链，属工单 **093**（R-0013 第 1 层的执行侧）。
+2. **`ask → allowedTools` 分歧**（§4 登记）：`posture_translation.py` 仍按 60 的表把 `ask` 译进 allow 列表，
+   相对中立姿态是**放宽**，与本单 G2 相冲。本单不动那个文件（不改别人的契约）⇒ **交回调度者**：一处映射
+   修正，或 085 之后另开一单收口。
+3. **claude `permissions.ask` 的运行时效果**（§5 未验证项 1）：需要一次真实工具调用才看得见提示 ⇒ 模型轮。
+
+⇒ 60 维持 `PARTIAL`，剩余按上面三条如实写；本单终态见账行。
+
+### 7.5 顺带钉死的一条环境事实（**不是本单引入的回归**）
+
+阶段 4 跑门时先撞到：裸 `python3 -m pytest -q tests/server` 以 **40 个 collection error** 失败，报
+`ModuleNotFoundError: No module named 'agent_box.server'`。只读诊断（未改任何环境文件）给出原因：
+
+- `~/.local/lib/python3.12/site-packages/` 下三条 `__editable__` pth —— `agent_box-0.1.0`（mtime
+  2026-06-19）、`agent_box_cli-1.0.0`（2026-08-05）、`agent_box_cli-1.9.0`（2026-08-20）——
+  内容都是 `/home/maoqh/projects/agent-box/src`（**另一个仓**，且没有 `server` 包）；
+- 该条目在 `sys.path` 里位于本站 `src` 之前 ⇒ `import agent_box` 解析到发布源 main。
+
+⇒ 本树全部门**必须**带账行第 7 行与 `tests/conftest.py` 注释里那条
+`PYTHONPATH=src:plugins/agent-box-*/src …`（PYTHONPATH 先于 site-packages 生效）。
+本节计数均按该口径：`tests/server -k posture` ⇒ **39 passed / 593 deselected**；根套件计数见账行。
+记录以免后来者把这 40 个错误读成实现回归。
+
+### 7.6 两条一手复核：注册表派生的反例演练，以及一条我自己算错的账
+
+**(a) 派生名单的反例演练（内存内，未改任何仓内文件）**。用 `load_registry(text)`（同一份 loader，
+收文本）把内置注册表**加第九家** `zz-new`（复制 codex 块改 `driver`/`harness_type`）：
+
+| | 派生出的拒绝名单 | 注册表条数 / digest |
+| --- | --- | --- |
+| 当前基线 | `dsh, hermes, kilo, opencode, pi, qwen`（6） | 8 / `sha256:d8eb80e…` |
+| 加了 `zz-new` 后 | `dsh, hermes, kilo, opencode, pi, qwen, **zz-new**`（7） | 9 / `sha256:a4c31e2…` |
+| **手抄名单**（阶段 4 之前的写法） | 只有那 6 个名字 ⇒ **漏 `zz-new`** | — |
+
+并且 `write_posture_config(..., harness="zz-new")` 当场给出
+`POSTURE_CONFIG_UNPINNED_HARNESS`、目标文件字节未变。
+⇒ "缺席即失败"落在**覆盖面**上，而不只落在断言上：一家新注册的家**落地当天**就在拒绝名单里，
+不依赖有人记得去改测试。
+
+**(b) 一条我算错的账（更正，不留悬案）**。阶段 2/3 的账与提交信息把
+`-k posture` 的 **36** 当成了"本单文件的条数"。一手复核：
+
+- `pytest tests/server/test_posture_config_write.py --collect-only -q` ⇒ 本单文件 **34** 条（阶段 4 后；阶段 2/3 时 **31** 条）。
+- `-k posture` 现在选中 **39** = 本单 34 + **5 条先前既有**的同名姿态测试
+  （`test_posture_translation.py` 2 条、`test_profile_permissions.py` 2 条、`test_hermes_production_chain.py` 1 条）。
+  ⇒ Validation 命令的选面**本就是"所有姿态测试"**，这条计数没错，错的是我把它读成"本单文件"。
+- 于是上一轮挂的"893 vs 898 差 5 条"**是我这边的算术假象，不是套件退化**：
+  `git diff --stat 873a6d4..HEAD -- tests/ src/` 只列出本单的两个新文件（`posture_config.py` + 本测试文件），
+  873a6d4 时本测试文件不存在（`git show` 报 `exists on disk, but not in '873a6d4'`）
+  ⇒ 该提交处根套件 = 932 − 34 = **898**，与 084 行记录**逐字相符**，零退化。
+- 本单终账因此是：根套件 **932 passed / 0 failed**（= 084 的 898 + 本单 34）。

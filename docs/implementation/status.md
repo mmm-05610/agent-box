@@ -85,7 +85,7 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 | [37](work-orders/37-http-codex.md) | **SERVER_HTTP_CODEX_R1_PARTIAL** | [原完成审计](../server-round1/completion-audit.md) / [C/D证据](../server-round1/stage-c-d.md)保留；检查点5a45303/5b71393/cd5efbe/67c6b40。独立定向23 passed；同键并发双accept已由39复现并修复；能力不诚实已由39结构性修复 | abandon 断言经探针定性为**测试侧竞态**（终止状态持久化后约50ms才 abandon；负载高时10/10失败），已改为有界等待、断言强度不变，修后10/10通过；原生语义迁移由40执行 |
 | [44](work-orders/44-environment-providers.md) | **ENV_PROVIDERS_DONE** | [环境 provider 证据](../server-round1/fullstack/local-ssh-env-providers.md) + 两份门报告（[local](../server-round1/fullstack/env-provider-gate-local.json) / [ssh](../server-round1/fullstack/env-provider-gate-ssh.json)，同一部署文档 sha256 `6026b9…`）：Worker 以 musl 静态构建上实验机（`SSH_WORKER_HELLO_OK`，控制协议 3 全握手）；第一手发现实验机 bwrap 0.4.0 缺 `--clearenv` 跑不了房间，已在实验机源码构建 0.11.0 并带备份切换（回滚见证据 §1b）；`local-env-gate` 与 `ssh-env-gate` 均 exit 0（no-model fixture，真实模型 0 次、¥0）；四家假端点门 exit 0；全量 **915 passed / 5 skipped / 0 failed**（基线 886/6，无退化，另修复两条被 skip 掩盖的既有用例与本机通道零凭据崩溃、connector 分派 kwargs 丢失两个真实缺陷） | 未做项（工单明示范围外）：前端选择器接线、Windows 原生沙箱、远端多用户/跳板机/密钥托管 |
 | [38](work-orders/38-harness-extension-selection.md) | **HARNESS_EXTENSION_SELECTION_READY_FOR_DECISION** | 两轮 A/B/C 完成：[最终建议与边界](../server-round1/harness-selection/boundary.md)。保留有条件首选 `harness-remote v3.0.2`；零模型/凭据 | 首选已由40消费进入有门禁接入；不再等待决定 |
-| [60](work-orders/60-profile-settings.md) | **PROFILE_SETTINGS_PARTIAL**（A–F 落地 + 两项补记；姿态逐家翻译 claude/codex 已落地，只收紧或拒绝） | [60 报告](../server-round1/fullstack/profile-settings-60.md)：逐工具权限求解（键/动作闭集、last-match-wins、预设回落，绝不默认 allow）+ **schema 16** 冻结进轮；归属纠正测试（会话属工作区、跨家族切换拒绝 `PROFILE_HARNESS_MISMATCH`）；克隆与逐家迁移表 + `profiles.clone`；资产重绑（`reboundAssets` 与迁移报告同源，测试断言一致）与 `profiles.setPermissions` wire；`posture_translation.py`（claude 工具名表、codex 最严格 sandbox+审批；不可表达即 `PERMISSION_POSTURE_UNEXPRESSIBLE`，laxer 永不静默）；提交 f8ed9d2（840）→03c210d（844）→8b73c7d→27dfa26（845）→e39959f（879，八家全链门 exit 0） | 翻译产物**写入**各家配置文档待逐家钉死设置键（60 报告 §附）；`ask`↔审批往返端到端；P17 前端同步与两仓重锁 |
+| [60](work-orders/60-profile-settings.md) | **PROFILE_SETTINGS_PARTIAL**（A–F 落地 + 两项补记；姿态逐家翻译 claude/codex 已落地，只收紧或拒绝；**翻译产物写入配置由 085 落地**） | [60 报告](../server-round1/fullstack/profile-settings-60.md)：逐工具权限求解（键/动作闭集、last-match-wins、预设回落，绝不默认 allow）+ **schema 16** 冻结进轮；归属纠正测试（会话属工作区、跨家族切换拒绝 `PROFILE_HARNESS_MISMATCH`）；克隆与逐家迁移表 + `profiles.clone`；资产重绑（`reboundAssets` 与迁移报告同源，测试断言一致）与 `profiles.setPermissions` wire；`posture_translation.py`（claude 工具名表、codex 最严格 sandbox+审批；不可表达即 `PERMISSION_POSTURE_UNEXPRESSIBLE`，laxer 永不静默）；提交 f8ed9d2（840）→03c210d（844）→8b73c7d→27dfa26（845）→e39959f（879，八家全链门 exit 0）。**[085 写入证据](../server-round1/fullstack/posture-config-keys-085.md)**：一手钉住 claude `settings.json›permissions.ask/deny` 与 codex 顶层 `sandbox_mode`/`approval_policy`（含版本漂移事实：宿主 codex 0.154.0 已拒 `untrusted`，本部署 0.147.0 接受），`posture_config.py` 只收紧 + 真实工件快照对比（`claude doctor` / `codex debug prompt-input`）；其余六家 `POSTURE_CONFIG_UNPINNED_HARNESS` 类型化拒绝，名单从注册表派生 | 60 的遗留**由 085 收窄为三条**（逐条给入口）：① **生产接线**——085 Scope 明写"不碰 wire"，`posture_config.py` 目前无调用方 ⇒ 归 **093**；② **`ask→allowedTools` 分歧**——`posture_translation.py` 仍把 `ask` 译进 allow 列表，相对中立姿态是**放宽**，与 085 G2 相冲 ⇒ **交回调度者**（一处映射修正，非扩协议；085 不代改别人的契约）；③ claude `permissions.ask` 的**运行时效果**需一次真实工具调用才可见（模型轮）。另：`ask`↔审批往返端到端；P17 前端同步与两仓重锁 |
 | [61](work-orders/61-pacthold-rebrand.md) | **PACTHOLD_REBRAND_DONE**（基础设施侧；合同 ID/环境变量/import 路径零变化） | [改名报告](../branding/REBRANDING_REPORT.md)：审计计数与四类处理表、新旧映射（分发名 `pacthold`、六条 CLI 新旧同源一 main）、兼容保留清单（entry-point group/`agent-box.*@1`/`AGENTBOX_*`/数据目录）、本地 wheel `Name: pacthold` + 新名真实启动冒烟；提交 ff0c578（848）+ 30adedf（docs 拼写修正） | 插件分发名改名留后续单；发布/远端改名/数据迁移明示不做；P18 桌面侧一致性归桌面工作树 |
 | [62](work-orders/62-workspace-git-status.md) | **WORKSPACE_GIT_STATUS_DONE**（DoD 的"本机与 WSL 各一次"两条腿**均已真跑**：本机 62 报告 §3，WSL 由 **083** 补跑。契约偏差澄清：WSL 路径**结构性永不报** `additions`/`deletions`（无字段级 reason 概念，62 的 `reason` 是答案级），已按 083 记录交回，不改 wire/实现，故不影响本行终态） | [62 报告](../server-round1/fullstack/workspace-git-status-62.md)：`workspaces.gitStatus` 六字段 + reason（null=拿不到不是 0；二进制在场 ⇒ 增删行 null + `GIT_BINARY_DIFF`）；porcelain v2 + numstat；流式上限超限即杀；只读性逐字节证明（index mtime 未变）；提交 76e7c35（854）。**[083 WSL 真腿](../server-round1/fullstack/wsl-legs-62-64-083.md)**：真 `wsl.exe` + 真仓 ⇒ `main`/2 改/`ahead=2`/`behind=0`；非 git 目录 ⇒ `GIT_NOT_A_REPOSITORY` 全 null；无连接器 ⇒ `GIT_UNAVAILABLE` 不编数；答案零宿主路径 | WSL 侧增删行是否补 numstat（**交回调度者拍**：多一次命令 vs 维持两字段恒空，是产品决定不是缺陷修复）；P20 前端同步与两仓重锁（新增 1 个只读方法） |
 | [63](work-orders/63-profile-memory-read.md) | **PROFILE_MEMORY_READ_DONE**（本机侧完整；WSL 侧未接，如实记账） | [63 报告](../server-round1/fullstack/profile-memory-63.md)：注册表 `memory_paths`（claude/codex 一手钉住；未声明不画假分区）；`profiles.memory` 只读有界 + 扫描（`MEMORY_CONTAINS_SECRET` 拒绝项无 content）；声明了但缺失=缺席不报错；提交 4d7b0e0（858） | WSL 侧读（按 62 同族设计）；P17 前端同步与两仓重锁（新增 1 个只读方法） |
@@ -656,7 +656,7 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 | 63 | PROFILE_MEMORY_READ_DONE（本机侧完整；注册表 memory_paths、只读+有界+扫描、profiles.memory wire；4 条测试） | WSL 侧读；P17 同步与重锁 | 本轮 |
 | 62 | WORKSPACE_GIT_STATUS_DONE（本机侧完整 + WSL 接线；6 条测试含只读性证明） | WSL 真机轮；P20 同步与重锁 | 本轮 |
 | 61 | PACTHOLD_REBRAND_DONE（基础设施侧）：A 审计/映射/保留清单、B README×2+品牌说明+banner/favicon、C 六条 CLI（新名+旧别名同源）、D wheel 元数据 `Name: pacthold`、E 服务发现未坏（新名起 Server+hello/readiness 冒烟）、合同零变化 | 插件分发名改名为后续单；发布/远端改名/数据迁移不做；P18 一致性归桌面工作树 | 本轮 |
-| 60 | PROFILE_SETTINGS_PARTIAL：A/B/C/D/E/F＋资产重绑＋setPermissions wire＋**姿态逐家翻译**（claude/codex，只收紧或拒绝；2 条测试） | 翻译产物写入配置文档待逐家钉死设置键；ask↔审批端到端；P17 同步与重锁 | f8ed9d2…本轮 |
+| 60 | PROFILE_SETTINGS_PARTIAL：A/B/C/D/E/F＋资产重绑＋setPermissions wire＋**姿态逐家翻译**（claude/codex，只收紧或拒绝；2 条测试） | 翻译产物写入配置文档~~待逐家钉死设置键~~ ⇒ **已由 085 落地**（claude/codex 按一手钉死的键写入 + 真实工件快照；其余六家类型化拒绝），剩余三条见本文件 60 主行；ask↔审批端到端；P17 同步与重锁 | f8ed9d2…本轮 + 085 |
 | 59 | HOOK_MODELS_PARTIAL：A 观测、逐家 schema、账本、物化 G3、触发账本 G5、hooks.* wire（+6）、**代码资产 publishPlugin（+1，逐字存储+有界预览）**；10 条测试 | 触发事实生产端未接、P16 同步与重锁、G4 端到端、OpenCode 插件物化槽位（未钉死）、Windows 差异 | 0babb42 + 5801556 + 3179535 + 本轮 |
 | 58 | ASSET_HUBS_PARTIAL：A 槽位观测、skill/MCP 存储、逐家渲染、目录+绑定（schema 13）、物化进执行、**G7 目录式来源**（快照/安装/失败不落地）、**G6 MCP 有界探测**、assets.* wire（+10 方法）；15 条测试 | 凭据注入逐家钉死、P15 前端同步与重锁、commands/hooks 声明 | bddbba5…本轮 |
 | 56 | SUBSCRIPTION_CREDENTIALS_PARTIAL：资产存储+锁+乐观摘要、物化/回收本机端到端、schema 12、accounts.* wire 面（+4 方法）、codex 声明、45 补节；8 条测试 | **前端 P12 同步与两仓重锁**、Worker 侧物化（home.put）、其余家登录文件路径（需真机登录轮）、G2/G4 真机登录轮 | 1299275 + 本轮 |
@@ -757,6 +757,11 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 | B2 | `providerModels.update` 合同/实现不齐（合同 `displayName`/`credentialId` 可选；实现必填且 `params[...]` 直接取值） | [070 报告 §6.1](../server-round1/fullstack/provider-model-55.md)；`handlers._provider_model_body` | 定语义：**省略即保留原值**（改实现 + 测试）或收紧合同（改工件 + 重锁） | 合法请求被 400；若只放开校验则变 500 |
 | B3 | 54 的 `sidecar.py:631-632` 一行修（空快照折叠） | [069 报告 §3-4](../server-round1/fullstack/wsl-change-set-observation-069.md)（插桩 + 三态探针） | 并入 b2 的 066-G5 收尾单（同文件族）一起改 + 空快照测试 + 复跑观测轮 | WSL 通道变更集**恒 unknown**（首轮必现，且"正例只需审计文件"） |
 | B4 | **两仓仍未锁定**（081 已登记差异）：前端交回阶段 2 对 `6e8ae84a`/`f5d27269`（59 方法）≠ 后端登记 `64dc9961`/`42a164a4` ≠ 本树副本 `a1bd52a4`（33 方法）；摘要在两工具链间不可复现 ⇒ 需**换工件本体** | [wire-review Order 81 节](../server-round1/wire-review.md) | 拍四件：①后端发布 64 方法工件（或前端补 5 个后重生成）并**交换本体**；②替换本树旧副本（strict 5 项失败之因）；③定生成/比较口径；④补 Order 57/58/59/65 的 wire-review 小节（当前 0 命中） | 摘要永远对不上；前端按 59 方法实现、后端跑 64 方法，落后 5 个面的差异继续分叉 |
+| B5 | **同一个 `ask` 在两处翻译方向相反**（085 阶段 1 一手登记）：60 的 `posture_translation.py::translate_claude()` 把 `ask` 译进 **`allowedTools`**，而 CLI flag 语义与 settings 层 `permissions.allow` 同义 = **预先批准、免提示**；085 的写入器把 `ask` 落进 **`permissions.ask`** = 真的弹提示。前者相对中立姿态是**放宽**，与 60 自己的"只收紧"规则和 085 G2 相冲 | [085 证据 §4](../server-round1/fullstack/posture-config-keys-085.md)（钉死的落点表）+ §7.4 | 二选一：**改 60 的 claude 表**为 `ask→permissions.ask`（一处映射修正，不扩协议，但要重跑 60 的翻译测试），或**另开一单**收口（093 的写入器上线前必须有个答案）。085 不代改别人的契约，故只登记 | 一旦 093 把冻结配置落盘，同一份姿态会同时经两条路径翻译 ⇒ 60 那条把 ask 写成"免提示"，**用户看到的 ask 与实际生效的 ask 不一致**（放宽且不可见） |
+
+> 编号说明：上一节 `## CHECKPOINT b2`（080/081 那次）的 §2 写了"新增 B5"，但当时表里没落 B5
+> （其内容并入了 B4 的四项交回）。本表 **B5 由 085 新增**，是该编号的实际持有者；批末重写那节时一并更正引用。
+
 
 ---
 
@@ -866,3 +871,41 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   `ps -eo comm | grep -c agent-box-worker` → `0`（`pgrep -x` 因 15 字符截断不可靠，故取 `ps`）；演示目录 `/tmp/084ce` 已删。
 - **不改协议、不越界**：wire 零改动；`plugins/**` 与 `scripts/**` 零改动（观测轮用现成 `--keep` 旗标，前置 env 走文档化的
   `AGENT_BOX_SANDBOX_MODULE`，未把该前置补进脚本——那要另一张有 `scripts/**` 写权的单）。
+
+
+## 工单 085 — 60 遗留：先钉键，再把姿态产物写进配置（2026-09-18，执行者）
+
+| 单 | 终态码 | 门 | 回归 | 真实模型 | 提交 |
+| --- | --- | --- | --- | --- | --- |
+| 085 | `POSTURE_CONFIG_WRITE_DONE` | G1 ✅ 每个被写入的键都有**一手**依据 + 真实工件快照对比：claude CLI **2.1.270** 的 `doctor › Invalid settings`（渲染件**无话可说** / 把 `permissions.ask` 改成字符串即报**带路径的类型化错误**），codex CLI **0.147.0** 的 `debug prompt-input` 回显（把 `danger-full-access`+`never` 收紧 ⇒ 归一后与"本来就严格"的文件**逐字同一块** 473B `5db7584e377bcef7`）；G2 ✅ **只收紧**有两半反例（照姿态放宽的写入器会产出 3977B `bf9aedaed1d9cb40`，多出整段"Escalation Requests"越权指引；反向：姿态已被满足 ⇒ `changes==[]` 且**字节不变**）；G3 ✅ 类型化拒绝**六半**：未知键、未知动作、坏 base 形状、内联 `[profiles.*]`、未钉死的家、不在注册表的名字 | 本单新增 **34** 条（`-k claude` 11 / `-k codex` 10 为该文件内子集）；Validation `python3 -m pytest -q tests/server -k posture` → **39 passed / 593 deselected**（= 本单 34 + **先前既有**同名姿态测试 5，口径见证据 §7.6b）；根套件 **932 passed / 0 failed / 0 error**（255 s，= 084 的 898 + 本单 34，**零退化**） | **0 次 / ¥0** | `a323441`（阶段 1 钉键证据）+ `813d1d0`（阶段 2+3 写入器与 31 条测试 + §6 快照证据；**两阶段落一个实现提交，登记为偏差**）+ 本提交（阶段 4 类型化拒绝 + §7 证据 + 60 收口 + 本账行） |
+
+- **实现落点**：`src/agent_box/server/profiles/posture_config.py`（`render_posture_config` / `write_posture_config`）。
+  claude 只写 `permissions.ask`/`permissions.deny`，**合并进受审文件**（`allow` 与 `defaultMode` 可达但是放宽 ⇒ 不写）；
+  codex 只以**文本**改顶层 `sandbox_mode`/`approval_policy`（不重排表与注释、绝不写 `danger-full-access`/`never`/`on-failure`、
+  绝不产 `[profiles.*]`）。落盘 `mkstemp` + `os.replace`；返回值即快照对比（每路径一条 `before`/`after`，`before` 是文件原样）。
+- **钉键的地基是一条版本事实**：宿主另有 codex **0.154.0** 已**拒绝** `approval_policy="untrusted"`，本部署钉死的 **0.147.0** 接受
+  ⇒ 全部钉键观测只用**仓内工件**；写入面不得被"更安全的默认"偷偷扩大，也不得把 0.154.0 的收紧当"本部署未知键"。
+- **阶段 4 的拒绝面从注册表派生，不是家名抄本**（一手）：`load_builtin_registry()` 给 8 家 ⇒ 拒绝名单 = 8 − 钉死 2 =
+  `dsh, hermes, kilo, opencode, pi, qwen`。反例演练（内存内加第九家 `zz-new`）：派生名单随之变 7，
+  **手抄名单会漏**；`write_posture_config(..., harness="zz-new")` 当场 `POSTURE_CONFIG_UNPINNED_HARNESS` 且目标字节未变。
+- **一条容易误读的轴**（写给 093 的执行者）：注册表里只有 `codex` 声明 `permissions` 能力、`claude-code` **没有**，
+  而该能力说的是"**运行时会不会应答权限请求**"，与"姿态能否物化进受审配置"**不是一条轴**。
+  用它推写入面会同时得出两个错结论（claude 被误判不可写、六家被误判可写）⇒ 已由测试钉住区分。
+- **60 收口（不改别人的契约）**：60 的"翻译产物写入配置"遗留**收窄为三条**并写进 60 行；**60 维持 `PARTIAL`**。
+- **精确剩余（本单未做，逐条给入口）**：
+  1. **生产接线**——`posture_config.py` 目前无调用方，本单 Scope 明写"不碰 wire" ⇒ 归 **093**（R-0013 第 1 层执行侧）。
+  2. claude `permissions.ask` 的**运行时效果**未验证（需一次真实工具调用才看得见提示）⇒ 模型轮。
+  3. **`ask→allowedTools` 分歧** ⇒ **B5（待人拍）**：见下面阻塞表。
+  4. `external_directory` 无钉死的 claude 规则名 ⇒ 沿用 60 的 `PERMISSION_POSTURE_UNEXPRESSIBLE` 面，本单不发明。
+- **账务与清理**：真实模型调用 **0 次 / ¥0**（三家 oracle 全零成本：`doctor`、`debug prompt-input`、读注册表）；
+  两家探针全程走隔离目录，**未读**用户真实 `~/.codex`/`~/.claude`，未装载任何凭据（locator 目录全程未访问）；
+  `codex debug prompt-input` 会把 cwd 的 `AGENTS.md` 渲进提示 ⇒ 只在 `/tmp` 下跑、输出经关键词过滤后才进证据文件；
+  `/tmp/085*` 十项临时件（`085cx147`/`085claude-config`/`085claude-proj`/`085claude`/`085claude-help.txt`/
+  `085codex`/`085cxws`/`085cx-pro.txt`/`085snap`/`085split`）已删除并核实 `ls -d /tmp/085*` 为空。
+- **两条环境/账目事实（都不是本单回归）**：
+  ① 裸 `python3 -m pytest` 在本机以 **40 个 collection error** 失败（`~/.local/lib/python3.12/site-packages/` 三条
+  `__editable__*.pth`，mtime 2026-06-19/08-05/08-20，把 `agent_box` 指向 `/home/maoqh/projects/agent-box/src`，
+  该路径**没有** `server` 包）⇒ 本树门必须带本节头「计数口径」那条 `PYTHONPATH`；**三条 pth 未改动**（只读诊断）。
+  ② 上一轮挂的"893 vs 898 差 5 条"**是我这边的算术假象**：我把 `-k posture` 的选中面当成了本单文件的条数。
+  一手复核后 084 的 898 **逐字成立**（`git diff --stat 873a6d4..HEAD -- tests/ src/` 只含本单两个新文件），
+  本单 34 条 ⇒ 932，无悬案。详见证据 §7.6(b)。

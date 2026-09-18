@@ -15,6 +15,7 @@ import pytest
 from agent_box.server.profiles.permissions import resolve_all
 from agent_box.server.profiles.posture_config import (
     PINNED_FAMILIES,
+    RENDERERS,
     PostureConfigError,
     render_posture_config,
     write_posture_config,
@@ -248,7 +249,20 @@ def test_posture_write_codex_refuses_a_base_value_outside_the_pinned_vocabulary(
 
 # ------------------------------------------------------- refusals both families
 
-@pytest.mark.parametrize("harness", ["pi", "hermes", "opencode", "kilo", "dsh", "qwen"])
+def _registered_families():
+    from agent_box_harnesses.registry.loader import load_builtin_registry
+    return {d.harness_type: tuple(d.capabilities)
+            for d in load_builtin_registry().all()}
+
+
+#: Stage 4: the refusal list comes from the harness registry, not from a copy
+#: of the family names, so a family added to the registry is refused (or has to
+#: pin its keys) on the day it lands rather than after someone remembers.
+UNPINNED_FAMILIES = sorted(
+    set(_registered_families()) - set(PINNED_FAMILIES))
+
+
+@pytest.mark.parametrize("harness", UNPINNED_FAMILIES)
 def test_posture_write_refuses_every_family_with_no_pinned_key(harness, tmp_path):
     target = tmp_path / "config"
     target.write_text("unchanged", encoding="utf-8")
@@ -257,6 +271,34 @@ def test_posture_write_refuses_every_family_with_no_pinned_key(harness, tmp_path
                              harness=harness, destination=target)
     assert refused.value.code == "POSTURE_CONFIG_UNPINNED_HARNESS"
     assert target.read_text(encoding="utf-8") == "unchanged"
+
+
+def test_posture_write_refuses_a_harness_that_is_not_in_the_registry_at_all(tmp_path):
+    target = tmp_path / "config"
+    target.write_text("unchanged", encoding="utf-8")
+    with pytest.raises(PostureConfigError) as refused:
+        write_posture_config(_posture([{"key": "edit", "action": "deny"}]),
+                             harness="not-a-harness", destination=target)
+    assert refused.value.code == "POSTURE_CONFIG_UNPINNED_HARNESS"
+
+
+def test_posture_write_pinned_families_are_all_registered_harnesses():
+    registered = set(_registered_families())
+    assert set(PINNED_FAMILIES) <= registered
+    assert set(RENDERERS) == set(PINNED_FAMILIES)
+
+
+def test_posture_write_pinning_is_not_the_same_axis_as_the_runtime_permission_capability():
+    # `permissions` in the registry means "this family answers a permission
+    # request at runtime", and measured on the built registry claude-code does
+    # not claim it while codex does. Neither fact bears on whether a posture
+    # can be *materialised into the reviewed settings file*, which stage 1
+    # pinned first-hand for both families. This test exists to stop a later
+    # reader from deriving the write vocabulary from the capability list.
+    capabilities = _registered_families()
+    assert "permissions" in capabilities["codex"]
+    assert "permissions" not in capabilities["claude-code"]
+    assert set(PINNED_FAMILIES) <= set(capabilities)
 
 
 def test_posture_write_refuses_an_unknown_key_or_action_rather_than_reading_it_as_absent():
