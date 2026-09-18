@@ -133,7 +133,7 @@ describe('AgentBoxAssetHub (orders 58/59 write paths)', () => {
     expect(error.textContent).toContain('INVALID_REQUEST')
   })
 
-  it('G2: an unreadable catalogue leaves every write control disabled', async () => {
+  it('G2: an unreadable catalogue leaves every write control disabled, and clicking one sends nothing', async () => {
     const port = {
       bind: vi.fn(),
       bindings: vi.fn(async () => []),
@@ -152,6 +152,18 @@ describe('AgentBoxAssetHub (orders 58/59 write paths)', () => {
     const buttons = Array.from(container.querySelectorAll('button'))
 
     expect(buttons.every(button => button.disabled)).toBe(true)
+
+    // The counter-example this gate exists for: pressing a control on an
+    // unusable surface must not reach the service at all.
+    for (const button of buttons) {
+      fireEvent.click(button)
+    }
+
+    expect(port.bind).not.toHaveBeenCalled()
+    expect(port.unbind).not.toHaveBeenCalled()
+    expect(port.publishSkill).not.toHaveBeenCalled()
+    expect(port.publishMcp).not.toHaveBeenCalled()
+    expect(port.publishPlugin).not.toHaveBeenCalled()
   })
 })
 
@@ -192,7 +204,18 @@ describe('AgentBoxAccounts (order 56 write paths)', () => {
 
     await screen.findByText(/need a platform secret store/)
     expect(container.querySelector('[data-accounts-failure]')).not.toBeNull()
-    expect(Array.from(container.querySelectorAll('button')).every(button => button.disabled)).toBe(true)
+
+    const buttons = Array.from(container.querySelectorAll('button'))
+
+    expect(buttons.every(button => button.disabled)).toBe(true)
+
+    for (const button of buttons) {
+      fireEvent.click(button)
+    }
+
+    expect(port.create).not.toHaveBeenCalled()
+    expect(port.importAsset).not.toHaveBeenCalled()
+    expect(port.bind).not.toHaveBeenCalled()
   })
 })
 

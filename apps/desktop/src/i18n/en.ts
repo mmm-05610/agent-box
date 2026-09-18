@@ -583,7 +583,7 @@ export const en: Translations = {
     accountsService: {
       title: 'Subscription accounts',
       description: 'The accounts this service manages. Only references cross this surface: an id, a family and an identifier — never a token, never a path.',
-      unavailableBadge: 'Unavailable',
+      unavailableBadge: 'Needs a secret store',
       serviceOffline: 'The service is not connected, so accounts cannot be listed or changed.',
       unavailable: reason => `The account store is unavailable: ${reason}`,
       empty: 'No managed accounts',
@@ -611,7 +611,7 @@ export const en: Translations = {
     hookSettings: {
       title: 'Hooks',
       description: 'Hooks this service manages, with the exact commands they would run. Enabling is a separate, explicit act; a hook with no command handler cannot be enabled.',
-      unavailableBadge: 'Unavailable',
+      unavailableBadge: 'Ledger not composed',
       serviceOffline: 'The service is not connected, so hooks cannot be listed or changed.',
       unavailable: reason => `The hook ledger is unavailable: ${reason}`,
       empty: 'No hooks',

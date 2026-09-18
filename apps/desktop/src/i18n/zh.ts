@@ -568,7 +568,7 @@ export const zh: Translations = {
     accountsService: {
       title: '订阅账号',
       description: '这个服务管理的账号。穿过这个界面的只有引用：一个 id、一个家族、一个标识——没有令牌，也没有路径。',
-      unavailableBadge: '不可用',
+      unavailableBadge: '需要密钥库',
       serviceOffline: '服务未连接，账号既列不出也改不了。',
       unavailable: reason => `账号存储不可用：${reason}`,
       empty: '没有受管账号',
@@ -596,7 +596,7 @@ export const zh: Translations = {
     hookSettings: {
       title: 'Hook',
       description: '这个服务管理的 hook，以及它们会跑的确切命令。启用是单独的一次显式动作；没有命令处理器的 hook 启用不了。',
-      unavailableBadge: '不可用',
+      unavailableBadge: '账本未装配',
       serviceOffline: '服务未连接，hook 既列不出也改不了。',
       unavailable: reason => `hook 账本不可用：${reason}`,
       empty: '没有 hook',

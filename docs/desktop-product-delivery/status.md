@@ -1893,3 +1893,27 @@ P21 五个测试文件：`wire-v1.test.ts` 28（+11）、`work-status.test.ts` 1
   （事件已被回收 ⇒ 抛错），改为先取值再 set；② hook 删除后 `run()` 用空字符串覆盖了动作自己设的回执文案。
 - 提交：`P22 stage 3`（pathspec）。
 
+## P22 阶段 4（2026-09-18）：四项真跑 + G2 反例 + 真实服务写路径 — `P22_STAGE4_CHECKS`
+
+完整证据：`evidence/P22-stage4-gates.md`（含逐文件清单、反例表、真实转录）。
+
+| 项 | 退出码 | 计数 |
+| --- | --- | --- |
+| tsc（三项目） | **0** | 全过 |
+| eslint（全树） | 1 | **11 errors / 186 warnings**，errors 全在 P22 未触碰的 7 个文件（交集 ∅）；本单改动文件 **0 error** |
+| build | **0** | dist + electron bundle + native deps |
+| vitest（全量） | 1 | **990 文件：986 passed / 2 failed（全 electron 宿主基线）**；10252 用例：**10242 passed / 4 failed**；`\|ui\|` 全绿 |
+
+- **G2 反例演练**：三面各"读失败 ⇒ 全部写控件禁用 + 显示服务原话"，并**逐个点击后断言调用数为 0**
+  （资产 5 个写方法、账号 3 个、hook 单行禁用）；角色页克隆与权限保存在 `disabled` 下同样点不出请求。
+  另在真实服务上抓到两条**真**类型化拒绝（`HOOK_FAMILY_UNSUPPORTED`、账号 `UNAVAILABLE`），界面按同一规则灰显。
+- **真实服务写路径（DoD-3）**：`e2e/p22-write-faces-driver.mjs` **13/13 PASS**——构建产物 + 真后端，
+  五处写路径全部真调并拿到真实回答：publishSkill（`sha256:f3023e70…`）/ publishPlugin（带预览）/
+  bind→bindings→unbind / profiles.clone（**2 migrated / 3 refused**，`originProfileId` 已置）/
+  setPermissions（`plan` + 规则展开，version 2）/ hooks.list + 真拒绝 / accounts.list 真拒绝。
+- **eslint 基线变化**：`--fix` 在 `src/features/settings` 顺带清掉 5 个**既有** error（纯导入顺序），16 → 11；
+  其余 11 仍在未触碰文件，作为待拍项保留（**不是放宽**）。
+- **环境插曲（如实记）**：`node_modules` 被系统回收的后台 `npm install` 带走过两次；第二次该安装自身遇 TLS 失败，
+  改用 `npm ci` 一次成功，并按需重新解出 electron 二进制。**仓库文件、提交、tag 未受影响**（`node_modules` 不入库）。
+- 提交：`P22 stage 4`（pathspec）。
+
