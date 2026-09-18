@@ -637,6 +637,7 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 | --- | --- | --- |
 | 51 | USAGE_FACT_PARTIAL：pi/codex 端到端含 wire（11/7/18→22/14/36 累计）、四家解析器就绪经真实数据验证、schema 7 usage 列 | hermes/claude 观测轮（门 marker 维护债）、dsh/qwen 无本地样本（opencode/kilo 解析器已落地） |
 | 52 | B/D+E 完成：thought/plan/mode 三新 wire kind + 四类映射入账本 + process-facts 端到端 | 真 harness 观测轮（假 peer 已定向验证，真 harness 轮待跑） |
+| 66 | SHARED_SESSION_STORE_PARTIAL：A 声明与绑定、B 切换前置（含 home_locator 根因修复）、C 守卫+命中处置、G1/G2/G3/G4/G5(夹具级) | 15b8620 + 本轮 |
 | 53 | USAGE_AGGREGATION_DONE：聚合模块 + usage.aggregate/export wire 方法 + 未知即未知反例 | hermes/claude 观测轮（opencode/kilo 解析器已落地，聚合面可直接消费其 fact） |
 | 54 | USAGE_FACT_PARTIAL：本机+WSL 通道变更集落地、c11 五家四绿（kilo marker 维护债）、schema 9 change_set 列 | WSL 端到端观测轮（c11 已绿 pi 门）；kilo marker 维护债 |
 | 55 | USAGE_PROBES_DONE（G1+G2–G4）；本机通道 usage_probe 断口已修复（67, 59fe1bb） | 真端点观测轮待做（无可用凭据端点时受限观测） |
@@ -644,7 +645,7 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 ### 未开始的工单（依赖链排后）
 
 56（←45 PARTIAL+50）、58/59（←45 PARTIAL+50）、60（←55+58）、61（←60）、62（←?）、
-63（←?）、64（←?）、65（←?）、66（←45；§8 doc 更正已做）。45 G3 解除后 56/58/59 可开工；55 G2 解除后 60 可开工。
+63（←?）、64（←?）、65（←?）。45 G3 解除后 56/58/59 可开工；55 G2 解除后 60 可开工。
 
 ### 已解除的历史阻塞
 

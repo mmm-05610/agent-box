@@ -141,3 +141,22 @@ another profile identity`）。按 66 §0"每次执行按当前绑定物化"，�
 - 新增夹具 `tests/server/fixtures/shared_store_acp_peer.mjs`：模型"播种文件存在但为空=
   尚无状态"（与真实家族的空 SQLite 库同形；`stateful_acp_peer.mjs` 的"存在即已持久化"
   语义与播种不兼容，故**不改既有门依赖的夹具**）。
+
+## 12. 阶段 E —— 收口
+
+- **对 60 的修订（落地方案，父仓工单文本属调度方，本文记录应改的语义）**：60 的 G6/E
+  现写"共享 DB 式如实重启"；在 **kilo/opencode** 上应改为"**共享整库 + 空凭据守卫**"
+  （本单已实现：库按家族共享、切换前置只读守卫、命中不删；"重启"语义仅剩 profile home
+  的非共享面），**hermes 维持原样**（66 §7：state.db 与 skills/缓存同库，单独评估）。
+- **doc-only 附带更正**：51/52 的观察表行已按 66 §8 更正（提交 `d1f7431`）；解析实现未动。
+- **status 分账**：66 记为"完成中的工单——A–C 与 G1/G2/G4/G5(夹具级)已落地；
+  G5 的 SQLite 级断言（冷启动单例行、零 SQLITE_BUSY）挂到真实家族的 c11 门"。
+- **未做项**：G5 的真 SQLite 竞态断言（需真 kilo/opencode runtime 在 c11 的并发轮）与
+  远端守卫（Worker 侧读库）——两者都在本单 §6 记账，不写成通过。
+
+## 13. 完整测试面（本单新增，9 条全绿）
+
+`tests/server/test_shared_session_store.py`：编译器叠加与越界拒绝 / 共享名落公共库 /
+非共享名留 profile home / 切换前置四查 / 命中处置 / **G1 跨 profile 真召回** /
+**G2 守卫三反例+正向** / **G5 并发两 profile 同库 + 运行中切换拒绝** /
+**G3 隔离事实与公共库可见内容清单**。

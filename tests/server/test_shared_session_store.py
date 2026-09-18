@@ -579,3 +579,153 @@ def test_the_guard_refuses_credential_rows_at_the_switch(tmp_path):
         assert refusal["error"]["details"]["internalCode"] in {
             "SESSION_STORE_GUARD_STRUCTURE", "SESSION_STORE_CREDENTIALS_PRESENT",
         }, refusal
+
+
+@pytest.mark.skipif(shutil.which("bwrap") is None, reason="bwrap is required")
+def test_cross_profile_parallel_turns_and_the_running_switch(tmp_path):
+    """Order 66 G5 (fixture-level): two Profiles write one library at once.
+
+    First-hand facts: two different Sessions of two Profiles run concurrently
+    against the same shared library and both complete; each append lands (no
+    lost update); the journal keeps both lines; a session with an active Turn
+    refuses a role switch (the same-session writer rule). The SQLite-level
+    cold-start assertions (one project row, zero SQLITE_BUSY) belong to the
+    real family's gate - a fixture has no SQLite - and are recorded there.
+    """
+    import threading
+
+    from fastapi.testclient import TestClient
+
+    from agent_box.server.transport.http import create_app
+
+    (tmp_path / "project").mkdir(exist_ok=True)
+    deployment = json.loads(json.dumps(G1_DEPLOYMENT))
+    deployment["harnesses"][0]["sessionStore"]["shared"].append(
+        {"name": "journal.txt", "kind": "file"})
+    runtime, data_root = _build_whole_db_runtime(
+        tmp_path, deployment, STATEFUL_PEER_SOURCE, STATEFUL_PEER_BYTES)
+    with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
+        token = runtime.token
+        opened = _wire(client, token, "workspaces.open", {
+            "requestId": "par-open", "path": str(tmp_path / "project"),
+            "environment": {"kind": "local", "host": None, "user": None},
+        })["result"]
+        profiles = {}
+        for name in ("role-a", "role-b"):
+            created = client.post("/api/v1/profiles", headers={
+                "Authorization": f"Bearer {token}", "Idempotency-Key": f"par-{name}",
+            }, json={"name": name, "harness_type": "kilo",
+                     "configuration": {}, "credential_id": None})
+            profiles[name] = created.json()["profile_id"]
+
+        started: dict[str, dict] = {}
+        errors: list[str] = []
+
+        def send(name: str, text: str) -> None:
+            try:
+                started[name] = _wire(client, token, "sessions.createAndSend", {
+                    "requestId": f"par-{name}-turn", "workspaceId": opened["workspace"]["id"],
+                    "profileId": profiles[name], "overrides": [],
+                    "message": {"text": text, "attachments": []},
+                })["result"]
+            except BaseException as exc:  # noqa: BLE001
+                errors.append(f"{name}: {exc}")
+
+        threads = [
+            threading.Thread(target=send, args=("role-a", f"{NONCE} journal:alpha-turn")),
+            threading.Thread(target=send, args=("role-b", f"{NONCE} journal:bravo-turn")),
+        ]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        assert errors == [], errors
+
+        sessions = {name: value["session"]["id"] for name, value in started.items()}
+        for name, session_id in sessions.items():
+            session = _wait_session(runtime, session_id, 1)
+            assert session["turns"][0]["state"] == "completed", (name, session["turns"][0])
+
+        journal = data_root / "profiles" / "_sessions" / "kilo" / "journal.txt"
+        lines = sorted(journal.read_text(encoding="utf-8").split())
+        assert lines == ["alpha-turn", "bravo-turn"], lines
+
+        # The same-session writer rule, at the switch: while a Turn is active,
+        # the session refuses a role change. The hold window makes it
+        # deterministic.
+        held = _wire(client, token, "sessions.createAndSend", {
+            "requestId": "par-held-turn", "workspaceId": opened["workspace"]["id"],
+            "profileId": profiles["role-a"], "overrides": [],
+            "message": {"text": "hold-for-window", "attachments": []},
+        })["result"]
+        held_session = held["session"]["id"]
+        version = runtime.repository.get_session(held_session)["version"]
+        refusal = _wire(client, token, "sessions.switchProfile", {
+            "requestId": "par-switch", "sessionId": held_session,
+            "profileId": profiles["role-b"], "expectedVersion": version,
+        })
+        assert refusal["result"]["outcome"] == "rejected"
+        assert refusal["result"]["reason"] == "execution_running"
+        _wait_session(runtime, held_session, 1)
+
+
+@pytest.mark.skipif(shutil.which("bwrap") is None, reason="bwrap is required")
+def test_isolation_facts_two_profiles_and_the_librarys_visible_content(tmp_path):
+    """Order 66 G3: what stays per-profile, and what the library exposes.
+
+    Two Profiles each write their own non-shared log/ (state dir under the
+    profile home): neither role directory can see the other's file, and the
+    library never holds log/. The library's own visible content is enumerated
+    from the disk - the declared shared entries plus the mount-point residue
+    bwrap leaves - and recorded here as a fact, not a defect.
+    """
+    from fastapi.testclient import TestClient
+
+    from agent_box.server.transport.http import create_app
+
+    (tmp_path / "project").mkdir(exist_ok=True)
+    runtime, data_root = _build_whole_db_runtime(
+        tmp_path, G1_DEPLOYMENT, STATEFUL_PEER_SOURCE, STATEFUL_PEER_BYTES)
+    with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
+        token = runtime.token
+        opened = _wire(client, token, "workspaces.open", {
+            "requestId": "iso-open", "path": str(tmp_path / "project"),
+            "environment": {"kind": "local", "host": None, "user": None},
+        })["result"]
+        sessions = {}
+        for name in ("role-a", "role-b"):
+            created = client.post("/api/v1/profiles", headers={
+                "Authorization": f"Bearer {token}", "Idempotency-Key": f"iso-{name}",
+            }, json={"name": name, "harness_type": "kilo",
+                     "configuration": {}, "credential_id": None})
+            started = _wire(client, token, "sessions.createAndSend", {
+                "requestId": f"iso-{name}-turn", "workspaceId": opened["workspace"]["id"],
+                "profileId": created.json()["profile_id"], "overrides": [],
+                "message": {"text": f"journal:{name}", "attachments": []},
+            })["result"]
+            sessions[name] = started["session"]["id"]
+            _wait_session(runtime, sessions[name], 1)
+
+        role_dirs = sorted(
+            item for item in (data_root / "profiles").iterdir()
+            if item.is_dir() and item.name != "_sessions"
+        )
+        assert len(role_dirs) == 2, [item.name for item in role_dirs]
+        # Each role owns its own home; neither holds the other's marker.
+        markers = {item.name: (item / ".agentbox-profile.json").is_file()
+                   for item in role_dirs}
+        assert all(markers.values()), markers
+        # Anything the declaration did not share stays per-profile: each role
+        # wrote its own journal inside its own home, and the library holds
+        # neither the journal nor a log/ directory.
+        for role in role_dirs:
+            assert (role / "sessions" / "journal.txt").is_file(), sorted(role.rglob("*"))
+        library = data_root / "profiles" / "_sessions" / "kilo"
+        assert not (library / "log").exists()
+        assert not (library / "journal.txt").exists()
+        # The library's visible content, enumerated (order 66 G3 fact list):
+        # the declared shared entries (an unwritten kilo.db, the state file),
+        # and nothing else.
+        visible = sorted(str(item.relative_to(library)) for item in library.rglob("*"))
+        assert "state.json" in visible and "kilo.db" in visible, visible
+        assert "journal.txt" not in visible, visible

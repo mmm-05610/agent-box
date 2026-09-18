@@ -12,7 +12,7 @@
 // (including one issued under a different Profile of the same family) can
 // prove the state outlived the role switch.
 import readline from "node:readline"
-import { writeFileSync, readFileSync, mkdirSync } from "node:fs"
+import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 
 const stateDir = `${homedir()}/sessions`
@@ -65,15 +65,28 @@ for await (const line of rl) {
     }
   } else if (method === "session/prompt") {
     const text = params.prompt.find((item) => item.type === "text")?.text ?? ""
+    // A journal line per turn: an append-only shared artifact two concurrent
+    // turns of two Profiles both write, which is what "no lost update across
+    // profiles" is asserted on.
+    const label = text.match(/journal:([A-Za-z0-9-]+)/)?.[1]
+    if (label) {
+      mkdirSync(stateDir, { recursive: true })
+      appendFileSync(`${stateDir}/journal.txt`, `${label}\n`)
+    }
     if (!nonce) {
       nonce = text.match(/STATEFUL-NONCE-[A-Z0-9-]+/)?.[0] ?? "STATEFUL-NONCE-MISSING"
       saveState({ nativeSessionId: sessionId, nonce })
     }
-    send({ jsonrpc: "2.0", method: "session/update", params: {
-      sessionId,
-      update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: nonce } },
-    } })
-    send({ jsonrpc: "2.0", id, result: { stopReason: "end_turn" } })
+    const answer = () => {
+      send({ jsonrpc: "2.0", method: "session/update", params: {
+        sessionId,
+        update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: nonce } },
+      } })
+      send({ jsonrpc: "2.0", id, result: { stopReason: "end_turn" } })
+    }
+    // A deterministic overlap window for the concurrency gates.
+    if (text.includes("hold-for-window")) setTimeout(answer, 500)
+    else answer()
   } else if (method === "session/cancel") {
     send({ jsonrpc: "2.0", id, result: {} })
   } else {
