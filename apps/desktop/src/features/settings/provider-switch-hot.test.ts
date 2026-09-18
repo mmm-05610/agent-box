@@ -80,6 +80,7 @@ describe('provider/model switch is per-turn', () => {
 
   it('does not touch a session that is already running', async () => {
     const running = session('session-running', 'running')
+
     const before = {
       'session-running': {
         ...emptyWireSessionProjection('session-running'),

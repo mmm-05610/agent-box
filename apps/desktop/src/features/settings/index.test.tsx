@@ -46,7 +46,10 @@ describe('AgentBox SettingsView', () => {
   it('moves a legacy MCP deep link to the truthful resources page without mounting its old controls', async () => {
     renderSettings('/settings?tab=mcp&server=legacy')
 
-    expect(screen.getByText(/Manage a shared resource library/i)).toBeTruthy()
+    // P22 replaced the resource plan with the real catalogue surface; the deep
+    // link must still land there, and the legacy install controls must still
+    // be absent — only the anchor changed.
+    expect(screen.getByText(/The asset catalogue this service keeps/i)).toBeTruthy()
     expect(screen.queryByRole('button', { name: /install/i })).toBeNull()
     await waitFor(() => expect(screen.getByTestId('location').textContent).toContain('tab=product%3Aresources'))
   })

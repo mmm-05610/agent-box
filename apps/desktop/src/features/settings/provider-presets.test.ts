@@ -7,8 +7,8 @@ import {
   CUSTOM_PROVIDER,
   harnessOptions,
   knownModelIds,
-  providerOptions,
-  PROVIDER_PRESETS
+  PROVIDER_PRESETS,
+  providerOptions
 } from './provider-presets'
 
 const record = (overrides: Partial<ProviderModelConfigRecord> = {}): ProviderModelConfigRecord => ({

@@ -1,0 +1,376 @@
+{
+  "steps": [
+    {
+      "detail": "",
+      "id": "server-live",
+      "label": "the AgentBox service answers /live",
+      "status": "PASS"
+    },
+    {
+      "detail": "",
+      "id": "app-attached",
+      "label": "the built app exposes its window",
+      "status": "PASS"
+    },
+    {
+      "detail": "{\"asset\":{\"assetId\":\"p22-fixture-skill\",\"kind\":\"skill\",\"name\":\"p22-fixture-skill\",\"description\":\"A fixture skill the P22 driver publishes\",\"latestRevision\":1,\"digest\":\"sha256:f3023e7065135cd49ef18fef0c57566723a0233ec59b0",
+      "id": "publish-skill",
+      "label": "assets.publishSkill stores the directory and answers its digest",
+      "status": "PASS"
+    },
+    {
+      "detail": "{\"asset\":{\"assetId\":\"p22-fixture-plugin\",\"kind\":\"plugin\",\"name\":\"p22-fixture-plugin\",\"description\":null,\"latestRevision\":1,\"digest\":\"sha256:04fb4bbae5869af34e690455f689a9c1884b317886b60b5faabac273e7e9719f\",\"source\":\"loca",
+      "id": "publish-plugin",
+      "label": "assets.publishPlugin stores the file verbatim and previews it",
+      "status": "PASS"
+    },
+    {
+      "detail": "{\"binding\":{\"assetId\":\"p22-fixture-skill\",\"kind\":\"skill\",\"name\":\"p22-fixture-skill\",\"revision\":1,\"digest\":\"sha256:f3023e7065135cd49ef18fef0c57566723a0233ec59b0627ad4d1c11c02fdb4a\",\"enabled\":true}}",
+      "id": "bind",
+      "label": "assets.bind binds the published revision to the role",
+      "status": "PASS"
+    },
+    {
+      "detail": "{\"bindings\":[{\"assetId\":\"p22-fixture-skill\",\"kind\":\"skill\",\"name\":\"p22-fixture-skill\",\"revision\":1,\"digest\":\"sha256:f3023e7065135cd49ef18fef0c57566723a0233ec59b0627ad4d1c11c02fdb4a\",\"enabled\":true}]}",
+      "id": "bindings",
+      "label": "assets.bindings lists the binding for that role",
+      "status": "PASS"
+    },
+    {
+      "detail": "{\"unbound\":true}",
+      "id": "unbind",
+      "label": "assets.unbind removes it again",
+      "status": "PASS"
+    },
+    {
+      "detail": "{\"profile\":{\"id\":\"profile_cba665bfdd244028848772ff860a2591\",\"version\":1,\"displayName\":\"P22 write fixture copy\",\"harness\":\"hermes\",\"accountId\":null,\"permissionPreset\":null,\"permissionRules\":[],\"originProfileId\":\"profile_d",
+      "id": "clone",
+      "label": "profiles.clone answers the migration report",
+      "status": "PASS"
+    },
+    {
+      "detail": "{\"profile\":{\"id\":\"profile_decc064faf314bc49e017fa0db0795a4\",\"version\":2,\"displayName\":\"P22 write fixture\",\"harness\":\"hermes\",\"accountId\":null,\"permissionPreset\":\"plan\",\"permissionRules\":[{\"key\":\"edit\",\"pattern\":null,\"act",
+      "id": "set-permissions",
+      "label": "profiles.setPermissions writes the posture",
+      "status": "PASS"
+    },
+    {
+      "detail": "2 migrated / 3 refused · origin=set",
+      "id": "clone-report",
+      "label": "the clone report names what traveled and what did not",
+      "status": "PASS"
+    },
+    {
+      "detail": "{\"hooks\":[]}",
+      "id": "hooks-list",
+      "label": "hooks.list answers the ledger",
+      "status": "PASS"
+    },
+    {
+      "detail": "UNAVAILABLE: the 'opencode' family declares no hook model [HOOK_FAMILY_UNSUPPORTED]",
+      "id": "hooks-create",
+      "label": "hooks.create is answered (accepted or refused by code)",
+      "status": "PASS"
+    },
+    {
+      "detail": "UNAVAILABLE: managed subscription accounts need a platform secret store [-]",
+      "id": "accounts-list",
+      "label": "accounts.list is answered (typed either way)",
+      "status": "PASS"
+    }
+  ],
+  "transcript": [
+    {
+      "answer": {
+        "ok": true,
+        "result": {
+          "asset": {
+            "assetId": "p22-fixture-skill",
+            "kind": "skill",
+            "name": "p22-fixture-skill",
+            "description": "A fixture skill the P22 driver publishes",
+            "latestRevision": 1,
+            "digest": "sha256:f3023e7065135cd49ef18fef0c57566723a0233ec59b0627ad4d1c11c02fdb4a",
+            "source": "local:fixture-skill",
+            "createdAt": "2026-09-18T09:44:58.474231+00:00",
+            "updatedAt": "2026-09-18T09:44:58.474231+00:00"
+          }
+        }
+      },
+      "id": "publish-skill",
+      "method": "assets.publishSkill",
+      "params": {
+        "assetId": "p22-fixture-skill",
+        "requestId": "p22-pub-1789724698462",
+        "revision": 1,
+        "sourcePath": "/tmp/p22-write/fixture-skill"
+      }
+    },
+    {
+      "answer": {
+        "ok": true,
+        "result": {
+          "asset": {
+            "assetId": "p22-fixture-plugin",
+            "kind": "plugin",
+            "name": "p22-fixture-plugin",
+            "description": null,
+            "latestRevision": 1,
+            "digest": "sha256:04fb4bbae5869af34e690455f689a9c1884b317886b60b5faabac273e7e9719f",
+            "source": "local:fixture-plugin.mjs",
+            "createdAt": "2026-09-18T09:44:58.501604+00:00",
+            "updatedAt": "2026-09-18T09:44:58.501604+00:00"
+          },
+          "preview": "export default { name: \"p22-fixture-plugin\" }"
+        }
+      },
+      "id": "publish-plugin",
+      "method": "assets.publishPlugin",
+      "params": {
+        "assetId": "p22-fixture-plugin",
+        "requestId": "p22-plug-1789724698489",
+        "revision": 1,
+        "sourcePath": "/tmp/p22-write/fixture-plugin.mjs"
+      }
+    },
+    {
+      "answer": {
+        "ok": true,
+        "result": {
+          "binding": {
+            "assetId": "p22-fixture-skill",
+            "kind": "skill",
+            "name": "p22-fixture-skill",
+            "revision": 1,
+            "digest": "sha256:f3023e7065135cd49ef18fef0c57566723a0233ec59b0627ad4d1c11c02fdb4a",
+            "enabled": true
+          }
+        }
+      },
+      "id": "bind",
+      "method": "assets.bind",
+      "params": {
+        "assetId": "p22-fixture-skill",
+        "profileId": "profile_decc064faf314bc49e017fa0db0795a4",
+        "requestId": "p22-bind-1789724698519"
+      }
+    },
+    {
+      "answer": {
+        "ok": true,
+        "result": {
+          "bindings": [
+            {
+              "assetId": "p22-fixture-skill",
+              "kind": "skill",
+              "name": "p22-fixture-skill",
+              "revision": 1,
+              "digest": "sha256:f3023e7065135cd49ef18fef0c57566723a0233ec59b0627ad4d1c11c02fdb4a",
+              "enabled": true
+            }
+          ]
+        }
+      },
+      "id": "bindings",
+      "method": "assets.bindings",
+      "params": {
+        "profileId": "profile_decc064faf314bc49e017fa0db0795a4"
+      }
+    },
+    {
+      "answer": {
+        "ok": true,
+        "result": {
+          "unbound": true
+        }
+      },
+      "id": "unbind",
+      "method": "assets.unbind",
+      "params": {
+        "assetId": "p22-fixture-skill",
+        "profileId": "profile_decc064faf314bc49e017fa0db0795a4",
+        "requestId": "p22-unbind-1789724698575"
+      }
+    },
+    {
+      "answer": {
+        "ok": true,
+        "result": {
+          "profile": {
+            "id": "profile_cba665bfdd244028848772ff860a2591",
+            "version": 1,
+            "displayName": "P22 write fixture copy",
+            "harness": "hermes",
+            "accountId": null,
+            "permissionPreset": null,
+            "permissionRules": [],
+            "originProfileId": "profile_decc064faf314bc49e017fa0db0795a4",
+            "archivedAt": null,
+            "createdAt": "2026-09-18T09:44:58.616779+00:00",
+            "updatedAt": "2026-09-18T09:44:58.616779+00:00",
+            "capabilities": {
+              "stream": true,
+              "native_continuation": true
+            }
+          },
+          "migration": {
+            "targetFamily": "hermes",
+            "sourceFamily": "hermes",
+            "sameFamily": true,
+            "items": [
+              {
+                "item": "configuration",
+                "migrated": true,
+                "reason": "same family: the configuration object is reused"
+              },
+              {
+                "item": "credential",
+                "migrated": false,
+                "reason": "the source has no credential"
+              },
+              {
+                "item": "account",
+                "migrated": false,
+                "reason": "the source has no bound account"
+              },
+              {
+                "item": "permissions",
+                "migrated": true,
+                "reason": "the rule set is family-neutral and travels in order"
+              },
+              {
+                "item": "native-sessions",
+                "migrated": false,
+                "reason": "native sessions are the source's; a clone starts with none"
+              }
+            ],
+            "permissions": {
+              "preset": "default",
+              "rules": []
+            },
+            "migratedCount": 2,
+            "refusedCount": 3,
+            "reboundAssets": []
+          }
+        }
+      },
+      "id": "clone",
+      "method": "profiles.clone",
+      "params": {
+        "displayName": "P22 write fixture copy",
+        "profileId": "profile_decc064faf314bc49e017fa0db0795a4",
+        "requestId": "p22-clone-1789724698602"
+      }
+    },
+    {
+      "answer": {
+        "ok": true,
+        "result": {
+          "profile": {
+            "id": "profile_decc064faf314bc49e017fa0db0795a4",
+            "version": 2,
+            "displayName": "P22 write fixture",
+            "harness": "hermes",
+            "accountId": null,
+            "permissionPreset": "plan",
+            "permissionRules": [
+              {
+                "key": "edit",
+                "pattern": null,
+                "action": "deny"
+              },
+              {
+                "key": "bash",
+                "pattern": null,
+                "action": "deny"
+              },
+              {
+                "key": "external_directory",
+                "pattern": null,
+                "action": "deny"
+              },
+              {
+                "key": "read",
+                "pattern": null,
+                "action": "allow"
+              }
+            ],
+            "originProfileId": null,
+            "archivedAt": null,
+            "createdAt": "2026-09-18T09:44:58.446998+00:00",
+            "updatedAt": "2026-09-18T09:44:58.646117+00:00",
+            "capabilities": {
+              "stream": true,
+              "native_continuation": true
+            }
+          }
+        }
+      },
+      "id": "set-permissions",
+      "method": "profiles.setPermissions",
+      "params": {
+        "expectedVersion": 1,
+        "preset": "plan",
+        "profileId": "profile_decc064faf314bc49e017fa0db0795a4",
+        "requestId": "p22-perm-1789724698636",
+        "rules": [
+          {
+            "action": "allow",
+            "key": "read",
+            "pattern": null
+          }
+        ]
+      }
+    },
+    {
+      "answer": {
+        "ok": true,
+        "result": {
+          "hooks": []
+        }
+      },
+      "id": "hooks-list",
+      "method": "hooks.list",
+      "params": {
+        "requestId": "p22-hooks-1789724698662"
+      }
+    },
+    {
+      "answer": {
+        "code": "UNAVAILABLE",
+        "detail": "HOOK_FAMILY_UNSUPPORTED",
+        "message": "the 'opencode' family declares no hook model",
+        "ok": false
+      },
+      "id": "hooks-create",
+      "method": "hooks.create",
+      "params": {
+        "family": "opencode",
+        "model": {
+          "event": "session_end",
+          "handlers": [
+            {
+              "async": false,
+              "command": "/usr/bin/true",
+              "timeout": 30,
+              "type": "command"
+            }
+          ]
+        },
+        "name": "P22 fixture hook",
+        "requestId": "p22-hook-1789724698682"
+      }
+    },
+    {
+      "answer": {
+        "code": "UNAVAILABLE",
+        "detail": null,
+        "message": "managed subscription accounts need a platform secret store",
+        "ok": false
+      },
+      "id": "accounts-list",
+      "method": "accounts.list",
+      "params": {}
+    }
+  ]
+}

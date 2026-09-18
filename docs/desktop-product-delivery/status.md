@@ -1755,3 +1755,221 @@ P21 五个测试文件：`wire-v1.test.ts` 28（+11）、`work-status.test.ts` 1
 - **未编入合同**：`profiles.subagent*`（Order 65 在飞）、`usage.aggregate/export`（Order 53 未收口）。
 - 全树 lint 红与 electron 测试基线是**既有**问题，不是本单引入（证据含逐文件比对）。
 
+## P21 追加（2026-09-18，检查点之后）：真实环境两项现在跑到了 — `P21_REAL_ENV_RUN`
+
+> 本节写于 `checkpoint/Q1`（`ee721f5d`）之后。章程 §3.2：执行者不为检查点停下，分支继续往前；
+> 主树合并仍按 `checkpoint/Q1^{commit}` 的 sha。以下内容在那之后再补一次提交，**不覆盖** tag。
+
+- **触发**：阶段边界重读时发现后端账本新增 **R-0011（2026-09-19）：真实模型调用授权放开**
+  （DeepSeek 官方端点，不设预算上限），影响面明写"**P21 之后的真实 UI 门**"；同时发现本机
+  `electron` 二进制缺失只是**没下载**，而不是不可用。⇒ DoD-3 的"构建产物真跑一遍"从"做不到"变成"做得到"。
+- **处置**（三处环境缺口，处置过程见 `evidence/P21-read-faces/README.md` §0）：
+  1. `curl` GitHub release 取 `electron-v40.10.2-linux-x64.zip` 解到 `node_modules/electron/dist`
+     （**未改任何入库文件**；electron 项目的 3 个 0-test 基线失败到此消失）；
+  2. playwright `_electron.launch` 在本机握手失败 ⇒ 驱动自己 spawn + CDP 附着；
+  3. 服务的"本地工作区"被拒的真因是**服务进程缺插件根 + PYTHONPATH 运行时没有 entry point**
+     （bwrap 本身 `probe()` 实测 `available`）⇒ 补 `PYTHONPATH` 四根 +
+     `AGENT_BOX_SANDBOX_MODULE=agent_box_sandbox_bwrap.port`。
+- **新证据**：
+  - `apps/desktop/e2e/p21-built-app-smoke.mjs` → **7/7 PASS**（窗口 "Ordessa"、渲染层挂载、
+    `phase=unavailable`、截图 `p21-built-app-boot.png`；日志里还能读到
+    `install stamp: 3545335b3bf9` 与渲染层的类型化 `UNAVAILABLE`）。
+  - `apps/desktop/e2e/p21-read-faces-driver.mjs`（真服务 + 真 git 仓库）→ **13/13 PASS**：
+    `workspaces.gitStatus` 答 `{branch:"fixture-branch", changedFiles:2, additions:2, deletions:2,
+    ahead:null, behind:null, reason:null}`，与驱动先跑的 `git` 逐项一致；面板 Git 卡截图显示
+    **Ahead/Behind = "Not obtainable (unknown)"**（不是 0），折叠行 `Failed fixture-branch 0:00`。
+  - 截图与逐步 JSON：`evidence/P21-read-faces/`。
+- **DoD-3 改判为 ✅ RUN**（真构建产物 + 真服务）。**仍未验**（如实）：
+  ① 执行清单卡带真实行的截图（本机 placement=local 跑不动 turn，台账恒 0 行；需 Windows+WSL 宿主）；
+  ② 角色页记忆/权限分区在真实服务上的截图（现由 9+7 条渲染/纯函数测试覆盖）；
+  ③ 真实模型调用 0 次（本轮用假 ACP peer fixture，不需要模型；真实 UI 门按 R-0011 归下一单）。
+- 提交：`P21 real-env run`（pathspec：两个 e2e 驱动 + evidence/P21-read-faces/** + 本文件）。
+
+## P21 计数更正（2026-09-18，补装 Electron 之后复跑）
+
+检查点报告里的 vitest 数字是 **electron 二进制缺失时**的计数；补装后同一命令复跑，结果更好且更准：
+
+| 项 | 检查点报告（无 electron 二进制） | 复核（有 electron 二进制） |
+| --- | --- | --- |
+| vitest 文件 | 985：**978 passed / 5 failed** / 2 skipped | 985：**981 passed / 2 failed** / 2 skipped |
+| vitest 用例 | 10205：**10195 passed / 4 failed** | 10231：**10221 passed / 4 failed** |
+| 失败文件 | 5（3 个 0-test 因 `getElectronPath` + 回环监听 3 条 + live 重试 1 条） | **2**：`electron/host-capabilities/credentials/mcp-oauth-callback-ipc.test.ts`（3 条回环监听）、`electron/legacy-hermes/api-transport.test.ts`（1 条 live 重试）——都在 `\|electron\|` 项目、都与 P21 的改动面（`src/**`、`e2e/**`）无交集，性质是宿主/网络基线 |
+| eslint 全树 | 16 errors / 181 warnings | **16 errors / 185 warnings**（errors 不变，全是 P21 未触碰的 12 个文件；warnings +4 来自本单测试里的 `document`） |
+| eslint 本单文件 | 0 errors / 23 warnings | 0 errors / 23 warnings；**两个新 e2e 驱动：0 problems** |
+
+- `tsc`（三项目）与 `build` 在最终态仍为 exit 0（阶段 4 已跑，其后只改渲染逻辑、e2e 驱动与文档；类型与构建面未变）。
+- 结论不变：**P21 的改动面全绿**；剩余失败与 lint 红是既有基线，已在检查点报告 §2 ④ 里作为待拍项登记。
+
+## P21 阻塞登记（按"需要人拍的标成阻塞"要求，2026-09-18）
+
+以下四项**是阻塞**（本执行者无权解除，且各自下游工作等它们）：
+
+| # | 阻塞项 | 阻塞了什么 | 谁能解 |
+| --- | --- | --- | --- |
+| B1 | **合并回主树**：`checkpoint/Q1` 的 sha 待批 | 主树看不到合同与四个面；本树后续单的 baseline 也停在旧值 | 用户批（prefs：合并=ask，不可豁免） |
+| B2 | 后端 `providerArtifacts.install` 参数表与 handler 不一致（handler 读 `params["digest"]`，参数表把它当 unexpected 拒） | 该方法在真实后端上**无可用调用形态**；合同里保留 `digest` 与 handler 一致，但联调会撞上 | 后端改自己的 `_PARAM_SHAPES`（本树禁写后端仓） |
+| B3 | **两仓摘要未锁定**：本树交出 TS `6e8ae84a…` / 工件 `f5d27269…`，后端登记值仍停在 `b284f70c` 的 `64dc9961…`/`42a164a4…` | 合同虽两端可达，但"锁定"这个事实不成立；且工件哈希跨工具链不可复现，必须交**工件本体** | 后端按本树工件重新登记（调度者转交） |
+| B4 | 全树 eslint 16 errors（12 个 P21 未触碰文件） | `lint` 门长期红，会掩盖将来真正的新错误 | 用户/调度者拍一张 lint 卫生单（或批准一次 `eslint --fix`） |
+
+**不阻塞但未做**（已在"不含糊"与真实环境证据里写明）：执行清单卡带真实行的截图、角色页记忆/权限分区在真实服务上的截图、
+真实模型调用（0 次）。这三项都需要**支持 placement 的宿主**（Windows + WSL，即既有验收驱动那台），按 R-0011 归"P21 之后的真实 UI 门"。
+
+## P21 阶段边界重读的如实记录（过程检讨）
+
+- **做了两次全量重读**：① 开工（阶段 1 提交前）读齐章程 §5 的六份（本树章程/工单目录、主树 README §3§4、
+  manifest、status、rulings、prefs）；② 收口（阶段 4b 之后、打 tag 之前）重读同样六份。
+- **没做的**：阶段 2/3/4 各自提交前没有再重读一遍。这段窗口里后端侧实际变动的是
+  `status.md`（15:20）、`rulings.md`/`prefs.md`（15:07）——**在收口重读时已全部纳入**，
+  R-0011（真实模型调用授权）正是那次收口重读发现的，并立刻改变了本单 DoD-3 的可执行性（见"追加"节）。
+- **教训（写下来给下一单）**：重读的成本远低于错过一条改向的成本；本单靠"收口那次"补上了，
+  但正确做法是每次阶段提交前扫一眼 `rulings.md`/`prefs.md`/`status.md` 的尾部（三份都短）。
+
+## P22 阶段 1（2026-09-18）：五处写路径的合同签名与类型化码核对 — `P22_STAGE1_AUDIT`
+
+- **阶段边界重读**（章程 §5）：本树章程（新增"队列不空规则"：做完无下一张就写 `QUEUE_EMPTY_AT <日期>`）+
+  `work-orders/`（P22 已投递，baseline `8fc1a807`）+ 主树 `README.md`/`manifest.json`/`status.md`/`rulings.md`/`prefs.md`
+  （README/rulings/prefs 自上次重读未变；status 尾部新增 `next_batches_2026-09-19`，列了前端 Q2 的五项）。
+- **产出**：`evidence/P22-contract-audit.md`——五面逐方法的 params/result 签名（取自本树合同）与
+  **内部类型化码**（取自后端实现文件，不是 wire-review 转述），以及每面的产品面设计与"不可用"判定表。
+- **发现一条后端事实（登记，不改后端仓）**：`server.hello` 的能力表由静态 `CAPABILITY_IDS`
+  （`wire/handlers.py:34-62`）生成，**不含** `assets.*`/`hooks.*`/`accounts.*`/`profiles.clone|memory|setPermissions`/
+  `workspaces.gitStatus`/`executions.list`/`providerArtifacts.*`——即"实现了但没声明"。
+  若照 `wireCapability()` 的 fail-closed 门控，本单五面会永久灰显，而真因是表陈旧。
+  ⇒ 本单对这些增量面**不**用能力行做开关，改用可观测门：服务就绪 + 该面读成功 + 每次写的类型化回执
+  （理由与反例写进审计 §5.0，**不是放宽验收**：不可用面仍必须点不出请求）。
+- **错误呈现统一**：抽 `lib/wire-error-text.ts`（`FAMILY: message [internalCode]`），五面共用，不再各造格式。
+- 提交：`P22 stage 1`（pathspec）。
+
+## P22 阶段 2（2026-09-18）：角色页写路径（克隆 + 权限规则） — `P22_STAGE2_ROLE_WRITES`
+
+- **新增合同调用**（`application/profile/wire-profile-writes.ts`）：
+  `cloneAgentBoxProfile` → `profiles.clone`（家族未变时**不发** `harness`，让服务自己决定），
+  `setAgentBoxProfilePermissions` → `profiles.setPermissions`（带调用方 `expectedVersion`）。
+- **界面**：
+  - 角色头部新增"克隆"按钮：服务不可用时**灰显并带原因**（G2），可用时开 `CloneProfileDialog`
+    （新名 + 家族下拉；家族不变则不下发）→ 成功后**在对话框里显示逐项迁移报告**
+    （`items[].migrated/reason`、`migratedCount/refusedCount`、`reboundAssets`）；拒绝时显示类型化码且**本地零变化**。
+  - 权限分区从"只读行"升级为 `ProfilePermissionEditor`：预设输入（带建议列表，**不当闭集**）、
+    规则行（工具键/模式/动作）增删、保存；**顺序原样提交**（最后匹配生效）；`disabled` 时**提交点不出请求**。
+- **错误呈现**：新增 `lib/wire-error-text.ts`（`FAMILY: message [internalCode]`），本单五面共用；
+  `details.internalCode` 由后端 `WireError.from_server_error` 写入（`wire/errors.py:117-125`，第一手核对）。
+- **测试**（新增 4 文件 / 14 例，全绿）：
+  - `wire-error-text.test.ts`：带/不带 internalCode、本地错误不被包装成服务答复。
+  - `wire-profile-writes.test.ts`：两方法的参数与 `requestId` 生成、家族省略、CAS 版本透传。
+  - `clone-profile-dialog.test.tsx`：报告逐条显示、家族仅在变化时下发、**类型化拒绝时零本地变化**。
+  - `profile-permission-editor.test.tsx`：顺序原样、增删不重排、**G2：disabled 时不发请求**、拒绝后保留草稿。
+  - 既有 `src/features/profiles` 8 文件 / 73 例仍全绿（`permissionEditor` 为可选 prop，未破坏 P17 语义）。
+- **环境插曲（如实记）**：会话早期那个后台 `npm install` 被系统回收时把本仓 `node_modules` 带走了
+  （`vitest` 一度无法加载）；已重装（`node_modules` 不入库、无仓库文件受损），并重新解出
+  `electron` 二进制到 `node_modules/electron/dist`（`/tmp/electron.zip` 仍在，未重新下载）。
+- 提交：`P22 stage 2`（pathspec）。
+
+## P22 阶段 3（2026-09-18）：资产 hub + 订阅账号 + hook 管理（写路径） — `P22_STAGE3_HUB_ACCOUNTS_HOOKS`
+
+- **新增三个端口**（`application/`，与既有 `*Port` 同构、可注入假实现）：
+  - `assets/wire-asset-hub-port.ts`：`assets.list`/`bindings`/`bind`/`unbind`/`publishSkill`/`publishMcp`/`publishPlugin`。
+  - `accounts/wire-accounts-port.ts`：`accounts.list`/`create`/`importAsset`/`bind`。
+  - `hooks/wire-hooks-port.ts`：`hooks.list`/`create`/`setEnabled`/`delete`/`triggers`。
+- **界面（三处 P15/P16/P12 占位面 ⇒ 真面）**：
+  - `product:resources` → `AgentBoxAssetHub`：目录（kind/name/revision/digest/source，**不含内容**）、
+    按所选角色**绑定/解绑**（禁用的绑定如实标注）、发布区（skill/plugin 用主机路径、MCP 用 JSON 定义）。
+  - `product:identities` → `AgentBoxAccounts`：服务账号列表（`hasAsset`/`lastVerifiedAt`/`state`，零 token 零 locator）、
+    新建（家族+标识）、导入登录态、绑定到角色（带 `expectedVersion`）。
+  - `product:hooks` → `AgentBoxHookSettings`：hook 列表 + **逐条命令**（启用前可见）、启停、
+    触发历史（`blocking` 用 destructive 徽标如实呈现）、删除二次确认并在回执里显示连带删掉的触发行数、
+    新建（family/name/event/command → `{event, handlers:[{type:'command', command, timeout:30, async:false}]}`）。
+  - `product-settings.tsx` 删掉两段"字段计划"占位文案（51 行），改为挂载这三个面。
+- **G2（不画假开关）在本阶段的落点**：每面的写控件都绑定"读是否成功 + 服务是否就绪"；
+  读失败（`UNAVAILABLE` 等）时**全部禁用**并在页面显示服务原话。测试对三面各有一条反例断言
+  （`buttons.every(disabled)`、`HOOK_NOT_EXECUTABLE` 单行禁用）。
+- **测试**：
+  - 新增 `agentbox-contract-faces.test.tsx` 8 例：绑定真调、发布走 skill 路径并按码显示拒绝（含 `internalCode`）、
+    目录不可读⇒全禁用、账号新建/参考字段、无密钥库⇒全禁用、hook 启停真调、无命令处理器⇒开关禁用、新建模型形状 + 删除回执行数。
+  - 改写 `product-settings.test.tsx` 的两组"占位文案"测试为新面的行为测试（占位已按本单意图替换）；
+    更新 `index.test.tsx` 的 MCP 深链断言锚点（语义不变：落在 resources 面、且不挂旧 install 控件）。
+  - `src/features/settings` 15 文件 / 153 例、`src/features/profiles` 8 文件 / 73 例、
+    `src/application` 全量 87 文件 / **844 例全绿**；本阶段改动文件 eslint **0 error**（16 warnings 全是测试里的 `document`）。
+- **修掉两处自己写出的真 bug**（测试抓到）：① `Input` 的 `onChange` 里在 state updater 内读 `event.currentTarget`
+  （事件已被回收 ⇒ 抛错），改为先取值再 set；② hook 删除后 `run()` 用空字符串覆盖了动作自己设的回执文案。
+- 提交：`P22 stage 3`（pathspec）。
+
+## P22 阶段 4（2026-09-18）：四项真跑 + G2 反例 + 真实服务写路径 — `P22_STAGE4_CHECKS`
+
+完整证据：`evidence/P22-stage4-gates.md`（含逐文件清单、反例表、真实转录）。
+
+| 项 | 退出码 | 计数 |
+| --- | --- | --- |
+| tsc（三项目） | **0** | 全过 |
+| eslint（全树） | 1 | **11 errors / 186 warnings**，errors 全在 P22 未触碰的 7 个文件（交集 ∅）；本单改动文件 **0 error** |
+| build | **0** | dist + electron bundle + native deps |
+| vitest（全量） | 1 | **990 文件：986 passed / 2 failed（全 electron 宿主基线）**；10252 用例：**10242 passed / 4 failed**；`\|ui\|` 全绿 |
+
+- **G2 反例演练**：三面各"读失败 ⇒ 全部写控件禁用 + 显示服务原话"，并**逐个点击后断言调用数为 0**
+  （资产 5 个写方法、账号 3 个、hook 单行禁用）；角色页克隆与权限保存在 `disabled` 下同样点不出请求。
+  另在真实服务上抓到两条**真**类型化拒绝（`HOOK_FAMILY_UNSUPPORTED`、账号 `UNAVAILABLE`），界面按同一规则灰显。
+- **真实服务写路径（DoD-3）**：`e2e/p22-write-faces-driver.mjs` **13/13 PASS**——构建产物 + 真后端，
+  五处写路径全部真调并拿到真实回答：publishSkill（`sha256:f3023e70…`）/ publishPlugin（带预览）/
+  bind→bindings→unbind / profiles.clone（**2 migrated / 3 refused**，`originProfileId` 已置）/
+  setPermissions（`plan` + 规则展开，version 2）/ hooks.list + 真拒绝 / accounts.list 真拒绝。
+- **eslint 基线变化**：`--fix` 在 `src/features/settings` 顺带清掉 5 个**既有** error（纯导入顺序），16 → 11；
+  其余 11 仍在未触碰文件，作为待拍项保留（**不是放宽**）。
+- **环境插曲（如实记）**：`node_modules` 被系统回收的后台 `npm install` 带走过两次；第二次该安装自身遇 TLS 失败，
+  改用 `npm ci` 一次成功，并按需重新解出 electron 二进制。**仓库文件、提交、tag 未受影响**（`node_modules` 不入库）。
+- 提交：`P22 stage 4`（pathspec）。
+
+## P22 收口（2026-09-18）：五处写路径产品面 — `CONTRACT_FACES_DONE`
+
+- **阶段**：1 合同/类型化码核对（`254ce3bf`）→ 2 角色页写路径（`45cf8162`）→ 3 资产/账号/hook 写路径（`1114176f`）
+  → 4 四项真跑 + 反例 + 真实服务写路径（`1aadf3a0`）。
+- **交付（五处，全部真调合同方法）**：
+  1. **克隆**：角色页按钮 → `CloneProfileDialog` → `profiles.clone`，对话框内显示逐项迁移报告与来源（真实服务 2 migrated / 3 refused）。
+  2. **权限规则**：`ProfilePermissionEditor` → `profiles.setPermissions`（顺序原样、CAS 版本、类型化拒绝保留草稿）。
+  3. **资产绑定/解绑/发布**：`product:resources` 真目录 + `assets.bind/unbind/publishSkill/publishPlugin/publishMcp`。
+  4. **订阅账号**：`product:identities` 服务账号列表 + `accounts.create/importAsset/bind`（零 token 零 locator）。
+  5. **hook 管理**：`product:hooks` 列表（逐条命令）+ `hooks.setEnabled/create/delete/triggers`（删除显示连带触发行数）。
+- **G2（不画假开关）**：三面读失败 ⇒ 全部写控件禁用 + 服务原话；测试逐个点击后断言写方法调用数为 0。
+- **验收**：`Acceptance` 绿条件满足（五处都有调用点、参数按合同、单测 + **真实服务转录**双重证据）。
+- **未验（如实登记）**：① 点击级 UI 验收（组件测试与 wire 转录合起来的那一次）属 Q2 计划的**真实模型 UI 门**；
+  ② `hooks.create` 在真实服务上只拿到类型化拒绝（该部署 opencode 未声明 hook 模型）；③ 真实模型调用 0 次。
+
+## CHECKPOINT Q2 [DONE]
+
+**1 现在能试什么**
+
+| 入口 | 命令 / 位置 | 期望看到什么 |
+| --- | --- | --- |
+| 合同与摘要 | `contracts/wire-v1/README.md` | 59 方法、后端登记值 vs 本树当前值、未锁定的原因 |
+| 四项检查 | `npm run --workspace apps/desktop typecheck` / `lint` / `build` / `test` | 0 / 1（11 既有 error，未触碰文件）/ 0 / 986 passed（4 条 electron 宿主基线） |
+| 真实服务写路径 | `AGENTBOX_SERVER_SOURCE_ROOT=<env-provider> node e2e/p22-write-faces-driver.mjs <sandbox> <out> --port 18760`（Linux 加 `xvfb-run -a`） | 13/13 PASS：五处写路径真实回答（含两条类型化拒绝） |
+| 只读面（Q1） | `node e2e/p21-read-faces-driver.mjs …` / `p21-built-app-smoke.mjs …` | 13/13 · 7/7 PASS |
+| 界面 | 设置 → Assets / Subscription accounts / Hooks；角色页 → Clone / Permission rules | 服务在线可写；离线全部灰显并给原因 |
+
+**2 要你拍的**
+
+| # | 问题 | 选项与代价 | 我的建议 | 不拍的后果 |
+| --- | --- | --- | --- | --- |
+| ① | 合并回主树（`checkpoint/Q1`、`checkpoint/Q2` 两个 sha） | 合 = 主树重跑门并重算摘要 | 按 tag sha 依次合 | 六处面与合同停在子树 |
+| ② | 后端 `providerArtifacts.install` 参数表与 handler 不一致（P21 登记） | 需后端改 | 转后端修 | 该方法永远调用不成功 |
+| ③ | 后端 `server.hello` 能力表落后于 `_handlers`（P22 新登记） | 后端补表 | 后端补表 | 该表继续误导按它门控的客户端 |
+| ④ | 两仓摘要仍未锁定（本树已交出工件本体） | 后端按工件重新登记 | 调度者转交 | "锁定"不成立 |
+| ⑤ | 全树 11 个既有 eslint error（7 个未触碰文件） | 单开 lint 卫生单 | 单开小单 | lint 门长期红 |
+| ⑥ | 真实模型 UI 门（R-0011 已授权） | 需宿主侧点击级验收 + 真实 DeepSeek | 下一张单 | 界面与真实模型的组合未验 |
+
+**3 花了什么**
+
+- 真实模型调用 **0 次**（本单不需要），费用 0；本地命令 ≈120 次；跨仓写 0 次。
+- 清理：`/tmp/p22-write`、`/tmp/p21-*` 为沙箱与日志；工作树 committed & clean。
+- 请求数未被环境导出，以提交数代记：**5 个提交**（含收口）。
+
+**4 恢复点**
+
+- 下一单：**`P24-sidebar-row-and-remote-icon`**（调度者已投递，batch Q2）——队列**不空**，故本批**不写** `QUEUE_EMPTY_AT`。
+- baseline：建议更新为 `checkpoint/Q2` 所在提交；分支 `feature/agentbox-desktop-product`。
+- 未提交改动：无。
+
+**5 不含糊**
+
+- **未跑**：点击级真实模型 UI 门；`hooks.create` 的成功路径（真实服务只给拒绝）。
+- **基线红照实记**：eslint 全树 11 errors（未触碰文件）、electron 4 条宿主基线失败。
+- Q1 的只读边界在 P22 被**有意**解除（那是 P22 的题目），"不可用时点不出请求"仍全绿（G2）。
+
