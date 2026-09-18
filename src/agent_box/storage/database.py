@@ -8,7 +8,7 @@ import threading
 from typing import Iterator
 
 
-PRODUCT_SCHEMA_VERSION = 12
+PRODUCT_SCHEMA_VERSION = 13
 
 
 class FutureSchemaError(RuntimeError):
@@ -186,6 +186,26 @@ CREATE TABLE IF NOT EXISTS server_accounts (
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS server_assets (
+    id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT,
+    latest_revision INTEGER NOT NULL,
+    digest TEXT NOT NULL,
+    source TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS server_profile_assets (
+    profile_id TEXT NOT NULL REFERENCES server_profiles(id),
+    asset_id TEXT NOT NULL REFERENCES server_assets(id),
+    revision INTEGER NOT NULL,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (profile_id, asset_id)
+);
 CREATE TABLE IF NOT EXISTS server_bootstrap (
     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
     server_id TEXT NOT NULL,
@@ -254,6 +274,31 @@ def _add_columns(conn: sqlite3.Connection, table: str, additions: dict[str, str]
     for name, declaration in additions.items():
         if name not in columns:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {declaration}")
+
+
+def _migrate_12_to_13(conn: sqlite3.Connection) -> None:
+    """Order 58: managed skill/MCP assets and their profile bindings.
+
+    `server_assets` is the catalogue (kind, name, latest revision, digest,
+    source); `server_profile_assets` is the binding (a Profile references an
+    asset id and a revision, and can disable it without dropping the
+    reference). Neither table carries asset *content* - that lives under the
+    assets root, content-addressed.
+    """
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS server_assets ("
+        "id TEXT PRIMARY KEY, kind TEXT NOT NULL, name TEXT NOT NULL, "
+        "description TEXT, latest_revision INTEGER NOT NULL, digest TEXT NOT NULL, "
+        "source TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)"
+    )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS server_profile_assets ("
+        "profile_id TEXT NOT NULL REFERENCES server_profiles(id), "
+        "asset_id TEXT NOT NULL REFERENCES server_assets(id), "
+        "revision INTEGER NOT NULL, enabled INTEGER NOT NULL DEFAULT 1, "
+        "created_at TEXT NOT NULL, updated_at TEXT NOT NULL, "
+        "PRIMARY KEY (profile_id, asset_id))"
+    )
 
 
 def _migrate_11_to_12(conn: sqlite3.Connection) -> None:
@@ -500,6 +545,8 @@ class Database:
                 _migrate_10_to_11(conn)
             if current in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11):
                 _migrate_11_to_12(conn)
+            if current in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12):
+                _migrate_12_to_13(conn)
             conn.executescript(_SCHEMA)
             conn.execute(
                 "INSERT OR IGNORE INTO agentbox_product_schema(singleton, version, applied_at) "

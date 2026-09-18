@@ -28,7 +28,7 @@ class ExecutableSpec:
     identity: str; resolver_kind: str; bundle_members: tuple[str, ...] = (); version_probe: tuple[str, ...] = (); metadata: Mapping[str, str] = field(default_factory=dict)
 @dataclass(frozen=True)
 class ProfileSpec:
-    native_home: str; guest_home: str; config_format: str; payload_schema: str; codec: str; overlay_policy: str; slots: tuple[str, ...] = (); skill_target: str | None = None; skill_env: str | None = None
+    native_home: str; guest_home: str; config_format: str; payload_schema: str; codec: str; overlay_policy: str; slots: tuple[str, ...] = (); skill_target: str | None = None; skill_env: str | None = None; mcp_target: str | None = None; mcp_key: str | None = None
 @dataclass(frozen=True)
 class LaunchMode:
     name: str; argv: tuple[str, ...]; io: str = "stdio"; resume_contract: str | None = None
@@ -61,7 +61,7 @@ def definition_from_dict(raw: Mapping) -> HarnessDefinition:
     identity=Identity(_s(ident["harness_type"],"harness_type"),_s(ident["display_name"],"display_name"),_s(ident.get("description",""),"description",512),_s(ident["version"],"version"),MappingProxyType(dict(ident.get("visual",{}))))
     exe=raw["executable"]; executable=ExecutableSpec(_s(exe["identity"],"executable identity"),_s(exe["resolver_kind"],"resolver kind"),_tuple(exe.get("bundle_members",()),"bundle_members"),_tuple(exe.get("version_probe",()),"version_probe"),MappingProxyType(dict(exe.get("metadata",{}))))
     prof=raw["profile"]
-    if set(prof)-{"native_home","guest_home","config_format","payload_schema","codec","overlay_policy","slots","skill_target","skill_env"}: raise ValueError("unknown profile field")
+    if set(prof)-{"native_home","guest_home","config_format","payload_schema","codec","overlay_policy","slots","skill_target","skill_env","mcp_target","mcp_key"}: raise ValueError("unknown profile field")
     guest=_s(prof["guest_home"],"guest_home")
     if not guest.startswith("/") or ".." in guest.split("/"): raise ValueError("guest_home must be canonical")
     slots=_tuple(prof.get("slots",()),"profile slots")
@@ -73,7 +73,21 @@ def definition_from_dict(raw: Mapping) -> HarnessDefinition:
             raise ValueError("skill_target must be a canonical bounded template")
     skill_env=prof.get("skill_env")
     if skill_env is not None and (not isinstance(skill_env, str) or not skill_env.isupper() or len(skill_env) > 64): raise ValueError("invalid skill_env")
-    profile=ProfileSpec(_s(prof["native_home"],"native_home"),guest,_s(prof["config_format"],"config_format"),_s(prof["payload_schema"],"payload_schema"),_s(prof["codec"],"codec"),_s(prof["overlay_policy"],"overlay_policy"),slots,skill_target,skill_env)
+    mcp_target=prof.get("mcp_target")
+    mcp_key=prof.get("mcp_key")
+    if (mcp_target is None) != (mcp_key is None):
+        raise ValueError("mcp_target and mcp_key are declared together")
+    if mcp_target is not None:
+        mcp_target=_s(mcp_target,"mcp_target",256)
+        mcp_key=_s(mcp_key,"mcp_key",64)
+        if (not mcp_target.startswith("/") or ".." in mcp_target.split("/")
+                or "{" in mcp_target or "}" in mcp_target):
+            raise ValueError("mcp_target must be a canonical absolute file path")
+        if not (mcp_target.endswith(".json") or mcp_target.endswith(".toml")):
+            raise ValueError("mcp_target must name a json or toml file")
+        if "mcp" not in slots:
+            raise ValueError("a declared mcp_target requires the mcp slot")
+    profile=ProfileSpec(_s(prof["native_home"],"native_home"),guest,_s(prof["config_format"],"config_format"),_s(prof["payload_schema"],"payload_schema"),_s(prof["codec"],"codec"),_s(prof["overlay_policy"],"overlay_policy"),slots,skill_target,skill_env,mcp_target,mcp_key)
     modes=[]; mode_names=set()
     for item in raw["launch_modes"]:
         if set(item)-{"name","argv","io","resume_contract"}: raise ValueError("unknown launch mode field")

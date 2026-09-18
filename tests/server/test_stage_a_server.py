@@ -306,7 +306,7 @@ def test_schema_one_migrates_turn_identity_columns_idempotently(tmp_path):
     with database.read() as conn:
         assert conn.execute(
             "SELECT version FROM agentbox_product_schema WHERE singleton=1"
-        ).fetchone()[0] == 12
+        ).fetchone()[0] == 13
         # Order 67: the uniqueness unit is the Session. The migration drops
         # the per-profile partial index (idempotently, forward-only) and the
         # schema script no longer re-creates it - a second initialize (above)

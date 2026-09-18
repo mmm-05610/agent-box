@@ -49,3 +49,33 @@
 - profile **绑定**（id+revision、enabled）与"下一轮生效"；资产记录表（schema 迁移）；
 - 外部来源同步（目录式、来源+摘要固定、不静默换源）与 MCP 有界探测（G6）；
 - `assets.*` wire 面（与 P15 前端配对、两仓重锁）；hooks **只如实声明**（不统一）。
+
+## 阶段 B 第二块（已落地）：MCP 资产、逐家渲染、资产目录与绑定
+
+- **MCP 资产存储**（`server/assets/mcp.py`）：存**标准形态**（stdio `{command,args,env}` /
+  remote `{url,headers}`），规范化后内容寻址（`<root>/mcp/<id>/<rev>/server.json` + 摘要）；
+  **凭据只存引用**——`env`/`headers` 的每个值必须是 `{"credentialRef": …}`，裸字符串是
+  类型化拒绝（`MCP_CREDENTIAL_REFERENCE_REQUIRED`，"库分不清秘密与常量，猜就是泄"）；
+  command 必须绝对路径、remote 必须 https（或 loopback）、名字小写 slug、重复修订拒绝。
+- **逐家渲染**（`server/assets/rendering.py`）：目标与键名**全部来自注册表声明**
+  （`mcp_target`/`mcp_key`，本腿扩展了 `schema.py` 的 `[harness.profile]` 字段集与校验），
+  已声明三家：codex=`/runtime/home/.codex/config.toml` + **TOML** `mcp_servers`、
+  claude-code=`/runtime/home/.claude/settings.json` + JSON `mcpServers`、
+  qwen=`/runtime/home/.qwen/settings.json` + JSON `mcpServers`（三者皆阶段 A 一手观测）；
+  **未声明 mcp 槽位的家（如 pi）→ `ASSET_SLOT_UNSUPPORTED`**，不近似渲染；凭据未解析 →
+  `MCP_CREDENTIAL_UNRESOLVED`（**渲染文本里永不出现秘密**）。
+- **资产目录与绑定**（`server/assets/records.py` + schema 13）：
+  `server_assets`（kind/name/latest_revision/digest/source，**无内容**）与
+  `server_profile_assets`（profile × asset，revision + enabled）——绑定可指旧修订、
+  可停用而不解绑；未发布修订拒绑（`ASSET_REVISION_UNKNOWN`）；source 只在显式给出时变化
+  （不静默换源）；目录视图零内容零 host 路径。
+- **测试**：新增 4 条（MCP 反例三则 + 存储/verify、两家渲染与未支持家拒绝、目录/绑定往返），
+  全量 **821 passed / 0 failed**；技能存储 6 条不变。
+
+## 58 未做（下腿）
+
+- **物化到沙箱**：把渲染出的 config 片段投成只读投影（需决定"合并进家内配置文件"还是
+  "单独文件+绑定"——涉及既有投影语义，未动）；
+- **来源同步**（目录式 hub：列表/安装/更新、来源与摘要固定、失败不落地）与 **MCP 有界探测**（G6）；
+- `assets.*` wire 面（与 P15 前端配对、两仓重锁）；commands 资产的同机制复用；
+  hooks **只如实声明**（不统一）。
