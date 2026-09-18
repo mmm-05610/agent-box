@@ -137,6 +137,56 @@ class ProfileRecords:
                 "SELECT * FROM server_profiles WHERE id=?", (profile_id,),
             ).fetchone())
 
+    def grant_subagent(self, *, parent_id: str, child_id: str) -> dict[str, Any]:
+        """Grant one delegation edge (idempotent; nothing is granted by default)."""
+        if parent_id == child_id:
+            raise ServerError("SUBAGENT_CYCLE", "a Profile cannot call itself", status=409)
+        timestamp = now()
+        with self.database.transaction() as conn:
+            for profile_id in (parent_id, child_id):
+                if conn.execute(
+                    "SELECT 1 FROM server_profiles WHERE id=?", (profile_id,),
+                ).fetchone() is None:
+                    raise ServerError("PROFILE_NOT_FOUND", "Profile was not found", status=404)
+            # A grant that would close a cycle is refused here rather than at
+            # call time: A→B→A never becomes representable.
+            if conn.execute(
+                "SELECT 1 FROM server_subagent_grants WHERE parent_profile_id=? "
+                "AND child_profile_id=?", (child_id, parent_id),
+            ).fetchone() is not None:
+                raise ServerError(
+                    "SUBAGENT_CYCLE",
+                    "that grant would close a delegation cycle", status=409,
+                )
+            conn.execute(
+                "INSERT OR IGNORE INTO server_subagent_grants("
+                "parent_profile_id,child_profile_id,created_at) VALUES (?,?,?)",
+                (parent_id, child_id, timestamp),
+            )
+            return {"parentProfileId": parent_id, "childProfileId": child_id}
+
+    def revoke_subagent(self, *, parent_id: str, child_id: str) -> None:
+        with self.database.transaction() as conn:
+            removed = conn.execute(
+                "DELETE FROM server_subagent_grants WHERE parent_profile_id=? "
+                "AND child_profile_id=?", (parent_id, child_id),
+            )
+            if removed.rowcount != 1:
+                raise ServerError(
+                    "SUBAGENT_GRANT_NOT_FOUND", "that grant does not exist", status=404)
+
+    def subagent_grants(self, *, parent_id: str | None = None) -> list[dict[str, Any]]:
+        with self.database.read() as conn:
+            if parent_id is None:
+                rows = conn.execute(
+                    "SELECT * FROM server_subagent_grants ORDER BY parent_profile_id,"
+                    "child_profile_id").fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM server_subagent_grants WHERE parent_profile_id=? "
+                    "ORDER BY child_profile_id", (parent_id,)).fetchall()
+        return [dict(row) for row in rows]
+
     def set_permissions(
         self, *, profile_id: str, preset: str, rules: Sequence[Any],
         expected_version: int, key: str, request_digest: str,

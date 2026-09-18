@@ -8,7 +8,7 @@ import threading
 from typing import Iterator
 
 
-PRODUCT_SCHEMA_VERSION = 16
+PRODUCT_SCHEMA_VERSION = 17
 
 
 class FutureSchemaError(RuntimeError):
@@ -231,6 +231,12 @@ CREATE TABLE IF NOT EXISTS server_hook_triggers (
     blocking INTEGER NOT NULL DEFAULT 0,
     effect TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS server_subagent_grants (
+    parent_profile_id TEXT NOT NULL REFERENCES server_profiles(id),
+    child_profile_id TEXT NOT NULL REFERENCES server_profiles(id),
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (parent_profile_id, child_profile_id)
+);
 CREATE TABLE IF NOT EXISTS server_bootstrap (
     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
     server_id TEXT NOT NULL,
@@ -299,6 +305,21 @@ def _add_columns(conn: sqlite3.Connection, table: str, additions: dict[str, str]
     for name, declaration in additions.items():
         if name not in columns:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {declaration}")
+
+
+def _migrate_16_to_17(conn: sqlite3.Connection) -> None:
+    """Order 65 A: explicit delegation edges (none by default).
+
+    One row per granted edge: a parent Profile may call the child. Visibility
+    and tool materialisation derive from these rows, and nothing else does.
+    """
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS server_subagent_grants ("
+        "parent_profile_id TEXT NOT NULL REFERENCES server_profiles(id), "
+        "child_profile_id TEXT NOT NULL REFERENCES server_profiles(id), "
+        "created_at TEXT NOT NULL, "
+        "PRIMARY KEY (parent_profile_id, child_profile_id))"
+    )
 
 
 def _migrate_15_to_16(conn: sqlite3.Connection) -> None:
@@ -625,6 +646,8 @@ class Database:
                 _migrate_14_to_15(conn)
             if current in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15):
                 _migrate_15_to_16(conn)
+            if current in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16):
+                _migrate_16_to_17(conn)
             conn.executescript(_SCHEMA)
             conn.execute(
                 "INSERT OR IGNORE INTO agentbox_product_schema(singleton, version, applied_at) "
