@@ -88,4 +88,30 @@
 
 - 会话 fork/克隆（§7 明确不做）；跨家族切换仍只能克隆（60-G5）。
 - dsh/qwen 的并发判定待其本地门首跑后可从 exclusive 收紧回 shared（本单按 §3 保守处置）。
-- kilo 门的 marker 债仍未定位根因（全库维护债，与本单无关）。
+- kilo 门的 marker 债已由 66 §14 解除（e394f09 起四家 43 代门 exit 0），本项关闭。
+
+## 9. 当前基线复跑记录（2026-09-18/19 本树执行；068 轮后）
+
+**命令**（本机门；`AGENT_BOX_SANDBOX_MODULE` 是 PYTHONPATH 运行下的沙箱端口解析入口，缺它门会以
+`LOCAL_SANDBOX_UNAVAILABLE` 拒开工作区，与 67 无关）：
+
+```bash
+AGENT_BOX_SANDBOX_MODULE=agent_box_sandbox_bwrap \
+PYTHONPATH=src:plugins/agent-box-harnesses/src:plugins/agent-box-runtime-wsl/src:plugins/agent-box-runtime-local/src:plugins/agent-box-sandbox-bwrap/src:plugins/agent-box-skills/src:plugins/agent-box-terminal-session/src \
+python3 scripts/server-round1/native-home-gate.py --report <path>
+```
+
+- **复跑 1**：`NATIVE_HOME_GATE_FAILED`，仅停在 **G8**（取消后召回：召回轮 `completed` 但该
+  turn_id 无 delta，`recallDeltas: []`）；G1–G6 全 pass（含 G3 两条并发轮与运行中切换拒绝）。
+- **复跑 2**：**`NATIVE_HOME_GATE_OK`**（全门；证据
+  [per-session-admission-67-native-home-gate.json](per-session-admission-67-native-home-gate.json)，
+  sha256 `40166e92d1dadd4e…`）；G8 `recallDeltas: ["STATEFUL-NONCE-7A21"]`。
+- **45-G3 两次都 pass**（`turnStates: ["completed","completed"]`、`nativeIdsDiffer: true`、
+  `deltasPerSession: [1,1]`）；G2 形态（同会话入队 `queue_…`、运行中切换 `rejected/execution_running`）两次一致。
+- **新增维护债（非本单门，如实记录）**：G8 的取消竞态间歇（2 次复跑 1 败）——失败形态是
+  **召回轮 completed 但流为空**，而门内的"重试一次"只覆盖"召回轮被 cancelled"的形态；
+  复跑 2 的 stderr 里可见 `SIDECAR_CLOSED: sidecar exited before answering`（取消 abort 与下一轮
+  流竞争的设计已知行为）。建议后续单给召回轮加"空流即重试"或消除该竞态，本单不动。
+- **定向测试**：与准入/归属/收窄锁相关的五个文件 **38 passed**（test_server_boundaries /
+  test_stage_a_server / test_usage_aggregate / test_execution_inventory / test_delegation）；
+  根套件 **879 passed / 0 failed**（本树实测，226 s）。
