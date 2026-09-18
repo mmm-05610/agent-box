@@ -17,6 +17,7 @@ from agent_box.server.errors import ServerError
 from agent_box.server.records import canonical, digest, reject_sensitive_keys
 from agent_box.server.wire.envelope import CursorCodec
 from agent_box.server.wire.errors import WireError
+from agent_box.server.accounts.records import account_view
 from agent_box.server.wire.projection import (
     event_frame,
     execution_state,
@@ -82,6 +83,10 @@ _PARAM_SHAPES = {
     "providerModels.archive": (
         {"requestId", "providerModelId", "expectedVersion"}, set(),
     ),
+    "accounts.list": (set(), set()),
+    "accounts.create": ({"requestId", "harness", "accountIdentifier"}, set()),
+    "accounts.bind": ({"requestId", "profileId", "expectedVersion", "accountId"}, set()),
+    "accounts.importAsset": ({"requestId", "accountId", "sourcePath"}, set()),
     "providerModels.probeModels": (
         {"requestId", "baseUrl", "credentialId"}, {"provenance"},
     ),
@@ -215,10 +220,20 @@ class WireService:
         token_required: bool = True,
         artifact_store=None,
         usage_aggregator=None,
+        accounts=None,
+        account_assets=None,
+        subscription_files_for=None,
     ) -> None:
         self._server_id_provider = server_id_provider
         self.artifact_store = artifact_store
         self.usage_aggregator = usage_aggregator
+        #: Order 56's managed subscription accounts (records + assets). None
+        #: when the composition has no secret store: the methods refuse typed.
+        self.accounts = accounts
+        self.account_assets = account_assets
+        #: Order 56: harness -> its declared subscription login-state files,
+        #: read from the deployment set the composition loaded.
+        self.subscription_files_for = subscription_files_for or (lambda _harness: ())
         self.workspaces = workspaces
         self.profiles = profiles
         self.sessions = sessions
@@ -246,6 +261,10 @@ class WireService:
             "providerModels.update": self.provider_models_update,
             "providerModels.archive": self.provider_models_archive,
             "providerModels.probeModels": self.provider_models_probe_models,
+            "accounts.list": self.accounts_list,
+            "accounts.create": self.accounts_create,
+            "accounts.bind": self.accounts_bind,
+            "accounts.importAsset": self.accounts_import_asset,
             "providerModels.probeConnection": self.provider_models_probe_connection,
             "providerArtifacts.list": self.provider_artifacts_list,
             "providerArtifacts.install": self.provider_artifacts_install,
@@ -400,6 +419,105 @@ class WireService:
             if isinstance(value, bool)
         }
         return item
+
+    # -- managed subscription accounts (Order 56) --------------------------
+
+    def _require_accounts(self):
+        if self.accounts is None or self.account_assets is None:
+            raise WireError(
+                "UNAVAILABLE",
+                "managed subscription accounts need a platform secret store",
+            )
+        return self.accounts, self.account_assets
+
+    def accounts_list(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        del params
+        accounts, _assets = self._require_accounts()
+        return {"accounts": [account_view(row) for row in accounts.list()]}
+
+    def accounts_create(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        accounts, _assets = self._require_accounts()
+        _kind, created = accounts.create(
+            key=_request_id(params["requestId"]),
+            request_digest=digest({
+                "harness": params["harness"],
+                "accountIdentifier": params["accountIdentifier"],
+            }),
+            harness_type=_bounded(params["harness"], "harness", 64),
+            account_identifier=_bounded(params["accountIdentifier"], "accountIdentifier", 128),
+        )
+        # The record layer speaks snake_case rows; the wire view is the one
+        # projection, so replay and fresh creation answer identically.
+        return {"account": account_view(accounts.get(created["account_id"]))}
+
+    def accounts_bind(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        accounts, _assets = self._require_accounts()
+        account_id = params["accountId"]
+        if account_id is not None:
+            account_id = _bounded(account_id, "accountId")
+            accounts.get(account_id)  # 404 before the profile write
+        try:
+            _status, body = self.profiles.records.bind_account(
+                profile_id=_bounded(params["profileId"], "profileId"),
+                account_id=account_id,
+                expected_version=_version(params["expectedVersion"]),
+                key=_request_id(params["requestId"]),
+                request_digest=digest({
+                    "profileId": params["profileId"], "accountId": account_id,
+                }),
+            )
+            row = body["profile"]
+        except ServerError as exc:
+            raise self._profile_error(exc) from exc
+        return {"profile": self._profile(row)}
+
+    def accounts_import_asset(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        """Import one login-state file as the account's asset.
+
+        The path is a host path the operator (or the Desktop) names, and the
+        same rules as the credential import apply: a real regular file, no
+        links, bounded; the bytes go straight into the platform secret store
+        and only the reference comes back.
+        """
+        from pathlib import Path as _Path
+
+        accounts, assets = self._require_accounts()
+        account_id = _bounded(params["accountId"], "accountId")
+        account = accounts.get(account_id)
+        source = _Path(_bounded(params["sourcePath"], "sourcePath", 4096))
+        if source.is_symlink() or not source.is_file():
+            raise WireError("INVALID_REQUEST", "sourcePath must be a regular file")
+        size = source.stat().st_size
+        if size <= 0 or size > 256 * 1024:
+            raise WireError("INVALID_REQUEST", "the login-state file is empty or oversized")
+        harness = str(account["harness_type"])
+        declared = self._subscription_files_for(harness)
+        if not declared:
+            raise WireError(
+                "INVALID_REQUEST",
+                f"the {harness!r} family declares no subscription login-state files",
+            )
+        # The import names one file; it is the only one that can be declared
+        # here, so a mismatch is a refusal rather than a partial asset.
+        name = declared[0] if len(declared) == 1 else None
+        if name is None:
+            raise WireError(
+                "INVALID_REQUEST",
+                "importing one file into a multi-file login state is not supported",
+            )
+        payload = source.read_bytes()
+        locator, digest_value = assets.write_asset(
+            account_id=account_id, files={name: payload}, kind="subscription",
+        )
+        accounts.record_asset(
+            account_id, locator=locator, digest=digest_value,
+            state=str(account["state"]),
+        )
+        return {"account": account_view(accounts.get(account_id))}
+
+    def _subscription_files_for(self, harness: str) -> tuple[str, ...]:
+        """The family's declared subscription files, from the deployment."""
+        return tuple(self.subscription_files_for(harness) or ())
 
     def profiles_create(self, params: Mapping[str, Any]) -> dict[str, Any]:
         # `credentialId` is optional and nullable: a Harness whose credential

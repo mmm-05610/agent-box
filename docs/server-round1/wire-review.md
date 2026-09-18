@@ -451,3 +451,19 @@ ProviderModelConfigRecord = {
   `executionId: null`），不是错误——这与 60 的队列面一致，非本单新增。
 - **部署面新增非 wire 字段**：`homeConcurrency: "shared" | "exclusive"`（装配解析，
   默认 shared；其它值 `SIDECAR_DEPLOYMENT_INVALID`）——不进 wire 契约。
+
+## Order 56 — 托管订阅账户（accounts.*，2026-09-18，env-provider）
+
+- **新方法（+4，纯新增面）**：
+  - `accounts.list {} → {accounts: AccountView[]}`；
+  - `accounts.create {requestId, harness, accountIdentifier} → {account}`；
+  - `accounts.bind {requestId, profileId, expectedVersion, accountId|null} →
+    {profile}`（null=解绑；版本化冲突走既有 `RECORD_VERSION_CONFLICT`）；
+  - `accounts.importAsset {requestId, accountId, sourcePath} → {account}`
+    （单文件导入：常规文件、非链接、≤256 KiB；字节直接进平台 SecretStore，
+    只回引用）。
+- **AccountView**（新投影）：`{accountId, harnessType, accountIdentifier, state,
+  hasAsset, lastVerifiedAt, createdAt, updatedAt}`——**零令牌、零 locator、零摘要**。
+- **profiles 投影 +1 字段**：`accountId`（绑定的订阅账户或 null）；wire 形状有变
+  ⇒ **需前端同步（P12）并重锁两仓摘要**（本工作树未动前端仓）。
+- **无 SecretStore 的组合**：四个方法类型化拒绝 `UNAVAILABLE`（不落明文资产）。

@@ -113,6 +113,9 @@ def profile_record(row: Mapping[str, Any]) -> dict[str, Any]:
         "version": int(row.get("version") or 1),
         "displayName": row.get("display_name") or row.get("name") or row["id"],
         "harness": row["harness_type"],
+        # Order 56: the bound subscription account, or null. The locator and
+        # the digest stay server-side; the client needs the reference only.
+        "accountId": row.get("account_id"),
         "archivedAt": row.get("archived_at"),
         "createdAt": row["created_at"],
         "updatedAt": row["updated_at"],

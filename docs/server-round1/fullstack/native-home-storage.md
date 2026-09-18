@@ -250,3 +250,17 @@ G3 阻塞项按原口径复跑：
 - 整门终态 `NATIVE_HOME_GATE_OK`（`native-home-gate.json`：g3.result=pass）。
 - 逐家 home 并发结论表与 claude/dsh/qwen 的收窄锁见
   [per-session-admission-67.md](per-session-admission-67.md) §4。
+
+## 补节（56 §4 一致性）：订阅登录态是受管凭据资产，不是原生状态
+
+45 的结论"原生 home 是该平台原生状态的唯一来源"**不变**；本补节写明一类**例外及其边界**：
+
+- **订阅/官方登录态属于"受管凭据资产"**：由控制面托管（`<data_root>/accounts/<id>/` 的
+  引用 + 平台 SecretStore 加密的整包），**按轮物化**成 harness 期望的文件形态、**轮末回收**
+  （56 的新机制：有界、只收声明文件、每账号一把锁、乐观摘要、冲突类型化）。
+- **home 里的那份只是本轮工作副本**：不是事实来源；轮次结束即回收到资产（可能被 harness
+  原地刷新过——这是 45 的"可写 state"语义在凭据面上的延伸，不与之冲突）。
+- **边界**：45 的三条规则（只读配置投影 / tmpfs 遮蔽 / 受保护路径）与凭据扫描三条
+  （注入值精确匹配、命中类型化、命中处置按树定分）都不因此放宽；56 的回收是**唯一**的
+  写回路径，且只写回**账号资产**，绝不写回配置或 profile home 的其它面。
+- 逐家形态与可用性裁断见 [subscription-credentials-56.md](subscription-credentials-56.md) §阶段 A。

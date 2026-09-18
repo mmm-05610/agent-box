@@ -290,3 +290,104 @@ def test_a_bound_account_materialises_reclaims_and_conflicts_typed(tmp_path):
         assert store.read_asset(locator=_locator, declared=[login_name]) == stored
     finally:
         runtime_module._sidecar_deployment_file = original_file
+
+
+@pytest.mark.skipif(shutil.which("bwrap") is None, reason="bwrap is required")
+def test_the_accounts_wire_face_creates_imports_binds_lists(tmp_path):
+    """Order 56's wire face: create -> import the login file -> bind -> list.
+
+    First-hand at the wire: the account view carries no token and no locator;
+    the bind moves the profile's `accountId`; importing a second file for a
+    family whose login state is a single declared file is refused; the import
+    keeps the account's state (the import is not a validity assertion).
+    """
+    from fastapi.testclient import TestClient
+
+    from agent_box.server.bootstrap import build_runtime_from_sidecar_deployment
+    from agent_box.server.transport.http import create_app
+    from agent_box.storage.secrets import MemorySecretStore
+
+    import agent_box.server.bootstrap.runtime as runtime_module
+
+    peer_source = "tests/harness_remote/home_probe_acp_peer.mjs"
+    peer_bytes = REPO / "tests" / "server" / "fixtures" / "home_probe_acp_peer.mjs"
+    deployment = {
+        "schemaVersion": 1,
+        "harnesses": [{
+            "id": "codex", "capabilityClaims": {"stream": True},
+            "adapter": {"command": "/usr/bin/node", "args": [], "source": peer_source},
+            "stateProjection": {"target": "/runtime/home/.codex"},
+            "subscriptionCredential": {"files": [".codex/auth.json"]},
+            "timeoutMs": 60_000,
+        }],
+    }
+    original_file = runtime_module._sidecar_deployment_file
+
+    def deployment_file(root, relative):
+        if relative == peer_source:
+            return peer_bytes.read_bytes()
+        return original_file(root, relative)
+
+    runtime_module._sidecar_deployment_file = deployment_file
+    try:
+        document = tmp_path / "deployment.json"
+        document.write_text(json.dumps(deployment), encoding="utf-8")
+        runtime = build_runtime_from_sidecar_deployment(
+            tmp_path / "server", document, plugin_root=PLUGIN,
+            secret_store=MemorySecretStore(values={}))
+        runtime.start()
+        login_file = tmp_path / "auth.json"
+        login_file.write_text('{"tokens": {"access": "wire-token"}}', encoding="utf-8")
+
+        with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
+            token = runtime.token
+
+            def call(method, params):
+                return client.post(f"/wire/v1/{method}", headers={
+                    "Authorization": f"Bearer {token}"}, json={
+                    "jsonrpc": "2.0", "id": method, "method": method, "params": params,
+                }).json()
+
+            created = call("accounts.create", {
+                "requestId": "wire-account-create", "harness": "codex",
+                "accountIdentifier": "person@example.com",
+            })["result"]["account"]
+            assert created["state"] == "unknown" and created["hasAsset"] is False
+            assert "wire-token" not in json.dumps(created)
+
+            imported = call("accounts.importAsset", {
+                "requestId": "wire-account-import",
+                "accountId": created["accountId"], "sourcePath": str(login_file),
+            })["result"]["account"]
+            assert imported["hasAsset"] is True
+            assert imported["state"] == "unknown", "an import never asserts validity"
+            assert "wire-token" not in json.dumps(imported)
+
+            profile = runtime.repository.profiles.create(
+                key="p", request_digest="p", name="role", harness_type="codex",
+                config_digest=runtime.objects.publish(
+                    b'{"schema_version":1,"harness_type":"codex","configuration":{}}').digest,
+                credential_id=None)[1]
+            version = runtime.repository.profiles.get(profile["profile_id"])["version"]
+            bound = call("accounts.bind", {
+                "requestId": "wire-account-bind", "profileId": profile["profile_id"],
+                "expectedVersion": version, "accountId": created["accountId"],
+            })["result"]["profile"]
+            assert bound["accountId"] == created["accountId"]
+
+            listed = call("accounts.list", {})["result"]["accounts"]
+            assert [item["accountId"] for item in listed] == [created["accountId"]]
+            assert "wire-token" not in json.dumps(listed)
+
+            # A family that declares no subscription files refuses an import.
+            other = call("accounts.create", {
+                "requestId": "wire-account-other", "harness": "pi",
+                "accountIdentifier": "second@example.com",
+            })["result"]["account"]
+            refused = call("accounts.importAsset", {
+                "requestId": "wire-account-import-2",
+                "accountId": other["accountId"], "sourcePath": str(login_file),
+            })
+            assert "error" in refused and refused["error"]["code"] == "INVALID_REQUEST"
+    finally:
+        runtime_module._sidecar_deployment_file = original_file

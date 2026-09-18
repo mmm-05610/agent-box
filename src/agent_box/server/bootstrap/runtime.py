@@ -287,6 +287,7 @@ def build_runtime(
     execution_factory=None,
     home_concurrency: Mapping[str, str] | None = None,
     shared_store_guards: Mapping[str, Any] | None = None,
+    subscription_files_for=None,
 ) -> ServerRuntime:
     """Assemble a provider-neutral Server runtime.
 
@@ -389,6 +390,8 @@ def build_runtime(
         queue=queue_records, approvals=approval_records, harnesses=registry,
         objects=objects, execution=execution, cursor_secret=token.encode("utf-8"),
         model_configs=provider_model_service,
+        accounts=account_records, account_assets=account_assets,
+        subscription_files_for=subscription_files_for,
     )
     runtime = ServerRuntime(
         root, database, objects, repository, service, owner, token, token_path,
@@ -969,7 +972,10 @@ def build_runtime_from_sidecar_deployment(
                                 harness_id: deployment["_home_concurrency"]
                                 for harness_id, deployment in deployments.items()
                             },
-                            shared_store_guards=shared_store_guards)
+                            shared_store_guards=shared_store_guards,
+                            subscription_files_for=lambda harness: (
+                                deployments.get(harness, {}).get("_subscription_files") or ()
+                            ))
     runtime.declared_credentials = tuple(declared_credentials)
     return runtime
 

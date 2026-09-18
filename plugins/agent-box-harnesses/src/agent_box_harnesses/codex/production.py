@@ -322,6 +322,11 @@ def harness_deployment(
         # §14: this family's session subtree is splittable from the rest
         # of its home, so it lives in the per-harness session store.
         "sessionStore": {"kind": "sessions-subtree"},
+        # Order 56: the subscription login state is a managed account asset.
+        # The path is first-hand (`$CODEX_HOME/auth.json`: 65 CODEX_HOME refs
+        # and 4 auth.json refs in the pinned 0.147.0 binary), and the other
+        # families are declared only once a real login run pins their file.
+        "subscriptionCredential": {"files": [".codex/auth.json"]},
         "adapter": {
             "command": "/usr/bin/node",
             "args": [ADAPTER_ARTIFACT_ENTRY],
