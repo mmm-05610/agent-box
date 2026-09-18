@@ -87,9 +87,9 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 | [38](work-orders/38-harness-extension-selection.md) | **HARNESS_EXTENSION_SELECTION_READY_FOR_DECISION** | 两轮 A/B/C 完成：[最终建议与边界](../server-round1/harness-selection/boundary.md)。保留有条件首选 `harness-remote v3.0.2`；零模型/凭据 | 首选已由40消费进入有门禁接入；不再等待决定 |
 | [60](work-orders/60-profile-settings.md) | **PROFILE_SETTINGS_PARTIAL**（A–F 落地 + 两项补记；姿态逐家翻译 claude/codex 已落地，只收紧或拒绝） | [60 报告](../server-round1/fullstack/profile-settings-60.md)：逐工具权限求解（键/动作闭集、last-match-wins、预设回落，绝不默认 allow）+ **schema 16** 冻结进轮；归属纠正测试（会话属工作区、跨家族切换拒绝 `PROFILE_HARNESS_MISMATCH`）；克隆与逐家迁移表 + `profiles.clone`；资产重绑（`reboundAssets` 与迁移报告同源，测试断言一致）与 `profiles.setPermissions` wire；`posture_translation.py`（claude 工具名表、codex 最严格 sandbox+审批；不可表达即 `PERMISSION_POSTURE_UNEXPRESSIBLE`，laxer 永不静默）；提交 f8ed9d2（840）→03c210d（844）→8b73c7d→27dfa26（845）→e39959f（879，八家全链门 exit 0） | 翻译产物**写入**各家配置文档待逐家钉死设置键（60 报告 §附）；`ask`↔审批往返端到端；P17 前端同步与两仓重锁 |
 | [61](work-orders/61-pacthold-rebrand.md) | **PACTHOLD_REBRAND_DONE**（基础设施侧；合同 ID/环境变量/import 路径零变化） | [改名报告](../branding/REBRANDING_REPORT.md)：审计计数与四类处理表、新旧映射（分发名 `pacthold`、六条 CLI 新旧同源一 main）、兼容保留清单（entry-point group/`agent-box.*@1`/`AGENTBOX_*`/数据目录）、本地 wheel `Name: pacthold` + 新名真实启动冒烟；提交 ff0c578（848）+ 30adedf（docs 拼写修正） | 插件分发名改名留后续单；发布/远端改名/数据迁移明示不做；P18 桌面侧一致性归桌面工作树 |
-| [62](work-orders/62-workspace-git-status.md) | **WORKSPACE_GIT_STATUS_PARTIAL**（本机侧完整；62 §3 DoD 明示"本机与 WSL 各一次"，WSL 真机轮未跑——报告 §5 自记；报告自述词为 DONE，068 G3 按 DoD 证据口径下调） | [62 报告](../server-round1/fullstack/workspace-git-status-62.md)：`workspaces.gitStatus` 六字段 + reason（null=拿不到不是 0；二进制在场 ⇒ 增删行 null + `GIT_BINARY_DIFF`）；porcelain v2 + numstat；流式上限超限即杀；只读性逐字节证明（index mtime 未变）；提交 76e7c35（854） | WSL 真机轮（可搭 069 的 WSL 轮一并取证）；P20 前端同步与两仓重锁（新增 1 个只读方法） |
+| [62](work-orders/62-workspace-git-status.md) | **WORKSPACE_GIT_STATUS_DONE**（DoD 的"本机与 WSL 各一次"两条腿**均已真跑**：本机 62 报告 §3，WSL 由 **083** 补跑。契约偏差澄清：WSL 路径**结构性永不报** `additions`/`deletions`（无字段级 reason 概念，62 的 `reason` 是答案级），已按 083 记录交回，不改 wire/实现，故不影响本行终态） | [62 报告](../server-round1/fullstack/workspace-git-status-62.md)：`workspaces.gitStatus` 六字段 + reason（null=拿不到不是 0；二进制在场 ⇒ 增删行 null + `GIT_BINARY_DIFF`）；porcelain v2 + numstat；流式上限超限即杀；只读性逐字节证明（index mtime 未变）；提交 76e7c35（854）。**[083 WSL 真腿](../server-round1/fullstack/wsl-legs-62-64-083.md)**：真 `wsl.exe` + 真仓 ⇒ `main`/2 改/`ahead=2`/`behind=0`；非 git 目录 ⇒ `GIT_NOT_A_REPOSITORY` 全 null；无连接器 ⇒ `GIT_UNAVAILABLE` 不编数；答案零宿主路径 | WSL 侧增删行是否补 numstat（**交回调度者拍**：多一次命令 vs 维持两字段恒空，是产品决定不是缺陷修复）；P20 前端同步与两仓重锁（新增 1 个只读方法） |
 | [63](work-orders/63-profile-memory-read.md) | **PROFILE_MEMORY_READ_DONE**（本机侧完整；WSL 侧未接，如实记账） | [63 报告](../server-round1/fullstack/profile-memory-63.md)：注册表 `memory_paths`（claude/codex 一手钉住；未声明不画假分区）；`profiles.memory` 只读有界 + 扫描（`MEMORY_CONTAINS_SECRET` 拒绝项无 content）；声明了但缺失=缺席不报错；提交 4d7b0e0（858） | WSL 侧读（按 62 同族设计）；P17 前端同步与两仓重锁（新增 1 个只读方法） |
-| [64](work-orders/64-execution-inventory.md) | **EXECUTION_INVENTORY_PARTIAL**（本机 pid 已接；64 §3 DoD 明示"本机与 WSL 各一次，含 pid 有/无"，WSL 真机轮未跑——报告只给协议结论；068 G3 按 DoD 证据口径下调） | [64 报告](../server-round1/fullstack/execution-inventory-64.md)：账本同源（完成后行即刻消失）、本机 `pid` 三态（无端口/报值/报 null）、上限 200 类型化失败、零宿主路径；`executions.list` wire；提交 faaeedf（862） | WSL 真机轮（可搭 069 的 WSL 轮；预期 pid=null+`PID_NOT_REPORTED`，待一手证实）；`adapterPid` 不做；P20 前端同步与两仓重锁 |
+| [64](work-orders/64-execution-inventory.md) | **EXECUTION_INVENTORY_PARTIAL**（本机 pid 已接；**083 已在真 WSL 组合上跑通清单面**（空列表反例 + `placement="wsl"` + `pid=null`/`PID_NOT_REPORTED`），但 DoD 要的是"WSL 真机轮**含飞行中取样**"，那一条仍未见——组合路径阻塞见 083 证据 §3.1） | [64 报告](../server-round1/fullstack/execution-inventory-64.md)：账本同源（完成后行即刻消失）、本机 `pid` 三态（无端口/报值/报 null）、上限 200 类型化失败、零宿主路径；`executions.list` wire；提交 faaeedf（862）。**[083 WSL 腿](../server-round1/fullstack/wsl-legs-62-64-083.md)**：`build_runtime(connector=真 WslConnector)` + 真 wire 读取；通道本身另有第一手活证（真 c11 `probe()` 握手，`worker_digest` `sha256:c1e353c8…`） | **精确剩余**：真 Worker 飞行中的取样（本侧组合不出：`_builtin_connector` 仅 `os.name=='nt'`、`build_runtime_from_sidecar_deployment` 不收 `connector=`、门脚本 `--placement` 只有 `local\|ssh`；路由缺陷已另拍 **090**）；`adapterPid` 不做；P20 前端同步与两仓重锁 |
 | [65](work-orders/65-profile-as-subagent.md) | **SUBAGENT_DELEGATION_PARTIAL**（A/B + C 三块：授权边与两工具契约、委派服务、真桥端到端与并发） | [65 报告](../server-round1/fullstack/profile-as-subagent-65.md)：**schema 17/18**；授予即拒环（`SUBAGENT_CYCLE`）、未授权名零泄露（只内联被授权名）、可选参数只收紧（`SUBAGENT_PERMISSION_WIDENED`/`SUBAGENT_MODEL_WIDENED`）、扇出 ≤4、10 分钟有界；真桥进程→按次令牌→真本机通道子轮→有界摘要（≤4096 字符）+ 用量同源；父 deny 继承（`inheritedFrom`）与审批镜像（同 id 到父轮）；授权 CRUD wire；提交 75253fa（865）→701ae20（872）→6854e4c（875）→07b43fa（877）→e39959f（879） | 真 harness（非夹具）父轮自己发起 `tools/call` 的一圈；P17/P20 前端（授权分区 UI 与"智能体"卡） |
 | [66](work-orders/66-shared-session-store.md) | **SHARED_SESSION_STORE_DONE**（A–C 落地、G1–G5 齐；G5 的首跑竞态由 **080** 的按库首跑锁补齐） | [66 报告 §15](../server-round1/fullstack/shared-session-store-66.md) + [并发证据](../server-round1/fullstack/shared-session-store-66-concurrency.json) + [080 报告](../server-round1/fullstack/first-run-lock-80.md)：whole-db 声明与收窄共享集、叠加绑定与播种、切换前置四查、守卫（读穿 WAL、fail-closed）、凭据处置改写（共享库命中不删）；43 代门 marker 债解除（e394f09）；无锁门 `scripts/server-round1/shared-store-concurrency-gate.py` 保留为反例（真 opencode 1.18.21，零模型）；提交 3fcb2df/15b8620/dc65731/e394f09/7398e66 + 080（本轮） | G5 复验：**真 harness 7/7 全绿（有锁）/ 2/3 失败（无锁，同形状）**；远端守卫（Worker 读库）仍 fail-closed；`project` 非单例的事实更正已入报告；首跑锁的就绪=首轮终态（每库一次等待，见 080 §2 取舍） |
 | [67](work-orders/67-per-session-admission.md) | **PER_SESSION_ADMISSION_DONE**（45-G3 转 pass，并在当前基线复现） | [67 报告 §9](../server-round1/fullstack/per-session-admission-67.md) + [复跑门报告](../server-round1/fullstack/per-session-admission-67-native-home-gate.json)：`_migrate_9_to_10` 去 per-profile 索引（幂等、只前向，"下次启动不建回来"）、两处 409 文案收窄到会话、`run_state`=任一活跃轮/`native_generation` 完成即 +1、`homeConcurrency` 逐家显式声明（claude/dsh/qwen 收窄锁）；提交 59fe1bb（+e8d0db8 状态）；**当前基线复跑**：native-home 门 OK（复跑 2，G3 两次都 pass：两轮都 completed、`nativeIdsDiffer`、同会话入队、运行中切换 rejected）、定向 38 passed、根套件 879 | 新增维护债（非本单门）：G8 取消竞态"空流"间歇（2 次复跑 1 败；建议召回轮加空流重试）；dsh/qwen 待其本地门首跑后可从 exclusive 收紧回 shared |
@@ -817,3 +817,28 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   sha256 `0501467351fe…`，`temporaryRootRemoved: true`）。
 - **反例演练（G1）**：把 45 行改回 `PARTIAL` 而不加注记 ⇒ G1 失败；本单以注记 + 实跑证据满足转换，非仅换字。
 - **未做项（不属本单，如实移交）**：G8 取消/召回间歇 → **087**；claude/dsh/qwen 43 代门 marker 根因 → 67 §4。
+
+## 工单 083 — 62/64 的 WSL 真腿（2026-09-19，执行者）
+
+- **已纳入投递**：work order `090`/`091` 修订 @`b7ca376` 与章程队列更新 @`a38d2bd`（裁决 R-0012）；
+  本单 §3.1 的阻塞正是 090 的管辖面，故不越界代跑。
+
+| 单 | 终态码 | 门 | 回归 | 真实模型 | 提交 |
+| --- | --- | --- | --- | --- | --- |
+| 083 | `WSL_LEGS_62_64_PARTIAL` | G1 ✅ 真 `wsl.exe` 真仓取值 + 非 git 目录走 `GIT_NOT_A_REPOSITORY` + 无连接器走 `GIT_UNAVAILABLE`（不编数）；G2 ⚠️ **部分**：空列表反例 ✅、`placement="wsl"`+`pid=null`/`PID_NOT_REPORTED` ✅，但"真 Worker 飞行中取样"未见；G3 ✅ 两处答案零宿主路径 | 本单 6 条绿（2.59s）；Validation `-k "git_status or execution_inventory"` **10 passed / 583 deselected**；全量 **893 passed + 1 error**（= 基线 887 + 本单 6；error 是 `test_opencode_gate_cleanup.py:388` teardown，与 WSL 腿无关，本单未复核是否既有 ⇒ 挂待查） | **0 次 / ¥0** | `0d92aad`（腿 + 反例）+ 本提交（证据 + 账） |
+
+- **62 行** → `WORKSPACE_GIT_STATUS_DONE`（DoD 两条腿齐）；**64 行**保持 `PARTIAL`，理由已从"没跑"换成"组合不出飞行中取样"。
+- **证据**：[wsl-legs-62-64-083.md](../server-round1/fullstack/wsl-legs-62-64-083.md)（含一条命令的复跑方式、
+  事实分级、以及两处交回项）。
+- **精确剩余（本单未做，逐条给入口）**：
+  1. **真飞行中的 WSL 执行清单取样**（64 的 DoD 尾项）。本侧第一手阻塞：`runtime.py:140` 的
+     `_builtin_connector` 在非 `nt` 恒返回 `None`；`build_runtime_from_sidecar_deployment`（`runtime.py:449`）
+     不收 `connector=`；`env-provider-gate.py --placement` 只认 `local|ssh`（且 `scripts/**` 不在本单 `write_paths`）。
+     归 **090**（它有 `src/**` 写权，且已实测到路由缺陷 `sandbox-windows` → `SANDBOX_PROVIDER_UNRESOLVED` → `DispatchAmbiguous`）。
+  2. **WSL 侧增删行**：`additions`/`deletions` 结构上恒 null 且答案级 `reason` 也为 null。
+     补 numstat 还是把它写进 62 的契约文字 ⇒ **要人拍**（产品决定），本单只记录。
+  3. **`test_opencode_gate_cleanup.py:388` 的那 1 个 teardown error** ⇒ 交回（本单权限下无法单独复跑取证）。
+- **清理**：本单探查 `probe()` 时留下的 `/tmp/agentbox-worker-r1/083-probe` 已删；该根下 16 个 `server_*`
+  目录属先前运行，未动；`pgrep -c -x agent-box-worker` → `0`。
+- **不改协议**：两条腿都走现成 wire 与现成 `WslConnector` 方法，`src/**`/`plugins/**` 零改动。
+
