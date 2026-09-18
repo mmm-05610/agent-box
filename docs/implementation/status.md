@@ -921,7 +921,12 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 | 单 | 阶段 | 门 | 回归 | 真实模型 | 提交 |
 | --- | --- | --- | --- | --- | --- |
 | 086 | 1 选家并核对工具播发 | 本阶段的门 = **读路径一手钉死 + 发散即失败**：claude CLI 的 `tools` 数组里，探针工具**只在** `.claude.json` 与 `.mcp.json` 声明时出现，**在 `settings.json`（= 65/58 的渲染落点）声明时缺席**；空白对照三文件皆无 ⇒ 断言空。生产形态组装门：有出向授予 ⇒ 桥条目**真的落进** `.claude.json` 且轮次 `completed`；无授予（反例）⇒ 角色目录里**没有** `.claude.json`；只读投影 `settings.json` 存在且**不含**桥条目 | 本单新增 **9** 条（`-k mcp_config_source` 5 / `-k subagent` 面内新 4）；Validation `python3 -m pytest -q tests/server -k subagent` → **8 passed / 633 deselected**（= 本单 4 ＋ 65 既有 4）；根套件 **941 passed / 0 failed / 0 error**（356 s，= 085 的 932 ＋ 本单 9，**零退化**） | **0 次 / ¥0** | 本提交（阶段 1） |
-| 086 | 2 真 harness 父轮一轮 | **未过——被一条真缺陷挡住，已开 099 处理**。跑出来的部分（全一手）：真 Server 起 uvicorn 真监听 → 两个 Profile → **播种轮 completed 且没有任何一次请求播发桥工具**（"条目不是恒常存在"的反例成立）→ 授予 → 父轮**失败** `EXECUTION_FAILED`，根因 `WorkerError: operation is unsupported`（`sidecar.py:593` 发 `home.put`）| 本阶段新增 1 条真实链路用例（`tests/server/test_subagent_harness_real_round_086.py`；无 Worker 二进制或无 bwrap 时**跳过**，故根套件计数不变 **941**） | **0 次 / ¥0**（假端点只在 loopback，凭据是 gate 的假令牌） | 本提交（登记）＋ 099 |
+| 086 | 2 真 harness 父轮一轮 | **未过——被一条真缺陷挡住，已开 099 处理**。跑出来的部分（全一手）：真 Server 起 uvicorn 真监听 → 两个 Profile → **播种轮 completed 且没有任何一次请求播发桥工具**（"条目不是恒常存在"的反例成立）→ 授予 → 父轮**失败** `EXECUTION_FAILED`，根因 `WorkerError: operation is unsupported`（`sidecar.py:593` 发 `home.put`）| 本阶段新增 1 条真实链路用例（`tests/server/test_subagent_harness_real_round_086.py`；无 Worker 二进制或无 bwrap 时**跳过**）| **0 次 / ¥0**（假端点只在 loopback，凭据是 gate 的假令牌） | 本提交（登记）＋ 099 |
+
+- **本宿主上这条用例是红的，如实登记为"已知红"**：两道前置（`c11` 二进制在场、`bwrap` 在场）在本机都满足 ⇒ 它**真的在跑**，
+  失败原因正是 099 的 `home.put` 未接线。因此**不能**说"根套件计数不变 941 = 零退化"——941 是**阶段 1 时**的数，
+  加入这条后的套件计数**本环境尚未复核**；复核点就是 099 阶段 4 修好后的那一次全量跑（预期转绿 ⇒ 942）。
+  留一个红的用例在此提交里是有意的：它就是 099 的门 G5 的对象，红→绿必须是同一份代码跑出来的。
 
 - **本阶段跑出来的不是"绿了一圈"，是一条真缺陷**：65 把桥渲染进 claude 的 `mcp_target =
   `/runtime/home/.claude/settings.json`，而**该家根本不从这个文件读 MCP 服务器** ⇒ 条落进没人读的文件；
