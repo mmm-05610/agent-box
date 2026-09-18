@@ -611,3 +611,43 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 已知边界：Codex CLI 此路径没有硬输出 token cap，验收以短回答提示、4 KiB 输入与 120 秒超时约束；首轮仅白名单 `deepseek-flash`。后续 Desktop 接线/Pi/记忆并发合并/安装器未派。
 
 38终态：`HARNESS_EXTENSION_SELECTION_READY_FOR_DECISION` / `HARNESS_EXTENSION_SELECTION_NO_FIT` / `HARNESS_EXTENSION_SELECTION_PARTIAL`；阶段态 `HARNESS_EXTENSION_SELECTION_RESEARCHING`。没有合格候选不得转手写。
+
+
+---
+
+## 会话总结（2026-09-17/18，env-provider 工作树多轮执行）
+
+### 已完成的工单
+
+| 单 | 结论 | 关键提交 |
+| --- | --- | --- |
+| 44 | ENV_PROVIDERS_DONE | 前期 |
+| 46 | DONE | 前期 |
+| 47 | SANDBOX_PLAN_SEAM_DONE（A–D） | 8c494a2 |
+| 48 | WINDOWS_PLACEMENT_DONE_IN_D5_DEGRADED_SHAPE | 前期 + spike 0340f61 |
+| 49 | EVIDENCE_HYGIENE_DONE | 3302fb2 |
+| 50 | CAPABILITY_LAYER_ABSORBED | 642b1af |
+| 55 | USAGE_PROBES_DONE（G1+G2–G4） | 642b1af + a83df9d |
+| 57 | SANDBOX_PLAN_SEAM_DONE（A–D） | 8c494a2 + 92e51a8 |
+
+### 完成中的工单
+
+| 单 | 已落地 | 剩余 |
+| --- | --- | --- |
+| 51 | USAGE_FACT_PARTIAL：pi/codex 端到端含 wire（11/7/18→22/14/36 累计）、四家解析器就绪经真实数据验证、schema 7 usage 列 | hermes/claude 观测轮（门 marker 维护债）、opencode/kilo blob 解析、dsh/qwen 无本地样本 |
+| 52 | B/D+E 完成：thought/plan/mode 三新 wire kind + 四类映射入账本 + process-facts 端到端 | 真 harness 观测轮（假 peer 已定向验证，真 harness 轮待跑） |
+| 53 | USAGE_AGGREGATION_DONE：聚合模块 + usage.aggregate/export wire 方法 + 未知即未知反例 | opencode/kilo blob 解析器、hermes/claude 观测轮 |
+| 54 | USAGE_FACT_PARTIAL：本机+WSL 通道变更集落地、c11 五家四绿（kilo marker 维护债）、schema 9 change_set 列 | WSL 端到端观测轮（c11 已绿 pi 门）；kilo marker 维护债 |
+| 55 | USAGE_PROBES_DONE（G1+G2–G4） | 真端点观测轮待做（无可用凭据端点时受限观测） |
+
+### 未开始的工单（依赖链排后）
+
+56（←45 PARTIAL+50）、58/59（←45 PARTIAL+50）、60（←55+58）、61（←60）、62（←?）、
+63（←?）、64（←?）、65（←?）。45 G3 解除后 56/58/59 可开工；55 G2 解除后 60 可开工。
+
+### 全局维护债
+
+1. 43 代门（dsh/kilo/qwen/claude）的 HOME_MARKER_CONFLICT：同门内多相位间 profile
+   身份冲突，根因未定位。影响：这四家在 c11 上的观测轮无法全绿。
+2. 48 AppContainer 恢复 spike 需管理员权限（Windows 11 限制 IL 标签写入）。
+3. terminal 短名能力词汇未版本化（slots.py 已记录，收敛待后续）。
