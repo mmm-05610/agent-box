@@ -921,12 +921,19 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 | 单 | 阶段 | 门 | 回归 | 真实模型 | 提交 |
 | --- | --- | --- | --- | --- | --- |
 | 086 | 1 选家并核对工具播发 | 本阶段的门 = **读路径一手钉死 + 发散即失败**：claude CLI 的 `tools` 数组里，探针工具**只在** `.claude.json` 与 `.mcp.json` 声明时出现，**在 `settings.json`（= 65/58 的渲染落点）声明时缺席**；空白对照三文件皆无 ⇒ 断言空。生产形态组装门：有出向授予 ⇒ 桥条目**真的落进** `.claude.json` 且轮次 `completed`；无授予（反例）⇒ 角色目录里**没有** `.claude.json`；只读投影 `settings.json` 存在且**不含**桥条目 | 本单新增 **9** 条（`-k mcp_config_source` 5 / `-k subagent` 面内新 4）；Validation `python3 -m pytest -q tests/server -k subagent` → **8 passed / 633 deselected**（= 本单 4 ＋ 65 既有 4）；根套件 **941 passed / 0 failed / 0 error**（356 s，= 085 的 932 ＋ 本单 9，**零退化**） | **0 次 / ¥0** | 本提交（阶段 1） |
-| 086 | 2 真 harness 父轮一轮 | **未过——被一条真缺陷挡住，已开 099 处理**。跑出来的部分（全一手）：真 Server 起 uvicorn 真监听 → 两个 Profile → **播种轮 completed 且没有任何一次请求播发桥工具**（"条目不是恒常存在"的反例成立）→ 授予 → 父轮**失败** `EXECUTION_FAILED`，根因 `WorkerError: operation is unsupported`（`sidecar.py:593` 发 `home.put`）| 本阶段新增 1 条真实链路用例（`tests/server/test_subagent_harness_real_round_086.py`；无 Worker 二进制或无 bwrap 时**跳过**）| **0 次 / ¥0**（假端点只在 loopback，凭据是 gate 的假令牌） | 本提交（登记）＋ 099 |
+| 086 | 2 真 harness 父轮一轮 | **首跑未过（真缺陷）→ 099 修好后复跑绿**。首跑：真 Server 起 uvicorn 真监听 → 两个 Profile → **播种轮 completed 且没有任何一次请求播发桥工具**（"条目不是恒在"的反例成立）→ 授予 → 父轮**失败** `EXECUTION_FAILED`，根因 `WorkerError: operation is unsupported`（`sidecar.py:593` 发 `home.put`）。复跑（c12，**全一手**，`SUBAGENT_REAL_ROUND_OK`）：真 CLI 读 `.claude.json` → `tools/list` **带上两个桥工具** → 父**自己**调 `list_subagents` 拿回 `[{"name":"086 beta",...}]` → 父**自己**调 `run_subagent` → Server 派到 beta 的 Profile 跑出**一个真子轮**（`parent_turn_id` 指向父轮、`usage_source: claude-projects-line`）→ 子摘要回到父历史并被父最终文本带出 → 出口守护 loaded、非 loopback 目的地**零**次到达、`unauthorizedProviderRequests = 0`。**G1 反例仍咬得住**：同一份用例里"没有任何一次请求播发桥工具"的缺席判定 + `discovered == ["086 beta"]`（名字只可能来自桥返回的 roster，写死常量的第一版正是被授权检查打回的）| 本阶段新增 1 条真实链路用例（`tests/server/test_subagent_harness_real_round_086.py`；无 Worker 二进制或无 bwrap 时**跳过**）| **0 次 / ¥0**（端点是 loopback 脚本假端点，凭据是 gate 的假令牌；真模型一次未调） | 本提交（复跑绿）＋ 099 |
 
-- **本宿主上这条用例是红的，如实登记为"已知红"**：两道前置（`c11` 二进制在场、`bwrap` 在场）在本机都满足 ⇒ 它**真的在跑**，
-  失败原因正是 099 的 `home.put` 未接线。因此**不能**说"根套件计数不变 941 = 零退化"——941 是**阶段 1 时**的数，
-  加入这条后的套件计数**本环境尚未复核**；复核点就是 099 阶段 4 修好后的那一次全量跑（预期转绿 ⇒ 942）。
-  留一个红的用例在此提交里是有意的：它就是 099 的门 G5 的对象，红→绿必须是同一份代码跑出来的。
+- **阶段 2 的红已按其本来的用途转绿（同一份代码、同一份用例，一手）**：登记为"已知红"时它正是 099 的门 G5 的对象，
+  修好前不许改期望。复跑过程中另修掉**两处夹具自身**的缺陷（都不是放松验收）：
+  ① 默认 Worker 从 `c11` 改指 `c12`——把反例留在默认位上等于"根套件故意红"，反例应由 099 的 wire 用例**按名钉住**；
+  ② 读 `tool_result` 要取**最新一条消息的最后一个块**：一轮里连发两个工具时两个结果并排落在同一条 user 消息里，
+  取第一个就永远先读到 roster，父轮明明已拿到子摘要却被判"没拿到"，脚本于是委派了第二次（`DELEGATION LOOP`）。
+  现在把整条 `toolResults`/`historyToolCalls` 链一并记进报告，这类"多工具轮"的观测错位一眼可辨。
+
+
+- **阶段 1 计数口径已作废并被复核替代**：当时写的"根套件 **941** = 零退化"只覆盖到阶段 1 新增用例，
+  阶段 2 那条真实链路用例（当时红）尚未计入。099 阶段 4 修好后的全量复跑：**946 passed / 0 failed / 0 error**
+  （284 s）= 941 ＋ 086 真实轮 1 ＋ 099 wire 4。留一个红的用例在阶段 2 的提交里是**有意的**：它就是 099 门 G5 的对象。
 
 - **本阶段跑出来的不是"绿了一圈"，是一条真缺陷**：65 把桥渲染进 claude 的 `mcp_target =
   `/runtime/home/.claude/settings.json`，而**该家根本不从这个文件读 MCP 服务器** ⇒ 条落进没人读的文件；
@@ -977,7 +984,15 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 
 | 单 | 阶段 | 门 | 回归 | 真实模型 | 提交 |
 | --- | --- | --- | --- | --- | --- |
-| 099 | 1 观测 | 本阶段的门 = **真二进制上一手复现**：`home.prepare` 成功、`home.put` ⇒ `OP_UNSUPPORTED "operation is unsupported"`（不是夹具里的手写 JSON）。作用域钉死三处行号：实现在 `main.rs:2153` **完整存在**、分发臂 `main.rs:355` **缺 `"home.put"`**、兜底臂 `main.rs:491` 产该码 | 本阶段无新增测试（观测 + 契约）；根套件计数不变 **941** | **0 次 / ¥0** | 本提交 |
+| 099 | 1 观测 | 本阶段的门 = **真二进制上一手复现**：`home.prepare` 成功、`home.put` ⇒ `OP_UNSUPPORTED "operation is unsupported"`（不是夹具里的手写 JSON）。作用域钉死三处行号：实现在 `main.rs:2153` **完整存在**、分发臂 `main.rs:355` **缺 `"home.put"`**、兜底臂 `main.rs:491` 产该码 | 本阶段无新增测试（观测 + 契约）；根套件计数 **941 是 086 阶段 1 时的数，不能当"零退化"**（见 086 §计数口径） | **0 次 / ¥0** | `4443056` |
+| 099 | 2 接线 | 一行：`"home.prepare" \| "home.put" \| "home.list" \| "home.get" \| "home.delete" =>`（`main.rs:355`）。**边界一字不动**（超限 `HOME_IO`、逃逸 `PATH_INVALID`、非普通文件拒、错误码逐字保持）。投递到**新** bundle `.acceptance-bundle-c12`（`sha256 9d8df86d214bf2b3e99afa461bd5ca83c62caae847cec507ea20e2518ce97088`），`c11` 原样留作反例（`sha256 c1e353c89609ab2feed0765205feeb3eb4c8db9679f353ba4065302df35a2457`） | `cargo test` **43 passed**；根套件见阶段 4 | **0 次 / ¥0** | `d5b7407` |
+| 099 | 3 门 | **G1** 真进程 wire：c12 上 prepare→put→get 读回同一份字节、`home.list` 出现 `state/auth.json`；**反例**＝同一份用例跑 c11 ⇒ 该 op `OP_UNSUPPORTED` 且**同一条流上 `home.list` 仍正常**（反例只咬一个 op，不是一条死通道）。**G2** 空/超限/转义名/目录目标/叶子符号链接各自类型化错误，越界外那个 `outside` 哨兵字节仍 `untouched`，用例尾再发一发 `home.get` 证明流未死。**G3** 发散门 `the_dispatch_arm_and_handle_home_cover_one_home_operation_set` 读**两处真源码**比对集合；**演示**＝手工从臂里删掉 `"home.put"` ⇒ 门红并打印 `left=[4 op] right=[5 op]`（`main.rs:3203`），还原后 sha256 与备份一致 | 新增 `tests/server/test_worker_home_put_wire_099.py` **4 passed**（2 op 用例 × 2 bundle）；`cargo test` 43 passed | **0 次 / ¥0** | `5d70166` |
+| 099 | 4 收口 | **G4** 根套件 **946 passed / 0 failed / 0 error**（284.51 s）＝ 941 ＋ 086 真实轮 1 ＋ 本单 wire 4，**零退化**；首轮那次 4 个 `ERROR` 是 `test_state_capture_error_boundary` 的**新鲜度门**（它按 mtime 判定 `target/debug` 二进制落后于 `main.rs`——阶段 3 往 `main.rs` 加了 90 行测试码，字节无关但 mtime 更新了），`cargo build` 后复跑即全绿，**不是产品回归**。**G5** 消费者 = 086 阶段 2 真轮由红转绿（见 086 行） | 946；插件目录不在根 `testpaths` 内（口径不变） | **0 次 / ¥0** | 本提交 |
+
+| 单 | 终态码 | 门 | 回归 | 真实模型 | 提交 |
+| --- | --- | --- | --- | --- | --- |
+| 099 | `WORKER_HOME_PUT_DISPATCH_DONE` | **G1** ✅ c12 真进程上 prepare→put→get 读回同字节、list 出现该文件；**反例真咬**：同一份用例 c11 ⇒ 该 op `OP_UNSUPPORTED` 且同一条流上 `home.list` 仍正常。**G2** ✅ 超限/转义名/目录目标/叶子符号链接各自类型化错误，`outside` 哨兵字节仍 `untouched`，用例尾 `home.get` 证明流未死；**实测与工单 §5 不一致处按实测登记**（空载荷 = `REQUEST_INVALID`，非 `HOME_IO`）。**G3** ✅ 发散门读两处真源码，删一 op 即红并打印两侧集合（演示 + 按 sha256 还原）。**G4** ✅ 946 零退化。**G5** ✅ 消费者 086 真轮红转绿 | `cargo test` **43 passed** ＋ 根套件 **946**（本单新增 wire 用例 4 条） | **0 次 / ¥0** | `4443056`＋`d5b7407`＋`5d70166`＋本提交 |
+
 
 - **为什么它活得下来**：Worker 侧的 `home` 单测直接调 `handle_home`（绕过分发），Server 侧的资产写入用例走
   `TestClient`/内存实现（不经真 wire），于是"实现了但没接上"这条缝两侧都看不见。这与 58 的账行为何是
@@ -987,5 +1002,6 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   56 的订阅文件（同一调用点，只是先前没有用例走到）；**未验证** = 其余通道。
 - **顺手的一条契约卫生**：`082-ledger-45-closeout.md` 的三行 Stages 各带一个游离的起始 `^`，
   使 `validate_order.py --strict` 在全目录上失败；已用 `od -c` 逐字核对后删掉，勾选状态与文字一字未动。
-- **本单不做**：不改 `home.put` 的边界语义（空/超限仍 `HOME_IO`、非普通文件仍拒、逃逸仍 `PATH_INVALID`）、
+- **本单不做**：不改 `home.put` 的边界语义（超限仍 `HOME_IO`、非普通文件仍拒、逃逸仍 `PATH_INVALID`；
+  **空载荷实测到不了 `HOME_IO`**——`value_string` 先拒空串 ⇒ `REQUEST_INVALID`，该分支在真实客户端上不可达，见证据 §8 末）、
   不改 wire 形状、不动既有 bundle 目录（`c11` 留作反例样本，重建只写进新目录 `c12`）。
