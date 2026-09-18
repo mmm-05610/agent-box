@@ -337,6 +337,11 @@ def build_runtime(
 
     from agent_box.server.assets.catalog import CatalogStore
 
+    from agent_box.server.hooks.records import HookRecords
+    from agent_box.server.hooks.triggers import HookTriggerRecords
+
+    hook_records = HookRecords(database, idempotency)
+    hook_triggers = HookTriggerRecords(database)
     asset_records = AssetRecords(database, idempotency)
     assets_root = root / "assets"
     skill_assets = SkillAssetStore(assets_root)
@@ -420,6 +425,8 @@ def build_runtime(
     runtime.skill_assets = skill_assets
     runtime.mcp_assets = mcp_assets
     runtime.asset_catalogs = asset_catalogs
+    runtime.hook_records = hook_records
+    runtime.hook_triggers = hook_triggers
     return runtime
 
 
@@ -849,6 +856,18 @@ def build_runtime_from_sidecar_deployment(
                     and getattr(runtime, "asset_records", None) is not None
                     and Path(runtime.database.path).exists()):
                 from agent_box.server.assets.rendering import McpRenderError, render_for_family
+                from agent_box.server.hooks.rendering import (
+                    HookRenderError,
+                    hooks_target_for,
+                    merge_fragments,
+                    render_hooks_fragment,
+                )
+
+                profile_spec = _registry_profile_spec(context["harness_type"])
+                # One document per declared target; JSON targets collect keyed
+                # fragments and merge, TOML targets concatenate their tables.
+                json_documents: dict[str, dict[str, dict]] = {}
+                toml_fragments: dict[str, list[str]] = {}
 
                 for binding in runtime.asset_records.bindings(
                         profile_id_for_assets, enabled_only=True):
@@ -856,7 +875,7 @@ def build_runtime_from_sidecar_deployment(
                         continue
                     definition = runtime.mcp_assets.read(
                         asset_id=binding["assetId"], revision=binding["revision"])
-                    if binding["digest"] != "" and not runtime.mcp_assets.verify(
+                    if not runtime.mcp_assets.verify(
                             asset_id=binding["assetId"], revision=binding["revision"],
                             expected_digest=binding["digest"]):
                         raise RuntimeError(
@@ -866,12 +885,6 @@ def build_runtime_from_sidecar_deployment(
                     stdio = definition.get("transport", {}).get("stdio")
                     references = dict((stdio or {}).get("env") or {})
                     if references:
-                        # Order 58 G5: a credential value must not be written
-                        # into a durable config file (the audit refuses it,
-                        # correctly), and resolving it into the file is exactly
-                        # what "references, never values" forbids. Until each
-                        # family's own injection path is pinned first-hand,
-                        # such a binding is refused rather than half-rendered.
                         raise RuntimeError(
                             "MCP_CREDENTIAL_INJECTION_UNVERIFIED: this server "
                             f"carries credential references {sorted(references)} "
@@ -879,10 +892,7 @@ def build_runtime_from_sidecar_deployment(
                         )
                     try:
                         target, rendered = render_for_family(
-                            definition,
-                            profile_spec=_registry_profile_spec(context["harness_type"]),
-                            resolved_env={},
-                        )
+                            definition, profile_spec=profile_spec, resolved_env={})
                     except McpRenderError as refusal:
                         raise RuntimeError(f"{refusal.code}: {refusal.message}") from refusal
                     if not target.startswith("/runtime/home/"):
@@ -890,17 +900,62 @@ def build_runtime_from_sidecar_deployment(
                             "ASSET_SLOT_UNSUPPORTED: the declared MCP target is "
                             "outside the guest home"
                         )
-                    role_relative = target[len("/runtime/home/"):]
-                    projected = {
-                        str(target_value)
-                        for _source, target_value in deployment.get("_projection_mounts", ())
-                    }
+                    if target.endswith(".toml"):
+                        toml_fragments.setdefault(target, []).append(rendered)
+                    else:
+                        key = getattr(profile_spec, "mcp_key", None) or "mcpServers"
+                        document = json.loads(rendered)
+                        json_documents.setdefault(target, {}).setdefault(key, {}).update(
+                            document.get(key, {}))
+
+                # Order 59: enabled hooks join the same assembly, in the
+                # family's own document shape.
+                hook_rows = getattr(runtime, "hook_records", None)
+                if hook_rows is not None:
+                    enabled = hook_rows.enabled_for_family(context["harness_type"])
+                    if enabled:
+                        target, key = hooks_target_for(profile_spec)
+                        if target is None:
+                            raise RuntimeError(
+                                "HOOK_TARGET_UNSUPPORTED: this family declares "
+                                "no hook document target"
+                            )
+                        fragment = render_hooks_fragment(
+                            context["harness_type"],
+                            [row["model"] for row in enabled],
+                        )
+                        if target.endswith(".json"):
+                            json_documents.setdefault(target, {})[key or "hooks"] = fragment
+                        else:
+                            raise RuntimeError(
+                                "HOOK_TARGET_UNSUPPORTED: hooks need a JSON target"
+                            )
+
+                projected = {
+                    str(target_value)
+                    for _source, target_value in deployment.get("_projection_mounts", ())
+                }
+                for target, fragments in sorted(json_documents.items()):
                     if target in projected:
                         raise RuntimeError(
                             "ASSET_SLOT_CONFLICT: a read-only projection already "
-                            "covers the declared MCP target"
+                            "covers the declared target " + target
                         )
-                    asset_files[role_relative] = rendered.encode("utf-8")
+                    try:
+                        text = merge_fragments(
+                            target, [(key, value) for key, value in fragments.items()])
+                    except HookRenderError as refusal:
+                        raise RuntimeError(f"{refusal.code}: {refusal.message}") from refusal
+                    asset_files[target[len("/runtime/home/"):]] = text.encode("utf-8")
+                for target, parts in sorted(toml_fragments.items()):
+                    if target in projected:
+                        raise RuntimeError(
+                            "ASSET_SLOT_CONFLICT: a read-only projection already "
+                            "covers the declared target " + target
+                        )
+                    asset_files[target[len("/runtime/home/"):]] = (
+                        "\n".join(part.rstrip("\n") for part in parts) + "\n"
+                    ).encode("utf-8")
             subscription = None
             subscription_asset: dict[str, bytes] = {}
             account_id = context.get("account_id")

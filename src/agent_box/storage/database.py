@@ -8,7 +8,7 @@ import threading
 from typing import Iterator
 
 
-PRODUCT_SCHEMA_VERSION = 14
+PRODUCT_SCHEMA_VERSION = 15
 
 
 class FutureSchemaError(RuntimeError):
@@ -216,6 +216,17 @@ CREATE TABLE IF NOT EXISTS server_hooks (
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS server_hook_triggers (
+    id TEXT PRIMARY KEY,
+    hook_id TEXT NOT NULL REFERENCES server_hooks(id),
+    event TEXT NOT NULL,
+    at TEXT NOT NULL,
+    exit_code INTEGER NOT NULL,
+    output_summary TEXT NOT NULL,
+    summary_truncated INTEGER NOT NULL DEFAULT 0,
+    blocking INTEGER NOT NULL DEFAULT 0,
+    effect TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS server_bootstrap (
     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
     server_id TEXT NOT NULL,
@@ -284,6 +295,22 @@ def _add_columns(conn: sqlite3.Connection, table: str, additions: dict[str, str]
     for name, declaration in additions.items():
         if name not in columns:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {declaration}")
+
+
+def _migrate_14_to_15(conn: sqlite3.Connection) -> None:
+    """Order 59 G5: the hook trigger ledger.
+
+    One row per observed hook execution: the bounded output summary, the exit
+    code, and the effect the families' semantics give it (`blocked` for exit
+    2, never folded into a plain success).
+    """
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS server_hook_triggers ("
+        "id TEXT PRIMARY KEY, hook_id TEXT NOT NULL REFERENCES server_hooks(id), "
+        "event TEXT NOT NULL, at TEXT NOT NULL, exit_code INTEGER NOT NULL, "
+        "output_summary TEXT NOT NULL, summary_truncated INTEGER NOT NULL DEFAULT 0, "
+        "blocking INTEGER NOT NULL DEFAULT 0, effect TEXT NOT NULL)"
+    )
 
 
 def _migrate_13_to_14(conn: sqlite3.Connection) -> None:
@@ -574,6 +601,8 @@ class Database:
                 _migrate_12_to_13(conn)
             if current in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13):
                 _migrate_13_to_14(conn)
+            if current in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14):
+                _migrate_14_to_15(conn)
             conn.executescript(_SCHEMA)
             conn.execute(
                 "INSERT OR IGNORE INTO agentbox_product_schema(singleton, version, applied_at) "

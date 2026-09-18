@@ -312,6 +312,13 @@ def test_a_bound_mcp_asset_is_rendered_and_materialised_without_writeback(tmp_pa
             credential_id="credential_1")[1]
         runtime.asset_records.bind(profile_id=profile["profile_id"],
                                    asset_id=published["asset_id"])
+        # Order 59: an enabled hook joins the same document (claude keeps hooks
+        # in settings.json under the `hooks` key).
+        hook = runtime.hook_records.create(
+            key="h", request_digest="h", family="claude-code", name="guard-bash",
+            model={"event": "PreToolUse", "matcher": "Bash",
+                   "handlers": [{"type": "command", "command": "/bin/guard --check"}]})[1]
+        runtime.hook_records.set_enabled(hook_id=hook["hook_id"], enabled=True)
 
         with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
             token = runtime.token
@@ -341,6 +348,9 @@ def test_a_bound_mcp_asset_is_rendered_and_materialised_without_writeback(tmp_pa
         rendered = json.loads((role / ".claude" / "settings.json").read_text(encoding="utf-8"))
         assert rendered["mcpServers"]["web-tools"]["command"] == "/bin/web-tools"
         assert rendered["mcpServers"]["web-tools"]["args"] == ["--stdio"]
+        hook_document = rendered["hooks"]["PreToolUse"][0]
+        assert hook_document["matcher"] == "Bash"
+        assert hook_document["hooks"][0]["command"] == "/bin/guard --check"
         # Nothing in the file is a credential value, and the audit (which
         # scans the home for the injected material) passed on this turn.
         assert "resolved-secret" not in (role / ".claude" / "settings.json").read_text()

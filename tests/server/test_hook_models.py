@@ -125,3 +125,84 @@ def test_the_ledger_crud_keeps_hooks_disabled_until_enabled(tmp_path):
     with pytest.raises(ServerError) as not_executable:
         records.set_enabled(hook_id=declared_only["hook_id"], enabled=True)
     assert not_executable.value.code == "HOOK_NOT_EXECUTABLE"
+
+
+def test_hooks_render_in_the_families_own_shape_and_merge_into_one_document():
+    from agent_box.server.hooks.rendering import (
+        merge_fragments,
+        render_hooks_fragment,
+    )
+
+    canonical = validate_model("claude-code", _model())
+    fragment = render_hooks_fragment("claude-code", [canonical])
+    assert list(fragment) == ["PreToolUse"]
+    group = fragment["PreToolUse"][0]
+    assert group["matcher"] == "Bash"
+    assert group["hooks"] == [{"type": "command", "command": "/bin/guard --check",
+                              "timeout": DEFAULT_TIMEOUT_SECONDS, "async": False}]
+
+    # Claude's settings.json gathers mcpServers and hooks as two keys; codex's
+    # hooks.json is the fragment itself.
+    merged = merge_fragments("/x/settings.json", [
+        ("mcpServers", {"web-tools": {"command": "/bin/web-tools"}}),
+        ("hooks", fragment),
+    ])
+    document = __import__("json").loads(merged)
+    assert set(document) == {"mcpServers", "hooks"}
+    assert document["hooks"]["PreToolUse"][0]["hooks"][0]["command"] == "/bin/guard --check"
+
+    root = merge_fragments("/x/hooks.json", [(None, fragment)])
+    assert set(__import__("json").loads(root)) == {"PreToolUse"}
+
+    # Two fragments claiming one key refuse rather than overwrite.
+    with pytest.raises(Exception) as conflict:
+        merge_fragments("/x/settings.json", [("hooks", {}), ("hooks", {})])
+    assert "HOOK_TARGET_CONFLICT" in str(conflict.value)
+
+
+def test_trigger_facts_are_bounded_scanned_and_blocking_is_explicit(tmp_path):
+    from agent_box.server.hooks.triggers import (
+        BLOCKING_EXIT_CODE,
+        MAX_SUMMARY_CHARS,
+        HookTriggerRecords,
+        TriggerError,
+        classify_exit,
+    )
+
+    database = Database(tmp_path / "data")
+    database.initialize()
+    hooks = HookRecords(database, IdempotentRecords(database))
+    triggers = HookTriggerRecords(database)
+    hook = hooks.create(key="a", request_digest="a", family="claude-code",
+                        name="guard", model=_model())[1]
+
+    ran = triggers.record(hook_id=hook["hook_id"], event="PreToolUse", exit_code=0,
+                          output="checked\n")
+    assert ran["effect"] == "ran" and ran["blocking"] is False
+
+    blocked = triggers.record(hook_id=hook["hook_id"], event="PreToolUse",
+                              exit_code=BLOCKING_EXIT_CODE, output="denied: rm -rf /\n")
+    assert blocked["blocking"] is True and blocked["effect"] == "blocked"
+
+    failed = triggers.record(hook_id=hook["hook_id"], event="PostToolUse", exit_code=1)
+    assert failed["effect"] == "failed"
+
+    long_text = "x" * (MAX_SUMMARY_CHARS + 100)
+    truncated = triggers.record(hook_id=hook["hook_id"], event="Stop", exit_code=0,
+                                output=long_text)
+    assert truncated["truncated"] is True
+    assert len(truncated["output_summary"]) == MAX_SUMMARY_CHARS
+
+    # A summary carrying the execution's credential material is refused.
+    with pytest.raises(TriggerError) as secret:
+        triggers.record(hook_id=hook["hook_id"], event="Stop", exit_code=0,
+                        output=b"leak: sk-abc123", forbidden=b"sk-abc123")
+    assert secret.value.code == "HOOK_TRIGGER_CONTAINS_SECRET"
+
+    with pytest.raises(TriggerError) as shape:
+        triggers.record(hook_id=hook["hook_id"], event="Stop", exit_code="two")
+    assert shape.value.code == "HOOK_TRIGGER_INVALID"
+
+    assert classify_exit(BLOCKING_EXIT_CODE) == (True, "blocked")
+    assert len(triggers.list(hook_id=hook["hook_id"])) == 4
+    assert triggers.list(limit=2)  # newest first, bounded

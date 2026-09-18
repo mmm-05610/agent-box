@@ -46,3 +46,32 @@
 - 沙箱内执行接线（G4：命令在沙箱内、凭据不进 hook 环境、输出有界+扫描）；
 - `hooks.*` wire 面（与 P16 前端配对、两仓重锁）；OpenCode 插件资产形态；
   Windows 执行侧差异（`shell` 语义）与 Codex 受管层的真机验证。
+
+## 阶段 B 第二块（已落地）：物化（G3）与触发账本（G5）
+
+- **hooks 槽位声明**（注册表扩展，同 mcp 的规则）：`hooks_target`（必须 .json）+ 可选
+  `hooks_key`（键名；None=该文件自身就是 hooks 映射）——claude-code=`settings.json` 的
+  `hooks` 键、codex=`.codex/hooks/hooks.json` 根对象（皆阶段 A 一手）；qwen/pi 未声明
+  ⇒ 有启用 hook 时物化**类型化拒绝** `HOOK_TARGET_UNSUPPORTED`。
+- **渲染**（`server/hooks/rendering.py`）：按各家**原生形态**（事件 → matcher 组 →
+  `hooks` 数组，`timeout`/`async` 始终写出，与账本同源）；`merge_fragments` 把同一目标的
+  多个片段合成一份文档（claude 的 `settings.json` 同时承载 `mcpServers` 与 `hooks`；
+  codex 的 `hooks.json` 是片段本身；TOML 目标按表格追加）——**同键冲突拒绝，不覆盖**。
+- **装配**：runtime 的资产装配改为"**按目标聚合再渲染一次**"：启用的 mcp 绑定逐条取修订
+  （校验摘要）→ 片段；启用 hook → hooks 片段；同一目标合并后经 `home.put`/本机写面写入
+  **我们自己的** guest 工作副本（零回写原生配置；投影冲突仍 `ASSET_SLOT_CONFLICT`）。
+- **触发账本**（`server/hooks/triggers.py` + schema 15 `server_hook_triggers`）：
+  `record(hook_id, event, exit_code, output, forbidden)`——输出**有界**（512 字符 + 截断标注）、
+  **先扫描**（含该次执行注入凭据材料 ⇒ `HOOK_TRIGGER_CONTAINS_SECRET`，不落库）、
+  **阻断语义如实**：`exit 2 → blocking=true, effect="blocked"`（另有 `ran`/`failed`），
+  绝不把"阻断了一次工具调用"显示成普通成功；`list` 有界（1..500，最新在前）。
+- **测试**：+2 条（渲染形状与合并冲突、触发四态/截断/凭据扫描/形状反例）并对既有 e2e
+  扩展断言（**同一轮里 MCP 与 hook 合并进同一 `settings.json`**）；全量见提交记录。
+
+## 59 仍缺（下腿）
+
+- **触发事实的生产端**：hook 在沙箱内由各家自己执行，事实来源（各家 journal 或受控包装）
+  尚未接线——本腿交付的是**账本与契约**，生产端如实标注未接；
+- `hooks.*` wire 面（与 P16 前端配对、两仓重锁）；OpenCode 插件资产形态；
+  Windows 执行侧差异（`shell` 语义）；G4 的"凭据不进 hook 环境"端到端（当前由
+  "带凭据引用的 MCP 一律拒绝 + 触发摘要扫描"覆盖，hook 命令自身的沙箱执行接线待做）。

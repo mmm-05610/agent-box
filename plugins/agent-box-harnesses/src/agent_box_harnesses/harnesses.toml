@@ -26,13 +26,16 @@ config_format = "json-or-toml"
 payload_schema = "codex-profile-v1"
 codec = "codex"
 overlay_policy = "execution-local"
-slots = ["provider", "permission", "instruction", "mcp", "skill"]
+slots = ["provider", "permission", "instruction", "mcp", "skill", "hooks"]
 skill_target = "/runtime/home/skills/{skill_id}"
 skill_env = "CODEX_HOME"
 # Order 58 stage A (first-hand): the pinned codex binary declares `mcp_servers`
 # in $CODEX_HOME/config.toml (34 occurrences of the key in 0.147.0).
 mcp_target = "/runtime/home/.codex/config.toml"
 mcp_key = "mcp_servers"
+# Order 59 stage A (first-hand): codex reads `hooks/hooks.json` with the
+# same event names as claude (SessionStart…SubagentStop, hook_event_name).
+hooks_target = "/runtime/home/.codex/hooks/hooks.json"
 [[harness.inputs]]
 contract_id = "agent-box.skill@1"
 minimum = 0
@@ -95,12 +98,16 @@ config_format = "json"
 payload_schema = "claude-code-profile-v1"
 codec = "claude"
 overlay_policy = "execution-local"
-slots = ["provider", "instruction", "mcp", "skill"]
+slots = ["provider", "instruction", "mcp", "skill", "hooks"]
 # Order 58 stage A (first-hand): `.claude/skills` (52 refs), `mcpServers` in
 # settings.json (100 refs).
 skill_target = "/runtime/home/.claude/skills/{skill_id}"
 mcp_target = "/runtime/home/.claude/settings.json"
 mcp_key = "mcpServers"
+# Order 59 stage A (first-hand): claude declares hooks in settings.json
+# (PreToolUse 108 refs, disableAllHooks 30).
+hooks_target = "/runtime/home/.claude/settings.json"
+hooks_key = "hooks"
 [[harness.launch_modes]]
 name = "acp"
 argv = ["claude-agent-acp"]
