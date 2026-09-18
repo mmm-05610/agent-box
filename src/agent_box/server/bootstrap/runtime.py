@@ -757,6 +757,7 @@ def build_runtime_from_sidecar_deployment(
                 )
             home_locator = context.get("home_locator") or _profile_home_locator(
                 context.get("profile_name") or context["harness_type"], native_home,
+                profile_id=context.get("profile_id"),
             )
             # The workspace record says where this turn belongs; that fact - and
             # only that fact - decides which channel stages and starts it.
@@ -1209,16 +1210,28 @@ def _registry_native_homes() -> dict[str, str]:
     return homes
 
 
-def _profile_home_locator(name: str, native_home: str) -> str:
-    """`<role>/<native home>` - the locator a first Session records.
+def _profile_home_locator(name: str, native_home: str, *, profile_id: str | None = None) -> str:
+    """`<role>-<id suffix>/<native home>` - the locator a first Session records.
 
     The role directory is a normalized label chosen at creation; a later
     rename never recomputes it, because the Session (and the marker inside)
     keeps the locator that was recorded when the home was made.
+
+    The eight-character suffix is the Profile's own identity, and it is what
+    keeps two Profiles that share a display name on two different homes: the
+    marker check compares identities, so a name-only directory would refuse
+    the second Profile for good (the HOME_MARKER_CONFLICT the family gates
+    kept hitting across runs). A first Session always records the resolved
+    locator, so the rule stays stable for every later turn.
     """
     normalized = re.sub(r"[^a-z0-9-]+", "-", (name or "").lower()).strip("-")
     normalized = normalized[:40] or "role"
-    return f"{normalized}/{native_home}"
+    suffix = ""
+    if profile_id:
+        tail = re.sub(r"[^a-z0-9]+", "", str(profile_id).lower())[-8:]
+        if tail:
+            suffix = f"-{tail}"
+    return f"{normalized}{suffix}/{native_home}"
 
 
 def _window_of_state_target(state_target: str | None, native_home: str) -> str | None:

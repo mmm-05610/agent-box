@@ -532,7 +532,10 @@ def test_the_loader_derives_protected_paths_and_hands_them_to_the_launcher(
     finally:
         runtime.stop()
     assert captured["audit_window"] == ".fixture"
-    assert captured["home_locator"] == "fixture/.fixture"
+    # The locator carries the Profile's identity suffix (its last eight
+    # characters): "profile_test" -> "filetest". Two Profiles that share a
+    # display name therefore never collide on one home.
+    assert captured["home_locator"] == "fixture-filetest/.fixture"
     assert captured["protected_state_paths"] == ("config.json",)
     assert [target for _source, target in captured["projection_mounts"]] == [
         f"{AGENT_DIRECTORY}/config.json",

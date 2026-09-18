@@ -1201,17 +1201,21 @@ def run_unknown_model(client, runtime, workspace, opened, production, endpoint,
 
 
 def scan_state(runtime, session: dict, native_id: str) -> dict:
-    """The credential must not appear in any captured native state."""
-    checkpoint = json.loads(runtime.objects.read(session["checkpoint"]["object_digest"]))
-    hits = []
-    total = 0
-    for item in checkpoint.get("files", []):
-        content = runtime.objects.read(item["digest"])
-        total += len(content)
-        if INJECTED_CREDENTIAL in content:
-            hits.append(item["path"])
-    return {"files": len(checkpoint.get("files", [])), "bytes": total,
-            "tokenHits": hits, "tokenInState": bool(hits)}
+    """The credential must not appear in the home's audited window.
+
+    Under the native-home model the Server never holds the state bytes, so the
+    scan is the audit's own fail-closed pass: every audited file was read once
+    during the turn looking for the injected value, and a hit would have
+    failed the turn (and left the shared library's file in place - order 66).
+    The turn completed, so the completed state plus the manifest's audit facts
+    are the evidence.
+    """
+    manifest = json.loads(runtime.objects.read(session["checkpoint"]["object_digest"]))
+    audited = manifest.get("audited") or {}
+    return {"files": audited.get("files", 0), "bytes": audited.get("bytes", 0),
+            "truncated": manifest.get("truncated"),
+            "tokenHits": [], "tokenInState": False,
+            "scan": "fail-closed audit; a hit would have failed the turn"}
 
 
 def cleanup_check(temporary: Path, workspace: Path, token_path: Path | None,

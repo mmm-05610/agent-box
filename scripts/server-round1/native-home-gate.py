@@ -190,8 +190,13 @@ def main() -> int:
     runtime = build_runtime_from_sidecar_deployment(data_root, document, plugin_root=PLUGIN)
     home_root = data_root / "profiles"
     # The role directory (locator segment 1): the durable home that owns the
-    # harness's session facts.
-    home_dir = home_root / "native-home-gate"
+    # harness's session facts. Its name carries the Profile's identity suffix
+    # (order 67's locator rule), so it is discovered rather than spelled.
+    def role_dir_now() -> Path:
+        return next(
+            item for item in home_root.iterdir()
+            if item.is_dir() and item.name != "_sessions"
+        )
 
     try:
         with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
@@ -232,6 +237,9 @@ def main() -> int:
 
             # G1a: the home holds the harness's own durable session facts
             # (the bridge's persisted transcript for the peer session).
+            # Only the pi seat's role exists right now: capture it now, before
+            # the echo profile below adds a second role directory.
+            home_dir = role_dir_now()
             home_facts = sorted(str(item.relative_to(home_dir))
                                 for item in home_dir.rglob("*") if item.is_file())
             REPORT["g1HomeFile"] = {

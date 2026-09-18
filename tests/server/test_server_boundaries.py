@@ -384,3 +384,21 @@ def test_exclusive_home_families_keep_one_active_turn_per_profile(tmp_path):
         checkpoint_native_id="native-a", result_object_digest="sha256:ra")
     _, second_turn = sessions.create_turn(second["session_id"], "key-c", body)
     assert second_turn["turn_id"] != first_turn["turn_id"]
+
+
+def test_two_profiles_with_one_name_get_two_homes():
+    """The locator carries the Profile's identity, so a shared display name
+    cannot collide two homes (the HOME_MARKER_CONFLICT class the family gates
+    kept hitting across runs on a persistent home root)."""
+    from agent_box.server.bootstrap.runtime import _profile_home_locator
+
+    first = _profile_home_locator("role", ".config/kilo",
+                                  profile_id="profile_0123456789abcdef")
+    second = _profile_home_locator("role", ".config/kilo",
+                                   profile_id="profile_fedcba9876543210")
+    assert first != second
+    assert first.endswith("/.config/kilo") and second.endswith("/.config/kilo")
+    # A rename does not change anything for a recorded locator; a missing id
+    # still yields a usable (if generic) locator.
+    assert _profile_home_locator("role", ".pi", profile_id="profile_0123456789abcdef") == first.replace(".config/kilo", ".pi")
+    assert _profile_home_locator("role", ".pi") == "role/.pi"
