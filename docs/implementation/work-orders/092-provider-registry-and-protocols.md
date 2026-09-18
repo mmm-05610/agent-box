@@ -198,3 +198,74 @@ git diff --check && git status --short
 - 凭据只作 locator；**不得**把任何 key 值写进测试、日志、证据或 argv。真实调用按 R-0011 授权并逐笔记账；
   本单不**需要**真实模型调用（探针可复用 070 的复跑方式）。
 - 自检：`python3 ~/.agents/skills/incremental-work-order/scripts/validate_order.py . --strict`。
+
+---
+
+## 修订 v2（2026-09-19，R-0013 追加：一个 harness 多个模型槽）
+
+用户指认：profile 侧的模型配置**不是一个槽**——claude-code 要能配 主模型 / opus / sonnet / haiku / **fable** / **子代理**，
+还要能配上下文与输出长度。设计全文（含逐家槽表）见主树 `docs/server-round1/model-settings-two-layer-design.md` §3b/§4/§6。
+
+### 追加 Scope
+
+| From | To / action | Reason |
+| --- | --- | --- |
+| 描述符的单一 `model_control_id` | **多槽声明 `model_controls`**：每槽 `{controlId, role, label, required, protocols?, requires?, allowFollow?}`；老的单 id 声明读为 `[{role:"default"}]` | 多角色 |
+| profile 的模型引用 | 从单一 `{providerId, modelId}` 变**槽表**（每槽一个引用 + 可选 `context`/`output` 覆盖）；老形状按 `role=default` 兼容读入 | 逐槽选择 |
+| `config.describe` 的 `model_slot` 投影 | 逐槽输出一个 `model_slot`（带 role/label/required/该槽的协议与能力要求） | 界面按槽渲染 |
+| `freeze_execution_configuration` | **逐槽**解析并校验（协议/能力要求逐槽判），拒绝时指名槽 | 一处真相 |
+
+一手的槽与原生字段（**票源**：cc-switch 的写入器/预设、opencode 官方 `config.json` schema、本仓 deploy 模板、
+`docs/specs/archive/provider-form-gap-analysis.md`）——claude-code：`ANTHROPIC_MODEL` / `ANTHROPIC_DEFAULT_OPUS_MODEL` /
+`…_SONNET_MODEL` / `…_HAIKU_MODEL`（旧名 `ANTHROPIC_SMALL_FAST_MODEL`）/ `…_FABLE_MODEL` / `CLAUDE_CODE_SUBAGENT_MODEL`，
+上限 `CLAUDE_CODE_MAX_OUTPUT_TOKENS`；opencode/kilo：`model` / `small_model` / `provider.<id>.models.<mid>.limit{context,input?,output}`；
+其余家见设计 §4。**描述符只声明槽的语义与要求，原生字段名属 093。**
+
+### 追加 Requirements
+
+#### Requirement: 多槽声明与投影
+
+##### Scenario: 每家按声明出槽
+
+**WHEN** 某家 deployment 声明 `modelControls=[{controlId:"model",role:"default",required:true},{controlId:"subagent",role:"subagent",label:"子代理",allowFollow:true},…]`
+**THEN** `config.describe` 为**每个槽**输出一个 `model_slot` 控件（含 role/label/required/要求），顺序与声明一致；控件 id 与 profile 配置里的键一一对应
+
+##### Scenario: 单槽声明不退化（兼容）
+
+**WHEN** 某家仍只声明老的 `modelControlId="model"` + `controlOptions={"model":[]}`
+**THEN** 读为 `[{controlId:"model", role:"default", required:false}]`，投影与冻结行为与今天**逐字一致**（F2 修过的"空枚举→model_slot"路径不变）
+
+#### Requirement: 逐槽冻结与逐槽兼容
+
+##### Scenario: 槽各自校验
+
+**WHEN** 主模型槽填了兼容的上游，子代理槽填了一个**不兼容**的上游（例如只声明 `openai-chat` 而该家子代理槽要求 `anthropic-messages`）
+**THEN** 冻结**类型化拒绝**并**指名槽**（`PROTOCOL_INCOMPATIBLE` 携带 `controlId`）；把该槽换成兼容上游后通过
+
+##### Scenario: 未声明不拦
+
+**WHEN** 某槽的 `requires` 未声明、或上游没声明协议
+**THEN** 该槽**不被拦**（未知不是不可用），冻结成功且不猜值
+
+#### Requirement: 每槽的限额覆盖（缺席即不写）
+
+##### Scenario: 覆盖与事实分开
+
+**WHEN** 某槽带 `overrides={context:200000, output:32000}`
+**THEN** 冻结产物里该槽有这两个覆盖值；**模型事实本身不被改写**；另一槽无覆盖 ⇒ 产物里**没有**覆盖键（读时用事实，不猜）
+**反例**：把"缺席"渲染成 `context:0`/默认值必须让门失败
+
+### 追加 Gates
+
+| Gate | Assertion | Counter-example (required) | Absent / unknown ⇒ |
+| --- | --- | --- | --- |
+| G8 多槽 | 逐槽投影 + 逐槽冻结；拒绝带 `controlId` | 只投影/只校验第一个槽必须门红 | fail (typed) |
+| G9 兼容读入 | 老单槽声明与老引用形状行为逐字不变 | 老形状被拒或被改写必须门红 | fail (typed) |
+| G10 覆盖 | 覆盖与事实分离；缺席不写键 | 给缺席槽补默认值必须门红 | fail (typed) |
+
+### 追加 Validation
+
+```bash
+python3 -m pytest tests/server -q -k "model or profile or freeze"
+python3 ~/.agents/skills/incremental-work-order/scripts/validate_order.py docs/implementation/work-orders --strict
+```

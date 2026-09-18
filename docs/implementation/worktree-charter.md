@@ -75,6 +75,9 @@
 > `PROTOCOL_INCOMPATIBLE`）→ `093-native-config-materialization`（R-0013 第 1 层的执行侧：冻结配置落进各家原生文件，
 > 逐家钉键、钉不死就类型化拒绝）。两单引用主树 `docs/server-round1/model-settings-two-layer-design.md`（R-0013 设计全文）。
 > 批末打 `checkpoint/b4` tag + 写检查点报告，然后继续。
+> **修订 v2（2026-09-19，R-0013 追加）**：092/093 各追加一节——**一个 harness 多个模型槽**
+> （claude-code：主模型 / opus / sonnet / haiku / fable / **子代理**；opencode·kilo：主模型 / 小模型）
+> 与**逐模型限额**（上下文/输出，覆盖与事实分离、缺席不写键）。以单文件里的 §修订 v2 为准。
 > **队列不空规则（调度者失误的如实标记）**：`080-first-run-lock` 与 `081-relock-register-frontend` **已投递**，可执行；
 > 若我在做完当前单后发现 `work-orders/` 里**没有属于 b2 的下一张**，就在本树 status 写一行 `QUEUE_EMPTY_AT <日期>`——
 > 这是**合法停止**但要如实报出来；调度者把它视为自己的失误并在下一次边界补齐投递。

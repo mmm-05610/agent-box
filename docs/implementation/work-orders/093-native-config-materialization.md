@@ -160,3 +160,62 @@ git diff --check && git status --short
 - 凭据只作 locator；真实模型调用按 R-0011（本单不必需）。
 - 需要人拍的事 → 本树 status §Questions；契约问题交回调度者。
 - 自检：`python3 ~/.agents/skills/incremental-work-order/scripts/validate_order.py . --strict`。
+
+---
+
+## 修订 v2（2026-09-19，R-0013 追加：逐槽落盘 + 逐模型限额）
+
+092 已扩为**多模型槽**（主模型 / opus / sonnet / haiku / fable / 子代理…）。本单相应扩为：**每个槽各自写进它自己的原生字段**，
+以及**每模型限额**（上下文/输出）的落盘。槽表与一手字段名见主树设计文档 §4。
+
+### 追加 Scope
+
+| 家 | 要写的槽/限额（一手字段名） |
+| --- | --- |
+| claude-code | `ANTHROPIC_MODEL` · `ANTHROPIC_DEFAULT_OPUS_MODEL` · `…_SONNET_MODEL` · `…_HAIKU_MODEL`（旧名 `ANTHROPIC_SMALL_FAST_MODEL` 只在需要时保留兼容读）· `…_FABLE_MODEL` · `CLAUDE_CODE_SUBAGENT_MODEL`；上限 `CLAUDE_CODE_MAX_OUTPUT_TOKENS`、思考 `MAX_THINKING_TOKENS` |
+| codex | `model` / `wire_api` / `model_reasoning_effort` / `model_max_output_tokens` |
+| opencode / kilo | `model` / `small_model` / `provider.<id>.models.<mid>.limit{context,input?,output}`（条目本就吃 models.dev 形状的事实：`cost`/`modalities`/`tool_call`/`reasoning`） |
+| pi | `settings.json` 的 `defaultProvider`/`defaultModel`；`models.json` 的 `models[].{contextWindow,maxTokens,…}` |
+| hermes | `model.default`；`models.<id>.{context_length,max_tokens}` |
+| dsh | `llm-<vendor>.{maxTokens,thinking,reasoningEffort}` |
+| qwen | 未钉死 ⇒ 钉死或类型化拒绝（不猜 env 名） |
+
+- **"跟随主模型"**：槽声明 `allowFollow` 且用户选了跟随 ⇒ **不写该键**（缺席就是缺席，不写等于主模型的值）。
+- **限额来源标注**：写进原生文件的是**生效值**；profile 里"你的覆盖"与"上游声明"的区分由 092 保证，本单不重复实现。
+- 钉不死键位的家（当前已知：qwen 的 env 形态、dsh 的模型 id 键若要按 provider 变）⇒ 类型化拒绝 + status 记剩余。
+
+### 追加 Requirements
+
+#### Requirement: 逐槽写对位置
+
+##### Scenario: claude-code 六槽逐条
+
+**WHEN** profile 填了主模型 + opus + haiku + 子代理（sonnet/fable 走"跟随主模型"）
+**THEN** guest 内 `settings.json` 的 `env` 恰有 `ANTHROPIC_MODEL`/`ANTHROPIC_DEFAULT_OPUS_MODEL`/`ANTHROPIC_DEFAULT_HAIKU_MODEL`/`CLAUDE_CODE_SUBAGENT_MODEL` 四键，**没有** sonnet/fable 两键；值来自记录的 model id
+**反例**：把"跟随"写成空串或写上与主模型相同的值必须让门失败（缺席必须真的是缺席）
+
+##### Scenario: opencode/kilo 的两槽与限额
+
+**WHEN** 主模型 + `small_model` 都选，且主模型带 `context`/`output` 覆盖
+**THEN** `opencode.json`（或 `kilo.json`）里 `model`、`small_model` 与 `provider.<id>.models.<mid>.limit.{context,output}` 三处都对；未覆盖时 `limit` 取**上游声明的事实值**（无事实 ⇒ 不写该子键并如实记 unknown）
+
+#### Requirement: 限额覆盖不是猜测
+
+##### Scenario: 覆盖生效、缺席不写
+
+**WHEN** 某模型无上游限额事实、用户也没覆盖
+**THEN** 原生文件里**不出现** `limit`/`contextWindow`/`context_length` 之类的键（不补默认值），且 status 记"该模型限额 unknown"
+
+### 追加 Gates
+
+| Gate | Assertion | Counter-example (required) | Absent / unknown ⇒ |
+| --- | --- | --- | --- |
+| G7 逐槽 | claude-code 六槽逐条断言（写了哪些、**没写哪些**） | 把跟随槽写成空值必须门红 | fail (typed) |
+| G8 限额 | 覆盖 → 写覆盖值；无覆盖有事实 → 写事实；都无 → 不写键 | 给"都无"补默认值必须门红 | unknown，不写键 |
+
+### 追加 Validation
+
+```bash
+python3 -m pytest plugins/agent-box-harnesses/tests/ -q -k claude
+python3 scripts/server-round1/claude-production-chain-gate.py --loopback   # 逐家既有门
+```
