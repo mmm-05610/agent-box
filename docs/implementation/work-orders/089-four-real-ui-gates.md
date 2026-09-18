@@ -3,7 +3,7 @@ id: 089
 slug: four-real-ui-gates
 batch: b3
 baseline: "b2 checkpoint"
-depends_on: [{"order": "082", "condition": "merged into main as <sha>"}]
+depends_on: [{"order": "082", "condition": "merged into main as <sha>"}, {"order": "090", "condition": "Windows 控制面下 WSL 工作区的放置路由可用（R-0014）"}, {"order": "091", "condition": "控制面同步与每执行凭据投影可用"}]
 write_paths: ["docs/server-round1/fullstack/**", "docs/implementation/status.md", "scripts/server-round1/**"]
 forbidden: ["src/agent_box/**", "plugins/**", "tests/**", "/home/maoqh/projects/agent-box-desktop-next-wsl-round1/**"]
 ruling: R-0011
@@ -13,6 +13,26 @@ parallel_units: []
 ---
 
 # Work Order 089 — 四家真实 UI 门（最终验收路径）
+
+---
+
+## 修订 v2（2026-09-19，用户裁定 R-0014 / R-0015 / R-0017）
+
+**三处前提被用户裁定改写，以本节为准**：
+
+1. **控制面就是 Windows**（R-0014，效仿 ZCode 的单一控制面设计）：执行侧（WSL/远程）只是 worker。
+   ⇒ 本单**改在 Windows 侧的 Server 上验收**（真实数据根 + 真实凭据），**不再**用"Server 跑在 WSL"的试用绕行；
+   前置＝**090（放置路由）与 091（控制面同步）**，它们不落地本单无意义。
+   （本节以下"Current state"里"Server 必须跑在 WSL 侧"那段是**试用期的权宜之计**，被 R-0014 取代——保留以便溯源。）
+2. **Stage 1 的广度＝先 pi + codex 两家**（R-0015，用户把广度判断授权给调度者）：本单**只做这两家**的端到端
+   真实 UI 门（真实 Electron → **Windows Server** → wsl.exe → release Worker → bwrap → 该家 harness → **真实 DeepSeek**）。
+   其余家（hermes / opencode / claude-code / dsh / kilo / qwen）**移到 100**，在本单绿之后再逐个补。
+3. **成本纪律（R-0017）**：真实模型额度＝DeepSeek 账号余额，**用尽为止、不设上限**，但**机械验证一律优先假端点**
+   （loopback/夹具），**真实调用只花在门本身**；逐笔记账照旧，报告里写清"本轮真实调用次数与用途"。
+
+**验收判据（两家各一轮）**：用户在自己的 Desktop 里，选该家 profile → 发送 → 得到真实回答；
+过程中的思考/工具/审批按该家能力如实出现（没有就写"该家未产生"）；失败路径至少一条（关掉凭据或指向坏端点）给类型化原因。
+
 
 ## Objective
 
