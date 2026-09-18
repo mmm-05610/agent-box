@@ -1993,6 +1993,35 @@ export interface Translations {
       permissionsPreset: (preset: string) => string
       permissionsPresetUnknown: string
       permissionsShadowed: string
+      /** P22 (order 60): the rule editor. */
+      permissionsPresetLabel: string
+      permissionsSave: string
+      permissionsSaving: string
+      permissionsSaved: string
+      permissionsAdd: string
+      permissionsRemove: string
+      permissionsKey: string
+      permissionsPattern: string
+      permissionsAction: string
+      permissionsOrderNote: string
+    }
+    /** P22 (order 60): cloning through the wire, with the migration report. */
+    clone: {
+      title: (name: string) => string
+      description: string
+      nameLabel: string
+      harnessLabel: string
+      familyNote: string
+      nameRequired: string
+      submit: string
+      cancel: string
+      cloning: string
+      cloned: string
+      done: string
+      reportTitle: string
+      reportCounts: (migrated: number, refused: number) => string
+      familyChanged: (from: string, to: string) => string
+      rebound: (count: number) => string
     }
     agentBoxCapabilityAbsent: string
     agentBoxMaintenanceUnavailable: string

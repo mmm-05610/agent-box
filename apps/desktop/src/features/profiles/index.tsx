@@ -23,6 +23,7 @@ import {
 } from '@/application/profile/profile-maintenance-port'
 import { ensureAgentBoxProfileCatalog } from '@/application/profile/wire-composer-profile'
 import { loadProfileAssetBindings, loadProfileMemory } from '@/application/profile/wire-profile-read'
+import { cloneAgentBoxProfile, setAgentBoxProfilePermissions } from '@/application/profile/wire-profile-writes'
 import { ensureAgentBoxProviderModelCatalog } from '@/application/provider-model/wire-provider-model-catalog'
 import { useRefreshHotkey } from '@/components/hooks/use-refresh-hotkey'
 import { PageLoader } from '@/components/page-loader'
@@ -40,6 +41,7 @@ import { Input } from '@/components/ui/input'
 import { ProfileGlyph } from '@/components/ui/profile-glyph'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useI18n } from '@/i18n'
+import { Copy } from '@/lib/icons'
 import { normalize } from '@/lib/text'
 import {
   $agentBoxHello,
@@ -50,7 +52,14 @@ import {
   agentBoxCapabilitySupported,
   upsertAgentBoxProfile
 } from '@/store/agentbox-service'
-import type { AssetBinding, ConfigControl, ConfigDescriptor, ProfileRecord, ProfilesUpdateConfigResult } from '@/types/wire/wire-v1'
+import type {
+  AssetBinding,
+  ConfigControl,
+  ConfigDescriptor,
+  PermissionRule,
+  ProfileRecord,
+  ProfilesUpdateConfigResult
+} from '@/types/wire/wire-v1'
 
 import {
   buildProfileConfigValues,
@@ -59,6 +68,8 @@ import {
   type ProfileConfigDraft,
   ProfileConfigEditor
 } from './profile-config-editor'
+import { CloneProfileDialog } from './clone-profile-dialog'
+import { ProfilePermissionEditor } from './profile-permission-editor'
 import { profileMemoryView, type ProfileMemoryView, profilePermissionView } from './profile-read-facts'
 import { ProfileRoleSettings } from './profile-role-settings'
 
@@ -310,6 +321,38 @@ function ProfileDetail({ maintenance, profile, serviceOffline }: ProfileDetailPr
     }
   }, [profile.id])
 
+  // P22 (order 60): the two write paths this page owns. Both report the
+  // service's answer — a refusal changes nothing locally.
+  const [cloneOpen, setCloneOpen] = useState(false)
+
+  const clone = useCallback(
+    async (intent: { displayName: string; harness?: string }) => {
+      const result = await cloneAgentBoxProfile(agentBoxRuntimeClient(), {
+        ...intent,
+        profileId: profile.id
+      })
+
+      upsertAgentBoxProfile(result.profile)
+
+      return result
+    },
+    [profile.id]
+  )
+
+  const savePermissions = useCallback(
+    async (intent: { preset: string; rules: PermissionRule[] }) => {
+      const updated = await setAgentBoxProfilePermissions(agentBoxRuntimeClient(), {
+        expectedVersion: profile.version,
+        preset: intent.preset,
+        profileId: profile.id,
+        rules: intent.rules
+      })
+
+      upsertAgentBoxProfile(updated)
+    },
+    [profile.id, profile.version]
+  )
+
   const readDescriptor = useCallback(async (): Promise<DescriptorState> => {
     try {
       return {
@@ -420,6 +463,20 @@ function ProfileDetail({ maintenance, profile, serviceOffline }: ProfileDetailPr
               {saving ? t.common.saving : copy.agentBoxSaveProfile}
             </Button>
           ) : null}
+          {/* Cloning is a service write, so it needs the service: without it
+              the control is disabled and says why (P22 G2 — a control that can
+              never act must not invite a click). */}
+          <Button
+            disabled={!maintenance}
+            onClick={() => setCloneOpen(true)}
+            size="sm"
+            title={maintenance ? copy.clone.description : copy.agentBoxMaintenanceUnavailable}
+            type="button"
+            variant="ghost"
+          >
+            <Copy className="size-3.5" />
+            {copy.clone.submit}
+          </Button>
         </div>
 
         <PanelMeta
@@ -477,7 +534,26 @@ function ProfileDetail({ maintenance, profile, serviceOffline }: ProfileDetailPr
             <RuntimeConfigSummary controls={descriptor.descriptor.controls} />
           )
         }
+        permissionEditor={
+          maintenance ? (
+            <ProfilePermissionEditor
+              copy={copy.roleSettings}
+              disabled={saving}
+              onSave={savePermissions}
+              profile={profile}
+            />
+          ) : null
+        }
         permissions={profilePermissionView(profile)}
+      />
+
+      <CloneProfileDialog
+        copy={copy.clone}
+        harnessChoices={maintenance?.harnessChoices ?? []}
+        onClone={clone}
+        onClose={() => setCloneOpen(false)}
+        open={cloneOpen}
+        profile={profile}
       />
 
       {serviceOffline ? (

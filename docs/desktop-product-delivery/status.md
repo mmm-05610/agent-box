@@ -1840,3 +1840,27 @@ P21 五个测试文件：`wire-v1.test.ts` 28（+11）、`work-status.test.ts` 1
 - **错误呈现统一**：抽 `lib/wire-error-text.ts`（`FAMILY: message [internalCode]`），五面共用，不再各造格式。
 - 提交：`P22 stage 1`（pathspec）。
 
+## P22 阶段 2（2026-09-18）：角色页写路径（克隆 + 权限规则） — `P22_STAGE2_ROLE_WRITES`
+
+- **新增合同调用**（`application/profile/wire-profile-writes.ts`）：
+  `cloneAgentBoxProfile` → `profiles.clone`（家族未变时**不发** `harness`，让服务自己决定），
+  `setAgentBoxProfilePermissions` → `profiles.setPermissions`（带调用方 `expectedVersion`）。
+- **界面**：
+  - 角色头部新增"克隆"按钮：服务不可用时**灰显并带原因**（G2），可用时开 `CloneProfileDialog`
+    （新名 + 家族下拉；家族不变则不下发）→ 成功后**在对话框里显示逐项迁移报告**
+    （`items[].migrated/reason`、`migratedCount/refusedCount`、`reboundAssets`）；拒绝时显示类型化码且**本地零变化**。
+  - 权限分区从"只读行"升级为 `ProfilePermissionEditor`：预设输入（带建议列表，**不当闭集**）、
+    规则行（工具键/模式/动作）增删、保存；**顺序原样提交**（最后匹配生效）；`disabled` 时**提交点不出请求**。
+- **错误呈现**：新增 `lib/wire-error-text.ts`（`FAMILY: message [internalCode]`），本单五面共用；
+  `details.internalCode` 由后端 `WireError.from_server_error` 写入（`wire/errors.py:117-125`，第一手核对）。
+- **测试**（新增 4 文件 / 14 例，全绿）：
+  - `wire-error-text.test.ts`：带/不带 internalCode、本地错误不被包装成服务答复。
+  - `wire-profile-writes.test.ts`：两方法的参数与 `requestId` 生成、家族省略、CAS 版本透传。
+  - `clone-profile-dialog.test.tsx`：报告逐条显示、家族仅在变化时下发、**类型化拒绝时零本地变化**。
+  - `profile-permission-editor.test.tsx`：顺序原样、增删不重排、**G2：disabled 时不发请求**、拒绝后保留草稿。
+  - 既有 `src/features/profiles` 8 文件 / 73 例仍全绿（`permissionEditor` 为可选 prop，未破坏 P17 语义）。
+- **环境插曲（如实记）**：会话早期那个后台 `npm install` 被系统回收时把本仓 `node_modules` 带走了
+  （`vitest` 一度无法加载）；已重装（`node_modules` 不入库、无仓库文件受损），并重新解出
+  `electron` 二进制到 `node_modules/electron/dist`（`/tmp/electron.zip` 仍在，未重新下载）。
+- 提交：`P22 stage 2`（pathspec）。
+

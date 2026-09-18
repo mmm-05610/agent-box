@@ -38,6 +38,9 @@ export interface ProfileRoleSettingsProps {
   memory?: null | ProfileMemoryView
   /** Order 60: the posture in force, with overridden rows marked. */
   permissions?: ProfilePermissionView
+  /** Order 60's WRITE path (P22): when the page can offer it, the editor is
+   *  rendered above the read-only rows. Absent = the surface is read-only. */
+  permissionEditor?: React.ReactNode
 }
 
 const SECTIONS = ['basics', 'harness', 'model', 'credentials', 'instruction', 'skill', 'mcp', 'permission'] as const
@@ -70,6 +73,7 @@ export function ProfileRoleSettings({
   maintenanceAvailable,
   memory = null,
   modelEditor,
+  permissionEditor = null,
   permissions = { preset: null, rows: [] }
 }: ProfileRoleSettingsProps) {
   const [selected, setSelected] = useState<string>('basics')
@@ -194,6 +198,7 @@ export function ProfileRoleSettings({
         )}
         {selected === 'permission' && (
           <section className="space-y-1" data-role-section="permission">
+            {permissionEditor}
             <p className="text-xs text-muted-foreground" data-role-pending="permission">{copy.pendingPermission}</p>
             <div className="text-xs font-medium text-foreground">{copy.permissionsTitle}</div>
             <p className="text-xs text-muted-foreground" data-role-permission-preset={permissions.preset ?? ''}>
