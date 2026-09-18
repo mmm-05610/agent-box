@@ -1,7 +1,7 @@
 {
  "cleanup": {
   "homePreservedOutsideAttempts": true,
-  "temporaryRoot": "/tmp/agentbox-native-home-gate-0yge9f_s"
+  "temporaryRoot": "/tmp/agentbox-native-home-gate-o868_lhx"
  },
  "cost": {
   "authorizedRealModelCalls": 0,
@@ -19,7 +19,7 @@
    "sessions/pi/c3RhdGVmdWwtMTM.json",
    "sessions/reopen-method.txt"
   ],
-  "roleDir": "profiles/native-home-gate"
+  "roleDir": "profiles/native-home-gate-f0fda2c7"
  },
  "g1Manifest": {
   "files": [
@@ -27,12 +27,12 @@
    "pi/c3RhdGVmdWwtMTM.json",
    "reopen-method.txt"
   ],
-  "homeLocator": "native-home-gate/.pi",
+  "homeLocator": "native-home-gate-f0fda2c7/.pi",
   "nativePlatform": "local",
   "schemaVersion": 3,
   "truncated": {
-   "bytes": 107,
-   "entries": 1,
+   "bytes": 0,
+   "entries": 0,
    "oversize": 0
   }
  },
@@ -56,7 +56,7 @@
   "result": "pass",
   "sameSessionOutcome": {
    "held": "queued",
-   "queueItemId": "queue_259c8a881c464790a2eaffb03dce03df"
+   "queueItemId": "queue_a0d14ed8b8ef4b61a91243e58ccebebf"
   },
   "switchWhileRunning": {
    "outcome": "rejected",
@@ -98,7 +98,7 @@
   "outcome": "stop_requested",
   "turnState": "completed"
  },
- "homeLocator": "native-home-gate/.pi",
+ "homeLocator": "native-home-gate-f0fda2c7/.pi",
  "model": {
   "mode": "loopback fake endpoint not required: the stateful peer answers from its own script",
   "realModelRequests": 0
@@ -106,6 +106,6 @@
  "reportPath": "docs/server-round1/fullstack/native-home-gate.json",
  "result": "NATIVE_HOME_GATE_OK",
  "script": "scripts/server-round1/native-home-gate.py",
- "temporaryRoot": "/tmp/agentbox-native-home-gate-0yge9f_s",
+ "temporaryRoot": "/tmp/agentbox-native-home-gate-o868_lhx",
  "temporaryRootRemoved": true
 }
