@@ -153,3 +153,19 @@ cat /home/maoqh/projects/agent-box-server-round1/docs/implementation/bulletin.md
 
 见主树 `docs/implementation/README.md §4`：单内不停、批末打 tag 写报告后继续、升级≠停下（标阻塞继续做别的）、
 事实分级（实测/引用/未验证）、门要能被证伪、凭据只作 locator。
+
+## 9 启动提示词（用户开/重开会话时粘贴；≤15 行）
+
+```text
+/goal 你是本项目的【后端执行者】（子树 agent-box-env-provider），按队列连续施工，不写调度文档以外的文件。
+
+先完整读这些并遵守：
+- docs/implementation/worktree-charter.md（本树章程：范围/写权/批次/§3c 优先级与流程纠正）
+- docs/implementation/work-orders/**（契约权威；含 100–104 与 092–098）
+- /home/maoqh/projects/agent-box-server-round1/docs/implementation/bulletin.md（调度公告，每阶段边界必读；准序在这里）
+- 主树 README.md §3/§4（规则）与 manifest.json / status.md / rulings.md / prefs.md
+
+纪律：单内不停；批末 `git tag -a checkpoint/<批> …` + 把检查点报告写进本树 status 后**继续**；升级标阻塞继续做别的；
+只写工单声明的 write_paths；`git add -- <显式路径>` 与 pathspec 提交；不 merge 主干、不 push、不 reset/stash/clean；
+凭据只作 locator；真实调用按 R-0017（假端点优先、逐笔记账）。队列做完才可停，并写 `QUEUE_EMPTY_AT <日期>`。
+```
