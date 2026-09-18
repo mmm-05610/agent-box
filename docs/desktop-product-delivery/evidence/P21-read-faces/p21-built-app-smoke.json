@@ -1,0 +1,47 @@
+{
+  "facts": {
+    "bodyText": "Profiles\nNew task\n\nNo sessions yet\n\nOpen folder\nOpen remote folder\nSettings\nWhat are we building?\nAsk in your own words — the composer below is the same one you will keep using.\nWaiting for the Pacthold service…\nPacthold service is unavailable\nChoose a profile\nUnknown\nService\nGateway is not connected\nv0.16.0",
+    "chat": true,
+    "phase": "unavailable",
+    "rootChildren": 1,
+    "workStatusPanel": false
+  },
+  "steps": [
+    {
+      "detail": "/home/maoqh/projects/agent-box-desktop-next-wsl-round1/apps/desktop/dist/electron-main.mjs",
+      "id": "build-present",
+      "label": "the build output exists",
+      "status": "PASS"
+    },
+    {
+      "detail": "pid=1042581",
+      "id": "app-spawned",
+      "label": "electron started the built main",
+      "status": "PASS"
+    },
+    {
+      "detail": "port=9444",
+      "id": "devtools-ready",
+      "label": "the window exposed a DevTools endpoint",
+      "status": "PASS"
+    },
+    {
+      "detail": "Ordessa",
+      "id": "window-opened",
+      "label": "a window loaded its document",
+      "status": "PASS"
+    },
+    {
+      "detail": "root children=1 chat=true phase=unavailable",
+      "id": "renderer-mounted",
+      "label": "the renderer mounted the shell",
+      "status": "PASS"
+    },
+    {
+      "detail": "/tmp/p21-smoke/p21-built-app-boot.png",
+      "id": "screenshot",
+      "label": "the boot screenshot is on disk",
+      "status": "PASS"
+    }
+  ]
+}

@@ -1,0 +1,83 @@
+{
+  "notes": [],
+  "steps": [
+    {
+      "detail": "{\"additions\":2,\"branch\":\"fixture-branch\",\"deletions\":2}",
+      "id": "fixture-repo",
+      "label": "a real repository exists for the Git face",
+      "status": "PASS"
+    },
+    {
+      "detail": "",
+      "id": "server-live",
+      "label": "the AgentBox service answers /live",
+      "status": "PASS"
+    },
+    {
+      "detail": "port=18758",
+      "id": "app-attached",
+      "label": "the built app exposes its window to the driver",
+      "status": "PASS"
+    },
+    {
+      "detail": "phase=ready",
+      "id": "service-connected",
+      "label": "the app reachable the service (not the no-service shell)",
+      "status": "PASS"
+    },
+    {
+      "detail": "ws_507ebb776f324ef8ab5189a1bbc3b1d6",
+      "id": "workspace-registered",
+      "label": "the fixture repo is a service workspace",
+      "status": "PASS"
+    },
+    {
+      "detail": "{\"branch\":\"fixture-branch\",\"changedFiles\":2,\"additions\":2,\"deletions\":2,\"ahead\":null,\"behind\":null,\"reason\":null}",
+      "id": "git-face-truthful",
+      "label": "the Git face agrees with git itself, and leaves ahead/behind unobtainable",
+      "status": "PASS"
+    },
+    {
+      "detail": "profile_50631ad972384c788c6a92f4e90ab00f",
+      "id": "profile-created",
+      "label": "a role exists for the session row",
+      "status": "PASS"
+    },
+    {
+      "detail": "rows=0",
+      "id": "inventory-answered",
+      "label": "the inventory answers from the ledger",
+      "status": "PASS"
+    },
+    {
+      "detail": "session_bfd427740b3d402a855260877f518364",
+      "id": "session-created",
+      "label": "a session row exists for the sidebar",
+      "status": "PASS"
+    },
+    {
+      "detail": "via=session-route id=session_bfd427740b3d402a855260877f518364",
+      "id": "session-opened",
+      "label": "the session is open in the real chat view",
+      "status": "PASS"
+    },
+    {
+      "detail": "{\"gitText\":\"GitBranchfixture-branchChanged files2Additions2Deletions2AheadNot obtainable (unknown)BehindNot obtainable (unknown)\",\"line\":\"Failedfixture-branch0:00\"}",
+      "id": "panel-shows-git",
+      "label": "the panel renders the Git card (and the refresh read affordance)",
+      "status": "PASS"
+    },
+    {
+      "detail": "card=false rowsThen=[]",
+      "id": "panel-inventory-card",
+      "label": "the execution card appears only when the ledger has a row",
+      "status": "PASS"
+    },
+    {
+      "detail": "/tmp/p21-read/shots",
+      "id": "shots",
+      "label": "both screenshots are on disk",
+      "status": "PASS"
+    }
+  ]
+}

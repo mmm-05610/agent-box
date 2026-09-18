@@ -1755,3 +1755,33 @@ P21 五个测试文件：`wire-v1.test.ts` 28（+11）、`work-status.test.ts` 1
 - **未编入合同**：`profiles.subagent*`（Order 65 在飞）、`usage.aggregate/export`（Order 53 未收口）。
 - 全树 lint 红与 electron 测试基线是**既有**问题，不是本单引入（证据含逐文件比对）。
 
+## P21 追加（2026-09-18，检查点之后）：真实环境两项现在跑到了 — `P21_REAL_ENV_RUN`
+
+> 本节写于 `checkpoint/Q1`（`ee721f5d`）之后。章程 §3.2：执行者不为检查点停下，分支继续往前；
+> 主树合并仍按 `checkpoint/Q1^{commit}` 的 sha。以下内容在那之后再补一次提交，**不覆盖** tag。
+
+- **触发**：阶段边界重读时发现后端账本新增 **R-0011（2026-09-19）：真实模型调用授权放开**
+  （DeepSeek 官方端点，不设预算上限），影响面明写"**P21 之后的真实 UI 门**"；同时发现本机
+  `electron` 二进制缺失只是**没下载**，而不是不可用。⇒ DoD-3 的"构建产物真跑一遍"从"做不到"变成"做得到"。
+- **处置**（三处环境缺口，处置过程见 `evidence/P21-read-faces/README.md` §0）：
+  1. `curl` GitHub release 取 `electron-v40.10.2-linux-x64.zip` 解到 `node_modules/electron/dist`
+     （**未改任何入库文件**；electron 项目的 3 个 0-test 基线失败到此消失）；
+  2. playwright `_electron.launch` 在本机握手失败 ⇒ 驱动自己 spawn + CDP 附着；
+  3. 服务的"本地工作区"被拒的真因是**服务进程缺插件根 + PYTHONPATH 运行时没有 entry point**
+     （bwrap 本身 `probe()` 实测 `available`）⇒ 补 `PYTHONPATH` 四根 +
+     `AGENT_BOX_SANDBOX_MODULE=agent_box_sandbox_bwrap.port`。
+- **新证据**：
+  - `apps/desktop/e2e/p21-built-app-smoke.mjs` → **7/7 PASS**（窗口 "Ordessa"、渲染层挂载、
+    `phase=unavailable`、截图 `p21-built-app-boot.png`；日志里还能读到
+    `install stamp: 3545335b3bf9` 与渲染层的类型化 `UNAVAILABLE`）。
+  - `apps/desktop/e2e/p21-read-faces-driver.mjs`（真服务 + 真 git 仓库）→ **13/13 PASS**：
+    `workspaces.gitStatus` 答 `{branch:"fixture-branch", changedFiles:2, additions:2, deletions:2,
+    ahead:null, behind:null, reason:null}`，与驱动先跑的 `git` 逐项一致；面板 Git 卡截图显示
+    **Ahead/Behind = "Not obtainable (unknown)"**（不是 0），折叠行 `Failed fixture-branch 0:00`。
+  - 截图与逐步 JSON：`evidence/P21-read-faces/`。
+- **DoD-3 改判为 ✅ RUN**（真构建产物 + 真服务）。**仍未验**（如实）：
+  ① 执行清单卡带真实行的截图（本机 placement=local 跑不动 turn，台账恒 0 行；需 Windows+WSL 宿主）；
+  ② 角色页记忆/权限分区在真实服务上的截图（现由 9+7 条渲染/纯函数测试覆盖）；
+  ③ 真实模型调用 0 次（本轮用假 ACP peer fixture，不需要模型；真实 UI 门按 R-0011 归下一单）。
+- 提交：`P21 real-env run`（pathspec：两个 e2e 驱动 + evidence/P21-read-faces/** + 本文件）。
+
