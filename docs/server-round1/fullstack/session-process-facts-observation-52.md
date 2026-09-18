@@ -36,3 +36,16 @@
    确认 wire 现状只有 agent_message_chunk 单一转发路径可挂。
 4. **"没有就显示没有"**：mode/plan 在 codex/hermes 的 native 层无专列，若其协议面
    也不播发，则 UI 对该家族显示"无计划/无模式"——不编造。
+
+## 观测轮补记（2026-09-18）：真 harness（pi）一圈的一手事实
+
+命令：`pi-production-chain-gate.py --worker c11 --keep` → exit 0（`/tmp/agentbox-pi-gate-s8qhq6lh`），
+随后**只读**查门留下的账本 `server/state/agentbox.sqlite`：
+
+| 事实类 | 本圈结果 | 说明 |
+| --- | --- | --- |
+| **52 过程事实（thought/plan/mode/tool）** | **零出现** | 事件 kind 只有 `message.delta/final`、`turn.*`、`usage.updated`：**真 pi + 假端点在这一圈没有产生四类过程事实**（这是**否定观测**，不是通过）。结论：四类映射在当前 pi 假端点流里无法端到端取证；要在场必须有真发这些 ACP 更新的负载（夹具已单独验证播发路径）。 |
+| **54 变更集** | 三个轮次 `change_set_object_digest` **全 NULL** | 这一圈工作区**没有被编辑**（pi 只作了回答）——"空改动 ⇒ 不发布变更集"的行为与 54 的定向测试一致；54 的正例证据仍在 54 的定向测试里。 |
+| **55 用量** | 两个完成轮 `(11, 7, 18, 'pi-acp-journal')`；失败轮（未知模型拒绝）**全 NULL** | 探针在本圈再次产出真事实；未跑成的轮**如实未知**，不是 0。 |
+
+结论：52 的"真 harness 观测轮"以**否定结果**记账（不得写成通过）；54/55 的行为与本圈一致。

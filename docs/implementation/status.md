@@ -636,7 +636,7 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 | 单 | 已落地 | 剩余 |
 | --- | --- | --- |
 | 51 | USAGE_FACT_DONE：pi/codex/hermes/claude 门级观测轮全部产出事实（hermes (11,7)/(22,14)、claude (11,7)，source=声明格式）；WAL 侧车根因修复；六家解析器就绪 | kilo/opencode/dsh/qwen 模板未声明 usageProbe（解析器已备，未启用；kilo/opencode 启用时读共享库，走 66 只读规则） |
-| 52 | B/D+E 完成：thought/plan/mode 三新 wire kind + 四类映射入账本 + process-facts 端到端 | 真 harness 观测轮（假 peer 已定向验证，真 harness 轮待跑） |
+| 52 | B/D+E 完成：三新 wire kind + 四类映射入账本 + 夹具端到端 | 真 harness 观测轮已跑（pi+假端点一圈**零过程事实**，否定结果记账）；需能发四类负载的真流 |
 | 65 | SUBAGENT_DELEGATION_PARTIAL：A/B＋C（授权边、两工具契约、委派服务、`parent_turn_id`、有界摘要、用量同源、续接/深度/环/扇出、取消传播、桥入 bundle、loopback 端点按次令牌、有授权才渲染、父 deny 继承、审批镜像、授权 CRUD wire、**真桥端到端（真进程→真通道子执行→摘要）**、并发扇出）；12 条测试 | P17/P20 前端；真 harness 父侧发起 tools/call 的一圈 | 75253fa + 701ae20 + 6854e4c + 本轮 |
 | 64 | EXECUTION_INVENTORY_DONE（账本同源、pid 本机可报/远端 null+reason、上限 200 类型化、零宿主路径；4 条测试） | WSL pid（需 Worker 单）；P20 同步与重锁 | 本轮 |
 | 63 | PROFILE_MEMORY_READ_DONE（本机侧完整；注册表 memory_paths、只读+有界+扫描、profiles.memory wire；4 条测试） | WSL 侧读；P17 同步与重锁 | 本轮 |
