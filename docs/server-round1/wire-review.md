@@ -485,3 +485,16 @@ ProviderModelConfigRecord = {
 - **物化时机**：绑定在**下一轮**生效（执行前按启用绑定渲染并写入执行内，零回写）；
   带凭据引用的 MCP 服务器当前**类型化拒绝**（逐家注入路径未钉死前不落秘密）。
 - **需前端同步（P15）与两仓重锁**；本工作树未动前端仓。
+
+## Order 58 G6/G7 — 目录式来源与 MCP 探测（2026-09-18，env-provider）
+
+- **新方法（+4，纯新增面）**：
+  - `assets.syncCatalog {requestId, sourceId, sourcePath} → {catalog}`
+    （读目录索引成快照；无效索引/源缺失=类型化拒绝，**失败不落地**）；
+  - `assets.catalog {sourceId} → {catalog}`（快照 + 逐条 installed/installedDigest 标注）；
+  - `assets.installFromCatalog {requestId, sourceId, entryName, revision} → {installed}`
+    （用户动作；provenance `<快照摘要>:<条目 origin>` 写进记录，**不静默换源**）；
+  - `assets.probe {definition} → {probe}`（一次有界 stdio 握手：超时/上限/可取消/类型化码
+    `PROBE_TIMEOUT`/`PROBE_FORMAT_INVALID`/`PROBE_RESPONSE_TOO_LARGE`/`PROBE_SPAWN_FAILED`；
+    **不写配置、零凭据、零补全**）。
+- 需前端同步（P15）与两仓重锁。

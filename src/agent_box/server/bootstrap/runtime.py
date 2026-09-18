@@ -335,10 +335,13 @@ def build_runtime(
     from agent_box.server.assets.records import AssetRecords
     from agent_box.server.assets.skills import SkillAssetStore
 
+    from agent_box.server.assets.catalog import CatalogStore
+
     asset_records = AssetRecords(database, idempotency)
     assets_root = root / "assets"
     skill_assets = SkillAssetStore(assets_root)
     mcp_assets = McpAssetStore(assets_root)
+    asset_catalogs = CatalogStore(assets_root / "catalogs")
     # Order 56's encryption-at-rest requirement is the platform SecretStore's:
     # without one, a bound subscription account is a typed refusal at the turn
     # boundary rather than an unencrypted asset.
@@ -401,7 +404,7 @@ def build_runtime(
         accounts=account_records, account_assets=account_assets,
         subscription_files_for=subscription_files_for,
         asset_records=asset_records, skill_assets=skill_assets,
-        mcp_assets=mcp_assets,
+        mcp_assets=mcp_assets, catalogs=asset_catalogs,
     )
     runtime = ServerRuntime(
         root, database, objects, repository, service, owner, token, token_path,
@@ -416,6 +419,7 @@ def build_runtime(
     runtime.asset_records = asset_records
     runtime.skill_assets = skill_assets
     runtime.mcp_assets = mcp_assets
+    runtime.asset_catalogs = asset_catalogs
     return runtime
 
 

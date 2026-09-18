@@ -495,5 +495,188 @@ def test_the_assets_wire_face_publishes_binds_and_lists(tmp_path):
             assert unbound["unbound"] is True
             assert call("assets.bindings", {
                 "profileId": profile["profile_id"]})["result"]["bindings"] == []
+
+            # G7: sync a directory source through the wire, then install one
+            # entry from the snapshot; the annotation reports it installed.
+            source = _catalog_source(tmp_path / "hub")
+            # A fresh entry name, so "installed" in the annotation is this
+            # install's fact rather than an earlier publish's.
+            (source / "mcp" / "calendar.json").write_text(json.dumps({
+                "name": "calendar-tools",
+                "transport": {"stdio": {"command": "/bin/calendar-tools"}},
+            }), encoding="utf-8")
+            index = json.loads((source / "index.json").read_text(encoding="utf-8"))
+            index["entries"].append({"kind": "mcp", "name": "calendar-tools",
+                                     "path": "mcp/calendar.json",
+                                     "origin": "example.test/mcp/calendar-tools"})
+            (source / "index.json").write_text(json.dumps(index), encoding="utf-8")
+            catalog = call("assets.syncCatalog", {
+                "requestId": "wire-sync-1", "sourceId": "community",
+                "sourcePath": str(source)})["result"]["catalog"]
+            assert catalog["digest"].startswith("sha256:")
+            before = {item["name"]: item["installed"] for item in catalog["entries"]}
+            # my-skill and web-tools were published earlier in this test, so
+            # only the fresh entry is not yet in the catalogue.
+            assert before == {"my-skill": True, "web-tools": True, "calendar-tools": False}, before
+            installed = call("assets.installFromCatalog", {
+                "requestId": "wire-install-1", "sourceId": "community",
+                "entryName": "calendar-tools", "revision": 1})["result"]["installed"]
+            assert installed["source"].startswith(catalog["digest"] + ":")
+            refreshed = call("assets.catalog", {"sourceId": "community"})["result"]["catalog"]
+            by_name = {item["name"]: item for item in refreshed["entries"]}
+            assert by_name["calendar-tools"]["installed"] is True
+            assert by_name["calendar-tools"]["installedDigest"] == installed["digest"]
+            # A failed sync leaves the snapshot as it was.
+            (source / "index.json").write_text("{ nope", encoding="utf-8")
+            refused_sync = call("assets.syncCatalog", {
+                "requestId": "wire-sync-2", "sourceId": "community",
+                "sourcePath": str(source)})
+            assert "error" in refused_sync
+            assert call("assets.catalog", {"sourceId": "community"})["result"]["catalog"] == refreshed
+
+            # G6: probe a fake stdio server through the wire.
+            fake = REPO / "tests" / "server" / "fixtures" / "fake_mcp_server.py"
+            probe = call("assets.probe", {
+                "definition": {"name": "fake", "transport": {"stdio": {
+                    "command": "/usr/bin/python3", "args": [str(fake)]}}}})
+            assert probe["result"]["probe"]["serverName"] == "fake-mcp"
+            dead = call("assets.probe", {
+                "definition": {"name": "dead", "transport": {"stdio": {
+                    "command": "/nonexistent/binary"}}}})
+            assert "error" in dead and "PROBE_SPAWN_FAILED" in dead["error"]["message"]
     finally:
         runtime_module._sidecar_deployment_file = original_file
+
+
+# -- the directory-shaped hub and the MCP probe (order 58 G7/G6) -----------
+
+
+def _catalog_source(root: pathlib.Path) -> pathlib.Path:
+    source = root / "source"
+    skill = source / "skills" / "my-skill"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text(
+        "---\nname: my-skill\ndescription: does a thing\n---\n\nBody.\n", encoding="utf-8")
+    (source / "mcp" / "server.json").parent.mkdir(parents=True)
+    (source / "mcp" / "server.json").write_text(json.dumps({
+        "name": "web-tools", "transport": {"stdio": {"command": "/bin/web-tools"}},
+    }), encoding="utf-8")
+    (source / "index.json").write_text(json.dumps({
+        "schema_version": 1,
+        "entries": [
+            {"kind": "skill", "name": "my-skill", "path": "skills/my-skill",
+             "origin": "example.test/skills/my-skill", "description": "does a thing"},
+            {"kind": "mcp", "name": "web-tools", "path": "mcp/server.json",
+             "origin": "example.test/mcp/web-tools"},
+        ],
+    }), encoding="utf-8")
+    return source
+
+
+def test_the_catalog_snapshots_and_installs_with_pinned_provenance(tmp_path):
+    from agent_box.server.assets.catalog import CatalogError, CatalogStore
+    from agent_box.server.assets.mcp import McpAssetStore
+    from agent_box.server.assets.records import AssetRecords
+    from agent_box.server.assets.skills import SkillAssetStore
+    from agent_box.server.idempotency import IdempotentRecords
+    from agent_box.storage import Database
+
+    database = Database(tmp_path / "data")
+    database.initialize()
+    records = AssetRecords(database, IdempotentRecords(database))
+    assets_root = tmp_path / "assets"
+    catalog = CatalogStore(assets_root / "catalogs")
+    skills = SkillAssetStore(assets_root)
+    mcp = McpAssetStore(assets_root)
+
+    source = _catalog_source(tmp_path)
+    snapshot = catalog.sync(source_id="community", source_path=source)
+    assert snapshot["digest"].startswith("sha256:")
+    assert len(snapshot["entries"]) == 2
+
+    annotated = catalog.annotate(snapshot, installed={})
+    assert [item["installed"] for item in annotated] == [False, False]
+
+    skill = catalog.install_entry(snapshot=snapshot, entry_name="my-skill", revision=1,
+                                  records=records, skills=skills, mcp=mcp)
+    assert skill["source"] == f"{snapshot['digest']}:example.test/skills/my-skill"
+    server = catalog.install_entry(snapshot=snapshot, entry_name="web-tools", revision=1,
+                                   records=records, skills=skills, mcp=mcp)
+    assert server["kind"] == "mcp"
+
+    listed = {row["id"]: row for row in records.list()}
+    assert listed["my-skill"]["source"].endswith("example.test/skills/my-skill")
+    assert records.bindings  # attribute exists; no binding yet
+
+    # A failed sync leaves the previous snapshot exactly as it was.
+    (source / "index.json").write_text("{ not json", encoding="utf-8")
+    with pytest.raises(CatalogError) as refused:
+        catalog.sync(source_id="community", source_path=source)
+    assert refused.value.code == "CATALOG_INVALID"
+    assert catalog.snapshot("community") == snapshot
+
+    # The payload resolves inside the source it came from, and an unknown
+    # entry is a typed refusal.
+    with pytest.raises(CatalogError) as unknown:
+        catalog.payload_path(snapshot, "no-such-entry")
+    assert unknown.value.code == "CATALOG_ENTRY_UNKNOWN"
+
+
+def test_a_catalog_index_with_unknown_or_escaping_entries_is_refused():
+    from agent_box.server.assets.catalog import CatalogError, parse_index
+
+    def index(entries):
+        return json.dumps({"schema_version": 1, "entries": entries}).encode()
+
+    with pytest.raises(CatalogError) as escaping:
+        parse_index(index([{"kind": "skill", "name": "x", "path": "../escape",
+                            "origin": "o"}]))
+    assert escaping.value.code == "CATALOG_INVALID"
+    with pytest.raises(CatalogError) as origin:
+        parse_index(index([{"kind": "skill", "name": "x", "path": "x"}]))
+    assert origin.value.code == "CATALOG_ORIGIN_MISSING"
+    with pytest.raises(CatalogError) as kind:
+        parse_index(index([{"kind": "hook", "name": "x", "path": "x", "origin": "o"}]))
+    assert kind.value.code == "CATALOG_INVALID"
+
+
+def test_the_mcp_probe_answers_bounded_and_types_every_failure(tmp_path):
+    from agent_box.server.assets.mcp_probe import McpProbeError, probe_stdio
+
+    server = REPO / "tests" / "server" / "fixtures" / "fake_mcp_server.py"
+    ok = probe_stdio("/usr/bin/python3", args=[str(server)], timeout=5.0)
+    assert ok["status"] == "ok" and ok["serverName"] == "fake-mcp"
+
+    with pytest.raises(McpProbeError) as command:
+        probe_stdio("relative-command")
+    assert command.value.code == "PROBE_COMMAND_INVALID"
+
+    with pytest.raises(McpProbeError) as spawn:
+        probe_stdio("/nonexistent/server-binary")
+    assert spawn.value.code == "PROBE_SPAWN_FAILED"
+
+    # The failure modes are selected by the child's own environment; the probe
+    # hands it a minimal one, so the modes are chosen by the fixture's default
+    # plus a wrapper script for silence/garbage/oversize.
+    def probe_with(mode: str, **kwargs):
+        wrapper = tmp_path / f"server-{mode}.py"
+        wrapper.write_text(
+            "import os, sys\n"
+            f"os.environ['FAKE_MCP_MODE'] = {mode!r}\n"
+            f"sys.argv = ['fake', {str(server)!r}]\n"
+            f"exec(open({str(server)!r}).read())\n",
+            encoding="utf-8",
+        )
+        return probe_stdio("/usr/bin/python3", args=[str(wrapper)], **kwargs)
+
+    with pytest.raises(McpProbeError) as timeout:
+        probe_with("silent", timeout=0.5)
+    assert timeout.value.code == "PROBE_TIMEOUT"
+
+    with pytest.raises(McpProbeError) as garbage:
+        probe_with("garbage", timeout=5.0)
+    assert garbage.value.code == "PROBE_FORMAT_INVALID"
+
+    with pytest.raises(McpProbeError) as oversized:
+        probe_with("oversized", timeout=5.0, max_bytes=4096)
+    assert oversized.value.code == "PROBE_RESPONSE_TOO_LARGE"

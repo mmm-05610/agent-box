@@ -103,3 +103,25 @@
 - **凭据注入逐家钉死**（claude/qwen/codex 的 env 插值/进程环境路径）——钉死后解开上面的拒绝；
 - 来源同步（目录式 hub）、MCP 有界探测（G6）、`assets.*` wire 面与 P15 前端配对；
 - commands 资产复用同机制；hooks 只如实声明。
+
+## 阶段 B 第四块（已落地）：目录式来源（G7）与 MCP 有界探测（G6）
+
+- **来源快照**（`server/assets/catalog.py`）：源=目录（含 `index.json`）；同步只读索引并
+  快照（暂存+原子替换，**失败不落地**——测试就地验证"坏索引后快照原样"）；条目必须带
+  `origin`（缺=类型化拒绝）、路径不得逃出源、kind 只收 skill/mcp、重名拒绝；
+  快照自带摘要。
+- **列表优先**：`annotate` 逐条给出 installed/installedDigest（目录先行，安装是用户动作）；
+  `install_entry` 经普通存储安装（格式规则照旧），记录 provenance=`<快照摘要>:<origin>`，
+  载荷只从**快照命名的源**读取。
+- **探测**（`server/assets/mcp_probe.py`）：起一个 stdio 子进程 → 发一条 initialize →
+  有界读取（64 KiB 上限、超时、selectors）→ **每条退出路径都杀进程组**；环境最小化
+  （PATH/LANG/HOME，**零凭据**）；畸形输出/超时/超限/起不来/相对命令 各有类型化码。
+- **wire**：`assets.syncCatalog/catalog/installFromCatalog/probe`（+4 方法），
+  wire-review 已记。
+- **测试**：新增 4 条（快照/安装/失败不落地/逃逸与 origin 反例、探测五态、wire 端到端），
+  夹具 `tests/server/fixtures/fake_mcp_server.py`；全量见提交记录。
+
+## 58 余下（下腿）
+
+- 凭据注入逐家钉死（解开 `MCP_CREDENTIAL_INJECTION_UNVERIFIED`）；P15 前端同步与两仓重锁；
+  commands 资产复用；hooks 只如实声明（本单明确不统一）。

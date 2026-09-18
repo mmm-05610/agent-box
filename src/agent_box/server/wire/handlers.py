@@ -90,6 +90,10 @@ _PARAM_SHAPES = {
     "assets.bind": ({"requestId", "profileId", "assetId"}, {"revision", "enabled"}),
     "assets.unbind": ({"requestId", "profileId", "assetId"}, set()),
     "assets.bindings": ({"profileId"}, set()),
+    "assets.syncCatalog": ({"requestId", "sourceId", "sourcePath"}, set()),
+    "assets.catalog": ({"sourceId"}, set()),
+    "assets.installFromCatalog": ({"requestId", "sourceId", "entryName", "revision"}, set()),
+    "assets.probe": ({"definition"}, set()),
     "accounts.list": (set(), set()),
     "accounts.create": ({"requestId", "harness", "accountIdentifier"}, set()),
     "accounts.bind": ({"requestId", "profileId", "expectedVersion", "accountId"}, set()),
@@ -248,6 +252,7 @@ class WireService:
         asset_records=None,
         skill_assets=None,
         mcp_assets=None,
+        catalogs=None,
     ) -> None:
         self._server_id_provider = server_id_provider
         self.artifact_store = artifact_store
@@ -260,6 +265,8 @@ class WireService:
         self.asset_records = asset_records
         self.skill_assets = skill_assets
         self.mcp_assets = mcp_assets
+        #: Order 58 G7: directory-shaped source snapshots.
+        self.catalogs = catalogs
         #: Order 56: harness -> its declared subscription login-state files,
         #: read from the deployment set the composition loaded.
         self.subscription_files_for = subscription_files_for or (lambda _harness: ())
@@ -296,6 +303,10 @@ class WireService:
             "assets.bind": self.assets_bind,
             "assets.unbind": self.assets_unbind,
             "assets.bindings": self.assets_bindings,
+            "assets.syncCatalog": self.assets_sync_catalog,
+            "assets.catalog": self.assets_catalog,
+            "assets.installFromCatalog": self.assets_install_from_catalog,
+            "assets.probe": self.assets_probe,
             "accounts.list": self.accounts_list,
             "accounts.create": self.accounts_create,
             "accounts.bind": self.accounts_bind,
@@ -456,6 +467,85 @@ class WireService:
         return item
 
     # -- managed assets (Order 58) -----------------------------------------
+
+    def _require_catalogs(self):
+        if self.catalogs is None:
+            raise WireError("UNAVAILABLE", "no catalogue store is composed")
+        return self.catalogs
+
+    def assets_sync_catalog(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        """Snapshot one directory-shaped source (list now, install later)."""
+        from pathlib import Path as _Path
+
+        catalogs = self._require_catalogs()
+        try:
+            snapshot = catalogs.sync(
+                source_id=_slug(params["sourceId"], "sourceId"),
+                source_path=_Path(_bounded(params["sourcePath"], "sourcePath", 4096)),
+            )
+        except Exception as refusal:  # noqa: BLE001 - typed by the store
+            raise WireError("INVALID_REQUEST",
+                            f"{getattr(refusal, 'code', type(refusal).__name__)}: "
+                            f"{getattr(refusal, 'message', refusal)}")
+        return {"catalog": self._catalog_view(snapshot)}
+
+    def assets_catalog(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        catalogs = self._require_catalogs()
+        snapshot = catalogs.snapshot(_slug(params["sourceId"], "sourceId"))
+        if snapshot is None:
+            raise WireError("NOT_FOUND", "that source has no snapshot yet")
+        return {"catalog": self._catalog_view(snapshot)}
+
+    def _catalog_view(self, snapshot: Mapping[str, Any]) -> dict[str, Any]:
+        records, _skills, _mcp = self._require_assets()
+        installed = {
+            f"{row['kind']}:{row['name']}": row["digest"] for row in records.list()
+        }
+        return {
+            "sourcePath": snapshot["source_path"],
+            "digest": snapshot["digest"],
+            "entries": self._require_catalogs().annotate(snapshot, installed=installed),
+        }
+
+    def assets_install_from_catalog(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        """Install one catalogue entry (a user action), provenance pinned."""
+        catalogs = self._require_catalogs()
+        records, skills, mcp = self._require_assets()
+        source_id = _slug(params["sourceId"], "sourceId")
+        snapshot = catalogs.snapshot(source_id)
+        if snapshot is None:
+            raise WireError("NOT_FOUND", "that source has no snapshot yet")
+        try:
+            installed = catalogs.install_entry(
+                snapshot=snapshot,
+                entry_name=_slug(params["entryName"], "entryName"),
+                revision=_positive(params["revision"], "revision"),
+                records=records, skills=skills, mcp=mcp,
+            )
+        except Exception as refusal:  # noqa: BLE001 - typed by the store
+            raise WireError("INVALID_REQUEST",
+                            f"{getattr(refusal, 'code', type(refusal).__name__)}: "
+                            f"{getattr(refusal, 'message', refusal)}")
+        return {"installed": installed}
+
+    def assets_probe(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        """One bounded stdio handshake probe; no config write, no model call."""
+        from agent_box.server.assets.mcp import McpAssetError, canonical_definition
+        from agent_box.server.assets.mcp_probe import McpProbeError, probe_stdio
+
+        try:
+            canonical = canonical_definition(params["definition"])
+        except McpAssetError as refusal:
+            raise WireError("INVALID_REQUEST", f"{refusal.code}: {refusal.message}")
+        transport = canonical["transport"]
+        if "stdio" not in transport:
+            raise WireError("INVALID_REQUEST", "only stdio servers can be probed yet")
+        body = transport["stdio"]
+        try:
+            facts = probe_stdio(body["command"], args=body["args"])
+        except McpProbeError as refusal:
+            raise WireError("UNAVAILABLE", f"{refusal.code}: {refusal.message}")
+        return {"probe": facts}
 
     def _require_assets(self):
         if self.asset_records is None or self.skill_assets is None or self.mcp_assets is None:
