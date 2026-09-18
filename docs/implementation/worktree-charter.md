@@ -27,7 +27,8 @@
 | 2 | `066-shared-session-store` | kilo/opencode 改"共享整库 + 空凭据守卫"；切绑定不搬库 | 无（与 068 可并行） |
 | 3 | `067-per-session-admission` | 准入单位从 profile 改为会话；禁同会话双写；home 并发可变态逐家判定 | 45 已落地 |
 | 4 | `070-real-endpoint-probes` | 55 的 G2–G4：真实端点探测（R-0011 已授权，不设上限、逐笔记账） | 无 |
-| 5 | `069-wsl-observation-54` | 54 的 WSL 通道观测轮（c11 门已绿）：变更集一手事实，含否定项 | 无 |
+| 5 | `072-windows-48-closeout` | 48 结案取证（只写证据；核对写/读隔离仍为 false） | 无 |
+| 6 | `069-wsl-observation-54` | 54 的 WSL 通道观测轮（c11 门已绿）：变更集一手事实，含否定项 | 无 |
 
 > 契约文件在 `docs/implementation/work-orders/`；**新单与修订由调度者直接投递进来**（父树对本树有白名单写权），
 > 我每个阶段边界重读该目录即可，不需要去别处复制，也没有副本要合并。
