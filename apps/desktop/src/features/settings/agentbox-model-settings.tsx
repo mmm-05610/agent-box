@@ -28,7 +28,6 @@ import {
 import type { ProviderModelConfigRecord } from '@/types/wire/wire-v1'
 
 import { AccountList } from './account-list'
-
 import { CUSTOM_HARNESS, CUSTOM_PROVIDER, harnessOptions, knownModelIds, providerOptions } from './provider-presets'
 
 type ModelsCopy = Translations['settings']['product']['models']
@@ -660,8 +659,10 @@ function CreateForm({
     directory.map(record => record.harness),
     values[1]
   )
+
   const providerChoices = providerOptions(directory.map(record => record.provider))
   const providerSuggestions = knownModelIds(directory, values[2])
+
   const set = (index: number) => (event: ChangeEvent<HTMLInputElement>) =>
     setValues(current => current.map((value, item) => (item === index ? event.target.value : value)))
 

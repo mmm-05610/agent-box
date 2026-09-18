@@ -395,12 +395,14 @@ describe('AgentBox model settings honesty', () => {
     const capabilities = container.querySelector('[data-model-capabilities]')
 
     expect(capabilities).toBeTruthy()
+
     for (const name of ['Refresh from provider', 'Test connection']) {
       const button = screen.getByRole('button', { name }) as HTMLButtonElement
 
       expect(button.disabled).toBe(true)
       expect(button.getAttribute('title')).toBe('Not available: the service declares no method for this yet.')
     }
+
     expect(capabilities?.textContent).toContain('Not available: the service declares no method for this yet.')
   })
 

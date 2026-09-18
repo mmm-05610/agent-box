@@ -61,6 +61,7 @@ import type {
   ProfilesUpdateConfigResult
 } from '@/types/wire/wire-v1'
 
+import { CloneProfileDialog } from './clone-profile-dialog'
 import {
   buildProfileConfigValues,
   emptyProfileConfigDraft,
@@ -68,7 +69,6 @@ import {
   type ProfileConfigDraft,
   ProfileConfigEditor
 } from './profile-config-editor'
-import { CloneProfileDialog } from './clone-profile-dialog'
 import { ProfilePermissionEditor } from './profile-permission-editor'
 import { profileMemoryView, type ProfileMemoryView, profilePermissionView } from './profile-read-facts'
 import { ProfileRoleSettings } from './profile-role-settings'

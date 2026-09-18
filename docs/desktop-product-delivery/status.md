@@ -1864,3 +1864,32 @@ P21 五个测试文件：`wire-v1.test.ts` 28（+11）、`work-status.test.ts` 1
   `electron` 二进制到 `node_modules/electron/dist`（`/tmp/electron.zip` 仍在，未重新下载）。
 - 提交：`P22 stage 2`（pathspec）。
 
+## P22 阶段 3（2026-09-18）：资产 hub + 订阅账号 + hook 管理（写路径） — `P22_STAGE3_HUB_ACCOUNTS_HOOKS`
+
+- **新增三个端口**（`application/`，与既有 `*Port` 同构、可注入假实现）：
+  - `assets/wire-asset-hub-port.ts`：`assets.list`/`bindings`/`bind`/`unbind`/`publishSkill`/`publishMcp`/`publishPlugin`。
+  - `accounts/wire-accounts-port.ts`：`accounts.list`/`create`/`importAsset`/`bind`。
+  - `hooks/wire-hooks-port.ts`：`hooks.list`/`create`/`setEnabled`/`delete`/`triggers`。
+- **界面（三处 P15/P16/P12 占位面 ⇒ 真面）**：
+  - `product:resources` → `AgentBoxAssetHub`：目录（kind/name/revision/digest/source，**不含内容**）、
+    按所选角色**绑定/解绑**（禁用的绑定如实标注）、发布区（skill/plugin 用主机路径、MCP 用 JSON 定义）。
+  - `product:identities` → `AgentBoxAccounts`：服务账号列表（`hasAsset`/`lastVerifiedAt`/`state`，零 token 零 locator）、
+    新建（家族+标识）、导入登录态、绑定到角色（带 `expectedVersion`）。
+  - `product:hooks` → `AgentBoxHookSettings`：hook 列表 + **逐条命令**（启用前可见）、启停、
+    触发历史（`blocking` 用 destructive 徽标如实呈现）、删除二次确认并在回执里显示连带删掉的触发行数、
+    新建（family/name/event/command → `{event, handlers:[{type:'command', command, timeout:30, async:false}]}`）。
+  - `product-settings.tsx` 删掉两段"字段计划"占位文案（51 行），改为挂载这三个面。
+- **G2（不画假开关）在本阶段的落点**：每面的写控件都绑定"读是否成功 + 服务是否就绪"；
+  读失败（`UNAVAILABLE` 等）时**全部禁用**并在页面显示服务原话。测试对三面各有一条反例断言
+  （`buttons.every(disabled)`、`HOOK_NOT_EXECUTABLE` 单行禁用）。
+- **测试**：
+  - 新增 `agentbox-contract-faces.test.tsx` 8 例：绑定真调、发布走 skill 路径并按码显示拒绝（含 `internalCode`）、
+    目录不可读⇒全禁用、账号新建/参考字段、无密钥库⇒全禁用、hook 启停真调、无命令处理器⇒开关禁用、新建模型形状 + 删除回执行数。
+  - 改写 `product-settings.test.tsx` 的两组"占位文案"测试为新面的行为测试（占位已按本单意图替换）；
+    更新 `index.test.tsx` 的 MCP 深链断言锚点（语义不变：落在 resources 面、且不挂旧 install 控件）。
+  - `src/features/settings` 15 文件 / 153 例、`src/features/profiles` 8 文件 / 73 例、
+    `src/application` 全量 87 文件 / **844 例全绿**；本阶段改动文件 eslint **0 error**（16 warnings 全是测试里的 `document`）。
+- **修掉两处自己写出的真 bug**（测试抓到）：① `Input` 的 `onChange` 里在 state updater 内读 `event.currentTarget`
+  （事件已被回收 ⇒ 抛错），改为先取值再 set；② hook 删除后 `run()` 用空字符串覆盖了动作自己设的回执文案。
+- 提交：`P22 stage 3`（pathspec）。
+

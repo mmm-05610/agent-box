@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
 
+import { Button } from '@/components/ui/button'
+import type { Translations } from '@/i18n'
 import { AlertTriangle } from '@/lib/icons'
 import { wireErrorText } from '@/lib/wire-error-text'
 import type { PermissionRule, ProfileRecord } from '@/types/wire/wire-v1'
-
-import { Button } from '@/components/ui/button'
-import type { Translations } from '@/i18n'
 
 export type PermissionEditorCopy = Translations['profiles']['roleSettings']
 

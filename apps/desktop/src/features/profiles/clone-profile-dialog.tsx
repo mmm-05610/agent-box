@@ -1,9 +1,5 @@
 import { useEffect, useState } from 'react'
 
-import { AlertTriangle } from '@/lib/icons'
-import { wireErrorText } from '@/lib/wire-error-text'
-import type { ProfileMigration, ProfileRecord, ProfilesCloneResult } from '@/types/wire/wire-v1'
-
 import { ActionStatus } from '@/components/ui/action-status'
 import { Button } from '@/components/ui/button'
 import {
@@ -17,6 +13,9 @@ import {
 import { Field } from '@/components/ui/field'
 import { SanitizedInput } from '@/components/ui/sanitized-input'
 import type { Translations } from '@/i18n'
+import { AlertTriangle } from '@/lib/icons'
+import { wireErrorText } from '@/lib/wire-error-text'
+import type { ProfileMigration, ProfileRecord, ProfilesCloneResult } from '@/types/wire/wire-v1'
 
 export type CloneProfileCopy = Translations['profiles']['clone']
 

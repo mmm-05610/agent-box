@@ -501,7 +501,101 @@ export interface Translations {
         fieldsPending: string
         nextTurn: string
       }
-      data: { title: string; description: string; boundary: string }
+      /** P22 (orders 58/59): the asset catalogue, its bindings and publishes. */
+    assetHub: {
+      title: string
+      description: string
+      serviceOffline: string
+      unavailable: (reason: string) => string
+      empty: string
+      emptyDescription: string
+      targetRole: string
+      noRole: string
+      bind: string
+      unbind: string
+      bound: string
+      unbound: string
+      revision: (revision: number) => string
+      sourceUnknown: string
+      disabledBinding: string
+      publishTitle: string
+      publishDescription: string
+      publishKind: string
+      publishAssetId: string
+      publishRevision: string
+      publishPath: string
+      publishDefinition: string
+      publishSubmit: string
+      published: string
+      publishProvenanceNote: string
+      refused: (reason: string) => string
+    }
+    /** P22 (order 56): the service's managed subscription accounts. */
+    accountsService: {
+      title: string
+      description: string
+      unavailableBadge: string
+      serviceOffline: string
+      unavailable: (reason: string) => string
+      empty: string
+      emptyDescription: string
+      bind: string
+      bound: string
+      boundHere: string
+      hasAsset: string
+      noAsset: string
+      lastVerified: string
+      unknown: string
+      writeTitle: string
+      targetRole: string
+      noRole: string
+      harnessLabel: string
+      identifierLabel: string
+      create: string
+      created: string
+      importPathLabel: string
+      importAsset: string
+      imported: string
+      importPathNote: string
+      refused: (reason: string) => string
+    }
+    /** P22 (order 59): managed hooks, their enable state and their ledger. */
+    hookSettings: {
+      title: string
+      description: string
+      unavailableBadge: string
+      serviceOffline: string
+      unavailable: (reason: string) => string
+      empty: string
+      emptyDescription: string
+      enable: string
+      disable: string
+      enabled: string
+      disabled: string
+      enabledState: string
+      disabledState: string
+      notExecutable: string
+      triggers: string
+      triggersTitle: string
+      triggersEmpty: string
+      triggersEmptyDescription: string
+      blocking: string
+      truncated: string
+      remove: string
+      removeTitle: string
+      removeDescription: (name: string) => string
+      removed: (count: number) => string
+      createTitle: string
+      createFamily: string
+      createName: string
+      createEvent: string
+      createCommand: string
+      create: string
+      created: string
+      createNote: string
+      refused: (reason: string) => string
+    }
+    data: { title: string; description: string; boundary: string }
     }
     plugins: {
       title: string

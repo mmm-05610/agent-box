@@ -1,7 +1,10 @@
 import { ListRow, Pill, SettingsContent, SettingsSection } from '@/components/settings/primitives'
 import { useI18n } from '@/i18n'
-import { Archive, Cpu, Package, Zap, Users, Wrench } from '@/lib/icons'
+import { Archive, Cpu, Package, Users, Wrench, Zap } from '@/lib/icons'
 
+import { AgentBoxAccounts } from './agentbox-accounts'
+import { AgentBoxAssetHub } from './agentbox-asset-hub'
+import { AgentBoxHookSettings } from './agentbox-hook-settings'
 import { AgentBoxModelSettings } from './agentbox-model-settings'
 import type { ProductSettingsView } from './settings-navigation'
 
@@ -19,6 +22,22 @@ export function ProductSettings({ view }: { view: ProductSettingsView }) {
 
   if (view === 'models') {
     return <AgentBoxModelSettings />
+  }
+
+  // P22: three of these views stopped being "the fields this will carry" and
+  // became the faces themselves — the catalogue and its writes (58/59), the
+  // managed accounts (56) and the hook ledger (59). What is left below is the
+  // pair that genuinely has no service surface yet.
+  if (view === 'resources') {
+    return <AgentBoxAssetHub />
+  }
+
+  if (view === 'hooks') {
+    return <AgentBoxHookSettings />
+  }
+
+  if (view === 'identities') {
+    return <AgentBoxAccounts />
   }
 
   const section = copy[view]
@@ -46,57 +65,6 @@ export function ProductSettings({ view }: { view: ProductSettingsView }) {
               ))}
             </ul>
             <div data-harness-version-next-turn="">{copy.harnesses.nextTurn}</div>
-          </div>
-        )}
-        {view === 'hooks' && (
-          /* P16: the hook model lives in the service (59) — per-family schema,
-             storage, materialization and the trigger ledger. Until it declares
-             them this surface names each family's real shape, states what is
-             missing, and renders NOTHING that could be pressed: a read-only
-             shell here would be a dead control, and the order's top discipline
-             is that a control which cannot act is not shown at all. */
-          <div className="space-y-3 px-3 py-2 text-xs text-muted-foreground" data-hook-plan="">
-            <div>{copy.hooks.familiesPending}</div>
-            <ul className="list-disc space-y-0.5 pl-4" data-hook-families="">
-              {copy.hooks.families.map(family => (
-                <li key={family}>{family}</li>
-              ))}
-            </ul>
-            <div data-hook-safety="">{copy.hooks.safety}</div>
-            <div className="space-y-1" data-hook-ledger="">
-              <ul className="list-disc space-y-0.5 pl-4">
-                {copy.hooks.ledgerFields.map(field => (
-                  <li key={field}>{field}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        )}
-        {view === 'resources' && (
-          /* P15-B/C: the skill library and the MCP server list belong to the
-             service (58). Until it declares them, the surface names the fields
-             of each list and says outright that nothing is being guessed: no
-             installed state, no digest, no update badge, no credential VALUE,
-             no test button that could not run — and the per-profile enablement
-             rule stated before it can ever be used. */
-          <div className="space-y-3 px-3 py-2 text-xs text-muted-foreground" data-skill-mcp-plan="">
-            <div className="space-y-1" data-skill-plan="">
-              <div>{copy.resources.skillPending}</div>
-              <ul className="list-disc space-y-0.5 pl-4">
-                {copy.resources.skillFields.map(field => (
-                  <li key={field}>{field}</li>
-                ))}
-              </ul>
-            </div>
-            <div className="space-y-1" data-mcp-plan="">
-              <div>{copy.resources.mcpPending}</div>
-              <ul className="list-disc space-y-0.5 pl-4">
-                {copy.resources.mcpFields.map(field => (
-                  <li key={field}>{field}</li>
-                ))}
-              </ul>
-            </div>
-            <div data-resource-enablement-rule="">{copy.resources.enablement}</div>
           </div>
         )}
       </SettingsSection>

@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { I18nProvider } from '@/i18n'
 
-import { AccountList, accountKindLabel } from './account-list'
+import { accountKindLabel, AccountList } from './account-list'
 
 afterEach(cleanup)
 

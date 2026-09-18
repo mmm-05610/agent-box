@@ -36,9 +36,11 @@ describe('ProductSettings harness program plan', () => {
 
     expect(plan).toBeTruthy()
     expect(plan?.textContent).toContain('The program directory is not available')
+
     for (const field of ['Current version', 'Other installed versions', 'Size', 'Source', 'Installed at', 'Update badge']) {
       expect(plan?.textContent).toContain(field)
     }
+
     expect(plan?.textContent).toContain('Nothing is guessed in the meantime')
   })
 
@@ -69,89 +71,60 @@ describe('ProductSettings harness program plan', () => {
 // Until it declares them this surface names their fields, states what is
 // missing, and holds the line that matters most here: a credential is only
 // ever a reference, and no switch or test button exists before it could work.
-describe('ProductSettings skill and MCP hubs', () => {
-  it('names both lists' + "'" + ' fields and says each library is missing', () => {
+// P22: these two views stopped being "the fields this will carry" and became
+// the faces themselves (orders 58/59). What still matters here — and what the
+// old plan copy was protecting — is that a surface without a service can be
+// neither read nor written: it says why, and every write control is disabled.
+describe('ProductSettings asset hub (P22, order 58/59 write path)', () => {
+  it('renders the catalogue surface with the service state named, never a fabricated list', () => {
     const { container } = render(<ProductSettings view="resources" />)
 
-    const skill = container.querySelector('[data-skill-plan]')
-    const mcp = container.querySelector('[data-mcp-plan]')
-
-    expect(skill?.textContent).toContain('The skill library is not available')
-    for (const field of ['SKILL.md', 'Source', 'Digest / revision', 'Enabled per profile']) {
-      expect(skill?.textContent).toContain(field)
-    }
-    expect(mcp?.textContent).toContain('The MCP server list is not available')
-    for (const field of ['Transport (stdio or remote)', 'Command or URL', 'Credential reference']) {
-      expect(mcp?.textContent).toContain(field)
-    }
+    expect(container.querySelector('[data-asset-hub-offline]')).not.toBeNull()
+    expect(container.textContent).not.toMatch(/sha256:[0-9a-f]{6,}/i)
   })
 
-  it('promises credential references only, and no test button before one can run', () => {
+  it('G2: with no readable catalogue every write control is disabled', () => {
     const { container } = render(<ProductSettings view="resources" />)
+    const buttons = Array.from(container.querySelectorAll('button'))
 
-    const mcp = container.querySelector('[data-mcp-plan]')?.textContent ?? ''
-
-    expect(mcp).toContain('never its value')
-    expect(mcp).toContain('no test button exists until the service can run one')
-    expect(screen.queryByRole('button')).toBeNull()
+    expect(buttons.length).toBeGreaterThan(0)
+    expect(buttons.every(button => button.disabled)).toBe(true)
   })
 
-  it('states the per-profile enablement rule, including the absent-slot case', () => {
-    const { container } = render(<ProductSettings view="resources" />)
+  it('states what a published revision keeps (provenance) before anything is published', () => {
+    render(<ProductSettings view="resources" />)
 
-    expect(container.querySelector('[data-resource-enablement-rule]')?.textContent).toContain(
-      'a family without a slot for a resource says so'
-    )
-  })
-
-  it('renders no installed state, digest or update badge for either list', () => {
-    const { container } = render(<ProductSettings view="resources" />)
-
-    expect(container.textContent).not.toMatch(/\bv?\d+\.\d+\.\d+\b/)
-    expect(container.textContent).not.toMatch(/sha256|sk-[A-Za-z0-9]{6,}/i)
+    expect(screen.getByText(/keeps its provenance/i)).toBeTruthy()
   })
 })
 
-// P16: hooks are per family and live in the service (59). Until it declares
-// the schema and ledger, the surface names each family's real shape and the
-// safety rule, and renders no control at all — a read-only shell would be
-// exactly the dead control the order forbids.
-describe('ProductSettings hook plan', () => {
-  it('names each family' + "'" + 's own model, including the one still to be measured', () => {
+describe('ProductSettings hook surface (P22, order 59 write path)', () => {
+  it('renders the hook surface with its state named', () => {
     const { container } = render(<ProductSettings view="hooks" />)
 
-    const families = container.querySelector('[data-hook-families]')?.textContent ?? ''
-
-    expect(families).toContain('Claude Code — declarative')
-    expect(families).toContain('OpenCode — a code asset')
-    expect(families).toContain('Codex — shape pending measurement')
-    expect(container.querySelector('[data-hook-plan]')?.textContent).toContain('Editing is not available yet')
+    expect(container.querySelector('[data-hooks-offline]')).not.toBeNull()
   })
 
-  it('states default-off, sandbox execution and the confirmation before enabling', () => {
+  it('G2: with no readable ledger no hook control is enabled', () => {
     const { container } = render(<ProductSettings view="hooks" />)
+    const buttons = Array.from(container.querySelectorAll('button'))
 
-    const safety = container.querySelector('[data-hook-safety]')?.textContent ?? ''
-
-    expect(safety).toContain('off by default')
-    expect(safety).toContain('inside that execution’s sandbox')
-    expect(safety).toContain('never directly on this machine')
+    expect(buttons.length).toBeGreaterThan(0)
+    expect(buttons.every(button => button.disabled)).toBe(true)
   })
 
-  it('names the trigger ledger and its blocking semantics', () => {
-    const { container } = render(<ProductSettings view="hooks" />)
+  it('says a hook starts disabled and that the service owns the family schema', () => {
+    render(<ProductSettings view="hooks" />)
 
-    const ledger = container.querySelector('[data-hook-ledger]')?.textContent ?? ''
-
-    expect(ledger).toContain('Exit code')
-    expect(ledger).toContain('Blocking, named as such')
+    expect(screen.getByText(/validates the event and handler against the declared schema/i)).toBeTruthy()
   })
+})
 
-  it('renders no switch, field or button: nothing dead to press', () => {
-    const { container } = render(<ProductSettings view="hooks" />)
+describe('ProductSettings accounts surface (P22, order 56 write path)', () => {
+  it('renders the service-account surface with its state named, not the local credential file', () => {
+    const { container } = render(<ProductSettings view="identities" />)
 
-    expect(screen.queryByRole('button')).toBeNull()
-    expect(screen.queryByRole('switch')).toBeNull()
-    expect(screen.queryByRole('textbox')).toBeNull()
+    expect(container.querySelector('[data-accounts-offline]')).not.toBeNull()
+    expect(screen.getByText(/Only references cross this surface/i)).toBeTruthy()
   })
 })
