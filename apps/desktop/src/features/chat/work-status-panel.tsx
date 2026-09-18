@@ -37,8 +37,13 @@ export interface WorkStatusPanelProps {
   /** Order 64: the service's inventory, or null while it has not answered a
    *  read yet — null is "no fact", and an empty list is "none in flight". */
   executions?: ExecutionInventoryRow[] | null
+  /** Why the inventory read failed — a refused read (over the row bound, say)
+   *  is shown, never silently truncated to an empty list. */
+  executionsError?: null | string
   /** Order 62: the workspace's Git answer, or null while unknown. */
   git?: WorkspaceGitStatus | null
+  /** Why the Git read failed, if it did. */
+  gitError?: null | string
   queue: QueueItem[]
   /** Re-reads the two read-only faces; nothing here writes anything. */
   onRefresh?: () => void
@@ -63,7 +68,15 @@ function useNowTicking(active: boolean): number {
   return now
 }
 
-export function WorkStatusPanel({ execution, executions = null, git = null, onRefresh, queue }: WorkStatusPanelProps) {
+export function WorkStatusPanel({
+  execution,
+  executions = null,
+  executionsError = null,
+  git = null,
+  gitError = null,
+  onRefresh,
+  queue
+}: WorkStatusPanelProps) {
   const { t } = useI18n()
   const copy = t.workStatus
   const mode = useStore($workStatusPanelMode)
@@ -97,7 +110,9 @@ export function WorkStatusPanel({ execution, executions = null, git = null, onRe
       })
     : []
 
-  const hasCards = process !== null || gitRows !== null || executionRows.length > 0
+  const gitFailed = gitError !== null
+  const executionsFailed = executionsError !== null
+  const hasCards = process !== null || gitRows !== null || executionRows.length > 0 || gitFailed || executionsFailed
 
   // The line is assembled from service facts; when the only facts are card
   // facts (a Git answer with no branch, say) the line names the card instead of
@@ -113,7 +128,16 @@ export function WorkStatusPanel({ execution, executions = null, git = null, onRe
       now
     ) ??
     (hasCards
-      ? { activity: 'idle' as const, parts: [process ? copy.processCard : gitRows ? copy.gitCard : copy.executionsCard] }
+      ? {
+          activity: 'idle' as const,
+          parts: [
+            process
+              ? copy.processCard
+              : gitRows || gitFailed
+                ? copy.gitCard
+                : copy.executionsCard
+          ]
+        }
       : null)
 
   if (mode === 'closed' || !line) {
@@ -225,24 +249,35 @@ export function WorkStatusPanel({ execution, executions = null, git = null, onRe
                 )}
               </div>
             )}
-            {gitRows && (
+            {(gitRows || gitFailed) && (
               <div className="border-t border-(--ui-stroke-tertiary) px-2.5 py-1.5" data-work-status-card="git">
                 <div className="text-[0.625rem] uppercase tracking-wide text-(--ui-text-quaternary)">{copy.gitCard}</div>
-                <dl className="mt-1 grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-0.5">
-                  {gitRows.map(row => (
-                    <Fragment key={row.label}>
-                      <dt className="text-[0.6875rem] text-(--ui-text-quaternary)">{row.label}</dt>
-                      <dd className="truncate text-right font-mono text-[0.6875rem] text-(--ui-text-secondary)">{row.value}</dd>
-                    </Fragment>
-                  ))}
-                </dl>
+                {gitRows ? (
+                  <dl className="mt-1 grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-0.5">
+                    {gitRows.map(row => (
+                      <Fragment key={row.label}>
+                        <dt className="text-[0.6875rem] text-(--ui-text-quaternary)">{row.label}</dt>
+                        <dd className="truncate text-right font-mono text-[0.6875rem] text-(--ui-text-secondary)">{row.value}</dd>
+                      </Fragment>
+                    ))}
+                  </dl>
+                ) : (
+                  <div className="mt-1 text-[0.6875rem] italic text-(--ui-text-tertiary)" data-work-status-git-error="">
+                    {gitError}
+                  </div>
+                )}
               </div>
             )}
-            {executionRows.length > 0 && (
+            {(executionRows.length > 0 || executionsFailed) && (
               <div className="border-t border-(--ui-stroke-tertiary) px-2.5 py-1.5" data-work-status-card="executions">
                 <div className="text-[0.625rem] uppercase tracking-wide text-(--ui-text-quaternary)">
                   {copy.executionsCard}
                 </div>
+                {executionsFailed ? (
+                  <div className="mt-1 text-[0.6875rem] italic text-(--ui-text-tertiary)" data-work-status-executions-error="">
+                    {executionsError}
+                  </div>
+                ) : null}
                 <ul className="mt-1 space-y-1">
                   {executionRows.map(row => (
                     <li className="text-[0.6875rem] text-(--ui-text-secondary)" data-work-status-execution={row.executionId} key={row.executionId}>

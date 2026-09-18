@@ -14,13 +14,17 @@ const RUNNING_SINCE = new Date(Date.now() - 249_000).toISOString()
 const mount = ({
   execution = null,
   executions = null,
+  executionsError = null,
   git = null,
+  gitError = null,
   onRefresh,
   queue = []
 }: {
   execution?: null | { executionId: string; reason: null | string; since?: string; state: string }
   executions?: null | Record<string, unknown>[]
+  executionsError?: null | string
   git?: null | Record<string, unknown>
+  gitError?: null | string
   onRefresh?: () => void
   queue?: { itemId: string; message: { text: string }; state: string }[]
 }) =>
@@ -29,7 +33,9 @@ const mount = ({
       <WorkStatusPanel
         execution={execution as never}
         executions={executions as never}
+        executionsError={executionsError}
         git={git as never}
+        gitError={gitError}
         onRefresh={onRefresh}
         queue={queue as never}
       />
@@ -188,5 +194,28 @@ describe('WorkStatusPanel P21 cards (orders 62/64)', () => {
     fireEvent.click(document.querySelector<HTMLButtonElement>('[data-work-status-refresh]')!)
 
     expect(refreshed).toBe(1)
+  })
+})
+
+describe('WorkStatusPanel P21 read failures (order 64: no silent truncation)', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+    $workStatusPanelMode.set('expanded')
+  })
+
+  it('shows the typed refusal of an over-bound inventory read instead of hiding the card', () => {
+    mount({ executionsError: 'INVALID_REQUEST: INVENTORY_LIMIT_EXCEEDED: more than 200 executions are in flight' })
+
+    const card = document.querySelector('[data-work-status-card="executions"]')
+
+    expect(card).not.toBeNull()
+    expect(document.querySelector('[data-work-status-executions-error]')?.textContent).toContain('INVENTORY_LIMIT_EXCEEDED')
+  })
+
+  it('says why the Git read failed rather than drawing six empty fields', () => {
+    mount({ gitError: 'UNAVAILABLE: Pacthold service is unavailable' })
+
+    expect(document.querySelector('[data-work-status-git-error]')?.textContent).toContain('UNAVAILABLE')
+    expect(document.querySelector('[data-work-status-card="git"] dl')).toBeNull()
   })
 })

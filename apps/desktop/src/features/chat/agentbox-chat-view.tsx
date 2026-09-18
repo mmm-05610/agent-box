@@ -212,7 +212,9 @@ export function AgentBoxChatView({ maxVoiceRecordingSeconds }: { maxVoiceRecordi
           <WorkStatusPanel
             execution={binding.projection?.execution ?? null}
             executions={reads.executions}
+            executionsError={reads.executionsError}
             git={reads.git}
+            gitError={reads.gitError}
             onRefresh={reads.refresh}
             queue={binding.queue}
           />
