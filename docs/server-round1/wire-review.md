@@ -467,3 +467,21 @@ ProviderModelConfigRecord = {
 - **profiles 投影 +1 字段**：`accountId`（绑定的订阅账户或 null）；wire 形状有变
   ⇒ **需前端同步（P12）并重锁两仓摘要**（本工作树未动前端仓）。
 - **无 SecretStore 的组合**：四个方法类型化拒绝 `UNAVAILABLE`（不落明文资产）。
+
+## Order 58 — 受管资产（assets.*，2026-09-18，env-provider）
+
+- **新方法（+6，纯新增面）**：
+  - `assets.list {} → {assets: AssetView[]}`（目录：kind/name/latestRevision/digest/source，
+    **零内容、零 host 路径**）；
+  - `assets.publishSkill {requestId, assetId, revision, sourcePath} → {asset}`
+    （安装一个**本机目录**为一修订；frontmatter 规则由存储层类型化拒绝，
+    经 wire 以 `INVALID_REQUEST` + 具体码回传）；
+  - `assets.publishMcp {requestId, assetId, revision, definition} → {asset}`
+    （标准 server 定义；env/headers 只收 `{"credentialRef": …}`）；
+  - `assets.bind {requestId, profileId, assetId, revision?, enabled?} → {binding}`；
+  - `assets.unbind {requestId, profileId, assetId} → {unbound}`；
+  - `assets.bindings {profileId} → {bindings: [{assetId, kind, name, revision, digest, enabled}]}`。
+- **身份**：assetId 是稳定 slug，目录行/存储目录/绑定共用同一身份。
+- **物化时机**：绑定在**下一轮**生效（执行前按启用绑定渲染并写入执行内，零回写）；
+  带凭据引用的 MCP 服务器当前**类型化拒绝**（逐家注入路径未钉死前不落秘密）。
+- **需前端同步（P15）与两仓重锁**；本工作树未动前端仓。

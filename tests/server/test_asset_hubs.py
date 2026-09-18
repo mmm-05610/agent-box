@@ -385,3 +385,115 @@ def test_a_bound_mcp_asset_is_rendered_and_materialised_without_writeback(tmp_pa
             }
     finally:
         runtime_module._sidecar_deployment_file = original_file
+
+
+@pytest.mark.skipif(shutil.which("bwrap") is None, reason="bwrap is required")
+def test_the_assets_wire_face_publishes_binds_and_lists(tmp_path):
+    """Order 58's wire face: publish a skill directory and an MCP definition,
+    bind them to a Profile, list the catalogue and the bindings.
+
+    First-hand at the wire: the catalogue view carries the digest but no
+    content and no host paths; the binding reports the revision that will be
+    materialised; an unpublished revision is refused.
+    """
+    from fastapi.testclient import TestClient
+
+    from agent_box.server.bootstrap import build_runtime_from_sidecar_deployment
+    from agent_box.server.transport.http import create_app
+    from agent_box.storage.secrets import MemorySecretStore
+
+    import agent_box.server.bootstrap.runtime as runtime_module
+
+    peer_source = "tests/harness_remote/home_probe_acp_peer.mjs"
+    peer_bytes = REPO / "tests" / "server" / "fixtures" / "home_probe_acp_peer.mjs"
+    deployment = {
+        "schemaVersion": 1,
+        "harnesses": [{
+            "id": "codex", "capabilityClaims": {"stream": True},
+            "adapter": {"command": "/usr/bin/node", "args": [], "source": peer_source},
+            "stateProjection": {"target": "/runtime/home/.codex"},
+            "timeoutMs": 60_000,
+        }],
+    }
+    original_file = runtime_module._sidecar_deployment_file
+
+    def deployment_file(root, relative):
+        if relative == peer_source:
+            return peer_bytes.read_bytes()
+        return original_file(root, relative)
+
+    runtime_module._sidecar_deployment_file = deployment_file
+    try:
+        document = tmp_path / "deployment.json"
+        document.write_text(json.dumps(deployment), encoding="utf-8")
+        runtime = build_runtime_from_sidecar_deployment(
+            tmp_path / "server", document, plugin_root=PLUGIN,
+            secret_store=MemorySecretStore(values={}))
+        runtime.start()
+        skill_dir = tmp_path / "my-skill"
+        skill_dir.mkdir()
+        (skill_dir / "SKILL.md").write_text(
+            "---\nname: my-skill\ndescription: does a thing\n---\n\nBody.\n",
+            encoding="utf-8")
+        profile = runtime.repository.profiles.create(
+            key="p", request_digest="p", name="role", harness_type="codex",
+            config_digest=runtime.objects.publish(
+                b'{"schema_version":1,"harness_type":"codex","configuration":{}}').digest,
+            credential_id=None)[1]
+
+        with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
+            token = runtime.token
+
+            def call(method, params):
+                return client.post(f"/wire/v1/{method}", headers={
+                    "Authorization": f"Bearer {token}"}, json={
+                    "jsonrpc": "2.0", "id": method, "method": method, "params": params,
+                }).json()
+
+            skill = call("assets.publishSkill", {
+                "requestId": "wire-skill-1", "assetId": "my-skill", "revision": 1,
+                "sourcePath": str(skill_dir),
+            })["result"]["asset"]
+            assert skill["kind"] == "skill" and skill["digest"].startswith("sha256:")
+            assert skill["name"] == "my-skill" and "content" not in json.dumps(skill)
+
+            mcp = call("assets.publishMcp", {
+                "requestId": "wire-mcp-1", "assetId": "web-tools", "revision": 1,
+                "definition": {"name": "web-tools",
+                               "transport": {"stdio": {"command": "/bin/web-tools"}}},
+            })["result"]["asset"]
+            assert mcp["kind"] == "mcp" and mcp["digest"].startswith("sha256:")
+
+            listing = call("assets.list", {})["result"]["assets"]
+            assert sorted(item["assetId"] for item in listing) == ["my-skill", "web-tools"]
+
+            bound = call("assets.bind", {
+                "requestId": "wire-bind-1", "profileId": profile["profile_id"],
+                "assetId": "my-skill",
+            })["result"]["binding"]
+            assert bound["revision"] == 1 and bound["enabled"] is True
+            bindings = call("assets.bindings", {
+                "profileId": profile["profile_id"]})["result"]["bindings"]
+            assert [(item["assetId"], item["enabled"]) for item in bindings] == [("my-skill", True)]
+
+            # An unpublished revision and a malformed definition are refused.
+            refused = call("assets.bind", {
+                "requestId": "wire-bind-2", "profileId": profile["profile_id"],
+                "assetId": "my-skill", "revision": 5,
+            })
+            assert "error" in refused
+            bad = call("assets.publishMcp", {
+                "requestId": "wire-mcp-2", "assetId": "bad-server", "revision": 1,
+                "definition": {"name": "bad-server",
+                               "transport": {"stdio": {"command": "relative"}}},
+            })
+            assert "error" in bad and "MCP_DEFINITION_INVALID" in bad["error"]["message"]
+
+            unbound = call("assets.unbind", {
+                "requestId": "wire-unbind-1", "profileId": profile["profile_id"],
+                "assetId": "my-skill"})["result"]
+            assert unbound["unbound"] is True
+            assert call("assets.bindings", {
+                "profileId": profile["profile_id"]})["result"]["bindings"] == []
+    finally:
+        runtime_module._sidecar_deployment_file = original_file

@@ -400,6 +400,8 @@ def build_runtime(
         model_configs=provider_model_service,
         accounts=account_records, account_assets=account_assets,
         subscription_files_for=subscription_files_for,
+        asset_records=asset_records, skill_assets=skill_assets,
+        mcp_assets=mcp_assets,
     )
     runtime = ServerRuntime(
         root, database, objects, repository, service, owner, token, token_path,

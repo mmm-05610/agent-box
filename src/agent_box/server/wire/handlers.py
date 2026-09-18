@@ -18,6 +18,7 @@ from agent_box.server.records import canonical, digest, reject_sensitive_keys
 from agent_box.server.wire.envelope import CursorCodec
 from agent_box.server.wire.errors import WireError
 from agent_box.server.accounts.records import account_view
+from agent_box.server.assets.records import asset_view
 from agent_box.server.wire.projection import (
     event_frame,
     execution_state,
@@ -83,6 +84,12 @@ _PARAM_SHAPES = {
     "providerModels.archive": (
         {"requestId", "providerModelId", "expectedVersion"}, set(),
     ),
+    "assets.list": (set(), set()),
+    "assets.publishSkill": ({"requestId", "assetId", "revision", "sourcePath"}, set()),
+    "assets.publishMcp": ({"requestId", "assetId", "revision", "definition"}, set()),
+    "assets.bind": ({"requestId", "profileId", "assetId"}, {"revision", "enabled"}),
+    "assets.unbind": ({"requestId", "profileId", "assetId"}, set()),
+    "assets.bindings": ({"profileId"}, set()),
     "accounts.list": (set(), set()),
     "accounts.create": ({"requestId", "harness", "accountIdentifier"}, set()),
     "accounts.bind": ({"requestId", "profileId", "expectedVersion", "accountId"}, set()),
@@ -138,6 +145,21 @@ def _require(params: Mapping[str, Any], *names: str) -> None:
     missing = [name for name in names if name not in params]
     if missing:
         raise WireError("INVALID_REQUEST", f"params is missing {', '.join(missing)}")
+
+
+def _slug(value: Any, name: str) -> str:
+    """A lowercase slug: the asset id every store and binding shares."""
+    import re as _re
+
+    if not isinstance(value, str) or _re.match(r"[a-z0-9][a-z0-9._-]{0,63}\Z", value) is None:
+        raise WireError("INVALID_REQUEST", f"{name} must be a lowercase slug")
+    return value
+
+
+def _positive(value: Any, name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise WireError("INVALID_REQUEST", f"{name} must be a positive integer")
+    return value
 
 
 def _bounded(value: Any, name: str, limit: int = 4096) -> str:
@@ -223,6 +245,9 @@ class WireService:
         accounts=None,
         account_assets=None,
         subscription_files_for=None,
+        asset_records=None,
+        skill_assets=None,
+        mcp_assets=None,
     ) -> None:
         self._server_id_provider = server_id_provider
         self.artifact_store = artifact_store
@@ -231,6 +256,10 @@ class WireService:
         #: when the composition has no secret store: the methods refuse typed.
         self.accounts = accounts
         self.account_assets = account_assets
+        #: Order 58's asset catalogue and the two stores.
+        self.asset_records = asset_records
+        self.skill_assets = skill_assets
+        self.mcp_assets = mcp_assets
         #: Order 56: harness -> its declared subscription login-state files,
         #: read from the deployment set the composition loaded.
         self.subscription_files_for = subscription_files_for or (lambda _harness: ())
@@ -261,6 +290,12 @@ class WireService:
             "providerModels.update": self.provider_models_update,
             "providerModels.archive": self.provider_models_archive,
             "providerModels.probeModels": self.provider_models_probe_models,
+            "assets.list": self.assets_list,
+            "assets.publishSkill": self.assets_publish_skill,
+            "assets.publishMcp": self.assets_publish_mcp,
+            "assets.bind": self.assets_bind,
+            "assets.unbind": self.assets_unbind,
+            "assets.bindings": self.assets_bindings,
             "accounts.list": self.accounts_list,
             "accounts.create": self.accounts_create,
             "accounts.bind": self.accounts_bind,
@@ -419,6 +454,96 @@ class WireService:
             if isinstance(value, bool)
         }
         return item
+
+    # -- managed assets (Order 58) -----------------------------------------
+
+    def _require_assets(self):
+        if self.asset_records is None or self.skill_assets is None or self.mcp_assets is None:
+            raise WireError("UNAVAILABLE", "the asset stores are not composed")
+        return self.asset_records, self.skill_assets, self.mcp_assets
+
+    def assets_list(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        del params
+        records, _skills, _mcp = self._require_assets()
+        return {"assets": [asset_view(row) for row in records.list()]}
+
+    def assets_publish_skill(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        """Install one skill directory (a host path) as a revision."""
+        from pathlib import Path as _Path
+
+        records, skills, _mcp = self._require_assets()
+        asset_id = _slug(params["assetId"], "assetId")
+        revision = _positive(params["revision"], "revision")
+        source = _Path(_bounded(params["sourcePath"], "sourcePath", 4096))
+        try:
+            facts = skills.install(source, asset_id=asset_id, revision=revision)
+        except Exception as refusal:  # noqa: BLE001 - typed by the store
+            raise WireError("INVALID_REQUEST",
+                            f"{getattr(refusal, 'code', type(refusal).__name__)}: "
+                            f"{getattr(refusal, 'message', refusal)}")
+        published = records.publish(
+            key=_request_id(params["requestId"]),
+            request_digest=digest({"assetId": asset_id, "revision": revision,
+                                   "sourcePath": params["sourcePath"]}),
+            kind="skill", name=facts["name"], revision=revision,
+            digest=facts["tree_digest"], description=facts["description"],
+            source=f"local:{source.name}", asset_id=asset_id,
+        )[1]
+        return {"asset": asset_view({**published, "id": published["asset_id"],
+                                     "latest_revision": published["latest_revision"]})}
+
+    def assets_publish_mcp(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        """Store one standard MCP server definition as a revision."""
+        from agent_box.server.assets.mcp import definition_digest
+
+        records, _skills, mcp = self._require_assets()
+        asset_id = _slug(params["assetId"], "assetId")
+        revision = _positive(params["revision"], "revision")
+        definition = params["definition"]
+        try:
+            canonical = mcp.install(definition, asset_id=asset_id, revision=revision)
+        except Exception as refusal:  # noqa: BLE001 - typed by the store
+            raise WireError("INVALID_REQUEST",
+                            f"{getattr(refusal, 'code', type(refusal).__name__)}: "
+                            f"{getattr(refusal, 'message', refusal)}")
+        published = records.publish(
+            key=_request_id(params["requestId"]),
+            request_digest=digest({"assetId": asset_id, "revision": revision,
+                                   "definition": definition}),
+            kind="mcp", name=canonical["name"], revision=revision,
+            digest=definition_digest(mcp.read(asset_id=asset_id, revision=revision)),
+            asset_id=asset_id,
+        )[1]
+        return {"asset": asset_view({**published, "id": published["asset_id"],
+                                     "latest_revision": published["latest_revision"]})}
+
+    def assets_bind(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        records, _skills, _mcp = self._require_assets()
+        revision = params.get("revision")
+        if revision is not None:
+            revision = _positive(revision, "revision")
+        enabled = params.get("enabled", True)
+        if not isinstance(enabled, bool):
+            raise WireError("INVALID_REQUEST", "enabled must be a boolean")
+        binding = records.bind(
+            profile_id=_bounded(params["profileId"], "profileId"),
+            asset_id=_slug(params["assetId"], "assetId"),
+            revision=revision, enabled=enabled,
+        )
+        return {"binding": binding}
+
+    def assets_unbind(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        records, _skills, _mcp = self._require_assets()
+        records.unbind(
+            profile_id=_bounded(params["profileId"], "profileId"),
+            asset_id=_slug(params["assetId"], "assetId"),
+        )
+        return {"unbound": True}
+
+    def assets_bindings(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        records, _skills, _mcp = self._require_assets()
+        return {"bindings": records.bindings(
+            _bounded(params["profileId"], "profileId"))}
 
     # -- managed subscription accounts (Order 56) --------------------------
 
