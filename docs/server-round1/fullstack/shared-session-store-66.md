@@ -160,3 +160,26 @@ another profile identity`）。按 66 §0"每次执行按当前绑定物化"，�
 非共享名留 profile home / 切换前置四查 / 命中处置 / **G1 跨 profile 真召回** /
 **G2 守卫三反例+正向** / **G5 并发两 profile 同库 + 运行中切换拒绝** /
 **G3 隔离事实与公共库可见内容清单**。
+
+## 14. 附带：43 代门 HOME_MARKER_CONFLICT 维护债——根因定位并解除
+
+本单在 G1 复现了长期挂账的 `HOME_MARKER_CONFLICT`（"the home belongs to another profile
+identity"），并定位到**两个叠加的陈旧假设**：
+
+1. **locator 由 profile 名字派生，marker 身份却是 profile ID**：两个同名 profile
+   （门每轮用同名新建一个）落在同一个 role 目录；机器级持久 home root
+   （Worker 默认 `$HOME/.agent-box/profiles`）让旧 marker 跨运行留存 ⇒ 第二轮起
+   被 marker 正确拒绝，但那个 profile 从此不可用（真实隔离缺陷，不只是门的问题）。
+   **修复**：`_profile_home_locator` 后缀 = profile 身份后 8 字符
+   （`<slug>-<id8>/<native home>`）；首轮记录的 locator 不变（rename 不变性保留），
+   同名的两个 profile 从此各得其所。
+2. **四家门的 `scan_state` 停留在 45 之前的模型**（把审计清单里每个文件的 digest 当对象
+   读回内容）；native-home 模型下审计是"只记摘要、从不存字节"（45-G1c 即此断言）。
+   门从未在 45 后复跑，所以这段陈旧代码此前从未被执行到。**修复**：按 pi 门已现代化的
+   版本移植（audit facts + fail-closed 表述）。
+
+**结果（第一手，c11 worker `sha256:aa65e919…`，假端点）**：`kilo`、`claude`、`dsh`、
+`qwen` 四家生产链门**全部 exit 0**（`*_PRODUCTION_CHAIN_GATE_OK`；日志中的 traceback 是
+各家"未知模型拒绝"负相位的设计行为，报告内记为 `failed` 子项）。连带影响：51 的
+"hermes/claude 观测轮"与"dsh/qwen 无本地样本"两项阻塞随之解除（claude/dsh/qwen 门现在
+可跑；hermes 门此前已绿）。

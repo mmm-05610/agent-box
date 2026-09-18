@@ -637,7 +637,7 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 | --- | --- | --- |
 | 51 | USAGE_FACT_PARTIAL：pi/codex 端到端含 wire（11/7/18→22/14/36 累计）、四家解析器就绪经真实数据验证、schema 7 usage 列 | hermes/claude 观测轮（门 marker 维护债）、dsh/qwen 无本地样本（opencode/kilo 解析器已落地） |
 | 52 | B/D+E 完成：thought/plan/mode 三新 wire kind + 四类映射入账本 + process-facts 端到端 | 真 harness 观测轮（假 peer 已定向验证，真 harness 轮待跑） |
-| 66 | SHARED_SESSION_STORE_PARTIAL：A 声明与绑定、B 切换前置（含 home_locator 根因修复）、C 守卫+命中处置、G1/G2/G3/G4/G5(夹具级) | 15b8620 + 本轮 |
+| 66 | SHARED_SESSION_STORE_PARTIAL：A/B/C 落地、G1–G5（G5 夹具级）、43 代门 marker 债解除 | dc65731 + e394f09 |
 | 53 | USAGE_AGGREGATION_DONE：聚合模块 + usage.aggregate/export wire 方法 + 未知即未知反例 | hermes/claude 观测轮（opencode/kilo 解析器已落地，聚合面可直接消费其 fact） |
 | 54 | USAGE_FACT_PARTIAL：本机+WSL 通道变更集落地、c11 五家四绿（kilo marker 维护债）、schema 9 change_set 列 | WSL 端到端观测轮（c11 已绿 pi 门）；kilo marker 维护债 |
 | 55 | USAGE_PROBES_DONE（G1+G2–G4）；本机通道 usage_probe 断口已修复（67, 59fe1bb） | 真端点观测轮待做（无可用凭据端点时受限观测） |
@@ -653,7 +653,9 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 
 ### 全局维护债
 
-1. 43 代门（dsh/kilo/qwen/claude）的 HOME_MARKER_CONFLICT：同门内多相位间 profile
-   身份冲突，根因未定位。影响：这四家在 c11 上的观测轮无法全绿。
+1. ~~43 代门（dsh/kilo/qwen/claude）的 HOME_MARKER_CONFLICT~~ **已解除（2026-09-18，
+   见 66 报告 §14）**：根因=locator 按名字派生而 marker 身份是 profile ID（同名 profile
+   跨运行碰撞于持久 home root）+ 四家门的 scan_state 停留在 45 前模型。两处修复后
+   **四家生产链门全 exit 0**。
 2. 48 AppContainer 恢复 spike 需管理员权限（Windows 11 限制 IL 标签写入）。
 3. terminal 短名能力词汇未版本化（slots.py 已记录，收敛待后续）。
