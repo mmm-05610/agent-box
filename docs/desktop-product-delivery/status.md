@@ -1785,3 +1785,18 @@ P21 五个测试文件：`wire-v1.test.ts` 28（+11）、`work-status.test.ts` 1
   ③ 真实模型调用 0 次（本轮用假 ACP peer fixture，不需要模型；真实 UI 门按 R-0011 归下一单）。
 - 提交：`P21 real-env run`（pathspec：两个 e2e 驱动 + evidence/P21-read-faces/** + 本文件）。
 
+## P21 计数更正（2026-09-18，补装 Electron 之后复跑）
+
+检查点报告里的 vitest 数字是 **electron 二进制缺失时**的计数；补装后同一命令复跑，结果更好且更准：
+
+| 项 | 检查点报告（无 electron 二进制） | 复核（有 electron 二进制） |
+| --- | --- | --- |
+| vitest 文件 | 985：**978 passed / 5 failed** / 2 skipped | 985：**981 passed / 2 failed** / 2 skipped |
+| vitest 用例 | 10205：**10195 passed / 4 failed** | 10231：**10221 passed / 4 failed** |
+| 失败文件 | 5（3 个 0-test 因 `getElectronPath` + 回环监听 3 条 + live 重试 1 条） | **2**：`electron/host-capabilities/credentials/mcp-oauth-callback-ipc.test.ts`（3 条回环监听）、`electron/legacy-hermes/api-transport.test.ts`（1 条 live 重试）——都在 `\|electron\|` 项目、都与 P21 的改动面（`src/**`、`e2e/**`）无交集，性质是宿主/网络基线 |
+| eslint 全树 | 16 errors / 181 warnings | **16 errors / 185 warnings**（errors 不变，全是 P21 未触碰的 12 个文件；warnings +4 来自本单测试里的 `document`） |
+| eslint 本单文件 | 0 errors / 23 warnings | 0 errors / 23 warnings；**两个新 e2e 驱动：0 problems** |
+
+- `tsc`（三项目）与 `build` 在最终态仍为 exit 0（阶段 4 已跑，其后只改渲染逻辑、e2e 驱动与文档；类型与构建面未变）。
+- 结论不变：**P21 的改动面全绿**；剩余失败与 lint 红是既有基线，已在检查点报告 §2 ④ 里作为待拍项登记。
+
