@@ -629,6 +629,7 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 | 50 | CAPABILITY_LAYER_ABSORBED | 642b1af |
 | 55 | USAGE_PROBES_DONE（G1+G2–G4） | 642b1af + a83df9d |
 | 57 | SANDBOX_PLAN_SEAM_DONE（A–D） | 8c494a2 + 92e51a8 |
+| 67 | PER_SESSION_ADMISSION_DONE（45-G3 转 pass） | 59fe1bb |
 
 ### 完成中的工单
 
@@ -638,12 +639,16 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 | 52 | B/D+E 完成：thought/plan/mode 三新 wire kind + 四类映射入账本 + process-facts 端到端 | 真 harness 观测轮（假 peer 已定向验证，真 harness 轮待跑） |
 | 53 | USAGE_AGGREGATION_DONE：聚合模块 + usage.aggregate/export wire 方法 + 未知即未知反例 | hermes/claude 观测轮（opencode/kilo 解析器已落地，聚合面可直接消费其 fact） |
 | 54 | USAGE_FACT_PARTIAL：本机+WSL 通道变更集落地、c11 五家四绿（kilo marker 维护债）、schema 9 change_set 列 | WSL 端到端观测轮（c11 已绿 pi 门）；kilo marker 维护债 |
-| 55 | USAGE_PROBES_DONE（G1+G2–G4） | 真端点观测轮待做（无可用凭据端点时受限观测） |
+| 55 | USAGE_PROBES_DONE（G1+G2–G4）；本机通道 usage_probe 断口已修复（67, 59fe1bb） | 真端点观测轮待做（无可用凭据端点时受限观测） |
 
 ### 未开始的工单（依赖链排后）
 
 56（←45 PARTIAL+50）、58/59（←45 PARTIAL+50）、60（←55+58）、61（←60）、62（←?）、
-63（←?）、64（←?）、65（←?）。45 G3 解除后 56/58/59 可开工；55 G2 解除后 60 可开工。
+63（←?）、64（←?）、65（←?）、66（←45；§8 doc 更正已做）。45 G3 解除后 56/58/59 可开工；55 G2 解除后 60 可开工。
+
+### 已解除的历史阻塞
+
+45-G3（同 profile 两会话并行）由工单 67 解除：native-home-gate 全绿（G3=pass）。
 
 ### 全局维护债
 
