@@ -1824,3 +1824,19 @@ P21 五个测试文件：`wire-v1.test.ts` 28（+11）、`work-status.test.ts` 1
 - **教训（写下来给下一单）**：重读的成本远低于错过一条改向的成本；本单靠"收口那次"补上了，
   但正确做法是每次阶段提交前扫一眼 `rulings.md`/`prefs.md`/`status.md` 的尾部（三份都短）。
 
+## P22 阶段 1（2026-09-18）：五处写路径的合同签名与类型化码核对 — `P22_STAGE1_AUDIT`
+
+- **阶段边界重读**（章程 §5）：本树章程（新增"队列不空规则"：做完无下一张就写 `QUEUE_EMPTY_AT <日期>`）+
+  `work-orders/`（P22 已投递，baseline `8fc1a807`）+ 主树 `README.md`/`manifest.json`/`status.md`/`rulings.md`/`prefs.md`
+  （README/rulings/prefs 自上次重读未变；status 尾部新增 `next_batches_2026-09-19`，列了前端 Q2 的五项）。
+- **产出**：`evidence/P22-contract-audit.md`——五面逐方法的 params/result 签名（取自本树合同）与
+  **内部类型化码**（取自后端实现文件，不是 wire-review 转述），以及每面的产品面设计与"不可用"判定表。
+- **发现一条后端事实（登记，不改后端仓）**：`server.hello` 的能力表由静态 `CAPABILITY_IDS`
+  （`wire/handlers.py:34-62`）生成，**不含** `assets.*`/`hooks.*`/`accounts.*`/`profiles.clone|memory|setPermissions`/
+  `workspaces.gitStatus`/`executions.list`/`providerArtifacts.*`——即"实现了但没声明"。
+  若照 `wireCapability()` 的 fail-closed 门控，本单五面会永久灰显，而真因是表陈旧。
+  ⇒ 本单对这些增量面**不**用能力行做开关，改用可观测门：服务就绪 + 该面读成功 + 每次写的类型化回执
+  （理由与反例写进审计 §5.0，**不是放宽验收**：不可用面仍必须点不出请求）。
+- **错误呈现统一**：抽 `lib/wire-error-text.ts`（`FAMILY: message [internalCode]`），五面共用，不再各造格式。
+- 提交：`P22 stage 1`（pathspec）。
+
