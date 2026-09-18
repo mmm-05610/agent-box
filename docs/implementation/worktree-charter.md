@@ -100,6 +100,7 @@ cat /home/maoqh/projects/agent-box-server-round1/docs/implementation/manifest.js
 cat /home/maoqh/projects/agent-box-server-round1/docs/implementation/status.md      # 主树汇总账
 cat /home/maoqh/projects/agent-box-server-round1/docs/implementation/rulings.md     # 裁决账（R-xxxx）
 cat /home/maoqh/projects/agent-box-server-round1/docs/implementation/prefs.md       # 偏好账
+cat /home/maoqh/projects/agent-box-server-round1/docs/implementation/bulletin.md    # 调度公告（每阶段必读，只追加）
 ```
 
 - **阶段边界 = 每次阶段性提交之前**；纳入**修订**后在本树 status 记 `已纳入 work order <NNN> 修订 @<sha>`
