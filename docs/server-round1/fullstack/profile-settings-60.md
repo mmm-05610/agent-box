@@ -87,7 +87,8 @@
 - **未做（如实）**：
   1. 权限姿态的**逐家翻译**（把中性键翻成各家工具名/审批点，含 `ask` 与既有审批往返的
      端到端）——需要逐家工具名一手对照表，未做；
-  2. `profiles.setPermissions` 的 wire 方法（当前写入路径是仓库层；UI 编辑面待 P17 时一并锁）；
-  3. 克隆的**资产重绑**：`migration` 报告说"迁移"，但把绑定实际复制到新 profile 的
-     写路径（`server_profile_assets` 复制）尚未接线（报告与行已就绪）；
-  4. P17 前端同步与两仓重锁。
+  2. P17 前端同步与两仓重锁。
+
+**补记（同日后半）：两项已补做**——`profiles.setPermissions` wire 方法已接入（合法写入 +
+非法规则带码拒绝，测试覆盖）；克隆的**资产重绑写路径**已接线（`AssetRecords.copy_bindings`
+只复制 `migration` 报告标记为迁移的条目，回执 `reboundAssets` 与报告同源，测试断言两者一致）。

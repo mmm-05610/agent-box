@@ -73,6 +73,8 @@ _PARAM_SHAPES = {
     "profiles.updateConfig": ({"requestId", "profileId", "expectedVersion", "values"}, set()),
     "profiles.archive": ({"requestId", "profileId", "expectedVersion"}, set()),
     "profiles.clone": ({"requestId", "profileId", "displayName"}, {"harness"}),
+    "profiles.setPermissions": (
+        {"requestId", "profileId", "expectedVersion", "preset", "rules"}, set()),
     "providerModels.list": ({"includeArchived"}, set()),
     "providerModels.create": (
         {"requestId", "displayName", "harness", "provider", "credentialId",
@@ -311,6 +313,7 @@ class WireService:
             "profiles.updateConfig": self.profiles_update_config,
             "profiles.archive": self.profiles_archive,
             "profiles.clone": self.profiles_clone,
+            "profiles.setPermissions": self.profiles_set_permissions,
             "providerModels.list": self.provider_models_list,
             "providerModels.create": self.provider_models_create,
             "providerModels.update": self.provider_models_update,
@@ -886,6 +889,31 @@ class WireService:
         )
         return {"profile": self._profile(row)}
 
+    def profiles_set_permissions(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        """Write the profile's permission posture (order 60 A/G2).
+
+        The rules are validated by the record layer before storage, so an
+        illegal key or action answers with its own code and nothing is saved.
+        """
+        rules = params["rules"]
+        if not isinstance(rules, list):
+            raise WireError("INVALID_REQUEST", "rules must be a list")
+        try:
+            updated = self.profiles.records.set_permissions(
+                profile_id=_bounded(params["profileId"], "profileId"),
+                preset=_bounded(params["preset"], "preset", 32),
+                rules=rules,
+                expected_version=_version(params["expectedVersion"]),
+                key=_request_id(params["requestId"]),
+                request_digest=digest({
+                    "profileId": params["profileId"], "preset": params["preset"],
+                    "rules": rules,
+                }),
+            )
+        except ServerError as exc:
+            raise self._profile_error(exc) from exc
+        return {"profile": self._profile(updated[1]["profile"])}
+
     def profiles_clone(self, params: Mapping[str, Any]) -> dict[str, Any]:
         """Clone one Profile into a new one, with the migration report.
 
@@ -918,6 +946,17 @@ class WireService:
                 source_id=source_id, name=name, harness_type=harness, report=report)
         except ServerError as exc:
             raise self._profile_error(exc) from exc
+        # The plan's migrated asset entries are exactly what gets rebound: the
+        # report and the rows cannot disagree because one is derived from the
+        # other.
+        rebound: list[str] = []
+        if self.asset_records is not None:
+            migrated = [entry["item"] for entry in report["items"]
+                        if entry["migrated"] and ":" in entry["item"]]
+            rebound = self.asset_records.copy_bindings(
+                source_profile_id=source_id, target_profile_id=clone["id"],
+                items=migrated)
+        report["reboundAssets"] = rebound
         return {"profile": self._profile(clone), "migration": report}
 
     def _asset_bindings_for(self, profile_id: str) -> list[dict[str, Any]]:

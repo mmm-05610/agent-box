@@ -9,7 +9,7 @@ verified against.
 from __future__ import annotations
 
 import re
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 from agent_box.server.errors import ServerError
 from agent_box.server.idempotency import IdempotentRecords
@@ -122,6 +122,46 @@ class AssetRecords:
             )
             if removed.rowcount != 1:
                 raise ServerError("ASSET_BINDING_NOT_FOUND", "that binding does not exist", status=404)
+
+    def copy_bindings(
+        self, *, source_profile_id: str, target_profile_id: str,
+        items: Sequence[str],
+    ) -> list[str]:
+        """Copy the bindings a clone's plan marked as migrated.
+
+        `items` are the report labels ("skill:my-skill"); only those rows are
+        copied, with their revision and enabled flag, so a clone's bindings are
+        exactly what the user was told traveled.
+        """
+        wanted = {str(item) for item in items}
+        copied: list[str] = []
+        timestamp = now()
+        with self.database.transaction() as conn:
+            if conn.execute(
+                "SELECT 1 FROM server_profiles WHERE id=?", (target_profile_id,),
+            ).fetchone() is None:
+                raise ServerError("PROFILE_NOT_FOUND", "Profile was not found", status=404)
+            rows = conn.execute(
+                "SELECT b.asset_id,b.revision,b.enabled,a.kind,a.name "
+                "FROM server_profile_assets b JOIN server_assets a ON a.id=b.asset_id "
+                "WHERE b.profile_id=?",
+                (source_profile_id,),
+            ).fetchall()
+            for row in rows:
+                label = f"{row['kind']}:{row['name']}"
+                if label not in wanted:
+                    continue
+                conn.execute(
+                    "INSERT INTO server_profile_assets(profile_id,asset_id,revision,enabled,"
+                    "created_at,updated_at) VALUES (?,?,?,?,?,?) "
+                    "ON CONFLICT(profile_id,asset_id) DO UPDATE SET revision=?,enabled=?,"
+                    "updated_at=?",
+                    (target_profile_id, row["asset_id"], int(row["revision"]),
+                     int(row["enabled"]), timestamp, timestamp,
+                     int(row["revision"]), int(row["enabled"]), timestamp),
+                )
+                copied.append(label)
+        return sorted(copied)
 
     def bindings(self, profile_id: str, *, enabled_only: bool = False) -> list[dict[str, Any]]:
         with self.database.read() as conn:

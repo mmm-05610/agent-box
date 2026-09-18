@@ -369,3 +369,80 @@ def test_the_clone_wire_face_returns_the_migration_report(tmp_path):
         same_items = {entry["item"]: entry for entry in same["migration"]["items"]}
         assert same_items["configuration"]["migrated"] is True
         assert same_items["native-sessions"]["migrated"] is False
+
+
+def test_a_clone_rebinds_exactly_the_migrated_assets_and_setpermissions_writes(tmp_path):
+    """Order 60: the clone's bindings match its report, and the permission
+    posture has a wire write path with the same refusals."""
+    from fastapi.testclient import TestClient
+
+    from agent_box.server.bootstrap import build_runtime
+    from agent_box.server.transport.http import create_app
+
+    runtime = build_runtime(tmp_path / "server")
+    runtime.start()
+    source = runtime.repository.profiles.create(
+        key="p", request_digest="p", name="role", harness_type="claude-code",
+        config_digest=runtime.objects.publish(
+            b'{"schema_version":1,"harness_type":"claude-code","configuration":{}}').digest,
+        credential_id=None)[1]
+    # One skill binding and one plugin binding on the source.
+    skill_dir = tmp_path / "my-skill"
+    skill_dir.mkdir()
+    (skill_dir / "SKILL.md").write_text(
+        "---\nname: my-skill\ndescription: does a thing\n---\nBody.\n", encoding="utf-8")
+    from agent_box.resource_contracts.runtime_artifacts import runtime_artifact_tree_digest
+
+    runtime.skill_assets.install(skill_dir, asset_id="my-skill", revision=1)
+    runtime.asset_records.publish(
+        key="s", request_digest="s", kind="skill", name="my-skill", revision=1,
+        digest=runtime_artifact_tree_digest(runtime.skill_assets.revision_dir("my-skill", 1)),
+        asset_id="my-skill")
+    plugin = tmp_path / "guard.js"
+    plugin.write_text("export const Guard = async () => {}\n", encoding="utf-8")
+    facts = runtime.plugin_assets.install(plugin, asset_id="guard", revision=1)
+    runtime.asset_records.publish(
+        key="pg", request_digest="pg", kind="plugin", name="guard", revision=1,
+        digest=facts["digest"], asset_id="guard")
+    runtime.asset_records.bind(profile_id=source["profile_id"], asset_id="my-skill")
+    runtime.asset_records.bind(profile_id=source["profile_id"], asset_id="guard")
+
+    with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
+        token = runtime.token
+        cloned = client.post("/wire/v1/profiles.clone", headers={
+            "Authorization": f"Bearer {token}"}, json={
+            "jsonrpc": "2.0", "id": "c", "method": "profiles.clone",
+            "params": {"requestId": "clone-rebind-1", "profileId": source["profile_id"],
+                       "displayName": "clone", "harness": "codex"},
+        }).json()["result"]
+        report = cloned["migration"]
+        clone_id = cloned["profile"]["id"]
+        # codex declares the mcp slot but has no skill slot in this fixture's
+        # terms: whatever the plan said migrated is what got rebound.
+        migrated = sorted(entry["item"] for entry in report["items"]
+                          if entry["migrated"] and ":" in entry["item"])
+        assert report["reboundAssets"] == migrated
+        bound = runtime.asset_records.bindings(clone_id)
+        assert sorted(item["assetId"] for item in bound) == [
+            item.split(":", 1)[1] for item in migrated]
+
+        # setPermissions: a valid write lands, an illegal rule refuses typed.
+        written = client.post("/wire/v1/profiles.setPermissions", headers={
+            "Authorization": f"Bearer {token}"}, json={
+            "jsonrpc": "2.0", "id": "sp", "method": "profiles.setPermissions",
+            "params": {"requestId": "set-permissions-1", "profileId": clone_id,
+                       "expectedVersion": cloned["profile"]["version"],
+                       "preset": "plan",
+                       "rules": [{"key": "webfetch", "action": "deny"}]},
+        }).json()["result"]["profile"]
+        assert written["permissionPreset"] == "plan"
+        assert written["permissionRules"][-1]["key"] == "webfetch"
+
+        refused = client.post("/wire/v1/profiles.setPermissions", headers={
+            "Authorization": f"Bearer {token}"}, json={
+            "jsonrpc": "2.0", "id": "sp2", "method": "profiles.setPermissions",
+            "params": {"requestId": "set-permissions-2", "profileId": clone_id,
+                       "expectedVersion": written["version"], "preset": "plan",
+                       "rules": [{"key": "shell", "action": "allow"}]},
+        }).json()
+        assert refused["error"]["details"]["internalCode"] == "PERMISSION_KEY_UNSUPPORTED"
