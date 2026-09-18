@@ -62,6 +62,12 @@
 | 8 | G8 取消/召回间歇 | 067 记录的维护债（run1 空召回、run2 通过） | 067 提交 |
 | 9 | 四家真实 UI 模型门 | 累计 ≤¥10（现由 R-0011 放开，仍逐笔记账）——**这是通向最终验收的门** | 长期目标 |
 
+> **已投递（b2，可执行；按序）**：`082-ledger-45-closeout`（45 转 DONE）→ `083-wsl-legs-62-64`（62/64 的 WSL 真腿）→
+> `084-usage-parsers-remaining`（hermes/claude 观测轮 + opencode/kilo blob）→ `085-posture-config-write`（60：先钉键再写配置）→
+> `086-subagent-harness-round`（65 最后一圈：真 harness 父侧自发起 tools/call）→ `087-cancel-recall-flake`（G8 间歇）→
+> `088-windows-wsl-decode`（试用抓到的真 bug：Windows 宿主读 `wsl.exe` 输出被非 UTF-8 打挂）。
+> **已投递（b3，b2 收口后）**：`089-four-real-ui-gates`（四家真实 UI 门＝最终验收路径；**Server 须跑在 WSL 侧**，
+> 见主树 `docs/server-round1/try-checkpoints.md` 的教训）。
 > **队列不空规则（调度者失误的如实标记）**：`080-first-run-lock` 与 `081-relock-register-frontend` **已投递**，可执行；
 > 若我在做完当前单后发现 `work-orders/` 里**没有属于 b2 的下一张**，就在本树 status 写一行 `QUEUE_EMPTY_AT <日期>`——
 > 这是**合法停止**但要如实报出来；调度者把它视为自己的失误并在下一次边界补齐投递。
