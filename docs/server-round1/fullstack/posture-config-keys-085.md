@@ -206,10 +206,64 @@ config.toml 顶层   <   <CODEX_HOME>/<profile>.config.toml （由 -p/--profile 
   输出经 `tr -cd '[:print:]'` + 关键词过滤后才进本文件，未整段落盘、未复述仓库内容。
 - 凭据 locator 未被读、未被删（`/home/maoqh/.agentbox-acceptance-secret.CnsAonj6/` 全程未访问）。
 - 临时件：`/tmp/085cx147`、`/tmp/085claude-config`、`/tmp/085claude-proj`、`/tmp/085claude`、
-  `/tmp/085claude-help.txt`、`/tmp/085codex`、`/tmp/085cxws`、`/tmp/085cx-pro.txt` —— 本单阶段 4 前删除。
+  `/tmp/085claude-help.txt`、`/tmp/085codex`、`/tmp/085cxws`、`/tmp/085cx-pro.txt`、
+  `/tmp/085snap`（§6）、`/tmp/085split`（阶段 2/3 提交的暂存副本） —— 本单阶段 4 前删除。
 - 未验证项（**不伪装成钉死**）：
   1. claude `permissions.ask` 的**运行时效果**（真的会弹提示吗）只有读取点与形状校验证据，无效果证据——
      要一条真实工具调用来证明，属模型轮，本单不花；
-  2. codex `on-request` vs `on-failure` 不可区分（§1.2）；
+  2. ~~codex `on-request` vs `on-failure` 不可区分（§1.2）~~ ⇒ 已由 §6.3 **实测关闭**（归一后逐字相同），
+     `on-failure` 因此留在**不可写**词汇表里，理由从推断变成测量；
   3. 内嵌文档只列 4 个 `defaultMode`，doctor 收 6 个 ⇒ 采 doctor，差集未向官方文档二次核对（离线，不外发）；
   4. 除 claude/codex 外的家（pi/hermes/opencode/kilo/dsh/qwen）**没有姿态键**可钉 ⇒ 阶段 4 走类型化拒绝。
+
+## 6 阶段 2/3 落地后的真实工件快照对比（DoD-3，实测）
+
+写入器（`src/agent_box/server/profiles/posture_config.py`）渲染出的文件**原样落盘**到隔离目录，
+再用 §1 的两个 oracle 读回来。全部零模型调用、无凭据。
+
+### 6.1 claude：`doctor` 对渲染件无话可说，对被改坏一件**有**话可说
+
+| 输入（`CLAUDE_CONFIG_DIR`） | `claude doctor` 2.1.270 的 `Invalid settings` 段 |
+| --- | --- |
+| 渲染件 `settings.json`（`permissions.deny=[Edit,NotebookEdit,WebSearch,Write]`、`permissions.ask=[Bash,Task]`，`env`/`model` 保留） | **无该段**（`grep -A6 "Invalid settings"` 空） |
+| 反例：同文件把 `permissions.ask` 改成字符串 `"Bash"` | `Invalid settings` + `/tmp/085snap/bad-config/settings.json › permissions.ask: Expected array, but received undefined` |
+
+⇒ 这条配对是"缺席即失败"的两半：oracle 会报（反例报了），渲染件没被报。
+**边界照旧**：`doctor` 只判形状，不判合并语义 ⇒ claude 的 G2（不放宽既有规则）在真实工件上**不可观测**，仍只有 §6.4 的密封证据。
+
+### 6.2 codex：`debug prompt-input` 回显的 `<permissions instructions>` 块
+
+四个 case，`CODEX_HOME=/tmp/085snap/cx/<case>`，同一工作目录；把块内 `CODEX_HOME` 路径归一后取长度与 sha256 前 16 位。
+（**整段输出不可直接比 hash**：里面有每次新生成的 `msg_<uuid>`，见 §6.3。）
+
+| case | 落盘的 toml | 归一后块 |
+| --- | --- | --- |
+| `tighten` | 写入器把 base 的 `danger-full-access`/`never` 收紧为 `read-only`/`untrusted`（changes 两条） | 473 字节 `5db7584e377bcef7` |
+| `keep` | base 本来就是 `read-only`/`untrusted`；姿态只要 `on-request` ⇒ **写入器一个字都不改**（`written=false`） | 473 字节 `5db7584e377bcef7`（**与 `tighten` 逐字相同**） |
+| `naive` | 反例：一个"照姿态放宽"的写入器会写出的文件（`approval_policy="on-request"`） | 3977 字节 `bf9aedaed1d9cb40` —— 多出整段 "Escalation Requests" 指引 |
+
+三条都是**一手效果证据**：
+1. **写入生效**：收紧后的文件与"本来就严格"的文件回显同一个块 ⇒ 我们写进去的键就是 harness 读到的键。
+2. **G2 有牙**：`keep` 与 `naive` 的差不是措辞而是**模型可见提示的形态**（放宽后多出 3.5KB 的越权申请指引）
+   ⇒ "不放宽"不是一句口号，它对应一个可观测的差异，而写入器站在严格那一侧。
+3. `sandbox_mode` 解析名与 `approval_policy` 解析名分别是 `read-only` / `unless-trusted`（toml 里写 `untrusted`）。
+
+### 6.3 顺带钉死的一条：oracle 自身不稳定，以及 `on-request` vs `on-failure`
+
+- 同一份配置连跑两次，`prompt-input` 的**整体** sha256 不同（`f2e8a6e0…` vs `08c7e3b9…`）：
+  输出含 `msg_<uuid>`，且 `CODEX_HOME` 路径会出现在 skills 段里。⇒ 快照对比**只能比归一后的目标块**，
+  比整段哈希会得出"naive 与 on-failure 不同"的**假结论**（我第一轮就踩了这个）。
+- 归一后 `on-failure` 与 `on-request` 的块**逐字相同**（同为 `bf9aedaed1d9cb40`）
+  ⇒ §5 未验证项 2 升级为**实测**：这两档在可观测面上不可区分，所以 `on-failure` 继续**不写**。
+- 该 oracle 还有个副作用：codex 会在 `CODEX_HOME` 下建 `skills/.system/…`，并打印
+  `Refusing to create helper binaries under temporary dir "/tmp"`（**警告不致命**，配置解析照常）
+  ⇒ 记录为观测噪声，不是失败；真实部署的 `CODEX_HOME` 在 guest 内 `/runtime/home/.codex`，不落 `/tmp`。
+
+### 6.4 密封门（同一份代码，可重复）
+
+```bash
+python3 -m pytest -q tests/server -k posture      # 36 passed（G1 键有据 / G2 只收紧 / G3 类型化拒绝 + 写入原子性 + 与 60 的表一致性）
+```
+其中两条是本节结论的密封对应物：`…_reports_one_change_per_path_from_the_file_as_it_stood`
+（快照每路径一条、`before` 是文件原样）与 `…_does_not_report_a_rule_it_did_not_add`
+（姿态已被满足 ⇒ `changes==[]` 且**字节不变**，不趁机重排既有规则顺序）。
