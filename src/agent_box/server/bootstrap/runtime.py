@@ -286,6 +286,7 @@ def build_runtime(
     execution: TurnExecutionPort | None = None,
     execution_factory=None,
     home_concurrency: Mapping[str, str] | None = None,
+    shared_store_guards: Mapping[str, Any] | None = None,
 ) -> ServerRuntime:
     """Assemble a provider-neutral Server runtime.
 
@@ -323,7 +324,8 @@ def build_runtime(
     profile_records = ProfileRecords(database, idempotency)
     provider_model_records = ProviderModelRecords(database, idempotency)
     session_records = SessionRecords(database, idempotency,
-                                     home_concurrency=home_concurrency)
+                                     home_concurrency=home_concurrency,
+                                     shared_store_guards=shared_store_guards)
     queue_records = QueueRecords(
         database, idempotency, append_event=session_records._append_session_event,
         objects=objects,
@@ -702,6 +704,30 @@ def build_runtime_from_sidecar_deployment(
     # fact, never a document field and never a recorded path.
     local_home_root = str(Path(data_root).resolve() / "profiles")
 
+    # Order 66 stage B: per-family guards for the shared session library. The
+    # guard reads the library's database files on this machine
+    # read-only (through the WAL) and refuses a switch when any credential
+    # table is non-empty; families without a whole-db store have no guard.
+    shared_store_guards: dict[str, Any] = {}
+    for harness_id, deployment in deployments.items():
+        if deployment.get("_session_store") != "whole-db":
+            continue
+        database_files = [
+            name for name, kind in deployment["_session_store_shared"]
+            if kind == "file" and name.endswith(".db")
+        ]
+        if not database_files:
+            continue
+        library = Path(local_home_root) / "_sessions" / harness_id
+
+        def guard(paths=tuple(library / name for name in database_files)):
+            from agent_box.server.execution.session_store_guard import guard_shared_store
+
+            for path in paths:
+                guard_shared_store(path)
+
+        shared_store_guards[harness_id] = guard
+
     def factory(records, objects, approvals, notifier, connectors, credentials, secret_store):
         # No gate here: whether a connector is required depends on the placement
         # the workspace names, and that is resolved per turn.
@@ -869,7 +895,8 @@ def build_runtime_from_sidecar_deployment(
                             home_concurrency={
                                 harness_id: deployment["_home_concurrency"]
                                 for harness_id, deployment in deployments.items()
-                            })
+                            },
+                            shared_store_guards=shared_store_guards)
     runtime.declared_credentials = tuple(declared_credentials)
     return runtime
 

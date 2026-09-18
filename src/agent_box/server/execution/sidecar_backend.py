@@ -633,12 +633,32 @@ def _audited_home(run: "_Run") -> tuple[dict[str, Any], bool]:
     except BaseException as exc:
         if getattr(exc, "code", None) == "SIDECAR_STATE_CONTAINS_SECRET":
             relative = getattr(exc, "path", None)
-            if relative:
+            disposition = _credential_hit_disposition(exc, run.port)
+            if disposition == "keep-shared":
+                logging.getLogger(__name__).warning(
+                    "turn %s: credential material found in the shared session "
+                    "library at %s; the shared file is left in place (order 66)",
+                    run.turn_id, relative,
+                )
+            elif disposition == "delete" and relative:
                 try:
                     run.port.delete_home_file(run.turn_id, relative)
                 except BaseException:  # noqa: BLE001 - the leak failure stands
                     pass
         raise
+
+
+def _credential_hit_disposition(exc: BaseException, port: Any) -> str:
+    """What to do with one credential-hit audit failure (order 66 §2.5).
+
+    ``keep-shared`` - the audited tree is the shared family library: the hit
+    stays a typed failure, but the file must not be deleted (it may hold other
+    Profiles' sessions). ``delete`` - a profile-scoped tree: the old rule, the
+    leaked file is removed. ``none`` - not a credential hit at all.
+    """
+    if getattr(exc, "code", None) != "SIDECAR_STATE_CONTAINS_SECRET":
+        return "none"
+    return "keep-shared" if getattr(port, "shared_store", False) else "delete"
 
 
 class CapabilityGateRefusal(SidecarError):

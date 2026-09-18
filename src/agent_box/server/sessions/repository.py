@@ -7,9 +7,10 @@ cannot both own an acceptance: the loser observes the committed receipt.
 from __future__ import annotations
 
 import json
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 from agent_box.server.errors import ServerError
+from agent_box.server.execution.session_store_guard import SessionStoreGuardError
 from agent_box.server.idempotency import IdempotentRecords
 from agent_box.server.ids import now, opaque_id
 from agent_box.storage import Database
@@ -45,9 +46,15 @@ class SessionRecords:
     TERMINAL_TURN_STATES = TERMINAL_TURN_STATES
 
     def __init__(self, database: Database, idempotency: IdempotentRecords, *,
-                 home_concurrency: Mapping[str, str] | None = None) -> None:
+                 home_concurrency: Mapping[str, str] | None = None,
+                 shared_store_guards: Mapping[str, Callable[[], None]] | None = None) -> None:
         self.database = database
         self.idempotency = idempotency
+        #: Order 66 stage B: per-family read-only guards for the shared session
+        #: library, run before a role switch is admitted. A family absent from
+        #: this mapping has no shared store to guard (profile-home) or has
+        #: none that carries credential tables.
+        self.shared_store_guards = dict(shared_store_guards or {})
         #: Order 67's narrowed lock, per Harness family: a family whose home
         #: cannot be proven safe for concurrent writers declares "exclusive"
         #: in its deployment, and admission then holds the pre-67 rule for
@@ -316,6 +323,61 @@ class SessionRecords:
                 }
                 self.idempotency.insert(conn, scope, request_id, request_digest, 200, body)
                 return "rejected", body
+            # Order 66 stage B: the switch's preflight. Switching keeps the
+            # Session and changes which role advances it, so it is only ever a
+            # same-family move (cross-family is the clone rule, 60 G5), the
+            # target role must not be mid-turn, and the family's shared store
+            # must pass its read-only credential guard. The data layer does
+            # nothing: the store is the same directory either way.
+            current = None
+            if session["profile_id"]:
+                current = conn.execute(
+                    "SELECT * FROM server_profiles WHERE id=?", (session["profile_id"],),
+                ).fetchone()
+            if (current is not None
+                    and str(current["harness_type"]) != str(target["harness_type"])):
+                raise ServerError(
+                    "PROFILE_HARNESS_MISMATCH",
+                    "A Session keeps its Harness family across a role switch; "
+                    "cross-family work starts as a new Session",
+                    status=409,
+                )
+            target_active = conn.execute(
+                "SELECT 1 FROM server_turns WHERE profile_id=? AND state IN "
+                "('accepted','dispatching','running','capturing') LIMIT 1",
+                (profile_id,),
+            ).fetchone()
+            if target_active is not None:
+                raise ServerError(
+                    "TURN_CONCURRENCY_CONFLICT",
+                    "The target Profile already has an active execution",
+                    status=409,
+                )
+            guard = self.shared_store_guards.get(str(target["harness_type"]))
+            if guard is not None:
+                workspace = conn.execute(
+                    "SELECT env_kind FROM server_workspaces WHERE id=?",
+                    (session["workspace_id"],),
+                ).fetchone()
+                env_kind = str(workspace["env_kind"]) if workspace is not None else ""
+                if env_kind != "local":
+                    # Fail closed: the guard reads the library on this machine,
+                    # and a remote placement's library is not here yet. A
+                    # switch that cannot be guarded is refused, never waved
+                    # through (order 66 §3).
+                    raise ServerError(
+                        "SESSION_STORE_GUARD_UNAVAILABLE",
+                        "the shared session store of this family lives on a "
+                        "remote machine and cannot be guarded here",
+                        status=409,
+                    )
+                try:
+                    guard()
+                except SessionStoreGuardError as exc:
+                    raise ServerError(
+                        exc.code, exc.message or "the shared session store was refused",
+                        status=409,
+                    ) from exc
             timestamp = now()
             # Switching to the role the Session already uses changes nothing, so
             # the record is written (the version still moves, as any accepted
@@ -323,10 +385,25 @@ class SessionRecords:
             # "the effective configuration changed", and reporting it here would
             # tell the client to re-read a configuration that did not move.
             configuration_changed = str(session["profile_id"] or "") != profile_id
-            conn.execute(
-                "UPDATE server_sessions SET profile_id=?,version=version+1,updated_at=? WHERE id=?",
-                (profile_id, timestamp, session_id),
-            )
+            if configuration_changed:
+                # Order 66 §0: each execution materialises the *current*
+                # binding. The recorded home locator pinned the previous
+                # role's home; after a switch the next turn must derive the
+                # new role's home instead (the session's own state lives in
+                # the shared family library, not in the role directory). The
+                # locator is cleared, not rewritten: derivation is the one
+                # rule that survives profile renames.
+                conn.execute(
+                    "UPDATE server_sessions SET profile_id=?,home_locator=NULL,"
+                    "version=version+1,updated_at=? WHERE id=?",
+                    (profile_id, timestamp, session_id),
+                )
+            else:
+                conn.execute(
+                    "UPDATE server_sessions SET profile_id=?,version=version+1,"
+                    "updated_at=? WHERE id=?",
+                    (profile_id, timestamp, session_id),
+                )
             if configuration_changed:
                 # The Session's effective configuration just changed identity, and
                 # the contract delivers that to clients as `config.changed` with the

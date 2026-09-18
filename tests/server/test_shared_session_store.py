@@ -181,3 +181,401 @@ def test_whole_db_shared_names_land_in_the_library(tmp_path, state_dir, placemen
                 assert not shared_file.exists(), sorted(library.rglob("*"))
     finally:
         runtime_module._sidecar_deployment_file = original_file
+
+def test_switch_preflight_same_family_idle_guard(tmp_path):
+    """Order 66 stage B: the switch preflight - same family, idle sides, guard.
+
+    First-hand facts at the repository boundary: a same-family switch to an
+    idle role is confirmed; a cross-family target is refused; a target role
+    with an active Turn is refused with the running rule; a failing shared-
+    store guard refuses typed and never moves the link.
+    """
+    from agent_box.server.credentials import CredentialRecords
+    from agent_box.server.errors import ServerError
+    from agent_box.server.execution.session_store_guard import SessionStoreGuardError
+    from agent_box.server.idempotency import IdempotentRecords
+    from agent_box.server.profiles import ProfileRecords
+    from agent_box.server.sessions import SessionRecords, SessionService
+    from agent_box.server.workspaces import WorkspaceRecords
+    from agent_box.storage import Database, ObjectStore
+
+    database = Database(tmp_path / "data")
+    database.initialize()
+    idempotency = IdempotentRecords(database)
+    credentials = CredentialRecords(database)
+    profiles = ProfileRecords(database, idempotency)
+    workspaces = WorkspaceRecords(database, idempotency)
+    objects = ObjectStore(tmp_path / "data")
+
+    state = {"refuse": False}
+
+    def guard():
+        if state["refuse"]:
+            raise SessionStoreGuardError(
+                "SESSION_STORE_CREDENTIALS_PRESENT",
+                "credential rows are present in the shared store",
+                table="credential",
+            )
+
+    records = SessionRecords(database, idempotency,
+                             shared_store_guards={"kilo": guard})
+
+    class _NoExecution:
+        def accept(self, turn_id, *, overrides=None):
+            return None
+
+        def cancel(self, turn_id):
+            return True
+
+    from agent_box.server.execution import HarnessDescriptor, HarnessRegistry
+
+    registry = HarnessRegistry()
+    registry.register(HarnessDescriptor("kilo", credential_kind=None))
+    registry.register(HarnessDescriptor("alpha", credential_kind=None))
+    service = SessionService(records, idempotency, objects,
+                             harnesses=registry, profiles=profiles,
+                             credentials=credentials, execution=_NoExecution())
+
+    config_kilo = objects.publish(
+        b'{"schema_version":1,"harness_type":"kilo","configuration":{}}')
+    role_a = profiles.create(
+        key="a", request_digest="a", name="role-a", harness_type="kilo",
+        config_digest=config_kilo.digest, credential_id=None)[1]
+    role_b = profiles.create(
+        key="b", request_digest="b", name="role-b", harness_type="kilo",
+        config_digest=config_kilo.digest, credential_id=None)[1]
+    role_other = profiles.create(
+        key="c", request_digest="c", name="role-c", harness_type="alpha",
+        config_digest=config_kilo.digest, credential_id=None)[1]
+    workspace = workspaces.create(
+        key="w", request_digest="w", distribution="Ubuntu", remote_user="tester",
+        remote_path="/workspace", connection_id="connection",
+    )[1]
+    with database.transaction() as conn:
+        conn.execute("UPDATE server_workspaces SET env_kind='local' WHERE id=?",
+                     (workspace["workspace_id"],))
+
+    first = service.create_session("s1", {
+        "workspace_id": workspace["workspace_id"], "profile_id": role_a["profile_id"],
+    })[1]
+    second = service.create_session("s2", {
+        "workspace_id": workspace["workspace_id"], "profile_id": role_b["profile_id"],
+    })[1]
+
+    def linked_role(session_id):
+        with database.read() as conn:
+            return conn.execute("SELECT profile_id FROM server_sessions WHERE id=?",
+                                (session_id,)).fetchone()[0]
+
+    def switch(target_id, request_id):
+        with database.read() as conn:
+            version = conn.execute(
+                "SELECT version FROM server_sessions WHERE id=?",
+                (first["session_id"],)).fetchone()[0]
+        return records.switch_profile(
+            session_id=first["session_id"], profile_id=target_id,
+            expected_version=version, request_id=request_id, request_digest=request_id,
+        )
+
+    # 1) The target role is mid-turn: the switch is refused with the running
+    #    rule (and the same-family check passed first).
+    _kind, busy_turn = service.create_turn(
+        second["session_id"], "busy-key",
+        {"text": "hold", "expected_profile_revision": 1})
+    with pytest.raises(ServerError) as busy:
+        switch(role_b["profile_id"], "switch-busy")
+    assert busy.value.code == "TURN_CONCURRENCY_CONFLICT"
+    assert "target Profile" in busy.value.message
+    # End the busy turn so the later cases exercise the guard, not the lock.
+    records.fail_turn(busy_turn["turn_id"], "TEST_ENDED", capture_state="failed")
+
+    # 2) Cross family -> refused typed, before any guard runs.
+    with pytest.raises(ServerError) as mismatch:
+        switch(role_other["profile_id"], "switch-other")
+    assert mismatch.value.code == "PROFILE_HARNESS_MISMATCH"
+
+    # 3) The guard refuses -> typed code, and the link never moves.
+    state["refuse"] = True
+    with pytest.raises(ServerError) as guarded:
+        switch(role_b["profile_id"], "switch-guarded")
+    assert guarded.value.code == "SESSION_STORE_CREDENTIALS_PRESENT"
+    assert linked_role(first["session_id"]) == role_a["profile_id"]
+
+    # 4) Guard passes and the target is idle -> confirmed, link moves.
+    state["refuse"] = False
+    outcome, body = switch(role_b["profile_id"], "switch-ok")
+    assert outcome == "confirmed" and body["outcome"] == "confirmed"
+    assert linked_role(first["session_id"]) == role_b["profile_id"]
+
+
+def test_a_credential_hit_in_the_shared_library_is_kept_not_deleted():
+    """Order 66 §2.5: the disposition rule for one credential-hit failure.
+
+    The audited tree decides: on the shared family library the hit stays a
+    typed failure and the file is left in place (deleting would destroy other
+    Profiles' sessions); on a profile-scoped tree the old delete rule holds;
+    anything that is not a credential hit has no disposition.
+    """
+    from agent_box.server.execution.sidecar_backend import _credential_hit_disposition
+
+    class _Hit(Exception):
+        code = "SIDECAR_STATE_CONTAINS_SECRET"
+
+    class _Other(Exception):
+        code = "SIDECAR_STATE_OUTSIDE_BOUNDS"
+
+    class _SharedPort:
+        shared_store = True
+
+    class _ProfilePort:
+        shared_store = False
+
+    assert _credential_hit_disposition(_Hit(), _SharedPort()) == "keep-shared"
+    assert _credential_hit_disposition(_Hit(), _ProfilePort()) == "delete"
+    assert _credential_hit_disposition(_Other(), _SharedPort()) == "none"
+    assert _credential_hit_disposition(_Hit(), object()) == "delete"
+
+
+STATEFUL_PEER_SOURCE = "tests/harness_remote/shared_store_acp_peer.mjs"
+STATEFUL_PEER_BYTES = REPO / "tests" / "server" / "fixtures" / "shared_store_acp_peer.mjs"
+NONCE = "STATEFUL-NONCE-6X37"
+
+G1_DEPLOYMENT = {
+    "schemaVersion": 1,
+    "harnesses": [
+        {
+            "id": "kilo",
+            "capabilityClaims": {"stream": True, "native_continuation": True},
+            "adapter": {"command": "/usr/bin/node", "args": [],
+                        "source": STATEFUL_PEER_SOURCE},
+            "stateProjection": {"target": "/runtime/home/sessions"},
+            "sessionStore": {"kind": "whole-db",
+                             "shared": [{"name": "state.json", "kind": "file"},
+                                        {"name": "kilo.db", "kind": "file"}]},
+            "timeoutMs": 60_000,
+        },
+    ],
+}
+
+
+def _build_whole_db_runtime(tmp_path, deployment, peer_source, peer_bytes):
+    from agent_box.server.bootstrap import build_runtime_from_sidecar_deployment
+
+    import agent_box.server.bootstrap.runtime as runtime_module
+
+    original_file = runtime_module._sidecar_deployment_file
+
+    def deployment_file(root, relative):
+        if relative == peer_source:
+            return peer_bytes.read_bytes()
+        return original_file(root, relative)
+
+    runtime_module._sidecar_deployment_file = deployment_file
+    (tmp_path / "project").mkdir(exist_ok=True)
+    try:
+        data_root = tmp_path / "server"
+        document = tmp_path / "deployment.json"
+        document.write_text(json.dumps(deployment), encoding="utf-8")
+        runtime = build_runtime_from_sidecar_deployment(
+            data_root, document, plugin_root=PLUGIN)
+    finally:
+        runtime_module._sidecar_deployment_file = original_file
+    return runtime, data_root
+
+
+def _wire(client, token, method, params):
+    response = client.post(f"/wire/v1/{method}", headers={
+        "Authorization": f"Bearer {token}",
+    }, json={"jsonrpc": "2.0", "id": method, "method": method, "params": params})
+    return response.json()
+
+
+def _wait_session(runtime, session_id, turns_expected, timeout=90.0):
+    deadline = time.monotonic() + timeout
+    session = None
+    while time.monotonic() < deadline:
+        session = runtime.repository.get_session(session_id)
+        if (len(session["turns"]) >= turns_expected
+                and session["turns"][turns_expected - 1]["state"] in {"completed", "failed"}):
+            return session
+        time.sleep(0.05)
+    raise AssertionError(f"turn {turns_expected} never reached a terminal state: {session and session['turns']}")
+
+
+@pytest.mark.skipif(shutil.which("bwrap") is None, reason="bwrap is required")
+def test_cross_profile_recall_through_the_shared_library(tmp_path):
+    """Order 66 G1: two rounds under one role, then a role switch, and the
+    *third* turn really recalls what round one stored - same native identity."""
+    from fastapi.testclient import TestClient
+
+    from agent_box.server.transport.http import create_app
+
+    runtime, data_root = _build_whole_db_runtime(
+        tmp_path, G1_DEPLOYMENT, STATEFUL_PEER_SOURCE, STATEFUL_PEER_BYTES)
+    with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
+        token = runtime.token
+        opened = _wire(client, token, "workspaces.open", {
+            "requestId": "recall-open", "path": str(tmp_path / "project"),
+            "environment": {"kind": "local", "host": None, "user": None},
+        })["result"]
+        profiles = {}
+        for name in ("role-a", "role-b"):
+            created = client.post("/api/v1/profiles", headers={
+                "Authorization": f"Bearer {token}",
+                "Idempotency-Key": f"recall-{name}",
+            }, json={"name": name, "harness_type": "kilo",
+                     "configuration": {}, "credential_id": None})
+            assert created.status_code == 201, created.text
+            profiles[name] = created.json()["profile_id"]
+
+        first = _wire(client, token, "sessions.createAndSend", {
+            "requestId": "recall-turn-1", "workspaceId": opened["workspace"]["id"],
+            "profileId": profiles["role-a"], "overrides": [],
+            "message": {"text": f"{NONCE} remember this and answer.", "attachments": []},
+        })["result"]
+        session_id = first["session"]["id"]
+        session = _wait_session(runtime, session_id, 1)
+        assert session["turns"][0]["state"] == "completed", session["turns"][0]
+        native_after_first = session["checkpoint"]["native_id"]
+
+        # The switch: same family, both sides idle, guard sees an empty store.
+        version = runtime.repository.get_session(session_id)["version"]
+        switched = _wire(client, token, "sessions.switchProfile", {
+            "requestId": "recall-switch", "sessionId": session_id,
+            "profileId": profiles["role-b"], "expectedVersion": version,
+        })
+        assert "error" not in switched, switched
+        assert switched["result"]["outcome"] == "confirmed", switched
+
+        second = _wire(client, token, "sessions.send", {
+            "requestId": "recall-turn-2", "sessionId": session_id, "overrides": [],
+            "message": {"text": "What did I ask you to remember? Reply with the nonce.",
+                        "attachments": []},
+        })
+        assert "error" not in second, second
+        session = _wait_session(runtime, session_id, 2)
+        assert session["turns"][1]["state"] == "completed", session["turns"][1]
+
+        turn_two_id = session["turns"][1]["id"]
+        recalled = [item["data"].get("text") for item in session["events"]
+                    if item["kind"] == "message.delta" and item.get("turn_id") == turn_two_id]
+        assert NONCE in recalled, recalled
+        # Same native identity across the role switch: the reopened session is
+        # the one round one wrote into the shared library.
+        assert session["checkpoint"]["native_id"] == native_after_first
+        # The switch published the existing config.changed event, and each turn
+        # keeps its own role attribution.
+        assert any(item["kind"] == "config.changed" for item in session["events"])
+        with runtime.database.read() as conn:
+            attribution = [
+                row["profile_id"] for row in conn.execute(
+                    "SELECT profile_id FROM server_turns WHERE session_id=? ORDER BY created_at, id",
+                    (session_id,),
+                ).fetchall()
+            ]
+        assert attribution == [profiles["role-a"], profiles["role-b"]], attribution
+        # The state file landed in the family library, not in either role home.
+        assert (data_root / "profiles" / "_sessions" / "kilo" / "state.json").is_file()
+
+
+@pytest.mark.skipif(shutil.which("bwrap") is None, reason="bwrap is required")
+def test_the_guard_refuses_credential_rows_at_the_switch(tmp_path):
+    """Order 66 G2: the guard's counterexamples, exercised at the switch.
+
+    A synthetic credential row in the shared library refuses the switch
+    (typed, wire-visible); the same row kept WAL-resident still refuses; a
+    structure the guard cannot read refuses too - all fail-closed."""
+    import sqlite3
+
+    from fastapi.testclient import TestClient
+
+    from agent_box.server.transport.http import create_app
+
+    runtime, data_root = _build_whole_db_runtime(
+        tmp_path, G1_DEPLOYMENT, STATEFUL_PEER_SOURCE, STATEFUL_PEER_BYTES)
+    library = data_root / "profiles" / "_sessions" / "kilo"
+    library.mkdir(parents=True, exist_ok=True)
+    db = library / "kilo.db"
+
+    with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
+        token = runtime.token
+        opened = _wire(client, token, "workspaces.open", {
+            "requestId": "guard-open", "path": str(tmp_path / "project"),
+            "environment": {"kind": "local", "host": None, "user": None},
+        })["result"]
+        profiles = {}
+        for name in ("role-a", "role-b"):
+            created = client.post("/api/v1/profiles", headers={
+                "Authorization": f"Bearer {token}", "Idempotency-Key": f"guard-{name}",
+            }, json={"name": name, "harness_type": "kilo",
+                     "configuration": {}, "credential_id": None})
+            profiles[name] = created.json()["profile_id"]
+
+        first = _wire(client, token, "sessions.createAndSend", {
+            "requestId": "guard-turn", "workspaceId": opened["workspace"]["id"],
+            "profileId": profiles["role-a"], "overrides": [],
+            "message": {"text": "hello", "attachments": []},
+        })["result"]
+        session_id = first["session"]["id"]
+        _wait_session(runtime, session_id, 1)
+
+        def switch(request_id):
+            version = runtime.repository.get_session(session_id)["version"]
+            return _wire(client, token, "sessions.switchProfile", {
+                "requestId": request_id, "sessionId": session_id,
+                "profileId": profiles["role-b"], "expectedVersion": version,
+            })
+
+        # Control: an empty seeded store passes.
+        assert switch("guard-clean")["result"]["outcome"] == "confirmed"
+
+        # 1) A synthetic credential row (committed) refuses the switch.
+        writer = sqlite3.connect(db)
+        writer.execute("PRAGMA journal_mode=WAL")
+        writer.execute("CREATE TABLE IF NOT EXISTS credential (id TEXT PRIMARY KEY, value TEXT)")
+        writer.execute("INSERT INTO credential VALUES ('synthetic', 'not-a-real-secret')")
+        writer.commit()
+        writer.close()
+        refusal = switch("guard-hit")
+        assert "error" in refusal, refusal
+        assert refusal["error"]["code"] == "CONFLICT_REQUEST"
+        assert refusal["error"]["details"]["internalCode"] == "SESSION_STORE_CREDENTIALS_PRESENT"
+
+        # 2) The WAL variant: rows that live only in the -wal file still
+        #    refuse. A held read snapshot keeps the committed rows
+        #    WAL-resident, so a plain immutable read lags behind the live
+        #    count while the guard (mode=ro, which reads through the WAL)
+        #    still refuses.
+        reader = sqlite3.connect(db)
+        reader.execute("BEGIN")
+        # Materialise the read snapshot before the writer commits: a deferred
+        # BEGIN alone holds nothing, and the writer's close would checkpoint.
+        assert reader.execute("SELECT COUNT(*) FROM credential").fetchone()[0] == 1
+        writer = sqlite3.connect(db)
+        writer.execute("INSERT INTO credential VALUES ('in-wal', 'still-not-a-secret')")
+        writer.commit()
+        writer.close()
+        assert (library / "kilo.db-wal").exists()
+        assert (library / "kilo.db-wal").stat().st_size > 0
+        immutable = sqlite3.connect(f"file:{db}?mode=ro&immutable=1", uri=True)
+        try:
+            seen_immutable = immutable.execute(
+                "SELECT COUNT(*) FROM credential").fetchone()[0]
+        except sqlite3.OperationalError:
+            seen_immutable = 0  # the table itself is only in the WAL
+        immutable.close()
+        live = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+        seen_live = live.execute("SELECT COUNT(*) FROM credential").fetchone()[0]
+        live.close()
+        assert seen_live == 2 and seen_immutable < seen_live, (
+            f"immutable saw {seen_immutable}, live saw {seen_live}")
+        refusal = switch("guard-wal")
+        assert refusal["error"]["details"]["internalCode"] == "SESSION_STORE_CREDENTIALS_PRESENT", refusal
+        reader.close()
+
+        # 3) A structure the guard cannot read refuses (fail-closed).
+        db.write_bytes(b"this is not a database\n")
+        refusal = switch("guard-structure")
+        assert refusal["error"]["details"]["internalCode"] in {
+            "SESSION_STORE_GUARD_STRUCTURE", "SESSION_STORE_CREDENTIALS_PRESENT",
+        }, refusal

@@ -94,3 +94,50 @@ sessions-subtree 同规；profile home 里未共享的文件（`log/`、`repos/`
   + 凭据处置改写（命中共享库=类型化失败+不删共享文件+记账）。
 - D：G1–G5 真跑（含 66 修订后的冷启动竞态四条）。
 - E：60 的 G6/E 修订落地、51 附带更正已做（见 `d1f7431`）、status 与收口报告。
+
+## 8. 阶段 B —— 物化与切换（已完成）
+
+**切换前置校验（`switch_profile`）**，四查依次：
+
+1. **同家族**：目标 profile 的 `harness_type` 必须与当前绑定相同，否则
+   `PROFILE_HARNESS_MISMATCH`（跨家族=克隆规则，60 G5）；
+2. **两侧运行锁空闲**：本会话有活跃轮（既有 `rejected/execution_running`）+ 目标
+   profile 有活跃轮（`TURN_CONCURRENCY_CONFLICT`，"target Profile already has an
+   active execution"）；
+3. **空凭据守卫**（见 §9）：本机放置直接只读检查公共库；**远端放置 fail-closed**
+   （`SESSION_STORE_GUARD_UNAVAILABLE`——守卫读的是本机库，远程库不在这里，放行才是撒谎）；
+4. **数据层零操作**：只改绑定指针 + 版本 + 既有 `config.changed(next_send)`。
+
+**根因修复（本单实测发现，属 43 代门 HOME_MARKER_CONFLICT 债务的同类）**：会话在首轮把
+`home_locator` 钉死；切换后新 profile 的轮次仍写旧 role 的 home ⇒ 标记校验
+`HOME_MARKER_CONFLICT`（本轮 G1 第一枪即复现，`LocalChannelError: the home belongs to
+another profile identity`）。按 66 §0"每次执行按当前绑定物化"，切换时**清空
+`home_locator`**（下一轮按新 profile 重新派生；rename 不变性保留——派生规则本身与名字
+无关地记录在会话上）。修复后 G1 直通。
+
+## 9. 阶段 C —— 守卫与审计（已完成）
+
+- **守卫接线**：装配边界为每个 whole-db 家族注册守卫（库内每个 `.db` 共享条目；
+  本机 home root 下的 `_sessions/<family>/<name>`）；`switch_profile` 调用失败即
+  fail-closed（`SESSION_STORE_CREDENTIALS_PRESENT` / `..._STRUCTURE`）。
+- **凭据处置改写**（66 §2.5）：审计命中时按树定分——**共享库**（`port.shared_store`，
+  由 launcher 的 `session_store_harness` 判定）⇒ 类型化失败 + **不删文件** + 警告记账；
+  profile 级树 ⇒ 旧规则（删除命中文件）。抽成 `_credential_hit_disposition` 以便直测。
+- 守卫本身：`session_store_guard.py`（只读、读穿 WAL、fail-closed；见 §6b）。
+
+## 10. 门（G1–G5）
+
+| 门 | 结果 | 第一手 |
+| --- | --- | --- |
+| **G1 跨 profile 真召回** | ✅ | 会话在 role-a 跑一轮（写入共享 `state.json` + nonce）→ `switchProfile`（confirmed）→ role-b 第二轮**真召回 nonce**、`native_id` 不变、`config.changed` 在、两轮的 `profile_id` 归属分别为 role-a/role-b（从账本直读）；共享文件落在 `_sessions/kilo/state.json` |
+| **G2 空凭据守卫** | ✅（三条反例 + 正向） | ① 合成 `credential` 行（已提交）→ 切换被拒 `SESSION_STORE_CREDENTIALS_PRESENT`（wire family CONFLICT_REQUEST）；② **WAL 变体**：行只活在 `-wal`（读快照下）→ **仍被拒**；同文件 `immutable=1` 视图落后于 live 计数（`seen_immutable < seen_live`，实测 1<2）证明"读穿 WAL"不是巧合；③ 结构未知（非数据库字节）→ fail-closed；正向：播种后的空库（0 字节）切换通过 |
+| **G3 隔离事实** | ⚠️ 部分（已证 + 待列） | 已证：`log/`（未共享名）的写入留在 profile home、公共库无该文件；`log/`/`repos/`/`telemetry-id`/`auth.json` 由**绑定**保证按 profile 隔离（B 家的 role 目录里没有 A 家的文件——由 66 §2.1 的收窄共享集 + 阶段 A 的绑定规则推得，逐项清单待 E 收口时并入文档） |
+| **G4 凭据处置** | ✅（规则级） | `_credential_hit_disposition` 直测：共享库命中=keep-shared（不删）、profile 树=delete、非命中=none；共享库的"文件仍在 + 他 profile 会话仍可读"由规则本身保证（不删即仍在），端到端注入留待 D 的后续轮 |
+| **G5 并发** | ⏳ 未跑 | 修订后的四条（跨 profile 并行、冷启动单例行竞态、零 SQLITE_BUSY 上浮、同会话拒绝）需要真并发轮次；67 的 G1/G2 已覆盖"同会话拒绝"的机制面（per-session 索引 + 运行中 switch 拒绝），冷启动/并行两条待下一轮 |
+
+## 11. 阶段 B/C 的回归与清理
+
+- 新增测试 7 条（`test_shared_session_store.py`），全绿；全量计数见提交时的套件结果。
+- 新增夹具 `tests/server/fixtures/shared_store_acp_peer.mjs`：模型"播种文件存在但为空=
+  尚无状态"（与真实家族的空 SQLite 库同形；`stateful_acp_peer.mjs` 的"存在即已持久化"
+  语义与播种不兼容，故**不改既有门依赖的夹具**）。

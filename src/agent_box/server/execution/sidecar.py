@@ -1246,6 +1246,17 @@ class SidecarHarnessPort:
             **audit,
         }, resumable
 
+    @property
+    def shared_store(self) -> bool:
+        """Whether this execution's audited tree is the shared family library.
+
+        Order 66 §2.5: a credential hit in the shared library is a typed
+        failure that must NOT delete the file - deleting there would destroy
+        other Profiles' sessions. The launcher is the only object that knows
+        which tree the audit covers.
+        """
+        return bool(getattr(self.launcher, "session_store_harness", None))
+
     def delete_home_file(self, execution_id: str, relative: str) -> None:
         """Remove one leaked file from the home (the credential rule)."""
         envelope = self._require(execution_id)
