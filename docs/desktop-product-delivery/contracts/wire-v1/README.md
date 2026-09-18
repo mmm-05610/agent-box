@@ -13,9 +13,39 @@
 | 服务端评审面 | `generated/wire-v1.schema.json` | 由 `wireJsonSchemas()` 生成，禁止手改；重生成命令见下 |
 | 语义对照 | [semantics-map.md](semantics-map.md) | core v1 §8 每项能力 → 方法/事件/错误；幂等作用域逐方法登记；§9 场景 → fixture 计划 |
 
-当前摘要（SHA-256，2026-09-17 随 Hermes credentialId 重锁更新）：权威
-`774640498429ca9f501dcddd3c7f434e58af3c60a7360578e0387e8aca356276`；生成工件
-`14f7f73605bb6f048a09a8e7faa93f15ca77d4d66a0b38439a9e9cf2bc6428c7`。
+### 摘要登记（P21 阶段 1 第一手核对，2026-09-18）
+
+**后端已登记的最后一条**——`agent-box-env-provider/docs/server-round1/wire-review.md`
+第 434–437 行（Order 55 G2，前端提交 `b284f70c`），逐字：
+
+| 工件 | 后端登记值 |
+| --- | --- |
+| TS 权威 `apps/desktop/src/types/wire/wire-v1.ts` | `64dc99610b15360d4d114cb377b9034efeab127d5d15a34da5b7db8f42d8e08f` |
+| 生成工件 `generated/wire-v1.schema.json` | `42a164a47697f7481f4e5a224e7e2f5241719c1fa3fa476fa54f824c2096433d` |
+
+**本树当前重生成的一对**——用下条命令在 `dcfaf4d8` 的工作树上实测
+（Node v22.23.2 / zod 4.4.3 / `--experimental-strip-types`）：
+
+| 工件 | 本树当前值 |
+| --- | --- |
+| TS 权威 `apps/desktop/src/types/wire/wire-v1.ts` | `a0693877c8d2c28909024b556fd9105363e1a5f2770c9b50a50ad06fe4491635` |
+| 生成工件 `generated/wire-v1.schema.json` | `d34b7aa9d42666ff143fef5dbfee7def8fcebc4da3f9bad40e80fb47d95d04b8` |
+
+**⇒ 两端未锁定**（两条都是实测，不是推断）：
+
+1. **本树 TS 在后端登记之后又动过**：`2e9d37c2`（Order 57 C，`providerArtifacts.*`）改了权威，
+   而这条重锁没在后端 `wire-review.md` 留登记行——后端只持有与之对应的工件副本
+   `docs/server-round1/fullstack/generated/wire-v1.schema.json`
+   （sha256 `a1bd52a4fb68436079ae2d2e439953e8ac7f345ab5934a936a9434952bee0729`，方法集含
+   `providerArtifacts.*`）。故"后端最后登记值"停在 `b284f70c`，本树权威已在前。
+2. **文件式摘要不可跨工具链复现**：用本目录命令重生成 `b284f70c` 的权威得
+   `d465e526…`（≠ 后端登记的 `42a164a4…`）。差异是等价的两种联合编码——
+   zod 4 输出 `{"anyOf":[…]}`，后端登记值里是 `{"type":["string","number"]}`（zod 3 形）——
+   **语义相同、字节不同**。所以重锁必须把**工件本体**交给后端重新登记，
+   只报摘要不足以让两端对齐；摘要只在同一工具链下可比。
+3. 本目录里的工件副本自 `d7464166` 起**已落后**（停在 `14f7f736…`，不含
+   `providerArtifacts.*`），本次已按命令重生成补齐。
+
 重生成：`cd apps/desktop && node --experimental-strip-types -e "import('./src/types/wire/wire-v1.ts').then(async m => { const fs = await import('node:fs'); fs.writeFileSync('../../docs/desktop-product-delivery/contracts/wire-v1/generated/wire-v1.schema.json', JSON.stringify(m.wireJsonSchemas(), null, 2) + '\\n') })"`
 
 **放置说明（机械选择）**：权威放 `src/types/wire/` 而非本目录，是为了让客户端直接

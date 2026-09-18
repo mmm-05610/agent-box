@@ -1524,3 +1524,32 @@ Appearance（8 套主题 + 语言 + UI Scale + 终端字体）与 Keyboard Short
 - **派单表状态**：P00–P20 全部有结论，**无 P21+ 新增**。P19、P20 本 goal 内收口（见上两节）。
 - writer_lease = **RELEASED**（队列耗尽，本 goal 停止写入）。
 - 工作树干净；HEAD `5de44668`；分支 `feature/agentbox-desktop-product`（未碰 main，未 merge，未 push）。
+
+## P21 阶段 1（2026-09-18）：两仓摘要第一手核对 + 工件重生成 — `P21_STAGE1_RELOCK_READ`
+
+- **阶段边界重读**（章程 §5）：已读本树 `worktree-charter.md` + `work-orders/`（P21 本单），
+  主树 `README.md`（§3 规则 / §4 纪律）、`manifest.json`（P21 条目 `depends_on: [58,59,60,62,63,64]`，
+  stages `A-relock/B-contract/C-surfaces/D-checks`）、`status.md`、`rulings.md`、`prefs.md`。
+- **后端最后登记的一对**（第一手读 `agent-box-env-provider/docs/server-round1/wire-review.md`
+  第 434–437 行，Order 55 G2，前端提交 `b284f70c`，逐字）：
+  - TS 权威 `64dc99610b15360d4d114cb377b9034efeab127d5d15a34da5b7db8f42d8e08f`
+  - 生成工件 `42a164a47697f7481f4e5a224e7e2f5241719c1fa3fa476fa54f824c2096433d`
+  - （该行之后全文件再无摘要对——`awk NR>434 | grep -E "[0-9a-f]{64}"` 只命中这两条。）
+- **本树重生成后的一对**（本目录 README 的命令，Node v22.23.2 / zod 4.4.3 实测）：
+  - TS 权威 `a0693877c8d2c28909024b556fd9105363e1a5f2770c9b50a50ad06fe4491635`
+  - 生成工件 `d34b7aa9d42666ff143fef5dbfee7def8fcebc4da3f9bad40e80fb47d95d04b8`
+- **修掉的落后**：本目录工件副本自 `d7464166` 起停在 `14f7f736…`（不含 `providerArtifacts.*`），
+  P20 之后一直没重生成；本次按命令补齐。
+- **两端未锁定，两条实测原因**（不是推断）：
+  1. 权威在后端登记之后又动过：`2e9d37c2`（Order 57 C，`providerArtifacts.*`）改了 TS，
+     而这条重锁在后端 `wire-review.md` **零登记**（`grep providerArtifacts wire-review.md` = 0 命中）；
+     后端只持有对应工件副本 `fullstack/generated/wire-v1.schema.json`
+     = `a1bd52a4fb68436079ae2d2e439953e8ac7f345ab5934a936a9434952bee0729`。
+  2. **文件式摘要不可跨工具链复现**：用同一条命令重生成 `b284f70c` 的权威得 `d465e526…`，
+     ≠ 后端登记的 `42a164a4…`；成分对比是等价的两种联合编码（zod 4 `anyOf` vs zod 3 `type:[…]`）。
+     同一条命令重生成 `d7464166` 的权威**逐字节**等于当时提交的 `14f7f736…` ⇒ 命令确定性没问题，
+     不可复现来自工具链。**结论：重锁必须交工件本体，不能只报摘要。**
+- **证据**：`evidence/P21-stage1-relock-read.md`（含每条命令与输出）。
+- **给后端的交付物**：本目录 `generated/wire-v1.schema.json`（本次重生成后的本体）+ 上面那对摘要；
+  后端按它重新登记即为阶段 2 之后的锁定候选。
+- 提交：`P21 stage 1`（pathspec 提交，只含本目录 README、generated 工件、evidence、本文件）。

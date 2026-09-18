@@ -208,6 +208,140 @@
             "properties": {
               "kind": {
                 "type": "string",
+                "const": "thought.delta"
+              },
+              "sessionId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "sessionId",
+              "text"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "plan.updated"
+              },
+              "sessionId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "entries": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "content": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "priority": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "content",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "kind",
+              "sessionId",
+              "entries"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "mode.updated"
+              },
+              "sessionId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "currentModeId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "sessionId",
+              "currentModeId"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "usage.updated"
+              },
+              "sessionId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "turnId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "usage": {
+                "type": "object",
+                "properties": {
+                  "inputTokens": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "outputTokens": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "totalTokens": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "kind",
+              "sessionId",
+              "turnId",
+              "usage"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
                 "const": "message.final"
               },
               "sessionId": {
@@ -798,6 +932,140 @@
           "messageId",
           "role",
           "text"
+        ],
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "thought.delta"
+          },
+          "sessionId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "sessionId",
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "plan.updated"
+          },
+          "sessionId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "priority": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "content",
+                "status"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "kind",
+          "sessionId",
+          "entries"
+        ],
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "mode.updated"
+          },
+          "sessionId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "currentModeId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "sessionId",
+          "currentModeId"
+        ],
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "usage.updated"
+          },
+          "sessionId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "turnId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "usage": {
+            "type": "object",
+            "properties": {
+              "inputTokens": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "outputTokens": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "totalTokens": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "kind",
+          "sessionId",
+          "turnId",
+          "usage"
         ],
         "additionalProperties": false
       },
@@ -3016,6 +3284,45 @@
                 }
               ]
             },
+            "provenance": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "baseUrl": {
+                      "type": "string"
+                    },
+                    "authStyle": {
+                      "type": "string",
+                      "enum": [
+                        "api_key",
+                        "oauth",
+                        "none"
+                      ]
+                    },
+                    "wireApi": {
+                      "type": "string",
+                      "enum": [
+                        "chat_completions",
+                        "responses"
+                      ]
+                    },
+                    "fieldsSource": {
+                      "type": "string",
+                      "enum": [
+                        "preset",
+                        "pulled",
+                        "manual"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "createdAt": {
               "type": "string",
               "format": "date-time",
@@ -3148,6 +3455,38 @@
       "requestId": {
         "type": "string",
         "minLength": 8
+      },
+      "provenance": {
+        "type": "object",
+        "properties": {
+          "baseUrl": {
+            "type": "string"
+          },
+          "authStyle": {
+            "type": "string",
+            "enum": [
+              "api_key",
+              "oauth",
+              "none"
+            ]
+          },
+          "wireApi": {
+            "type": "string",
+            "enum": [
+              "chat_completions",
+              "responses"
+            ]
+          },
+          "fieldsSource": {
+            "type": "string",
+            "enum": [
+              "preset",
+              "pulled",
+              "manual"
+            ]
+          }
+        },
+        "additionalProperties": false
       }
     },
     "required": [
@@ -3264,6 +3603,45 @@
                 "type": "string",
                 "format": "date-time",
                 "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "provenance": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "baseUrl": {
+                    "type": "string"
+                  },
+                  "authStyle": {
+                    "type": "string",
+                    "enum": [
+                      "api_key",
+                      "oauth",
+                      "none"
+                    ]
+                  },
+                  "wireApi": {
+                    "type": "string",
+                    "enum": [
+                      "chat_completions",
+                      "responses"
+                    ]
+                  },
+                  "fieldsSource": {
+                    "type": "string",
+                    "enum": [
+                      "preset",
+                      "pulled",
+                      "manual"
+                    ]
+                  }
+                },
+                "additionalProperties": false
               },
               {
                 "type": "null"
@@ -3513,6 +3891,45 @@
               }
             ]
           },
+          "provenance": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "baseUrl": {
+                    "type": "string"
+                  },
+                  "authStyle": {
+                    "type": "string",
+                    "enum": [
+                      "api_key",
+                      "oauth",
+                      "none"
+                    ]
+                  },
+                  "wireApi": {
+                    "type": "string",
+                    "enum": [
+                      "chat_completions",
+                      "responses"
+                    ]
+                  },
+                  "fieldsSource": {
+                    "type": "string",
+                    "enum": [
+                      "preset",
+                      "pulled",
+                      "manual"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time",
@@ -3679,6 +4096,45 @@
               }
             ]
           },
+          "provenance": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "baseUrl": {
+                    "type": "string"
+                  },
+                  "authStyle": {
+                    "type": "string",
+                    "enum": [
+                      "api_key",
+                      "oauth",
+                      "none"
+                    ]
+                  },
+                  "wireApi": {
+                    "type": "string",
+                    "enum": [
+                      "chat_completions",
+                      "responses"
+                    ]
+                  },
+                  "fieldsSource": {
+                    "type": "string",
+                    "enum": [
+                      "preset",
+                      "pulled",
+                      "manual"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time",
@@ -3708,6 +4164,314 @@
     },
     "required": [
       "providerModel"
+    ],
+    "additionalProperties": false
+  },
+  "providerModels.probeModels#params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "requestId": {
+        "type": "string",
+        "minLength": 8
+      },
+      "baseUrl": {
+        "type": "string",
+        "minLength": 1
+      },
+      "credentialId": {
+        "anyOf": [
+          {
+            "type": "string",
+            "minLength": 1
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "required": [
+      "requestId",
+      "baseUrl"
+    ],
+    "additionalProperties": false
+  },
+  "providerModels.probeModels#result": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "status": {
+        "type": "string",
+        "enum": [
+          "ok",
+          "failed"
+        ]
+      },
+      "models": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "code": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "status",
+      "models"
+    ],
+    "additionalProperties": false
+  },
+  "providerModels.probeConnection#params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "requestId": {
+        "type": "string",
+        "minLength": 8
+      },
+      "baseUrl": {
+        "type": "string",
+        "minLength": 1
+      },
+      "credentialId": {
+        "anyOf": [
+          {
+            "type": "string",
+            "minLength": 1
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "required": [
+      "requestId",
+      "baseUrl"
+    ],
+    "additionalProperties": false
+  },
+  "providerModels.probeConnection#result": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "status": {
+        "type": "string",
+        "enum": [
+          "reachable",
+          "unreachable",
+          "failed"
+        ]
+      },
+      "code": {
+        "type": "string"
+      },
+      "detail": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "status"
+    ],
+    "additionalProperties": false
+  },
+  "providerArtifacts.list#params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "harness": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "required": [
+      "harness"
+    ],
+    "additionalProperties": false
+  },
+  "providerArtifacts.list#result": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "harness": {
+        "type": "string",
+        "minLength": 1
+      },
+      "versions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "entries": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "bytes": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "version",
+            "entries",
+            "bytes"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "current": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "required": [
+      "harness",
+      "versions",
+      "current"
+    ],
+    "additionalProperties": false
+  },
+  "providerArtifacts.install#params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "requestId": {
+        "type": "string",
+        "minLength": 8
+      },
+      "harness": {
+        "type": "string",
+        "minLength": 1
+      },
+      "version": {
+        "type": "string",
+        "minLength": 1
+      },
+      "sourceToken": {
+        "type": "string",
+        "minLength": 1
+      },
+      "digest": {
+        "type": "string",
+        "pattern": "^sha256:[0-9a-f]{64}$"
+      }
+    },
+    "required": [
+      "requestId",
+      "harness",
+      "version",
+      "sourceToken",
+      "digest"
+    ],
+    "additionalProperties": false
+  },
+  "providerArtifacts.install#result": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "harness": {
+        "type": "string",
+        "minLength": 1
+      },
+      "current": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "version": {
+        "type": "string"
+      },
+      "digest": {
+        "type": "string"
+      },
+      "entries": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "harness"
+    ],
+    "additionalProperties": false
+  },
+  "providerArtifacts.rollback#params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "requestId": {
+        "type": "string",
+        "minLength": 8
+      },
+      "harness": {
+        "type": "string",
+        "minLength": 1
+      },
+      "version": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "required": [
+      "requestId",
+      "harness",
+      "version"
+    ],
+    "additionalProperties": false
+  },
+  "providerArtifacts.rollback#result": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "harness": {
+        "type": "string",
+        "minLength": 1
+      },
+      "current": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "version": {
+        "type": "string"
+      },
+      "digest": {
+        "type": "string"
+      },
+      "entries": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "harness"
     ],
     "additionalProperties": false
   },
@@ -4167,6 +4931,45 @@
                 }
               ]
             },
+            "latestUsage": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "turnId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "usageSource": {
+                      "type": "string"
+                    },
+                    "inputTokens": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "outputTokens": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "totalTokens": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "turnId",
+                    "usageSource"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "createdAt": {
               "type": "string",
               "format": "date-time",
@@ -4294,6 +5097,45 @@
               }
             ]
           },
+          "latestUsage": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "turnId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "usageSource": {
+                    "type": "string"
+                  },
+                  "inputTokens": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "outputTokens": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "totalTokens": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "turnId",
+                  "usageSource"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time",
@@ -4392,6 +5234,45 @@
                 "type": "string",
                 "format": "date-time",
                 "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "latestUsage": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "turnId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "usageSource": {
+                    "type": "string"
+                  },
+                  "inputTokens": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "outputTokens": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "totalTokens": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "turnId",
+                  "usageSource"
+                ],
+                "additionalProperties": false
               },
               {
                 "type": "null"
@@ -4513,6 +5394,45 @@
                   }
                 ]
               },
+              "latestUsage": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "turnId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "usageSource": {
+                        "type": "string"
+                      },
+                      "inputTokens": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "outputTokens": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "totalTokens": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "turnId",
+                      "usageSource"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
               "createdAt": {
                 "type": "string",
                 "format": "date-time",
@@ -4593,6 +5513,45 @@
                     "type": "string",
                     "format": "date-time",
                     "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "latestUsage": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "turnId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "usageSource": {
+                        "type": "string"
+                      },
+                      "inputTokens": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "outputTokens": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "totalTokens": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "turnId",
+                      "usageSource"
+                    ],
+                    "additionalProperties": false
                   },
                   {
                     "type": "null"
@@ -4768,6 +5727,45 @@
                     "type": "string",
                     "format": "date-time",
                     "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "latestUsage": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "turnId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "usageSource": {
+                        "type": "string"
+                      },
+                      "inputTokens": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "outputTokens": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "totalTokens": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "turnId",
+                      "usageSource"
+                    ],
+                    "additionalProperties": false
                   },
                   {
                     "type": "null"
@@ -5826,6 +6824,140 @@
                         "messageId",
                         "role",
                         "text"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "const": "thought.delta"
+                        },
+                        "sessionId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "text": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "sessionId",
+                        "text"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "const": "plan.updated"
+                        },
+                        "sessionId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "entries": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "content": {
+                                "type": "string"
+                              },
+                              "status": {
+                                "type": "string"
+                              },
+                              "priority": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "content",
+                              "status"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "sessionId",
+                        "entries"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "const": "mode.updated"
+                        },
+                        "sessionId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "currentModeId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "sessionId",
+                        "currentModeId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "const": "usage.updated"
+                        },
+                        "sessionId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "turnId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "usage": {
+                          "type": "object",
+                          "properties": {
+                            "inputTokens": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "outputTokens": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "totalTokens": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "sessionId",
+                        "turnId",
+                        "usage"
                       ],
                       "additionalProperties": false
                     },
