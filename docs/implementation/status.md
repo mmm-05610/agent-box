@@ -634,9 +634,9 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 
 | 单 | 已落地 | 剩余 |
 | --- | --- | --- |
-| 51 | USAGE_FACT_PARTIAL：pi/codex 端到端含 wire（11/7/18→22/14/36 累计）、四家解析器就绪经真实数据验证、schema 7 usage 列 | hermes/claude 观测轮（门 marker 维护债）、opencode/kilo blob 解析、dsh/qwen 无本地样本 |
+| 51 | USAGE_FACT_PARTIAL：pi/codex 端到端含 wire（11/7/18→22/14/36 累计）、四家解析器就绪经真实数据验证、schema 7 usage 列 | hermes/claude 观测轮（门 marker 维护债）、dsh/qwen 无本地样本（opencode/kilo 解析器已落地） |
 | 52 | B/D+E 完成：thought/plan/mode 三新 wire kind + 四类映射入账本 + process-facts 端到端 | 真 harness 观测轮（假 peer 已定向验证，真 harness 轮待跑） |
-| 53 | USAGE_AGGREGATION_DONE：聚合模块 + usage.aggregate/export wire 方法 + 未知即未知反例 | opencode/kilo blob 解析器、hermes/claude 观测轮 |
+| 53 | USAGE_AGGREGATION_DONE：聚合模块 + usage.aggregate/export wire 方法 + 未知即未知反例 | hermes/claude 观测轮（opencode/kilo 解析器已落地，聚合面可直接消费其 fact） |
 | 54 | USAGE_FACT_PARTIAL：本机+WSL 通道变更集落地、c11 五家四绿（kilo marker 维护债）、schema 9 change_set 列 | WSL 端到端观测轮（c11 已绿 pi 门）；kilo marker 维护债 |
 | 55 | USAGE_PROBES_DONE（G1+G2–G4） | 真端点观测轮待做（无可用凭据端点时受限观测） |
 

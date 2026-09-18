@@ -10,8 +10,7 @@ refusal, not a silent fallback.
 from __future__ import annotations
 
 import json
-import os
-from pathlib import Path
+from contextlib import contextmanager
 from typing import Any
 
 
@@ -153,6 +152,39 @@ def parse_claude_projects_line(content: bytes) -> dict[str, Any] | None:
     return fact
 
 
+@contextmanager
+def _scratch_sqlite(content: bytes):
+    """Open fetched bytes as a read-only scratch database, or yield None.
+
+    The three SQLite-backed families (hermes, opencode, kilo) all parse
+    through here: bytes are spooled under a unique scratch name, opened with
+    ``mode=ro`` (never the live store), and unlinked afterwards.
+    """
+    import os
+    import sqlite3
+    import tempfile
+    import uuid
+    from pathlib import Path
+
+    scratch = (Path(tempfile.gettempdir())
+               / f"agentbox-usage-{os.getpid()}-{uuid.uuid4().hex}.db")
+    connection = None
+    try:
+        scratch.write_bytes(content)
+        connection = sqlite3.connect(f"file:{scratch}?mode=ro", uri=True)
+    except (OSError, sqlite3.Error):
+        connection = None
+    try:
+        yield connection
+    finally:
+        if connection is not None:
+            connection.close()
+        try:
+            scratch.unlink()
+        except OSError:
+            pass
+
+
 def parse_hermes_state_db(content: bytes) -> dict[str, Any] | None:
     """The Hermes session database (SQLite) opened from the fetched bytes.
 
@@ -163,12 +195,10 @@ def parse_hermes_state_db(content: bytes) -> dict[str, Any] | None:
     ordering (last rowid), and copies exactly the reported fields.
     """
     import sqlite3
-    import tempfile
 
-    scratch = Path(tempfile.gettempdir()) / f"agentbox-usage-{os.getpid()}-{id(content)}.db"
-    try:
-        scratch.write_bytes(content)
-        connection = sqlite3.connect(f"file:{scratch}?mode=ro", uri=True)
+    with _scratch_sqlite(content) as connection:
+        if connection is None:
+            return None
         try:
             columns = [row[1] for row in connection.execute("PRAGMA table_info(sessions)")]
             wanted = [name for name in (
@@ -181,15 +211,99 @@ def parse_hermes_state_db(content: bytes) -> dict[str, Any] | None:
             row = connection.execute(
                 f"SELECT {selection} FROM sessions ORDER BY rowid DESC LIMIT 1"
             ).fetchone()
-        finally:
-            connection.close()
-    except sqlite3.Error:
+        except sqlite3.Error:
+            return None
+    if row is None:
         return None
-    finally:
+    return _neutral(**{name: value for name, value in zip(wanted, row)})
+
+
+def _tokens_blob(tokens: Any) -> dict[str, int] | None:
+    """Map the opencode/kilo token blob shape into the neutral fields.
+
+    Both families spell one call's usage as ``total`` / ``input`` / ``output``
+    / ``reasoning`` plus ``cache.read`` / ``cache.write``; anything absent
+    stays absent.
+    """
+    if not isinstance(tokens, dict):
+        return None
+    cache = tokens.get("cache")
+    cache = cache if isinstance(cache, dict) else {}
+    return _neutral(
+        input_tokens=tokens.get("input"),
+        output_tokens=tokens.get("output"),
+        reasoning_tokens=tokens.get("reasoning"),
+        total_tokens=tokens.get("total"),
+        cache_read_tokens=cache.get("read"),
+        cache_write_tokens=cache.get("write"),
+    )
+
+
+def parse_opencode_db(content: bytes) -> dict[str, Any] | None:
+    """The opencode state database (SQLite) opened from the fetched bytes.
+
+    Assistant rows of ``message`` carry the family's own per-call ``tokens``
+    blob (and ``modelID``/``providerID``) in their ``data`` JSON. The parser
+    returns the last assistant row's neutral fact - the newest call's numbers,
+    not a re-derived session sum - or None when the store reports none.
+    """
+    import sqlite3
+
+    with _scratch_sqlite(content) as connection:
+        if connection is None:
+            return None
         try:
-            scratch.unlink()
-        except OSError:
-            pass
+            cursor = connection.execute("SELECT data FROM message ORDER BY rowid")
+        except sqlite3.Error:
+            return None
+        fact: dict[str, int] | None = None
+        for (data,) in cursor:
+            try:
+                payload = json.loads(data)
+            except (TypeError, ValueError):
+                continue  # a malformed row is skipped, not fatal
+            if not isinstance(payload, dict) or payload.get("role") != "assistant":
+                continue
+            candidate = _tokens_blob(payload.get("tokens"))
+            if candidate:
+                fact = candidate
+    return fact
+
+
+def parse_kilo_db(content: bytes) -> dict[str, Any] | None:
+    """The kilo state database (SQLite) opened from the fetched bytes.
+
+    ``session`` carries the family's own per-session totals in dedicated
+    columns (``tokens_input`` / ``tokens_output`` / ``tokens_reasoning`` /
+    ``tokens_cache_read`` / ``tokens_cache_write``). The parser takes the
+    newest session by the store's own ``time_updated`` and copies exactly the
+    columns that exist; a column the store did not report stays absent.
+    """
+    import sqlite3
+
+    wanted_names = (
+        ("tokens_input", "input_tokens"),
+        ("tokens_output", "output_tokens"),
+        ("tokens_reasoning", "reasoning_tokens"),
+        ("tokens_cache_read", "cache_read_tokens"),
+        ("tokens_cache_write", "cache_write_tokens"),
+    )
+    with _scratch_sqlite(content) as connection:
+        if connection is None:
+            return None
+        try:
+            columns = [row[1] for row in connection.execute("PRAGMA table_info(session)")]
+            wanted = [neutral for store, neutral in wanted_names if store in columns]
+            if not wanted:
+                return None
+            stores = [store for store, neutral in wanted_names if store in columns]
+            selection = ", ".join(stores)
+            row = connection.execute(
+                f"SELECT {selection} FROM session "
+                "ORDER BY time_updated DESC, rowid DESC LIMIT 1"
+            ).fetchone()
+        except sqlite3.Error:
+            return None
     if row is None:
         return None
     return _neutral(**{name: value for name, value in zip(wanted, row)})
@@ -202,6 +316,8 @@ FORMATS = {
     "codex-rollout": parse_codex_rollout,
     "claude-projects-line": parse_claude_projects_line,
     "hermes-state-db": parse_hermes_state_db,
+    "opencode-state-db": parse_opencode_db,
+    "kilo-state-db": parse_kilo_db,
 }
 
 
@@ -215,4 +331,11 @@ def parse_usage(usage_format: str, content: bytes) -> dict[str, int] | None:
     return parser(content)
 
 
-__all__ = ["FORMATS", "UsageParseError", "parse_pi_acp_journal", "parse_usage"]
+__all__ = [
+    "FORMATS",
+    "UsageParseError",
+    "parse_pi_acp_journal",
+    "parse_opencode_db",
+    "parse_kilo_db",
+    "parse_usage",
+]

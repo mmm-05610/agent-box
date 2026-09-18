@@ -49,3 +49,37 @@
   作为可审计出处记录。
 - D（wire 重锁）：与 52 共享一次重锁（工单已定）；本阶段确认 wire 现状无 usage 字段。
 - E（前端交接）：前端 P08 容器消费"到达的内容"；ACP 家族在 native 回读落地前显示未知。
+
+## 阶段 B 增量（2026-09-18）：opencode / kilo 的 data blob 解析器落地
+
+**代码**：`usage.py` 新增 `parse_opencode_db` / `parse_kilo_db`，注册名
+`opencode-state-db` / `kilo-state-db`；三家 SQLite 载体（hermes/opencode/kilo）收敛到
+同一个 `_scratch_sqlite` 助手（bytes 落盘唯一临时名 → `mode=ro` 打开 → 用后删除；
+绝不打开活库）。hermes 解析器重写到该助手，**语义零改动**（其两条既有测试原样通过）。
+
+**第一手形状（本机真库只读观测，零模型调用）**：
+
+- opencode.db（sha256 `94eda077e98be340…`，2,273,280 B）：`message.data` 的 assistant
+  行自带 `tokens` blob（`total/input/output/reasoning` + `cache.read/write`）与
+  `modelID/providerID`——与 kilo 的 `part` 行 `step-finish` blob 同构。解析器取
+  **最新一条 assistant 行**（与 pi 的"最后一条 usage 行获胜"同一约定）。
+- kilo.db（sha256 `6e99dd55d67f0c82…`，307,200 B）：`session` 表有**专用列**
+  `tokens_input/output/reasoning/cache_read/cache_write`（另有 `cost`——成本不进
+  neutral fact，工单 53 的"无真实单价来源即未知"照旧）。解析器按 `time_updated`
+  取最新会话，**列缺失即字段缺失**（有老库列子集的反例测试）。
+
+**真机映射证据（逐字节复制，未编造）**：
+
+- opencode 最新 assistant 行是**诚实全零 blob**（被中止的调用如实报 0）——解析器
+  输出全零 fact，这是"最新值=0"的事实而非解析失败；同一库中一条**逐字复制的非零行**
+  （session `ses_…76Rof0H`，total 10587 = 10446 in + 110 out + 31 reasoning）映射出
+  完整 neutral fact `10446/110/cacheRead 0/cacheWrite 0/reasoning 31/total 10587`。
+- kilo 最新会话（`time_updated=1789514895767`）列值 12/10 → fact
+  `{inputTokens:12, outputTokens:10}`，与库逐字段一致。
+
+**测试与回归**：解析器套件 17 passed（新增 4 条：blob 映射、缺表=None、非 SQLite
+bytes=None、kilo 列子集）；全量 **784 passed / 0 failed**（loopback probe 的既有
+抖动本次以 socket 就绪等待根治，此前该测试在全量下偶发连接拒绝）。
+
+**51 剩余（不变）**：hermes/claude 的门级观测轮（43 代门 marker 维护债）、
+dsh/qwen 仍无本地样本。

@@ -164,6 +164,101 @@ def test_hermes_db_without_the_sessions_table_is_a_none_not_a_guess(tmp_path):
     db.unlink()
 
 
+def _sqlite_bytes(tmp_path, name, statements):
+    import sqlite3
+
+    db = tmp_path / name
+    connection = sqlite3.connect(db)
+    for statement in statements:
+        connection.execute(statement)
+    connection.commit()
+    connection.close()
+    return db.read_bytes()
+
+
+OPENCODE_SCHEMA = (
+    "CREATE TABLE message (id TEXT PRIMARY KEY, session_id TEXT, "
+    "time_created INTEGER, time_updated INTEGER, data TEXT)",
+    "INSERT INTO message VALUES ('m1', 's1', 1, 1, "
+    "'" + json.dumps({"role": "user", "parts": []}) + "')",
+    # A malformed row is skipped, not fatal.
+    "INSERT INTO message VALUES ('m2', 's1', 2, 2, '{not json')",
+    "INSERT INTO message VALUES ('m3', 's1', 3, 3, "
+    "'" + json.dumps({"role": "assistant", "modelID": "model-a",
+                      "tokens": {"total": 11, "input": 8, "output": 3,
+                                 "reasoning": 1,
+                                 "cache": {"write": 2, "read": 4}}}) + "')",
+    "INSERT INTO message VALUES ('m4', 's1', 4, 4, "
+    "'" + json.dumps({"role": "assistant", "modelID": "model-a",
+                      "tokens": {"total": 20, "input": 15, "output": 5}}) + "')",
+)
+
+
+def test_opencode_db_maps_the_assistant_token_blob(tmp_path):
+    """First-hand shape (stage A on this machine): the assistant rows of
+    ``message`` carry the per-call token blob (total/input/output/reasoning
+    plus cache.read/write) in their data JSON. The last assistant row wins;
+    fields the newest call did not report stay absent."""
+    from agent_box.server.execution.usage import parse_opencode_db
+
+    content = _sqlite_bytes(tmp_path, "opencode.db", OPENCODE_SCHEMA)
+    assert parse_opencode_db(content) == {
+        "inputTokens": 15, "outputTokens": 5, "totalTokens": 20,
+    }
+    # Registered reachability: the deployment's format name resolves.
+    assert parse_usage("opencode-state-db", content) == {
+        "inputTokens": 15, "outputTokens": 5, "totalTokens": 20,
+    }
+
+
+def test_opencode_db_without_the_message_table_is_none(tmp_path):
+    from agent_box.server.execution.usage import parse_opencode_db
+
+    content = _sqlite_bytes(tmp_path, "opencode.db",
+                            ("CREATE TABLE unrelated (x INTEGER)",))
+    assert parse_opencode_db(content) is None
+    # Not a database at all is also a None, not a crash or a guess.
+    assert parse_opencode_db(b"this is not sqlite") is None
+
+
+def test_kilo_db_reads_the_newest_session_totals(tmp_path):
+    """First-hand shape (stage A on this machine): kilo's ``session`` table
+    carries per-session totals in dedicated token columns; the newest session
+    by the store's own time_updated wins."""
+    from agent_box.server.execution.usage import parse_kilo_db
+
+    content = _sqlite_bytes(tmp_path, "kilo.db", (
+        "CREATE TABLE session (id TEXT PRIMARY KEY, tokens_input INTEGER, "
+        "tokens_output INTEGER, tokens_reasoning INTEGER, "
+        "tokens_cache_read INTEGER, tokens_cache_write INTEGER, "
+        "time_created INTEGER, time_updated INTEGER)",
+        "INSERT INTO session VALUES ('older', 1, 1, 0, 0, 0, 1, 1)",
+        "INSERT INTO session VALUES ('newest', 120, 30, 6, 8, 2, 10, 20)",
+    ))
+    assert parse_kilo_db(content) == {
+        "inputTokens": 120, "outputTokens": 30, "reasoningTokens": 6,
+        "cacheReadTokens": 8, "cacheWriteTokens": 2,
+    }
+    assert parse_usage("kilo-state-db", content) == {
+        "inputTokens": 120, "outputTokens": 30, "reasoningTokens": 6,
+        "cacheReadTokens": 8, "cacheWriteTokens": 2,
+    }
+
+
+def test_kilo_db_copies_only_the_columns_the_store_reports(tmp_path):
+    """A store that predates some token columns reports only what it has."""
+    from agent_box.server.execution.usage import parse_kilo_db
+
+    content = _sqlite_bytes(tmp_path, "kilo.db", (
+        "CREATE TABLE session (id TEXT PRIMARY KEY, tokens_input INTEGER, "
+        "tokens_output INTEGER, time_updated INTEGER)",
+        "INSERT INTO session VALUES ('only', 40, 9, 5)",
+    ))
+    assert parse_kilo_db(content) == {"inputTokens": 40, "outputTokens": 9}
+    assert parse_kilo_db(_sqlite_bytes(tmp_path, "kilo2.db",
+                                       ("CREATE TABLE unrelated (x INTEGER)",))) is None
+
+
 def test_probe_validates_the_endpoint_before_any_network_call():
     """SSRF/Order-55 §2: only https (loopback http exempt), no private nets."""
     from agent_box.server.model_configs.probe import ProbeError, pull_models
@@ -209,6 +304,17 @@ def test_pull_models_parses_a_loopback_fake(tmp_path):
 
     server = Server(("127.0.0.1", 0), Handler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
+
+    # Under a full-suite run the accepting thread can lag behind the port
+    # being bound; wait for a real accepted connection before any request.
+    import socket
+
+    for _ in range(100):
+        with socket.socket() as probe:
+            if probe.connect_ex(("127.0.0.1", server.server_port)) == 0:
+                break
+        time.sleep(0.01)
+
     try:
         from agent_box.server.model_configs.probe import (
             ProbeError,
