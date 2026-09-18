@@ -707,3 +707,51 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 **投递回执**：已纳入 work order 070 投递 @111bf4d（批内排 067 之后、069 之前；章程 §3 顺序已更新）——按新队列继续，不为检查点停下。
 
 **Validation**：`git diff --check` 干净；阶段提交后 `git status --short` 无输出。
+
+---
+
+## CHECKPOINT b1（2026-09-19）
+
+**CHECKPOINT b1 [PARTIAL]**（唯一未收口的是 066 的 G5 首发锁——方案已交付、**未实施**；其余单 DONE，62/64 为 068 按证据下调的 PARTIAL）
+
+**1 现在能试什么**（入口/命令 + 期望）
+
+- 批次结构门：`python3 ~/.agents/skills/incremental-work-order/scripts/validate_order.py docs/implementation/work-orders/ --batch b1 --strict` → 4 个 b1 单全 **OK、exit 0**（阶段全勾、门三列齐、场景齐）。
+- 回归：`PYTHONPATH=src:plugins/... pytest tests/ -q` → **882 passed / 0 failed**（258 s，本批末实测；批内基线 879，+本批新增 3 测试）。
+- 66 并发门（**红=缺陷仍在**，预期）：`python3 scripts/server-round1/shared-store-concurrency-gate.py --attempts 3` → 冷启动 6/7 失败（5×`database is locked`、1×外键竞态）、初始化后 3/3 双绿；证据 [JSON](../server-round1/fullstack/shared-session-store-66-concurrency.json)。
+- 67 门（绿；注意 G8 有 1/2 间歇）：`AGENT_BOX_SANDBOX_MODULE=agent_box_sandbox_bwrap PYTHONPATH=… python3 scripts/server-round1/native-home-gate.py` → `NATIVE_HOME_GATE_OK`（G3 = 45-G3 复现：两轮都 completed、`nativeIdsDiffer`、同会话入队、运行中切换 rejected）；复现报告 [JSON](../server-round1/fullstack/per-session-admission-67-native-home-gate.json)。
+- 070 探测面（绿）：经 wire 调 `providerModels.probeModels` / `probeConnection`（真实端点一轮 2×GET、0 token）；证据 [JSON](../server-round1/fullstack/provider-model-55-real-probe.json) + [报告](../server-round1/fullstack/provider-model-55.md)。
+- 069 观测（否定 + 根因）：[报告](../server-round1/fullstack/wsl-change-set-observation-069.md)（WSL 变更集全 NULL ⇒ `sidecar.py:631-632` 空快照折叠）。
+- 072 结案：[48 报告 §七/§八](../server-round1/fullstack/windows-placement-48.md)（两轮退出码 `0xC0000142`、H1 排除、声明仍 false、低于 Linux 侧）。
+
+**2 要你拍的**：见本节末 **「阻塞（待人拍）」** 四条——066 首发锁实施、`providerModels.update` 省略语义、54 的一行修并入 b2、两仓重锁节奏。
+
+**3 花了什么**
+
+- 真实模型调用：**2 次**（070：`GET https://api.deepseek.com/models` ×2；**0 token、¥0**，R-0011 不设上限口径）；其余全部 loopback 假端点/本机，零外网。
+- 门与批：全量套件 3 次（879 / 879 / 882）、native-home 2 次、pi 门（c11）3 次、共享库并发门 3 批、五类反例演练 1 批、wire/探针定向多批。
+- 清理：本会话临时根已删；**保留 1 个**（069 证据引用的 kept 根 `/tmp/agentbox-pi-gate-mkb9aso9`，110 MB）；更早会话遗留的 pi-gate 根未动（非本会话产物）。
+
+**4 恢复点**
+
+- 下一批 **b2**（章程 §「下一批 b2」9 项：066-G5 首发锁 → 两仓重锁收口 → 45 收口 → 62/64 的 WSL 真腿 → 53 解析器 → 60 配置写入 → 65 最后一圈 → G8 间歇 → 四家真实 UI 模型门）；契约由调度者逐单投递。
+- baseline = `checkpoint/b1` 指向的 commit；工作树在检查点提交后 clean。
+
+**5 不含糊**
+
+- **066 = SHARED_SESSION_STORE_PARTIAL**：G5 真并发腿出**确定性缺陷**（6/7 失败），首发锁方案已交付、**未实施**——不得写成 DONE。
+- **62/64 = PARTIAL**：DoD 明示的 WSL 真机腿未跑（068 按证据口径下调，行内注明）。
+- **67 的 G8**（取消/召回）有 1/2 间歇（复跑 1 败 1 过；失败形态=召回轮 completed 但流为空），已记入 67 报告 §9，**不是** 67 的门。
+- **069 是观测轮**：WSL 变更集**否定结果**（全 NULL）+ 根因（空快照折叠），修法与测试已交回，**未实施**。
+- **070 交回两项**合同不齐（`providerModels.update`、`providerArtifacts.install`）与"窗口/能力无记录面"。
+- **072 自查发现**：48 行此前写"报告显式写低于 Linux 侧"而文档实际缺失——已由 §七 补齐并在行内如实记录。
+- 阶段勾选：13 个复选框已勾（仅 `- [ ]`→`- [x]`，契约文本未动；068 的 `forbidden` 按"禁改契约实质"理解，如与调度者口径不符请按差量回退）。
+
+## 阻塞（待人拍，2026-09-19）
+
+| # | 阻塞 | 证据（指针） | 建议 | 不拍的后果 |
+| --- | --- | --- | --- | --- |
+| B1 | 066-G5 **首发锁实施**未做 | [66 报告 §15](../server-round1/fullstack/shared-session-store-66.md)（方案）+ 并发门 6/7 失败 | b2 首单实施：键=（放置侧 home root，家族）；Server DB 记账 + 准入锁；**只锁首轮**，成功终态后放行后续并发 | 两个 profile 首次共用新库**必有一方 failed**（确定性，非偶发） |
+| B2 | `providerModels.update` 合同/实现不齐（合同 `displayName`/`credentialId` 可选；实现必填且 `params[...]` 直接取值） | [070 报告 §6.1](../server-round1/fullstack/provider-model-55.md)；`handlers._provider_model_body` | 定语义：**省略即保留原值**（改实现 + 测试）或收紧合同（改工件 + 重锁） | 合法请求被 400；若只放开校验则变 500 |
+| B3 | 54 的 `sidecar.py:631-632` 一行修（空快照折叠） | [069 报告 §3-4](../server-round1/fullstack/wsl-change-set-observation-069.md)（插桩 + 三态探针） | 并入 b2 的 066-G5 收尾单（同文件族）一起改 + 空快照测试 + 复跑观测轮 | WSL 通道变更集**恒 unknown**（首轮必现，且"正例只需审计文件"） |
+| B4 | P17/P20 两仓重锁（前端交回值 `b284f70c`） | b2 计划第 2 项；55/62/63/64 行"待重锁" | 按 b2 计划收口：登记前端工件摘要并与后端逐字一致 | strict 工件 5 项既有失败持续；前端面缺新字段/新方法 |
