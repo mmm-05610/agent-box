@@ -690,3 +690,110 @@ def test_the_mcp_probe_answers_bounded_and_types_every_failure(tmp_path):
     with pytest.raises(McpProbeError) as oversized:
         probe_with("oversized", timeout=5.0, max_bytes=4096)
     assert oversized.value.code == "PROBE_RESPONSE_TOO_LARGE"
+
+
+def test_a_plugin_is_stored_as_code_with_a_digest_and_a_preview(tmp_path):
+    """Order 59: OpenCode's hook is a code asset - stored verbatim, previewed.
+
+    The refusals are the point: a binary, a symlink, an oversized file and a
+    duplicate revision all refuse typed, and nothing ever assembles code from
+    form fields - what the user wrote is what the digest covers.
+    """
+    from agent_box.server.assets.plugins import PluginAssetError, preview_of, PluginAssetStore
+
+    store = PluginAssetStore(tmp_path / "assets")
+    source = tmp_path / "guard.js"
+    source.write_text("export const Guard = async (input, output) => {\n"
+                      "  output.blocked = true\n}\n", encoding="utf-8")
+    facts = store.install(source, asset_id="guard", revision=1)
+    assert facts["digest"].startswith("sha256:") and facts["filename"] == "guard.js"
+    assert "Guard" in facts["preview"]
+    assert store.verify(asset_id="guard", revision=1, expected_digest=facts["digest"]) is True
+    name, content = store.read(asset_id="guard", revision=1)
+    assert name == "guard.js" and content == source.read_bytes()
+
+    with pytest.raises(PluginAssetError) as exists:
+        store.install(source, asset_id="guard", revision=1)
+    assert exists.value.code == "PLUGIN_REVISION_EXISTS"
+
+    binary = tmp_path / "bad.js"
+    binary.write_bytes(b"\xff\xfe\x00binary")
+    with pytest.raises(PluginAssetError) as not_text:
+        store.install(binary, asset_id="bad", revision=1)
+    assert not_text.value.code == "PLUGIN_NOT_TEXT"
+
+    link = tmp_path / "link.js"
+    os.symlink(source, link)
+    with pytest.raises(PluginAssetError) as linked:
+        store.install(link, asset_id="linked", revision=1)
+    assert linked.value.code == "PLUGIN_ASSET_INVALID"
+
+    wrong_suffix = tmp_path / "hook.py"
+    wrong_suffix.write_text("print('nope')\n", encoding="utf-8")
+    with pytest.raises(PluginAssetError) as suffix:
+        store.install(wrong_suffix, asset_id="pyscript", revision=1)
+    assert suffix.value.code == "PLUGIN_ASSET_INVALID"
+
+    oversized = tmp_path / "big.js"
+    oversized.write_text("x" * (256 * 1024 + 1), encoding="utf-8")
+    with pytest.raises(PluginAssetError) as bounds:
+        store.install(oversized, asset_id="big", revision=1)
+    assert bounds.value.code == "PLUGIN_ASSET_OUTSIDE_BOUNDS"
+
+    # The preview is bounded and marks its own truncation.
+    long_preview = preview_of("\n".join(f"line {index}" for index in range(100)).encode())
+    assert long_preview.endswith("…") and long_preview.count("\n") <= 24
+
+
+@pytest.mark.skipif(shutil.which("bwrap") is None, reason="bwrap is required")
+def test_assets_publish_plugin_over_the_wire_returns_a_preview(tmp_path):
+    from fastapi.testclient import TestClient
+
+    from agent_box.server.bootstrap import build_runtime_from_sidecar_deployment
+    from agent_box.server.transport.http import create_app
+    from agent_box.storage.secrets import MemorySecretStore
+
+    import agent_box.server.bootstrap.runtime as runtime_module
+
+    peer_source = "tests/harness_remote/home_probe_acp_peer.mjs"
+    peer_bytes = REPO / "tests" / "server" / "fixtures" / "home_probe_acp_peer.mjs"
+    deployment = {"schemaVersion": 1, "harnesses": [{
+        "id": "codex", "capabilityClaims": {"stream": True},
+        "adapter": {"command": "/usr/bin/node", "args": [], "source": peer_source},
+        "stateProjection": {"target": "/runtime/home/.codex"},
+        "timeoutMs": 60_000}]}
+    original_file = runtime_module._sidecar_deployment_file
+
+    def deployment_file(root, relative):
+        if relative == peer_source:
+            return peer_bytes.read_bytes()
+        return original_file(root, relative)
+
+    runtime_module._sidecar_deployment_file = deployment_file
+    try:
+        document = tmp_path / "deployment.json"
+        document.write_text(json.dumps(deployment), encoding="utf-8")
+        runtime = build_runtime_from_sidecar_deployment(
+            tmp_path / "server", document, plugin_root=PLUGIN,
+            secret_store=MemorySecretStore(values={}))
+        runtime.start()
+        plugin = tmp_path / "guard.js"
+        plugin.write_text("export const Guard = async () => {}\n", encoding="utf-8")
+        with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
+            token = runtime.token
+            response = client.post("/wire/v1/assets.publishPlugin", headers={
+                "Authorization": f"Bearer {token}"}, json={
+                "jsonrpc": "2.0", "id": "p", "method": "assets.publishPlugin",
+                "params": {"requestId": "plugin-publish-1", "assetId": "guard",
+                           "revision": 1, "sourcePath": str(plugin)},
+            }).json()["result"]
+            assert response["asset"]["kind"] == "plugin"
+            assert response["asset"]["digest"].startswith("sha256:")
+            assert "Guard" in response["preview"]
+            listed = client.post("/wire/v1/assets.list", headers={
+                "Authorization": f"Bearer {token}"}, json={
+                "jsonrpc": "2.0", "id": "l", "method": "assets.list", "params": {},
+            }).json()["result"]["assets"]
+            assert [item["kind"] for item in listed] == ["plugin"]
+    finally:
+        runtime_module._sidecar_deployment_file = original_file

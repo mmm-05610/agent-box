@@ -16,7 +16,7 @@ from agent_box.server.idempotency import IdempotentRecords
 from agent_box.server.ids import now, opaque_id
 from agent_box.storage import Database
 
-KINDS = ("skill", "mcp", "command")
+KINDS = ("skill", "mcp", "command", "plugin")
 _ASSET_ID = re.compile(r"[a-z0-9][a-z0-9._-]{0,63}\Z")
 
 

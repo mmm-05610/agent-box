@@ -89,6 +89,7 @@ _PARAM_SHAPES = {
     "assets.list": (set(), set()),
     "assets.publishSkill": ({"requestId", "assetId", "revision", "sourcePath"}, set()),
     "assets.publishMcp": ({"requestId", "assetId", "revision", "definition"}, set()),
+    "assets.publishPlugin": ({"requestId", "assetId", "revision", "sourcePath"}, set()),
     "assets.bind": ({"requestId", "profileId", "assetId"}, {"revision", "enabled"}),
     "assets.unbind": ({"requestId", "profileId", "assetId"}, set()),
     "assets.bindings": ({"profileId"}, set()),
@@ -260,6 +261,7 @@ class WireService:
         asset_records=None,
         skill_assets=None,
         mcp_assets=None,
+        plugin_assets=None,
         catalogs=None,
         hooks=None,
         hook_triggers=None,
@@ -275,6 +277,8 @@ class WireService:
         self.asset_records = asset_records
         self.skill_assets = skill_assets
         self.mcp_assets = mcp_assets
+        #: Order 59: the code-asset store (OpenCode-style plugin files).
+        self.plugin_assets = plugin_assets
         #: Order 58 G7: directory-shaped source snapshots.
         self.catalogs = catalogs
         #: Order 59: the managed-hook ledger and its trigger facts.
@@ -313,6 +317,7 @@ class WireService:
             "assets.list": self.assets_list,
             "assets.publishSkill": self.assets_publish_skill,
             "assets.publishMcp": self.assets_publish_mcp,
+            "assets.publishPlugin": self.assets_publish_plugin,
             "assets.bind": self.assets_bind,
             "assets.unbind": self.assets_unbind,
             "assets.bindings": self.assets_bindings,
@@ -703,6 +708,39 @@ class WireService:
         )[1]
         return {"asset": asset_view({**published, "id": published["asset_id"],
                                      "latest_revision": published["latest_revision"]})}
+
+    def assets_publish_plugin(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        """Store one code asset (a plugin file) with its digest and preview.
+
+        No form ever assembles this code: the user supplies the file, the
+        store keeps it verbatim, and the response carries a bounded preview so
+        the UI can show what was stored without reading it back from disk.
+        """
+        from pathlib import Path as _Path
+
+        if self.plugin_assets is None:
+            raise WireError("UNAVAILABLE", "no plugin asset store is composed")
+        records, _skills, _mcp = self._require_assets()
+        asset_id = _slug(params["assetId"], "assetId")
+        revision = _positive(params["revision"], "revision")
+        source = _Path(_bounded(params["sourcePath"], "sourcePath", 4096))
+        try:
+            facts = self.plugin_assets.install(
+                source, asset_id=asset_id, revision=revision)
+        except Exception as refusal:  # noqa: BLE001 - typed by the store
+            raise WireError("INVALID_REQUEST",
+                            f"{getattr(refusal, 'code', type(refusal).__name__)}: "
+                            f"{getattr(refusal, 'message', refusal)}")
+        published = records.publish(
+            key=_request_id(params["requestId"]),
+            request_digest=digest({"assetId": asset_id, "revision": revision,
+                                   "sourcePath": params["sourcePath"]}),
+            kind="plugin", name=asset_id, revision=revision, digest=facts["digest"],
+            source=f"local:{source.name}", asset_id=asset_id,
+        )[1]
+        return {"asset": asset_view({**published, "id": published["asset_id"],
+                                     "latest_revision": published["latest_revision"]}),
+                "preview": facts["preview"]}
 
     def assets_bind(self, params: Mapping[str, Any]) -> dict[str, Any]:
         records, _skills, _mcp = self._require_assets()

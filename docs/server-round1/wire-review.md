@@ -518,3 +518,12 @@ ProviderModelConfigRecord = {
 - **可观测的生产端**：本工作树交付账本与契约；hook 触发事实的采集端（各家 journal/受控包装）
   未接线，如实记账。
 - 需前端同步（P16）与两仓重锁。
+
+## Order 59 — 代码资产 `assets.publishPlugin`（2026-09-18，env-provider）
+
+- **新方法（+1）**：`assets.publishPlugin {requestId, assetId, revision, sourcePath} →
+  {asset, preview}`——OpenCode 形态的 hook 是**代码资产**：用户提供源码（`.js/.mjs/.ts`、
+  UTF-8 文本、≤256 KiB），我们**逐字存储**（摘要覆盖原字节）并回**有界预览**
+  （≤24 行/4096 字符，自带截断标记），**绝不由表单拼装代码**。
+- 反例：二进制（`PLUGIN_NOT_TEXT`）、符号链接、后缀不符、超限、重复修订各有类型化码。
+- 逐家物化槽位（opencode 的 plugins 目录）**未一手钉死 ⇒ 不声明、不物化**（如实记账）。
