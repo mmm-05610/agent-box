@@ -1,16 +1,17 @@
 import { useStore } from '@nanostores/react'
 import { AnimatePresence, motion } from 'motion/react'
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 
 import type { WireSessionProjection } from '@/application/session/wire-session-projection'
-import type { QueueItem } from '@/types/wire/wire-v1'
-
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
+import type { ExecutionInventoryRow, QueueItem, WorkspaceGitStatus } from '@/types/wire/wire-v1'
 
 import {
   formatWorkStatusElapsed,
   workStatusElapsedSeconds,
+  workStatusExecutionRows,
+  workStatusGitRows,
   workStatusIsBusy,
   workStatusLineParts,
   workStatusProcessFacts
@@ -20,10 +21,11 @@ import { $workStatusPanelMode, hydrateWorkStatusPanelMode, setWorkStatusPanelMod
 /**
  * P20 work status panel: a floating top-left element over the chat area.
  * Collapsed by default to a single line assembled ONLY from service facts
- * (turn state, queue count, duration-in-state); clicking expands it into the
- * vertical card stack. Cards without a backend data source — git, goals,
- * sub-agents, background — do not render (the work order's honesty boundary;
- * see work-status.ts for the field contracts awaiting their faces).
+ * (turn state, queue count, duration-in-state, the reported branch); clicking
+ * expands it into the vertical card stack. P21 added the two cards whose
+ * backend faces landed (Git, the execution inventory) — every other reference
+ * card still has no data source and therefore does not render (see
+ * work-status.ts for the field contracts awaiting their faces).
  *
  * Interaction logic only is learned from the reference projects; the visuals
  * are this app's own tokens, and the user's collapsed/expanded/closed choice
@@ -32,7 +34,14 @@ import { $workStatusPanelMode, hydrateWorkStatusPanelMode, setWorkStatusPanelMod
 
 export interface WorkStatusPanelProps {
   execution: WireSessionProjection['execution']
+  /** Order 64: the service's inventory, or null while it has not answered a
+   *  read yet — null is "no fact", and an empty list is "none in flight". */
+  executions?: ExecutionInventoryRow[] | null
+  /** Order 62: the workspace's Git answer, or null while unknown. */
+  git?: WorkspaceGitStatus | null
   queue: QueueItem[]
+  /** Re-reads the two read-only faces; nothing here writes anything. */
+  onRefresh?: () => void
 }
 
 const TICK_MS = 1000
@@ -54,7 +63,7 @@ function useNowTicking(active: boolean): number {
   return now
 }
 
-export function WorkStatusPanel({ execution, queue }: WorkStatusPanelProps) {
+export function WorkStatusPanel({ execution, executions = null, git = null, onRefresh, queue }: WorkStatusPanelProps) {
   const { t } = useI18n()
   const copy = t.workStatus
   const mode = useStore($workStatusPanelMode)
@@ -65,11 +74,47 @@ export function WorkStatusPanel({ execution, queue }: WorkStatusPanelProps) {
 
   const busy = workStatusIsBusy(execution)
   const now = useNowTicking(busy)
-  const line = workStatusLineParts(
-    { execution, queue },
-    { queuedCount: copy.queuedCount, stateLabel: copy.stateLabel },
-    now
-  )
+  const process = workStatusProcessFacts({ execution, queue })
+  const elapsedSeconds = workStatusElapsedSeconds(execution, now)
+
+  const gitRows = git
+    ? workStatusGitRows(git, {
+        additions: copy.gitAdditions,
+        ahead: copy.gitAhead,
+        behind: copy.gitBehind,
+        branch: copy.gitBranch,
+        changedFiles: copy.gitChangedFiles,
+        deletions: copy.gitDeletions,
+        unavailable: reason => copy.gitFieldUnavailable(reason ?? copy.gitFieldUnknown)
+      })
+    : null
+
+  const executionRows = executions
+    ? workStatusExecutionRows(executions, {
+        pid: copy.pid,
+        pidUnknown: reason => copy.pidUnknown(reason ?? copy.pidReasonUnknown),
+        stateLabel: copy.stateLabel
+      })
+    : []
+
+  const hasCards = process !== null || gitRows !== null || executionRows.length > 0
+
+  // The line is assembled from service facts; when the only facts are card
+  // facts (a Git answer with no branch, say) the line names the card instead of
+  // leaving the panel unreachable.
+  const line =
+    workStatusLineParts(
+      {
+        execution,
+        gitBranch: git?.branch ?? null,
+        queue
+      },
+      { queuedCount: copy.queuedCount, stateLabel: copy.stateLabel },
+      now
+    ) ??
+    (hasCards
+      ? { activity: 'idle' as const, parts: [process ? copy.processCard : gitRows ? copy.gitCard : copy.executionsCard] }
+      : null)
 
   if (mode === 'closed' || !line) {
     // Closed (or nothing to say): when the user closed it, a quiet ghost
@@ -93,9 +138,6 @@ export function WorkStatusPanel({ execution, queue }: WorkStatusPanelProps) {
       </button>
     )
   }
-
-  const process = workStatusProcessFacts({ execution, queue })
-  const elapsedSeconds = workStatusElapsedSeconds(execution, now)
 
   return (
     <motion.div
@@ -140,7 +182,7 @@ export function WorkStatusPanel({ execution, queue }: WorkStatusPanelProps) {
         </button>
       </div>
       <AnimatePresence initial={false}>
-        {mode === 'expanded' && process && (
+        {mode === 'expanded' && hasCards && (
           <motion.div
             animate={{ height: 'auto', opacity: 1 }}
             className="border-t border-(--ui-stroke-tertiary)"
@@ -149,38 +191,86 @@ export function WorkStatusPanel({ execution, queue }: WorkStatusPanelProps) {
             initial={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.16, ease: 'easeOut' }}
           >
-            <div className="px-2.5 py-1.5" data-work-status-card="process">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[0.625rem] uppercase tracking-wide text-(--ui-text-quaternary)">
-                  {copy.processCard}
-                </span>
-                <span className="font-mono text-[0.625rem] text-(--ui-text-tertiary)">
-                  {elapsedSeconds !== null ? formatWorkStatusElapsed(elapsedSeconds) : '—'}
-                </span>
-              </div>
-              <div className="mt-1 text-xs text-(--ui-text-secondary)">
-                {process.execution ? copy.stateLabel(process.execution.state) : null}
-                {process.execution?.reason ? ` — ${process.execution.reason}` : null}
-              </div>
-              {process.pending.length > 0 && (
-                <div className="mt-1.5" data-work-status-queue="">
-                  <div className="text-[0.625rem] text-(--ui-text-quaternary)">
-                    {copy.queuedCount(process.pending.length)}
-                  </div>
-                  <ul className="mt-0.5 space-y-0.5">
-                    {process.pending.map(item => (
-                      <li className="flex items-center gap-1.5 text-[0.6875rem] text-(--ui-text-tertiary)" key={item.itemId}>
-                        <span
-                          aria-hidden="true"
-                          className="inline-block size-1 shrink-0 rounded-full bg-(--ui-stroke-quaternary)"
-                        />
-                        <span className="truncate">{item.message.text}</span>
-                      </li>
-                    ))}
-                  </ul>
+            {process && (
+              <div className="px-2.5 py-1.5" data-work-status-card="process">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[0.625rem] uppercase tracking-wide text-(--ui-text-quaternary)">
+                    {copy.processCard}
+                  </span>
+                  <span className="font-mono text-[0.625rem] text-(--ui-text-tertiary)">
+                    {elapsedSeconds !== null ? formatWorkStatusElapsed(elapsedSeconds) : '—'}
+                  </span>
                 </div>
-              )}
-            </div>
+                <div className="mt-1 text-xs text-(--ui-text-secondary)">
+                  {process.execution ? copy.stateLabel(process.execution.state) : null}
+                  {process.execution?.reason ? ` — ${process.execution.reason}` : null}
+                </div>
+                {process.pending.length > 0 && (
+                  <div className="mt-1.5" data-work-status-queue="">
+                    <div className="text-[0.625rem] text-(--ui-text-quaternary)">
+                      {copy.queuedCount(process.pending.length)}
+                    </div>
+                    <ul className="mt-0.5 space-y-0.5">
+                      {process.pending.map(item => (
+                        <li className="flex items-center gap-1.5 text-[0.6875rem] text-(--ui-text-tertiary)" key={item.itemId}>
+                          <span
+                            aria-hidden="true"
+                            className="inline-block size-1 shrink-0 rounded-full bg-(--ui-stroke-quaternary)"
+                          />
+                          <span className="truncate">{item.message.text}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+            {gitRows && (
+              <div className="border-t border-(--ui-stroke-tertiary) px-2.5 py-1.5" data-work-status-card="git">
+                <div className="text-[0.625rem] uppercase tracking-wide text-(--ui-text-quaternary)">{copy.gitCard}</div>
+                <dl className="mt-1 grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-0.5">
+                  {gitRows.map(row => (
+                    <Fragment key={row.label}>
+                      <dt className="text-[0.6875rem] text-(--ui-text-quaternary)">{row.label}</dt>
+                      <dd className="truncate text-right font-mono text-[0.6875rem] text-(--ui-text-secondary)">{row.value}</dd>
+                    </Fragment>
+                  ))}
+                </dl>
+              </div>
+            )}
+            {executionRows.length > 0 && (
+              <div className="border-t border-(--ui-stroke-tertiary) px-2.5 py-1.5" data-work-status-card="executions">
+                <div className="text-[0.625rem] uppercase tracking-wide text-(--ui-text-quaternary)">
+                  {copy.executionsCard}
+                </div>
+                <ul className="mt-1 space-y-1">
+                  {executionRows.map(row => (
+                    <li className="text-[0.6875rem] text-(--ui-text-secondary)" data-work-status-execution={row.executionId} key={row.executionId}>
+                      <div className="flex items-center gap-1.5">
+                        <span className="shrink-0">{row.state}</span>
+                        <span className="truncate text-(--ui-text-tertiary)">{row.facts.join(' · ')}</span>
+                      </div>
+                      <div className="font-mono text-[0.625rem] text-(--ui-text-quaternary)">
+                        {copy.pid}:{' '}
+                        <span className={row.pidIsReason ? 'italic' : undefined}>{row.pid}</span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {onRefresh && (
+              <div className="border-t border-(--ui-stroke-tertiary) px-2.5 py-1">
+                <button
+                  className="rounded px-1 text-[0.625rem] text-(--ui-text-quaternary) hover:bg-(--ui-hover-background) hover:text-(--ui-text-secondary)"
+                  data-work-status-refresh=""
+                  onClick={onRefresh}
+                  type="button"
+                >
+                  {copy.refresh}
+                </button>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

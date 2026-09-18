@@ -1596,3 +1596,36 @@ Appearance（8 套主题 + 语言 + UI Scale + 终端字体）与 Keyboard Short
 - **证据**：`evidence/P21-stage2-contract.md`；工件重生成后
   TS `6e8ae84a…` / 工件 `f5d27269…`（59 方法），已写进 `contracts/wire-v1/README.md`。
 - 提交：`P21 stage 2`（pathspec）。
+
+## P21 阶段 3（2026-09-18）：四个只读面接线 — `P21_STAGE3_SURFACES_WIRED`
+
+- **读路径**（application 层，只调读方法）：
+  `application/workspace/wire-workspace-git.ts`（`workspaces.gitStatus`）、
+  `application/execution/wire-execution-inventory.ts`（`executions.list`）、
+  `application/profile/wire-profile-read.ts`（`profiles.memory`、`assets.bindings`）。
+- **纯函数层（诚实规则可测，不看源码）**：
+  `features/chat/work-status.ts` 增 `workStatusGitRows`（六字段各自 null→其 `reason`，真 0 仍是 0）、
+  `workStatusExecutionRows`（`pid` 为 null→`pidReason`，带 `pidIsReason` 标记）、
+  `workStatusGitBranch`（折叠行多一条真实事实）；
+  `features/profiles/profile-read-facts.ts` 增 `profileMemoryView`（`available:false` ⇒ **返回 null**，
+  UI 不画分区）、`profilePermissionRows`（保留存储顺序，标出被后续更宽规则覆盖的行）、
+  `profileBindingsOfKind`（禁用绑定仍在列）。
+- **面**：
+  - Git 卡 + 执行清单卡进 `WorkStatusPanel`（无事实 = 不渲染；两张卡各自独立；
+    新增刷新控件，只触发读）。新 hook `app/composition/wiring/agentbox-work-status-reads.ts`
+    在面板已有信号（执行态/队列长度）变化与工作区切换时重读，**不设定时器**。
+  - 角色页：`memory` 分区（服务未声明路径时**不进导航**）、permission 分区显示真实
+    `permissionPreset`/`permissionRules`、skill/mcp 分区显示 `assets.bindings` 的只读列表。
+  - i18n：`types.ts` + 六份 locale（en/zh/zh-hant/ja/ru/ar）各 +25 键（workStatus 14 + roleSettings 11）。
+- **G2/G3 反例（阶段 4 汇总，这里先记断言）**：
+  - 反例①：`additions:null` 不得渲染成 0 —— `work-status.test.ts`「shows the reason for every field the
+    service could not obtain」+ 面板测试「renders the six git fields and names the reason for each null」
+    同时断言 `textContent` 不含 `Additions0`。
+  - 反例②：`available:false` 不得画空分区 —— `profile-read-facts.test.ts` 断言返回 `null`；
+    角色页测试断言 `[data-role-section="memory"]` 与导航项都不存在。
+  - 反例③：`pid:null` 不得显示 0 —— 纯函数与面板两层各一条断言。
+  - 反例④（G3 只读）：本阶段新增/改动的读路径只出现 `workspaces.gitStatus`、`executions.list`、
+    `profiles.memory`、`assets.bindings` 四个读方法（阶段 4 用 grep 证据固化）。
+- **lint 顺带修的既有问题**：`features/profiles/profile-role-settings.tsx` 原有两处未使用导入
+  （`declaredSlots`、`useI18n`）随本单 `eslint --fix` 清掉（这些行本就在本单写权内且被本单触碰）。
+- 提交：`P21 stage 3`（pathspec）。

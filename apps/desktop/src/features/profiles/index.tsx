@@ -22,6 +22,7 @@ import {
   wireProfileMaintenancePort
 } from '@/application/profile/profile-maintenance-port'
 import { ensureAgentBoxProfileCatalog } from '@/application/profile/wire-composer-profile'
+import { loadProfileAssetBindings, loadProfileMemory } from '@/application/profile/wire-profile-read'
 import { ensureAgentBoxProviderModelCatalog } from '@/application/provider-model/wire-provider-model-catalog'
 import { useRefreshHotkey } from '@/components/hooks/use-refresh-hotkey'
 import { PageLoader } from '@/components/page-loader'
@@ -49,7 +50,7 @@ import {
   agentBoxCapabilitySupported,
   upsertAgentBoxProfile
 } from '@/store/agentbox-service'
-import type { ConfigControl, ConfigDescriptor, ProfileRecord, ProfilesUpdateConfigResult } from '@/types/wire/wire-v1'
+import type { AssetBinding, ConfigControl, ConfigDescriptor, ProfileRecord, ProfilesUpdateConfigResult } from '@/types/wire/wire-v1'
 
 import {
   buildProfileConfigValues,
@@ -58,6 +59,7 @@ import {
   type ProfileConfigDraft,
   ProfileConfigEditor
 } from './profile-config-editor'
+import { profileMemoryView, type ProfileMemoryView, profilePermissionView } from './profile-read-facts'
 import { ProfileRoleSettings } from './profile-role-settings'
 
 export interface ProfilesViewProps {
@@ -284,6 +286,29 @@ function ProfileDetail({ maintenance, profile, serviceOffline }: ProfileDetailPr
   const [savedFor, setSavedFor] = useState<null | ProfilesUpdateConfigResult['effectiveFor']>(null)
   const [descriptor, setDescriptor] = useState<DescriptorState>({ status: 'loading' })
   const [draft, setDraft] = useState<ProfileConfigDraft>(emptyProfileConfigDraft)
+  // P21 read-only faces (orders 58/63): the role's bound assets and its memory
+  // files. Both start as "no fact" — the memory section stays out of the nav
+  // until the service says this family has paths at all.
+  const [bindings, setBindings] = useState<AssetBinding[]>([])
+  const [memory, setMemory] = useState<null | ProfileMemoryView>(null)
+
+  useEffect(() => {
+    let current = true
+
+    setBindings([])
+    setMemory(null)
+
+    void loadProfileAssetBindings(agentBoxRuntimeClient(), profile.id)
+      .then(rows => current && setBindings(rows))
+      .catch(() => current && setBindings([]))
+    void loadProfileMemory(agentBoxRuntimeClient(), profile.id)
+      .then(facts => current && setMemory(profileMemoryView(facts)))
+      .catch(() => current && setMemory(null))
+
+    return () => {
+      current = false
+    }
+  }, [profile.id])
 
   const readDescriptor = useCallback(async (): Promise<DescriptorState> => {
     try {
@@ -428,10 +453,12 @@ function ProfileDetail({ maintenance, profile, serviceOffline }: ProfileDetailPr
       ) : null}
 
       <ProfileRoleSettings
+        bindings={bindings}
         copy={copy.roleSettings}
         displayName={profile.displayName}
         harness={profile.harness}
         maintenanceAvailable={maintenance !== undefined}
+        memory={memory}
         modelEditor={
           descriptor.status === 'loading' ? (
             <PageLoader className="min-h-24" label={copy.loading} />
@@ -450,6 +477,7 @@ function ProfileDetail({ maintenance, profile, serviceOffline }: ProfileDetailPr
             <RuntimeConfigSummary controls={descriptor.descriptor.controls} />
           )
         }
+        permissions={profilePermissionView(profile)}
       />
 
       {serviceOffline ? (

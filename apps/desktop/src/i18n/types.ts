@@ -1962,7 +1962,8 @@ export interface Translations {
         instruction: string
         skill: string
         mcp: string
-        permission: string
+        permission: string,
+        memory: string
       }
       unsupportedSlot: (slot: string) => string
       pendingRecords: string
@@ -1980,6 +1981,18 @@ export interface Translations {
       permissions: readonly string[]
       rebindTitle: string
       rebind: readonly string[]
+      /** P21 read-only facts (orders 58/60/63). */
+      bindingsDisabled: string
+      bindingsEmpty: string
+      bindingsRevision: (revision: number) => string
+      bindingsTitle: string
+      memoryRefused: (reason: string) => string
+      memoryTitle: string
+      permissionsAnyTarget: string
+      permissionsEmpty: string
+      permissionsPreset: (preset: string) => string
+      permissionsPresetUnknown: string
+      permissionsShadowed: string
     }
     agentBoxCapabilityAbsent: string
     agentBoxMaintenanceUnavailable: string
@@ -2362,6 +2375,23 @@ export interface Translations {
     processCard: string
     queuedCount: (count: number) => string
     stateLabel: (state: string) => string
+    /** P21 (orders 62/64): the two cards whose backend faces landed. */
+    executionsCard: string
+    gitAdditions: string
+    gitAhead: string
+    gitBehind: string
+    gitBranch: string
+    gitCard: string
+    gitChangedFiles: string
+    gitDeletions: string
+    gitFieldUnknown: string
+    /** A field the service could not obtain: the typed reason, never a 0. */
+    gitFieldUnavailable: (reason: string) => string
+    pid: string
+    pidReasonUnknown: string
+    /** A pid the platform did not report: the typed reason, never a 0. */
+    pidUnknown: (reason: string) => string
+    refresh: string
   }
 
   composer: {

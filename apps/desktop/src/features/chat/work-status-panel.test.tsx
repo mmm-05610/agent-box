@@ -13,15 +13,24 @@ const RUNNING_SINCE = new Date(Date.now() - 249_000).toISOString()
 
 const mount = ({
   execution = null,
+  executions = null,
+  git = null,
+  onRefresh,
   queue = []
 }: {
   execution?: null | { executionId: string; reason: null | string; since?: string; state: string }
+  executions?: null | Record<string, unknown>[]
+  git?: null | Record<string, unknown>
+  onRefresh?: () => void
   queue?: { itemId: string; message: { text: string }; state: string }[]
 }) =>
   render(
     <I18nProvider localePreference={null}>
       <WorkStatusPanel
         execution={execution as never}
+        executions={executions as never}
+        git={git as never}
+        onRefresh={onRefresh}
         queue={queue as never}
       />
     </I18nProvider>
@@ -104,5 +113,80 @@ describe('WorkStatusPanel', () => {
     })
 
     expect(document.querySelector('[data-work-status-cards]')).not.toBeNull()
+  })
+})
+
+describe('WorkStatusPanel P21 cards (orders 62/64)', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+    $workStatusPanelMode.set('expanded')
+  })
+
+  const gitFact = (overrides: Record<string, unknown> = {}) => ({
+    additions: null,
+    ahead: null,
+    behind: null,
+    branch: null,
+    changedFiles: null,
+    deletions: null,
+    reason: 'GIT_UNAVAILABLE',
+    ...overrides
+  })
+
+  const executionFact = (overrides: Record<string, unknown> = {}) => ({
+    adapterPid: null,
+    adapterPidReason: 'ADAPTER_PID_NOT_REPORTED',
+    executionId: 'execution_1',
+    harness: 'opaque-alpha',
+    pid: null,
+    pidReason: 'PID_NOT_REPORTED',
+    placement: 'wsl',
+    profile: 'Builder',
+    profileId: 'profile_1',
+    queueItemId: null,
+    sessionId: 'session_1',
+    startedAt: '2026-09-18T00:00:00.000Z',
+    state: 'running',
+    turnId: 'turn_1',
+    workspace: 'fixture',
+    workspaceId: 'workspace_1',
+    ...overrides
+  })
+
+  it('does not render the git card without a service answer', () => {
+    mount({})
+
+    expect(document.querySelector('[data-work-status-panel]')).toBeNull()
+    expect(document.querySelector('[data-work-status-card="git"]')).toBeNull()
+  })
+
+  it('renders the six git fields and names the reason for each null', () => {
+    mount({ git: gitFact({ branch: 'main', changedFiles: 0 }) })
+
+    const card = document.querySelector('[data-work-status-card="git"]')
+
+    expect(card).not.toBeNull()
+    expect(card?.textContent).toContain('main')
+    expect(card?.textContent).toContain('Not obtainable (GIT_UNAVAILABLE)')
+    // A null must never be rendered as a measured zero.
+    expect(card?.textContent).not.toContain('Additions0')
+  })
+
+  it('renders an execution row with its pid reason instead of a zero', () => {
+    mount({ executions: [executionFact()] })
+
+    const card = document.querySelector('[data-work-status-card="executions"]')
+
+    expect(card?.textContent).toContain('Not reported (PID_NOT_REPORTED)')
+    expect(card?.textContent).not.toContain('PID: 0')
+  })
+
+  it('asks for a re-read when the refresh control is used', () => {
+    let refreshed = 0
+
+    mount({ executions: [executionFact()], onRefresh: () => (refreshed += 1) })
+    fireEvent.click(document.querySelector<HTMLButtonElement>('[data-work-status-refresh]')!)
+
+    expect(refreshed).toBe(1)
   })
 })

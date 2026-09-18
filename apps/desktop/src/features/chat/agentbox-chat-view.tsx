@@ -2,6 +2,7 @@ import { AssistantRuntimeProvider, type ThreadMessage } from '@assistant-ui/reac
 import { type ReactNode, Suspense, useMemo } from 'react'
 
 import { useAgentBoxMainChat } from '@/app/composition/wiring/agentbox-main-chat'
+import { useAgentBoxWorkStatusReads } from '@/app/composition/wiring/agentbox-work-status-reads'
 import type { WireSessionProjection } from '@/application/session/wire-session-projection'
 import { Thread } from '@/components/assistant-ui/thread'
 import { TranscriptWindowProvider } from '@/components/assistant-ui/thread/transcript-window'
@@ -156,6 +157,13 @@ export function AgentBoxChatView({ maxVoiceRecordingSeconds }: { maxVoiceRecordi
   const binding = useAgentBoxMainChat()
   const messages = agentBoxProjectionMessages(binding.projection, binding.busy)
 
+  // P21: re-read the two read-only cards whenever the facts the panel already
+  // reacts to move (a new turn state, a different queue shape) — no timer.
+  const reads = useAgentBoxWorkStatusReads(
+    binding.workspace?.id ?? null,
+    `${binding.projection?.execution?.state ?? 'idle'}:${binding.queue.length}`
+  )
+
   const composerProfile = useComposerProfile({
     draftScope: binding.draftScopeKey,
     sessionId: binding.sessionId,
@@ -201,7 +209,13 @@ export function AgentBoxChatView({ maxVoiceRecordingSeconds }: { maxVoiceRecordi
 
       <AgentBoxThreadRuntime binding={binding} messages={messages}>
         <div className="relative min-h-0 flex-1 overflow-hidden bg-(--ui-chat-surface-background)" data-slot="composer-bounds">
-          <WorkStatusPanel execution={binding.projection?.execution ?? null} queue={binding.queue} />
+          <WorkStatusPanel
+            execution={binding.projection?.execution ?? null}
+            executions={reads.executions}
+            git={reads.git}
+            onRefresh={reads.refresh}
+            queue={binding.queue}
+          />
           <Thread
             clampToComposer
             cwd={binding.workspace?.normalizedPath ?? null}

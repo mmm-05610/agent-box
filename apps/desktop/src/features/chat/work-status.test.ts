@@ -5,6 +5,8 @@ import { asWireId, type QueueItem } from '@/types/wire/wire-v1'
 import {
   formatWorkStatusElapsed,
   workStatusElapsedSeconds,
+  workStatusExecutionRows,
+  workStatusGitRows,
   workStatusIsBusy,
   workStatusLineParts,
   workStatusPendingQueue,
@@ -118,5 +120,86 @@ describe('workStatusProcessFacts', () => {
 
   it('is null with nothing to show — the card does not render an empty shell', () => {
     expect(workStatusProcessFacts({ execution: null, queue: [] })).toBeNull()
+  })
+})
+
+describe('workStatusGitRows (order 62)', () => {
+  const gitLabels = {
+    additions: 'Additions',
+    ahead: 'Ahead',
+    behind: 'Behind',
+    branch: 'Branch',
+    changedFiles: 'Changed files',
+    deletions: 'Deletions',
+    unavailable: (reason: null | string) => `Not obtainable (${reason ?? 'unknown'})`
+  }
+
+  it('shows the reason for every field the service could not obtain', () => {
+    const rows = workStatusGitRows(
+      { additions: null, ahead: null, behind: null, branch: null, changedFiles: null, deletions: null, reason: 'GIT_UNAVAILABLE' },
+      gitLabels
+    )
+
+    expect(rows).toHaveLength(6)
+    expect(rows.every(row => row.value === 'Not obtainable (GIT_UNAVAILABLE)')).toBe(true)
+    expect(rows.some(row => row.value === '0')).toBe(false)
+  })
+
+  it('keeps a real zero and an obtained value beside a null sibling', () => {
+    const rows = workStatusGitRows(
+      { additions: null, ahead: 0, behind: null, branch: 'main', changedFiles: 0, deletions: null, reason: 'GIT_BINARY_DIFF' },
+      gitLabels
+    )
+
+    const value = (label: string) => rows.find(row => row.label === label)?.value
+
+    expect(value('Branch')).toBe('main')
+    expect(value('Changed files')).toBe('0')
+    expect(value('Ahead')).toBe('0')
+    expect(value('Additions')).toBe('Not obtainable (GIT_BINARY_DIFF)')
+  })
+})
+
+describe('workStatusExecutionRows (order 64)', () => {
+  const labels = {
+    pid: 'PID',
+    pidUnknown: (reason: null | string) => `Not reported (${reason ?? 'reason not reported'})`,
+    stateLabel: (state: string) => state.toUpperCase()
+  }
+
+  const row = (overrides: Partial<Parameters<typeof workStatusExecutionRows>[0][number]> = {}) =>
+    ({
+      adapterPid: null,
+      adapterPidReason: 'ADAPTER_PID_NOT_REPORTED',
+      executionId: asWireId('execution_1'),
+      harness: 'opaque-alpha',
+      pid: 4242,
+      pidReason: null,
+      placement: 'wsl',
+      profile: 'Builder',
+      profileId: asWireId('profile_1'),
+      queueItemId: null,
+      sessionId: asWireId('session_1'),
+      startedAt: '2026-09-18T00:00:00.000Z',
+      state: 'running',
+      turnId: asWireId('turn_1'),
+      workspace: 'fixture',
+      workspaceId: asWireId('workspace_1'),
+      ...overrides
+    }) as Parameters<typeof workStatusExecutionRows>[0][number]
+
+  it('reports a real pid as a number', () => {
+    const [facts] = workStatusExecutionRows([row()], labels)
+
+    expect(facts?.pid).toBe('4242')
+    expect(facts?.pidIsReason).toBe(false)
+  })
+
+  it('reports an absent pid as its typed reason, never as 0', () => {
+    const [facts] = workStatusExecutionRows([row({ pid: null, pidReason: 'PID_NOT_REPORTED' })], labels)
+
+    expect(facts?.pid).toBe('Not reported (PID_NOT_REPORTED)')
+    expect(facts?.pidIsReason).toBe(true)
+    expect(facts?.pid).not.toBe('0')
   })
 })
