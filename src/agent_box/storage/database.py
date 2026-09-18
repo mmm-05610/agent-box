@@ -8,7 +8,7 @@ import threading
 from typing import Iterator
 
 
-PRODUCT_SCHEMA_VERSION = 10
+PRODUCT_SCHEMA_VERSION = 12
 
 
 class FutureSchemaError(RuntimeError):
@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS server_profiles (
     native_generation INTEGER NOT NULL DEFAULT 0 CHECK (native_generation >= 0),
     config_object_digest TEXT NOT NULL,
     credential_id TEXT,
+    account_id TEXT,
     run_state TEXT NOT NULL DEFAULT 'idle',
     recovery_pending INTEGER NOT NULL DEFAULT 0,
     display_name TEXT,
@@ -174,6 +175,17 @@ CREATE TABLE IF NOT EXISTS server_approvals (
     settled_at TEXT
 );
 CREATE INDEX IF NOT EXISTS server_approvals_by_execution ON server_approvals(execution_id, created_at);
+CREATE TABLE IF NOT EXISTS server_accounts (
+    id TEXT PRIMARY KEY,
+    harness_type TEXT NOT NULL,
+    account_identifier TEXT NOT NULL,
+    state TEXT NOT NULL,
+    asset_locator TEXT,
+    asset_digest TEXT,
+    last_verified_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS server_bootstrap (
     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
     server_id TEXT NOT NULL,
@@ -242,6 +254,31 @@ def _add_columns(conn: sqlite3.Connection, table: str, additions: dict[str, str]
     for name, declaration in additions.items():
         if name not in columns:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {declaration}")
+
+
+def _migrate_11_to_12(conn: sqlite3.Connection) -> None:
+    """Order 56: the profile's bound subscription account.
+
+    A binding, not a credential: the account row (server_accounts) owns the
+    asset; the profile only names which account a turn materialises.
+    """
+    _add_columns(conn, "server_profiles", {"account_id": "TEXT"})
+
+
+def _migrate_10_to_11(conn: sqlite3.Connection) -> None:
+    """Order 56: managed subscription accounts.
+
+    One row per account the control plane owns. The row holds the family, the
+    account identifier, the observed state, and the *reference* to the asset
+    in the secret store - never a token.
+    """
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS server_accounts ("
+        "id TEXT PRIMARY KEY, harness_type TEXT NOT NULL, "
+        "account_identifier TEXT NOT NULL, state TEXT NOT NULL, "
+        "asset_locator TEXT, asset_digest TEXT, last_verified_at TEXT, "
+        "created_at TEXT NOT NULL, updated_at TEXT NOT NULL)"
+    )
 
 
 def _migrate_9_to_10(conn: sqlite3.Connection) -> None:
@@ -459,6 +496,10 @@ class Database:
                 _migrate_8_to_9(conn)
             if current in (1, 2, 3, 4, 5, 6, 7, 8, 9):
                 _migrate_9_to_10(conn)
+            if current in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10):
+                _migrate_10_to_11(conn)
+            if current in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11):
+                _migrate_11_to_12(conn)
             conn.executescript(_SCHEMA)
             conn.execute(
                 "INSERT OR IGNORE INTO agentbox_product_schema(singleton, version, applied_at) "

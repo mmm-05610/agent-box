@@ -602,6 +602,46 @@ def _effective_attachment_support(port, execution_id: str) -> bool:
     return False
 
 
+def _reclaim_subscription(run: "_Run") -> None:
+    """Copy the declared working files back into the account asset.
+
+    Every failure here is typed and recorded; none of them replace the stored
+    asset (order 56 §1: never a half-way overwrite), and none of them fail the
+    turn after the fact - the turn's own result is already durable.
+    """
+    subscription = getattr(run.port, "subscription", None)
+    plumbing = getattr(run.port, "account_plumbing", None)
+    if not subscription or not plumbing:
+        return
+    records, asset_store = plumbing
+    account_id = subscription["account_id"]
+    declared = subscription["files"]
+
+    def stored_digest_of():
+        _locator, digest = records.asset_reference(account_id)
+        return digest
+
+    try:
+        read = getattr(run.port, "read_subscription", None)
+        working = read(run.turn_id) if callable(read) else {}
+        if not working:
+            return
+        locator, digest = asset_store.reclaim(
+            account_id=account_id,
+            stored_digest_of=stored_digest_of,
+            materialized_digest=subscription.get("materialized_digest"),
+            files=working,
+            kind="subscription",
+        )
+        records.record_asset(account_id, locator=locator, digest=digest, state="valid")
+    except BaseException as error:  # noqa: BLE001 - recorded, never silent
+        logging.getLogger(__name__).warning(
+            "turn %s: subscription reclaim for %s refused (%s); the stored "
+            "asset is unchanged", run.turn_id, account_id,
+            getattr(error, "code", type(error).__name__),
+        )
+
+
 def _audited_home(run: "_Run") -> tuple[dict[str, Any], bool]:
     """Audit the home of a finished attempt, applying the credential rule.
 
@@ -629,6 +669,11 @@ def _audited_home(run: "_Run") -> tuple[dict[str, Any], bool]:
                 )
                 run.usage_fact = None
                 run.usage_source = None
+        # Order 56: reclaim the subscription working copy while the channel is
+        # still alive. A reclaim that cannot take the account's lock, or that
+        # finds the stored asset moved, is recorded and never overwrites the
+        # asset - the working copy simply stays unclaimed.
+        _reclaim_subscription(run)
         return audit, resumable
     except BaseException as exc:
         if getattr(exc, "code", None) == "SIDECAR_STATE_CONTAINS_SECRET":

@@ -283,6 +283,7 @@ class WorkerSidecarLauncher:
         session_store_harness: str | None = None,
         session_store_target: str | None = None,
         session_store_shared: Sequence[str] = (),
+        subscription_files: Sequence[str] = (),
         usage_probe: dict[str, str] | None = None,
     ) -> None:
         self.connector = connector
@@ -334,6 +335,10 @@ class WorkerSidecarLauncher:
         #: store (if any) is the §14 subtree shape.
         self.session_store_shared = tuple(
             (str(name), str(kind)) for name, kind in session_store_shared)
+        #: Order 56: a bound subscription account's working-copy names. The
+        #: Worker-hosted channel has no home-write op yet, so a bound account
+        #: on this channel is a typed refusal rather than a silent no-op.
+        self.subscription_files = tuple(str(name) for name in subscription_files)
         #: Order 51: a declared usage probe turns the audited journal into the
         #: neutral usage fact after the attempt (tokens only, no estimates).
         self.usage_probe = dict(usage_probe) if usage_probe else None
@@ -343,6 +348,13 @@ class WorkerSidecarLauncher:
             SandboxPortUnavailable, SidecarRoomRequest,
         )
 
+        if self.subscription_files:
+            raise SidecarError(
+                "SUBSCRIPTION_MATERIALIZE_UNSUPPORTED",
+                "this channel cannot write the subscription working copy into "
+                "the home yet (Worker home-write op pending); the turn is "
+                "refused rather than run without its login state",
+            )
         if self.sandbox_port is None:
             raise SidecarError(
                 "SANDBOX_PORT_UNAVAILABLE",
@@ -1018,6 +1030,11 @@ class SidecarEnvelope:
         if callable(delete):
             delete(relative)
 
+    def read_subscription(self) -> dict[str, bytes]:
+        """Read the declared subscription working files back (order 56)."""
+        read = getattr(self._channels, "read_subscription", None)
+        return read() if callable(read) else {}
+
     # -- reader ------------------------------------------------------------
 
     def _read_loop(self) -> None:
@@ -1100,8 +1117,16 @@ class SidecarHarnessPort:
         capability_authorized_providers: "tuple[str, ...] | None" = None,
         capability_binding: str | None = None,
         usage_probe: dict[str, str] | None = None,
+        subscription: Mapping[str, Any] | None = None,
+        account_plumbing: Any = None,
     ) -> None:
         self.launcher = launcher
+        #: Order 56: this turn's subscription binding (account id, the digest
+        #: it materialised, and the declared working-copy names) plus the
+        #: records/assets pair the reclaim path needs. All None/empty when the
+        #: profile is not bound to an account.
+        self.subscription = dict(subscription) if subscription else None
+        self.account_plumbing = account_plumbing
         self.environment = dict(environment)
         # 调用方必须给出部署声明的 harness 类型；空值会在 register 时被 sidecar
         # 以 HARNESS_PROFILE_UNREGISTERED 拒绝，这里不替任何一家猜一个默认名字。
@@ -1278,6 +1303,12 @@ class SidecarHarnessPort:
         """Remove one leaked file from the home (the credential rule)."""
         envelope = self._require(execution_id)
         envelope.delete_state_file(relative)
+
+    def read_subscription(self, execution_id: str) -> dict[str, bytes]:
+        """Read the declared subscription working files back (order 56)."""
+        envelope = self._require(execution_id)
+        read = getattr(envelope, "read_subscription", None)
+        return read() if callable(read) else {}
 
     def accept(self, execution_id: str, *, overrides: Mapping[str, Any] | None = None) -> None:
         """Open the execution; the prompt is issued by `prompt`."""

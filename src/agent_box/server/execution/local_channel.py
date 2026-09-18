@@ -65,6 +65,86 @@ def _safe_relative(value: str) -> str:
     return value
 
 
+#: Order 56: one subscription working copy may not exceed these bounds (the
+#: asset module's caps; restated here because this layer enforces them before
+#: the file ever reaches a home).
+MAX_SUBSCRIPTION_FILE_BYTES = 256 * 1024
+MAX_SUBSCRIPTION_FILES = 8
+
+
+def _subscription_target(role_dir: Path, name: str) -> Path:
+    """The host path of one declared guest-relative subscription file.
+
+    The guest path minus `/runtime/home/` is exactly the role-relative path:
+    both the native-home bind and the state window bind map that way, so the
+    declared name is the whole mapping rule - no guessing from the harness.
+    """
+    relative = _safe_relative(name)
+    target = role_dir.joinpath(*relative.split("/"))
+    resolved_parent = target.parent.resolve()
+    if not resolved_parent.is_relative_to(role_dir.resolve()):
+        raise LocalChannelError("ACCOUNT_MATERIALIZE_INVALID", "a subscription path escapes the home")
+    return target
+
+
+def write_subscription_files(
+    role_dir: Path, files: Mapping[str, bytes], *, declared: Sequence[str],
+) -> list[str]:
+    """Materialise the working copy: exactly the declared names, bounded.
+
+    Parents are created inside the role directory; the leaf is written with
+    O_NOFOLLOW so a planted link can never redirect the write, and the mode is
+    0600 - a login state is credential material even though it is not the
+    injected secret.
+    """
+    written: list[str] = []
+    if len(files) > MAX_SUBSCRIPTION_FILES:
+        raise LocalChannelError("ACCOUNT_MATERIALIZE_INVALID", "too many subscription files")
+    for name in declared:
+        payload = files.get(name)
+        if payload is None:
+            continue
+        if not payload or len(payload) > MAX_SUBSCRIPTION_FILE_BYTES:
+            raise LocalChannelError(
+                "ACCOUNT_MATERIALIZE_INVALID", "a subscription file is empty or oversized")
+        target = _subscription_target(role_dir, name)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if os.path.lexists(target):
+            info = os.lstat(target)
+            if not stat.S_ISREG(info.st_mode):
+                raise LocalChannelError(
+                    "ACCOUNT_MATERIALIZE_INVALID", "a subscription target is not a regular file")
+        handle = os.open(
+            target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(handle, "wb") as stream:
+            stream.write(payload)
+        written.append(name)
+    return written
+
+
+def read_subscription_files(
+    role_dir: Path, *, declared: Sequence[str],
+) -> dict[str, bytes]:
+    """Read the working copy back for reclamation: declared names only."""
+    files: dict[str, bytes] = {}
+    for name in declared:
+        target = _subscription_target(role_dir, name)
+        try:
+            info = os.lstat(target)
+        except FileNotFoundError:
+            continue
+        if not stat.S_ISREG(info.st_mode):
+            raise LocalChannelError(
+                "ACCOUNT_RECLAIM_INVALID", "a subscription working file is not a regular file")
+        if info.st_size <= 0 or info.st_size > MAX_SUBSCRIPTION_FILE_BYTES:
+            raise LocalChannelError(
+                "ACCOUNT_RECLAIM_INVALID", "a subscription working file is empty or oversized")
+        handle = os.open(target, os.O_RDONLY | os.O_NOFOLLOW)
+        with os.fdopen(handle, "rb") as stream:
+            files[name] = stream.read(MAX_SUBSCRIPTION_FILE_BYTES + 1)
+    return files
+
+
 def _seed_store_entries(store: Path, entries: Sequence[tuple[str, str]]) -> None:
     """Order 66: create the declared shared entries in the family library.
 
@@ -289,6 +369,8 @@ class LocalSidecarLauncher:
         session_store_harness: str | None = None,
         session_store_target: str | None = None,
         session_store_shared: Sequence[str] = (),
+        subscription_files: Sequence[str] = (),
+        subscription_asset: Mapping[str, bytes] | None = None,
         usage_probe: Mapping[str, str] | None = None,
     ) -> None:
         if len(bundle) > MAX_BUNDLE_FILES or sum(map(len, bundle.values())) > MAX_BUNDLE_BYTES:
@@ -318,6 +400,10 @@ class LocalSidecarLauncher:
         #: Order 66's whole-db names and kinds (see the Worker-hosted launcher).
         self.session_store_shared = tuple(
             (str(name), str(kind)) for name, kind in session_store_shared)
+        #: Order 56: the declared subscription working-copy names and the
+        #: account asset bytes this turn materialises (empty when unbound).
+        self.subscription_files = tuple(str(name) for name in subscription_files)
+        self.subscription_asset = dict(subscription_asset or {})
         #: Order 55's probe rides the port (the backend reads it from here) and
         #: the read itself happens through the channels below; a deployment
         #: without a probe leaves every usage column NULL.
@@ -361,6 +447,13 @@ class LocalSidecarLauncher:
             home_dir = str(self.home.prepare())
             if (self.session_store_shared and self.home.store is not None):
                 _seed_store_entries(self.home.store, self.session_store_shared)
+            if self.subscription_files:
+                # Order 56: the working copy lands before the room exists, and
+                # only the declared names are ever written.
+                write_subscription_files(
+                    self.home.role_dir, self.subscription_asset,
+                    declared=self.subscription_files,
+                )
             # Two read-write binds: the native home at its guest target, and —
             # when the deployment declared a window elsewhere — the window at
             # its own guest target.
@@ -440,6 +533,7 @@ class LocalSidecarLauncher:
             home=self.home, before_snapshot=before_snapshot, job=job,
             protected_state_paths=self.protected_state_paths,
             state_ephemeral_paths=self.state_ephemeral_paths,
+            subscription_files=self.subscription_files,
         )
 
 
@@ -453,6 +547,7 @@ class _LocalChannels:
         job: "object | None" = None,
         before_snapshot: dict | None = None,
         workspace_root: "Path | None" = None,
+        subscription_files: Sequence[str] = (),
     ) -> None:
         self.process = process
         #: Order 54: the attempt's before-snapshot of the declared workspace;
@@ -469,6 +564,7 @@ class _LocalChannels:
         self.home = home
         self.protected_state_paths = tuple(protected_state_paths)
         self.state_ephemeral_paths = tuple(state_ephemeral_paths)
+        self._subscription_files = tuple(subscription_files)
         self._lock = threading.RLock()
         self._closed = False
 
@@ -568,6 +664,14 @@ class _LocalChannels:
     def delete_state_file(self, relative: str) -> None:
         if self.home is not None:
             self.home.delete(relative)
+
+    # -- subscription working copy (Order 56) ------------------------------
+    def read_subscription(self) -> dict[str, bytes]:
+        """Read the declared subscription working files back for reclaim."""
+        if self.home is None or not self._subscription_files:
+            return {}
+        return read_subscription_files(
+            self.home.role_dir, declared=self._subscription_files)
 
     # -- usage (Order 55) --------------------------------------------------
     def read_usage(self, usage_probe: Mapping[str, str] | None) -> dict[str, int] | None:

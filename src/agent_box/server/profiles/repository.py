@@ -101,6 +101,22 @@ class ProfileRecords:
             assignments={"archived_at": now()},
         )
 
+    def bind_account(
+        self, *, profile_id: str, account_id: str | None, expected_version: int,
+        key: str, request_digest: str,
+    ) -> tuple[int, dict[str, Any]]:
+        """Order 56: name the subscription account this Profile materialises.
+
+        `None` unbinds. The account row owns the asset; this is only the
+        reference, and the write goes through the same versioned mutation the
+        other profile updates use.
+        """
+        return self._mutate(
+            profile_id=profile_id, expected_version=expected_version, key=key,
+            request_digest=request_digest, operation="update",
+            assignments={"account_id": account_id},
+        )
+
     def _mutate(
         self, *, profile_id: str, expected_version: int, key: str,
         request_digest: str, operation: str, assignments: dict[str, Any],

@@ -54,6 +54,7 @@ class ProductRepositoryView:
             "config_revision": row["config_revision"],
             "native_generation": row["native_generation"],
             "credential_id": row["credential_id"], "run_state": row["run_state"],
+                "account_id": row["account_id"] if "account_id" in row.keys() else None,
             "recovery_pending": bool(row["recovery_pending"]),
         } for row in self.profiles.list()]
 

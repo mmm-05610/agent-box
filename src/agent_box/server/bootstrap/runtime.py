@@ -326,6 +326,17 @@ def build_runtime(
     session_records = SessionRecords(database, idempotency,
                                      home_concurrency=home_concurrency,
                                      shared_store_guards=shared_store_guards)
+    from agent_box.server.accounts.assets import AccountAssetStore
+    from agent_box.server.accounts.records import AccountRecords
+
+    account_records = AccountRecords(database, idempotency)
+    # Order 56's encryption-at-rest requirement is the platform SecretStore's:
+    # without one, a bound subscription account is a typed refusal at the turn
+    # boundary rather than an unencrypted asset.
+    account_assets = (
+        AccountAssetStore(secret_store=secrets_store, accounts_root=root / "accounts")
+        if secrets_store is not None else None
+    )
     queue_records = QueueRecords(
         database, idempotency, append_event=session_records._append_session_event,
         objects=objects,
@@ -379,12 +390,17 @@ def build_runtime(
         objects=objects, execution=execution, cursor_secret=token.encode("utf-8"),
         model_configs=provider_model_service,
     )
-    return ServerRuntime(
+    runtime = ServerRuntime(
         root, database, objects, repository, service, owner, token, token_path,
         notifier, secrets_store, registry, execution, wire,
         approval_records, queue_records,
         provider_model_service,
     )
+    # Order 56: the managed-account half of the composition, reachable where
+    # the product and the acceptance gates need it (records + assets).
+    runtime.account_records = account_records
+    runtime.account_assets = account_assets
+    return runtime
 
 
 def build_runtime_from_sidecar_deployment(
@@ -438,6 +454,28 @@ def build_runtime_from_sidecar_deployment(
         model_control_id = item.get("modelControlId")
         credential_kind = item.get("credentialKind")
         credential_environment = item.get("credentialEnvironment")
+        # Order 56 stage A: a family whose subscription login is a declared
+        # file set names it here, guest-home-relative. The names are the whole
+        # authority for materialisation and reclamation - the working copy is
+        # exactly these files, never a directory walk.
+        subscription_credential = item.get("subscriptionCredential")
+        subscription_files: tuple[str, ...] = ()
+        if subscription_credential is not None:
+            if (not isinstance(subscription_credential, dict)
+                    or set(subscription_credential) != {"files"}
+                    or not isinstance(subscription_credential.get("files"), list)
+                    or not subscription_credential["files"]
+                    or len(subscription_credential["files"]) > 8):
+                raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
+            declared_files: list[str] = []
+            for relative in subscription_credential["files"]:
+                if not isinstance(relative, str):
+                    raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
+                _home_projection_target(f"/runtime/home/{relative}", kind="file")
+                declared_files.append(relative)
+            if len(set(declared_files)) != len(declared_files):
+                raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
+            subscription_files = tuple(declared_files)
         timeout_ms = item.get("timeoutMs", 120_000)
         if (harness_id in deployments
                 or re.fullmatch(r"[a-z][a-z0-9._-]{0,63}", harness_id) is None
@@ -645,6 +683,7 @@ def build_runtime_from_sidecar_deployment(
             deployment["_usage_probe"] = None
         deployment["_session_store"] = session_store_kind
         deployment["_session_store_shared"] = session_store_shared
+        deployment["_subscription_files"] = subscription_files
         # Order 67's narrowed lock: a family whose home cannot be certified for
         # concurrent writers declares `homeConcurrency = "exclusive"`, and
         # admission then admits one active Turn per Profile for that family
@@ -782,6 +821,30 @@ def build_runtime_from_sidecar_deployment(
                 or os.environ.get("AGENT_BOX_SANDBOX_PROVIDER")
                 or _default_provider
             )
+            subscription = None
+            subscription_asset: dict[str, bytes] = {}
+            account_id = context.get("account_id")
+            if account_id:
+                declared = deployment.get("_subscription_files") or ()
+                if not declared:
+                    raise RuntimeError(
+                        "SUBSCRIPTION_UNSUPPORTED: this Harness declares no "
+                        "subscription login-state files"
+                    )
+                # The accounts half is attached to the runtime by
+                # build_runtime; the closure reads it per turn.
+                if getattr(runtime, "account_assets", None) is None:
+                    raise RuntimeError("ACCOUNT_STORE_UNAVAILABLE")
+                _record = runtime.account_records.get(account_id)
+                locator, digest = runtime.account_records.asset_reference(account_id)
+                if locator is not None:
+                    subscription_asset = runtime.account_assets.read_asset(
+                        locator=locator, declared=declared)
+                subscription = {
+                    "account_id": account_id,
+                    "materialized_digest": digest,
+                    "files": tuple(declared),
+                }
             if placement.channel in {WSL_CHANNEL, SSH_CHANNEL}:
                 launcher = WorkerSidecarLauncher(
                     connectors[placement.kind],
@@ -815,6 +878,7 @@ def build_runtime_from_sidecar_deployment(
                         if deployment["_session_store"] in {"sessions-subtree", "whole-db"} else None
                     ),
                     session_store_shared=deployment["_session_store_shared"],
+                    subscription_files=(subscription or {}).get("files", ()),
                     usage_probe=deployment["_usage_probe"],
                 )
             else:
@@ -842,13 +906,21 @@ def build_runtime_from_sidecar_deployment(
                         if deployment["_session_store"] in {"sessions-subtree", "whole-db"} else None
                     ),
                     session_store_shared=deployment["_session_store_shared"],
+                    subscription_files=(subscription or {}).get("files", ()),
+                    subscription_asset=subscription_asset,
                     usage_probe=deployment["_usage_probe"],
                 )
             capability_documents, capability_grants, authorized, binding = (
                 _capability_material(context, deployment)
             )
             return SidecarHarnessPort(
-                launcher, environment={"AGENTBOX_SIDECAR_ISOLATED": "1"},
+                launcher,
+                subscription=subscription,
+                account_plumbing=(
+                    (runtime.account_records, runtime.account_assets)
+                    if subscription is not None else None
+                ),
+                environment={"AGENTBOX_SIDECAR_ISOLATED": "1"},
                 profile=context["harness_type"], adapter=deployment["adapter"],
                 model=execution.get("model"),
                 capability_documents=capability_documents,
