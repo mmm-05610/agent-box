@@ -1,0 +1,206 @@
+{
+  "allOk": true,
+  "counts": {
+    "PASS": 28,
+    "FAIL": 0,
+    "SKIP": 0,
+    "PENDING": 0
+  },
+  "executed": 28,
+  "finishedAt": "2026-09-17T12:23:51.966Z",
+  "notes": [
+    "baseline Hermes-named processes before launch: []",
+    "launched process tree before close: [34312,20388,8892,10296,19412,12468]"
+  ],
+  "screenshots": [
+    "C:\\Users\\maoqh\\AppData\\Local\\Temp\\ordessa-p18-out-005ac8b2\\arrival-no-service.png",
+    "C:\\Users\\maoqh\\AppData\\Local\\Temp\\ordessa-p18-out-005ac8b2\\workspace-sidebar.png",
+    "C:\\Users\\maoqh\\AppData\\Local\\Temp\\ordessa-p18-out-005ac8b2\\settings-no-service.png",
+    "C:\\Users\\maoqh\\AppData\\Local\\Temp\\ordessa-p18-out-005ac8b2\\appearance-local-preferences.png",
+    "C:\\Users\\maoqh\\AppData\\Local\\Temp\\ordessa-p18-out-005ac8b2\\profiles-unavailable.png",
+    "C:\\Users\\maoqh\\AppData\\Local\\Temp\\ordessa-p18-out-005ac8b2\\command-center-agentbox.png",
+    "C:\\Users\\maoqh\\AppData\\Local\\Temp\\ordessa-p18-out-005ac8b2\\command-palette-agentbox.png"
+  ],
+  "sha256": {
+    "appearance-local-preferences.png": "0775b91dd9b217ca9d9b05a89ef24f0ae8bf71db550914f94faffefe968c442f",
+    "arrival-no-service.png": "127202fec6680b960aa283539ec461494acba7bf3be4bc5d819349136802d07f",
+    "command-center-agentbox.png": "b8bb5a721ea220863787ec3fd99b76864b44d6d9c2b129abfb6ab601c00c2f6a",
+    "command-palette-agentbox.png": "4cf56ec80ac64641ed2f63415eb1be3519842b9dcdf3934bc65ee3a3994f71a6",
+    "main-process-safe.log": "ce562ea80ed451d577de726cc32f5bb36490bdf3926787bff72e2ca8d00ff57b",
+    "profiles-unavailable.png": "d259870eb6e0fcc3ed813e031cf2fc97b0b4bddc396fd66f3030935726dcd8c8",
+    "renderer-console.log": "c7fe75d5271e0644115309bc506d99d6cd35d29a14cb04718c50dceac71e323e",
+    "settings-no-service.png": "0cb9611026c87341b41933414bb5856ac5499d047639bd2b04b3f9f1c79a8866",
+    "workspace-sidebar.png": "127202fec6680b960aa283539ec461494acba7bf3be4bc5d819349136802d07f"
+  },
+  "steps": [
+    {
+      "detail": "electron.exe=C:\\Users\\maoqh\\agentbox-wsl-round1\\apps\\desktop\\node_modules\\electron\\dist\\electron.exe; dist/index.html=true",
+      "id": "driver-target",
+      "status": "PASS",
+      "step": "driver target"
+    },
+    {
+      "detail": "userData=C:\\Users\\maoqh\\AppData\\Local\\Temp\\ordessa-p18-smoke-d86b3e0a\\user-data (expected C:\\Users\\maoqh\\AppData\\Local\\Temp\\ordessa-p18-smoke-d86b3e0a\\user-data); HERMES_HOME=C:\\Users\\maoqh\\AppData\\Local\\Temp\\ordessa-p18-smoke-d86b3e0a\\hermes-home; appName=HermesP06Acceptance",
+      "id": "sandbox-isolation",
+      "status": "PASS",
+      "step": "the run uses its own HERMES_HOME, userData and app name"
+    },
+    {
+      "detail": "no server env, no agentbox connection slot file, no credentials dir under the sandbox home",
+      "id": "no-service-provided",
+      "status": "PASS",
+      "step": "no Server, Harness, credential or model is provided"
+    },
+    {
+      "detail": "first window in 14547ms (deadline 30000ms); windows=1",
+      "id": "window-appears",
+      "status": "PASS",
+      "step": "the main window appears within the deadline"
+    },
+    {
+      "detail": "largest [data-glass-opaque] covers 0.0% (must be <90%); nodes=0; failurePanels=0; sidebar=1",
+      "id": "no-blocking-overlay",
+      "status": "PASS",
+      "step": "the arrival screen is not covered by a blocking surface"
+    },
+    {
+      "detail": "sidebar entries: local folder=true; remote/WSL=true; agentbox session rows=0 (must be 0)",
+      "id": "workspace-entries",
+      "status": "PASS",
+      "step": "local and remote/WSL workspace entries are co-visible, with no fabricated session"
+    },
+    {
+      "detail": "HERMES_DESKTOP_BOOT_FAKE=1 + FAKE_ERROR set; runtime launched=false; blocking coverage=0.0%",
+      "id": "legacy-fake-boot-ignored",
+      "status": "PASS",
+      "step": "the legacy Hermes fake-boot/fake-error environment neither blocks nor starts a runtime"
+    },
+    {
+      "detail": "submit present=true; disabled=true; unavailable banner=\"Pacthold service is unavailable\"; session rows after click=0 (must be 0)",
+      "id": "send-fails-closed",
+      "status": "PASS",
+      "step": "the send entry fails closed and creates no Session with no backend"
+    },
+    {
+      "detail": "after open: hash=#/settings?tab=product:models, text=1109 chars; after close: hash=#/",
+      "id": "settings-opens-closes",
+      "status": "PASS",
+      "step": "Settings opens and closes"
+    },
+    {
+      "detail": "hooks: language row=1, theme row=1, ui-scale row=1, resume row=1 (switch=1), terminal font input=1; page text=4026 chars; hash=#/settings?tab=appearance",
+      "id": "appearance-page-operable",
+      "status": "PASS",
+      "step": "the Appearance page opens as a real product page with its local controls painted"
+    },
+    {
+      "detail": "documentElement.lang: start=en → ja=ja → after reload=ja → restored=en",
+      "id": "appearance-language-persists",
+      "status": "PASS",
+      "step": "the language switch persists across a relaunch and the test language is restored"
+    },
+    {
+      "detail": "resume switch aria-checked: default=true → off=false → after reload=false → restored=true",
+      "id": "appearance-resume-pref-persists",
+      "status": "PASS",
+      "step": "the reopen-last-chat preference is local, survives a relaunch, and is switched back"
+    },
+    {
+      "detail": "terminal font field: typed=\"FiraCode Nerd Font\" → after reload=\"FiraCode Nerd Font\" → reset=\"\"",
+      "id": "appearance-terminal-font-persists",
+      "status": "PASS",
+      "step": "the terminal font is a local preference: set, kept across a relaunch, then reset to the default"
+    },
+    {
+      "detail": "renderer residual legacy paths after the Appearance steps=[] (must be []); console capture: first window predated the listener; the renderer boot was re-run under capture (reload); renderer-console.log=1620 chars",
+      "id": "appearance-no-legacy-rest",
+      "status": "PASS",
+      "step": "the Appearance page issues no legacy REST request, refused or otherwise"
+    },
+    {
+      "detail": "hash=#/profiles; unavailable copy present=true; session rows=0; text=\"@keyframes hermes-zone-fade { from { opacity: 0.001 } to { opacity: 1 } } [data-tree-group] :is(aside, [data-slot=sidebar]) { border-left-width: 0; border-right-width: 0; box-shado\"",
+      "id": "profiles-honest",
+      "status": "PASS",
+      "step": "Profiles opens and states unavailability instead of showing fabricated records"
+    },
+    {
+      "detail": "product:models: controls=0, honest=true; product:resources: controls=0, honest=true; product:identities: controls=0, honest=true; product:harnesses: controls=0, honest=true; product:data: controls=0, honest=true",
+      "id": "product-settings-honest",
+      "status": "PASS",
+      "step": "Models and the other product settings open; unavailable capabilities are stated, not faked"
+    },
+    {
+      "detail": "hash=#/command-center?section=sessions; legacy-looking actions=[]; text=\"@keyframes hermes-zone-fade { from { opacity: 0.001 } to { opacity: 1 } } [data-tree-group] :is(aside, [data-slot=sidebar]) { border-left-width: 0; border-right\"",
+      "id": "command-center-agentbox",
+      "status": "PASS",
+      "step": "the Command Center opens as AgentBox authority with no legacy System/Usage/Maintenance action"
+    },
+    {
+      "detail": "options=29; profiles row=true; legacy entries=[]; retired Bot Mode entries=[] (New Bot must be absent); first options=[\"New sessionCtrlN\",\"New windowCtrlShiftN\",\"SettingsCtrl,\",\"Profiles\",\"Open folder as project…CtrlO\",\"Toggle layout edit modeoffCtrlShift\\\\\",\"Reload desktop plugins\",\"Reset layout\",\"Toggle status baronCtrlShiftS\",\"Toggle tabsoffCtrlAltT\",\"Keyboard shortcuts\",\"Toggle terminaloffCtrl`\"]",
+      "id": "command-palette-agentbox",
+      "status": "PASS",
+      "step": "the command palette offers AgentBox navigation and no legacy restart/logs/profile share rows"
+    },
+    {
+      "detail": "palette New Bot/Bots rows=[]; Bots/Routines entries in tabs, menus and the sidebar=[]; chat-empty bot slot nodes=0; \"hermes.plugin.hermes-bots.*\" storage keys=[]",
+      "id": "bot-mode-retired",
+      "status": "PASS",
+      "step": "the retired Bot Mode surface contributes no command, tab, entry or plugin storage"
+    },
+    {
+      "detail": "settings entry accepted a real click; hash after click=#/settings",
+      "id": "sidebar-operable",
+      "status": "PASS",
+      "step": "the sidebar is operable with no backend (its Settings entry takes a real click)"
+    },
+    {
+      "detail": "#/cron → #/settings?tab=product:resources; #/agents → #/settings?tab=product:resources; #/starmap → #/settings?tab=product:resources; #/webhooks → #/settings?tab=product:resources",
+      "id": "legacy-view-routes-retired",
+      "status": "PASS",
+      "step": "Cron/Agents/Starmap/Webhooks deep links land on the honest product page, not a legacy view"
+    },
+    {
+      "detail": "new Hermes-named processes=[]; fake runtime stub invoked with serve=false",
+      "id": "no-hermes-process",
+      "status": "PASS",
+      "step": "no Hermes runtime process appears while the product runs"
+    },
+    {
+      "detail": "process tree at close=[34312,20388,8892,10296,19412,12468]; still alive after 20s=[]",
+      "id": "exit-no-orphans",
+      "status": "PASS",
+      "step": "closing the window exits Electron with no orphaned process"
+    },
+    {
+      "detail": "main-process refusals=0 (must be exactly 0)",
+      "id": "no-legacy-rest-reached-main",
+      "status": "PASS",
+      "step": "no legacy REST request is refused at the main-process door"
+    },
+    {
+      "detail": "renderer residual legacy paths=[] (must be []); console capture: first window predated the listener; the renderer boot was re-run under capture (reload); renderer-console.log=1620 chars",
+      "id": "no-legacy-rest-issued-by-renderer",
+      "status": "PASS",
+      "step": "the renderer issues no legacy REST request, refused or otherwise"
+    },
+    {
+      "detail": "main-process-safe.log=5177 chars; token-shaped material=false; renderer-console.log=1620 chars",
+      "id": "logs-token-free",
+      "status": "PASS",
+      "step": "the captured main-process log carries no token material"
+    },
+    {
+      "detail": "appearance-local-preferences.png, arrival-no-service.png, command-center-agentbox.png, command-palette-agentbox.png, profiles-unavailable.png, settings-no-service.png, workspace-sidebar.png",
+      "id": "required-screenshots",
+      "status": "PASS",
+      "step": "every required screenshot was captured"
+    },
+    {
+      "detail": "28 steps, none missing/duplicated/PENDING/SKIP",
+      "id": "required-steps-executed",
+      "status": "PASS",
+      "step": "every required step is present exactly once and executed"
+    }
+  ],
+  "unknownStatuses": []
+}

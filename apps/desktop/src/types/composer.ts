@@ -49,6 +49,10 @@ export type ComposerAttachmentPatch = Partial<Omit<ComposerAttachment, 'id' | 'o
 
 export interface SubmitTextOptions {
   attachments?: ComposerAttachment[]
+  /** Exact persisted draft version banked immediately before dispatch. The
+   * AgentBox caller uses it as the durable intent key, so a late response for
+   * an older send can never clear a newer draft. */
+  draftVersion?: number
   /** The composer scope key that was actually loaded when this text was
    *  submitted (see use-composer-draft's activeQueueSessionKeyRef). Compared
    *  against the resolved submit target in sessionContextDrift — a mismatch

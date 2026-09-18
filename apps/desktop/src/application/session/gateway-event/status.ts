@@ -205,7 +205,7 @@ export function handleStatusEvent(ctx: GatewayEventContext): boolean {
       notify({
         id: `gateway-error:${errorMessage}`,
         kind: 'error',
-        title: 'Hermes error',
+        title: 'AgentBox error',
         message: errorMessage
       })
     }

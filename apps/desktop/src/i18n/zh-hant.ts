@@ -4,7 +4,7 @@ import { defineFieldCopy } from './field-copy'
 export const zhHant = defineLocale({
   sessionImport: {
     title: '從其他應用程式繼續',
-    subtitle: '將對話匯入 Hermes，接著上次的進度繼續。',
+    subtitle: '將對話匯入 Ordessa，接著上次的進度繼續。',
     action: '匯入工作階段',
     readingFrom: '讀取自',
     connectedComputer: '已連線的電腦',
@@ -22,17 +22,17 @@ export const zhHant = defineLocale({
     more: '載入更多工作階段',
     messages: '則訊息',
     choose: '繼續一段對話',
-    chooseHelp: '選擇工作階段，在匯入 Hermes 前查看歷程記錄。',
+    chooseHelp: '選擇工作階段，在匯入 Ordessa 前查看歷程記錄。',
     previewLoading: '正在開啟預覽',
     previewError: '無法預覽',
     previewHelp: '來源檔案可能已移動或變更。請重新整理清單後重試。',
     previewLimit: '預覽已縮短，方便閱讀。匯入時會複製完整對話。',
     you: '你',
-    snapshot: '此對話已匯入 Hermes。開啟現有副本即可繼續。',
+    snapshot: '此對話已匯入 Ordessa。開啟現有副本即可繼續。',
     copyNotice: '複製對話文字，不變更來源檔案。不包含工具輸出和推理內容。',
     importing: '正在匯入…',
-    open: '在 Hermes 中開啟',
-    continue: '在 Hermes 中繼續',
+    open: '在 Ordessa 中開啟',
+    continue: '在 Ordessa 中繼續',
     importError: '無法匯入此對話。'
   },
   common: {
@@ -97,19 +97,19 @@ export const zhHant = defineLocale({
   },
 
   boot: {
-    ready: 'Hermes Desktop 已就緒',
+    ready: 'Ordessa 已就緒',
     desktopBootFailedWithMessage: message => `桌面啟動失敗：${message}`,
     steps: {
       connectingGateway: '正在連線桌面閘道',
-      loadingSettings: '正在載入 Hermes 設定',
+      loadingSettings: '正在載入 Ordessa 設定',
       loadingSessions: '正在載入最近工作階段',
-      retryingRemoteBackend: '正在重新連線遠端 Hermes 後端…',
+      retryingRemoteBackend: '正在重新連線遠端 Pacthold 後端…',
       startingDesktopConnection: '正在啟動桌面連線',
-      startingHermesDesktop: '正在啟動 Hermes Desktop…'
+      startingHermesDesktop: '正在啟動 Ordessa…'
     },
     errors: {
-      backgroundExited: 'Hermes 背景程序已結束。',
-      backgroundExitedDuringStartup: 'Hermes 背景程序在啟動期間結束。',
+      backgroundExited: 'Ordessa 背景程序已結束。',
+      backgroundExitedDuringStartup: 'Ordessa 背景程序在啟動期間結束。',
       backendStopped: '後端已停止',
       desktopBootFailed: '桌面啟動失敗',
       gatewayConnectionLost: '與閘道的連線已中斷',
@@ -119,7 +119,7 @@ export const zhHant = defineLocale({
       ipcBridgeUnavailable: '桌面 IPC 橋接器不可用。'
     },
     failure: {
-      title: 'Hermes 無法啟動',
+      title: 'Ordessa 無法啟動',
       description: '背景閘道未啟動。請嘗試下面的復原步驟。這裡的操作不會刪除您的聊天或設定。',
       remoteTitle: '需要重新登入遠端閘道',
       remoteDescription: '您的遠端閘道工作階段已過期。請重新登入以重新連線。這裡的操作不會刪除您的聊天或設定。',
@@ -129,6 +129,7 @@ export const zhHant = defineLocale({
       gatewaySettings: '閘道設定',
       back: '返回',
       openLogs: '開啟記錄',
+      dismiss: '關閉',
       repairHint: '修復會重新執行安裝程式，在新機器上可能需要幾分鐘。',
       remoteSignInHint: signInLabel =>
         `先登出已儲存的遠端瀏覽器工作階段，然後開啟${signInLabel}。使用本機閘道可切換至內建後端。`,
@@ -138,11 +139,11 @@ export const zhHant = defineLocale({
       cloudDownDescription:
         '此閘道連線的 Nous 託管雲端代理正在回傳伺服器錯誤。無法在此處重新啟動——請檢查其狀態、切換至本機閘道，或取得支援。',
       cloudDownHint: '使用下方按鈕開啟 Nous Portal（檢視執行個體狀態與操作）或加入 Discord 取得支援。',
-      notFoundTitle: '找不到 Hermes',
+      notFoundTitle: '找不到 Ordessa',
       notFoundDescription:
-        '桌面端找不到可啟動的 Hermes 執行階段。它會在 PATH 中尋找 hermes 指令，或使用自身管理的安裝。請先安裝 Hermes 再重試——此處的操作不會刪除你的對話或設定。',
+        '桌面端找不到可啟動的 Pacthold 執行階段。它會在 PATH 中尋找 hermes 指令，或使用自身管理的安裝。請先安裝 Ordessa 再重試——此處的操作不會刪除你的對話或設定。',
       notFoundHint:
-        '「修復安裝」會執行 Hermes 安裝程式；「重試」會在其可用後重新尋找。',
+        '「修復安裝」會執行 Ordessa 安裝程式；「重試」會在其可用後重新尋找。',
       cloudDownCheckPortal: '查看 Portal 狀態',
       cloudDownDiscord: '在 Discord 取得協助',
       hideRecentLogs: '隱藏最近記錄',
@@ -169,9 +170,9 @@ export const zhHant = defineLocale({
     copyDetail: '複製詳情',
     copyDetailFailed: '無法複製通知詳情',
     backendOutOfDateTitle: '後端版本過舊',
-    backendOutOfDateMessage: '您的 Hermes 後端早於目前的桌面版本，可能無法正常運作。請更新以保持一致。',
+    backendOutOfDateMessage: '您的 Pacthold 後端早於目前的桌面版本，可能無法正常運作。請更新以保持一致。',
     installMethodUnsupportedTitle: '不受支援的安裝方式',
-    updateHermes: '更新 Hermes',
+    updateHermes: '更新 Ordessa',
     updateReadyTitle: '有可用更新',
     updateReadyMessage: count => `有 ${count} 項新變更可用。`,
     updateReadyMessageUnknown: '有新更新可用。',
@@ -189,7 +190,7 @@ export const zhHant = defineLocale({
       elevenLabsRejectedKey: 'ElevenLabs 拒絕了該 API 金鑰 (401)。',
       diskFull: '磁碟已滿 — 請騰出一些空間後再試。',
       gatewayAuthFailed: '閘道認證失敗 — 請檢查你的 API_SERVER_KEY。',
-      methodNotAllowed: '桌面後端拒絕了該請求 (405 Method Not Allowed)。請嘗試重新啟動 Hermes Desktop。',
+      methodNotAllowed: '桌面後端拒絕了該請求 (405 Method Not Allowed)。請嘗試重新啟動 Ordessa。',
       microphonePermission: '麥克風權限已被拒絕。',
       openaiRejectedApiKey: 'OpenAI 拒絕了該 API 金鑰。',
       openaiRejectedApiKeyWithStatus: status => `OpenAI 拒絕了該 API 金鑰 (${status} invalid_api_key)。`,
@@ -206,15 +207,15 @@ export const zhHant = defineLocale({
       transcriptionFailed: '語音轉寫失敗',
       transcriptionUnavailable: '語音轉寫暫不可用。',
       tryRecordingAgain: '請再錄製一次。',
-      unavailable: '語音不可用'
+      unavailable: '等待服務能力宣告'
     },
     native: {
       approvalTitle: '需要核准',
       approveAction: '核准',
       rejectAction: '拒絕',
       inputTitle: '需要輸入',
-      inputBody: 'Hermes 正在等待你的回應。',
-      turnDoneTitle: 'Hermes 已完成',
+      inputBody: 'Ordessa 正在等待你的回應。',
+      turnDoneTitle: 'Ordessa 已完成',
       turnDoneBody: '',
       turnErrorTitle: '本輪失敗',
       backgroundDoneTitle: '背景工作已完成',
@@ -313,7 +314,7 @@ export const zhHant = defineLocale({
     exportConfig: '匯出設定',
     importConfig: '匯入設定',
     resetToDefaults: '恢復預設值',
-    resetConfirm: '要將所有設定恢復為 Hermes 預設值嗎？',
+    resetConfirm: '要將所有設定恢復為 Ordessa 預設值嗎？',
     exportFailed: '匯出失敗',
     resetFailed: '重設失敗',
     nav: {
@@ -322,23 +323,121 @@ export const zhHant = defineLocale({
       providerApiKeys: 'API 金鑰',
       providerCustomEndpoints: '自訂端點',
       providerLocalModels: '本地模型',
-      gateway: '閘道',
+      gateway: '服務',
       apiKeys: '工具與金鑰',
       keybinds: '鍵盤快捷鍵',
       keysTools: '工具',
       keysSettings: '設定',
       mcp: 'MCP',
       archivedChats: '已封存聊天',
+      scheduledJobs: '排程工作',
       about: '關於',
       billing: '帳單',
       notifications: '通知'
+    },
+    product: {
+      unavailable: '暫不可用',
+      unavailableDescription:
+        '僅在 Pacthold 服務宣告對應能力後顯示操作控制。Desktop 不回退舊 Ordessa 設定，也不會把本機變更假裝成已儲存。',
+      scope: '產品範圍',
+      boundary: '安全邊界',
+      models: {
+        title: '模型',
+        description: '設定由服務宣告的模型預設值與模型槽位。',
+        boundary: '模型欄位來自服務描述；Desktop 不硬編碼提供方或 Harness 選項。',
+        serviceBoundary: 'Pacthold 服務尚未宣告模型維護能力。',
+        unavailableDescription: '只有服務就緒並宣告完整模型操作能力時才顯示控制項。',
+        add: '新增模型設定',
+        loading: '正在載入模型設定…',
+        empty: '尚無模型設定',
+        emptyDescription: '新增由服務管理的提供方／模型設定後即可供 Profile 使用。',
+        error: '無法載入模型設定',
+        retry: '重試',
+        displayName: '顯示名稱',
+        harness: 'Harness',
+        provider: '提供方',
+        modelId: '模型 ID',
+        modelDisplayName: '模型名稱',
+        credential: '憑證參照',
+        present: '已設定',
+        absent: '未設定',
+        save: '儲存',
+        cancel: '取消',
+        edit: '編輯',
+        archive: '封存',
+        addModel: '新增模型',
+        removeModel: '移除模型',
+        availability: { available: '可用', unknown: '未知', unavailable: '不可用——未給出原因' },
+        providerPresets: '預設',
+        providerInUse: '已在用',
+        providerCustom: '自訂供應商（顯式覆寫）',
+        providerCustomPlaceholder: '供應商 ID',
+        harnessCustom: '自訂 Harness（顯式覆寫）',
+        harnessCustomPlaceholder: 'Harness 名稱',
+        modelMetaUnknown: '上下文視窗與能力：未知',
+        modelMetaUnknownTitle: '服務尚未為該模型宣告這些資訊',
+        refreshModels: '從供應商拉取',
+        testConnection: '測試連線',
+        capabilityUnavailable: '尚不可用：服務尚未宣告對應方法。',
+      },
+      accounts: {
+        title: '帳號',
+        description: '本機持有的訂閱與 API key。兩者都只是引用：記錄裡只有不透明 id，絕不含材料。',
+        empty: '尚無帳號記錄',
+        emptyDescription: '在此新增 API key，或在執行側完成官方登入——本應用絕不代收登入資訊。',
+        kindSubscription: '訂閱（官方登入）',
+        kindApiKey: 'API key',
+        statusUnknown: '狀態未知',
+        statusUnknownTitle: '服務尚未提供帳號探測面',
+        lastVerified: '上次驗證',
+        unknown: '未知',
+        loginGuidance: '請在執行側用該 harness 自己的登入流程完成登入。本應用絕不索取帳號憑據、不讀取原生登入態、也不複製權杖。',
+        hotSwitchNote: '為角色切換帳號在下一輪生效——每輪各自物化程序，因此無需重啟，執行中的一輪繼續使用它開始時使用的帳號。'
+      },
+      resources: {
+        title: 'Skills 與 MCP',
+        description: '管理共享資源庫，再由每個 Profile 明確選擇資源。',
+        boundary: '發現資源不會自動啟用，加入 MCP 設定也不會自動啟動。',
+        skillFields: ['名稱與描述（來自 SKILL.md）', '來源', '摘要／修訂', '安裝時間', '可更新（由服務宣告）', '依角色啟用'],
+        skillPending: '技能庫尚不可用：以下欄位會在服務宣告該能力後出現。在此之前不做任何猜測——不顯示已安裝狀態、摘要或可更新徽標。',
+        mcpFields: ['Server 名稱', '傳輸（stdio 或 remote）', '命令或 URL', '憑據引用與是否缺失', '上次測試時間與結果', '依角色啟用'],
+        mcpPending: 'MCP server 清單尚不可用：以下欄位會在服務宣告該能力後出現。憑據只顯示引用、絕不顯示內容；在服務能執行測試之前不提供測試按鈕。',
+        enablement: '啟用依角色進行：某家沒有該資源的槽位時會如實說明，而不是給一個不可能生效的開關。'
+      },
+      identities: {
+        title: '身分',
+        description: '管理具名登入與 API Key 身分；本機使用不要求 Ordessa 帳號。',
+        boundary: '憑證由服務管理，且不進入一般設定與備份。'
+      },
+      hooks: {
+        title: 'Hooks',
+        description: '事件觸發時執行命令——依家族各自宣告，在一個外殼裡編輯。',
+        boundary: 'Hook 不會被壓成一個抽象：每家保留自己的模型；不支援 hook 的家族會如實說明，而不是給一個開關。',
+        families: ['Claude Code——宣告式：事件、可選比對器、處理器（command/http）、timeout、async、狀態文案', 'OpenCode——程式碼資產：外掛原始碼本身，附摘要與預覽，放在該家載入它的位置', 'Codex——形態待實測：在實測出該家真實形態之前不顯示表單'],
+        familiesPending: '尚不可編輯：逐家 schema、儲存與觸發帳本屬於服務，而服務尚未宣告這些能力。在此之前不做任何假替——沒有可編輯表單、沒有開關、沒有點了不動的控件。',
+        safety: 'Hook 預設關閉。啟用時會顯示完整命令與它所綁定的事件並要求確認：它在當次執行的沙箱內、用當次執行的隔離與網路姿態執行，絕不在本機直跑。',
+        ledgerFields: ['Hook 名稱與事件', '何時執行', '結束碼', '有界的輸出摘要', '阻斷要如實標註——攔下工具呼叫的 hook 不得顯示成普通成功']
+      },
+      harnesses: {
+        title: 'Harness',
+        description: '只在這台電腦上安裝與更新支援的 Harness。',
+        boundary: '工作區連線與遠端目標屬於各自 Workspace；Desktop 不自造安裝命令。',
+        programFields: ['目前版本', '已安裝的其他版本', '大小', '來源', '安裝時間', '摘要', '可更新徽標'],
+        fieldsPending: '程式目錄尚不可用：以下欄位會在服務宣告該能力後出現。在此之前不做任何猜測——版本、大小、可更新徽標一律不顯示。',
+        nextTurn: '切換 harness 版本在下一輪生效：無需重啟，執行中的一輪繼續使用它開始時使用的版本。'
+      },
+      data: {
+        title: '資料管理',
+        description: '備份應用程式設定、會話、草稿、Profile 記憶與受管資源。',
+        boundary: '憑證、專案檔案與可重新下載的工具不進入備份；還原需要相容的服務合約。'
+      }
     },
     notifications: {
       title: '通知',
       intro: '原生桌面通知，與應用程式內提示不同。設定會依裝置保存，每台電腦各自獨立。',
       enableAll: '啟用通知',
       enableAllDesc: '關閉後靜音下方所有通知。',
-      focusedHint: '完成提醒僅在 Hermes 位於背景時觸發。',
+      focusedHint: '完成提醒僅在 Ordessa 位於背景時觸發。',
       kinds: {
         approval: {
           label: '需要核准',
@@ -346,11 +445,11 @@ export const zhHant = defineLocale({
         },
         input: {
           label: '需要輸入',
-          description: 'Hermes 提出了問題，或需要密碼或密鑰。'
+          description: 'Ordessa 提出了問題，或需要密碼或密鑰。'
         },
         turnDone: {
           label: '回覆就緒',
-          description: 'Hermes 在背景時完成了一輪對話。'
+          description: 'Ordessa 在背景時完成了一輪對話。'
         },
         turnError: {
           label: '本輪失敗',
@@ -366,11 +465,11 @@ export const zhHant = defineLocale({
         },
         plugin: {
           label: '外掛通知',
-          description: 'Hermes 在背景時，桌面外掛傳送了通知。'
+          description: 'Ordessa 在背景時，桌面外掛傳送了通知。'
         }
       },
       test: '傳送測試通知',
-      testTitle: 'Hermes',
+      testTitle: 'Ordessa',
       testBody: '通知運作正常。',
       testSent: '測試已傳送。若沒有出現，請檢查系統通知權限與專注模式／勿擾模式。',
       testUnsupported: '此系統不支援原生通知。',
@@ -389,7 +488,7 @@ export const zhHant = defineLocale({
       advanced: '進階'
     },
     searchPlaceholder: {
-      about: '關於 Hermes Desktop',
+      about: '關於 Ordessa',
       config: '搜尋設定…',
       gateway: '閘道連線…',
       keys: '搜尋 API 金鑰…',
@@ -405,7 +504,7 @@ export const zhHant = defineLocale({
       title: '外觀',
       intro: '這些是僅限桌面端的顯示偏好。模式控制亮度；主題控制強調色與聊天介面樣式。',
       colorMode: '色彩模式',
-      colorModeDesc: '選擇固定模式，或讓 Hermes 跟隨系統設定。',
+      colorModeDesc: '選擇固定模式，或讓 Ordessa 跟隨系統設定。',
       toolViewTitle: '工具呼叫顯示',
       toolViewDesc: '產品模式會隱藏原始工具 payload；技術模式會顯示完整輸入/輸出。',
       reasoningCollapsedTitle: '預設摺疊推理過程',
@@ -455,12 +554,12 @@ export const zhHant = defineLocale({
       introSplashTitle: '開場標識',
       introSplashDesc: '空白對話中顯示的字標和提示語。',
       reactionsTitle: '訊息回應',
-      reactionsDesc: 'iMessage 風格的表情回應 — 你可以對訊息做出回應，Hermes 也能回應你的訊息。',
+      reactionsDesc: 'iMessage 風格的表情回應 — 你可以對訊息做出回應，Ordessa 也能回應你的訊息。',
       tipsTitle: '應用程式內提示',
-      tipsDesc: '指向應用程式某處的小氣泡：閒置時偶爾出現，需要時 Hermes 也會給你一則。關掉一則就不再出現。',
+      tipsDesc: '指向應用程式某處的小氣泡：閒置時偶爾出現，需要時 Ordessa 也會給你一則。關掉一則就不再出現。',
       tipsReset: (count: number) => `復原 ${count} 則已關閉的提示`,
       toursTitle: '導覽',
-      toursDesc: '讓 Hermes 帶你認識應用程式：調暗畫面並逐步標示每個位置。',
+      toursDesc: '讓 Ordessa 帶你認識應用程式：調暗畫面並逐步標示每個位置。',
       composerPopoutTitle: '懸浮輸入框',
       composerPopoutDesc: '允許將輸入框拖出底部停靠區。關閉後，輸入框會鎖定在底部。',
       vibeHeartsTitle: '心情愛心',
@@ -493,8 +592,8 @@ export const zhHant = defineLocale({
       pet: {
         title: '寵物',
         intro:
-          '領養一隻懸浮在應用上的 petdex 動畫寵物，它會根據 Hermes 的狀態做出反應——工具執行時奔跑、成功時歡呼、出錯時沮喪。',
-        restartHint: '寵物功能需要重新啟動——目前執行的應用在此功能加入前啟動。請結束並重新開啟 Hermes，然後回到此處。',
+          '領養一隻懸浮在應用上的 petdex 動畫寵物，它會根據 Ordessa 的狀態做出反應——工具執行時奔跑、成功時歡呼、出錯時沮喪。',
+        restartHint: '寵物功能需要重新啟動——目前執行的應用在此功能加入前啟動。請結束並重新開啟 Ordessa，然後回到此處。',
         scaleTitle: '大小',
         scaleDesc: '調整懸浮寵物的大小，所有介面即時生效。',
         roamTitle: '漫遊',
@@ -704,10 +803,10 @@ export const zhHant = defineLocale({
         repoScanRoots: '要掃描的資料夾。留空時掃描主目錄。',
         repoScanExcludePaths: '探索程式碼儲存庫時略過這些資料夾及其子目錄。'
       },
-      timezone: 'Hermes 需要本機時間上下文時使用。留空則使用系統時區。',
+      timezone: 'Ordessa 需要本機時間上下文時使用。留空則使用系統時區。',
       agent: {
         imageInputMode: '控制圖片附件如何傳送給模型。',
-        maxTurns: 'Hermes 停止一次執行前的工具呼叫輪次上限。'
+        maxTurns: 'Ordessa 停止一次執行前的工具呼叫輪次上限。'
       },
       terminal: {
         cwd: '工具與終端機操作的預設專案資料夾。',
@@ -717,9 +816,9 @@ export const zhHant = defineLocale({
       codeExecution: {
         mode: '程式碼執行被限制在目前專案中的嚴格程度。'
       },
-      fileReadMaxChars: 'Hermes 單次檔案讀取可讀取的最大字元數。',
+      fileReadMaxChars: 'Ordessa 單次檔案讀取可讀取的最大字元數。',
       approvals: {
-        mode: 'Hermes 如何處理需要明確批准的指令。',
+        mode: 'Ordessa 如何處理需要明確批准的指令。',
         timeout: '批准提示逾時前等待的時間。'
       },
       security: {
@@ -749,21 +848,21 @@ export const zhHant = defineLocale({
       },
       updates: {
         nonInteractiveLocalChanges:
-          'Hermes 從應用程式內更新自身時，保留本機原始碼變更（stash）或丟棄（discard）。終端機更新一律會詢問。'
+          'Ordessa 從應用程式內更新自身時，保留本機原始碼變更（stash）或丟棄（discard）。終端機更新一律會詢問。'
       }
     }),
     about: {
-      heading: 'Hermes Desktop',
+      heading: 'Ordessa',
       version: value => `版本 ${value}`,
       versionUnavailable: '版本不可用',
       bundleOutOfSync: '應用程式建置版本過舊',
       bundleOutOfSyncDesc:
-        'Hermes 執行環境已更新,但桌面應用程式本身仍是舊建置——在應用程式更新之前,新的介面功能(如 Bot Mode)不會顯示。請執行下方的更新以重新建置應用程式。如果此警告仍未消除,請從最新的桌面安裝程式重新安裝。',
+        'Ordessa 執行環境已更新,但桌面應用程式本身仍是舊建置——在應用程式更新之前,新的介面功能(如 Bot Mode)不會顯示。請執行下方的更新以重新建置應用程式。如果此警告仍未消除,請從最新的桌面安裝程式重新安裝。',
       bundleOutOfSyncAction: '取得安裝程式',
       bundleSwapPending: '重新啟動以完成更新',
       bundleSwapPendingDesc:
-        '更新後的應用程式已安裝完成，只需重新啟動 Hermes 即可載入新版本。聊天記錄和設定不會受到影響。',
-      bundleSwapPendingAction: '重新啟動 Hermes',
+        '更新後的應用程式已安裝完成，只需重新啟動 Ordessa 即可載入新版本。聊天記錄和設定不會受到影響。',
+      bundleSwapPendingAction: '重新啟動 Ordessa',
       updates: '更新',
       checkNow: '立即檢查',
       checking: '檢查中…',
@@ -780,7 +879,7 @@ export const zhHant = defineLocale({
       lastChecked: age => `上次檢查：${age}`,
       justNowSuffix: ' · 剛剛',
       automaticUpdates: '自動更新',
-      automaticUpdatesDesc: 'Hermes 會在背景自動檢查更新，並在有可用更新時通知你。',
+      automaticUpdatesDesc: 'Ordessa 會在背景自動檢查更新，並在有可用更新時通知你。',
       branchCommit: (branch, commit) => `分支 ${branch} · 提交 ${commit}`,
       never: '從未',
       justNow: '剛剛',
@@ -797,7 +896,7 @@ export const zhHant = defineLocale({
       searchPlaceholder: '搜尋…',
       noResults: '找不到結果',
       systemDefault: '系統預設',
-      loading: '正在載入 Hermes 設定...',
+      loading: '正在載入 Ordessa 設定...',
       emptyTitle: '無可設定項目',
       emptyDesc: '此區段沒有可調整的設定。',
       failedLoad: '設定載入失敗',
@@ -809,7 +908,7 @@ export const zhHant = defineLocale({
     },
     quickEntry: {
       enabledTitle: '快速輸入',
-      enabledDesc: '用全域快速鍵在任何地方喚出一個小輸入框，無需開啟 Hermes 即可送出提示。',
+      enabledDesc: '用全域快速鍵在任何地方喚出一個小輸入框，無需開啟 Ordessa 即可送出提示。',
       shortcutTitle: '快速輸入快速鍵',
       shortcutDesc: '至少需要一個修飾鍵，例如 CommandOrControl+Shift+Space。',
       active: '快速鍵已生效。',
@@ -843,14 +942,14 @@ export const zhHant = defineLocale({
       title: '閘道連線',
       envOverride: '環境變數覆寫',
       intro:
-        'Hermes Desktop 預設會啟動自己的本機閘道。如果您希望此應用程式控制另一台機器或可信代理後面已執行的 Hermes 後端，請使用遠端閘道。閘道連線屬於本機層級設定；設定檔是從已連線的閘道中探索出來的。',
+        'Ordessa 預設會啟動自己的本機閘道。如果您希望此應用程式控制另一台機器或可信代理後面已執行的 Pacthold 後端，請使用遠端閘道。閘道連線屬於本機層級設定；設定檔是從已連線的閘道中探索出來的。',
       envOverrideTitle: '環境變數正在控制此桌面工作階段。',
       envOverrideDesc: '取消設定 HERMES_DESKTOP_REMOTE_URL 和 HERMES_DESKTOP_REMOTE_TOKEN 後才會使用下方儲存的設定。',
       localTitle: '本機閘道',
-      localDesc: '在 localhost 啟動私有 Hermes 後端。這是預設方式，可離線使用。',
+      localDesc: '在 localhost 啟動私有 Pacthold 後端。這是預設方式，可離線使用。',
       remoteTitle: '遠端閘道',
       remoteDesc:
-        '將此桌面殼層連線至遠端 Hermes 後端。託管閘道使用 OAuth 或帳號密碼；自託管閘道也可使用工作階段 Token。',
+        '將此桌面殼層連線至遠端 Pacthold 後端。託管閘道使用 OAuth 或帳號密碼；自託管閘道也可使用工作階段 Token。',
       remoteUrlTitle: '遠端 URL',
       remoteUrlDesc: '遠端儀表板後端的基礎 URL。支援路徑前綴，例如 /hermes。',
       probing: '正在檢查此閘道的驗證方式…',
@@ -894,7 +993,7 @@ export const zhHant = defineLocale({
       enterUrlFirst: '請先輸入遠端 URL。',
       restartingTitle: '閘道連線正在重新啟動',
       savedTitle: '閘道設定已儲存',
-      restartingMessage: 'Hermes Desktop 將使用已儲存的設定重新連線。',
+      restartingMessage: 'Ordessa 將使用已儲存的設定重新連線。',
       savedMessage: '已儲存，下次重新啟動後生效。',
       connectedTo: (baseUrl, version) => `已連線至 ${baseUrl}${version ? ` · Hermes ${version}` : ''}`,
       reachableTitle: '遠端閘道可連線',
@@ -908,7 +1007,7 @@ export const zhHant = defineLocale({
       saveFailed: '無法儲存閘道設定',
       sshTitle: '透過 SSH 連線',
       sshDesc:
-        'Hermes 會透過 SSH 在遠端啟動並以通道連線到本應用程式——無需自行啟動或公開任何服務。前提：已具備到該主機的金鑰 SSH 存取。',
+        'Ordessa 會透過 SSH 在遠端啟動並以通道連線到本應用程式——無需自行啟動或公開任何服務。前提：已具備到該主機的金鑰 SSH 存取。',
       sshTrustHint: '首次提供的主機金鑰會被信任並固定；後續變更將被拒絕。',
       sshHostTitle: '主機',
       sshHostDesc: 'user@host，或 ~/.ssh/config 中的 Host 別名。',
@@ -923,23 +1022,23 @@ export const zhHant = defineLocale({
       sshPortDesc: '留空 = 22 或 ~/.ssh/config 中的連接埠。',
       sshKeyTitle: '金鑰檔案',
       sshKeyDesc: '私密金鑰路徑。留空 = ssh-agent 或 ~/.ssh/config。',
-      sshHermesPathTitle: 'Hermes 路徑（選用）',
+      sshHermesPathTitle: 'Ordessa 路徑（選用）',
       sshHermesPathDesc: '遠端 hermes 執行檔的完整路徑。留空 = 自動偵測。',
       sshHermesPathPlaceholder: '自動偵測',
       sshTestConnection: '測試 SSH',
       sshConnect: '連線',
       sshButtonsHint: '「儲存」會在下次啟動時生效，「連線」則立即重新連線。',
-      sshReachable: (host, platform) => `可連線：${host}（${platform}）——已找到 Hermes`,
+      sshReachable: (host, platform) => `可連線：${host}（${platform}）——已找到 Ordessa`,
       sshIncompleteHost: '連線前請輸入 SSH 主機。',
       sshErrUnreachable: '無法透過 SSH 連線到該主機。請檢查主機、連接埠和網路。',
       sshErrAuth:
-        'SSH 驗證失敗。請將金鑰載入 ssh-agent（ssh-add），或在 ~/.ssh/config 中設定 IdentityFile——Hermes 以非互動方式執行 ssh。',
+        'SSH 驗證失敗。請將金鑰載入 ssh-agent（ssh-add），或在 ~/.ssh/config 中設定 IdentityFile——Ordessa 以非互動方式執行 ssh。',
       sshErrHostKey: '自上次連線以來主機金鑰已變更。請確認這是預期的，然後執行 ssh-keygen -R <host> 並重新連線。',
       sshErrNotInstalled:
-        '遠端主機上未安裝 Hermes。請在遠端安裝（curl -fsSL https://hermes-agent.nousresearch.com/install.sh | sh）或設定 Hermes 路徑。',
-      sshErrPlatform: '不支援的遠端平台。Hermes Desktop 的 SSH 模式支援 Linux、macOS 和 Windows 遠端主機。',
+        '遠端主機上未安裝 Ordessa。請在遠端安裝（curl -fsSL https://hermes-agent.nousresearch.com/install.sh | sh）或設定 Ordessa 路徑。',
+      sshErrPlatform: '不支援的遠端平台。Ordessa 的 SSH 模式支援 Linux、macOS 和 Windows 遠端主機。',
       sshErrTimeout: 'SSH 連線逾時。主機可能無法存取或處於睡眠狀態。',
-      sshErrUpdateRequired: '使用 Desktop SSH 連線前，請更新遠端主機上的 Hermes。',
+      sshErrUpdateRequired: '使用 Desktop SSH 連線前，請更新遠端主機上的 Ordessa。',
       sshErrUnknown: 'SSH 連線失敗。'
     },
     keys: {
@@ -1001,7 +1100,7 @@ export const zhHant = defineLocale({
       disableTool: tool => `停用 ${tool}`,
       noOutput: '尚無輸出。',
       deepLinkTitle: '新增 MCP 伺服器？',
-      deepLinkDescription: '一個連結要求將此 MCP 伺服器加入 Hermes。請檢查下方的完整設定——它來自該連結，而非 Hermes。',
+      deepLinkDescription: '一個連結要求將此 MCP 伺服器加入 Ordessa。請檢查下方的完整設定——它來自該連結，而非 Ordessa。',
       deepLinkStdioWarning: '此伺服器會使用下方所示指令在你的電腦上執行本機程序。僅在信任其來源時繼續。',
       deepLinkConfirm: '新增伺服器',
       deepLinkNameInvalid: '名稱須為 1-64 個字母、數字、點、連字號或底線。',
@@ -1053,7 +1152,7 @@ export const zhHant = defineLocale({
       runtimeReady: backend => `就緒 · ${backend}`,
       serverRunning: '執行中',
       runtimeInstalled: '已安裝 llama.cpp 執行環境',
-      runtimeInstalledDetail: (tag, backend) => `組建 ${tag}，${backend} 後端。Hermes 會為您啟動並管理伺服器。`,
+      runtimeInstalledDetail: (tag, backend) => `組建 ${tag}，${backend} 後端。Ordessa 會為您啟動並管理伺服器。`,
       installTitle: '安裝本地執行環境',
       installDetail: '下載 llama.cpp 推理引擎（數百 MB）。下載的模型完全在本機執行——無需帳號，資料不會離開您的電腦。',
       installAction: '安裝執行環境',
@@ -1086,7 +1185,7 @@ export const zhHant = defineLocale({
       updateAction: '更新引擎',
       updating: '正在更新引擎…',
       upToDateTitle: '引擎已是最新',
-      upToDateDetail: (tag, backend) => `正在執行 llama.cpp ${tag}（${backend}）——Hermes 提供的最新組建。`,
+      upToDateDetail: (tag, backend) => `正在執行 llama.cpp ${tag}（${backend}）——Ordessa 提供的最新組建。`,
       updateToast: next => `本地引擎有新組建（${next}）。可在 設定 → 本地模型 中更新。`,
       activeDetail: '新對話使用此模型——傳送首條訊息時載入',
       activeNotLoaded: '首條訊息時載入',
@@ -1147,7 +1246,7 @@ export const zhHant = defineLocale({
     providers: {
       connectAccount: '連結帳號',
       haveApiKey: '改用 API 金鑰？',
-      intro: '使用訂閱登入，無需複製 API 金鑰。Hermes 會在應用程式中為您完成瀏覽器登入。',
+      intro: '使用訂閱登入，無需複製 API 金鑰。Ordessa 會在應用程式中為您完成瀏覽器登入。',
       connected: '已連線',
       collapse: '收合',
       connectAnother: '連結其他提供方',
@@ -1162,7 +1261,7 @@ export const zhHant = defineLocale({
       noKeysMatch: '沒有符合的提供方。',
       localEndpoint: {
         title: '本地 / 自訂端點',
-        description: '將 Hermes 指向任意 OpenAI 相容端點（Zyphra、vLLM、llama.cpp、Ollama 等）。'
+        description: '將 Ordessa 指向任意 OpenAI 相容端點（Zyphra、vLLM、llama.cpp、Ollama 等）。'
       },
       loading: '正在載入提供方...'
     },
@@ -1257,7 +1356,7 @@ export const zhHant = defineLocale({
         failedLoad: '無法載入終端後端',
         ready: '就緒',
         needsSetup: '需要設定',
-        unavailable: '不可用',
+        unavailable: '服務未提供',
         inUse: '使用中',
         selectedTitle: '已選擇後端',
         selectedMessage: backend => `終端命令現在透過 ${backend} 執行。將套用於新工作階段。`,
@@ -1275,7 +1374,7 @@ export const zhHant = defineLocale({
         failedSave: '無法儲存真實設定檔設定',
         prompt: {
           title: '讓網站保持登入狀態',
-          body: '讓 Hermes 使用預設瀏覽器設定檔的快照進行瀏覽，網站開啟時即已登入。',
+          body: '讓 Ordessa 使用預設瀏覽器設定檔的快照進行瀏覽，網站開啟時即已登入。',
           bulletSnapshot: 'Cookie 與登入資訊會複製到受管理的快照中。',
           bulletLiveProfile: '絕不會直接開啟你的真實瀏覽器設定檔。',
           bulletLocal: '所有資料都不會離開這台電腦。',
@@ -1358,7 +1457,7 @@ export const zhHant = defineLocale({
     loadFailed: '無法載入記憶圖譜',
     loading: '載入中…',
     emptyTitle: '尚無學習內容',
-    emptyDesc: '當 Hermes 為你的工作建立技能與記憶時，會顯示在這裡。'
+    emptyDesc: '當 Ordessa 為你的工作建立技能與記憶時，會顯示在這裡。'
   },
   agents: {
     extendedTranscript: '完整記錄尾端',
@@ -1422,7 +1521,7 @@ export const zhHant = defineLocale({
       placeholder: '搜尋寵物…',
       loading: '正在載入 petdex 畫廊…',
       error: '無法連線至 petdex 畫廊。',
-      staleBackend: '請重新啟動 Hermes 以使用寵物功能。',
+      staleBackend: '請重新啟動 Ordessa 以使用寵物功能。',
       empty: '沒有符合的寵物。',
       turnOff: '關閉',
       turnOn: '開啟',
@@ -1449,8 +1548,8 @@ export const zhHant = defineLocale({
       hatchComposing: '正在拼合……',
       hatchSaving: '快好了……',
       namePlaceholder: '為寵物命名',
-      staleBackend: '請更新 Hermes 以生成寵物。',
-      backgroundHint: '你可以關閉此視窗——完成後 Hermes 會通知你。',
+      staleBackend: '請更新 Ordessa 以生成寵物。',
+      backgroundHint: '你可以關閉此視窗——完成後 Ordessa 會通知你。',
       slowProviderHint: '這可能需要幾分鐘',
       remix: '混合生成',
       remixConfirmTitle: '以此造型混合生成？',
@@ -1482,9 +1581,11 @@ export const zhHant = defineLocale({
       system: '狀態、記錄和系統動作',
       usage: '一段時間內的詞元、費用和技能活動'
     },
+    agentBoxUnavailableTitle: 'Ordessa 不提供此介面',
+    agentBoxUnavailableBody: '系統、使用量與維護面板屬於舊版 Hermes 執行階段，Ordessa 外殼不會呼叫它。',
     nav: {
       newChat: { title: '新工作階段', detail: '開始新的工作階段' },
-      settings: { title: '設定', detail: '設定 Hermes 桌面端' },
+      settings: { title: '設定', detail: '設定 Ordessa 桌面端' },
       skills: { title: '技能與工具', detail: '啟用技能、工具集和提供方' },
       artifacts: { title: '成品', detail: '瀏覽產生的輸出' }
     },
@@ -1505,11 +1606,11 @@ export const zhHant = defineLocale({
     noSessions: '暫無工作階段。',
     gatewayRunning: '訊息閘道執行中',
     gatewayStopped: '訊息閘道已停止',
-    hermesActiveSessions: (version, count) => `Hermes ${version} · 活躍工作階段 ${count}`,
+    hermesActiveSessions: (version, count) => `Ordessa ${version} · 活躍工作階段 ${count}`,
     restartGateway: '重新啟動閘道',
     openBrowser: '開啟瀏覽器',
     gatewayRestartFailed: '閘道重新啟動失敗。',
-    updateHermes: '更新 Hermes',
+    updateHermes: '更新 Ordessa',
     reloadWindow: '重新載入視窗',
     actionRunning: '執行中',
     actionDone: '完成',
@@ -1562,7 +1663,7 @@ export const zhHant = defineLocale({
       menuItem: '連線至遠端主機…',
       badge: (host: string) => `執行於 ${host}`,
       title: (profile: string) => `將 ${profile} 連線至遠端主機`,
-      description: '此設定檔中的工作階段將在你指定的遠端 Hermes 上執行，而不是這台電腦。',
+      description: '此設定檔中的工作階段將在你指定的遠端 Ordessa 上執行，而不是這台電腦。',
       urlLabel: '遠端位址',
       urlPlaceholder: 'https://hermes.example.com',
       urlInvalid: '請輸入以 http:// 或 https:// 開頭的完整位址',
@@ -1625,7 +1726,7 @@ export const zhHant = defineLocale({
     deleteDescMid: ' 並移除其 ',
     deleteDescSuffix: ' 目錄。此操作無法復原。',
     deleting: '刪除中…',
-    createDesc: '設定檔是獨立的 Hermes 環境：各自擁有獨立的設定、技能和 SOUL.md。',
+    createDesc: '設定檔是獨立的 Ordessa 環境：各自擁有獨立的設定、技能和 SOUL.md。',
     nameLabel: '名稱',
     cloneFrom: '複製來源',
     cloneFromNone: '無（空白）',
@@ -1652,7 +1753,73 @@ export const zhHant = defineLocale({
     failedLoadSoul: '載入 SOUL.md 失敗',
     failedSaveSoul: '儲存 SOUL.md 失敗',
     failedCreate: '建立設定檔失敗',
-    failedRename: '重新命名設定檔失敗'
+    failedRename: '重新命名設定檔失敗',
+    agentBoxHarness: 'Harness',
+    agentBoxVersion: '版本',
+    agentBoxCapabilities: '能力',
+    agentBoxAvailable: '可用',
+    agentBoxServiceNoReason: '服務未給出原因',
+    agentBoxServiceOffline: 'Pacthold 服務離線——角色與設定需要它',
+    agentBoxCapabilitiesNotDeclared: '服務尚未為該角色宣告任何能力',
+    agentBoxValuePending: '服務未宣告',
+
+    roleSettings: {
+        roleNav: {
+          basics: '基本資訊',
+          harness: 'Harness',
+          model: '模型',
+          credentials: '憑據/帳號',
+          instruction: '指令',
+          skill: '技能',
+          mcp: 'MCP',
+          permission: '權限規則',
+          memory: '記憶'
+        },
+        pendingRecords: '編輯能力隨擁有這些記錄的服務一起到來：在服務宣告之前，本節只列出名稱，不顯示無法儲存的控件。',
+        pendingInstruction: '服務宣告 instruction 槽位後，即可依角色附加指令資產。',
+        pendingSkill: '服務宣告 skill 槽位後，即可依角色啟用技能。',
+        pendingMcp: '服務宣告 MCP 槽位後，即可依角色啟用 MCP server。',
+        pendingPermission: '服務宣告 permission 槽位後，即可在此編輯權限規則。',
+        bindingsDisabled: '已停用',
+        bindingsEmpty: '此角色未綁定任何資產。',
+        bindingsRevision: revision => `r${revision}`,
+        bindingsTitle: '已綁定資產',
+        memoryRefused: reason => `${reason} — 內容不上屏`,
+        memoryTitle: '記憶',
+        permissionsAnyTarget: '任意目標',
+        permissionsEmpty: '服務未回報此角色的規則。',
+        permissionsPreset: preset => `預設：${preset}`,
+        permissionsPresetUnknown: '服務未回報預設',
+        permissionsShadowed: '被後面的規則覆蓋',
+        credentialsNote: '憑據掛在該角色指向的 provider/model 記錄上（見「模型」）；依角色的憑據引用等待服務。',
+        unsupportedSlot: (slot: string) => '該 harness 不支援此項：{slot}'.replace('{slot}', slot),
+      zonesTitle: '角色將承載什麼',
+      zones: ['指令（資產引用與文本本身）', '模型槽（取自 provider/model 記錄）', '憑據或帳號引用', '技能、MCP 與 hook（依角色啟用）', '權限規則', '服務宣告的進階執行上限'],
+      zonesPending: '編輯能力隨擁有這些記錄的服務一起到來：在服務宣告之前，本頁只列出分區，不顯示無法儲存的控件。',
+      ownershipTitle: '工作階段屬於工作區',
+      ownership: '角色被綁定到一次對話，但不擁有它。綁定可以更換，更換是**工作階段上的動作**——歷史保留，且每一輪記錄當時用的是哪個角色、哪一版。',
+      permissionsTitle: '權限規則的運作方式',
+      permissions: ['每個工具鍵一行（read、edit、bash、task、external_directory、webfetch、skill……），取值 ask / allow / deny，支援 glob', '**最後匹配的規則生效**——介面展示的就是這一條，而不是第一條', '預設（完全存取／預設／計畫）一次性填表，逐項仍可覆寫；被覆寫的行顯示為「已自訂」', 'ask 就是我們的審批往返：執行時暫停並詢問你'],
+      rebindTitle: '更換綁定與複製',
+      rebind: ['同家族：允許。檔案式 journal 的家族會把原生工作階段一起搬過去；共用同一資料庫的家族會重新開始原生連續性——提示出現在**操作之前**，不是事後', '換家族：不提供就地切換；改為**複製**成另一個家族的角色，複製介面列出可遷移與不可遷移項', 'session 類資產不遷移，複製也**不會繼承舊的原生工作階段']
+    },
+    agentBoxCapabilityAbsent: '未宣告',
+    agentBoxMaintenanceUnavailable: '角色維護目前無法使用',
+    agentBoxMaintenanceUnavailableDesc: '服務可以列出角色，但尚未宣告建立、編輯、封存或原生記憶控制能力。',
+    agentBoxRuntimeConfig: '執行設定',
+    agentBoxRuntimeConfigDesc: '由服務描述的預設值；儲存會替換整份角色設定。',
+    agentBoxCreateDesc: '選擇名稱和 Harness，其餘設定可稍後完成。',
+    agentBoxHarnessChoice: 'Harness',
+    agentBoxArchive: '封存',
+    agentBoxArchiveTitle: '封存角色？',
+    agentBoxArchiveDesc: name => `要封存「${name}」嗎？既有 Session 歷史會保留。`,
+    agentBoxSaveProfile: '儲存角色',
+    agentBoxUpdateFailed: '無法更新角色',
+    agentBoxConfigLocked: '由服務鎖定',
+    agentBoxConfigRestoreDefault: '恢復預設',
+    agentBoxConfigModelUnverified: '未驗證',
+    agentBoxConfigSavedNextSend: '角色設定已儲存，將於下次傳送時生效。',
+    agentBoxConfigSaveFailed: '無法更新角色設定'
   },
 
   cron: {
@@ -1664,7 +1831,7 @@ export const zhHant = defineLocale({
       message: count => `${count} 個未固定的排程工作將繼續使用建立時的模型執行。固定它們或設定 cron.model 以遷移。`,
       detailMore: (names, remaining) => `${names}，以及另外 ${remaining} 個`,
       review: '檢查排程工作',
-      saveFailed: 'Hermes 未儲存該模型變更。',
+      saveFailed: 'Ordessa 未儲存該模型變更。',
       confirmTitle: '模型選擇警告',
       confirmDetail: '僅在你接受此權衡時確認。',
       confirmAction: '確認',
@@ -1724,7 +1891,7 @@ export const zhHant = defineLocale({
     topOfHour: '每個整點',
     everyHourAt: minute => `每小時的 :${minute}`,
     newCron: '新排程工作',
-    emptyDescNew: '按 cron 表達式排程一個提示詞。Hermes 會執行它，並將結果傳送至您選擇的目的地。',
+    emptyDescNew: '按 cron 表達式排程一個提示詞。Ordessa 會執行它，並將結果傳送至您選擇的目的地。',
     emptyDescSearch: '請嘗試更廣泛的搜尋詞。',
     emptyTitleNew: '暫無排程工作',
     emptyTitleSearch: '無相符項目',
@@ -1801,40 +1968,6 @@ export const zhHant = defineLocale({
     }
   },
 
-  artifacts: {
-    search: '搜尋成品…',
-    refresh: '重新整理成品',
-    refreshing: '正在重新整理成品',
-    indexing: '正在索引最近工作階段的成品',
-    tabAll: '全部',
-    tabImages: '圖片',
-    tabFiles: '檔案',
-    tabLinks: '連結',
-    noArtifactsTitle: '找不到成品',
-    noArtifactsDesc: '當工作階段產生圖片和檔案輸出時，它們會顯示在這裡。',
-    failedLoad: '成品載入失敗',
-    openFailed: '開啟失敗',
-    itemsImage: '張圖片',
-    itemsLink: '個連結',
-    itemsFile: '個檔案',
-    itemsGeneric: '項',
-    zero: '0',
-    rangeOf: (start, end, total) => `${start}-${end}，共 ${total}`,
-    goToPage: (itemLabel, page) => `前往${itemLabel}第 ${page} 頁`,
-    colTitleLink: '連結標題',
-    colTitleFile: '名稱',
-    colTitleDefault: '標題 / 名稱',
-    colLocationLink: 'URL',
-    colLocationFile: '路徑',
-    colLocationDefault: '位置',
-    colSession: '工作階段',
-    kindImage: '圖片',
-    kindFile: '檔案',
-    kindLink: '連結',
-    chat: '聊天',
-    copyUrl: '複製 URL',
-    copyPath: '複製路徑'
-  },
 
   artifactCard: {
     kind: { code: '程式碼', html: '互動頁面', svg: '圖形' },
@@ -1857,6 +1990,69 @@ export const zhHant = defineLocale({
   },
 
   sidebar: {
+    agentBoxActions: {
+      newTask: '新增任務',
+      search: '搜尋'
+    },
+
+    agentBoxArchive: {
+
+      action: '在 Ordessa 中封存',
+
+      title: name => `在 Ordessa 中封存「${name}」？`,
+
+      desc: '只封存服務中的工作區記錄；側欄入口、檔案、Session 與歷史都會保留，執行中的任務也不會停止。',
+
+      failed: '無法封存工作區'
+
+    },
+    agentBoxSession: {
+
+      loading: '正在載入 Session…',
+
+      empty: '這裡還沒有 Ordessa Session。',
+
+      unavailable: 'Pacthold 服務目前無法使用。',
+
+      unavailableReasonFallback: '服務未提供原因。',
+
+      archivedEmpty: 'Ordessa 中還沒有已封存的 Session。',
+
+      loadFailed: '無法載入已封存的 Session',
+
+      listUnsupported: '目前的 Pacthold 服務不支援列出 Session。',
+
+      workspaceNotProvided: '此工作區沒有可用的 Ordessa Session。',
+
+      menuActions: 'Session 操作',
+
+      menuRename: '重新命名…',
+
+      menuPin: '置頂',
+
+      menuUnpin: '取消置頂',
+
+      menuArchive: '在 Ordessa 中封存',
+      running: '執行中',
+      unreadLocal: '未讀（本機）',
+
+      pinned: '已置頂',
+
+      renameTitle: name => `重新命名「${name}」`,
+
+      renameFailed: '無法重新命名 Session',
+
+      pinFailed: '無法置頂 Session',
+
+      unpinFailed: '無法取消置頂 Session',
+
+      archiveTitle: name => `在 Ordessa 中封存「${name}」？`,
+
+      archiveDesc: '只封存服務中的 Session 記錄；歷史會保留，執行中的任務不會停止，也不會改動任何檔案。',
+
+      archiveFailed: '無法封存 Session'
+
+    },
     gatewayGroups: {
       grouping: '閘道與設定檔',
       rename: '重新命名群組',
@@ -1874,6 +2070,8 @@ export const zhHant = defineLocale({
       artifacts: '成品',
       cron: '排程工作'
     },
+    profilesEntry: '角色',
+    settingsEntry: '設定',
     searchAria: '搜尋工作階段',
     searchPlaceholder: '搜尋工作階段…',
     clearSearch: '清除搜尋',
@@ -1897,7 +2095,7 @@ export const zhHant = defineLocale({
     noFilterMatches: '沒有工作階段符合這些篩選條件',
     projects: {
       showAllSessions: '顯示所有工作階段',
-      sectionLabel: '專案',
+      sectionLabel: '工作區',
       home: '主頁',
       autoDiscovered: '自動探索',
       newButton: '新增專案',
@@ -1927,9 +2125,11 @@ export const zhHant = defineLocale({
       reveal: '在資料夾中顯示',
       copyPath: '複製路徑',
       removeFromSidebar: '從側邊欄移除',
+      pathScopeWindowsPath: '該資料夾是 Windows 路徑，而會話在遠端後端上執行，無法開啟它。請改用後端瀏覽器選擇資料夾。',
+      pathScopeUnverified: '後端檔案系統未回應，無法核驗該資料夾。未建立、未啟動任何內容——請重新連線後再選擇資料夾。',
       createFailed: '無法建立專案',
-      staleBackend: '請更新 Hermes 後端以建立專案——目前後端比桌面應用舊（設定 → 更新 → 後端）。',
-      deleteConfirm: '這會從 Hermes 中移除已儲存的專案。檔案、git 儲存庫和工作樹維持不變。',
+      staleBackend: '請更新 Pacthold 後端以建立專案——目前後端比桌面應用舊（設定 → 更新 → 後端）。',
+      deleteConfirm: '這會從 Ordessa 中移除已儲存的專案。檔案、git 儲存庫和工作樹維持不變。',
       startWork: '新增工作樹',
       newWorktreeTitle: '新增工作樹',
       newWorktreeDesc: '為這個工作樹命名分支。',
@@ -1938,7 +2138,7 @@ export const zhHant = defineLocale({
       baseBranchPlaceholder: '搜尋分支…',
       baseBranchNone: '未找到分支',
       startWorkFailed: '無法建立工作樹',
-      worktreeStaleBackend: '請更新 Hermes 後端以在此遠端連線上建立工作樹 —— 該後端早於 git 工作樹 API。',
+      worktreeStaleBackend: '請更新 Pacthold 後端以在此遠端連線上建立工作樹 —— 該後端早於 git 工作樹 API。',
       worktreeProjectLabel: '專案',
       worktreeProjectPlaceholder: '搜尋專案…',
       worktreeProjectNone: '沒有包含資料夾的專案',
@@ -2018,15 +2218,85 @@ export const zhHant = defineLocale({
     }
   },
 
+  workStatus: {
+    closePanel: '關閉工作狀態',
+    executionsCard: '執行',
+    gitAhead: '領先',
+    gitBehind: '落後',
+    gitBranch: '分支',
+    gitCard: 'Git',
+    gitChangedFiles: '變更檔案',
+    gitDeletions: '刪除行',
+    gitFieldUnknown: '原因未報',
+    gitFieldUnavailable: reason => `取不到（${reason}）`,
+    gitAdditions: '新增行',
+    pid: 'PID',
+    pidReasonUnknown: '原因未報',
+    pidUnknown: reason => `未上報（${reason}）`,
+    refresh: '重新整理',
+    openPanel: '開啟工作狀態',
+    processCard: '處理程序',
+    queuedCount: count => `佇列：${count}`,
+    stateLabel: state =>
+      ({
+        queued: '排隊中',
+        dispatched: '已分發',
+        running: '執行中',
+        stopping: '正在停止',
+        stopped: '已停止',
+        completed: '已完成',
+        failed: '失敗',
+        unknown: '未知'
+      })[state] ?? state
+  },
+
   composer: {
     message: '訊息',
+    profile: '角色',
+    chooseProfile: '選擇角色',
+    profileRequired: '傳送前請選擇角色',
+    harness: name => `Harness：${name}`,
+    switchingProfile: '正在切換角色…',
+    profileSwitchUnavailable: '此角色不能用於目前工作階段',
+    temporaryConfig: '暫時設定',
+    temporaryConfigEmpty: '此角色沒有可暫時調整的設定。',
+    takesEffectNextSend: '變更將在下一次傳送時生效。',
+    takesEffectImmediately: '服務宣告這些變更會立即生效。',
+    securityLocked: '已由服務安全原則鎖定',
+    clearTemporaryValue: '使用角色預設值',
+    configUnavailable: '設定目前無法使用',
+    workspaceOpening: '正在向服務登記此工作區…',
+    workspaceUnavailable: '此工作區尚未在服務中登記。',
+    configResolving: '正在由服務檢查目前設定…',
+    configResolved: '服務已確認以下生效值。',
+    configRejected: '服務不會接受這份設定，因此無法傳送。',
+    configResolveUnavailable: '服務無法確認這份設定。',
+    configEffectiveValue: '生效',
+    configEffectiveServiceConfirmed: '服務已確認的值',
+    configFixesOnAccept: '實際執行設定只在服務接受傳送時才固定。',
+    emptyState: {
+      greeting: '今天要做什麼？',
+      subtitle: '用你自己的話描述即可——下方輸入列就是之後一直用的那一個。',
+      starters: ['總結本週的變更', '修復失敗的測試', '解釋這個程式庫'],
+      waiting: '正在等待 Pacthold 服務…',
+      blocked: '先選擇專案（與角色）即可開始——下方輸入列會寫明原因。'
+    },
+    serviceUnreachable: '無法連線到 Pacthold 服務',
+    workspaceMissing: '為這次對話選擇專案',
+    disabledPlaceholder: '傳送已暫停——請先選擇專案（和角色）',
+    modelSelector: '模型',
+    modelSelectorSearch: '搜尋模型…',
+    modelSelectorEmpty: '暫無可用模型',
+    modelSelectorDefault: '角色預設',
+    contextUsage: '上下文用量',
+    contextUsageUnknown: '未知',
     wakingProfile: profile => `正在喚醒 ${profile}…`,
-    placeholderStarting: '正在啟動 Hermes...',
-    placeholderReconnecting: '正在重新連線至 Hermes…',
+    placeholderStarting: '正在啟動 Ordessa...',
+    placeholderReconnecting: '正在重新連線至 Ordessa…',
     placeholderFollowUp: '傳送後續訊息',
     newSessionPlaceholders: [
       '我們要建立什麼？',
-      '給 Hermes 一個任務',
+      '給 Ordessa 一個任務',
       '您在想什麼？',
       '描述您需要什麼',
       '我們該處理什麼？',
@@ -2072,7 +2342,7 @@ export const zhHant = defineLocale({
       'composer.history': '循環彈出視窗 / 歷史記錄'
     },
     attachUrlTitle: '附加 URL',
-    attachUrlDesc: 'Hermes 將擷取該頁面並作為此回合的脈絡。',
+    attachUrlDesc: 'Ordessa 將擷取該頁面並作為此回合的脈絡。',
     urlPlaceholder: 'https://example.com/post',
     urlHintPre: '請輸入完整 URL，例如 ',
     attach: '附加',
@@ -2273,7 +2543,7 @@ export const zhHant = defineLocale({
       createPr: '建立 PR',
       openPr: '開啟 PR',
       ghMissing: '安裝 GitHub CLI (gh) 並登入後可開啟 PR',
-      agentShip: '讓 Hermes 提交並開 PR',
+      agentShip: '讓 Ordessa 提交並開 PR',
       agentShipUnavailable: '擁有這些變更的對話目前不在畫面上。',
       agentShipPrompt: '檢查目前的變更，使用清晰的約定式提交訊息提交，推送分支，並開啟一個拉取請求。',
       newBranch: '新增分支',
@@ -2291,9 +2561,9 @@ export const zhHant = defineLocale({
       fetch: '下載中…',
       pull: '快完成了…',
       pydeps: '收尾中…',
-      update: '正在更新 Hermes…',
+      update: '正在更新 Ordessa…',
       rebuild: '正在重新建置桌面應用程式…',
-      restart: '正在重新啟動 Hermes…',
+      restart: '正在重新啟動 Ordessa…',
       done: '更新完成',
       manual: '從終端機更新',
       guiSkew: '請更新桌面應用程式',
@@ -2303,40 +2573,40 @@ export const zhHant = defineLocale({
     checkFailedTitle: '無法檢查更新',
     tryAgain: '重試',
     notAvailableTitle: '更新不可用',
-    unsupportedMessage: '此版本的 Hermes 無法在應用程式內自行更新。',
+    unsupportedMessage: '此版本的 Ordessa 無法在應用程式內自行更新。',
     connectionRetry: '請檢查網路連線後重試。',
     latestBody: '您正在執行最新版本。',
     latestBodyBackend: '後端正在執行最新版本。',
     allSetTitle: '已是最新版本',
     availableTitle: '有可用更新',
-    availableBody: '新版 Hermes 已可安裝。',
+    availableBody: '新版 Ordessa 已可安裝。',
     availableTitleBackend: '後端有可用更新',
-    availableBodyBackend: '已連接的 Hermes 後端有新版本可安裝。',
+    availableBodyBackend: '已連接的 Pacthold 後端有新版本可安裝。',
     availableBodyNoChangelog: '已有新版本可用。此安裝方式無法顯示更新日誌。',
     updateNow: '立即更新',
     maybeLater: '稍後再說',
     moreChanges: count => `另有 ${count} 項變更。`,
     manualTitle: '從終端機更新',
-    manualBody: '您是從命令列安裝的 Hermes，因此更新也需要在那裡執行。請將此指令貼到終端機：',
-    manualPickedUp: '下次啟動 Hermes 時會使用新版本。',
+    manualBody: '您是從命令列安裝的 Ordessa，因此更新也需要在那裡執行。請將此指令貼到終端機：',
+    manualPickedUp: '下次啟動 Ordessa 時會使用新版本。',
     guiSkewTitle: '請更新桌面應用程式',
     guiSkewBody:
-      '後端已更新，但此桌面應用程式套件未變更。請更新或重新安裝 Hermes 桌面應用程式（你的 AppImage / .deb / .rpm）以保持一致。',
+      '後端已更新，但此桌面應用程式套件未變更。請更新或重新安裝 Ordessa 桌面應用程式（你的 AppImage / .deb / .rpm）以保持一致。',
     copy: '複製',
     copied: '已複製',
     done: '完成',
     applyingBody:
-      'Hermes 更新程式會在自己的視窗中接管，並在完成後自動重新開啟 Hermes。更新期間請勿自行重新開啟 Hermes。',
-    applyingBodyBackend: '遠端後端正在套用更新並將重新啟動。恢復後 Hermes 會自動重新連線。',
-    applyingClose: '此視窗會在更新期間關閉，隨後 Hermes 會自動重新開啟。',
+      'Ordessa 更新程式會在自己的視窗中接管，並在完成後自動重新開啟 Ordessa。更新期間請勿自行重新開啟 Ordessa。',
+    applyingBodyBackend: '遠端後端正在套用更新並將重新啟動。恢復後 Ordessa 會自動重新連線。',
+    applyingClose: '此視窗會在更新期間關閉，隨後 Ordessa 會自動重新開啟。',
     errorTitle: '更新未完成',
     errorBody: '沒有資料遺失。您可以現在重試。',
-    blockerTitle: '關閉本機預覽以更新 Hermes？',
-    blockerBody: 'Hermes 需要在更新前停止這些本機預覽。這不會修改或刪除您的檔案。',
-    foreignBlockerTitle: '關閉其他處理程序以更新 Hermes',
+    blockerTitle: '關閉本機預覽以更新 Ordessa？',
+    blockerBody: 'Ordessa 需要在更新前停止這些本機預覽。這不會修改或刪除您的檔案。',
+    foreignBlockerTitle: '關閉其他處理程序以更新 Ordessa',
     foreignBlockerBody:
-      'Hermes 無法安全地自動關閉這些處理程序。請關閉擁有這些處理程序的應用程式、終端機或服務，然後重試更新。',
-    mixedBlockerBody: 'Hermes 可以關閉下方列出的本機預覽。其他處理程序必須手動關閉，更新才能繼續。',
+      'Ordessa 無法安全地自動關閉這些處理程序。請關閉擁有這些處理程序的應用程式、終端機或服務，然後重試更新。',
+    mixedBlockerBody: 'Ordessa 可以關閉下方列出的本機預覽。其他處理程序必須手動關閉，更新才能繼續。',
     closePreviewsAndUpdate: '關閉預覽並更新',
     closePreviewsAndCheckAgain: '關閉預覽並重新檢查',
     localPreview: '本機預覽',
@@ -2369,7 +2639,7 @@ export const zhHant = defineLocale({
       skipped: '已略過',
       failed: '失敗'
     },
-    oneTimeTitle: 'Hermes 需要一次性安裝',
+    oneTimeTitle: 'Ordessa 需要一次性安裝',
     unsupportedDesc: platform =>
       `${platform} 暫不支援自動首次啟動安裝。請開啟終端機並執行下面的指令，然後重新啟動此應用程式。之後啟動會略過此步驟。`,
     installCommand: '安裝指令',
@@ -2377,21 +2647,21 @@ export const zhHant = defineLocale({
     viewDocs: '檢視安裝文件',
     installTo: '將安裝至',
     retryAfterRun: '我已執行 -- 重試',
-    setupChoiceTitle: '設定 Hermes Desktop',
-    setupChoiceDesc: '將此應用程式連線到您已執行的 Hermes 閘道，或在這台電腦上本機安裝 Hermes。',
-    connectExistingTitle: '連線到現有 Hermes',
+    setupChoiceTitle: '設定 Ordessa',
+    setupChoiceDesc: '將此應用程式連線到您已執行的 Pacthold 閘道，或在這台電腦上本機安裝 Ordessa。',
+    connectExistingTitle: '連線到現有 Ordessa',
     connectExistingShort: '連線現有環境',
     connectExistingDesc: '使用工作階段權杖或瀏覽器登入連線遠端後端。不會啟動本機安裝。',
-    installLocalTitle: '本機安裝 Hermes',
-    installLocalDesc: '下載 Hermes、建立 Python 環境，並在這台電腦上執行後端。',
-    localStartUnavailable: '無法啟動本機安裝。請重新啟動 Hermes Desktop 後再試一次。',
-    remoteSetupTitle: '連線到現有 Hermes',
-    remoteSetupDesc: '輸入閘道 URL。Hermes Desktop 會偵測需要權杖還是瀏覽器登入。',
+    installLocalTitle: '本機安裝 Ordessa',
+    installLocalDesc: '下載 Ordessa、建立 Python 環境，並在這台電腦上執行後端。',
+    localStartUnavailable: '無法啟動本機安裝。請重新啟動 Ordessa 後再試一次。',
+    remoteSetupTitle: '連線到現有 Ordessa',
+    remoteSetupDesc: '輸入閘道 URL。Ordessa 會偵測需要權杖還是瀏覽器登入。',
     remoteUrlTitle: '閘道 URL',
-    remoteUrlDesc: '使用 Hermes 閘道的基礎 URL；遠端位址請包含 https://。',
+    remoteUrlDesc: '使用 Pacthold 閘道的基礎 URL；遠端位址請包含 https://。',
     remoteUrlPlaceholder: 'https://gateway.example.com/hermes',
     probing: '正在偵測閘道驗證方式...',
-    probeError: '無法連線到該 Hermes 閘道。',
+    probeError: '無法連線到該 Pacthold 閘道。',
     identityProvider: '您的身分提供者',
     authTitle: '驗證',
     authNeedsOauth: provider => `測試此閘道前請先使用 ${provider} 登入。`,
@@ -2411,11 +2681,11 @@ export const zhHant = defineLocale({
     applyRemote: '套用並重新連線',
     backToSetup: '返回',
     failedTitle: '安裝失敗',
-    settingUpTitle: '正在設定 Hermes Agent',
+    settingUpTitle: '正在設定 Ordessa Agent',
     finishingTitle: '正在收尾',
     failedDesc:
-      '某個安裝步驟失敗。在 Windows 上，如果另一個 Hermes CLI 或桌面執行個體正在執行，可能會出現這種情況。請停止正在執行的 Hermes 執行個體後重試。可查看下方的詳細資訊或 desktop 記錄中的完整記錄。',
-    activeDesc: '這是一次性設定。Hermes 安裝程式正在下載相依套件並設定您的電腦。之後啟動會略過此步驟。',
+      '某個安裝步驟失敗。在 Windows 上，如果另一個 Ordessa CLI 或桌面執行個體正在執行，可能會出現這種情況。請停止正在執行的 Ordessa 執行個體後重試。可查看下方的詳細資訊或 desktop 記錄中的完整記錄。',
+    activeDesc: '這是一次性設定。Ordessa 安裝程式正在下載相依套件並設定您的電腦。之後啟動會略過此步驟。',
     progress: (completed, total) => `${completed}/${total} 個步驟已完成`,
     currentStage: stage => ` -- 目前：${stage}`,
     fetchingManifest: '正在取得安裝程式 manifest...',
@@ -2433,10 +2703,10 @@ export const zhHant = defineLocale({
   },
 
   onboarding: {
-    headerTitle: '開始設定 Hermes Agent',
+    headerTitle: '開始設定 Ordessa Agent',
     headerDesc: '連線模型提供方即可開始聊天。大多數選項只需一次點擊。',
-    preparingInstall: 'Hermes 正在完成安裝。首次執行通常不到一分鐘。',
-    starting: '正在啟動 Hermes…',
+    preparingInstall: 'Ordessa 正在完成安裝。首次執行通常不到一分鐘。',
+    starting: '正在啟動 Ordessa…',
     lookingUpProviders: '正在查詢提供方...',
     collapse: '收合',
     otherProviders: '其他提供方',
@@ -2444,7 +2714,7 @@ export const zhHant = defineLocale({
     chooseLater: '稍後再選擇提供方',
     recommended: '建議',
     connected: '已連線',
-    featuredPitch: '一個訂閱，300+ 前沿模型 — 執行 Hermes 的建議方式',
+    featuredPitch: '一個訂閱，300+ 前沿模型 — 執行 Ordessa 的建議方式',
     fireworksPitch: '直接模型 API — Fireworks 託管的前沿模型',
     localModelsTitle: '本地執行模型',
     localModelsPitch: '無需帳號——下載模型，在本機執行',
@@ -2457,7 +2727,7 @@ export const zhHant = defineLocale({
       xai: { short: 'Grok 模型', description: '直接存取 xAI Grok 模型。' },
       local: {
         short: '自託管',
-        description: '將 Hermes 指向本機或自託管的 OpenAI 相容端點（vLLM、llama.cpp、Ollama 等）。'
+        description: '將 Ordessa 指向本機或自託管的 OpenAI 相容端點（vLLM、llama.cpp、Ollama 等）。'
       }
     },
     backToSignIn: '返回登入',
@@ -2469,7 +2739,7 @@ export const zhHant = defineLocale({
     update: '更新',
     flowSubtitles: {
       pkce: '開啟瀏覽器登入，然後回到這裡繼續',
-      device_code: '在瀏覽器中開啟驗證頁面 — Hermes 會自動連線',
+      device_code: '在瀏覽器中開啟驗證頁面 — Ordessa 會自動連線',
       external: '先在終端機登入一次，然後回來繼續聊天'
     },
     startingSignIn: provider => `正在為 ${provider} 啟動登入...`,
@@ -2482,11 +2752,11 @@ export const zhHant = defineLocale({
     pickDifferentProvider: '選擇其他提供方',
     signInWith: provider => `使用 ${provider} 登入`,
     openedBrowser: provider => `已在瀏覽器中開啟 ${provider}。`,
-    authorizeThere: '請在那裡授權 Hermes。',
+    authorizeThere: '請在那裡授權 Ordessa。',
     copyAuthCode: '複製授權碼並貼到下方。',
     pasteAuthCode: '貼上授權碼',
     reopenAuthPage: '重新開啟授權頁面',
-    autoBrowser: provider => `已在瀏覽器中開啟 ${provider}。請在那裡授權 Hermes，連線會自動完成，無需複製或貼上。`,
+    autoBrowser: provider => `已在瀏覽器中開啟 ${provider}。請在那裡授權 Ordessa，連線會自動完成，無需複製或貼上。`,
     reopenSignInPage: '重新開啟登入頁面',
     waitingAuthorize: '等待您授權...',
     externalPending: provider => `${provider} 透過自己的 CLI 登入。請在終端機執行此指令，然後回來選擇「我已登入」：`,
@@ -2558,10 +2828,10 @@ export const zhHant = defineLocale({
       fastFailed: '快速模式更新失敗'
     },
     gatewayMenu: {
-      gateway: '閘道',
+      gateway: '服務',
       connected: '已連線',
       connecting: '連線中',
-      offline: '離線',
+      offline: '未連線到服務',
       inferenceReady: '推論已就緒',
       inferenceNotReady: '推論未就緒',
       checkingInference: '正在檢查推論',
@@ -2589,13 +2859,13 @@ export const zhHant = defineLocale({
       update: '更新',
       updateInProgress: '更新中',
       commitsBehind: (count, branch) => `落後 ${branch} ${count} 個提交`,
-      desktopVersion: version => `Hermes Desktop v${version}`,
+      desktopVersion: version => `Ordessa v${version}`,
       backendVersion: version => `後端 v${version}`,
       clientLabel: version => `用戶端 v${version}`,
       connectionSsh: host => `SSH: ${host}`,
       connectionRemote: host => `遠端: ${host}`,
       connectionCloud: host => `雲端: ${host}`,
-      connectionCloudTooltip: host => `Hermes Cloud · ${host}`,
+      connectionCloudTooltip: host => `Ordessa Cloud · ${host}`,
       connectionSshTooltip: host => `SSH · ${host}`,
       connectionRemoteTooltip: host => `Remote · ${host}`,
       backendLabel: version => `後端 v${version}`,
@@ -2605,15 +2875,15 @@ export const zhHant = defineLocale({
       openCommandCenter: '開啟命令中心',
       showTerminal: '顯示終端機',
       hideTerminal: '隱藏終端機',
-      gateway: '閘道',
+      gateway: '服務',
       gatewayReady: '就緒',
       gatewayNeedsSetup: '需要設定',
       gatewayUnavailable: '推論不可用',
       gatewayChecking: '檢查中',
       gatewayConnecting: '連線中',
-      gatewayOffline: '離線',
+      gatewayOffline: '未連線',
       gatewayRestarting: '重新啟動中…',
-      gatewayTitle: '閘道',
+      gatewayTitle: '服務',
       agents: '代理',
       closeAgents: '關閉代理',
       openAgents: '開啟代理',
@@ -2722,7 +2992,7 @@ export const zhHant = defineLocale({
     binaryTitle: '這看起來像二進位檔案',
     binaryBody: label => `預覽 ${label} 可能會顯示無法讀取的文字。`,
     largeTitle: '此檔案較大',
-    largeBody: (label, size) => `${label} 大小為 ${size}。Hermes 只會顯示前 512 KB。`,
+    largeBody: (label, size) => `${label} 大小為 ${size}。Ordessa 只會顯示前 512 KB。`,
     previewAnyway: '仍然預覽',
     truncated: '顯示前 512 KB。',
     noInlineTitle: '沒有行內預覽',
@@ -2762,11 +3032,11 @@ export const zhHant = defineLocale({
         '這個位址指向執行代理的那台機器，而不是本機。瀏覽器窗格會在本機載入頁面，因此遠端開發伺服器需要連接埠轉送或可連線的主機名稱。',
       failedToLoad: '預覽載入失敗',
       tryAgain: '重試',
-      restarting: 'Hermes 正在重新啟動...',
-      askRestart: '請 Hermes 重新啟動伺服器',
-      lookingRestart: taskId => `Hermes 正在尋找要重新啟動的預覽伺服器 (${taskId})`,
+      restarting: 'Ordessa 正在重新啟動...',
+      askRestart: '請 Ordessa 重新啟動伺服器',
+      lookingRestart: taskId => `Ordessa 正在尋找要重新啟動的預覽伺服器 (${taskId})`,
       restartingTitle: '正在重新啟動預覽伺服器',
-      restartingMessage: 'Hermes 正在背景執行。可在預覽主控台查看進度。',
+      restartingMessage: 'Ordessa 正在背景執行。可在預覽主控台查看進度。',
       startRestartFailed: message => `無法啟動伺服器重新啟動：${message}`,
       restartFailed: '伺服器重新啟動失敗',
       hideConsole: '隱藏預覽主控台',
@@ -2778,15 +3048,15 @@ export const zhHant = defineLocale({
       reload: '重新載入頁面',
       address: '網址',
       addressPlaceholder: '輸入網址',
-      blankPageBody: '在上方輸入網址開始瀏覽，或請 Hermes 開啟頁面。',
-      finishedRestarting: message => `Hermes 已完成預覽伺服器重新啟動${message ? `：${message}` : ''}`,
+      blankPageBody: '在上方輸入網址開始瀏覽，或請 Ordessa 開啟頁面。',
+      finishedRestarting: message => `Ordessa 已完成預覽伺服器重新啟動${message ? `：${message}` : ''}`,
       failedRestarting: message => `伺服器重新啟動失敗：${message}`,
       unknownError: '未知錯誤',
       restartedTitle: '預覽伺服器已重新啟動',
       reloadingNow: '正在重新載入預覽。',
       restartFailedTitle: '預覽重新啟動失敗',
-      restartFailedMessage: 'Hermes 無法重新啟動伺服器。',
-      stillWorking: 'Hermes 仍在執行，但尚未收到重新啟動結果。伺服器指令可能正在前台執行。',
+      restartFailedMessage: 'Ordessa 無法重新啟動伺服器。',
+      stillWorking: 'Ordessa 仍在執行，但尚未收到重新啟動結果。伺服器指令可能正在前台執行。',
       workspaceReloading: '工作區已變更，正在重新載入預覽',
       fileChanged: url => `檔案已變更，正在重新載入預覽：${url}`,
       filesChanged: (count, url) => `${count} 個檔案變更，正在重新載入預覽：${url}`,
@@ -2871,9 +3141,9 @@ export const zhHant = defineLocale({
 
   assistant: {
     thread: {
-      loadingSession: '正在載入工作階段',
+      loadingSession: '正在載入此工作階段',
       showEarlier: '顯示較早的訊息',
-      loadingResponse: 'Hermes 正在載入回覆',
+      loadingResponse: '正在載入回覆',
       resumeWhenBackgroundDone: count =>
         count === 1 ? '背景工作完成後將自動繼續' : `${count} 個背景工作完成後將自動繼續`,
       thinking: '思考中',
@@ -2927,7 +3197,7 @@ export const zhHant = defineLocale({
       attachingFile: '正在附加…'
     },
     approval: {
-      gatewayDisconnected: 'Hermes 閘道未連線',
+      gatewayDisconnected: 'Pacthold 閘道未連線',
       sendFailed: '無法傳送核准回應',
       run: '執行',
       command: '指令',
@@ -2938,12 +3208,12 @@ export const zhHant = defineLocale({
       reject: '拒絕',
       alwaysTitle: '一律允許此指令？',
       alwaysDescription: pattern =>
-        `這會將「${pattern}」模式加入永久允許清單（~/.hermes/config.yaml）。Hermes 對類似指令將不再詢問，包括目前工作階段和未來工作階段。`,
+        `這會將「${pattern}」模式加入永久允許清單（~/.hermes/config.yaml）。Ordessa 對類似指令將不再詢問，包括目前工作階段和未來工作階段。`,
       alwaysAllow: '一律允許'
     },
     clarify: {
       notReady: '澄清請求尚未就緒',
-      gatewayDisconnected: 'Hermes 閘道未連線',
+      gatewayDisconnected: 'Pacthold 閘道未連線',
       sendFailed: '無法傳送澄清回應',
       loadingQuestion: '正在載入問題…',
       other: '其他（輸入您的答案）',
@@ -3039,14 +3309,14 @@ export const zhHant = defineLocale({
   },
 
   prompts: {
-    gatewayDisconnected: 'Hermes 閘道未連線',
+    gatewayDisconnected: 'Pacthold 閘道未連線',
     sudoSendFailed: '無法傳送 sudo 密碼',
     secretSendFailed: '無法傳送密鑰',
     sudoTitle: '管理員密碼',
-    sudoDesc: 'Hermes 需要您的 sudo 密碼來執行特權指令。它只會傳送給您的本機代理。',
+    sudoDesc: 'Ordessa 需要您的 sudo 密碼來執行特權指令。它只會傳送給您的本機代理。',
     sudoPlaceholder: 'sudo 密碼',
     secretTitle: '需要密鑰',
-    secretDesc: 'Hermes 需要一個憑證才能繼續。',
+    secretDesc: 'Ordessa 需要一個憑證才能繼續。',
     secretPlaceholder: '密鑰值'
   },
 
@@ -3101,8 +3371,8 @@ export const zhHant = defineLocale({
     sessionExportFailed: '無法匯出工作階段',
     imageSaved: '圖片已儲存',
     downloadStarted: '下載已開始',
-    restartToUseSaveImage: '重新啟動 Hermes Desktop 後可使用儲存圖片。',
-    restartToSaveImages: '重新啟動 Hermes Desktop 以儲存圖片',
+    restartToUseSaveImage: '重新啟動 Ordessa 後可使用儲存圖片。',
+    restartToSaveImages: '重新啟動 Ordessa 以儲存圖片',
     imageDownloadFailed: '圖片下載失敗',
     openImage: '開啟圖片',
     downloadImage: '下載圖片',
@@ -3142,10 +3412,10 @@ export const zhHant = defineLocale({
       },
       skills: {
         title: '教一次就夠',
-        text: '技能是一組說明檔，Hermes 會在需要時自行載入。'
+        text: '技能是一組說明檔，Ordessa 會在需要時自行載入。'
       },
       artifacts: {
-        title: 'Hermes 做過的一切',
+        title: 'Ordessa 做過的一切',
         text: '所有工作階段的圖片、檔案與連結，都彙整在這裡。'
       },
       cron: {
@@ -3158,7 +3428,7 @@ export const zhHant = defineLocale({
       },
       profiles: {
         title: '設定檔彼此獨立',
-        text: '每個都是獨立的 Hermes — 自己的金鑰、記憶與工作階段。'
+        text: '每個都是獨立的 Ordessa — 自己的金鑰、記憶與工作階段。'
       },
       'composer-mentions': {
         title: '附件與指令',
@@ -3174,6 +3444,73 @@ export const zhHant = defineLocale({
         text: '檔案、終端機、審閱與內建瀏覽器都在側邊面板裡。'
       }
     }
+  },
+
+  wslWorkspace: {
+    menuOpenFolder: '開啟資料夾',
+    menuOpenRemoteFolder: '開啟遠端資料夾',
+    stepConfig: '設定 WSL',
+    stepBrowse: '選擇目錄',
+    distributionLabel: '發行版',
+    distributionStateRunning: '執行中',
+    distributionStateStopped: '已停止',
+    discovering: '正在探測發行版…',
+    discoverFailed: '無法探測 WSL 發行版。',
+    wslUnavailableDesc: '此機器上 Windows Subsystem for Linux 不可用。',
+    userLabel: 'Linux 使用者',
+    userPlaceholder: '留空則使用發行版預設使用者',
+    connectingDesc: '正在驗證發行版與使用者，過程有界，可取消。',
+    pathLabel: '路徑',
+    goTo: '前往',
+    upOneLevel: '上一層',
+    showHidden: '顯示隱藏目錄',
+    browseUnavailable: 'Ordessa 目錄瀏覽不可用',
+    readOnly: '唯讀',
+    cannotOpen: '無法開啟',
+    kindFile: '檔案',
+    kindOther: '其他',
+    emptyDirectory: '此目錄下沒有子目錄',
+    chooseDirectory: '選擇此目錄',
+    connectionInfo: '連線資訊',
+    reconnect: '重新連線',
+    reconnecting: '正在驗證…',
+    statusValidated: '已驗證',
+    statusUnverified: '未驗證',
+    statusValidating: '正在驗證…',
+    statusFailed: '無法連線',
+    userChangedWarning: user => `發行版預設使用者已變為 ${user}，與儲存時核實的身份不同。`,
+    defaultUserLabel: '發行版預設',
+    verifiedUserLabel: '核實的使用者',
+    rootPathLabel: '目錄',
+    sessionUnavailable: '本輪暫不支援在 WSL 工作區建立工作階段。',
+    wslBadge: 'WSL',
+    // Row management (round 36): rename / remove from the row menu.
+    menuRename: '重新命名…',
+    menuRemove: '從側欄移除',
+    moreActions: '更多動作',
+    removeTitle: name => `移除「${name}」？`,
+    removeDesc: '只移除側欄記錄；目錄中的檔案、會話與歷史都會保留，重新開啟該目錄可再次接入。',
+    renameTitle: name => `重新命名「${name}」`,
+    renameFailed: '工作區重新命名失敗。',
+    toggleExpand: (name, open) => `${open ? '收起' : '展開'}「${name}」`,
+    removeFailed: '工作區移除失敗。',
+    errWslUnavailable: '此機器上 WSL 不可用。',
+    errWslUnknownDistribution: '該發行版不存在，請重新整理後重新選擇。',
+    errWslUserNotFound: '該發行版中不存在此 Linux 使用者。',
+    errWslConnectTimeout: '連線逾時，請檢查發行版後重試。',
+    errWslConnectFailed: '無法連線到該發行版。',
+    errWslCancelled: '已取消。',
+    errWslConnectionExpired: '連線已過期，請重新連線。',
+    errWslInvalidPath: '請輸入絕對 Linux 目錄路徑。',
+    errWslDirectoryNotFound: '該目錄不存在。',
+    errWslDirectoryNoPermission: '所選使用者無權讀取該目錄。',
+    errWslListFailed: '無法列出目錄內容。',
+    errWslListOverflow: '該目錄項目過多，無法列出。',
+    errWslSaveFailed: '儲存工作區失敗。',
+    errWslNotFound: '該工作區已不存在。',
+    errWslStoreFutureVersion: '工作區儲存由更新版本的應用寫入，請先升級應用再操作。',
+    errWslStoreIllegalVersion: '工作區儲存檔案已損壞（版本號無法識別）。未做任何變更；請手動修復或刪除該檔案。',
+    errUnexpected: '發生意外錯誤。'
   },
 
   ui: {

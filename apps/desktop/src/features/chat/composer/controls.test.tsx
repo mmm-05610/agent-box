@@ -7,12 +7,21 @@ import { $hudMode } from '@/store/hud'
 
 import { ComposerControls } from './controls'
 
-vi.mock('./model-pill', () => ({ ModelPill: () => null }))
+vi.mock('./model-pill', () => ({ ModelPill: () => <div data-testid="model-pill" /> }))
 
 const state: ChatBarState = {
   model: { canSwitch: false, model: '', provider: '' },
   tools: { enabled: false, label: '' },
   voice: { active: false, enabled: false }
+}
+
+const profile: NonNullable<ChatBarState['profile']> = {
+  configDescriptor: null,
+  onOverrideChange: vi.fn(),
+  onSelect: vi.fn(),
+  options: [{ displayName: 'Builder', harness: 'agent', id: 'builder', selectable: true }],
+  overrides: [],
+  selectedId: 'builder'
 }
 
 function renderControls(overrides: Partial<React.ComponentProps<typeof ComposerControls>> = {}) {
@@ -105,5 +114,41 @@ describe('ComposerControls shortcut tooltips', () => {
     renderControls({ busy: true, busyAction: 'queue' })
 
     await expectShortcutTooltip('Queue message', 'Ctrl+↵')
+  })
+})
+
+describe('model presentation', () => {
+  it('keeps AgentBox profile controls while hiding the legacy model pill', () => {
+    const { container } = renderControls({ state: { ...state, model: { ...state.model, hidden: true }, profile } })
+
+    expect(screen.queryByTestId('model-pill')).toBeNull()
+    expect(container.querySelector('[data-slot="composer-profile-controls"]')).toBeTruthy()
+  })
+
+  it('keeps the legacy model pill when model presentation is not hidden', () => {
+    renderControls()
+
+    expect(screen.getByTestId('model-pill')).toBeTruthy()
+  })
+})
+
+// The AgentBox row carries the new P08 surfaces: the provider/model selector
+// appears only once the service declares a model slot control, and the context
+// usage pill reads "unknown" until the backend supplies a real fact.
+describe('AgentBox control row additions', () => {
+  it('shows the unknown context usage and no undeclared model selector', () => {
+    const { container } = renderControls({ state: { ...state, model: { ...state.model, hidden: true }, profile } })
+
+    const usage = container.querySelector('[data-slot="composer-context-usage"]')
+
+    expect(usage?.getAttribute('data-context-usage')).toBe('unknown')
+    expect(container.querySelector('[data-slot="composer-model-selector-trigger"]')).toBeNull()
+  })
+
+  it('shows neither addition on a surface without profile state', () => {
+    const { container } = renderControls()
+
+    expect(container.querySelector('[data-slot="composer-context-usage"]')).toBeNull()
+    expect(container.querySelector('[data-slot="composer-model-selector-trigger"]')).toBeNull()
   })
 })

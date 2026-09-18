@@ -145,6 +145,8 @@ export function primaryRuntimeConnectionId(connection: Pick<HermesConnection, 'c
 interface GatewayBootOptions {
   beforeConnectionSwitch: () => void
   handleGatewayEvent: (event: RpcEvent) => void
+  /** Keep the legacy Hermes transport opt-in explicit at product composition. */
+  legacyGatewayAutostart?: boolean
   onConnectionReady: (
     connection: Awaited<ReturnType<NonNullable<typeof window.hermesDesktop>['getConnection']>> | null
   ) => void
@@ -156,6 +158,7 @@ interface GatewayBootOptions {
 export function useGatewayBoot({
   beforeConnectionSwitch,
   handleGatewayEvent,
+  legacyGatewayAutostart = true,
   onConnectionReady,
   onGatewayReady,
   refreshHermesConfig,
@@ -181,6 +184,24 @@ export function useGatewayBoot({
 
   useEffect(() => {
     let cancelled = false
+
+    if (!legacyGatewayAutostart) {
+      // AgentBox owns its service lifecycle. This legacy hook must leave the
+      // renderer usable without even consulting the Hermes bridge.
+      activeGateway()?.close()
+      closeSecondaryGateways()
+      closeLegacySecondaryGateways()
+      setPrimaryGateway(null)
+      setPrimaryGatewayConnection(null)
+      setConnection(null)
+      callbacksRef.current.onConnectionReady(null)
+      callbacksRef.current.onGatewayReady(null)
+      setSessionsLoading(false)
+      completeDesktopBoot()
+
+      return () => void (cancelled = true)
+    }
+
     const desktop = window.hermesDesktop
 
     const publish = (next: HermesConnection | null) => {
@@ -332,7 +353,7 @@ export function useGatewayBoot({
         const conn = await withTimeout(
           desktop.getConnection(),
           RECONNECT_ATTEMPT_TIMEOUT_MS,
-          'Timed out reconnecting to Hermes backend'
+          'Timed out reconnecting to the Pacthold service'
         )
 
         setPrimaryGatewayConnection(conn)
@@ -620,7 +641,7 @@ export function useGatewayBoot({
         const conn = await withTimeout(
           desktop.getConnection(windowProfileOverride() ?? undefined),
           BACKEND_BOOT_WAIT_TIMEOUT_MS,
-          'Timed out reconnecting to Hermes backend'
+          'Timed out reconnecting to the Pacthold service'
         )
 
         if (!ownsSwitch()) {
@@ -1043,7 +1064,7 @@ export function useGatewayBoot({
         const conn = await withTimeout(
           desktop.getConnection(windowProfileOverride() ?? undefined),
           BACKEND_BOOT_WAIT_TIMEOUT_MS,
-          'Timed out connecting to Hermes backend'
+          'Timed out connecting to the Pacthold service'
         )
 
         if (cancelled) {
@@ -1261,5 +1282,5 @@ export function useGatewayBoot({
       setPrimaryGateway(null)
       $gateway.set(null)
     }
-  }, [])
+  }, [legacyGatewayAutostart])
 }

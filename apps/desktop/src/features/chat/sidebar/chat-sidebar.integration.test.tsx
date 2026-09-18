@@ -1,16 +1,22 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { searchSessions } from '@/api/sessions'
 import { type AppView, ROUTES_AREA, SIDEBAR_NAV_AREA } from '@/app/routes'
 import { SidebarProvider } from '@/components/ui/sidebar'
-import { makeSessionInfo } from '@/dev/test/session-info'
+import { makeCwdSession, makeSessionInfo } from '@/dev/test/session-info'
 import { registry } from '@/lib/contributions'
 import { group, split } from '@/lib/pane-tree'
+import { $agentBoxHello, $agentBoxService, $agentBoxSessions } from '@/store/agentbox-service'
+import { $commandPaletteOpen } from '@/store/command-palette'
+import { $pinnedSessionIds, setSidebarShowArchived } from '@/store/layout'
 import { $layoutTree, noteActiveTreeGroup } from '@/store/pane-shell/tree'
-import { $selectedStoredSessionId, $sessions } from '@/store/session'
+import { $gatewayState, $selectedStoredSessionId, $sessions, $sessionsLoading } from '@/store/session'
 import { $removedSessionIds } from '@/store/session-removal'
+import { loadArchivedSessions } from '@/store/sidebar-archive'
+import { asWireId, type ServerHelloResult, type SessionRecord, WIRE_PROTOCOL_VERSION } from '@/types/wire/wire-v1'
 
 import { ChatSidebar } from './index'
 
@@ -18,12 +24,51 @@ const noop = () => {}
 
 const noopAsync = async () => {}
 
+// The sidebar's WSL workspace rows refresh the host projection on mount; the
+// test harness has no Electron bridge, so the api layer is mocked out.
+vi.mock('@/api/sessions', () => ({
+  searchSessions: vi.fn(async () => ({ results: [] }))
+}))
+
+// P05: the AgentBox-authority branch must never call the legacy archive
+// loader. The store's own atoms stay real; only the fetch is observed.
+const loadArchivedSessionsMock = vi.hoisted(() => vi.fn(async () => undefined))
+
+vi.mock('@/store/sidebar-archive', async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  loadArchivedSessions: loadArchivedSessionsMock
+}))
+
+// P05: the AgentBox service is spoken to through the fake wire client — the
+// real refreshAgentBoxSessions seam runs, so the payload is exactly what would
+// cross the wire.
+const agentBoxWireClient = { call: vi.fn() }
+
+vi.mock('@/api/agentbox-runtime-client', () => ({ agentBoxRuntimeClient: () => agentBoxWireClient }))
+
+vi.mock('@/api/workspace', () => ({
+  listWslWorkspaces: vi.fn(async () => ({ ok: true as const, workspaces: [] })),
+  reconnectWslWorkspace: vi.fn(),
+  renameWslWorkspace: vi.fn(),
+  removeWslWorkspace: vi.fn(),
+  saveWslWorkspace: vi.fn(),
+  releaseWslConnection: vi.fn(),
+  connectWsl: vi.fn(),
+  listWslDirectories: vi.fn(),
+  discoverWsl: vi.fn(),
+  cancelWslOperation: vi.fn()
+}))
+
 const sessionRows = [
   makeSessionInfo({ id: 'tile-one', last_active: 2, profile: 'default', started_at: 1, title: 'Tile one' }),
   makeSessionInfo({ id: 'tile-two', last_active: 2, profile: 'default', started_at: 1, title: 'Tile two' })
 ]
 
-const renderSidebar = (pathname: string, currentView: AppView) =>
+const renderSidebar = (
+  pathname: string,
+  currentView: AppView,
+  sessionAuthority: 'agentbox' | 'hermes' = 'hermes'
+) =>
   render(
     <MemoryRouter initialEntries={[pathname]}>
       <SidebarProvider>
@@ -33,12 +78,11 @@ const renderSidebar = (pathname: string, currentView: AppView) =>
           onBranchSession={noop}
           onDeleteSession={noop}
           onLoadMoreSessions={noop}
-          onManageCronJob={noop}
           onNavigate={noop}
           onNewSessionInWorkspace={noop}
           onNewSessionSplit={noop}
           onResumeSession={noop}
-          onTriggerCronJob={noopAsync}
+          sessionAuthority={sessionAuthority}
         />
       </SidebarProvider>
     </MemoryRouter>
@@ -129,21 +173,31 @@ describe('ChatSidebar navigation activity', () => {
       $sessions.set(sessionRows)
     })
 
-    for (const [pathname, currentView, label] of [
-      ['/skills', 'skills', 'Capabilities'],
-      ['/artifacts', 'artifacts', 'Artifacts'],
-      ['/cron', 'cron', 'Scheduled jobs']
-    ] as const) {
-      cleanup()
-      focus('workspace-group')
-      renderSidebar(pathname, currentView)
-      expectOnlyCurrent(label)
-      expectOnlySelectedSession(null)
+    // Round 36: the fixed nav rows are retired — no Capabilities / Artifacts /
+    // Scheduled jobs / global New-session rows in the sidebar, and no Bots tab.
+    // The Profiles management entry rides at the top instead.
+    cleanup()
+    focus('workspace-group')
+    const unified = renderSidebar('/skills', 'skills')
 
-      focus('tile-one-group')
-      expectOnlyCurrent(null)
-      expectOnlySelectedSession('Tile one')
+    // The fixed nav rows are gone by their nav identity (the flat list's "+"
+    // affordance legitimately still offers a session where you are).
+    for (const retired of ['new-session', 'skills', 'artifacts', 'cron']) {
+      expect(unified.container.querySelector(`[data-tour="sidebar-nav-${retired}"]`)).toBeNull()
     }
+
+    expectOnlyCurrent(null)
+
+    focus('tile-one-group')
+    expectOnlySelectedSession('Tile one')
+
+    // The Profiles entry exists and lights up at its own route.
+    expect(screen.getByRole('button', { name: 'Profiles' })).toBeTruthy()
+    cleanup()
+    focus('workspace-group')
+    const profilesView = renderSidebar('/profiles', 'profiles')
+    expectOnlyCurrent('Profiles')
+    expect(profilesView.container.querySelector('[data-tour="sidebar-nav-profiles"]')).toBeTruthy()
 
     cleanup()
     focus('workspace-group')
@@ -158,5 +212,364 @@ describe('ChatSidebar navigation activity', () => {
     expect(screen.queryByRole('button', { name: 'Kanban' })).toBeNull()
     expectOnlyCurrent(null)
     expectOnlySelectedSession(null)
+  })
+})
+
+describe('ChatSidebar unified pinned + search (round 36)', () => {
+  const pinTarget = makeSessionInfo({ id: 'tile-one', last_active: 2, profile: 'default', started_at: 1, title: 'Tile one' })
+
+  const otherRows = [
+    pinTarget,
+    makeCwdSession('/home/maoqh/验收项目', { id: 's-cwd', last_active: 3, profile: 'default', started_at: 1, title: 'Needle one' })
+  ]
+
+  beforeEach(() => {
+    localStorage.clear()
+    $selectedStoredSessionId.set('tile-one')
+    $sessions.set(otherRows)
+    $removedSessionIds.set(new Set())
+    $layoutTree.set(
+      split('row', [group(['workspace'], { active: 'workspace', id: 'workspace-group' })])
+    )
+    noteActiveTreeGroup('workspace-group')
+  })
+
+  afterEach(() => {
+    cleanup()
+    $pinnedSessionIds.set([])
+    $selectedStoredSessionId.set(null)
+    $sessions.set([])
+    $removedSessionIds.set(new Set())
+    $layoutTree.set(null)
+    noteActiveTreeGroup(null)
+  })
+
+  it('hides the pinned section entirely while nothing is pinned', () => {
+    renderSidebar('/', 'chat')
+
+    expect(screen.queryByText('Pinned')).toBeNull()
+    // The sessions are still listed by recency — only the pinned section is gone.
+    expect(screen.getByText('Tile one')).toBeTruthy()
+  })
+
+  it('a pinned row opens the SAME session, and unpinning removes the section', () => {
+    const onResumeSession = vi.fn()
+
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <SidebarProvider>
+          <ChatSidebar
+            currentView="chat"
+            onArchiveSession={noop}
+            onBranchSession={noop}
+            onDeleteSession={noop}
+            onLoadMoreSessions={noop}
+            onNavigate={noop}
+            onNewSessionInWorkspace={noop}
+            onNewSessionSplit={noop}
+            onResumeSession={onResumeSession}
+            sessionAuthority="hermes"
+          />
+        </SidebarProvider>
+      </MemoryRouter>
+    )
+
+    act(() => {
+      $pinnedSessionIds.set(['tile-one'])
+    })
+
+    expect(screen.getByText('Pinned')).toBeTruthy()
+
+    // Clicking the pinned shortcut opens the ORIGINAL session — the row's
+    // resume carries the same stored id, not a copy.
+    fireEvent.click(screen.getByText('Tile one'))
+
+    expect(onResumeSession).toHaveBeenCalledWith('tile-one', expect.anything())
+
+    // Unpinning removes the shortcut; the session itself stays listed.
+    act(() => {
+      $pinnedSessionIds.set([])
+    })
+
+    expect(screen.queryByText('Pinned')).toBeNull()
+    expect(screen.getByText('Tile one')).toBeTruthy()
+  })
+
+  it('search hits keep their workspace attribution', () => {
+    renderSidebar('/', 'chat')
+
+    fireEvent.change(screen.getByPlaceholderText('Search sessions…'), { target: { value: 'needle' } })
+
+    // The card header line is the workspace context: the cwd leaf for a
+    // session not claimed by an explicit project.
+    expect(screen.getByText('验收项目')).toBeTruthy()
+  })
+})
+
+// P05 — under AgentBox authority the sidebar's search and Archived views read
+// the service cache and never the legacy Hermes REST endpoints, in every
+// gateway/service state. The real `refreshAgentBoxSessions` seam runs; only the
+// wire client and the legacy archive loader are observed fakes.
+describe('ChatSidebar AgentBox authority', () => {
+  const agentBoxSession = (overrides: Omit<Partial<SessionRecord>, 'id'> & { id?: string } = {}): SessionRecord => {
+    const { id = 'agentbox-session-1', ...rest } = overrides
+
+    return {
+      archivedAt: null,
+      createdAt: '2026-09-14T00:00:00.000Z',
+      displayName: `AgentBox ${id}`,
+      id: asWireId(id),
+      pinned: false,
+      profileId: null,
+      updatedAt: '2026-09-14T00:00:00.000Z',
+      version: 1,
+      workspaceId: asWireId('workspace-1'),
+      ...rest
+    }
+  }
+
+  const agentBoxHello = (ids: string[] = ['sessions.list']): ServerHelloResult => ({
+    auth: { required: false },
+    capabilities: ids.map(id => ({ id, supported: true })),
+    protocolVersion: WIRE_PROTOCOL_VERSION,
+    serverId: asWireId('server-1')
+  })
+
+  beforeEach(() => {
+    localStorage.clear()
+    vi.mocked(searchSessions).mockClear()
+    loadArchivedSessionsMock.mockClear()
+    agentBoxWireClient.call.mockReset()
+    setSidebarShowArchived(false)
+    $sessionsLoading.set(true)
+    $selectedStoredSessionId.set(null)
+    $sessions.set([])
+    $removedSessionIds.set(new Set())
+    $layoutTree.set(null)
+    $agentBoxService.set({ detail: null, phase: 'ready' })
+    $agentBoxHello.set(agentBoxHello())
+    $agentBoxSessions.set({})
+  })
+
+  afterEach(() => {
+    cleanup()
+    setSidebarShowArchived(false)
+    $gatewayState.set('idle')
+    $sessionsLoading.set(false)
+    $selectedStoredSessionId.set(null)
+    $sessions.set([])
+    $agentBoxService.set({ detail: null, phase: 'idle' })
+    $agentBoxHello.set(null)
+    $agentBoxSessions.set({})
+  })
+
+  it('search reads the service cache: zero legacy search calls, even after the debounce window', async () => {
+    $sessions.set([
+      makeSessionInfo({ id: 'legacy-1', last_active: 2, profile: 'default', started_at: 1, title: 'needle legacy' })
+    ])
+    $agentBoxSessions.set({
+      'agentbox-live': agentBoxSession({ displayName: 'Needle service', id: 'agentbox-live' })
+    })
+
+    renderSidebar('/', 'chat', 'agentbox')
+
+    fireEvent.change(screen.getByPlaceholderText('Search sessions…'), { target: { value: 'NEEDLE' } })
+
+    // The service record matches locally (displayName, case-insensitive)…
+    expect(screen.getByText('Needle service')).toBeTruthy()
+    // …and the legacy row that would have matched never enters the result set.
+    expect(screen.queryByText('needle legacy')).toBeNull()
+
+    // No gateway transition can re-enable the legacy endpoint: authority alone
+    // decides the data source.
+    act(() => {
+      $gatewayState.set('closed')
+      $gatewayState.set('open')
+    })
+
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 250))
+    })
+
+    expect(searchSessions).not.toHaveBeenCalled()
+  })
+
+  it('archived reads sessions.list(includeArchived) once and never the legacy loader', async () => {
+    agentBoxWireClient.call.mockResolvedValue({
+      items: [
+        agentBoxSession({ archivedAt: '2026-09-01T00:00:00.000Z', displayName: 'Archived one', id: 'ab-archived' }),
+        agentBoxSession({ displayName: 'Active one', id: 'ab-active' })
+      ]
+    })
+
+    renderSidebar('/', 'chat', 'agentbox')
+
+    act(() => setSidebarShowArchived(true))
+
+    await waitFor(() => expect(screen.getByText('Archived one')).toBeTruthy())
+
+    expect(screen.queryByText('Active one')).toBeNull()
+    expect(loadArchivedSessions).not.toHaveBeenCalled()
+    expect(agentBoxWireClient.call).toHaveBeenCalledTimes(1)
+    expect(agentBoxWireClient.call).toHaveBeenCalledWith('sessions.list', { includeArchived: true })
+  })
+
+  it('sends no archived request when the service cannot answer, and never fakes an empty list', () => {
+    $agentBoxHello.set(agentBoxHello(['sessions.update']))
+
+    const { container } = renderSidebar('/', 'chat', 'agentbox')
+
+    act(() => setSidebarShowArchived(true))
+
+    expect(agentBoxWireClient.call).not.toHaveBeenCalled()
+    expect(loadArchivedSessions).not.toHaveBeenCalled()
+    // Named as unsupported — not as "nothing archived".
+    expect(container.querySelector('[data-agentbox-global-unsupported]')).not.toBeNull()
+    expect(container.querySelector('[data-agentbox-global-empty]')).toBeNull()
+  })
+
+  it('a service failure shows the real reason and keeps the cached archived rows', async () => {
+    $agentBoxSessions.set({
+      'ab-cached': agentBoxSession({
+        archivedAt: '2026-09-01T00:00:00.000Z',
+        displayName: 'Cached archive',
+        id: 'ab-cached'
+      })
+    })
+    agentBoxWireClient.call.mockRejectedValue(new Error('connect ECONNREFUSED 127.0.0.1:8732'))
+
+    const { container } = renderSidebar('/', 'chat', 'agentbox')
+
+    act(() => setSidebarShowArchived(true))
+
+    await waitFor(() => expect(container.querySelector('[data-agentbox-global-error]')).not.toBeNull())
+
+    // The cached row survives the failure…
+    expect(screen.getByText('Cached archive')).toBeTruthy()
+    // …and the failure is the service's own reason, never "no results".
+    expect(container.querySelector('[data-agentbox-global-empty]')).toBeNull()
+    expect(screen.getByText('connect ECONNREFUSED 127.0.0.1:8732')).toBeTruthy()
+    expect(loadArchivedSessions).not.toHaveBeenCalled()
+  })
+})
+
+// The sidebar mounts the filter menu in two headers (the workspace root header
+// and the flat-list header). Both take the sidebar's own authority, so the
+// legacy profile-share row is absent from whichever one is on screen — and a
+// gateway-state flip cannot bring it back, because the authority never reads
+// that state.
+describe('ChatSidebar filter menu authority', () => {
+  const selectPaths = vi.fn()
+
+  beforeEach(() => {
+    $selectedStoredSessionId.set('tile-one')
+    $sessions.set(sessionRows)
+    $removedSessionIds.set(new Set())
+    Object.assign(window, { hermesDesktop: { selectPaths } })
+    selectPaths.mockClear()
+  })
+
+  afterEach(() => {
+    cleanup()
+    $selectedStoredSessionId.set(null)
+    $sessions.set([])
+    $removedSessionIds.set(new Set())
+    $gatewayState.set('idle')
+  })
+
+  /** Open the filter menu that is on screen, then its Profile submenu, and
+   *  return whether the submenu really opened (its `New profile` row is the
+   *  proof — without it, "no Import row" would pass for the wrong reason). */
+  const openFilterMenu = () => {
+    const trigger = screen.getAllByRole('button', { name: 'Filters' })[0]!
+
+    fireEvent.pointerDown(trigger, { button: 0, pointerType: 'mouse' })
+    fireEvent.pointerUp(trigger, { button: 0, pointerType: 'mouse' })
+    fireEvent.click(trigger)
+    fireEvent.click(screen.getByText('Profile'))
+
+    return Boolean(screen.queryByText('New profile'))
+  }
+
+  it('offers no legacy profile import under AgentBox authority, gateway state included', () => {
+    renderSidebar('/', 'chat', 'agentbox')
+
+    expect(openFilterMenu()).toBe(true)
+    expect(screen.queryByText('Import profile…')).toBeNull()
+    expect(selectPaths).not.toHaveBeenCalled()
+
+    // The sidebar re-renders on this flip; the authority must not. Whatever
+    // body the gateway state mounts, the legacy row is not in it and nothing
+    // reached the flow.
+    act(() => $gatewayState.set('open'))
+
+    expect(screen.queryAllByText('Import profile…')).toEqual([])
+    expect(selectPaths).not.toHaveBeenCalled()
+  })
+
+  it('keeps the legacy profile import under Hermes authority', () => {
+    renderSidebar('/', 'chat', 'hermes')
+
+    expect(openFilterMenu()).toBe(true)
+    expect(screen.getByText('Import profile…')).toBeTruthy()
+  })
+})
+
+// P10: the product action area. Two doors, both existing paths — the
+// new-session route and the command palette — and neither in the legacy
+// authority, which owns its own chrome.
+describe('AgentBox sidebar action area', () => {
+  const renderAgentBoxSidebar = (onNewSessionInWorkspace: () => void) =>
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <SidebarProvider>
+          <ChatSidebar
+            currentView="chat"
+            onArchiveSession={noop}
+            onBranchSession={noop}
+            onDeleteSession={noop}
+            onLoadMoreSessions={noop}
+            onNavigate={noop}
+            onNewSessionInWorkspace={onNewSessionInWorkspace}
+            onNewSessionSplit={noop}
+            onResumeSession={noop}
+            sessionAuthority="agentbox"
+          />
+        </SidebarProvider>
+      </MemoryRouter>
+    )
+
+  it('offers New task and Search, wired to the existing paths', () => {
+    const onNewSessionInWorkspace = vi.fn()
+    // The action area lives with the session sections: seed one service record
+    // so the sidebar is in its session mode, not the blank state.
+    $agentBoxSessions.set({
+      'agentbox-action': {
+        archivedAt: null,
+        createdAt: '2026-09-14T00:00:00.000Z',
+        displayName: 'AgentBox action row',
+        id: asWireId('agentbox-action'),
+        pinned: false,
+        profileId: null,
+        updatedAt: '2026-09-14T00:00:00.000Z',
+        version: 1,
+        workspaceId: asWireId('workspace-1')
+      }
+    })
+    renderAgentBoxSidebar(onNewSessionInWorkspace)
+
+    fireEvent.click(screen.getByRole('button', { name: 'New task' }))
+    expect(onNewSessionInWorkspace).toHaveBeenCalledWith(null)
+
+    $commandPaletteOpen.set(false)
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }))
+    expect($commandPaletteOpen.get()).toBe(true)
+  })
+
+  it('keeps the action area out of the legacy authority', () => {
+    $sessions.set([makeSessionInfo({ id: 'legacy-1', last_active: 2, profile: 'default', started_at: 1, title: 'legacy' })])
+    renderSidebar('/', 'chat', 'hermes')
+
+    expect(screen.queryByRole('button', { name: 'New task' })).toBeNull()
   })
 })

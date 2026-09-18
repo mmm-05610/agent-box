@@ -24,6 +24,10 @@ import { ChatRoutesSurface, SidebarSurface, StatusbarSurface, TerminalSurface } 
 import { ContribWiringContext } from '@/app/composition/root/context'
 import { useOverlayRouting } from '@/app/composition/routing/overlay-routing'
 import {
+  archiveRoutedAgentBoxSession,
+  toggleRoutedAgentBoxSessionPin
+} from '@/app/composition/wiring/agentbox-session-commands'
+import {
   CRON_ROUTE,
   navigateToWorkspacePage,
   routeSessionId,
@@ -33,10 +37,11 @@ import {
 } from '@/app/routes'
 import { TitlebarControls } from '@/app/shell/chrome/titlebar/controls'
 import { useWindowControlsOverlayWidth } from '@/app/shell/platform/use-window-controls-overlay-width'
-import { useHermesConfigRecord } from '@/application/config/use-config-record'
+import { $resumeLastSession, hydrateResumeLastSession } from '@/application/desktop-preferences/resume-last-session'
+import { hydrateTerminalFontFamilyPreference } from '@/application/desktop-preferences/terminal-font-preference'
 import { refreshActiveProfile } from '@/application/profile/catalog'
 import { getLatestSessionMessages } from '@/application/session-transcripts'
-import { mainChatOccupied, openSession } from '@/application/session/open-session'
+import { openSession } from '@/application/session/open-session'
 import { createSessionRpcDispatcher } from '@/application/session/session-rpc-dispatcher'
 import { useSessionHandback } from '@/application/session/window-handoff'
 import { closeAllTerminals } from '@/application/terminal/terminals'
@@ -59,7 +64,6 @@ import { TipHost } from '@/components/tips'
 import { emitGatewayEvent } from '@/extension/contrib/events'
 import { closeWorkspaceTab } from '@/features/chat/close-tab'
 import { $restartPreviewServer } from '@/features/chat/right-rail/restart-preview-server'
-import { triggerAndRefreshCronJobs } from '@/features/cron/cron-actions'
 import { PetGenerateOverlay } from '@/features/pet-generate/pet-generate-overlay'
 import { ModelPickerOverlay } from '@/features/profiles/model-picker-overlay'
 import { ModelVisibilityOverlay } from '@/features/profiles/model-visibility-overlay'
@@ -91,8 +95,8 @@ import {
 import { useSessionTileDelegate } from '@/features/session/tiles/use-session-tile-delegate'
 import { startWorkspaceSession } from '@/features/session/workspace-session-target'
 import { PluginInstallModal } from '@/features/settings/plugin-install-modal'
-import { McpInstallDeepLinkDialog } from '@/features/skills/mcp-install-deeplink-dialog'
 import { UpdatesOverlay } from '@/features/updates/updates-overlay'
+import { useI18n } from '@/i18n'
 import { type ChatMessage, chatMessageText, preserveLocalAssistantErrors, toChatMessages } from '@/lib/chat-messages'
 import { formatRefValue } from '@/lib/format-ref-value'
 import {
@@ -105,8 +109,9 @@ import { latestSessionTodos } from '@/lib/todos'
 import { $billingSettingsRequest } from '@/store/billing-block'
 import { $desktopBoot } from '@/store/boot'
 import { $activeConnectionId } from '@/store/connections'
-import { $cronReviewRequest, setCronFocusJobId } from '@/store/cron'
+import { $cronReviewRequest } from '@/store/cron'
 import { $pinnedSessionIds, pinSession, restoreWorktree, unpinSession } from '@/store/layout'
+import { notifyError } from '@/store/notifications'
 import { $newSessionTabAction, registerPaneCloser } from '@/store/pane-shell/tree'
 import {
   $workspaceMode,
@@ -115,7 +120,7 @@ import {
   setWorkspaceScope
 } from '@/store/pane-shell/workspace-scope'
 import { $previewTarget } from '@/store/preview'
-import { $activeGatewayProfile, $freshSessionRequest, $profileScope, ALL_PROFILES, normalizeProfileKey } from '@/store/profile'
+import { $activeGatewayProfile, $freshSessionRequest, $profileScope, normalizeProfileKey } from '@/store/profile'
 import { $newProjectSessionRequest, $startWorkSessionRequest, followActiveSessionCwd } from '@/store/projects'
 import {
   $activeSessionId,
@@ -141,25 +146,43 @@ import {
 import { clearSessionTodos, setSessionTodos, todosForHydration } from '@/store/todos'
 import { isAuxiliaryWindow, isBrowserWindow, isHudWindow } from '@/store/windows'
 
+import { applyProductRuntimePolicy } from '../product-runtime'
+
 import type { WiringActions, WiringApi } from './types'
+
+// This is the AgentBox product composition root, so the product runtime policy
+// is applied here — at import time, before any mounted surface can issue a
+// request — exactly as main.ts derives its own gate from the same runtime.
+// The product serves no legacy Hermes REST surface, so the composition must
+// not mount its callers either: the cold-start restore decision comes from
+// product-runtime.ts (never `GET /api/config`), and the MCP legacy health
+// checker is not started under the agentbox authority (desktop-integrations).
+applyProductRuntimePolicy()
+
+// The product's Desktop-local preferences are read once here — at the
+// composition root, before any surface can mount — so the terminal gets the
+// stored font on its first paint and the cold-start restore latch below reads
+// the same authority the Appearance switch writes. Both reads are synchronous
+// and side-effect-free beyond their atoms.
+hydrateResumeLastSession()
+hydrateTerminalFontFamilyPreference()
 
 // Overlay views the controller mounts over the shell — lazy, load on demand.
 // The workspace-route full-page views (skills/artifacts) are the
 // ChatRoutesSurface's and live in ./surfaces.
-const AgentsView = lazy(async () => ({ default: (await import('@/features/agents')).AgentsView }))
 const CommandCenterView = lazy(async () => ({ default: (await import('@/features/command-center')).CommandCenterView }))
-const CronView = lazy(async () => ({ default: (await import('@/features/cron')).CronView }))
-const WebhooksView = lazy(async () => ({ default: (await import('@/features/webhooks')).WebhooksView }))
 const ProfilesView = lazy(async () => ({ default: (await import('@/features/profiles')).ProfilesView }))
 const SettingsView = lazy(async () => ({ default: (await import('@/features/settings')).SettingsView }))
-const StarmapView = lazy(async () => ({ default: (await import('@/features/starmap')).StarmapView }))
 
-// The boot-failure overlay embeds the real Settings → Gateway panel in its
-// recovery surface; the host hands it over as a prop so the overlay never
-// imports an app screen and the code-split lives here with the other views.
-const GatewaySettingsView = lazy(async () => ({
-  default: (await import('@/features/settings/gateway-settings')).GatewaySettings
-}))
+// Agents / Cron / Webhooks / Starmap are deliberately NOT code-split here. This
+// is the AgentBox product controller, and those views read the legacy Hermes
+// REST plane. Their routes land on the honest "not available" product page
+// instead (see ChatRoutesSurface's route table), and nothing offers an entry.
+//
+// The boot-failure overlay likewise gets no gateway/connection panel: that panel
+// is legacy Hermes connection management, and its "Test connection" button dials
+// `hermes:connections:test`, which can start the runtime. The overlay renders the
+// action only when a panel is handed in, so passing nothing removes the path.
 
 // Surfaces (the four wired panes), the render context + WiredPane, and the
 // WiringActions/WiringApi contracts all live in sibling modules — this file is
@@ -167,6 +190,7 @@ const GatewaySettingsView = lazy(async () => ({
 export { WiredPane } from '@/app/composition/root/context'
 
 export function ContribWiring({ children }: { children: ReactNode }) {
+  const { t } = useI18n()
   const queryClient = useQueryClient()
   const location = useLocation()
   const navigate = useNavigate()
@@ -548,20 +572,12 @@ export function ContribWiring({ children }: { children: ReactNode }) {
   // workspace; an explicit worktree path also drills the sidebar into that
   // project so the new lane is visible.
   //
-  // `openTab` is the sidebar "+" behavior: once a chat is loaded, stack a new
-  // tab instead of replacing it (see mainChatOccupied). The composer's
-  // "branch off into a new worktree" flow keeps the fresh-draft path — it
-  // prefills the MAIN composer right after, so it has to own that surface.
+  // Workspace selection always takes the existing product surface to a local
+  // draft. It must never spend a backend Session merely because main already
+  // displays history; the first Send is the creation boundary.
   const startSessionInWorkspace = useCallback(
-    (path: null | string, options?: { openTab?: boolean }) => {
+    (path: null | string) => {
       setWorkspaceScope('sessions')
-
-      if (options?.openTab && mainChatOccupied(activeSessionIdRef.current, $selectedStoredSessionId.get())) {
-        void openNewSessionTile('center', { cwd: path, listed: false })
-
-        return
-      }
-
       startWorkspaceSession({
         activeSessionIdRef,
         followActiveSessionCwd,
@@ -571,7 +587,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
         startFreshSessionDraft
       })
     },
-    [activeSessionIdRef, openNewSessionTile, requestGateway, startFreshSessionDraft]
+    [activeSessionIdRef, requestGateway, startFreshSessionDraft]
   )
 
   // Composer "branch off into a new worktree": open a fresh session anchored
@@ -586,7 +602,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     }
 
     lastStartWorkTokenRef.current = startWorkSessionRequest.token
-    startSessionInWorkspace(startWorkSessionRequest.path, { openTab: startWorkSessionRequest.openTab })
+    startSessionInWorkspace(startWorkSessionRequest.path)
 
     if (startWorkSessionRequest.draft) {
       requestComposerInsert(startWorkSessionRequest.draft, { target: 'main' })
@@ -778,6 +794,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
       closeAllTerminals()
     },
     handleGatewayEvent: handleGatewayEventWithPlugins,
+    legacyGatewayAutostart: false,
     onConnectionReady: c => {
       connectionRef.current = c
     },
@@ -811,17 +828,18 @@ export function ContribWiring({ children }: { children: ReactNode }) {
   // remembered-session restore, and cross-window session-list sync.
   const previewTarget = useStore($previewTarget)
 
-  // display.resume_last_session gates the cold-start restore. `undefined` while
-  // the record is still loading holds the restore latch open; a failed fetch
-  // falls back to the historical behavior (resume).
-  const configRecord = useHermesConfigRecord()
-
-  const resumeLastSession = configRecord.isPending
-    ? undefined
-    : (configRecord.data?.display as { resume_last_session?: unknown } | undefined)?.resume_last_session !== false
+  // Cold-start restore is a Desktop-local preference (hydrated from storage at
+  // this module's import), not a setting read back from the legacy Hermes
+  // config record and not a hardcoded constant: the Appearance page writes the
+  // same `$resumeLastSession` atom. The value is definite — never `undefined` —
+  // so the restore resolves at cold start without waiting for any backend.
+  const resumeLastSession = useStore($resumeLastSession)
 
   useDesktopIntegrations({
     activeProfile: normalizeProfileKey(activeGatewayProfile),
+    // Explicit product authority: it alone decides which host integrations
+    // exist. Under agentbox the MCP legacy health checker is never installed.
+    authority: 'agentbox',
     chatOpen,
     hasPreview: Boolean(previewTarget),
     locationPathname: location.pathname,
@@ -836,8 +854,29 @@ export function ContribWiring({ children }: { children: ReactNode }) {
   })
 
   // Pin/unpin the selected session (statusbar keybind + chat header) — pinned
-  // on the durable lineage-root id so it survives auto-compression.
+  // on the durable lineage-root id so it survives auto-compression. On an
+  // AgentBox session route the service record is the authority and the flip
+  // rides `sessions.update` CAS instead of the renderer-local pin store; the
+  // narrow command module keeps that decision independently testable.
   const toggleSelectedPin = useCallback(() => {
+    const routed = toggleRoutedAgentBoxSessionPin(location.pathname)
+
+    if (routed) {
+      // The service's reason surfaces exactly like the sidebar row's does —
+      // the old pinned state stands (nothing was written locally).
+      void routed.promise.catch(error =>
+        notifyError(error, routed.pinned ? t.sidebar.agentBoxSession.pinFailed : t.sidebar.agentBoxSession.unpinFailed)
+      )
+
+      return
+    }
+
+    if (routeSessionId(location.pathname)) {
+      // A session route the service cannot prove (no record, no service, no
+      // declared capability) fails closed — no wire call, no legacy pin.
+      return
+    }
+
     const sessionId = $selectedStoredSessionId.get()
 
     if (!sessionId) {
@@ -852,7 +891,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     } else {
       pinSession(pinId)
     }
-  }, [])
+  }, [location.pathname, t])
 
   // The tab-strip "+" and ⌘T share one action: open a new session as its own
   // tab (stacked into the workspace zone) WITHOUT polluting the session list.
@@ -887,8 +926,30 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     void openNewSessionTile('center', { listed: false })
   }, [openNewSessionTile])
 
-  // Archive the selected session (rebindable `session.archive` hotkey).
+  // Archive the selected session (rebindable `session.archive` hotkey). On an
+  // AgentBox session route the service record is the authority and the archive
+  // rides `sessions.archive` CAS; the narrow command module keeps that decision
+  // independently testable. The open route, its history and any running turn
+  // are left exactly as they are — archiving hides the row from the sidebar,
+  // it does not close what the user is reading.
   const archiveSelectedSession = useCallback(() => {
+    const routed = archiveRoutedAgentBoxSession(location.pathname)
+
+    if (routed) {
+      // The service's reason surfaces exactly like the sidebar's does — no
+      // local mutation happened, so nothing on screen has to roll back.
+      void routed.promise.catch(error => notifyError(error, t.sidebar.agentBoxSession.archiveFailed))
+
+      return
+    }
+
+    if (routeSessionId(location.pathname)) {
+      // A session route the service cannot prove (no record, no service, no
+      // declared capability, or an already archived record) fails closed — no
+      // wire call, and never the same-id legacy session.
+      return
+    }
+
     const sessionId = $selectedStoredSessionId.get()
 
     if (!sessionId) {
@@ -896,7 +957,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     }
 
     void archiveSession(sessionId)
-  }, [archiveSession])
+  }, [archiveSession, location.pathname, t])
 
   // Single global listener for every rebindable hotkey plus the on-screen
   // keybind editor's capture mode (same as DesktopController).
@@ -953,12 +1014,8 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     onDismissError: dismissError,
     onEdit: editMessage,
     onLoadMoreSessions: loadMoreSessions,
-    onManageCronJob: jobId => {
-      setCronFocusJobId(jobId)
-      navigate(CRON_ROUTE)
-    },
     onNavigate: selectSidebarItem,
-    onNewSessionInWorkspace: path => startSessionInWorkspace(path, { openTab: true }),
+    onNewSessionInWorkspace: path => startSessionInWorkspace(path),
     onNewSessionSplit: (dir, opts) =>
       void openNewSessionTile(dir, {
         ...opts,
@@ -1003,10 +1060,6 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     onSubmit: submitText,
     onThreadMessagesChange: handleThreadMessagesChange,
     onToggleSelectedPin: toggleSelectedPin,
-    onTriggerCronJob: jobId =>
-      triggerAndRefreshCronJobs(jobId, profileScope === ALL_PROFILES ? 'all' : profileScope)
-        .then(() => undefined)
-        .catch(() => undefined),
     getGateway: () => gatewayRef.current,
     openAgents,
     openCommandCenterSection,
@@ -1154,20 +1207,20 @@ export function ContribWiring({ children }: { children: ReactNode }) {
         profile={activeGatewayProfile}
       />
       <UpdatesOverlay />
-      <GatewayConnectingOverlay />
-      <BootFailureOverlay GatewaySettingsView={GatewaySettingsView} />
+      <GatewayConnectingOverlay authority="agentbox" />
+      <BootFailureOverlay onboardingEnabled={gatewayState === 'open'} />
       <CommandPalette />
       <PluginInstallModal />
       <PetGenerateOverlay />
       <SessionSwitcher />
       <FileActionDialogs />
-      <McpInstallDeepLinkDialog />
       <RemoteFolderPicker />
       <FindBar />
 
       {settingsOpen && (
         <Suspense fallback={null}>
           <SettingsView
+            authority="agentbox"
             gateway={gateway}
             onClose={closeOverlayToPreviousRoute}
             onConfigSaved={() => {
@@ -1198,7 +1251,12 @@ export function ContribWiring({ children }: { children: ReactNode }) {
 
       {commandCenterOpen && (
         <Suspense fallback={null}>
+          {/* The AgentBox product shell names its session authority explicitly —
+              never inferred from gateway state, errors or cache contents — so an
+              agentbox Command Center reads the service cache and cannot mount
+              or call the legacy Hermes system/usage/maintenance panels. */}
           <CommandCenterView
+            authority="agentbox"
             initialSection={commandCenterInitialSection}
             onClose={closeOverlayToPreviousRoute}
             onDeleteSession={removeSession}
@@ -1208,36 +1266,9 @@ export function ContribWiring({ children }: { children: ReactNode }) {
         </Suspense>
       )}
 
-      {agentsOpen && (
-        <Suspense fallback={null}>
-          <AgentsView onClose={closeOverlayToPreviousRoute} />
-        </Suspense>
-      )}
-
-      {cronOpen && (
-        <Suspense fallback={null}>
-          <CronView
-            onClose={closeOverlayToPreviousRoute}
-            onOpenSession={sessionId => openSession(sessionId, navigate)}
-          />
-        </Suspense>
-      )}
-
-      {webhooksOpen && (
-        <Suspense fallback={null}>
-          <WebhooksView onClose={closeOverlayToPreviousRoute} />
-        </Suspense>
-      )}
-
       {profilesOpen && (
         <Suspense fallback={null}>
           <ProfilesView onClose={closeOverlayToPreviousRoute} />
-        </Suspense>
-      )}
-
-      {starmapOpen && (
-        <Suspense fallback={null}>
-          <StarmapView onClose={closeOverlayToPreviousRoute} />
         </Suspense>
       )}
 

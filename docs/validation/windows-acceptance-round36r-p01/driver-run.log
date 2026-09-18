@@ -1,0 +1,33 @@
+PASS  app opens  window title: Hermes
+PASS  isolated app identity  exe=C:\Users\maoqh\agentbox-wsl-round1\apps\desktop\node_modules\electron\dist\electron.exe (electron=true, in-worktree=true); userData isolated=true; name=Hermes (productName match=true; HERMES_DESKTOP_APP_NAME is a label-only override, app.setName is never called); build=0.17.2 (match=true)
+PASS  single-instance blocks reuse  second instance failed to start: Error: electron.launch: Process failed to launch!
+Call log:
+[2m  - <launching> "C:\Users\maoqh\agentbox-wsl-round1\apps; original window still live (readyState=complete, title="Hermes")
+PASS  backend this run drives  no gate (saved connection); boot log: remote backend http://127.0.0.1:9127 ready
+PASS  unified sidebar  Capabilities:gone, Artifacts:gone, Scheduled jobs:gone, BotsTab:gone; profilesEntry=true; settingsEntry=true
+PASS  add menu entries  open-folder=1, open-remote=1 (no naming page behind the menu)
+PASS  wizard opens on config (no method page)  distribution select visible on the first page
+PASS  connect → browse on one page  directory browser visible, no separate connecting page
+PASS  WSL open lands on the real directory  host record wsl_ws_c14cbd1903ef0342 rootPath=/home/maoqh/wsl-round1-验收 目录
+PASS  WSL save registers exactly one desktop-side record; row lives at [data-workspace-list]  list={"localIds":["p_a7cdbae7","p_57a756fd"],"wslIds":["wsl_ws_c14cbd1903ef0342"]}; host records=[{"id":"wsl_ws_c14cbd1903ef0342","name":"wsl-round1-验收 目录","archivedAt":null}]; backend-known local rows=2 (reported, not judged)
+PASS  WSL main row selects the workspace  data-workspace-row-selected=wsl_ws_c14cbd1903ef0342
+PASS  WSL row expands to the honest unavailable prompt  prompt visible=true; text="Sessions in WSL workspaces are not part of this round yet."; session starters on the row=0
+PENDING  local open (Windows real path)  Windows-local real open unsupported against this WSL-only backend: the picker never asked for the OS dialog (osDialogCalls=0, dialog="Choose remote folderBrowse folders on the connected backend."), so a Windows-local directory cannot enter the flow — no local-acceptance-r36r-mu0324qz row was created
+SKIP  local-row dependent steps  copy-path/entered-project/local-hide steps require a successfully opened local row (this run: PENDING); behavior tests cover them
+PASS  rename persists under the SAME id  row shows the new name; host record=[{"id":"wsl_ws_c14cbd1903ef0342","name":"round36R-验收","archivedAt":null}]
+PASS  second WSL workspace saved  host records=[{"id":"wsl_ws_5400c02cc90bdf3c","name":"子目录","archivedAt":null},{"id":"wsl_ws_c14cbd1903ef0342","name":"round36R-验收","archivedAt":null}]
+PASS  opening info is NOT selecting  A selectedCount=1, B selectedCount=0 while B's info dialog is open (A must be exactly 1, B exactly 0)
+PASS  archive keeps the record, drops only the row  rows before=[wsl_ws_5400c02cc90bdf3c,wsl_ws_c14cbd1903ef0342] after=[wsl_ws_c14cbd1903ef0342]; host=[{"id":"wsl_ws_5400c02cc90bdf3c","name":"子目录","archivedAt":1789320279628},{"id":"wsl_ws_c14cbd1903ef0342","name":"round36R-验收","archivedAt":null}]; dir still on disk=true
+PASS  reopen restores the ORIGINAL record (same id, archive cleared)  restored={"id":"wsl_ws_5400c02cc90bdf3c","name":"子目录","kind":"wsl","distribution":"Ubuntu","configuredUser":null,"actualUser":"maoqh","rootPath":"/home/maoqh/wsl-round1-验收 目录/子目录","createdAt":1789320271122,"updatedAt":1789320287352,"archivedAt":null}; expected id=wsl_ws_5400c02cc90bdf3c
+PASS  empty-workspace search reaches the workspace by name  hit for round36R-验收: true
+PASS  clearing search restores the selection  selection=wsl_ws_c14cbd1903ef0342 present after clear
+PASS  WSL row keeps its name readable (default layout)  name=107px of "round36R-验收" (text needs 107px, label=147px, row=213px); trailing strip (caret only)=20px (must be ≤24), overlay width=72px out of flow, overlay opacity=0 while idle
+PASS  hidden actions reveal on row hover and keep the name readable  hover: overlay opacity=1, width=72px, name still 107px
+PASS  actions yield the name back when the pointer leaves  after leave: overlay opacity=0 (must be 0)
+PASS  WSL row keeps its name readable (narrow layout)  narrow: name=107px of "round36R-验收" (text needs 107px, row=213px); trailing strip (caret only)=20px (must be ≤24), overlay opacity=0
+PASS  keyboard selects the workspace (Enter on the main row)  selected=true
+PASS  keyboard focus reveals the hidden actions (focus-within)  focused kebab: overlay opacity=1 (must be 1)
+SKIP  pinned sessions on the real machine  no real session exists in the isolated provider-less sandbox and no model request is allowed; pin/unpin behavior tests cover the row contract
+PASS  reopen: renamed workspace restored under its id  row visible=true; list={"localIds":["p_a7cdbae7","p_57a756fd"],"wslIds":["wsl_ws_c14cbd1903ef0342","wsl_ws_5400c02cc90bdf3c"]}
+PASS  reopen: reconnect re-verifies  connection info reports the verified identity at /home/maoqh/wsl-round1-验收 目录 (dialog shows the real rootPath=true)
+ACCEPTANCE: executed 27 → allOk=true; counts={"PASS":27,"FAIL":0,"SKIP":2,"PENDING":1} (allOk covers executed steps only)

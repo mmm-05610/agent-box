@@ -1,5 +1,7 @@
 import { contextBridge, ipcRenderer, webFrame, webUtils } from 'electron'
 
+let nextWireSubscriptionId = 0
+
 // Which translucency the OS can back. Asked synchronously because the renderer
 // needs it before its first paint, and answered by main because deciding it
 // needs `os.release()` — a sandboxed preload may only require electron, events,
@@ -11,6 +13,39 @@ const translucencySupport = ipcRenderer.sendSync('hermes:translucency:support')
 const hudWindowing = ipcRenderer.sendSync('hermes:hud:windowing')
 const hudNativeDrag = hudWindowing?.nativeDrag === true
 const launchFlags = ipcRenderer.sendSync('hermes:launch-flags')
+
+contextBridge.exposeInMainWorld('agentBoxDesktop', {
+  // A sibling of `wire`, not a member of it: these two answer different
+  // questions, and the credentials one must stay reachable when the wire is not
+  // (the surface that adds a credential is the same surface that shows why a
+  // service is unavailable).
+  credentials: {
+    // The secret the user types passes through to the main process and is not
+    // kept here; what comes back is the record (id, label, kind).
+    add: request => ipcRenderer.invoke('agentbox:credentials:add', request),
+    list: () => ipcRenderer.invoke('agentbox:credentials:list')
+  },
+  wire: {
+    request: request => ipcRenderer.invoke('agentbox:wire:request', request),
+    subscribeEvents: ({ sessionId, cursor }, callback) => {
+      const subscriptionId = `renderer-${++nextWireSubscriptionId}`
+
+      const listener = (_event, payload) => {
+        if (payload && typeof payload === 'object' && payload.subscriptionId === subscriptionId) {
+          callback(payload.frame)
+        }
+      }
+
+      ipcRenderer.on('agentbox:wire:event', listener)
+      ipcRenderer.send('agentbox:wire:events:subscribe', { cursor, sessionId, subscriptionId })
+
+      return () => {
+        ipcRenderer.removeListener('agentbox:wire:event', listener)
+        ipcRenderer.send('agentbox:wire:events:unsubscribe', { subscriptionId })
+      }
+    }
+  }
+})
 
 contextBridge.exposeInMainWorld('hermesDesktop', {
   glassSupported: translucencySupport?.glass === true,
@@ -198,6 +233,21 @@ contextBridge.exposeInMainWorld('hermesDesktop', {
     }
   },
   sshConfigHosts: () => ipcRenderer.invoke('hermes:ssh-config:hosts'),
+  // WSL Workspace (work order 35): discover distributions, connect with an
+  // optional Linux user, browse the real Linux tree, and save/reconnect
+  // Workspaces persisted by the main process. Structured outcomes only.
+  wslWorkspace: {
+    discover: () => ipcRenderer.invoke('hermes:wsl-workspace:discover'),
+    connect: payload => ipcRenderer.invoke('hermes:wsl-workspace:connect', payload),
+    listDirectories: payload => ipcRenderer.invoke('hermes:wsl-workspace:directories:list', payload),
+    saveWorkspace: payload => ipcRenderer.invoke('hermes:wsl-workspace:save', payload),
+    listWorkspaces: () => ipcRenderer.invoke('hermes:wsl-workspace:workspaces:list'),
+    renameWorkspace: payload => ipcRenderer.invoke('hermes:wsl-workspace:rename', payload),
+    archiveWorkspace: payload => ipcRenderer.invoke('hermes:wsl-workspace:archive', payload),
+    reconnectWorkspace: payload => ipcRenderer.invoke('hermes:wsl-workspace:reconnect', payload),
+    releaseConnection: payload => ipcRenderer.invoke('hermes:wsl-workspace:connection:release', payload),
+    cancelOperation: payload => ipcRenderer.invoke('hermes:wsl-workspace:operation:cancel', payload)
+  },
   sshResolveHost: host => ipcRenderer.invoke('hermes:ssh-config:resolve', host),
   probeConnectionConfig: remoteUrl => ipcRenderer.invoke('hermes:connection-config:probe', remoteUrl),
   oauthLoginConnectionConfig: remoteUrl => ipcRenderer.invoke('hermes:connection-config:oauth-login', remoteUrl),

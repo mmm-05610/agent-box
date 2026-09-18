@@ -73,6 +73,11 @@ it('a native click reveals the existing remote Bot tab without changing its owne
   renderHook(() =>
     useDesktopIntegrations({
       activeProfile: 'default',
+      // This file predates the authority input and exercises notification
+      // routing, not the runtime split; naming the legacy shell keeps its
+      // coverage exactly what it was when the checker was installed for every
+      // caller.
+      authority: 'hermes',
       chatOpen: false,
       hasPreview: false,
       locationPathname: '/settings',

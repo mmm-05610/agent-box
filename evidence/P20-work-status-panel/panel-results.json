@@ -1,0 +1,82 @@
+{
+  "allOk": true,
+  "counts": {
+    "PASS": 11,
+    "FAIL": 0,
+    "SKIP": 0,
+    "PENDING": 0
+  },
+  "executed": 11,
+  "unknownStatuses": [],
+  "detail": [
+    {
+      "detail": "sandbox=C:\\Users\\maoqh\\p20-panel\\sandbox",
+      "id": "driver-target",
+      "status": "PASS",
+      "step": "driver target"
+    },
+    {
+      "detail": "workspace=/tmp/agentbox-p20-mu5y3lyo",
+      "id": "sandbox-isolated",
+      "status": "PASS",
+      "step": "the isolated WSL workspace exists with both fixtures projected"
+    },
+    {
+      "detail": "dataRoot=C:\\Users\\maoqh\\p20-panel\\sandbox\\server-data",
+      "id": "server-started",
+      "status": "PASS",
+      "step": "the AgentBox Server is live on loopback with its own token"
+    },
+    {
+      "detail": "hello.serverId=server_3887b8800c8f4cf3af7bb8195a7b17ac",
+      "id": "lifecycle-connection-installed",
+      "status": "PASS",
+      "step": "the lifecycle connection is installed and reachable from the renderer"
+    },
+    {
+      "detail": "id=ws_141b4e18fd214d0189403b99525798e1",
+      "id": "workspaces-registered",
+      "status": "PASS",
+      "step": "the workspace registers and the host row is saved"
+    },
+    {
+      "detail": "fast=profile_18e8d29d8ee2494d8f0abaa3c0d95bba slow=profile_a619f2bffd7e44258380135607ab461d",
+      "id": "profiles-created",
+      "status": "PASS",
+      "step": "fast and slow roles exist"
+    },
+    {
+      "detail": "titles=2",
+      "id": "fast-sessions-seeded",
+      "status": "PASS",
+      "step": "two fast sessions completed"
+    },
+    {
+      "detail": "session=session_0722c3a0b5204e33beaba51c978bdcdc",
+      "id": "slow-turn-running",
+      "status": "PASS",
+      "step": "the slow turn is running on the service"
+    },
+    {
+      "detail": "sessionId=session_0722c3a0b5204e33beaba51c978bdcdc",
+      "id": "session-opened-with-panel",
+      "status": "PASS",
+      "step": "the running session is open and the panel shows its facts"
+    },
+    {
+      "detail": "C:\\Users\\maoqh\\p20-panel\\shots",
+      "id": "panel-shots-captured",
+      "status": "PASS",
+      "step": "collapsed, expanded and closed-ghost shots captured"
+    },
+    {
+      "detail": "portFree=true",
+      "id": "clean-shutdown",
+      "status": "PASS",
+      "step": "the app and the Server both stop"
+    }
+  ],
+  "notes": [],
+  "sandbox": "C:\\Users\\maoqh\\p20-panel\\sandbox",
+  "serverPort": 18757
+}

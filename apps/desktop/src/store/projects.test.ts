@@ -13,12 +13,14 @@ import {
   $projectScope,
   $projectsRpcAvailable,
   $projectTree,
+  $startWorkSessionRequest,
   $worktreeRefreshToken,
   ALL_PROJECTS,
   createProject,
   enterProject,
   exitProjectScope,
   fetchProjectSessions,
+  openFolderAsProject,
   openProjectCreate,
   pickProjectFolder,
   projectIdForCwd,
@@ -979,5 +981,61 @@ describe('tombstone pruning', () => {
     await refreshProjectTree()
 
     expect($removedSessionIds.get().has('sess-1')).toBe(false)
+  })
+})
+
+describe('openFolderAsProject dedupe (round 36: pick a directory → open directly)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    $activeGatewayProfile.set('default')
+    $activeProjectId.set(null)
+    $projectTree.set([])
+    $projectScope.set(ALL_PROJECTS)
+    $projectsRpcAvailable.set(true)
+    $startWorkSessionRequest.set(null)
+    setShowAllProfiles(false)
+  })
+
+  it('re-opening the same directory enters the existing project, never a duplicate', async () => {
+    const request = vi.fn(async (method: string) => {
+      if (method === 'projects.list') {
+        return { active_id: null, projects: [] }
+      }
+
+      if (method === 'projects.tree') {
+        return {
+          active_id: null,
+          scoped_session_ids: [],
+          projects: [
+            {
+              id: 'p_web',
+              label: 'Website',
+              path: '/repos/website',
+              sessionCount: 0,
+              repos: []
+            }
+          ]
+        }
+      }
+
+      if (method === 'projects.set_active') {
+        return { active_id: 'p_web' }
+      }
+
+      return {}
+    })
+
+    activeGateway.mockReturnValue({ connectionState: 'open', request } as never)
+    gatewayAtom.set({ connectionState: 'open', request } as never)
+
+    await openFolderAsProject('/repos/website')
+    await openFolderAsProject('/repos/website')
+
+    // Both opens entered the SAME project: no projects.create was ever sent,
+    // and the sidebar scopes to it (the active pin lands via the RPC echo).
+    expect(request).not.toHaveBeenCalledWith('projects.create', expect.anything())
+    expect(request).not.toHaveBeenCalledWith('session.create', expect.anything())
+    expect($projectScope.get()).toBe('p_web')
+    expect($startWorkSessionRequest.get()).toMatchObject({ path: '/repos/website' })
   })
 })

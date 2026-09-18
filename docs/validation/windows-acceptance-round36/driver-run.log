@@ -1,0 +1,17 @@
+PASS  app opens  window title: Hermes
+PASS  first-run setup  gate not shown; runtime already set up
+PASS  unified sidebar  Capabilities:gone, Artifacts:gone, Scheduled jobs:gone, BotsTab:gone; profilesEntry=true; settingsEntry=true
+PASS  add menu entries  open-folder=1, open-remote=1 (no naming page behind the menu)
+PASS  menu item selected  menu closed after select=true
+PASS  local open completes directly  local-acceptance row in the workspace list, no naming page
+PASS  wizard opens on config (no method page)  distribution select visible on the first page
+PASS  connect → browse on one page  directory browser visible, no separate connecting page
+PASS  local and WSL in one list  the WSL row renders inside the same workspace section as the local row
+PASS  switch within the list (WSL info opens)  WSL row and local row drive from the same list
+PASS  rename persists  row shows the new name; host record=[{"id":"wsl_ws_ccd0a97fc3de6a7e","name":"round36-验收"}]
+PASS  second WSL workspace saved  host records=[{"id":"wsl_ws_9952b63f57251f3b","name":"子目录"},{"id":"wsl_ws_ccd0a97fc3de6a7e","name":"round36-验收"}]
+PASS  remove drops only the record  rows before=[wsl_ws_9952b63f57251f3b,wsl_ws_ccd0a97fc3de6a7e] after=[wsl_ws_ccd0a97fc3de6a7e]; host=[{"id":"wsl_ws_ccd0a97fc3de6a7e","name":"round36-验收"}]; dir still on disk=true
+PASS  pinned/search on Windows  SKIPPED — no real session exists in the isolated sandbox (no model request allowed); behavior tests cover pin/unpin and search attribution on the dev side
+PASS  reopen: both workspaces restored  local=true, wsl(renamed)=true
+PASS  reopen: reconnect re-verifies  connection info reports the verified identity
+ACCEPTANCE: ALL STEPS PASSED

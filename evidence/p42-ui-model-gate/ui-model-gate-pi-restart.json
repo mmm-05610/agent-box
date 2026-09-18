@@ -1,0 +1,72 @@
+{
+  "allOk": true,
+  "counts": {
+    "PASS": 9,
+    "FAIL": 0,
+    "SKIP": 0,
+    "PENDING": 0
+  },
+  "executed": 9,
+  "unknownStatuses": [],
+  "detail": [
+    {
+      "detail": "family=pi; sandbox=C:\\Users\\maoqh\\agentbox-ui-gate-pi-restart-sandbox; model=deepseek-flash",
+      "id": "driver-target",
+      "status": "PASS",
+      "step": "driver target"
+    },
+    {
+      "detail": "harnesses=[\"pi\"]",
+      "id": "server-started-with-real-harness",
+      "status": "PASS",
+      "step": "the Server is live with the family-s production deployment"
+    },
+    {
+      "detail": "serverId=server_fe79e153d7a848129494f7f9ecf500c6",
+      "id": "lifecycle-connection-installed",
+      "status": "PASS",
+      "step": "the product reached the Server through its own lifecycle connection"
+    },
+    {
+      "detail": "credentialId=credential_0c1beead5f5947b9af604268342735f0",
+      "id": "credential-added-through-the-app",
+      "status": "PASS",
+      "step": "the interface-s own entry path imported the credential and recorded its id"
+    },
+    {
+      "detail": "providerModel=provider_8d0fa664b80e4958b0f2a6ba5963b68a credentialAttached=true",
+      "id": "provider-model-and-role-created",
+      "status": "PASS",
+      "step": "the model configuration carries the credential and the role selects it"
+    },
+    {
+      "detail": "answerChars=10 nonceRecalled=true terminal=true deltas=\"P42-1F4A9C\" final=\"P42-1F4A9C\"",
+      "id": "first-turn-answered-by-the-real-model",
+      "status": "PASS",
+      "step": "the first turn was answered by the real model and streamed before it finished"
+    },
+    {
+      "detail": "stopped=true restarted=true",
+      "id": "server-restart-between-turns",
+      "status": "PASS",
+      "step": "the Server comes back on the same data root and answers again"
+    },
+    {
+      "detail": "answerChars=83 nonceOccurrences=3 answer=\"P42-1F4A9CP42-1F4A9CYou asked me to remember **P42-1F4A9C**, and I replied with it.\"",
+      "id": "second-turn-carries-the-first",
+      "status": "PASS",
+      "step": "the second turn-s answer recalls the first turn-s content"
+    },
+    {
+      "detail": "portFree=true recordsFile=present (records only)",
+      "id": "clean-shutdown",
+      "status": "PASS",
+      "step": "the app and the Server stop, and no credential material was written to the evidence"
+    }
+  ],
+  "family": "pi",
+  "model": "deepseek-flash",
+  "notes": [],
+  "sandbox": "C:\\Users\\maoqh\\agentbox-ui-gate-pi-restart-sandbox",
+  "serverPort": 18766
+}

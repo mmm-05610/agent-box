@@ -1,0 +1,4 @@
+Captured verbatim from the Windows driver run (UTF-16 → UTF-8 conversion), including
+trailing whitespace and mojibake in the console echo. Normalising would change the
+captured bytes; `git diff --check` is waived for this one artifact, consistent with
+the prior captured-log precedent (P06 r3, see status.md).

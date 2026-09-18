@@ -10,7 +10,7 @@ import { SLASH_COMMAND_RE } from '@/lib/chat-runtime'
 import type { ChatBarProps } from '@/lib/composer/types'
 import { triggerHaptic } from '@/lib/haptics'
 import { hasClarifyRequest, skipClarifyRequest } from '@/store/clarify'
-import { clearSessionDraft } from '@/store/composer'
+import { clearSessionDraftIfVersion, sessionDraftVersion } from '@/store/composer'
 import { resetBrowseState } from '@/store/composer-input-history'
 import { enqueueQueuedPrompt, type QueuedPromptEntry } from '@/store/composer-queue'
 import { hasMcpSetupRequest, skipMcpSetupRequest } from '@/store/mcp-setup'
@@ -38,9 +38,10 @@ interface UseComposerSubmitArgs {
   queueCurrentDraft: () => boolean
   queueEdit: QueueEditState | null
   queuedPrompts: QueuedPromptEntry[]
+  runtimeAuthority?: 'agentbox' | 'hermes'
   sessionId: string | null | undefined
   setComposerText: (value: string) => void
-  stashAt: (scope: string | null, text?: string, attachments?: ComposerAttachment[]) => void
+  stashAt: (scope: string | null, text?: string, attachments?: ComposerAttachment[]) => number
 }
 
 /**
@@ -73,6 +74,7 @@ export function useComposerSubmit({
   queueCurrentDraft,
   queueEdit,
   queuedPrompts,
+  runtimeAuthority = 'hermes',
   sessionId,
   setComposerText,
   stashAt
@@ -86,8 +88,49 @@ export function useComposerSubmit({
   const dispatchSubmit = (text: string, attachments?: ComposerAttachment[], displayKind?: 'hidden') => {
     const submittedScope = activeQueueSessionKeyRef.current
     const submittedAttachments = attachments ?? []
+    // Bank the exact payload before handing control to an asynchronous
+    // transport. Its version is the compare-and-clear token for the response.
+    const submittedVersion = stashAt(submittedScope, text, submittedAttachments)
+
+    const bankNewerLiveIntent = () => {
+      if (activeQueueSessionKeyRef.current !== submittedScope) {
+        return false
+      }
+
+      const liveText = draftRef.current
+      const liveAttachments = scope.attachments.$attachments.get()
+
+      if (!liveText.trim() && liveAttachments.length === 0) {
+        return false
+      }
+
+      stashAt(submittedScope, liveText, liveAttachments)
+
+      return true
+    }
 
     const restore = () => {
+      if (bankNewerLiveIntent()) {
+        return
+      }
+
+      const currentVersion = sessionDraftVersion(submittedScope)
+
+      // A newer non-empty draft is newer user intent. A rejected old request
+      // must not repaint or overwrite it. An absent draft is allowed: leaving
+      // the composer after optimistic clear can legitimately stash emptiness.
+      if (currentVersion !== null && currentVersion !== submittedVersion) {
+        return
+      }
+
+      if (activeQueueSessionKeyRef.current !== submittedScope) {
+        if (currentVersion === null) {
+          stashAt(submittedScope, text, submittedAttachments)
+        }
+
+        return
+      }
+
       loadIntoComposer(text, submittedAttachments)
       // Use the scope captured at dispatch, not whatever session is focused
       // now — the gateway can reject well after the user has switched away,
@@ -98,10 +141,26 @@ export function useComposerSubmit({
 
     void Promise.resolve(
       attachments
-        ? onSubmit(text, { attachments, composerScope: submittedScope, ...(displayKind ? { displayKind } : {}) })
-        : onSubmit(text, { composerScope: submittedScope, ...(displayKind ? { displayKind } : {}) })
+        ? onSubmit(text, {
+            attachments,
+            composerScope: submittedScope,
+            ...(runtimeAuthority === 'agentbox' ? { draftVersion: submittedVersion } : {}),
+            ...(displayKind ? { displayKind } : {})
+          })
+        : onSubmit(text, {
+            composerScope: submittedScope,
+            ...(runtimeAuthority === 'agentbox' ? { draftVersion: submittedVersion } : {}),
+            ...(displayKind ? { displayKind } : {})
+          })
     )
-      .then(accepted => void (accepted === false ? restore() : clearSessionDraft(submittedScope)))
+      .then(accepted => {
+        if (accepted === false) {
+          restore()
+        } else {
+          bankNewerLiveIntent()
+          clearSessionDraftIfVersion(submittedScope, submittedVersion)
+        }
+      })
       .catch(restore)
   }
 
@@ -169,13 +228,13 @@ export function useComposerSubmit({
     // both RPCs ride the same socket in call order, so the gateway resolves the
     // clarify before it sees the follow-up. Awaiting first would leave the draft
     // live for a tick — long enough for a second Enter to send it twice.
-    if (payloadPresent && !queueEdit && hasClarifyRequest(sessionId)) {
+    if (runtimeAuthority === 'hermes' && payloadPresent && !queueEdit && hasClarifyRequest(sessionId)) {
       void skipClarifyRequest(sessionId)
     }
 
     // Same deal for a pending MCP setup card: the agent is blocked on
     // mcp.setup.respond, so a typed message declines the card and rides on.
-    if (payloadPresent && !queueEdit && hasMcpSetupRequest(sessionId)) {
+    if (runtimeAuthority === 'hermes' && payloadPresent && !queueEdit && hasMcpSetupRequest(sessionId)) {
       void skipMcpSetupRequest(sessionId)
     }
 
@@ -186,10 +245,24 @@ export function useComposerSubmit({
     // it through resolves the prompt to empty and ends the turn as "Operation
     // interrupted." — the message looks eaten. Queue the words as the next turn
     // instead; the prompt stays answerable and the queue drains on settle.
-    const blockingPrompt = !queueEdit && hasBlockingPromptRequest(sessionId)
+    const blockingPrompt = runtimeAuthority === 'hermes' && !queueEdit && hasBlockingPromptRequest(sessionId)
 
     if (queueEdit) {
       exitQueuedEdit('save')
+    } else if (busy && runtimeAuthority === 'agentbox') {
+      if (payloadPresent) {
+        const submittedAttachments = cloneAttachments(attachments)
+        triggerHaptic('submit')
+        resetBrowseState(sessionId)
+        clearDraft()
+        scope.attachments.clear()
+        // AgentBox sessions.send is itself the server-owned follow-up queue
+        // boundary. Never redirect through Hermes or stage a renderer queue.
+        dispatchSubmit(text, submittedAttachments)
+      } else {
+        triggerHaptic('cancel')
+        void Promise.resolve(onCancel())
+      }
     } else if (busy) {
       // Slash commands should execute immediately even while the agent is
       // busy — they're client-side operations (/yolo, /skin, /new, /help,

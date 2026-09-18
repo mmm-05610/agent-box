@@ -22,6 +22,11 @@ import { GatewayConnectingOverlay } from './gateway-connecting-overlay'
 // boot.error null. The fix keeps the initial-boot overlay out of post-boot
 // reconnects, leaving chat/settings usable while the reconnect loop runs.
 
+// The gateway/connection panel is a prop now (the AgentBox product hands in
+// none, so its recovery surface cannot reach legacy connection management).
+// These cases describe the legacy shell, so they hand in the stub.
+const StubGatewaySettingsView = () => <div data-testid="stub-gateway-settings" />
+
 function resetStores() {
   setGatewayState('idle')
   $gatewaySwitching.set(false)
@@ -74,7 +79,7 @@ describe('connecting overlay vs recovery surface', () => {
     await act(async () => {
       render(
         <>
-          <GatewayConnectingOverlay />
+          <GatewayConnectingOverlay authority="hermes" />
           <BootFailureOverlay />
         </>
       )
@@ -93,7 +98,7 @@ describe('connecting overlay vs recovery surface', () => {
     await act(async () => {
       const result = render(
         <>
-          <GatewayConnectingOverlay />
+          <GatewayConnectingOverlay authority="hermes" />
           <BootFailureOverlay />
         </>
       )
@@ -110,7 +115,7 @@ describe('connecting overlay vs recovery surface', () => {
       setGatewayState('closed')
       rerender!(
         <>
-          <GatewayConnectingOverlay />
+          <GatewayConnectingOverlay authority="hermes" />
           <BootFailureOverlay />
         </>
       )
@@ -128,7 +133,7 @@ describe('connecting overlay vs recovery surface', () => {
       setGatewayState('error')
       rerender!(
         <>
-          <GatewayConnectingOverlay />
+          <GatewayConnectingOverlay authority="hermes" />
           <BootFailureOverlay />
         </>
       )
@@ -143,7 +148,7 @@ describe('connecting overlay vs recovery surface', () => {
 
     const { rerender } = render(
       <>
-        <GatewayConnectingOverlay />
+        <GatewayConnectingOverlay authority="hermes" />
         <BootFailureOverlay />
       </>
     )
@@ -160,7 +165,7 @@ describe('connecting overlay vs recovery surface', () => {
       setGatewayState('closed')
       rerender(
         <>
-          <GatewayConnectingOverlay />
+          <GatewayConnectingOverlay authority="hermes" />
           <BootFailureOverlay />
         </>
       )
@@ -185,8 +190,8 @@ describe('connecting overlay vs recovery surface', () => {
     await act(async () => {
       render(
         <>
-          <GatewayConnectingOverlay />
-          <BootFailureOverlay />
+          <GatewayConnectingOverlay authority="hermes" />
+          <BootFailureOverlay GatewaySettingsView={StubGatewaySettingsView} />
         </>
       )
     })
@@ -194,6 +199,32 @@ describe('connecting overlay vs recovery surface', () => {
     // Escape hatch is reachable; the connecting overlay bows out.
     expect(isRecoveryShown()).toBe(true)
     expect(screen.getByRole('button', { name: /gateway settings/i })).toBeTruthy()
+    expect(isConnectingShown()).toBe(false)
+  })
+
+  it('covers the shell while the legacy runtime boots (the state the product must never enter)', async () => {
+    // The pre-progress frame: no error yet, boot still under way, no gateway.
+    $desktopBoot.set({ ...$desktopBoot.get(), error: null, progress: 0, running: true, visible: true })
+    setGatewayState('idle')
+
+    const { container } = render(<GatewayConnectingOverlay authority="hermes" />)
+
+    // Asserted on the mask rather than the animation: the decode text needs
+    // frames jsdom does not provide, but the full-screen cover is the property
+    // that matters.
+    expect(container.querySelectorAll('[data-glass-opaque]')).toHaveLength(1)
+  })
+
+  it('renders nothing under AgentBox authority, even before the product boot reports progress', async () => {
+    // The same pre-progress frame. The product latches this overlay on the
+    // first frame and would only leave it once a gateway opened — which never
+    // happens — so it must not exist at all, whatever the boot state says.
+    $desktopBoot.set({ ...$desktopBoot.get(), error: null, progress: 0, running: true, visible: true })
+    setGatewayState('idle')
+
+    const { container } = render(<GatewayConnectingOverlay authority="agentbox" />)
+
+    expect(container.querySelectorAll('[data-glass-opaque]')).toHaveLength(0)
     expect(isConnectingShown()).toBe(false)
   })
 })

@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import type { HermesGateway } from '@/api/client'
 import type { QuickModelOption, SubmitTextOptions } from '@/types/composer'
 import type { ContextSuggestion } from '@/types/context-suggestion'
+import type { ConfigDescriptor, ConfigOverride } from '@/types/wire/wire-v1'
 
 /** One entry resolved from a drop event. Declared here rather than beside the
  *  runtime that resolves it (`hooks/use-composer-actions`), so a consumer that
@@ -26,6 +27,8 @@ export interface ChatBarState {
     model: string
     provider: string
     canSwitch: boolean
+    /** Hides the legacy model pill while retaining profile-owned config UI. */
+    hidden?: boolean
     loading?: boolean
     quickModels?: QuickModelOption[]
     /** Reused status-bar dropdown (built with gateway + selectModel upstream). */
@@ -33,15 +36,75 @@ export interface ChatBarState {
   }
   tools: { enabled: boolean; label: string; suggestions?: ContextSuggestion[] }
   voice: { enabled: boolean; active: boolean }
+  profile?: ComposerProfileState
+  /** Present only after the composer is wired to the server-owned queue
+   * projection. A hello capability by itself must never reactivate the old
+   * renderer-local queue engine. */
+  queue?: { authority: 'server' }
+}
+
+export interface ComposerProfileOption {
+  displayName: string
+  harness: string
+  id: string
+  selectable: boolean
+  unavailableReason?: string
+}
+
+export interface ComposerConfigInvalidControl {
+  controlId: string
+  reason: string
+}
+
+/** The service's answer for one exact scope: a PREVIEW of the effective
+ *  configuration, never the running one — a run fixes its configuration only
+ *  when it accepts a send (`configVersion` on the acceptance). The renderer
+ *  presents this; it never computes the effective value itself (core v1 §5). */
+export type ComposerConfigResolutionState =
+  | { status: 'idle' }
+  | { status: 'resolving' }
+  | { effective: Array<{ controlId: string; value: unknown }>; status: 'resolved' }
+  | { invalidControls: ComposerConfigInvalidControl[]; status: 'rejected' }
+  | { detail: string; status: 'unavailable' }
+
+export interface ComposerProfileState {
+  modelChoices?: ComposerProviderModelChoice[]
+  configDescriptor?: ConfigDescriptor | null
+  /** Server-side preview for the current profile/workspace/override scope. */
+  configResolution?: ComposerConfigResolutionState
+  onOverrideChange: (overrides: ConfigOverride[]) => void
+  onSelect: (profileId: string) => Promise<boolean> | boolean
+  options: ComposerProfileOption[]
+  overrides: ConfigOverride[]
+  selectedId: null | string
+  switching?: boolean
+  unavailableReason?: string
+}
+
+export interface ComposerProviderModelChoice {
+  availability: 'available' | 'unknown' | 'unavailable'
+  displayName: string
+  modelId: string
+  providerDisplayName: string
+  providerId: string
+  unavailableReason: string | null
 }
 
 export interface ChatBarProps {
   busy: boolean
   disabled: boolean
+  /** Selects the business authority for submit/queue/input behavior. AgentBox
+   * never falls through to Hermes steering or the renderer-owned queue. */
+  runtimeAuthority?: 'agentbox' | 'hermes'
+  /** Server-owned queue projection. AgentBox supplies this as presentation;
+   * the Composer never copies it into the renderer queue engine. */
+  serverQueue?: ReactNode
   focusKey?: string | null
   maxRecordingSeconds?: number
   state: ChatBarState
   gateway?: HermesGateway | null
+  /** Stable workspace identity for a not-yet-created Session draft. */
+  draftScopeKey?: string | null
   queueSessionKey?: string | null
   sessionId?: string | null
   cwd?: string | null

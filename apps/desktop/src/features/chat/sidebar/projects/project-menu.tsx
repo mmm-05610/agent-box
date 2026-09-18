@@ -10,7 +10,6 @@ import {
   renderActionItem
 } from '@/components/ui/actions-menu'
 import { Codicon } from '@/components/ui/codicon'
-import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,9 +21,9 @@ import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
 import { $panesFlipped, dismissAutoProject } from '@/store/layout'
+import { $profileScope } from '@/store/profile'
 import {
   copyPath,
-  deleteProject,
   openProjectAddFolder,
   openProjectRename,
   revealPath,
@@ -32,6 +31,7 @@ import {
   setProjectAppearance
 } from '@/store/projects'
 import type { SidebarProjectTree } from '@/store/projects/membership'
+import { hideLocalWorkspace, workspaceHiddenKey } from '@/store/workspace-view'
 
 import { ProjectAppearancePicker } from './project-appearance'
 
@@ -45,17 +45,21 @@ function useProjectActions({
   project,
   isActive,
   scoped,
+  onArchiveInAgentBox,
   onExitScope
 }: {
   project: SidebarProjectTree
   isActive: boolean
   scoped: boolean
+  /** Injected by the surface that matched this row to a service Workspace.
+   *  These menus never reach for the wire client themselves. */
+  onArchiveInAgentBox?: () => void
   onExitScope?: () => void
 }) {
   const { t } = useI18n()
   const p = t.sidebar.projects
   const target = { id: project.id, name: project.label }
-  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
+  const profileScope = useStore($profileScope)
 
   const removeAuto = () => {
     dismissAutoProject(project.id)
@@ -65,8 +69,13 @@ function useProjectActions({
     }
   }
 
-  const confirmDelete = async () => {
-    await deleteProject(project.id)
+  // 36R — removal from the sidebar HIDES an explicit project: the backend
+  // record, its id, its sessions and its pins all survive (no
+  // projects.delete). The pref is scoped by backend/profile/id, so the same-
+  // named project under another backend or profile is never hidden by
+  // accident; re-opening the folder unhides the SAME record.
+  const removeExplicit = () => {
+    hideLocalWorkspace(workspaceHiddenKey({ backend: 'local', id: project.id, profile: profileScope }))
 
     if (scoped) {
       onExitScope?.()
@@ -112,29 +121,29 @@ function useProjectActions({
     }
   ]
 
-  const dangerItem: ActionItemSpec = project.isAuto
-    ? { icon: 'trash', key: 'remove', label: p.removeFromSidebar, onSelect: removeAuto, variant: 'destructive' }
-    : {
-        icon: 'trash',
-        key: 'delete',
-        label: `${p.menuDelete}…`,
-        onSelect: () => setConfirmDeleteOpen(true),
-        variant: 'destructive'
+  // Both kinds share the one removal entry — a reversible hide for the current
+  // scope, never a destructive delete.
+  const dangerItem: ActionItemSpec = {
+    icon: 'trash',
+    key: 'remove',
+    label: p.removeFromSidebar,
+    onSelect: project.isAuto ? removeAuto : removeExplicit,
+    variant: 'destructive'
+  }
+
+  // Offered only when the surface proved a matching service Workspace. It sits
+  // apart from the removal entry: "Remove from sidebar" hides this row, while
+  // archive touches the service record and nothing local.
+  const agentBoxItem: ActionItemSpec | null = onArchiveInAgentBox
+    ? {
+        icon: 'archive',
+        key: 'agentbox-archive',
+        label: t.sidebar.agentBoxArchive.action,
+        onSelect: onArchiveInAgentBox
       }
+    : null
 
-  const confirmDialog = (
-    <ConfirmDialog
-      confirmLabel={p.menuDelete}
-      description={p.deleteConfirm}
-      destructive
-      onClose={() => setConfirmDeleteOpen(false)}
-      onConfirm={confirmDelete}
-      open={confirmDeleteOpen}
-      title={`${p.menuDelete} "${project.label}"?`}
-    />
-  )
-
-  return { confirmDialog, dangerItem, identityItems, pathItems }
+  return { agentBoxItem, dangerItem, identityItems, pathItems }
 }
 
 // Per-project actions. The kebab keeps its row-anchored Appearance popover; the
@@ -144,11 +153,13 @@ export function ProjectMenu({
   project,
   isActive,
   scoped = false,
+  onArchiveInAgentBox,
   onExitScope,
   anchorRef
 }: {
   project: SidebarProjectTree
   isActive: boolean
+  onArchiveInAgentBox?: () => void
   // True when rendered in the entered-project header, so removal can leave the
   // now-defunct scope.
   scoped?: boolean
@@ -166,8 +177,9 @@ export function ProjectMenu({
   // when the panes are flipped (sidebar on the right).
   const panesFlipped = useStore($panesFlipped)
 
-  const { confirmDialog, dangerItem, identityItems, pathItems } = useProjectActions({
+  const { agentBoxItem, dangerItem, identityItems, pathItems } = useProjectActions({
     isActive,
+    onArchiveInAgentBox,
     onExitScope,
     project,
     scoped
@@ -250,6 +262,12 @@ export function ProjectMenu({
           )}
           {pathItems.map(item => renderActionItem(DROPDOWN_KIT, item))}
           <DropdownMenuSeparator />
+          {agentBoxItem ? (
+            <>
+              {renderActionItem(DROPDOWN_KIT, agentBoxItem)}
+              <DropdownMenuSeparator />
+            </>
+          ) : null}
           {renderActionItem(DROPDOWN_KIT, dangerItem)}
         </DropdownMenuContent>
       </DropdownMenu>
@@ -268,7 +286,6 @@ export function ProjectMenu({
           onIcon={icon => void applyAppearance({ icon })}
         />
       </PopoverContent>
-      {confirmDialog}
     </Popover>
   )
 }
@@ -277,6 +294,7 @@ interface ProjectContextMenuProps {
   project: SidebarProjectTree
   isActive: boolean
   scoped?: boolean
+  onArchiveInAgentBox?: () => void
   onExitScope?: () => void
   children: React.ReactNode
 }
@@ -288,14 +306,16 @@ export function ProjectContextMenu({
   project,
   isActive,
   scoped = false,
+  onArchiveInAgentBox,
   onExitScope,
   children
 }: ProjectContextMenuProps) {
   const { t } = useI18n()
   const p = t.sidebar.projects
 
-  const { confirmDialog, dangerItem, identityItems, pathItems } = useProjectActions({
+  const { agentBoxItem, dangerItem, identityItems, pathItems } = useProjectActions({
     isActive,
+    onArchiveInAgentBox,
     onExitScope,
     project,
     scoped
@@ -330,6 +350,12 @@ export function ProjectContextMenu({
       {(identityItems.length > 0 || canTheme) && <kit.Separator />}
       {pathItems.map(item => renderActionItem(kit, item))}
       <kit.Separator />
+      {agentBoxItem && (
+        <>
+          {renderActionItem(kit, agentBoxItem)}
+          <kit.Separator />
+        </>
+      )}
       {renderActionItem(kit, dangerItem)}
     </>
   )
@@ -339,7 +365,6 @@ export function ProjectContextMenu({
       <ActionsContextMenu ariaLabel={p.menu} contentClassName="w-48" items={items}>
         {children}
       </ActionsContextMenu>
-      {confirmDialog}
     </>
   )
 }

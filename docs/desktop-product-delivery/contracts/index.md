@@ -1,6 +1,6 @@
 # 前后端能力合同增量入口
 
-当前：CORE_SEMANTICS_APPROVED_WIRE_PENDING。
+当前：CORE_SEMANTICS_APPROVED_WIRE_LOCKED_FOR_IMPLEMENTATION。
 2026-09-14用户批准的核心行为已登记；不再以“所有产品合同未定”为由等待。
 没有任何HTTP路径、认证方案因语义批准而自动获批。
 既有后端实现和冻结Tauri合同可做事实输入，不自动视为Electron合同。
@@ -8,6 +8,7 @@
 | 版本 | 状态 | 覆盖 | 编制/实现入口 |
 | --- | --- | --- | --- |
 | [core-semantics/1](core-semantics-v1.md) | APPROVED_SEMANTICS | 生命周期、Worker/数据、Workspace、Profile/模型、消息/队列、审批/恢复 | 前端P07编制同一份wire候选；后端接单核对锁定；现有后端不宣称已实现 |
+| [wire-v1](wire-v1/README.md) | WIRE_LOCKED_FOR_IMPLEMENTATION | core-semantics/1 的单一可执行 wire schema、错误、事件、幂等、版本、核心维护及可恢复 Session 目录 | 原 17 方法已对齐；Profile/Provider-Model、Session/history 与队列终态机械更正形成当前 28 方法摘要，后端已用同一摘要登记确认，见 `wire-v1/backend-response.md` |
 
 APPROVED_SEMANTICS允许通用类型/用例/测试实现；PROPOSED_WIRE允许隔离测试服务与客户端适配验证，
 不能宣称已获真实服务支持。双方核对单一可执行schema及安全引导后登记WIRE_LOCKED_FOR_IMPLEMENTATION，

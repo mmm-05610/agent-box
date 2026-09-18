@@ -1,0 +1,122 @@
+{
+  "hello": {
+    "serverId": "server_5f89fbef81b8405f81c43915397ceee3",
+    "protocolVersion": "wire/1",
+    "capabilities": [
+      {
+        "id": "workspaces.browse",
+        "supported": true
+      },
+      {
+        "id": "workspaces.open",
+        "supported": true
+      },
+      {
+        "id": "workspaces.list",
+        "supported": true
+      },
+      {
+        "id": "workspaces.archive",
+        "supported": true
+      },
+      {
+        "id": "profiles.list",
+        "supported": true
+      },
+      {
+        "id": "profiles.create",
+        "supported": true
+      },
+      {
+        "id": "profiles.update",
+        "supported": true
+      },
+      {
+        "id": "profiles.updateConfig",
+        "supported": true
+      },
+      {
+        "id": "profiles.archive",
+        "supported": true
+      },
+      {
+        "id": "providerModels.list",
+        "supported": true
+      },
+      {
+        "id": "providerModels.create",
+        "supported": true
+      },
+      {
+        "id": "providerModels.update",
+        "supported": true
+      },
+      {
+        "id": "providerModels.archive",
+        "supported": true
+      },
+      {
+        "id": "config.describe",
+        "supported": true
+      },
+      {
+        "id": "config.resolve",
+        "supported": true
+      },
+      {
+        "id": "sessions.list",
+        "supported": true
+      },
+      {
+        "id": "sessions.update",
+        "supported": true
+      },
+      {
+        "id": "sessions.archive",
+        "supported": true
+      },
+      {
+        "id": "sessions.createAndSend",
+        "supported": true
+      },
+      {
+        "id": "sessions.send",
+        "supported": true
+      },
+      {
+        "id": "sessions.switchProfile",
+        "supported": true
+      },
+      {
+        "id": "sendOutcome.query",
+        "supported": true
+      },
+      {
+        "id": "queue.get",
+        "supported": true
+      },
+      {
+        "id": "queue.withdraw",
+        "supported": true
+      },
+      {
+        "id": "runs.stop",
+        "supported": true
+      },
+      {
+        "id": "approvals.decide",
+        "supported": true
+      },
+      {
+        "id": "history.snapshot",
+        "supported": true
+      }
+    ],
+    "auth": {
+      "required": true,
+      "schemes": [
+        "session_token"
+      ]
+    }
+  }
+}

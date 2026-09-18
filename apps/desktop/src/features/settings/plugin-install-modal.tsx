@@ -2,6 +2,7 @@ import { useStore } from '@nanostores/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 
+import { DESKTOP_PRODUCT_RUNTIME } from '@/app/composition/product-runtime'
 import { NEW_CHAT_ROUTE, SETTINGS_ROUTE } from '@/app/routes'
 import { ExternalLink } from '@/components/external-link'
 import { useGatewayRequest } from '@/components/hooks/use-gateway-request'
@@ -235,7 +236,7 @@ export function PluginInstallModal() {
 
           if (result.ok) {
             successes.push(m.desktopSuccess(result.pluginName ?? request.repo))
-            await discoverRuntimePlugins()
+            await discoverRuntimePlugins(DESKTOP_PRODUCT_RUNTIME)
           } else {
             errors.push(result.error || m.desktopFailed)
           }

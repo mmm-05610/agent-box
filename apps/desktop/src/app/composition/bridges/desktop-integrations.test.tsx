@@ -1,13 +1,20 @@
 import { renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { useDesktopIntegrations } from '@/app/composition/bridges/desktop-integrations'
+import { type DesktopIntegrationAuthority, useDesktopIntegrations } from '@/app/composition/bridges/desktop-integrations'
+import { resolveProductResumeLastSession } from '@/app/composition/product-runtime'
 import { sessionRoute } from '@/app/routes'
 import { makeSessionInfo } from '@/dev/test/session-info'
 import { createClientSessionState } from '@/lib/chat-runtime'
 import { requestMcpInstallFromDeepLink } from '@/store/mcp-deeplink-install'
+import { startMcpHealthChecker, stopMcpHealthChecker } from '@/store/mcp-health'
+import { openFolderAsProject } from '@/store/projects'
+import type * as ProjectsStore from '@/store/projects'
 import { _resetLegacyDiscardForTests } from '@/store/session'
 import { dropSessionState, publishSessionState } from '@/store/session-states'
+import type * as SessionSyncStore from '@/store/session-sync'
+import { startUpdatePoller, stopUpdatePoller } from '@/store/updates'
+import type * as UpdatesStore from '@/store/updates'
 import type * as WindowsStore from '@/store/windows'
 import type { SessionInfo } from '@/types/hermes'
 
@@ -16,9 +23,51 @@ import type { SessionInfo } from '@/types/hermes'
 // coverage exercising the real main-window path.
 const { hudWindowMock } = vi.hoisted(() => ({ hudWindowMock: vi.fn(() => false) }))
 
+// Captured cross-window listener: the real module subscribes to IPC/broadcast
+// channels, which a jsdom test cannot drive, so the handler is captured here
+// and fired by the neutral-behavior test.
+const sessionSync = vi.hoisted(() => ({ listener: null as null | (() => void) }))
+
 vi.mock('@/store/mcp-deeplink-install', () => ({
   requestMcpInstallFromDeepLink: vi.fn()
 }))
+
+vi.mock('@/store/mcp-health', () => ({
+  startMcpHealthChecker: vi.fn(),
+  stopMcpHealthChecker: vi.fn()
+}))
+
+vi.mock('@/store/updates', async importOriginal => {
+  const actual = await importOriginal<typeof UpdatesStore>()
+
+  return {
+    ...actual,
+    openUpdatesWindow: vi.fn(),
+    startUpdatePoller: vi.fn(),
+    stopUpdatePoller: vi.fn()
+  }
+})
+
+vi.mock('@/store/projects', async importOriginal => {
+  const actual = await importOriginal<typeof ProjectsStore>()
+
+  return { ...actual, openFolderAsProject: vi.fn() }
+})
+
+vi.mock('@/store/session-sync', async importOriginal => {
+  const actual = await importOriginal<typeof SessionSyncStore>()
+
+  return {
+    ...actual,
+    onSessionsChanged: (callback: () => void) => {
+      sessionSync.listener = callback
+
+      return () => {
+        sessionSync.listener = null
+      }
+    }
+  }
+})
 
 vi.mock('@/store/windows', async importOriginal => {
   const actual = await importOriginal<typeof WindowsStore>()
@@ -48,6 +97,12 @@ describe('useDesktopIntegrations', () => {
     window.localStorage.clear()
     _resetLegacyDiscardForTests()
     vi.mocked(requestMcpInstallFromDeepLink).mockClear()
+    vi.mocked(startMcpHealthChecker).mockClear()
+    vi.mocked(stopMcpHealthChecker).mockClear()
+    vi.mocked(startUpdatePoller).mockClear()
+    vi.mocked(stopUpdatePoller).mockClear()
+    vi.mocked(openFolderAsProject).mockClear()
+    sessionSync.listener = null
     navigate = vi.fn()
     // Every test starts as a main window; only the HUD describe flips this.
     hudWindowMock.mockReturnValue(false)
@@ -78,6 +133,9 @@ describe('useDesktopIntegrations', () => {
 
   function render({
     activeProfile = 'default',
+    // The pre-existing coverage is the legacy shell: hermes starts the MCP
+    // checker like it always did. The agentbox cases below name their authority.
+    authority = 'hermes' as DesktopIntegrationAuthority,
     locationPathname = '/',
     profileReady = false,
     resumeExhaustedSessionId = null as string | null,
@@ -106,6 +164,7 @@ describe('useDesktopIntegrations', () => {
       }) =>
         useDesktopIntegrations({
           activeProfile,
+          authority,
           chatOpen: false,
           hasPreview: false,
           locationPathname,
@@ -589,6 +648,7 @@ describe('useDesktopIntegrations', () => {
         ({ sessions }: { sessions: readonly SessionInfo[] }) =>
           useDesktopIntegrations({
             activeProfile: 'default',
+            authority: 'hermes',
             chatOpen: false,
             hasPreview: false,
             locationPathname: '/',
@@ -629,6 +689,117 @@ describe('useDesktopIntegrations', () => {
 
       unmount()
       dropSessionState('runtime-999')
+    })
+  })
+
+  describe('authority', () => {
+    it('never installs the MCP legacy health checker under agentbox', () => {
+      const { unmount } = render({ authority: 'agentbox', profileReady: true })
+
+      // The checker is legacy Hermes control flow (its sweep reads
+      // `GET /api/config`). Under the product authority it is never started —
+      // and start is what subscribes it to gateway/profile state.
+      expect(startMcpHealthChecker).not.toHaveBeenCalled()
+
+      unmount()
+
+      expect(stopMcpHealthChecker).not.toHaveBeenCalled()
+    })
+
+    it('starts and stops the MCP legacy health checker with the existing lifecycle under hermes', () => {
+      const { unmount } = render({ authority: 'hermes', profileReady: true })
+
+      expect(startMcpHealthChecker).toHaveBeenCalledTimes(1)
+
+      unmount()
+
+      expect(stopMcpHealthChecker).toHaveBeenCalledTimes(1)
+    })
+
+    it('restores a remembered AgentBox route at cold start with the product decision', () => {
+      window.localStorage.setItem('hermes.desktop.lastRoute.profile.default', '/remembered-session')
+
+      const sessions = [session({ id: 'remembered-session', profile: 'default' })]
+
+      render({
+        authority: 'agentbox',
+        profileReady: true,
+        resumeLastSession: resolveProductResumeLastSession(),
+        sessions
+      })
+
+      // A definite `true` (never the legacy `undefined` hold): the restore
+      // happens on the first profile-ready render, without any config fetch.
+      expect(navigate).toHaveBeenCalledWith('/remembered-session', { replace: true })
+    })
+
+    it('keeps the neutral host integrations running under agentbox', () => {
+      const setPreviewShortcutActive = vi.fn()
+      let openFolder: (() => void) | undefined
+      let previewNav: ((command: string) => void) | undefined
+      let closePreview: (() => void) | undefined
+
+      desktopWindow.hermesDesktop = {
+        ...desktopWindow.hermesDesktop,
+        setPreviewShortcutActive,
+        onClosePreviewRequested: (cb: () => void) => {
+          closePreview = cb
+
+          return () => undefined
+        },
+        onOpenFolderRequested: (cb: () => void) => {
+          openFolder = cb
+
+          return () => undefined
+        },
+        onPreviewNav: (cb: (command: string) => void) => {
+          previewNav = cb
+
+          return () => undefined
+        }
+      } as unknown as Window['hermesDesktop']
+
+      const refreshSessions = vi.fn()
+
+      const { unmount } = renderHook(() =>
+        useDesktopIntegrations({
+          activeProfile: 'default',
+          authority: 'agentbox',
+          chatOpen: false,
+          hasPreview: false,
+          locationPathname: '/',
+          navigate,
+          profileReady: true,
+          refreshSessions,
+          resumeExhaustedSessionId: null,
+          resumeLastSession: resolveProductResumeLastSession(),
+          routedSessionId: null,
+          runtimeIdByStoredSessionId: { current: new Map() },
+          sessions: []
+        })
+      )
+
+      // Update the client itself: the poller and the native menu bridge.
+      expect(startUpdatePoller).toHaveBeenCalledTimes(1)
+      // The renderer owns ⌘W (tab-vs-window decision) in every runtime.
+      expect(setPreviewShortcutActive).toHaveBeenCalledWith(true)
+      expect(closePreview).toBeTypeOf('function')
+      // Native browser gestures (⌘R / swipe) are still heard. jsdom cannot stub
+      // `location.reload`, so only the subscription is asserted, not the reload.
+      expect(previewNav).toBeTypeOf('function')
+      previewNav?.('back')
+      // File > Open Folder… still upserts a project.
+      expect(openFolder).toBeTypeOf('function')
+      openFolder?.()
+      expect(openFolderAsProject).toHaveBeenCalledTimes(1)
+      // Another window's session mutation still re-pulls this window's list.
+      expect(sessionSync.listener).toBeTypeOf('function')
+      sessionSync.listener?.()
+      expect(refreshSessions).toHaveBeenCalledTimes(1)
+
+      unmount()
+
+      expect(stopUpdatePoller).toHaveBeenCalledTimes(1)
     })
   })
 })

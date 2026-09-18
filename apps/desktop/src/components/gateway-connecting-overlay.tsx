@@ -36,7 +36,18 @@ function forcedPreview(): boolean {
   }
 }
 
-export function GatewayConnectingOverlay() {
+export interface GatewayConnectingOverlayProps {
+  /** Required: which runtime owns this mount. Under `'agentbox'` there is no
+   *  legacy gateway to connect to, and this surface must not exist at all: it
+   *  latches on the FIRST frame — before the product boot completes, so
+   *  `boot.progress < 100` reads as "still connecting" — and it only leaves
+   *  once a gateway opens, which never happens in the product. Left mounted it
+   *  is a permanent full-screen `[data-glass-opaque]` mask over a shell that is
+   *  otherwise ready. The authority alone decides, never boot state. */
+  authority: 'agentbox' | 'hermes'
+}
+
+export function GatewayConnectingOverlay({ authority }: GatewayConnectingOverlayProps) {
   const gatewayState = useStore($gatewayState)
   const boot = useStore($desktopBoot)
   const gatewaySwitching = useStore($gatewaySwitching)
@@ -119,6 +130,13 @@ export function GatewayConnectingOverlay() {
 
   // Boot failed — BootFailureOverlay owns the screen; don't linger behind it.
   if (boot.error && !previewing) {
+    return null
+  }
+
+  // The AgentBox product never connects a legacy gateway, so this surface has
+  // nothing to report and everything to block. Checked after the hooks so the
+  // hook order stays identical for both authorities.
+  if (authority === 'agentbox') {
     return null
   }
 

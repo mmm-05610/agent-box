@@ -4,7 +4,7 @@ import type { Translations } from './types'
 export const en: Translations = {
   sessionImport: {
     title: 'Continue from another app',
-    subtitle: 'Bring a conversation into Hermes and pick up where you left off.',
+    subtitle: 'Bring a conversation into Ordessa and pick up where you left off.',
     action: 'Import session',
     readingFrom: 'Reading from',
     connectedComputer: 'the connected computer',
@@ -22,18 +22,18 @@ export const en: Translations = {
     more: 'Load more sessions',
     messages: 'messages',
     choose: 'A conversation worth continuing',
-    chooseHelp: 'Choose a session to read its history before bringing it into Hermes.',
+    chooseHelp: 'Choose a session to read its history before bringing it into Ordessa.',
     previewLoading: 'Opening preview',
     previewError: 'Preview unavailable',
     previewHelp: 'The source may have moved or changed. Refresh the list and try again.',
     previewLimit: 'Preview shortened for readability. The complete conversation is imported.',
     you: 'You',
-    snapshot: 'This conversation is already in Hermes. Open your existing copy to continue.',
+    snapshot: 'This conversation is already in Ordessa. Open your existing copy to continue.',
     copyNotice:
       'Copies conversation text. Source files stay unchanged. Tool output and reasoning are not carried over.',
     importing: 'Importing…',
-    open: 'Open in Hermes',
-    continue: 'Continue in Hermes',
+    open: 'Open in Ordessa',
+    continue: 'Continue in Ordessa',
     importError: 'Could not import this conversation.'
   },
   common: {
@@ -98,19 +98,19 @@ export const en: Translations = {
   },
 
   boot: {
-    ready: 'Hermes Desktop is ready',
+    ready: 'Ordessa is ready',
     desktopBootFailedWithMessage: message => `Desktop boot failed: ${message}`,
     steps: {
       connectingGateway: 'Connecting live desktop gateway',
-      loadingSettings: 'Loading Hermes settings',
+      loadingSettings: 'Loading Ordessa settings',
       loadingSessions: 'Loading recent sessions',
-      retryingRemoteBackend: 'Reconnecting to the remote Hermes backend…',
+      retryingRemoteBackend: 'Reconnecting to the remote Pacthold backend…',
       startingDesktopConnection: 'Starting desktop connection',
-      startingHermesDesktop: 'Starting Hermes Desktop…'
+      startingHermesDesktop: 'Starting Ordessa…'
     },
     errors: {
-      backgroundExited: 'Hermes background process exited.',
-      backgroundExitedDuringStartup: 'Hermes background process exited during startup.',
+      backgroundExited: 'Ordessa background process exited.',
+      backgroundExitedDuringStartup: 'Ordessa background process exited during startup.',
       backendStopped: 'Backend stopped',
       desktopBootFailed: 'Desktop boot failed',
       gatewayConnectionLost: 'Lost connection to the gateway',
@@ -120,7 +120,7 @@ export const en: Translations = {
       ipcBridgeUnavailable: 'Desktop IPC bridge is unavailable.'
     },
     failure: {
-      title: "Hermes couldn't start",
+      title: "Ordessa couldn't start",
       description:
         "The background gateway didn't come up. Try one of the recovery steps below. Nothing here deletes your chats or settings.",
       remoteTitle: 'Remote gateway sign-in required',
@@ -132,6 +132,7 @@ export const en: Translations = {
       gatewaySettings: 'Gateway settings',
       back: 'Back',
       openLogs: 'Open logs',
+      dismiss: 'Dismiss',
       repairHint: 'Repair re-runs the installer and can take a few minutes on a fresh machine.',
       remoteSignInHint: signInLabel =>
         `Signs out of the saved remote browser session, then opens ${signInLabel}. Use local gateway to switch to the bundled backend instead.`,
@@ -142,11 +143,11 @@ export const en: Translations = {
         'The Nous-managed cloud agent this gateway connects to is returning a server error. It cannot be restarted from here — check its status, switch to the local gateway, or get support.',
       cloudDownHint:
         'The buttons below open the Nous Portal (instance status and controls) and our Discord for support.',
-      notFoundTitle: 'Hermes isn\'t installed',
+      notFoundTitle: 'Ordessa isn\'t installed',
       notFoundDescription:
-        'The desktop couldn\'t find a Hermes runtime to launch. It looks for the hermes command on your PATH, or an install it manages itself. Install Hermes, then retry — nothing here deletes your chats or settings.',
+        'The desktop couldn\'t find an Pacthold runtime to launch. It looks for the hermes command on your PATH, or an install it manages itself. Install Ordessa, then retry — nothing here deletes your chats or settings.',
       notFoundHint:
-        'Repair install runs the Hermes installer; Retry looks for it again once it\'s available.',
+        'Repair install runs the Ordessa installer; Retry looks for it again once it\'s available.',
       cloudDownCheckPortal: 'Check Portal status',
       cloudDownDiscord: 'Get help on Discord',
       hideRecentLogs: 'Hide recent logs',
@@ -174,9 +175,9 @@ export const en: Translations = {
     copyDetailFailed: 'Could not copy notification detail',
     backendOutOfDateTitle: 'Backend out of date',
     backendOutOfDateMessage:
-      'Your Hermes backend is older than this desktop build and may not work correctly. Update to align them.',
+      'Your Pacthold backend is older than this desktop build and may not work correctly. Update to align them.',
     installMethodUnsupportedTitle: 'Unsupported install method',
-    updateHermes: 'Update Hermes',
+    updateHermes: 'Update Ordessa',
     updateReadyTitle: 'Update ready',
     updateReadyMessage: count => `${count} new change${count === 1 ? '' : 's'} available.`,
     updateReadyMessageUnknown: 'A new update is available.',
@@ -195,7 +196,7 @@ export const en: Translations = {
       diskFull: 'Disk full — free some space, then try again.',
       gatewayAuthFailed: 'Gateway authentication failed — check your API_SERVER_KEY.',
       methodNotAllowed:
-        'The desktop backend rejected that request (405 Method Not Allowed). Try restarting Hermes Desktop.',
+        'The desktop backend rejected that request (405 Method Not Allowed). Try restarting Ordessa.',
       microphonePermission: 'Microphone permission was denied.',
       openaiRejectedApiKey: 'OpenAI rejected the API key.',
       openaiRejectedApiKeyWithStatus: status => `OpenAI rejected the API key (${status} invalid_api_key).`,
@@ -212,15 +213,15 @@ export const en: Translations = {
       transcriptionFailed: 'Voice transcription failed',
       transcriptionUnavailable: 'Voice transcription is not available yet.',
       tryRecordingAgain: 'Try recording again.',
-      unavailable: 'Voice unavailable'
+      unavailable: 'Awaiting a service capability'
     },
     native: {
       approvalTitle: 'Approval needed',
       approveAction: 'Approve',
       rejectAction: 'Reject',
       inputTitle: 'Input needed',
-      inputBody: 'Hermes is waiting for your response.',
-      turnDoneTitle: 'Hermes finished',
+      inputBody: 'Ordessa is waiting for your response.',
+      turnDoneTitle: 'Ordessa finished',
       turnDoneBody: '',
       turnErrorTitle: 'Turn failed',
       backgroundDoneTitle: 'Background task finished',
@@ -327,7 +328,6 @@ export const en: Translations = {
       'nav.settings': 'Open settings',
       'nav.profiles': 'Open profiles',
       'nav.skills': 'Open skills',
-      'nav.artifacts': 'Open artifacts',
       'nav.cron': 'Open scheduled jobs',
       'nav.agents': 'Open agents',
       'session.new': 'New session',
@@ -431,7 +431,7 @@ export const en: Translations = {
     exportConfig: 'Export config',
     importConfig: 'Import config',
     resetToDefaults: 'Reset to defaults',
-    resetConfirm: 'Reset all settings to Hermes defaults?',
+    resetConfirm: 'Reset all settings to Ordessa defaults?',
     exportFailed: 'Export failed',
     resetFailed: 'Reset failed',
     nav: {
@@ -447,10 +447,116 @@ export const en: Translations = {
       keysSettings: 'Settings',
       mcp: 'MCP',
       archivedChats: 'Archived Chats',
+      scheduledJobs: 'Scheduled jobs',
       about: 'About',
       billing: 'Billing',
       notifications: 'Notifications',
       plugins: 'Plugins'
+    },
+    product: {
+      unavailable: 'Not available yet',
+      unavailableDescription:
+        'Controls appear only after the Pacthold service declares the matching capability. Desktop does not fall back to legacy Hermes settings or pretend a local change was saved.',
+      scope: 'Product scope',
+      boundary: 'Safety boundary',
+      models: {
+        title: 'Models',
+        description: 'Configure model defaults and model slots declared by the service.',
+        boundary: 'Model fields come from service descriptors; Desktop does not hard-code provider or Harness options.',
+        serviceBoundary: 'The Pacthold service has not declared provider/model maintenance yet.',
+        unavailableDescription:
+          'Controls appear only when the Pacthold service is ready and declares every provider/model operation.',
+        add: 'Add model configuration',
+        loading: 'Loading model configurations…',
+        empty: 'No model configurations',
+        emptyDescription: 'Add a service-owned provider/model configuration to make it available to Profiles.',
+        credentialNone: 'No credential',
+        credentialAdd: 'Add credential',
+        credentialLabel: 'Name',
+        credentialSecret: 'API key',
+        credentialSave: 'Save',
+        credentialCancel: 'Cancel',
+        credentialFailed: 'The credential could not be added',
+        error: 'Could not load model configurations',
+        retry: 'Retry',
+        displayName: 'Display name',
+        harness: 'Harness',
+        provider: 'Provider',
+        modelId: 'Model ID',
+        modelDisplayName: 'Model name',
+        credential: 'Credential reference',
+        present: 'present',
+        absent: 'absent',
+        save: 'Save',
+        cancel: 'Cancel',
+        edit: 'Edit',
+        archive: 'Archive',
+        addModel: 'Add model',
+        removeModel: 'Remove model',
+        availability: { available: 'Available', unknown: 'Unknown', unavailable: 'Not available — no reason given' },
+        providerPresets: 'Presets',
+        providerInUse: 'Already in use',
+        providerCustom: 'Custom provider (explicit override)',
+        providerCustomPlaceholder: 'Provider id',
+        harnessCustom: 'Custom harness (explicit override)',
+        harnessCustomPlaceholder: 'Harness name',
+        modelMetaUnknown: 'Context window and capabilities: unknown',
+        modelMetaUnknownTitle: 'The service has not declared these for this model',
+        refreshModels: 'Refresh from provider',
+        testConnection: 'Test connection',
+        capabilityUnavailable: 'Not available: the service declares no method for this yet.',
+      },
+      accounts: {
+        title: 'Accounts',
+        description: 'Subscriptions and API keys this Desktop holds. Both are references: a record carries an opaque id, never material.',
+        empty: 'No account records yet',
+        emptyDescription: 'Add an API key here, or finish an official login on the execution side — this app never collects login details itself.',
+        kindSubscription: 'Subscription (official login)',
+        kindApiKey: 'API key',
+        statusUnknown: 'Status unknown',
+        statusUnknownTitle: 'No service surface can probe accounts yet',
+        lastVerified: 'Last verified',
+        unknown: 'unknown',
+        loginGuidance: 'Sign in on the execution side with the harness’s own login flow. This app never asks for account credentials, never reads a native login state, and never copies a token.',
+        hotSwitchNote: 'Switching the account for a profile takes effect on the next turn — each turn materializes its own process, so nothing has to be restarted and a running turn keeps the account it started with.'
+      },
+      resources: {
+        title: 'Skills & MCP',
+        description: 'Manage a shared resource library, then explicitly select resources on each Profile.',
+        boundary: 'Discovery never auto-enables a resource, and adding MCP configuration does not start it.',
+        skillFields: ['Name and description (from SKILL.md)', 'Source', 'Digest / revision', 'Installed at', 'Update available (declared by the service)', 'Enabled per profile'],
+        skillPending: 'The skill library is not available: these fields appear once the service declares it. Nothing is guessed meanwhile — no installed state, no digest, no update badge.',
+        mcpFields: ['Server name', 'Transport (stdio or remote)', 'Command or URL', 'Credential reference and whether one is missing', 'Last test time and result', 'Enabled per profile'],
+        mcpPending: 'The MCP server list is not available: these fields appear once the service declares it. A credential is shown as a reference only — never its value — and no test button exists until the service can run one.',
+        enablement: 'Enablement is per profile: a family without a slot for a resource says so instead of offering a switch that could not work.'
+      },
+      identities: {
+        title: 'Identities',
+        description: 'Manage named logins and API-key identities without requiring an Ordessa account for local use.',
+        boundary: 'Credentials remain service-owned and are excluded from ordinary configuration and backups.'
+      },
+      hooks: {
+        title: 'Hooks',
+        description: 'Run a command when an event fires — declared per family, edited in one shell.',
+        boundary: 'Hooks never become a single abstraction: each family keeps its own model, and a family that supports no hooks says so instead of offering a switch.',
+        families: ['Claude Code — declarative: event, optional matcher, handler (command/http), timeout, async, status message', 'OpenCode — a code asset: the plugin source itself, with its digest and a preview, placed where that family loads it', 'Codex — shape pending measurement: no form is shown until that family’s real shape is measured'],
+        familiesPending: 'Editing is not available yet: the per-family schema, storage and trigger ledger belong to the service, which has not declared them. Nothing is faked in the meantime — no editable form, no switch, no dead control.',
+        safety: 'Hooks are off by default. Enabling one shows the full command and the event it is bound to, and asks for confirmation: it runs inside that execution’s sandbox with that execution’s isolation and network posture, never directly on this machine.',
+        ledgerFields: ['Hook name and event', 'When it ran', 'Exit code', 'A bounded output summary', 'Blocking, named as such — a hook that stopped the tool call must not read as an ordinary success']
+      },
+      harnesses: {
+        title: 'Harnesses',
+        description: 'Install and update supported Harnesses on this computer only.',
+        boundary: 'Workspace connections and remote targets stay with each Workspace; Desktop never invents install commands.',
+        programFields: ['Current version', 'Other installed versions', 'Size', 'Source', 'Installed at', 'Summary', 'Update badge'],
+        fieldsPending: 'The program directory is not available: these fields appear once the service declares it. Nothing is guessed in the meantime — no version, no size, no update badge.',
+        nextTurn: 'Changing a harness version takes effect on the next turn: nothing restarts, and a turn already running keeps the version it started with.'
+      },
+      data: {
+        title: 'Data management',
+        description: 'Back up app configuration, sessions, drafts, Profile memory, and managed resources.',
+        boundary: 'Credentials, project files, and downloadable tools are excluded; restore requires a compatible service contract.'
+      }
     },
     plugins: {
       title: 'Desktop plugins',
@@ -486,7 +592,7 @@ export const en: Translations = {
         agentTargetLocal: profile => `Installs into the ${profile} backend (~/.hermes/plugins/)`,
         agentTargetRemote: profile => `Installs into the connected ${profile} backend`,
         catalogPinned: (name, sha) =>
-          `Hermes catalog entry "${name}" — the agent component installs at the reviewed pin${sha ? ` ${sha}` : ''}, not the branch tip.`,
+          `Ordessa catalog entry "${name}" — the agent component installs at the reviewed pin${sha ? ` ${sha}` : ''}, not the branch tip.`,
         reviewedHeading: 'Reviewed catalog entry',
         reviewedIntro:
           'This entry was human-reviewed at its pinned commit. You can still inspect the exact code below.',
@@ -524,7 +630,7 @@ export const en: Translations = {
       intro: 'OS notifications (not in-app toasts). Per device.',
       enableAll: 'Enable notifications',
       enableAllDesc: 'Off silences every notification below.',
-      focusedHint: 'Completion alerts only fire while Hermes is in the background.',
+      focusedHint: 'Completion alerts only fire while Ordessa is in the background.',
       kinds: {
         approval: {
           label: 'Approval needed',
@@ -532,11 +638,11 @@ export const en: Translations = {
         },
         input: {
           label: 'Input needed',
-          description: 'Hermes asked a question or needs a password or secret.'
+          description: 'Ordessa asked a question or needs a password or secret.'
         },
         turnDone: {
           label: 'Response ready',
-          description: 'A turn finished while Hermes was in the background.'
+          description: 'A turn finished while Ordessa was in the background.'
         },
         turnError: {
           label: 'Turn failed',
@@ -552,11 +658,11 @@ export const en: Translations = {
         },
         plugin: {
           label: 'Plugin notifications',
-          description: 'A desktop plugin sent a notification while Hermes was in the background.'
+          description: 'A desktop plugin sent a notification while Ordessa was in the background.'
         }
       },
       test: 'Send test notification',
-      testTitle: 'Hermes',
+      testTitle: 'Ordessa',
       testBody: 'Notifications are working.',
       testSent: 'Test sent. If nothing appears, check your OS notification permissions and Focus/Do Not Disturb.',
       testUnsupported: 'This system does not support native notifications.',
@@ -575,7 +681,7 @@ export const en: Translations = {
       advanced: 'Advanced'
     },
     searchPlaceholder: {
-      about: 'About Hermes Desktop',
+      about: 'About Ordessa',
       config: 'Search settings...',
       gateway: 'Gateway connection...',
       keys: 'Search API keys...',
@@ -591,7 +697,7 @@ export const en: Translations = {
       title: 'Appearance',
       intro: 'Desktop-only. Mode is brightness; theme is palette and chat chrome.',
       colorMode: 'Color Mode',
-      colorModeDesc: 'Pick a fixed mode or let Hermes follow your system setting.',
+      colorModeDesc: 'Pick a fixed mode or let Ordessa follow your system setting.',
       toolViewTitle: 'Tool Call Display',
       toolViewDesc: 'Product hides raw tool payloads; Technical shows full input/output.',
       reasoningCollapsedTitle: 'Collapse thinking by default',
@@ -642,13 +748,13 @@ export const en: Translations = {
       introSplashTitle: 'Intro Splash',
       introSplashDesc: 'The wordmark and prompt shown on an empty chat.',
       reactionsTitle: 'Message Reactions',
-      reactionsDesc: 'iMessage-style emoji tapbacks — react to messages, and Hermes can react to yours.',
+      reactionsDesc: 'iMessage-style emoji tapbacks — react to messages, and Ordessa can react to yours.',
       tipsTitle: 'In-App Tips',
       tipsDesc:
-        'A small bubble pointing at one part of the app, shown occasionally while idle and by Hermes when it helps. Closing one retires it for good.',
+        'A small bubble pointing at one part of the app, shown occasionally while idle and by Ordessa when it helps. Closing one retires it for good.',
       tipsReset: (count: number) => `Bring back ${count} closed ${count === 1 ? 'tip' : 'tips'}`,
       toursTitle: 'Guided Tours',
-      toursDesc: 'Let Hermes walk you through the app, dimming the screen and spotlighting each step.',
+      toursDesc: 'Let Ordessa walk you through the app, dimming the screen and spotlighting each step.',
       composerPopoutTitle: 'Floating Composer',
       composerPopoutDesc: 'Allow dragging the composer out of its dock. Turn this off to keep it locked at the bottom.',
       vibeHeartsTitle: 'Vibe Hearts',
@@ -684,9 +790,9 @@ export const en: Translations = {
       pet: {
         title: 'Pet',
         intro:
-          'Adopt an animated petdex mascot that floats over the app and reacts to what Hermes is doing — running while tools execute, celebrating on success, sulking on errors.',
+          'Adopt an animated petdex mascot that floats over the app and reacts to what Ordessa is doing — running while tools execute, celebrating on success, sulking on errors.',
         restartHint:
-          'Pets need a quick restart — the running app started before this feature was added. Quit and reopen Hermes, then come back here.',
+          'Pets need a quick restart — the running app started before this feature was added. Quit and reopen Ordessa, then come back here.',
         on: 'On',
         off: 'Off',
         scaleTitle: 'Size',
@@ -724,17 +830,17 @@ export const en: Translations = {
     fieldLabels: FIELD_LABELS,
     fieldDescriptions: FIELD_DESCRIPTIONS,
     about: {
-      heading: 'Hermes Desktop',
+      heading: 'Ordessa',
       version: value => `Version ${value}`,
       versionUnavailable: 'Version unavailable',
       bundleOutOfSync: 'App build out of date',
       bundleOutOfSyncDesc:
-        'The Hermes runtime was updated, but the desktop app itself is still an older build — new interface features (like Bot Mode) will be missing until it updates. Run the update below to rebuild the app. If that doesn\u2019t clear this warning, reinstall from the latest desktop installer.',
+        'The Pacthold runtime was updated, but the desktop app itself is still an older build — new interface features (like Bot Mode) will be missing until it updates. Run the update below to rebuild the app. If that doesn\u2019t clear this warning, reinstall from the latest desktop installer.',
       bundleOutOfSyncAction: 'Get the installer',
       bundleSwapPending: 'Restart to finish the update',
       bundleSwapPendingDesc:
-        'The updated app is already installed — Hermes only needs to restart to load it. Chats and settings are untouched.',
-      bundleSwapPendingAction: 'Restart Hermes',
+        'The updated app is already installed — Ordessa only needs to restart to load it. Chats and settings are untouched.',
+      bundleSwapPendingAction: 'Restart Ordessa',
       updates: 'Updates',
       checkNow: 'Check now',
       checking: 'Checking…',
@@ -752,7 +858,7 @@ export const en: Translations = {
       justNowSuffix: ' · just now',
       automaticUpdates: 'Automatic updates',
       automaticUpdatesDesc:
-        'Hermes checks for updates automatically in the background and lets you know when one is ready.',
+        'Ordessa checks for updates automatically in the background and lets you know when one is ready.',
       branchCommit: (branch, commit) => `Branch ${branch} · Commit ${commit}`,
       never: 'never',
       justNow: 'just now',
@@ -769,7 +875,7 @@ export const en: Translations = {
       searchPlaceholder: 'Search…',
       noResults: 'No results found',
       systemDefault: 'System default',
-      loading: 'Loading Hermes configuration...',
+      loading: 'Loading Ordessa configuration...',
       emptyTitle: 'Nothing to configure',
       emptyDesc: 'This section has no adjustable settings.',
       failedLoad: 'Settings failed to load',
@@ -791,7 +897,7 @@ export const en: Translations = {
     quickEntry: {
       enabledTitle: 'Quick Entry',
       enabledDesc:
-        'Summon a small composer from anywhere with a global shortcut and fire a prompt without opening Hermes.',
+        'Summon a small composer from anywhere with a global shortcut and fire a prompt without opening Ordessa.',
       shortcutTitle: 'Quick Entry shortcut',
       shortcutDesc: 'Needs at least one modifier, e.g. CommandOrControl+Shift+Space.',
       active: 'Shortcut is active.',
@@ -821,7 +927,7 @@ export const en: Translations = {
     // v2 multi-connection registry: Settings → Gateways.
     connections: {
       title: 'Registered gateways',
-      intro: 'Manage this device and every Hermes gateway it can reach through remote, SSH, or Cloud connections.',
+      intro: 'Manage this device and every Pacthold gateway it can reach through remote, SSH, or Cloud connections.',
       stagedNote:
         'Switch gateways from Sessions. Profiles, chats, messaging, and cron jobs stay with their gateway; work on other gateways keeps running.',
       launchModeTitle: 'At startup, return to Sessions on the last-used gateway',
@@ -848,15 +954,15 @@ export const en: Translations = {
       updateAllRunning: 'Updating all instances…',
       updateAllDone: 'Updates dispatched',
       updateAllFailed: 'Update fan-out failed',
-      updateSkippedCloud: 'Managed by Hermes Cloud',
+      updateSkippedCloud: 'Managed by Ordessa Cloud',
       kindLocal: 'Local',
       kindRemote: 'Remote gateway',
-      kindCloud: 'Hermes Cloud',
+      kindCloud: 'Ordessa Cloud',
       kindSsh: 'SSH',
-      kindLocalDesc: 'The Hermes runtime managed by this app.',
-      kindRemoteDesc: 'A Hermes gateway reachable over HTTP(S) — LAN, Tailscale, or the internet.',
-      kindCloudDesc: 'A hosted instance discovered through your Hermes Cloud account.',
-      kindSshDesc: 'A Hermes install reached over SSH.',
+      kindLocalDesc: 'The Pacthold runtime managed by this app.',
+      kindRemoteDesc: 'An Pacthold gateway reachable over HTTP(S) — LAN, Tailscale, or the internet.',
+      kindCloudDesc: 'A hosted instance discovered through your Ordessa Cloud account.',
+      kindSshDesc: 'An Ordessa install reached over SSH.',
       labelTitle: 'Name',
       labelDesc: 'Required. Shown everywhere this instance appears; must be unique (e.g. “Homelab”, “Work laptop”).',
       labelPlaceholder: 'Homelab',
@@ -864,7 +970,7 @@ export const en: Translations = {
       sshHostTitle: 'SSH host',
       headersTitle: 'Extra gateway headers',
       headersDesc:
-        'Sent with every HTTP and WebSocket request to this gateway — for access proxies such as Cloudflare Access (CF-Access-Client-Id / CF-Access-Client-Secret). Values are stored encrypted. Headers Hermes manages (Authorization, Cookie, Host…) are ignored.',
+        'Sent with every HTTP and WebSocket request to this gateway — for access proxies such as Cloudflare Access (CF-Access-Client-Id / CF-Access-Client-Secret). Values are stored encrypted. Headers Ordessa manages (Authorization, Cookie, Host…) are ignored.',
       headerValuePlaceholder: 'Value',
       headerValueSaved: 'Saved — leave blank to keep',
       headerAdd: 'Add header',
@@ -875,7 +981,7 @@ export const en: Translations = {
       sameBackendHint: (label: string) => `Same backend as “${label}”`,
       localAddHint: 'Local is unavailable: the managed local connection already exists (there is only ever one).',
       cloudAddHint:
-        'Tip: signing in under Hermes Cloud above discovers your agents automatically — use this form only to register a known instance URL by hand.',
+        'Tip: signing in under Ordessa Cloud above discovers your agents automatically — use this form only to register a known instance URL by hand.',
       save: 'Save connection',
       saving: 'Saving…',
       cancel: 'Cancel',
@@ -906,22 +1012,22 @@ export const en: Translations = {
       title: 'Gateway Connection',
       envOverride: 'env override',
       intro:
-        'Local by default. Use remote when this app should drive a Hermes backend elsewhere. Gateway connections are machine-level; profiles are discovered from the gateways you connect.',
+        'Local by default. Use remote when this app should drive an Pacthold backend elsewhere. Gateway connections are machine-level; profiles are discovered from the gateways you connect.',
       envOverrideTitle: 'Environment variables are controlling this desktop session.',
       envOverrideDesc:
         'Unset HERMES_DESKTOP_REMOTE_URL and HERMES_DESKTOP_REMOTE_TOKEN to use the saved setting below.',
       modeTitle: 'Connection mode',
       localTitle: 'Local gateway',
-      localDesc: 'Start a private Hermes backend on localhost. This is the default and works offline.',
+      localDesc: 'Start a private Pacthold backend on localhost. This is the default and works offline.',
       remoteTitle: 'Remote gateway',
-      remoteDesc: 'Connect this desktop shell to a remote Hermes backend.',
+      remoteDesc: 'Connect this desktop shell to a remote Pacthold backend.',
       remoteAuthHint: 'Hosted gateways use OAuth or a username and password; self-hosted ones may use a session token.',
-      cloudTitle: 'Hermes Cloud',
-      cloudDesc: 'Sign in once to Hermes Cloud and pick from the agents on your account — no URL to paste.',
-      cloudSignInTitle: 'Hermes Cloud',
-      cloudSignIn: 'Sign in to Hermes Cloud',
-      cloudSignedIn: 'Signed in to Hermes Cloud',
-      cloudNeedsSignIn: 'Sign in to Hermes Cloud to discover the agents on your account.',
+      cloudTitle: 'Ordessa Cloud',
+      cloudDesc: 'Sign in once to Ordessa Cloud and pick from the agents on your account — no URL to paste.',
+      cloudSignInTitle: 'Ordessa Cloud',
+      cloudSignIn: 'Sign in to Ordessa Cloud',
+      cloudSignedIn: 'Signed in to Ordessa Cloud',
+      cloudNeedsSignIn: 'Sign in to Ordessa Cloud to discover the agents on your account.',
       cloudSignedInDesc: 'You are signed in. Pick an agent below; the session refreshes automatically.',
       cloudAgentsTitle: 'Your agents',
       cloudOrgPickerTitle: 'Choose an organization',
@@ -942,11 +1048,11 @@ export const en: Translations = {
       cloudUseSaved: 'Use gateway',
       cloudActive: 'Active in this window',
       cloudConnecting: 'Connecting…',
-      cloudDiscoverFailed: 'Could not load your Hermes Cloud agents',
+      cloudDiscoverFailed: 'Could not load your Ordessa Cloud agents',
       cloudConnectFailed: 'Could not connect to that agent',
-      cloudSignInFailed: 'Hermes Cloud sign-in failed',
-      cloudSignedOutTitle: 'Signed out of Hermes Cloud',
-      cloudSignedOutMessage: 'Cleared the Hermes Cloud session.',
+      cloudSignInFailed: 'Ordessa Cloud sign-in failed',
+      cloudSignedOutTitle: 'Signed out of Ordessa Cloud',
+      cloudSignedOutMessage: 'Cleared the Ordessa Cloud session.',
       cloudConnectedTitle: 'Connected',
       cloudConnectedPill: 'Connected',
       cloudConnectedTo: name => `Connected to ${name}.`,
@@ -996,7 +1102,7 @@ export const en: Translations = {
       enterUrlFirst: 'Enter a remote URL first.',
       restartingTitle: 'Gateway connection restarting',
       savedTitle: 'Gateway settings saved',
-      restartingMessage: 'Hermes Desktop will reconnect using the saved settings — the shell stays open.',
+      restartingMessage: 'Ordessa will reconnect using the saved settings — the shell stays open.',
       savedMessage: 'Saved for the next restart.',
       connectedTo: (baseUrl, version) => `Connected to ${baseUrl}${version ? ` · Hermes ${version}` : ''}`,
       reachableTitle: 'Remote gateway reachable',
@@ -1010,7 +1116,7 @@ export const en: Translations = {
       saveFailed: 'Could not save gateway settings',
       sshTitle: 'Connect via SSH',
       sshDesc:
-        'Hermes is launched on the remote over SSH and tunneled to this app — nothing to start or expose yourself. Requires working key-based SSH access to the host.',
+        'Ordessa is launched on the remote over SSH and tunneled to this app — nothing to start or expose yourself. Requires working key-based SSH access to the host.',
       sshTrustHint: 'The first presented host key is trusted and pinned; later changes fail closed.',
       sshHostTitle: 'Host',
       sshHostDesc: 'user@host, or a Host alias from ~/.ssh/config.',
@@ -1025,25 +1131,25 @@ export const en: Translations = {
       sshPortDesc: 'Blank = 22 or the ~/.ssh/config port.',
       sshKeyTitle: 'Identity file',
       sshKeyDesc: 'Private key path. Blank = ssh-agent or ~/.ssh/config.',
-      sshHermesPathTitle: 'Hermes path (optional)',
+      sshHermesPathTitle: 'Ordessa path (optional)',
       sshHermesPathDesc: 'Full path to the remote hermes binary. Blank = auto-detect.',
       sshHermesPathPlaceholder: 'auto-detect',
       sshTestConnection: 'Test SSH',
       sshConnect: 'Connect',
       sshButtonsHint: 'Save applies on the next launch. Connect reconnects now.',
-      sshReachable: (host, platform) => `Reachable: ${host} (${platform}) — Hermes found`,
+      sshReachable: (host, platform) => `Reachable: ${host} (${platform}) — Ordessa found`,
       sshIncompleteHost: 'Enter an SSH host before connecting.',
       sshErrUnreachable: 'Could not reach that host over SSH. Check the host, port, and your network.',
       sshErrAuth:
-        'SSH authentication failed. Load your key into the ssh-agent (ssh-add) or set an IdentityFile in ~/.ssh/config — Hermes runs ssh non-interactively.',
+        'SSH authentication failed. Load your key into the ssh-agent (ssh-add) or set an IdentityFile in ~/.ssh/config — Ordessa runs ssh non-interactively.',
       sshErrHostKey:
         'The host key has CHANGED since you last connected. Verify this is expected, then run ssh-keygen -R <host> and reconnect.',
       sshErrNotInstalled:
-        'Hermes is not installed on the remote host. Install it there (curl -fsSL https://hermes-agent.nousresearch.com/install.sh | sh) or set the Hermes path.',
+        'Ordessa is not installed on the remote host. Install it there (curl -fsSL https://hermes-agent.nousresearch.com/install.sh | sh) or set the Ordessa path.',
       sshErrPlatform:
-        'Unsupported remote platform. Hermes Desktop SSH mode supports Linux, macOS, and Windows remote hosts.',
+        'Unsupported remote platform. Ordessa SSH mode supports Linux, macOS, and Windows remote hosts.',
       sshErrTimeout: 'SSH connection timed out. The host may be unreachable or asleep.',
-      sshErrUpdateRequired: 'Update Hermes on the remote host before connecting with Desktop SSH.',
+      sshErrUpdateRequired: 'Update Ordessa on the remote host before connecting with Desktop SSH.',
       sshErrUnknown: 'SSH connection failed.'
     },
     keys: {
@@ -1129,7 +1235,7 @@ export const en: Translations = {
       noOutput: 'No output yet.',
       deepLinkTitle: 'Add MCP server?',
       deepLinkDescription:
-        'A link asked to add this MCP server to Hermes. Review the exact configuration below — it comes from the link, not from Hermes.',
+        'A link asked to add this MCP server to Ordessa. Review the exact configuration below — it comes from the link, not from Ordessa.',
       deepLinkStdioWarning:
         'This server runs a local process on your machine with the command shown below. Only continue if you trust its source.',
       deepLinkConfirm: 'Add server',
@@ -1190,7 +1296,7 @@ export const en: Translations = {
       serverRunning: 'Running',
       runtimeInstalled: 'llama.cpp runtime installed',
       runtimeInstalledDetail: (tag, backend) =>
-        `Build ${tag}, ${backend} backend. Hermes starts and manages the server for you.`,
+        `Build ${tag}, ${backend} backend. Ordessa starts and manages the server for you.`,
       installTitle: 'Install the local runtime',
       installDetail:
         'Downloads the llama.cpp inference engine (a few hundred MB). Models you download run entirely on this machine — no account, nothing leaves your computer.',
@@ -1241,7 +1347,7 @@ export const en: Translations = {
       updateAction: 'Update engine',
       updating: 'Updating engine…',
       upToDateTitle: 'Engine up to date',
-      upToDateDetail: (tag, backend) => `Running llama.cpp ${tag} (${backend}) — the latest build Hermes ships.`,
+      upToDateDetail: (tag, backend) => `Running llama.cpp ${tag} (${backend}) — the latest build Ordessa ships.`,
       updateToast: next => `A newer local engine build (${next}) is available. Update from Settings → Local Models.`,
       activeDetail: 'New chats use this model — it loads when you send your first message',
       activeNotLoaded: 'Loads on your first message',
@@ -1305,7 +1411,7 @@ export const en: Translations = {
       connectAccount: 'Connect an account',
       haveApiKey: 'Have an API key instead?',
       intro:
-        'Sign in with a subscription — no API key to copy. Hermes runs the browser sign-in for you, right here in the app.',
+        'Sign in with a subscription — no API key to copy. Ordessa runs the browser sign-in for you, right here in the app.',
       connected: 'Connected',
       collapse: 'Collapse',
       connectAnother: 'Connect another provider',
@@ -1326,7 +1432,7 @@ export const en: Translations = {
       noKeysMatch: 'No providers match your search.',
       localEndpoint: {
         title: 'Local / custom endpoint',
-        description: 'Point Hermes at any OpenAI-compatible endpoint (Zyphra, vLLM, llama.cpp, Ollama, etc).'
+        description: 'Point Ordessa at any OpenAI-compatible endpoint (Zyphra, vLLM, llama.cpp, Ollama, etc).'
       },
       loading: 'Loading providers...'
     },
@@ -1432,7 +1538,7 @@ export const en: Translations = {
         failedLoad: 'Could not load terminal backends',
         ready: 'Ready',
         needsSetup: 'Needs setup',
-        unavailable: 'Unavailable',
+        unavailable: 'Not available from the service',
         inUse: 'In use',
         selectedTitle: 'Backend selected',
         selectedMessage: backend => `Terminal commands now run via ${backend}. Applies to new sessions.`,
@@ -1450,7 +1556,7 @@ export const en: Translations = {
         failedSave: 'Could not save the real-profile setting',
         prompt: {
           title: 'Stay signed in to your sites',
-          body: 'Let Hermes browse with a snapshot of your default browser profile, so sites open already signed in.',
+          body: 'Let Ordessa browse with a snapshot of your default browser profile, so sites open already signed in.',
           bulletSnapshot: 'Cookies and logins are copied into a managed snapshot.',
           bulletLiveProfile: 'Your live browser profile is never opened directly.',
           bulletLocal: 'Nothing leaves this computer.',
@@ -1524,7 +1630,7 @@ export const en: Translations = {
       emptyHint: 'Browse the catalog below and install a reviewed plugin with one click.',
       loadFailed: 'Could not load agent plugins',
       toggleFailed: (name: string) => `Could not toggle ${name}`,
-      legacyBackend: 'This backend predates key-addressed plugin toggles — update Hermes to manage it here.',
+      legacyBackend: 'This backend predates key-addressed plugin toggles — update Ordessa to manage it here.',
       portableBadge: 'portable',
       catalogTitle: 'Plugin catalog',
       catalogBrowse: 'Browse',
@@ -1532,7 +1638,7 @@ export const en: Translations = {
       catalogHint:
         'Hit "+ Add to this Agent" on any plugin — reviewed entries install at their pinned commit into the selected profile. Bundled agent+desktop plugins offer both halves.',
       alreadyInstalled: (name: string) => `${name} is already installed in this profile.`,
-      catalogProvenance: (sha: string) => `Installed from the Hermes catalog${sha ? ` at pin ${sha}` : ''}.`,
+      catalogProvenance: (sha: string) => `Installed from the Ordessa catalog${sha ? ` at pin ${sha}` : ''}.`,
       tierOfficial: 'official',
       tierCommunity: 'community',
       updateToPin: (sha: string) => `Update to ${sha}`,
@@ -1609,7 +1715,7 @@ export const en: Translations = {
     loadFailed: 'Could not load memory graph',
     loading: 'Loading…',
     emptyTitle: 'Nothing learned yet',
-    emptyDesc: 'As Hermes builds skills and memories for your work, they appear here.',
+    emptyDesc: 'As Ordessa builds skills and memories for your work, they appear here.',
     share: 'Share map',
     shareHint:
       'Copy the code to share this map, or paste one to load. It only includes the layout, not your memory or skill text.',
@@ -1691,7 +1797,7 @@ export const en: Translations = {
       placeholder: 'Search pets…',
       loading: 'Loading petdex gallery…',
       error: 'Could not reach the petdex gallery.',
-      staleBackend: 'Restart Hermes to use pets — the backend predates this feature.',
+      staleBackend: 'Restart Ordessa to use pets — the backend predates this feature.',
       empty: 'No matching pets.',
       turnOff: 'Turn off',
       turnOn: 'Turn on',
@@ -1718,8 +1824,8 @@ export const en: Translations = {
       hatchComposing: 'Piecing it together…',
       hatchSaving: 'Almost there…',
       namePlaceholder: 'Name your pet',
-      staleBackend: 'Update Hermes to generate pets.',
-      backgroundHint: 'You can close this — Hermes will notify you when it’s done.',
+      staleBackend: 'Update Ordessa to generate pets.',
+      backgroundHint: 'You can close this — Ordessa will notify you when it’s done.',
       slowProviderHint: 'This can take several minutes',
       remix: 'Remix',
       remixConfirmTitle: 'Remix this look?',
@@ -1753,9 +1859,12 @@ export const en: Translations = {
       system: 'Status, logs, and system actions',
       usage: 'Token, cost, and skill activity over time'
     },
+    agentBoxUnavailableTitle: 'Ordessa does not provide this surface',
+    agentBoxUnavailableBody:
+      'System, usage and maintenance panels belong to the legacy Hermes runtime, which the Ordessa shell does not call.',
     nav: {
       newChat: { title: 'New session', detail: 'Start a fresh session' },
-      settings: { title: 'Settings', detail: 'Configure Hermes desktop' },
+      settings: { title: 'Settings', detail: 'Configure Ordessa desktop' },
       skills: { title: 'Capabilities', detail: 'Skills, tools, and MCP servers' },
       artifacts: { title: 'Artifacts', detail: 'Browse generated outputs' }
     },
@@ -1776,11 +1885,11 @@ export const en: Translations = {
     noSessions: 'No sessions yet.',
     gatewayRunning: 'Messaging gateway running',
     gatewayStopped: 'Messaging gateway stopped',
-    hermesActiveSessions: (version, count) => `Hermes ${version} · Active sessions ${count}`,
+    hermesActiveSessions: (version, count) => `Ordessa ${version} · Active sessions ${count}`,
     restartGateway: 'Restart gateway',
     openBrowser: 'Open browser',
     gatewayRestartFailed: 'Gateway restart failed.',
-    updateHermes: 'Update Hermes',
+    updateHermes: 'Update Ordessa',
     reloadWindow: 'Reload window',
     actionRunning: 'running',
     actionDone: 'done',
@@ -1955,7 +2064,7 @@ export const en: Translations = {
       menuItem: 'Connect to a remote host…',
       badge: (host: string) => `Runs on ${host}`,
       title: (profile: string) => `Connect ${profile} to a remote host`,
-      description: 'Sessions in this profile will run on the remote Hermes you point it at, instead of this computer.',
+      description: 'Sessions opened while this profile is bound will run on the remote Ordessa you point it at, instead of this computer.',
       urlLabel: 'Remote address',
       urlPlaceholder: 'https://hermes.example.com',
       urlInvalid: 'Enter a full address starting with http:// or https://',
@@ -2020,7 +2129,7 @@ export const en: Translations = {
     deleteDescMid: ' and remove its ',
     deleteDescSuffix: ' directory. This cannot be undone.',
     deleting: 'Deleting...',
-    createDesc: 'Profiles are independent Hermes environments: separate config, skills, and SOUL.md.',
+    createDesc: 'Profiles are independent Ordessa environments: separate config, skills, and SOUL.md.',
     nameLabel: 'Name',
     cloneFrom: 'Clone from',
     cloneFromNone: 'None (blank)',
@@ -2050,7 +2159,74 @@ export const en: Translations = {
     failedLoadSoul: 'Failed to load SOUL.md',
     failedSaveSoul: 'Failed to save SOUL.md',
     failedCreate: 'Failed to create profile',
-    failedRename: 'Failed to rename profile'
+    failedRename: 'Failed to rename profile',
+    agentBoxHarness: 'Harness',
+    agentBoxVersion: 'Version',
+    agentBoxCapabilities: 'Capabilities',
+    agentBoxAvailable: 'Available',
+    agentBoxServiceNoReason: 'the service gave no reason',
+    agentBoxServiceOffline: 'The Pacthold service is offline — roles and settings need it',
+    agentBoxCapabilitiesNotDeclared: 'The service has not declared any capability for this role',
+    agentBoxValuePending: 'Not declared by the service',
+
+    roleSettings: {
+        roleNav: {
+          basics: 'Basics',
+          harness: 'Harness',
+          model: 'Model',
+          credentials: 'Credentials',
+          instruction: 'Instructions',
+          skill: 'Skills',
+          mcp: 'MCP',
+          permission: 'Permission rules',
+          memory: 'Memory'
+        },
+        unsupportedSlot: slot => `This harness does not support the ${slot} configuration`,
+        pendingRecords: 'Editing arrives with the service that owns these records. Until it declares them this section names itself instead of showing controls that could not save.',
+        pendingInstruction: 'Instruction assets attach per role once the service declares the instruction slot.',
+        pendingSkill: 'Skills are enabled per role once the service declares the skill slot.',
+        pendingMcp: 'MCP servers are enabled per role once the service declares the MCP slot.',
+        pendingPermission: 'Permission rules are edited here once the service declares the permission slot.',
+        bindingsDisabled: 'Disabled',
+        bindingsEmpty: 'No assets are bound to this role.',
+        bindingsRevision: revision => `r${revision}`,
+        bindingsTitle: 'Bound assets',
+        memoryRefused: reason => `${reason} — content withheld`,
+        memoryTitle: 'Memory',
+        permissionsAnyTarget: 'any target',
+        permissionsEmpty: 'The service reports no rules for this role.',
+        permissionsPreset: preset => `Preset: ${preset}`,
+        permissionsPresetUnknown: 'No preset reported by the service',
+        permissionsShadowed: 'Overridden by a later rule',
+        credentialsNote: 'Credentials attach to the provider/model records this role points at (see Model). A per-role credential reference waits for the service.',
+      zonesTitle: 'What a role will carry',
+      zones: ['Instructions (asset references and the text itself)', 'Model slot, from the provider/model records', 'Credential or account reference', 'Skills, MCP and hooks, enabled per role', 'Permission rules', 'Advanced runtime limits declared by the service'],
+      zonesPending: 'Editing arrives with the service that owns these records: until it declares them this page names the zones instead of showing controls that could not save.',
+      ownershipTitle: 'Sessions belong to a workspace',
+      ownership: 'A role is bound to a conversation; it does not own it. The binding can change, and changing it is an action on the session — history stays, and each turn records which role and which revision ran it.',
+      permissionsTitle: 'How permission rules will work',
+      permissions: ['One row per tool key (read, edit, bash, task, external_directory, webfetch, skill, …), each ask, allow or deny, with glob patterns allowed', 'The LAST matching rule wins — that is the rule the surface will show, not the first', 'Presets (full access, default, plan) fill the table once and stay overridable; an overridden row reads as customised', 'ask means our approval round trip: the run pauses and asks you at execution time'],
+      rebindTitle: 'Changing the binding, and cloning',
+      rebind: ['Same family: allowed. A family with file-based journals carries its native sessions along; a family sharing one database restarts native continuity — the notice appears BEFORE the change, never after', 'Another family: no in-place switch. Clone the role instead, and the clone lists what migrates and what does not', 'Session-class assets do not migrate, and a clone never inherits an old native session']
+    },
+    agentBoxCapabilityAbsent: 'not declared',
+    agentBoxMaintenanceUnavailable: 'Profile maintenance is unavailable',
+    agentBoxMaintenanceUnavailableDesc:
+      'The service can list profiles, but has not declared create, edit, archive, or native-memory controls.',
+    agentBoxRuntimeConfig: 'Runtime configuration',
+    agentBoxRuntimeConfigDesc: 'Service-described defaults. Saving replaces the whole profile configuration.',
+    agentBoxCreateDesc: 'Choose a name and Harness. The remaining configuration can be completed later.',
+    agentBoxHarnessChoice: 'Harness',
+    agentBoxArchive: 'Archive',
+    agentBoxArchiveTitle: 'Archive profile?',
+    agentBoxArchiveDesc: name => `Archive “${name}”? Existing Session history is kept.`,
+    agentBoxSaveProfile: 'Save profile',
+    agentBoxUpdateFailed: 'Could not update profile',
+    agentBoxConfigLocked: 'Locked by the service',
+    agentBoxConfigRestoreDefault: 'Restore default',
+    agentBoxConfigModelUnverified: 'Not verified',
+    agentBoxConfigSavedNextSend: 'Profile configuration saved. It applies to the next send.',
+    agentBoxConfigSaveFailed: 'Could not update the profile configuration'
   },
 
   cron: {
@@ -2063,7 +2239,7 @@ export const en: Translations = {
         `${count} unpinned scheduled ${count === 1 ? 'job keeps' : 'jobs keep'} running on the model ${count === 1 ? 'it was' : 'they were'} created under. Pin ${count === 1 ? 'it' : 'them'} or set cron.model to move ${count === 1 ? 'it' : 'them'}.`,
       detailMore: (names, remaining) => `${names} and ${remaining} more`,
       review: 'Review scheduled jobs',
-      saveFailed: 'Hermes did not save that model change.',
+      saveFailed: 'Ordessa did not save that model change.',
       confirmTitle: 'Model Selection Warning',
       confirmDetail: 'Confirm only if you accept this trade-off.',
       confirmAction: 'Confirm',
@@ -2124,7 +2300,7 @@ export const en: Translations = {
     everyHourAt: minute => `Every hour at :${minute}`,
     newCron: 'New cron',
     emptyDescNew:
-      'Schedule a prompt to run on a cron expression. Hermes will run it and deliver results to the destination you pick.',
+      'Schedule a prompt to run on a cron expression. Ordessa will run it and deliver results to the destination you pick.',
     emptyDescSearch: 'Try a broader search query.',
     emptyTitleNew: 'No scheduled jobs yet',
     emptyTitleSearch: 'No matches',
@@ -2200,40 +2376,6 @@ export const en: Translations = {
     }
   },
 
-  artifacts: {
-    search: 'Search artifacts...',
-    refresh: 'Refresh artifacts',
-    refreshing: 'Refreshing artifacts',
-    indexing: 'Indexing recent session artifacts',
-    tabAll: 'All',
-    tabImages: 'Images',
-    tabFiles: 'Files',
-    tabLinks: 'Links',
-    noArtifactsTitle: 'No artifacts found',
-    noArtifactsDesc: 'Generated images and file outputs will appear here as sessions produce them.',
-    failedLoad: 'Artifacts failed to load',
-    openFailed: 'Open failed',
-    itemsImage: 'images',
-    itemsLink: 'links',
-    itemsFile: 'files',
-    itemsGeneric: 'items',
-    zero: '0',
-    rangeOf: (start, end, total) => `${start}-${end} of ${total}`,
-    goToPage: (itemLabel, page) => `Go to ${itemLabel} page ${page}`,
-    colTitleLink: 'Link title',
-    colTitleFile: 'Name',
-    colTitleDefault: 'Title / name',
-    colLocationLink: 'URL',
-    colLocationFile: 'Path',
-    colLocationDefault: 'Location',
-    colSession: 'Session',
-    kindImage: 'image',
-    kindFile: 'file',
-    kindLink: 'link',
-    chat: 'Chat',
-    copyUrl: 'Copy URL',
-    copyPath: 'Copy path'
-  },
 
   artifactCard: {
     kind: { code: 'Code', html: 'Interactive page', svg: 'Graphic' },
@@ -2256,6 +2398,70 @@ export const en: Translations = {
   },
 
   sidebar: {
+    agentBoxActions: {
+      newTask: 'New task',
+      search: 'Search'
+    },
+
+    agentBoxArchive: {
+
+      action: 'Archive in Ordessa',
+
+      title: name => `Archive “${name}” in Ordessa?`,
+
+      desc: 'Archives the service workspace record only. The sidebar entry, files, sessions and history stay, and running tasks are not stopped.',
+
+      failed: 'Workspace could not be archived'
+
+    },
+
+    agentBoxSession: {
+
+      loading: 'Loading sessions…',
+
+      empty: 'No Ordessa sessions here yet.',
+
+      unavailable: 'Pacthold service is unavailable.',
+
+      unavailableReasonFallback: 'The service reported no reason.',
+
+      archivedEmpty: 'Nothing archived in Ordessa.',
+
+      loadFailed: 'Archived sessions could not be loaded',
+
+      listUnsupported: 'This Pacthold service does not support listing sessions.',
+
+      workspaceNotProvided: 'No Ordessa sessions are available for this workspace.',
+
+      menuActions: 'Session actions',
+
+      menuRename: 'Rename…',
+
+      menuPin: 'Pin',
+
+      menuUnpin: 'Unpin',
+
+      menuArchive: 'Archive in Ordessa',
+      running: 'Running',
+      unreadLocal: 'Unread — this window',
+
+      pinned: 'Pinned',
+
+      renameTitle: name => `Rename “${name}”`,
+
+      renameFailed: 'Session could not be renamed',
+
+      pinFailed: 'Session could not be pinned',
+
+      unpinFailed: 'Session could not be unpinned',
+
+      archiveTitle: name => `Archive “${name}” in Ordessa?`,
+
+      archiveDesc: 'Archives the session record on the service only. History is kept, nothing running is stopped and no files are touched.',
+
+      archiveFailed: 'Session could not be archived'
+
+    },
     gatewayGroups: {
       grouping: 'Gateway & profile',
       rename: 'Rename group',
@@ -2273,6 +2479,8 @@ export const en: Translations = {
       artifacts: 'Artifacts',
       cron: 'Scheduled jobs'
     },
+    profilesEntry: 'Profiles',
+    settingsEntry: 'Settings',
     searchAria: 'Search sessions',
     searchPlaceholder: 'Search sessions…',
     clearSearch: 'Clear search',
@@ -2296,7 +2504,7 @@ export const en: Translations = {
     noFilterMatches: 'No sessions match these filters',
     projects: {
       showAllSessions: 'Show all sessions',
-      sectionLabel: 'Projects',
+      sectionLabel: 'Workspaces',
       home: 'Home',
       autoDiscovered: 'Auto-discovered',
       newButton: 'New project',
@@ -2331,10 +2539,14 @@ export const en: Translations = {
       reveal: 'Reveal in folder',
       copyPath: 'Copy path',
       removeFromSidebar: 'Hide from sidebar',
+      pathScopeWindowsPath:
+        'This folder is a Windows path, but sessions run on the remote backend, which cannot open it. Pick the folder through the backend browser instead.',
+      pathScopeUnverified:
+        'The backend file system did not answer, so this folder cannot be verified. Nothing was created or started — reconnect and pick the folder again.',
       createFailed: 'Could not create project',
       staleBackend:
-        'Update the Hermes backend to create projects — your backend is older than this desktop app (Settings → Updates → Backend).',
-      deleteConfirm: 'This removes the saved project from Hermes. Files, git repos, and worktrees stay untouched.',
+        'Update the Pacthold backend to create projects — your backend is older than this desktop app (Settings → Updates → Backend).',
+      deleteConfirm: 'This removes the saved project from Ordessa. Files, git repos, and worktrees stay untouched.',
       startWork: 'New worktree',
       newWorktreeTitle: 'New worktree',
       newWorktreeDesc: 'Name the branch for this worktree.',
@@ -2344,7 +2556,7 @@ export const en: Translations = {
       baseBranchNone: 'No branches found',
       startWorkFailed: 'Could not create worktree',
       worktreeStaleBackend:
-        'Update the Hermes backend to create worktrees over this remote connection — it predates the git worktree API.',
+        'Update the Pacthold backend to create worktrees over this remote connection — it predates the git worktree API.',
       worktreeProjectLabel: 'Project',
       worktreeProjectPlaceholder: 'Search projects…',
       worktreeProjectNone: 'No projects with a folder',
@@ -2433,15 +2645,85 @@ export const en: Translations = {
     markAllRead: 'Mark all as read'
   },
 
+  workStatus: {
+    closePanel: 'Close work status',
+    executionsCard: 'Executions',
+    gitAhead: 'Ahead',
+    gitBehind: 'Behind',
+    gitBranch: 'Branch',
+    gitCard: 'Git',
+    gitChangedFiles: 'Changed files',
+    gitDeletions: 'Deletions',
+    gitFieldUnknown: 'unknown',
+    gitFieldUnavailable: reason => `Not obtainable (${reason})`,
+    gitAdditions: 'Additions',
+    pid: 'PID',
+    pidReasonUnknown: 'reason not reported',
+    pidUnknown: reason => `Not reported (${reason})`,
+    refresh: 'Refresh',
+    openPanel: 'Open work status',
+    processCard: 'Process',
+    queuedCount: count => `Queue: ${count}`,
+    stateLabel: state =>
+      ({
+        queued: 'Queued',
+        dispatched: 'Dispatched',
+        running: 'Running',
+        stopping: 'Stopping',
+        stopped: 'Stopped',
+        completed: 'Completed',
+        failed: 'Failed',
+        unknown: 'Unknown'
+      })[state] ?? state
+  },
+
   composer: {
     message: 'Message',
+    profile: 'Profile',
+    chooseProfile: 'Choose a profile',
+    profileRequired: 'Choose a profile before sending',
+    harness: name => `Harness: ${name}`,
+    switchingProfile: 'Switching profile…',
+    profileSwitchUnavailable: 'This profile cannot be used for this session',
+    temporaryConfig: 'Temporary settings',
+    temporaryConfigEmpty: 'This profile has no temporary settings.',
+    takesEffectNextSend: 'Changes apply to the next send.',
+    takesEffectImmediately: 'The service declares these changes immediate.',
+    securityLocked: 'Locked by the service security policy',
+    clearTemporaryValue: 'Use profile default',
+    configUnavailable: 'Configuration is unavailable',
+    workspaceOpening: 'Registering this workspace with the service…',
+    workspaceUnavailable: 'This workspace is not registered with the service.',
+    configResolving: 'Checking this configuration with the service…',
+    configResolved: 'The service confirmed these effective values.',
+    configRejected: 'The service will not accept this configuration, so it cannot be sent.',
+    configResolveUnavailable: 'The service cannot confirm this configuration.',
+    configEffectiveValue: 'Effective',
+    configEffectiveServiceConfirmed: 'Service-confirmed value',
+    configFixesOnAccept: 'The running configuration is fixed only when the service accepts a send.',
+    emptyState: {
+      greeting: 'What are we building?',
+      subtitle: 'Ask in your own words — the composer below is the same one you will keep using.',
+      starters: ['Summarize this week’s changes', 'Fix a failing test', 'Explain this codebase'],
+      waiting: 'Waiting for the Pacthold service…',
+      blocked: 'Choose a project (and a role) to start — the composer below shows why.'
+    },
+    serviceUnreachable: 'The Pacthold service is not reachable',
+    workspaceMissing: 'Choose a project for this chat',
+    disabledPlaceholder: 'Sending is on hold — choose a project (and a role) to start',
+    modelSelector: 'Model',
+    modelSelectorSearch: 'Search models…',
+    modelSelectorEmpty: 'No models available',
+    modelSelectorDefault: 'Profile default',
+    contextUsage: 'Context usage',
+    contextUsageUnknown: 'Unknown',
     wakingProfile: profile => `Waking up ${profile}…`,
-    placeholderStarting: 'Starting Hermes...',
-    placeholderReconnecting: 'Reconnecting to Hermes…',
+    placeholderStarting: 'Starting Ordessa...',
+    placeholderReconnecting: 'Reconnecting to Ordessa…',
     placeholderFollowUp: 'Send follow-up',
     newSessionPlaceholders: [
       'What are we building?',
-      'Give Hermes a task',
+      'Give Ordessa a task',
       "What's on your mind?",
       'Describe what you need',
       'What should we tackle?',
@@ -2488,7 +2770,7 @@ export const en: Translations = {
       'composer.history': 'cycle popover / history'
     },
     attachUrlTitle: 'Attach a URL',
-    attachUrlDesc: 'Hermes will fetch the page and include it as context for this turn.',
+    attachUrlDesc: 'Ordessa will fetch the page and include it as context for this turn.',
     urlPlaceholder: 'https://example.com/post',
     urlHintPre: 'Include the full URL, e.g. ',
     attach: 'Attach',
@@ -2726,7 +3008,7 @@ export const en: Translations = {
       createPr: 'Create PR',
       openPr: 'Open PR',
       ghMissing: 'Install the GitHub CLI (gh) and sign in to open PRs',
-      agentShip: 'Ask Hermes to open PR',
+      agentShip: 'Ask Ordessa to open PR',
       agentShipUnavailable: "The chat that owns these changes isn't on screen.",
       agentShipPrompt:
         'Review the current changes, commit them with a clear conventional-commit message, push the branch, and open a pull request.',
@@ -2745,9 +3027,9 @@ export const en: Translations = {
       fetch: 'Downloading…',
       pull: 'Almost there…',
       pydeps: 'Finishing up…',
-      update: 'Updating Hermes…',
+      update: 'Updating Ordessa…',
       rebuild: 'Rebuilding the desktop app…',
-      restart: 'Restarting Hermes…',
+      restart: 'Restarting Ordessa…',
       done: 'Update complete',
       manual: 'Update from your terminal',
       guiSkew: 'Update the desktop app',
@@ -2757,43 +3039,43 @@ export const en: Translations = {
     checkFailedTitle: 'Couldn’t check for updates',
     tryAgain: 'Try again',
     notAvailableTitle: 'Update not available',
-    unsupportedMessage: 'This version of Hermes can’t update itself from inside the app.',
+    unsupportedMessage: 'This version of Ordessa can’t update itself from inside the app.',
     connectionRetry: 'Check your connection and try again.',
     latestBody: 'You’re running the latest version.',
     latestBodyBackend: 'The backend is running the latest version.',
     allSetTitle: 'You’re all set',
     availableTitle: 'New update available',
-    availableBody: 'A new version of Hermes is ready to install.',
+    availableBody: 'A new version of Ordessa is ready to install.',
     availableTitleBackend: 'Backend update available',
-    availableBodyBackend: 'A newer version of the connected Hermes backend is ready to install.',
+    availableBodyBackend: 'A newer version of the connected Pacthold backend is ready to install.',
     availableBodyNoChangelog: 'A newer version is ready. Release notes aren’t available for this install type.',
     updateNow: 'Update now',
     maybeLater: 'Maybe later',
     moreChanges: count => `+ ${count} more change${count === 1 ? '' : 's'} included.`,
     manualTitle: 'Update from your terminal',
-    manualBody: 'You installed Hermes from the command line, so updates run there too. Paste this into your terminal:',
-    manualPickedUp: 'Hermes will pick up the new version next time you launch it.',
+    manualBody: 'You installed Ordessa from the command line, so updates run there too. Paste this into your terminal:',
+    manualPickedUp: 'Ordessa will pick up the new version next time you launch it.',
     guiSkewTitle: 'Update the desktop app',
     guiSkewBody:
-      'The backend was updated, but this desktop app package wasn’t changed. Update or reinstall the Hermes desktop app (your AppImage / .deb / .rpm) to match.',
+      'The backend was updated, but this desktop app package wasn’t changed. Update or reinstall the Ordessa desktop app (your AppImage / .deb / .rpm) to match.',
     copy: 'Copy',
     copied: 'Copied',
     done: 'Done',
     applyingBody:
-      'The Hermes updater takes over in its own window and reopens Hermes automatically when it’s done. Please don’t reopen Hermes yourself while it’s updating.',
+      'The Ordessa updater takes over in its own window and reopens Ordessa automatically when it’s done. Please don’t reopen Ordessa yourself while it’s updating.',
     applyingBodyBackend:
-      'The remote backend is applying the update and will restart. Hermes reconnects automatically when it’s back.',
-    applyingClose: 'This window will close while the update runs, then Hermes reopens on its own.',
+      'The remote backend is applying the update and will restart. Ordessa reconnects automatically when it’s back.',
+    applyingClose: 'This window will close while the update runs, then Ordessa reopens on its own.',
     errorTitle: 'Update didn’t finish',
     errorBody: 'No worries — nothing was lost. You can try again now.',
-    blockerTitle: 'Close local previews to update Hermes?',
+    blockerTitle: 'Close local previews to update Ordessa?',
     blockerBody:
-      'Hermes needs to stop these local previews before updating. This will not modify or delete your files.',
-    foreignBlockerTitle: 'Close other processes to update Hermes',
+      'Ordessa needs to stop these local previews before updating. This will not modify or delete your files.',
+    foreignBlockerTitle: 'Close other processes to update Ordessa',
     foreignBlockerBody:
-      'Hermes can’t safely close these processes automatically. Close the app, terminal, or service that owns each one, then try the update again.',
+      'Ordessa can’t safely close these processes automatically. Close the app, terminal, or service that owns each one, then try the update again.',
     mixedBlockerBody:
-      'Hermes can close the local previews listed below. Other processes must be closed manually before the update can continue.',
+      'Ordessa can close the local previews listed below. Other processes must be closed manually before the update can continue.',
     closePreviewsAndUpdate: 'Close previews and update',
     closePreviewsAndCheckAgain: 'Close previews and check again',
     localPreview: 'Local preview',
@@ -2827,7 +3109,7 @@ export const en: Translations = {
       skipped: 'Skipped',
       failed: 'Failed'
     },
-    oneTimeTitle: 'Hermes needs a one-time install',
+    oneTimeTitle: 'Ordessa needs a one-time install',
     unsupportedDesc: platform =>
       `Automated first-launch install isn’t available on ${platform} yet. Open Terminal and run the command below, then relaunch this app. Subsequent launches will skip this step.`,
     installCommand: 'Install command',
@@ -2835,22 +3117,22 @@ export const en: Translations = {
     viewDocs: 'View install docs',
     installTo: 'Will install to',
     retryAfterRun: 'I’ve run it -- retry',
-    setupChoiceTitle: 'Set up Hermes Desktop',
+    setupChoiceTitle: 'Set up Ordessa',
     setupChoiceDesc:
-      'Connect this app to a Hermes gateway you already run, or install Hermes locally on this computer.',
-    connectExistingTitle: 'Connect to existing Hermes',
+      'Connect this app to an Pacthold gateway you already run, or install Ordessa locally on this computer.',
+    connectExistingTitle: 'Connect to existing Ordessa',
     connectExistingShort: 'Connect existing',
     connectExistingDesc: 'Use a remote backend with a session token or browser sign-in. No local install will start.',
-    installLocalTitle: 'Install Hermes locally',
-    installLocalDesc: 'Download Hermes, create its Python environment, and run the backend on this computer.',
-    localStartUnavailable: 'Local installation could not start. Restart Hermes Desktop and try again.',
-    remoteSetupTitle: 'Connect to existing Hermes',
-    remoteSetupDesc: 'Enter your gateway URL. Hermes Desktop will detect whether it needs a token or browser sign-in.',
+    installLocalTitle: 'Install Ordessa locally',
+    installLocalDesc: 'Download Ordessa, create its Python environment, and run the backend on this computer.',
+    localStartUnavailable: 'Local installation could not start. Restart Ordessa and try again.',
+    remoteSetupTitle: 'Connect to existing Ordessa',
+    remoteSetupDesc: 'Enter your gateway URL. Ordessa will detect whether it needs a token or browser sign-in.',
     remoteUrlTitle: 'Gateway URL',
-    remoteUrlDesc: 'Use the base URL of the Hermes gateway, including https:// when remote.',
+    remoteUrlDesc: 'Use the base URL of the Pacthold gateway, including https:// when remote.',
     remoteUrlPlaceholder: 'https://gateway.example.com/hermes',
     probing: 'Detecting gateway authentication...',
-    probeError: 'Could not reach that Hermes gateway.',
+    probeError: 'Could not reach that Pacthold gateway.',
     identityProvider: 'your identity provider',
     authTitle: 'Authentication',
     authNeedsOauth: provider => `Sign in with ${provider} before testing this gateway.`,
@@ -2870,12 +3152,12 @@ export const en: Translations = {
     applyRemote: 'Apply and reconnect',
     backToSetup: 'Back',
     failedTitle: 'Installation failed',
-    settingUpTitle: 'Setting up Hermes Agent',
+    settingUpTitle: 'Setting up Ordessa Agent',
     finishingTitle: 'Finishing up',
     failedDesc:
-      'One of the install steps failed. On Windows, this can happen if another Hermes CLI or desktop instance is running. Stop any running Hermes instances, then retry. Check the details below or the desktop log for the full transcript.',
+      'One of the install steps failed. On Windows, this can happen if another Ordessa CLI or desktop instance is running. Stop any running Ordessa instances, then retry. Check the details below or the desktop log for the full transcript.',
     activeDesc:
-      'This is a one-time setup. The Hermes installer is downloading dependencies and configuring your machine. Subsequent launches will skip this step.',
+      'This is a one-time setup. The Ordessa installer is downloading dependencies and configuring your machine. Subsequent launches will skip this step.',
     progress: (completed, total) => `${completed} of ${total} steps complete`,
     currentStage: stage => ` -- now: ${stage}`,
     fetchingManifest: 'Fetching installer manifest...',
@@ -2893,10 +3175,10 @@ export const en: Translations = {
   },
 
   onboarding: {
-    headerTitle: "Let's get you setup with Hermes Agent",
+    headerTitle: "Let's get you setup with Ordessa Agent",
     headerDesc: 'Connect a model provider to start chatting. Most options take one click.',
-    preparingInstall: 'Hermes is finishing install. This usually takes under a minute on first run.',
-    starting: 'Starting Hermes…',
+    preparingInstall: 'Ordessa is finishing install. This usually takes under a minute on first run.',
+    starting: 'Starting Ordessa…',
     lookingUpProviders: 'Looking up providers...',
     collapse: 'Collapse',
     otherProviders: 'Other providers',
@@ -2904,7 +3186,7 @@ export const en: Translations = {
     chooseLater: "I'll choose a provider later",
     recommended: 'Recommended',
     connected: 'Connected',
-    featuredPitch: 'One subscription, 300+ frontier models — the recommended way to run Hermes',
+    featuredPitch: 'One subscription, 300+ frontier models — the recommended way to run Ordessa',
     fireworksPitch: 'Direct model API — Fireworks-hosted frontier models',
     localModelsTitle: 'Run models locally',
     localModelsPitch: 'No account needed — download a model and run it on this machine',
@@ -2923,7 +3205,7 @@ export const en: Translations = {
       xai: { short: 'Grok models', description: 'Direct access to xAI Grok models.' },
       local: {
         short: 'self-hosted',
-        description: 'Point Hermes at a local or self-hosted OpenAI-compatible endpoint (vLLM, llama.cpp, Ollama, etc).'
+        description: 'Point Ordessa at a local or self-hosted OpenAI-compatible endpoint (vLLM, llama.cpp, Ollama, etc).'
       }
     },
     backToSignIn: 'Back to sign in',
@@ -2936,7 +3218,7 @@ export const en: Translations = {
     update: 'Update',
     flowSubtitles: {
       pkce: 'Opens your browser to sign in, then continues here',
-      device_code: 'Opens a verification page in your browser — Hermes connects automatically',
+      device_code: 'Opens a verification page in your browser — Ordessa connects automatically',
       external: 'Sign in once in your terminal, then come back to chat'
     },
     startingSignIn: provider => `Starting sign-in for ${provider}...`,
@@ -2949,12 +3231,12 @@ export const en: Translations = {
     pickDifferentProvider: 'Pick a different provider',
     signInWith: provider => `Sign in with ${provider}`,
     openedBrowser: provider => `We opened ${provider} in your browser.`,
-    authorizeThere: 'Authorize Hermes there.',
+    authorizeThere: 'Authorize Ordessa there.',
     copyAuthCode: 'Copy the authorization code and paste it below.',
     pasteAuthCode: 'Paste authorization code',
     reopenAuthPage: 'Re-open authorization page',
     autoBrowser: provider =>
-      `We opened ${provider} in your browser. Authorize Hermes there and you'll be connected automatically — nothing to copy or paste.`,
+      `We opened ${provider} in your browser. Authorize Ordessa there and you'll be connected automatically — nothing to copy or paste.`,
     reopenSignInPage: 'Re-open sign-in page',
     waitingAuthorize: 'Waiting for you to authorize...',
     externalPending: provider =>
@@ -3028,10 +3310,10 @@ export const en: Translations = {
       fastFailed: 'Fast mode update failed'
     },
     gatewayMenu: {
-      gateway: 'Gateway',
+      gateway: 'Service',
       connected: 'Connected',
       connecting: 'Connecting',
-      offline: 'Offline',
+      offline: 'No connection to the service',
       inferenceReady: 'Inference ready',
       inferenceNotReady: 'Inference not ready',
       checkingInference: 'Checking inference',
@@ -3059,13 +3341,13 @@ export const en: Translations = {
       update: 'update',
       updateInProgress: 'Update in progress',
       commitsBehind: (count, branch) => `${count} commit${count === 1 ? '' : 's'} behind ${branch}`,
-      desktopVersion: version => `Hermes Desktop v${version}`,
+      desktopVersion: version => `Ordessa v${version}`,
       backendVersion: version => `Backend v${version}`,
       clientLabel: version => `client v${version}`,
       connectionSsh: host => `SSH: ${host}`,
       connectionRemote: host => `Remote: ${host}`,
       connectionCloud: host => `Cloud: ${host}`,
-      connectionCloudTooltip: host => `Hermes Cloud · ${host}`,
+      connectionCloudTooltip: host => `Ordessa Cloud · ${host}`,
       connectionSshTooltip: host => `SSH · ${host}`,
       connectionRemoteTooltip: host => `Remote · ${host}`,
       backendLabel: version => `backend v${version}`,
@@ -3075,15 +3357,15 @@ export const en: Translations = {
       openCommandCenter: 'Open Command Center',
       showTerminal: 'Show terminal',
       hideTerminal: 'Hide terminal',
-      gateway: 'Gateway',
+      gateway: 'Service',
       gatewayReady: 'ready',
       gatewayNeedsSetup: 'needs setup',
       gatewayUnavailable: 'inference unavailable',
       gatewayChecking: 'checking',
       gatewayConnecting: 'connecting',
-      gatewayOffline: 'offline',
+      gatewayOffline: 'Gateway is not connected',
       gatewayRestarting: 'restarting…',
-      gatewayTitle: 'Gateway',
+      gatewayTitle: 'Service',
       customizeTitle: 'Show in status bar',
       hideStatusbar: 'Hide status bar',
       resetStatusbar: 'Reset to defaults',
@@ -3210,7 +3492,7 @@ export const en: Translations = {
     binaryTitle: 'This looks like a binary file',
     binaryBody: label => `Previewing ${label} may show unreadable text.`,
     largeTitle: 'This file is large',
-    largeBody: (label, size) => `${label} is ${size}. Hermes will only show the first 512 KB.`,
+    largeBody: (label, size) => `${label} is ${size}. Ordessa will only show the first 512 KB.`,
     previewAnyway: 'Preview anyway',
     truncated: 'Showing first 512 KB.',
     noInlineTitle: 'No inline preview',
@@ -3251,11 +3533,11 @@ export const en: Translations = {
         'This address points at the machine running your agent, not this one. The browser pane loads pages locally, so a remote dev server needs a port forward or a reachable hostname.',
       failedToLoad: 'Preview failed to load',
       tryAgain: 'Try again',
-      restarting: 'Hermes is restarting...',
-      askRestart: 'Ask Hermes to restart the server',
-      lookingRestart: taskId => `Hermes is looking for a preview server to restart (${taskId})`,
+      restarting: 'Ordessa is restarting...',
+      askRestart: 'Ask Ordessa to restart the server',
+      lookingRestart: taskId => `Ordessa is looking for a preview server to restart (${taskId})`,
       restartingTitle: 'Restarting preview server',
-      restartingMessage: 'Hermes is working in the background. Watch the preview console for progress.',
+      restartingMessage: 'Ordessa is working in the background. Watch the preview console for progress.',
       startRestartFailed: message => `Could not start server restart: ${message}`,
       restartFailed: 'Server restart failed',
       hideConsole: 'Hide preview console',
@@ -3267,16 +3549,16 @@ export const en: Translations = {
       reload: 'Reload page',
       address: 'Address',
       addressPlaceholder: 'Enter address',
-      blankPageBody: 'Type an address above to browse, or ask Hermes to open a page.',
-      finishedRestarting: message => `Hermes finished restarting the preview server${message ? `: ${message}` : ''}`,
+      blankPageBody: 'Type an address above to browse, or ask Ordessa to open a page.',
+      finishedRestarting: message => `Ordessa finished restarting the preview server${message ? `: ${message}` : ''}`,
       failedRestarting: message => `Server restart failed: ${message}`,
       unknownError: 'unknown error',
       restartedTitle: 'Preview server restarted',
       reloadingNow: 'Reloading the preview now.',
       restartFailedTitle: 'Preview restart failed',
-      restartFailedMessage: 'Hermes could not restart the server.',
+      restartFailedMessage: 'Ordessa could not restart the server.',
       stillWorking:
-        'Hermes is still working, but no restart result has arrived yet. The server command may be running in the foreground.',
+        'Ordessa is still working, but no restart result has arrived yet. The server command may be running in the foreground.',
       workspaceReloading: 'Workspace changed, reloading preview',
       fileChanged: url => `File changed, reloading preview: ${url}`,
       filesChanged: (count, url) => `${count} file changes, reloading preview: ${url}`,
@@ -3375,9 +3657,9 @@ export const en: Translations = {
 
   assistant: {
     thread: {
-      loadingSession: 'Loading session',
+      loadingSession: 'Loading this chat',
       showEarlier: 'Show earlier messages',
-      loadingResponse: 'Hermes is loading a response',
+      loadingResponse: 'Loading a response',
       loadingLocalModel: model => `Loading ${model} into memory`,
       processingPrompt: 'Processing prompt',
       resumeWhenBackgroundDone: count =>
@@ -3439,7 +3721,7 @@ export const en: Translations = {
       attachingFile: 'Attaching…'
     },
     approval: {
-      gatewayDisconnected: 'Hermes gateway is not connected',
+      gatewayDisconnected: 'Pacthold gateway is not connected',
       sendFailed: 'Could not send approval response',
       run: 'Run',
       command: 'Command',
@@ -3450,12 +3732,12 @@ export const en: Translations = {
       reject: 'Reject',
       alwaysTitle: 'Always allow this command?',
       alwaysDescription: pattern =>
-        `This adds the “${pattern}” pattern to your permanent allowlist (~/.hermes/config.yaml). Hermes won’t ask again for commands like this — in this session or any future one.`,
+        `This adds the “${pattern}” pattern to your permanent allowlist (~/.hermes/config.yaml). Ordessa won’t ask again for commands like this — in this session or any future one.`,
       alwaysAllow: 'Always allow'
     },
     clarify: {
       notReady: 'Clarify request is not ready yet',
-      gatewayDisconnected: 'Hermes gateway is not connected',
+      gatewayDisconnected: 'Pacthold gateway is not connected',
       sendFailed: 'Could not send clarify response',
       loadingQuestion: 'Loading question…',
       other: 'Other (type your answer)',
@@ -3490,7 +3772,7 @@ export const en: Translations = {
       envRequired: 'Fill in the required credentials first',
       sendFailed: 'Could not send MCP setup response',
       reloadFailed: 'Server saved, but reloading MCP tools failed — they load next session',
-      gatewayDisconnected: 'Hermes gateway is not connected'
+      gatewayDisconnected: 'Pacthold gateway is not connected'
     },
     tool: {
       copyCode: 'Copy code',
@@ -3581,14 +3863,14 @@ export const en: Translations = {
   },
 
   prompts: {
-    gatewayDisconnected: 'Hermes gateway is not connected',
+    gatewayDisconnected: 'Pacthold gateway is not connected',
     sudoSendFailed: 'Could not send sudo password',
     secretSendFailed: 'Could not send secret',
     sudoTitle: 'Administrator password',
-    sudoDesc: 'Hermes needs your sudo password to run a privileged command. It is sent only to your local agent.',
+    sudoDesc: 'Ordessa needs your sudo password to run a privileged command. It is sent only to your local agent.',
     sudoPlaceholder: 'sudo password',
     secretTitle: 'Secret required',
-    secretDesc: 'Hermes needs a credential to continue.',
+    secretDesc: 'Ordessa needs a credential to continue.',
     secretPlaceholder: 'secret value'
   },
 
@@ -3645,8 +3927,8 @@ export const en: Translations = {
     sessionExportFailed: 'Could not export session',
     imageSaved: 'Image saved',
     downloadStarted: 'Download started',
-    restartToUseSaveImage: 'Restart Hermes Desktop to use Save Image.',
-    restartToSaveImages: 'Restart Hermes Desktop to save images',
+    restartToUseSaveImage: 'Restart Ordessa to use Save Image.',
+    restartToSaveImages: 'Restart Ordessa to save images',
     imageDownloadFailed: 'Image download failed',
     openImage: 'Open image',
     downloadImage: 'Download image',
@@ -3678,10 +3960,10 @@ export const en: Translations = {
       },
       skills: {
         title: 'Teach it once',
-        text: 'Skills are folders of instructions Hermes loads when the work calls for them.'
+        text: 'Skills are folders of instructions Ordessa loads when the work calls for them.'
       },
       artifacts: {
-        title: 'Everything Hermes made',
+        title: 'Everything Ordessa made',
         text: 'Images, files and links from every session, indexed in one place.'
       },
       cron: {
@@ -3694,7 +3976,7 @@ export const en: Translations = {
       },
       profiles: {
         title: 'Profiles are separate',
-        text: 'Each one is its own Hermes — own keys, own memory, own sessions.'
+        text: 'Each one is its own Ordessa — own keys, own memory, own sessions.'
       },
       'composer-mentions': {
         title: 'Attach and command',
@@ -3718,6 +4000,73 @@ export const en: Translations = {
     boundaryDesc: 'The view hit an unexpected error. Your chats and settings are safe.',
     reloadWindow: 'Reload window',
     openLogs: 'Open logs'
+  },
+
+  wslWorkspace: {
+    menuOpenFolder: 'Open folder',
+    menuOpenRemoteFolder: 'Open remote folder',
+    stepConfig: 'Configure WSL',
+    stepBrowse: 'Choose a directory',
+    distributionLabel: 'Distribution',
+    distributionStateRunning: 'Running',
+    distributionStateStopped: 'Stopped',
+    discovering: 'Discovering distributions…',
+    discoverFailed: 'Could not discover WSL distributions.',
+    wslUnavailableDesc: 'Windows Subsystem for Linux is not available on this machine.',
+    userLabel: 'Linux user',
+    userPlaceholder: 'Leave empty to use the distribution default',
+    connectingDesc: 'Verifying the distribution and user. This is bounded and can be cancelled.',
+    pathLabel: 'Path',
+    goTo: 'Go',
+    upOneLevel: 'Up one level',
+    showHidden: 'Show hidden directories',
+    browseUnavailable: 'Ordessa directory browsing is unavailable',
+    readOnly: 'Read-only',
+    cannotOpen: 'Cannot open',
+    kindFile: 'File',
+    kindOther: 'Other',
+    emptyDirectory: 'No subdirectories here',
+    chooseDirectory: 'Use this directory',
+    connectionInfo: 'Connection info',
+    reconnect: 'Reconnect',
+    reconnecting: 'Verifying…',
+    statusValidated: 'Verified',
+    statusUnverified: 'Not verified',
+    statusValidating: 'Verifying…',
+    statusFailed: 'Unreachable',
+    userChangedWarning: user => `The distribution's default user is now ${user}, which differs from the identity saved with this workspace.`,
+    defaultUserLabel: 'Distribution default',
+    verifiedUserLabel: 'Verified user',
+    rootPathLabel: 'Directory',
+    sessionUnavailable: 'Sessions in WSL workspaces are not part of this round yet.',
+    wslBadge: 'WSL',
+    // Row management (round 36): rename / remove from the row menu.
+    menuRename: 'Rename…',
+    menuRemove: 'Remove from sidebar',
+    moreActions: 'More actions',
+    removeTitle: name => `Remove "${name}"?`,
+    removeDesc: 'Only this sidebar record is removed. Files, sessions and history in the directory are kept, and re-opening the folder picks them up again.',
+    renameTitle: name => `Rename "${name}"`,
+    renameFailed: 'The workspace could not be renamed.',
+    toggleExpand: (name, open) => `${open ? 'Collapse' : 'Expand'} ${name}`,
+    removeFailed: 'The workspace could not be removed.',
+    errWslUnavailable: 'WSL is not available on this machine.',
+    errWslUnknownDistribution: 'That distribution does not exist. Refresh and pick again.',
+    errWslUserNotFound: 'That Linux user does not exist in this distribution.',
+    errWslConnectTimeout: 'Connecting timed out. Check the distribution and try again.',
+    errWslConnectFailed: 'Could not connect to the distribution.',
+    errWslCancelled: 'Cancelled.',
+    errWslConnectionExpired: 'The connection expired. Connect again.',
+    errWslInvalidPath: 'Enter an absolute Linux directory path.',
+    errWslDirectoryNotFound: 'That directory does not exist.',
+    errWslDirectoryNoPermission: 'This directory cannot be read with the selected user.',
+    errWslListFailed: 'Could not list the directory contents.',
+    errWslListOverflow: 'This directory has too many entries to list.',
+    errWslSaveFailed: 'Saving the workspace failed.',
+    errWslNotFound: 'This workspace no longer exists.',
+    errWslStoreFutureVersion: 'The workspace store was written by a newer version of the app. Update the app before making changes.',
+    errWslStoreIllegalVersion: 'The workspace store file is damaged (unreadable version). Nothing was changed; fix or remove the file by hand.',
+    errUnexpected: 'Something went wrong.'
   },
 
   ui: {

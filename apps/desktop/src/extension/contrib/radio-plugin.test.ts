@@ -40,7 +40,7 @@ describe('bundled Radio plugin', () => {
     vi.stubGlobal('Audio', audio)
     const initialStyles = document.head.querySelectorAll('style').length
 
-    discoverBundledPlugins()
+    discoverBundledPlugins('agentbox')
     expect($pluginRecords.get().radio).toMatchObject({ kind: 'bundled', status: 'disabled' })
     expect(registry.getArea('statusBar.right').some(item => item.source === 'plugin:radio')).toBe(false)
     expect(document.head.querySelectorAll('style').length).toBe(initialStyles)
@@ -59,7 +59,7 @@ describe('bundled Radio plugin', () => {
 
   it('releases the stream on disable and ignores late media events from the old player', async () => {
     $pluginDecisions.set({ accent: false, kanban: false, 'hermes-bots': false })
-    discoverBundledPlugins()
+    discoverBundledPlugins('agentbox')
     // jsdom has no decoder: the actual player and plugin lifecycle run against DOM media events.
     vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue()
     vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {})

@@ -177,6 +177,7 @@ export interface Translations {
       gatewaySettings: string
       back: string
       openLogs: string
+      dismiss: string
       repairHint: string
       remoteSignInHint: (signInLabel: string) => string
       signOutAndSignIn: string
@@ -393,10 +394,114 @@ export interface Translations {
       keysSettings: string
       mcp: string
       archivedChats: string
+      scheduledJobs: string
       about: string
       billing: string
       notifications: string
       plugins: string
+    }
+    product: {
+      unavailable: string
+      unavailableDescription: string
+      scope: string
+      boundary: string
+      models: {
+        title: string
+        description: string
+        boundary: string
+        serviceBoundary: string
+        unavailableDescription: string
+        add: string
+        loading: string
+        empty: string
+        emptyDescription: string
+        credentialNone: string
+        credentialAdd: string
+        credentialLabel: string
+        credentialSecret: string
+        credentialSave: string
+        credentialCancel: string
+        credentialFailed: string
+        error: string
+        retry: string
+        displayName: string
+        harness: string
+        provider: string
+        modelId: string
+        modelDisplayName: string
+        credential: string
+        present: string
+        absent: string
+        save: string
+        cancel: string
+        edit: string
+        archive: string
+        addModel: string
+        removeModel: string
+        availability: { available: string; unknown: string; unavailable: string }
+        providerPresets: string
+        providerInUse: string
+        providerCustom: string
+        providerCustomPlaceholder: string
+        harnessCustom: string
+        harnessCustomPlaceholder: string
+        modelMetaUnknown: string
+        modelMetaUnknownTitle: string
+        refreshModels: string
+        testConnection: string
+        capabilityUnavailable: string
+      }
+      accounts: {
+        title: string
+        description: string
+        empty: string
+        emptyDescription: string
+        kindSubscription: string
+        kindApiKey: string
+        statusUnknown: string
+        statusUnknownTitle: string
+        lastVerified: string
+        unknown: string
+        loginGuidance: string
+        hotSwitchNote: string
+      }
+      resources: {
+        title: string
+        description: string
+        boundary: string
+        /** The Skill Hub's fields, named while backend 58's library is absent. */
+        skillFields: readonly string[]
+        skillPending: string
+        /** The MCP Hub's fields — credential REFERENCES, never values. */
+        mcpFields: readonly string[]
+        mcpPending: string
+        /** Per-profile enablement rule, stated before it can be used. */
+        enablement: string
+      }
+      identities: { title: string; description: string; boundary: string }
+      hooks: {
+        title: string
+        description: string
+        boundary: string
+        /** One row per family model — the shapes are genuinely different. */
+        families: readonly string[]
+        familiesPending: string
+        /** Default-off and sandbox execution: stated before anything can run. */
+        safety: string
+        /** What a trigger record will carry, blocking semantics included. */
+        ledgerFields: readonly string[]
+      }
+      harnesses: {
+        title: string
+        description: string
+        boundary: string
+        /** The fields a program row WILL carry — named while the directory is
+         *  absent so nothing is guessed in its place. */
+        programFields: readonly string[]
+        fieldsPending: string
+        nextTurn: string
+      }
+      data: { title: string; description: string; boundary: string }
     }
     plugins: {
       title: string
@@ -1556,6 +1661,10 @@ export interface Translations {
     archivedChats: string
     sections: Record<'maintenance' | 'sessions' | 'system' | 'usage', string>
     sectionDescriptions: Record<'maintenance' | 'sessions' | 'system' | 'usage', string>
+    /** AgentBox authority: a section with no wire equivalent explains itself
+     *  instead of mounting a legacy Hermes panel. */
+    agentBoxUnavailableTitle: string
+    agentBoxUnavailableBody: string
     nav: Record<'newChat' | 'settings' | 'skills' | 'artifacts', { title: string; detail: string }>
 
     sectionEntries: Record<'sessions' | 'system' | 'usage', { title: string; detail: string }>
@@ -1836,6 +1945,72 @@ export interface Translations {
     failedSaveSoul: string
     failedCreate: string
     failedRename: string
+    agentBoxHarness: string
+    agentBoxVersion: string
+    agentBoxCapabilities: string
+    agentBoxAvailable: string
+    agentBoxCapabilitiesNotDeclared: string
+    agentBoxServiceNoReason: string
+    agentBoxServiceOffline: string
+    agentBoxValuePending: string
+    roleSettings: {
+      roleNav: {
+        basics: string
+        harness: string
+        model: string
+        credentials: string
+        instruction: string
+        skill: string
+        mcp: string
+        permission: string,
+        memory: string
+      }
+      unsupportedSlot: (slot: string) => string
+      pendingRecords: string
+      pendingInstruction: string
+      pendingSkill: string
+      pendingMcp: string
+      pendingPermission: string
+      credentialsNote: string
+      zonesTitle: string
+      zones: readonly string[]
+      zonesPending: string
+      ownershipTitle: string
+      ownership: string
+      permissionsTitle: string
+      permissions: readonly string[]
+      rebindTitle: string
+      rebind: readonly string[]
+      /** P21 read-only facts (orders 58/60/63). */
+      bindingsDisabled: string
+      bindingsEmpty: string
+      bindingsRevision: (revision: number) => string
+      bindingsTitle: string
+      memoryRefused: (reason: string) => string
+      memoryTitle: string
+      permissionsAnyTarget: string
+      permissionsEmpty: string
+      permissionsPreset: (preset: string) => string
+      permissionsPresetUnknown: string
+      permissionsShadowed: string
+    }
+    agentBoxCapabilityAbsent: string
+    agentBoxMaintenanceUnavailable: string
+    agentBoxMaintenanceUnavailableDesc: string
+    agentBoxRuntimeConfig: string
+    agentBoxRuntimeConfigDesc: string
+    agentBoxCreateDesc: string
+    agentBoxHarnessChoice: string
+    agentBoxArchive: string
+    agentBoxArchiveTitle: string
+    agentBoxArchiveDesc: (name: string) => string
+    agentBoxSaveProfile: string
+    agentBoxUpdateFailed: string
+    agentBoxConfigLocked: string
+    agentBoxConfigRestoreDefault: string
+    agentBoxConfigModelUnverified: string
+    agentBoxConfigSavedNextSend: string
+    agentBoxConfigSaveFailed: string
   }
 
   cron: {
@@ -1944,40 +2119,6 @@ export interface Translations {
     }
   }
 
-  artifacts: {
-    search: string
-    refresh: string
-    refreshing: string
-    indexing: string
-    tabAll: string
-    tabImages: string
-    tabFiles: string
-    tabLinks: string
-    noArtifactsTitle: string
-    noArtifactsDesc: string
-    failedLoad: string
-    openFailed: string
-    itemsImage: string
-    itemsLink: string
-    itemsFile: string
-    itemsGeneric: string
-    zero: string
-    rangeOf: (start: number, end: number, total: number) => string
-    goToPage: (itemLabel: string, page: number) => string
-    colTitleLink: string
-    colTitleFile: string
-    colTitleDefault: string
-    colLocationLink: string
-    colLocationFile: string
-    colLocationDefault: string
-    colSession: string
-    kindImage: string
-    kindFile: string
-    kindLink: string
-    chat: string
-    copyUrl: string
-    copyPath: string
-  }
 
   artifactCard: {
     kind: Record<'code' | 'html' | 'svg', string>
@@ -2000,6 +2141,60 @@ export interface Translations {
   }
 
   sidebar: {
+    /** The product sidebar's action area: two doors, both existing paths. */
+    agentBoxActions: {
+      newTask: string
+      search: string
+    }
+    /** AgentBox service actions on a workspace row — distinct from the local
+     *  "Remove from sidebar" hide and the WSL host's own remove. */
+    agentBoxArchive: {
+      action: string
+      title: (name: string) => string
+      desc: string
+      failed: string
+    }
+    /** The AgentBox SessionRecords inside a matched service workspace: the
+     *  honest states plus the `sessions.update` maintenance menu. */
+    agentBoxSession: {
+      loading: string
+      empty: string
+      /** The service is not callable: its cached records stay visible, and
+       *  this line names the state above them. */
+      unavailable: string
+      /** Shown in place of the reason when the service reported no detail. */
+      unavailableReasonFallback: string
+      /** The Archived view with no archived records to show. */
+      archivedEmpty: string
+      /** The Archived view's fetch failed; the service's own reason follows. */
+      loadFailed: string
+      /** The service is ready but its hello does not declare `sessions.list`,
+       *  so the Archived set cannot be asked for — named, never implied. */
+      listUnsupported: string
+      /** A local workspace row the service has no Workspace for: its expansion
+       *  says so instead of rendering legacy Hermes session previews. */
+      workspaceNotProvided: string
+      menuActions: string
+      menuRename: string
+      menuPin: string
+      menuUnpin: string
+      /** The `sessions.archive` menu entry on a session row. */
+      menuArchive: string
+      pinned: string
+      /** The service has an execution in flight for this session. */
+      running: string
+      /** Local visibility, not service truth — the label says so. */
+      unreadLocal: string
+      renameTitle: (name: string) => string
+      renameFailed: string
+      pinFailed: string
+      unpinFailed: string
+      archiveTitle: (name: string) => string
+      /** Says the record is archived on the service, history is kept, nothing
+       *  running is stopped and no files are touched. */
+      archiveDesc: string
+      archiveFailed: string
+    }
     gatewayGroups: {
       grouping: string
       rename: string
@@ -2012,6 +2207,8 @@ export interface Translations {
       actions: string
     }
     nav: Record<string, string>
+    profilesEntry: string
+    settingsEntry: string
     searchAria: string
     searchPlaceholder: string
     clearSearch: string
@@ -2070,6 +2267,10 @@ export interface Translations {
       reveal: string
       copyPath: string
       removeFromSidebar: string
+      // 36R path boundary: a local pick that cannot be verified against the
+      // backend's path space is refused BEFORE any project/session is created.
+      pathScopeWindowsPath: string
+      pathScopeUnverified: string
       createFailed: string
       staleBackend: string
       deleteConfirm: string
@@ -2168,8 +2369,71 @@ export interface Translations {
     markAllRead: string
   }
 
+  workStatus: {
+    closePanel: string
+    openPanel: string
+    processCard: string
+    queuedCount: (count: number) => string
+    stateLabel: (state: string) => string
+    /** P21 (orders 62/64): the two cards whose backend faces landed. */
+    executionsCard: string
+    gitAdditions: string
+    gitAhead: string
+    gitBehind: string
+    gitBranch: string
+    gitCard: string
+    gitChangedFiles: string
+    gitDeletions: string
+    gitFieldUnknown: string
+    /** A field the service could not obtain: the typed reason, never a 0. */
+    gitFieldUnavailable: (reason: string) => string
+    pid: string
+    pidReasonUnknown: string
+    /** A pid the platform did not report: the typed reason, never a 0. */
+    pidUnknown: (reason: string) => string
+    refresh: string
+  }
+
   composer: {
     message: string
+    profile: string
+    chooseProfile: string
+    profileRequired: string
+    harness: (name: string) => string
+    switchingProfile: string
+    profileSwitchUnavailable: string
+    temporaryConfig: string
+    temporaryConfigEmpty: string
+    takesEffectNextSend: string
+    takesEffectImmediately: string
+    securityLocked: string
+    clearTemporaryValue: string
+    configUnavailable: string
+    workspaceOpening: string
+    workspaceUnavailable: string
+    configResolving: string
+    configResolved: string
+    configRejected: string
+    configResolveUnavailable: string
+    configEffectiveValue: string
+    configEffectiveServiceConfirmed: string
+    configFixesOnAccept: string
+    emptyState: {
+      greeting: string
+      subtitle: string
+      starters: readonly string[]
+      waiting: string
+      blocked: string
+    }
+    serviceUnreachable: string
+    workspaceMissing: string
+    disabledPlaceholder: string
+    modelSelector: string
+    modelSelectorSearch: string
+    modelSelectorEmpty: string
+    modelSelectorDefault: string
+    contextUsage: string
+    contextUsageUnknown: string
     wakingProfile: (profile: string) => string
     placeholderStarting: string
     placeholderReconnecting: string
@@ -3280,6 +3544,80 @@ export interface Translations {
     boundaryDesc: string
     reloadWindow: string
     openLogs: string
+  }
+
+  wslWorkspace: {
+    // Add-project menu entries (round 36: open folder / open remote folder).
+    menuOpenFolder: string
+    menuOpenRemoteFolder: string
+    // Wizard steps
+    stepConfig: string
+    stepBrowse: string
+    distributionLabel: string
+    distributionStateRunning: string
+    distributionStateStopped: string
+    discovering: string
+    discoverFailed: string
+    wslUnavailableDesc: string
+    userLabel: string
+    userPlaceholder: string
+    connectingDesc: string
+    // Directory browser
+    pathLabel: string
+    goTo: string
+    upOneLevel: string
+    showHidden: string
+    browseUnavailable: string
+    readOnly: string
+    cannotOpen: string
+    kindFile: string
+    kindOther: string
+    emptyDirectory: string
+    chooseDirectory: string
+    // Sidebar projection
+    connectionInfo: string
+    reconnect: string
+    reconnecting: string
+    statusValidated: string
+    statusUnverified: string
+    statusValidating: string
+    statusFailed: string
+    userChangedWarning: (user: string) => string
+    defaultUserLabel: string
+    verifiedUserLabel: string
+    rootPathLabel: string
+    sessionUnavailable: string
+    wslBadge: string
+    // Row management (round 36): rename / remove from the row menu.
+    menuRename: string
+    menuRemove: string
+    // The row's kebab (36R): must never read as "connection info" — that is a
+    // separate, dedicated action.
+    moreActions: string
+    removeTitle: (name: string) => string
+    removeDesc: string
+    renameTitle: (name: string) => string
+    renameFailed: string
+    removeFailed: string
+    toggleExpand: (name: string, open: boolean) => string
+    // Typed failure copy, keyed by the host's WslWorkspaceErrorCode.
+    errWslUnavailable: string
+    errWslUnknownDistribution: string
+    errWslUserNotFound: string
+    errWslConnectTimeout: string
+    errWslConnectFailed: string
+    errWslCancelled: string
+    errWslConnectionExpired: string
+    errWslInvalidPath: string
+    errWslDirectoryNotFound: string
+    errWslDirectoryNoPermission: string
+    errWslListFailed: string
+    errWslListOverflow: string
+    errWslSaveFailed: string
+    errWslNotFound: string
+    errWslStoreFutureVersion: string
+    errWslStoreIllegalVersion: string
+    errUnexpected: string
   }
 
   ui: {

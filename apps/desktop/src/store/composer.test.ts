@@ -2,7 +2,26 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { ComposerAttachment } from '@/types/composer'
 
-import { $composerAttachments, addComposerAttachment, clearSessionDraft, createComposerAttachmentOccurrenceId, createComposerAttachmentScope, migrateSessionDraft, removeComposerAttachment, SESSION_DRAFTS_STORAGE_KEY, stashSessionDraft, takeSessionDraft, updateComposerAttachment } from './composer'
+import {
+  $composerAttachments,
+  addComposerAttachment,
+  clearSessionDraft,
+  clearSessionDraftIfVersion,
+  createComposerAttachmentOccurrenceId,
+  createComposerAttachmentScope,
+  LEGACY_SESSION_DRAFTS_STORAGE_KEY,
+  migrateSessionDraft,
+  reloadPersistedDrafts,
+  removeComposerAttachment,
+  SESSION_DRAFTS_STORAGE_KEY,
+  sessionDraftExecutionContext,
+  sessionDraftVersion,
+  setSessionDraftExecutionContext,
+  stashSessionDraft,
+  takeSessionDraft,
+  updateComposerAttachment,
+  workspaceDraftScope
+} from './composer'
 
 function attachment(overrides: Partial<ComposerAttachment> & Pick<ComposerAttachment, 'id'>): ComposerAttachment {
   return { kind: 'file', label: 'doc.pdf', ...overrides }
@@ -181,7 +200,7 @@ describe('updateComposerAttachment', () => {
 
 describe('session drafts', () => {
   afterEach(() => {
-    for (const scope of ['session-a', 'session-b', null]) {
+    for (const scope of ['session-a', 'session-b', 'workspace:project-a', 'workspace:project-b', null]) {
       clearSessionDraft(scope)
     }
 
@@ -206,15 +225,106 @@ describe('session drafts', () => {
     expect(takeSessionDraft('session-a').text).toBe('session draft')
   })
 
-  it('persists draft text (not attachments) to localStorage', () => {
-    stashSessionDraft('session-a', 'survives reload', [attachment({ id: 'file:a' })])
+  it('persists versioned text and safe attachment references to localStorage', () => {
+    stashSessionDraft('session-a', 'survives reload', [
+      attachment({
+        id: 'file:a',
+        path: '/workspace/doc.pdf',
+        previewUrl: 'data:secret-preview',
+        thumbnailUrl: 'data:secret-thumbnail',
+        uploadState: 'uploading'
+      })
+    ])
 
-    const persisted = JSON.parse(window.localStorage.getItem(SESSION_DRAFTS_STORAGE_KEY) ?? '{}') as Record<
-      string,
-      string
-    >
+    const persisted = JSON.parse(window.localStorage.getItem(SESSION_DRAFTS_STORAGE_KEY) ?? '{}') as {
+      drafts: Record<string, { attachments: ComposerAttachment[]; text: string; version: number }>
+      schemaVersion: number
+    }
 
-    expect(persisted['session-a']).toBe('survives reload')
+    expect(persisted.schemaVersion).toBe(4)
+    expect(persisted.drafts['session-a']?.text).toBe('survives reload')
+    expect(persisted.drafts['session-a']?.attachments).toEqual([
+      expect.objectContaining({ id: 'file:a', path: '/workspace/doc.pdf' })
+    ])
+    expect(persisted.drafts['session-a']?.attachments[0]).not.toHaveProperty('previewUrl')
+    expect(persisted.drafts['session-a']?.attachments[0]).not.toHaveProperty('thumbnailUrl')
+    expect(persisted.drafts['session-a']?.attachments[0]).not.toHaveProperty('uploadState')
+  })
+
+  it('persists the selected profile and temporary controls with the draft', () => {
+    const scope = workspaceDraftScope('project-a')
+
+    setSessionDraftExecutionContext(scope, {
+      profileId: 'profile-reviewer',
+      overrides: [
+        { controlId: 'model', value: 'model-fast' },
+        { controlId: 'temperature', value: '0.2' }
+      ]
+    })
+    stashSessionDraft(scope, 'review this change', [])
+
+    expect(sessionDraftExecutionContext(scope)).toEqual({
+      profileId: 'profile-reviewer',
+      overrides: [
+        { controlId: 'model', value: 'model-fast' },
+        { controlId: 'temperature', value: '0.2' }
+      ]
+    })
+
+    const persisted = JSON.parse(window.localStorage.getItem(SESSION_DRAFTS_STORAGE_KEY) ?? '{}') as {
+      drafts: Record<string, { overrides: unknown[]; profileId: null | string }>
+    }
+
+    expect(persisted.drafts[scope]).toMatchObject({
+      profileId: 'profile-reviewer',
+      overrides: [
+        { controlId: 'model', value: 'model-fast' },
+        { controlId: 'temperature', value: '0.2' }
+      ]
+    })
+  })
+
+  it('does not inherit another workspace draft profile or temporary controls', () => {
+    const projectA = workspaceDraftScope('project-a')
+    const projectB = workspaceDraftScope('project-b')
+
+    setSessionDraftExecutionContext(projectA, {
+      profileId: 'profile-a',
+      overrides: [{ controlId: 'model', value: 'model-a' }]
+    })
+
+    expect(sessionDraftExecutionContext(projectB)).toEqual({ overrides: [], profileId: null })
+  })
+
+  it('keeps newer profile intent when an older submitted draft settles', () => {
+    setSessionDraftExecutionContext('session-a', { overrides: [], profileId: 'profile-a' })
+    const submittedVersion = stashSessionDraft('session-a', 'first request', [])
+
+    setSessionDraftExecutionContext('session-a', {
+      overrides: [{ controlId: 'model', value: 'model-b' }],
+      profileId: 'profile-b'
+    })
+
+    expect(clearSessionDraftIfVersion('session-a', submittedVersion)).toBe(false)
+    expect(sessionDraftExecutionContext('session-a')).toEqual({
+      overrides: [{ controlId: 'model', value: 'model-b' }],
+      profileId: 'profile-b'
+    })
+  })
+
+  it('migrates the legacy v3 text dictionary on the next write', () => {
+    clearSessionDraft('legacy-session')
+    window.localStorage.removeItem(SESSION_DRAFTS_STORAGE_KEY)
+    window.localStorage.setItem(LEGACY_SESSION_DRAFTS_STORAGE_KEY, JSON.stringify({ 'legacy-session': 'do not lose me' }))
+
+    reloadPersistedDrafts()
+
+    expect(takeSessionDraft('legacy-session').text).toBe('do not lose me')
+
+    stashSessionDraft('legacy-session', 'updated safely', [])
+    expect(window.localStorage.getItem(LEGACY_SESSION_DRAFTS_STORAGE_KEY)).toBeNull()
+    expect(window.localStorage.getItem(SESSION_DRAFTS_STORAGE_KEY)).toContain('updated safely')
+    clearSessionDraft('legacy-session')
   })
 
   it('evicts empty drafts instead of leaving stale entries behind', () => {
@@ -229,6 +339,33 @@ describe('session drafts', () => {
     clearSessionDraft('session-a')
 
     expect(takeSessionDraft('session-a')).toEqual({ attachments: [], text: '' })
+  })
+
+  it('only clears the exact draft version accepted by the service', () => {
+    const submittedVersion = stashSessionDraft('session-a', 'first request', [])
+    stashSessionDraft('session-a', 'typed while waiting', [])
+
+    expect(clearSessionDraftIfVersion('session-a', submittedVersion)).toBe(false)
+    expect(takeSessionDraft('session-a').text).toBe('typed while waiting')
+
+    const currentVersion = sessionDraftVersion('session-a')
+    expect(currentVersion).not.toBeNull()
+    expect(clearSessionDraftIfVersion('session-a', currentVersion!)).toBe(true)
+    expect(takeSessionDraft('session-a').text).toBe('')
+  })
+
+  it('keeps new-session drafts isolated by stable workspace identity', () => {
+    const local = workspaceDraftScope('project-local')
+    const wsl = workspaceDraftScope('wsl:Ubuntu:/work/app')
+
+    stashSessionDraft(local, 'local draft', [])
+    stashSessionDraft(wsl, 'wsl draft', [])
+
+    expect(takeSessionDraft(local).text).toBe('local draft')
+    expect(takeSessionDraft(wsl).text).toBe('wsl draft')
+
+    clearSessionDraft(local)
+    clearSessionDraft(wsl)
   })
 
   it('returns clones so callers cannot mutate the stash', () => {
@@ -251,6 +388,20 @@ describe('session drafts', () => {
     expect(takeSessionDraft(tipBefore).text).toBe('')
 
     clearSessionDraft(tipAfter)
+  })
+
+  it('migrates the profile and temporary controls with the draft', () => {
+    setSessionDraftExecutionContext('session-a', {
+      overrides: [{ controlId: 'model', value: 'model-a' }],
+      profileId: 'profile-a'
+    })
+
+    expect(migrateSessionDraft('session-a', 'session-b')).toBe(true)
+    expect(sessionDraftExecutionContext('session-b')).toEqual({
+      overrides: [{ controlId: 'model', value: 'model-a' }],
+      profileId: 'profile-a'
+    })
+    expect(sessionDraftExecutionContext('session-a')).toEqual({ overrides: [], profileId: null })
   })
 
   it('does not overwrite a non-empty destination draft during migration', () => {

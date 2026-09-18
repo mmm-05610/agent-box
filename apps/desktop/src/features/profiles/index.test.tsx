@@ -1,173 +1,547 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import type * as Nanostores from 'nanostores'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { deleteProfile } from '@/api/profiles'
-import { refreshProfiles } from '@/application/profile/catalog'
-import { selectProfile } from '@/application/profile/navigation'
-import { retireLocalProfileGateways } from '@/store/gateway'
-import { setActiveProfile } from '@/store/profile/catalog-state'
-import type { ProfileInfo } from '@/types/hermes'
+import type { ProfileMaintenancePort, UpdateProfileConfigIntent } from '@/application/profile/profile-maintenance-port'
+import { stubMenuDomApis, stubResizeObserver } from '@/dev/test/jsdom'
+import { $agentBoxHello, $agentBoxProfiles, $agentBoxProviderModels, $agentBoxService } from '@/store/agentbox-service'
+import {
+  asWireId,
+  type ConfigDescriptor,
+  type ProfileRecord,
+  type ProfilesUpdateConfigResult,
+  type ProviderModelConfigRecord,
+  type ProviderModelRef,
+  WIRE_PROTOCOL_VERSION
+} from '@/types/wire/wire-v1'
 
 import { ProfilesView } from './index'
 
-// These tests pin the invariant this whole area exists to hold: the Manage
-// Profiles page and the sidebar rail share ONE set of profile dialogs, so both
-// "New Profile" entry points render the same modal (SOUL.md included), and
-// deleting the profile the gateway is on re-homes to default instead of
-// stranding it on a dead backend. The drift that motivated the fix got in
-// precisely because nothing rendered this view.
-
-afterEach(cleanup)
-
-// Real i18n (useI18n falls back to English with no provider), so labels are the
-// actual strings — no brittle key snapshot to maintain here.
-
-// CodeEditor is CodeMirror; the detail pane's SOUL editor doesn't matter to
-// these behaviors, so stub it out of the jsdom render.
-vi.mock('@/components/chat/code-editor', () => ({
-  CodeEditor: () => null
+const mocks = vi.hoisted(() => ({
+  ensureCatalog: vi.fn(async () => []),
+  ensureProviderModels: vi.fn(async () => []),
+  loadDescriptor: vi.fn()
 }))
 
-vi.mock('@/api/profiles', () => ({
-  createProfile: vi.fn(async () => ({ name: 'x', ok: true, path: '/x' })),
-  deleteProfile: vi.fn(async () => ({ ok: true, path: '/x' })),
-  getProfileSoul: vi.fn(async () => ({ content: '', exists: true })),
-  renameProfile: vi.fn(async () => ({ name: 'x', ok: true, path: '/x' })),
-  updateProfileSoul: vi.fn(async () => ({ ok: true }))
+vi.mock('@/api/agentbox-runtime-client', () => ({ agentBoxRuntimeClient: () => ({}) }))
+vi.mock('@/application/provider-model/wire-provider-model-catalog', async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  ensureAgentBoxProviderModelCatalog: () => mocks.ensureProviderModels()
+}))
+// The capability gate and the production maintenance port stay REAL: only the
+// descriptor read is stubbed, so the page's own gating is what is under test.
+vi.mock('@/application/profile/profile-maintenance-port', async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  loadProfileRuntimeDescriptor: (_client: unknown, profileId: string) => mocks.loadDescriptor(profileId)
+}))
+vi.mock('@/application/profile/wire-composer-profile', () => ({
+  ensureAgentBoxProfileCatalog: () => mocks.ensureCatalog()
 }))
 
-vi.mock('@/store/notifications', () => ({
-  notify: vi.fn(),
-  notifyError: vi.fn()
-}))
+stubMenuDomApis()
+stubResizeObserver()
 
-vi.mock('@/store/gateway', () => ({
-  retireLocalProfileGateways: vi.fn()
-}))
+const MAINTENANCE_METHODS = ['profiles.create', 'profiles.update', 'profiles.updateConfig', 'profiles.archive']
 
-const { $activeGatewayProfile: activeGateway, $profileColors } = vi.hoisted(() => {
-  const { atom } = require('nanostores') as typeof Nanostores
-
-  return {
-    $activeGatewayProfile: atom<string>('default'),
-    $profileColors: atom<Record<string, string>>({})
-  }
+const hello = (ids: string[]) => ({
+  auth: { required: false as const },
+  capabilities: ids.map(id => ({ id, supported: true })),
+  protocolVersion: WIRE_PROTOCOL_VERSION as typeof WIRE_PROTOCOL_VERSION,
+  serverId: asWireId('server-test')
 })
 
-vi.mock('@/store/profile/appearance-preferences', () => ({ $profileColors }))
-vi.mock('@/store/profile/catalog-state', () => ({ setActiveProfile: vi.fn() }))
-vi.mock('@/lib/profile-identity', () => ({
-  normalizeProfileKey: (name: null | string | undefined) => (name ?? '').trim() || 'default',
-  profileLabel: (profile: { display_name?: string; name: string }) =>
-    (profile.display_name ?? '').trim() || profile.name
-}))
-vi.mock('@/store/profile/runtime-route-state', () => ({ $activeGatewayProfile: activeGateway }))
-vi.mock('@/application/profile/catalog', () => ({ refreshProfiles: vi.fn(async () => [] as ProfileInfo[]) }))
-vi.mock('@/application/profile/navigation', () => ({ selectProfile: vi.fn() }))
+const slotRef = (
+  modelId: string,
+  availability: ProviderModelRef['availability'] = 'available',
+  unavailableReason: null | string = null
+): ProviderModelRef => ({ availability, modelId, providerId: asWireId('provider-one'), unavailableReason })
 
-// The one non-default profile these tests act on. Its name doubles as the row's
-// accessible name, so the delete helper queries by it rather than a literal.
-const NAMED_PROFILE = 'work'
+const modelEntry = (
+  modelId: string,
+  availability: ProviderModelConfigRecord['models'][number]['availability'] = 'available',
+  unavailableReason: null | string = null
+): ProviderModelConfigRecord['models'][number] => ({
+  availability,
+  displayName: modelId,
+  modelId,
+  unavailableReason
+})
 
-function makeProfile(name: string, isDefault = false): ProfileInfo {
-  return {
-    has_env: false,
-    is_default: isDefault,
-    model: null,
-    name,
-    path: `/home/user/.hermes/profiles/${name}`,
-    provider: null,
-    skill_count: 0
-  }
+const providerModel = (overrides: Partial<ProviderModelConfigRecord> = {}): ProviderModelConfigRecord => ({
+  archivedAt: null,
+  configuration: [],
+  createdAt: '2026-09-14T00:00:00.000Z',
+  credentialId: null,
+  displayName: 'Provider One',
+  harness: 'opaque-alpha',
+  id: asWireId('provider-one'),
+  models: [modelEntry('vendor/family/model-v1')],
+  provider: 'opaque-provider',
+  updatedAt: '2026-09-14T00:00:00.000Z',
+  version: 1,
+  ...overrides
+})
+
+/** The service's own description of a Profile's default configuration. */
+const serviceDescriptor = (profileId: string, values: { mode?: string; notes?: string } = {}): ConfigDescriptor => ({
+  controls: [
+    {
+      controlId: 'mode',
+      currentValue: values.mode ?? 'balanced',
+      editable: true,
+      kind: 'enum',
+      values: ['fast', 'balanced']
+    },
+    { controlId: 'notes', currentValue: values.notes ?? 'keep me', editable: true, kind: 'string', multiline: false },
+    { controlId: 'verbose', currentValue: true, editable: true, kind: 'boolean' },
+    { controlId: 'locked_flag', currentValue: true, editable: true, kind: 'boolean' },
+    {
+      controlId: 'primary_model',
+      currentValue: 'primary',
+      editable: true,
+      kind: 'model_slot',
+      slots: [{ model: slotRef('vendor/family/model-v1'), name: 'primary' }]
+    }
+  ],
+  effectTiming: 'next_send',
+  profileId: asWireId(profileId),
+  securityLockedIds: ['locked_flag'],
+  workspaceId: null
+})
+
+const profile = (overrides: Partial<ProfileRecord> = {}): ProfileRecord => ({
+  archivedAt: null,
+  capabilities: { native_memory: true, resume: false },
+  createdAt: '2026-09-14T00:00:00.000Z',
+  displayName: 'Reviewer',
+  harness: 'opaque-alpha',
+  id: asWireId('profile-reviewer'),
+  updatedAt: '2026-09-14T00:00:00.000Z',
+  version: 3,
+  ...overrides
+})
+
+const configResult = (overrides: Partial<ProfilesUpdateConfigResult> = {}): ProfilesUpdateConfigResult => ({
+  configVersion: 4,
+  effectiveFor: 'next_send',
+  profile: profile({ version: 4 }),
+  ...overrides
+})
+
+const maintenancePort = (overrides: Partial<ProfileMaintenancePort> = {}): ProfileMaintenancePort => ({
+  archive: vi.fn(async intent =>
+    profile({ archivedAt: '2026-09-14T01:00:00.000Z', id: asWireId(intent.profileId), version: 4 })
+  ),
+  create: vi.fn(async intent =>
+    profile({ displayName: intent.displayName, harness: intent.harness, id: asWireId('profile-created'), version: 1 })
+  ),
+  harnessChoices: [
+    { id: 'opaque-alpha', label: 'Alpha toolbench' },
+    { id: 'opaque-beta', label: 'Beta toolbench' }
+  ],
+  update: vi.fn(async intent => profile({ displayName: intent.displayName, version: intent.expectedVersion + 1 })),
+  updateConfig: vi.fn(async intent => configResult({ profile: profile({ version: intent.expectedVersion + 1 }) })),
+  ...overrides
+})
+
+function realClick(element: HTMLElement): void {
+  fireEvent.pointerDown(element, { button: 0, pointerType: 'mouse' })
+  fireEvent.pointerUp(element, { button: 0, pointerType: 'mouse' })
+  fireEvent.click(element)
 }
 
-// Radix's trigger opens on the pointerdown/up pair, not the synthetic click
-// alone — fire the full sequence a real click produces.
-function realClick(el: HTMLElement) {
-  fireEvent.pointerDown(el, { button: 0, pointerType: 'mouse' })
-  fireEvent.pointerUp(el, { button: 0, pointerType: 'mouse' })
-  fireEvent.click(el)
-}
+const field = (name: string): HTMLInputElement => screen.getByRole('textbox', { name }) as HTMLInputElement
 
-// ProfilesView loads its list in a mount effect (refreshProfiles → setProfiles),
-// so the first paint is the loader and the rows commit a microtask later. Flush
-// that inside act() so the rows exist before anything queries them, and so the
-// mount setState isn't left unwrapped.
-async function renderProfilesView() {
-  await act(async () => {
+const saveButton = (): HTMLElement => screen.getByRole('button', { name: 'Save profile' })
+
+const openSelect = (name: string): void => realClick(screen.getByRole('combobox', { name }))
+
+beforeEach(() => {
+  mocks.loadDescriptor.mockImplementation(async (profileId: string) => serviceDescriptor(profileId))
+  $agentBoxService.set({ detail: null, phase: 'ready' })
+})
+
+afterEach(() => {
+  cleanup()
+  $agentBoxProfiles.set([])
+  $agentBoxHello.set(null)
+  $agentBoxProviderModels.set([])
+  $agentBoxService.set({ detail: null, phase: 'idle' })
+  mocks.ensureCatalog.mockClear()
+  mocks.ensureProviderModels.mockClear()
+  mocks.loadDescriptor.mockClear()
+})
+
+describe('AgentBox ProfilesView', () => {
+  it('renders the neutral service projection; Harness is a badge and capabilities stay service-declared', async () => {
+    $agentBoxProfiles.set([profile()])
+    $agentBoxService.set({ detail: null, phase: 'ready' })
+
     render(<ProfilesView onClose={vi.fn()} />)
-  })
-}
 
-// PanelListRow labels BOTH the row's select target and its kebab with the
-// profile name (`menuLabel={profile.name}`), so the name alone matches two
-// buttons. Only the kebab is a menu trigger, so `expanded` disambiguates.
-function findRowMenu(profileName: string) {
-  return screen.findByRole('button', { expanded: false, name: profileName })
-}
-
-// Open the (only non-default) row's actions menu → Delete → confirm. The
-// confirm click kicks off an async chain (deleteProfile → onDeleted refresh →
-// setProfiles, plus the re-home writes), so settle it inside act() to flush
-// those updates deterministically instead of leaking them past the assertions.
-async function deleteTheNamedProfile() {
-  realClick(await findRowMenu(NAMED_PROFILE))
-  fireEvent.click(await screen.findByRole('menuitem', { name: /delete/i }))
-  const confirm = await screen.findByRole('button', { name: 'Delete' })
-  await act(async () => {
-    fireEvent.click(confirm)
-  })
-}
-
-describe('ProfilesView', () => {
-  it('opens the shared create dialog with the SOUL.md field (parity with the rail)', async () => {
-    vi.mocked(refreshProfiles).mockResolvedValue([])
-
-    await renderProfilesView()
-
-    realClick(await screen.findByRole('button', { name: 'New profile' }))
-
-    const soul = await screen.findByLabelText(/SOUL\.md/i)
-
-    expect(soul.tagName).toBe('TEXTAREA')
-    expect(soul.getAttribute('id')).toBe('new-profile-soul')
+    expect(await screen.findByRole('heading', { name: 'Reviewer' })).toBeTruthy()
+    expect(screen.getAllByText('opaque-alpha').length).toBeGreaterThan(0)
+    expect(screen.getByText('native_memory · Available')).toBeTruthy()
+    expect(screen.getByText('resume · not declared')).toBeTruthy()
+    expect(screen.getByText('Profile maintenance is unavailable')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'New profile' })).toBeNull()
+    expect(await screen.findByText('balanced')).toBeTruthy()
   })
 
-  it('re-homes to default when the active profile is deleted', async () => {
-    const deleteProfileMock = vi.mocked(deleteProfile)
-    const retireLocalProfileGatewaysMock = vi.mocked(retireLocalProfileGateways)
+  it('offers no editable control when the service has not declared profiles.updateConfig', async () => {
+    $agentBoxProfiles.set([profile()])
+    $agentBoxHello.set(hello(['profiles.create', 'profiles.update', 'profiles.archive']))
 
-    deleteProfileMock.mockClear()
-    retireLocalProfileGatewaysMock.mockClear()
-    vi.mocked(refreshProfiles).mockResolvedValue([makeProfile('default', true), makeProfile(NAMED_PROFILE)])
-    activeGateway.set(NAMED_PROFILE)
+    render(<ProfilesView onClose={vi.fn()} />)
 
-    await renderProfilesView()
-    await deleteTheNamedProfile()
+    expect(await screen.findByText('balanced')).toBeTruthy()
+    expect(screen.getByText('Profile maintenance is unavailable')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Save profile' })).toBeNull()
+    expect(screen.queryByRole('textbox', { name: 'Name' })).toBeNull()
+    expect(screen.queryByRole('textbox', { name: 'Notes' })).toBeNull()
+  })
 
-    await waitFor(() => expect(deleteProfile).toHaveBeenCalledWith(NAMED_PROFILE))
-    expect(retireLocalProfileGateways).toHaveBeenCalledWith(NAMED_PROFILE)
-    expect(retireLocalProfileGatewaysMock.mock.invocationCallOrder[0]).toBeLessThan(
-      deleteProfileMock.mock.invocationCallOrder[0]
+  it('names the missing provider/model record, not a missing capability, on an empty service', async () => {
+    // The service declares every maintenance method and has simply no
+    // provider/model record yet. Blaming the service for an undeclared
+    // capability here would send the reader looking for a problem that does
+    // not exist.
+    $agentBoxHello.set(hello(MAINTENANCE_METHODS))
+
+    render(<ProfilesView onClose={vi.fn()} />)
+
+    expect(await screen.findByText('No profiles yet.')).toBeTruthy()
+    expect(
+      screen.getByText('Add a service-owned provider/model configuration to make it available to Profiles.')
+    ).toBeTruthy()
+    expect(screen.queryByText('Profile maintenance is unavailable')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'New profile' })).toBeNull()
+  })
+
+  it('builds the Harness choices from the provider/model directory, so a first Profile can be created', async () => {
+    // The cold-start case: no Profile exists yet, so nothing can be derived
+    // from the Profile list, and the choices have to come from the directory
+    // a Profile is actually built on.
+    $agentBoxHello.set(hello(MAINTENANCE_METHODS))
+    $agentBoxProviderModels.set([
+      providerModel({ harness: 'opaque-alpha' }),
+      providerModel({ harness: 'opaque-beta', id: asWireId('provider-two') })
+    ])
+
+    render(<ProfilesView onClose={vi.fn()} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'New profile' }))
+    realClick(await screen.findByRole('combobox'))
+
+    expect(await screen.findByRole('option', { name: 'opaque-alpha' })).toBeTruthy()
+    expect(screen.getByRole('option', { name: 'opaque-beta' })).toBeTruthy()
+  })
+
+  it('edits the service-described defaults once the whole maintenance set is declared', async () => {
+    $agentBoxProfiles.set([profile()])
+    $agentBoxHello.set(hello(MAINTENANCE_METHODS))
+
+    render(<ProfilesView onClose={vi.fn()} />)
+
+    expect(await screen.findByRole('textbox', { name: 'Name' })).toBeTruthy()
+    expect(field('Notes').value).toBe('keep me')
+    expect(screen.getByRole('combobox', { name: 'Mode' })).toBeTruthy()
+    expect(screen.getByRole('combobox', { name: 'Primary model' }).textContent).toContain('vendor/family/model-v1')
+    expect(screen.queryByRole('button', { name: 'Save profile' })).toBeNull()
+  })
+
+  it('keeps the last projection when editing fails instead of reporting local success', async () => {
+    const update = vi.fn(async () => {
+      throw new Error('CONFLICT_VERSION')
+    })
+
+    const maintenance = maintenancePort({ update })
+    $agentBoxProfiles.set([profile()])
+
+    render(<ProfilesView maintenance={maintenance} onClose={vi.fn()} />)
+
+    fireEvent.change(await screen.findByRole('textbox', { name: 'Name' }), { target: { value: 'New name' } })
+    fireEvent.click(saveButton())
+
+    expect(await screen.findByText('CONFLICT_VERSION')).toBeTruthy()
+    expect($agentBoxProfiles.get()[0]?.displayName).toBe('Reviewer')
+    expect(update).toHaveBeenCalledWith({
+      displayName: 'New name',
+      expectedVersion: 3,
+      profileId: 'profile-reviewer'
+    })
+  })
+
+  it('creates through the injected maintenance port and adopts only its returned record', async () => {
+    const maintenance = maintenancePort()
+    $agentBoxService.set({ detail: null, phase: 'ready' })
+
+    render(<ProfilesView maintenance={maintenance} onClose={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'New profile' }))
+    fireEvent.change(await screen.findByRole('textbox'), { target: { value: 'Builder' } })
+
+    realClick(screen.getByRole('combobox'))
+    fireEvent.click(await screen.findByRole('option', { name: 'Beta toolbench' }))
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Create profile' }))
+    })
+
+    await waitFor(() =>
+      expect(maintenance.create).toHaveBeenCalledWith({ displayName: 'Builder', harness: 'opaque-beta' })
     )
-    await waitFor(() => expect(selectProfile).toHaveBeenCalledWith('default'))
-    expect(setActiveProfile).toHaveBeenCalledWith('default')
+    expect($agentBoxProfiles.get()).toEqual([
+      expect.objectContaining({ displayName: 'Builder', harness: 'opaque-beta', id: 'profile-created' })
+    ])
   })
 
-  it('leaves the active profile alone when a different profile is deleted', async () => {
-    vi.mocked(selectProfile).mockClear()
-    vi.mocked(setActiveProfile).mockClear()
-    vi.mocked(refreshProfiles).mockResolvedValue([makeProfile('default', true), makeProfile(NAMED_PROFILE)])
-    activeGateway.set('default')
+  it('renames first and then replaces the configuration with the version the rename returned', async () => {
+    const update = vi.fn(async (intent: { displayName: string }) =>
+      profile({ displayName: intent.displayName, version: 7 })
+    )
 
-    await renderProfilesView()
-    await deleteTheNamedProfile()
+    const updateConfig = vi.fn(async (intent: UpdateProfileConfigIntent) =>
+      configResult({
+        configVersion: 8,
+        profile: profile({ displayName: 'Renamed', version: intent.expectedVersion + 1 })
+      })
+    )
 
-    await waitFor(() => expect(deleteProfile).toHaveBeenCalledWith(NAMED_PROFILE))
-    // The dialog closes once the delete settles; a non-active delete must not re-home.
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull())
-    expect(selectProfile).not.toHaveBeenCalled()
-    expect(setActiveProfile).not.toHaveBeenCalled()
+    const maintenance = maintenancePort({ update, updateConfig })
+    $agentBoxProfiles.set([profile()])
+
+    render(<ProfilesView maintenance={maintenance} onClose={vi.fn()} />)
+
+    fireEvent.change(await screen.findByRole('textbox', { name: 'Name' }), { target: { value: 'Renamed' } })
+    fireEvent.change(field('Notes'), { target: { value: 'updated note' } })
+    fireEvent.click(saveButton())
+
+    await waitFor(() => expect(updateConfig).toHaveBeenCalledTimes(1))
+    expect(update).toHaveBeenCalledWith({ displayName: 'Renamed', expectedVersion: 3, profileId: 'profile-reviewer' })
+    expect(updateConfig.mock.calls[0]?.[0]).toMatchObject({ expectedVersion: 7, profileId: 'profile-reviewer' })
+    expect(update.mock.invocationCallOrder[0]).toBeLessThan(updateConfig.mock.invocationCallOrder[0]!)
+    expect($agentBoxProfiles.get()[0]).toMatchObject({ displayName: 'Renamed', version: 8 })
+  })
+
+  it('adopts the display name the service normalized, leaving nothing left to save', async () => {
+    const update = vi.fn(async (_intent: { displayName: string }) =>
+      profile({ displayName: 'Builder (normalized)', version: 7 })
+    )
+
+    const updateConfig = vi.fn(async (_intent: UpdateProfileConfigIntent) => configResult())
+
+    $agentBoxProfiles.set([profile()])
+
+    render(<ProfilesView maintenance={maintenancePort({ update, updateConfig })} onClose={vi.fn()} />)
+
+    fireEvent.change(await screen.findByRole('textbox', { name: 'Name' }), { target: { value: 'builder' } })
+    fireEvent.click(saveButton())
+
+    await waitFor(() => expect(field('Name').value).toBe('Builder (normalized)'))
+    expect($agentBoxProfiles.get()[0]).toMatchObject({ displayName: 'Builder (normalized)', version: 7 })
+    expect(update).toHaveBeenCalledTimes(1)
+    expect(update).toHaveBeenCalledWith({ displayName: 'builder', expectedVersion: 3, profileId: 'profile-reviewer' })
+    expect(updateConfig).not.toHaveBeenCalled()
+    // The submitted value is gone, so there is no stale dirty state to save.
+    expect(screen.queryByRole('button', { name: 'Save profile' })).toBeNull()
+  })
+
+  it('sends the whole configuration: untouched and locked values kept, restored values dropped', async () => {
+    const updateConfig = vi.fn(async (_intent: UpdateProfileConfigIntent) => configResult())
+    const update = vi.fn(async () => profile())
+    const maintenance = maintenancePort({ update, updateConfig })
+    $agentBoxProfiles.set([profile()])
+
+    render(<ProfilesView maintenance={maintenance} onClose={vi.fn()} />)
+
+    await screen.findByRole('combobox', { name: 'Mode' })
+    fireEvent.change(field('Notes'), { target: { value: 'edited' } })
+
+    openSelect('Mode')
+    fireEvent.click(await screen.findByRole('option', { name: 'Not set' }))
+    fireEvent.click(saveButton())
+
+    await waitFor(() => expect(updateConfig).toHaveBeenCalledTimes(1))
+    expect(update).not.toHaveBeenCalled()
+    expect(updateConfig.mock.calls[0]?.[0].values).toEqual([
+      { controlId: 'notes', value: 'edited' },
+      { controlId: 'verbose', value: true },
+      { controlId: 'locked_flag', value: true },
+      { controlId: 'primary_model', value: { modelId: 'vendor/family/model-v1', providerId: 'provider-one' } }
+    ])
+  })
+
+  it('sends the service-offered enum value, the toggled boolean, and the locked service value', async () => {
+    const updateConfig = vi.fn(async (_intent: UpdateProfileConfigIntent) => configResult())
+    $agentBoxProfiles.set([profile()])
+
+    render(<ProfilesView maintenance={maintenancePort({ updateConfig })} onClose={vi.fn()} />)
+
+    await screen.findByRole('combobox', { name: 'Mode' })
+    openSelect('Mode')
+    fireEvent.click(await screen.findByRole('option', { name: 'fast' }))
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Verbose' }))
+
+    // A security-locked control answers no click, and keeps its service value.
+    fireEvent.click(screen.getByRole('switch', { name: 'Locked flag' }))
+    fireEvent.click(saveButton())
+
+    await waitFor(() => expect(updateConfig).toHaveBeenCalledTimes(1))
+
+    const values = updateConfig.mock.calls[0]?.[0].values
+    expect(values).toContainEqual({ controlId: 'mode', value: 'fast' })
+    expect(values).toContainEqual({ controlId: 'verbose', value: false })
+    expect(values).toContainEqual({ controlId: 'locked_flag', value: true })
+  })
+
+  it('sends the exact provider/model reference chosen from the directory', async () => {
+    const updateConfig = vi.fn(async (_intent: UpdateProfileConfigIntent) => configResult())
+    $agentBoxProfiles.set([profile()])
+    $agentBoxProviderModels.set([providerModel({ models: [modelEntry('vendor/family/model-v9')] })])
+
+    render(<ProfilesView maintenance={maintenancePort({ updateConfig })} onClose={vi.fn()} />)
+
+    await screen.findByRole('combobox', { name: 'Primary model' })
+    openSelect('Primary model')
+    fireEvent.click(await screen.findByRole('option', { name: /vendor\/family\/model-v9/ }))
+    fireEvent.click(saveButton())
+
+    await waitFor(() => expect(updateConfig).toHaveBeenCalledTimes(1))
+    expect(updateConfig.mock.calls[0]?.[0].values).toContainEqual({
+      controlId: 'primary_model',
+      value: { modelId: 'vendor/family/model-v9', providerId: 'provider-one' }
+    })
+  })
+
+  it('keeps the service-normalized name and the draft when only the configuration update fails', async () => {
+    const update = vi.fn(async (intent: { displayName: string }) =>
+      profile({ displayName: `${intent.displayName} (normalized)`, version: 7 })
+    )
+
+    const updateConfig = vi.fn(async (_intent: UpdateProfileConfigIntent) => {
+      throw new Error('CONFLICT_VERSION')
+    })
+
+    $agentBoxProfiles.set([profile()])
+
+    render(<ProfilesView maintenance={maintenancePort({ update, updateConfig })} onClose={vi.fn()} />)
+
+    fireEvent.change(await screen.findByRole('textbox', { name: 'Name' }), { target: { value: 'Renamed' } })
+    fireEvent.change(field('Notes'), { target: { value: 'edited' } })
+    fireEvent.click(saveButton())
+
+    await waitFor(() => expect(updateConfig).toHaveBeenCalledTimes(1))
+    expect(await screen.findByText('CONFLICT_VERSION')).toBeTruthy()
+    expect($agentBoxProfiles.get()[0]).toMatchObject({ displayName: 'Renamed (normalized)', version: 7 })
+    expect(field('Name').value).toBe('Renamed (normalized)')
+    expect(field('Notes').value).toBe('edited')
+
+    // Retrying resumes at the version the successful rename returned, and does
+    // not send the rename a second time.
+    fireEvent.click(saveButton())
+
+    await waitFor(() => expect(updateConfig).toHaveBeenCalledTimes(2))
+    expect(update).toHaveBeenCalledTimes(1)
+    expect(updateConfig.mock.calls[1]?.[0]).toMatchObject({ expectedVersion: 7, profileId: 'profile-reviewer' })
+  })
+
+  it('holds the name input and the configuration controls while a save is pending', async () => {
+    let settle!: (result: ProfilesUpdateConfigResult) => void
+
+    const updateConfig = vi.fn(
+      () =>
+        new Promise<ProfilesUpdateConfigResult>(resolve => {
+          settle = resolve
+        })
+    )
+
+    const update = vi.fn(async () => profile())
+
+    $agentBoxProfiles.set([profile()])
+
+    render(<ProfilesView maintenance={maintenancePort({ update, updateConfig })} onClose={vi.fn()} />)
+
+    fireEvent.change(await screen.findByRole('textbox', { name: 'Notes' }), { target: { value: 'edited' } })
+
+    // One captured button, clicked twice while the first save is still pending.
+    const button = saveButton()
+    fireEvent.click(button)
+    fireEvent.click(button)
+
+    expect(updateConfig).toHaveBeenCalledTimes(1)
+    expect(update).not.toHaveBeenCalled()
+    // Nothing may build intent the in-flight request cannot carry.
+    expect(field('Name').disabled).toBe(true)
+    expect(field('Notes').disabled).toBe(true)
+    expect(button.hasAttribute('disabled')).toBe(true)
+
+    await act(async () => {
+      settle(configResult({ profile: profile({ version: 4 }) }))
+    })
+
+    expect(await screen.findByText('Profile configuration saved. It applies to the next send.')).toBeTruthy()
+    expect(field('Name').disabled).toBe(false)
+  })
+
+  it('adopts the descriptor the service normalizes to after saving, and states the effect timing', async () => {
+    const updateConfig = vi.fn(async (_intent: UpdateProfileConfigIntent) =>
+      configResult({ profile: profile({ version: 4 }) })
+    )
+
+    mocks.loadDescriptor
+      .mockImplementationOnce(async (profileId: string) => serviceDescriptor(profileId))
+      .mockImplementationOnce(async (profileId: string) =>
+        serviceDescriptor(profileId, { notes: 'normalized by service' })
+      )
+
+    $agentBoxProfiles.set([profile()])
+
+    render(<ProfilesView maintenance={maintenancePort({ updateConfig })} onClose={vi.fn()} />)
+
+    fireEvent.change(await screen.findByRole('textbox', { name: 'Notes' }), { target: { value: 'raw value' } })
+    fireEvent.click(saveButton())
+
+    await waitFor(() => expect(updateConfig).toHaveBeenCalledTimes(1))
+    expect(updateConfig.mock.calls[0]?.[0].values).toContainEqual({ controlId: 'notes', value: 'raw value' })
+
+    await waitFor(() => expect(field('Notes').value).toBe('normalized by service'))
+
+    const notice = screen.getByText('Profile configuration saved. It applies to the next send.')
+    expect(notice.getAttribute('data-effective-for')).toBe('next_send')
+    expect(notice.textContent).not.toContain('Execution')
+  })
+
+  it('never paints a late descriptor onto the profile the user switched to', async () => {
+    const pending: Array<() => void> = []
+
+    mocks.loadDescriptor.mockImplementation(
+      (profileId: string) =>
+        new Promise<ConfigDescriptor>(resolve => {
+          pending.push(() =>
+            resolve(serviceDescriptor(profileId, { notes: profileId === 'profile-second' ? 'second' : 'stale first' }))
+          )
+        })
+    )
+
+    $agentBoxProfiles.set([profile(), profile({ displayName: 'Second', id: asWireId('profile-second') })])
+
+    render(<ProfilesView maintenance={maintenancePort()} onClose={vi.fn()} />)
+
+    await waitFor(() => expect(pending.length).toBe(1))
+
+    // The row's own select target comes before its overflow-menu button.
+    fireEvent.click(screen.getAllByRole('button', { name: 'Second' })[0]!)
+    await waitFor(() => expect(pending.length).toBe(2))
+
+    await act(async () => {
+      pending[1]?.()
+    })
+    expect(field('Notes').value).toBe('second')
+
+    await act(async () => {
+      pending[0]?.()
+    })
+    expect(field('Notes').value).toBe('second')
+    expect(screen.queryByText('stale first')).toBeNull()
   })
 })

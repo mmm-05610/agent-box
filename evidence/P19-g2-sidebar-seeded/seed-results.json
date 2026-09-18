@@ -1,0 +1,99 @@
+{
+  "allOk": true,
+  "counts": {
+    "PASS": 13,
+    "FAIL": 0,
+    "SKIP": 0,
+    "PENDING": 0
+  },
+  "executed": 13,
+  "unknownStatuses": [],
+  "detail": [
+    {
+      "detail": "sandbox=C:\\Users\\maoqh\\p19-g2\\sandbox4",
+      "id": "driver-target",
+      "status": "PASS",
+      "step": "driver target"
+    },
+    {
+      "detail": "base=/tmp/agentbox-p19g2-mu5x0yu7; fixture=/tmp/agentbox-p19g2-mu5x0yu7/alpha-web/stateful_acp_peer.mjs",
+      "id": "sandbox-isolated",
+      "status": "PASS",
+      "step": "three isolated WSL workspaces exist with the fixture projected"
+    },
+    {
+      "detail": "dataRoot=C:\\Users\\maoqh\\p19-g2\\sandbox4\\server-data; tokenFile=present",
+      "id": "server-started",
+      "status": "PASS",
+      "step": "the AgentBox Server is live on loopback with its own token"
+    },
+    {
+      "detail": "hello.serverId=server_7530151036014b1ebccf51664b98bc11 protocol=wire/1",
+      "id": "lifecycle-connection-installed",
+      "status": "PASS",
+      "step": "the lifecycle connection is installed and reachable from the renderer"
+    },
+    {
+      "detail": "protocolVersion=wire/1",
+      "id": "server-hello",
+      "status": "PASS",
+      "step": "server.hello answers over the product transport"
+    },
+    {
+      "detail": "listed=3; ids=ws_718891e23df3447b84eb83b4b5183b9f,ws_68e3fe4858a14451987a503320d2d73d,ws_7ee036b4e7e04d6c830befed21c2adf1",
+      "id": "workspaces-registered",
+      "status": "PASS",
+      "step": "all three workspaces register and list back"
+    },
+    {
+      "detail": "profileId=profile_f731b9edea9546588b2914ffa3164a04",
+      "id": "profile-created",
+      "status": "PASS",
+      "step": "the seed role exists with the fixture model"
+    },
+    {
+      "detail": "completed=9/9",
+      "id": "sessions-seeded-completed",
+      "status": "PASS",
+      "step": "nine sessions seeded with completed turns"
+    },
+    {
+      "detail": "renamed=9/9 pinned=3/3",
+      "id": "session-titles-and-pins",
+      "status": "PASS",
+      "step": "sessions carry service titles; one per workspace is pinned"
+    },
+    {
+      "detail": "workspaceRows=3",
+      "id": "catalog-refreshed",
+      "status": "PASS",
+      "step": "after reload the sidebar lists the three WSL workspace rows"
+    },
+    {
+      "detail": "sessionRows=9",
+      "id": "sidebar-populated-three-by-three",
+      "status": "PASS",
+      "step": "all nine seeded sessions are visible under their workspace rows"
+    },
+    {
+      "detail": "shotsDir=C:\\Users\\maoqh\\p19-g2\\shots",
+      "id": "screenshots-captured",
+      "status": "PASS",
+      "step": "populated-sidebar and session-open screenshots captured"
+    },
+    {
+      "detail": "portFree=true tokenFile=present",
+      "id": "clean-shutdown",
+      "status": "PASS",
+      "step": "the app and the Server both stop"
+    }
+  ],
+  "notes": [],
+  "sandbox": "C:\\Users\\maoqh\\p19-g2\\sandbox4",
+  "serverPort": 18753,
+  "workspaces": [
+    "Alpha Web",
+    "Beta API",
+    "Gamma Docs"
+  ]
+}

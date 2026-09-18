@@ -1,11 +1,13 @@
 <p align="center">
-  <img src="assets/banner.png" alt="Hermes Agent" width="100%">
+  <img src="assets/banner.png" alt="Ordessa, powered by Pacthold" width="100%">
 </p>
 
-# Hermes Desktop
+# Ordessa
 
-The native desktop client for Hermes Agent: an Electron + React app that talks
-to a Hermes runtime running as a headless `hermes serve` process.
+**Ordessa, powered by Pacthold.** The native desktop client for the Pacthold
+service: an Electron + React app that connects to a running server, which owns
+Workspaces, Profiles and Sessions and runs the harnesses (including the
+`hermes` family) on this machine or a remote one.
 
 **This repository is the client only.** It ships no Hermes runtime, no CLI, no
 terminal UI and no browser dashboard — those live in Hermes Agent itself. The
@@ -71,5 +73,6 @@ npm test --prefix tests-js
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Hermes Desktop is part of the Hermes Agent
-project by Nous Research.
+MIT — see [LICENSE](LICENSE). Ordessa is built from the Hermes Desktop shell
+(Nous Research, MIT); upstream copyright and licence are retained unchanged, and
+`hermes` remains the name of a harness family this client can run.

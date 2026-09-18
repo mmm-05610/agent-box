@@ -11,11 +11,37 @@ import type {
   PetOverlayStatePayload
 } from './store/pet-overlay'
 import type { QuickEntryStatePush, QuickEntryStatus, QuickEntrySubmitPayload } from './store/quick-entry'
+import type { WireMethodName } from './types/wire/wire-v1'
+import type {
+  WslArchiveWorkspaceResult,
+  WslConnectRequest,
+  WslConnectResult,
+  WslDirectoryListing,
+  WslDiscoveryResult,
+  WslFailure,
+  WslListDirectoriesRequest,
+  WslReconnectResult,
+  WslRenameWorkspaceRequest,
+  WslRenameWorkspaceResult,
+  WslSaveWorkspaceRequest,
+  WslSaveWorkspaceResult,
+  WslWorkspacesResult
+} from './types/workspace'
 
 export {}
 
 declare global {
   interface Window {
+    agentBoxDesktop?: {
+      wire: {
+        subscribeEvents: (input: { cursor: string; sessionId: string }, callback: (frame: unknown) => void) => () => void
+        request: (request: {
+          body: unknown
+          method: WireMethodName
+          path: `/wire/v1/${WireMethodName}`
+        }) => Promise<unknown>
+      }
+    }
     hermesDesktop: {
       // Resolve a backend connection. Omit `profile` (or pass the primary) for
       // the window's backend; pass a named profile to lazily spawn/reuse that
@@ -197,6 +223,20 @@ declare global {
         ) => () => void
       }
       sshConfigHosts: () => Promise<DesktopSshHostsResult>
+      // WSL Workspace (work order 35). Structured outcomes from
+      // src/types/workspace.ts; never throws for expected failures.
+      wslWorkspace: {
+        discover: () => Promise<WslDiscoveryResult>
+        connect: (request: WslConnectRequest) => Promise<WslConnectResult | WslFailure>
+        listDirectories: (request: WslListDirectoriesRequest) => Promise<WslDirectoryListing | WslFailure>
+        saveWorkspace: (request: WslSaveWorkspaceRequest) => Promise<WslSaveWorkspaceResult | WslFailure>
+        listWorkspaces: () => Promise<WslWorkspacesResult | WslFailure>
+        renameWorkspace: (request: WslRenameWorkspaceRequest) => Promise<WslRenameWorkspaceResult | WslFailure>
+        archiveWorkspace: (request: { workspaceId: string }) => Promise<WslArchiveWorkspaceResult | WslFailure>
+        reconnectWorkspace: (request: { workspaceId: string }) => Promise<WslReconnectResult>
+        releaseConnection: (request: { connectionId: string }) => Promise<{ ok: true; released: boolean }>
+        cancelOperation: (request: { operationId: string }) => Promise<{ ok: true; cancelled: boolean }>
+      }
       sshResolveHost: (host: string) => Promise<DesktopSshResolveResult>
       probeConnectionConfig: (remoteUrl: string) => Promise<DesktopConnectionProbeResult>
       oauthLoginConnectionConfig: (remoteUrl: string) => Promise<DesktopOauthLoginResult>

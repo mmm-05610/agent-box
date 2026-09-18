@@ -1,10 +1,11 @@
 /**
- * E2E boot-failure tests — verify the app shows an error overlay when the
- * backend can't start.
+ * E2E boot-failure tests — verify the app surfaces an honest, NON-BLOCKING
+ * failure state when the backend can't start (P02A).
  *
  * Injects a fake boot error (HERMES_DESKTOP_BOOT_FAKE_ERROR) so the backend
- * resolution fails with a controlled error message. The app should show the
- * BootFailureOverlay with retry/repair actions.
+ * resolution fails with a controlled error message. The floating recovery
+ * panel (retry/repair/gateway settings) must appear while the shell stays
+ * interactive — the old full-screen mask is retired.
  *
  * Prerequisite: `npm run build` must have been run so dist/ exists.
  */

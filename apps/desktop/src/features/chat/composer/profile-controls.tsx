@@ -1,0 +1,340 @@
+import { useMemo } from 'react'
+
+import { Button } from '@/components/ui/button'
+import { Codicon } from '@/components/ui/codicon'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Tip } from '@/components/ui/tooltip'
+import { ConfigControlInput, controlLabel } from '@/features/profiles/config-control-input'
+import {
+  modelSlotChoices,
+  modelSlotCurrentValue,
+  removeOverride,
+  replaceOverride
+} from '@/features/profiles/model-slot'
+import { useI18n } from '@/i18n'
+import type { Translations } from '@/i18n'
+import type {
+  ComposerConfigResolutionState,
+  ComposerProfileState,
+  ComposerProviderModelChoice
+} from '@/lib/composer/types'
+import { cn } from '@/lib/utils'
+import type { ConfigControl, ConfigOverride } from '@/types/wire/wire-v1'
+
+const PROFILE_PILL = cn(
+  'h-(--composer-control-size) min-w-0 max-w-44 shrink gap-1 rounded-md px-2 text-xs font-normal',
+  'text-(--ui-text-tertiary) hover:bg-(--chrome-action-hover) hover:text-foreground'
+)
+
+export function ComposerProfileControls({ profile }: { profile: ComposerProfileState }) {
+  const { t } = useI18n()
+  const copy = t.composer
+  const selected = profile.options.find(option => option.id === profile.selectedId) ?? null
+  const disabled = Boolean(profile.unavailableReason || profile.switching)
+
+  return (
+    <div className="flex min-w-0 items-center gap-(--composer-control-gap)" data-slot="composer-profile-controls">
+      <DropdownMenu>
+        <Tip label={profile.unavailableReason || copy.profile} side="top">
+          <DropdownMenuTrigger asChild>
+            <Button
+              aria-label={selected ? `${copy.profile}: ${selected.displayName}` : copy.chooseProfile}
+              className={PROFILE_PILL}
+              data-slot="composer-profile-trigger"
+              disabled={disabled}
+              type="button"
+              variant="ghost"
+            >
+              <Codicon aria-hidden name="account" size="0.875rem" />
+              <span className="truncate">
+                {profile.switching ? copy.switchingProfile : selected?.displayName || copy.chooseProfile}
+              </span>
+              {selected ? (
+                <span className="max-w-20 truncate rounded bg-muted/70 px-1 py-0.5 text-[0.6rem] uppercase tracking-wide text-muted-foreground">
+                  {selected.harness}
+                </span>
+              ) : null}
+              <Codicon aria-hidden className="shrink-0 opacity-50" name="chevron-down" size="0.75rem" />
+            </Button>
+          </DropdownMenuTrigger>
+        </Tip>
+        <DropdownMenuContent align="end" className="min-w-60 max-w-80" side="top" sideOffset={8}>
+          <DropdownMenuLabel>{copy.chooseProfile}</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuRadioGroup
+            onValueChange={profileId => {
+              if (profileId && profileId !== profile.selectedId) {
+                void Promise.resolve(profile.onSelect(profileId))
+              }
+            }}
+            value={profile.selectedId ?? ''}
+          >
+            {profile.options.map(option => (
+              <DropdownMenuRadioItem
+                disabled={!option.selectable}
+                key={option.id}
+                title={option.unavailableReason || undefined}
+                value={option.id}
+              >
+                <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
+                  <span className="truncate">{option.displayName}</span>
+                  <span className="max-w-28 truncate text-[0.65rem] text-muted-foreground">
+                    {copy.harness(option.harness)}
+                  </span>
+                </span>
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <TemporaryConfigPopover profile={profile} />
+    </div>
+  )
+}
+
+function TemporaryConfigPopover({ profile }: { profile: ComposerProfileState }) {
+  const { t } = useI18n()
+  const copy = t.composer
+  const descriptor = profile.configDescriptor
+  const disabled = !profile.selectedId || !descriptor
+  const overrideCount = profile.overrides.length
+  const resolution = profile.configResolution ?? { status: 'idle' as const }
+
+  return (
+    <Popover>
+      <Tip label={descriptor === null ? copy.configUnavailable : copy.temporaryConfig} side="top">
+        <PopoverTrigger asChild>
+          <Button
+            aria-label={copy.temporaryConfig}
+            className="relative size-(--composer-control-size) shrink-0 rounded-md p-0"
+            data-slot="composer-temporary-config-trigger"
+            disabled={disabled}
+            size="icon"
+            type="button"
+            variant="ghost"
+          >
+            <Codicon aria-hidden name="settings-gear" size="0.875rem" />
+            {overrideCount > 0 ? (
+              <span
+                aria-label={`${overrideCount}`}
+                className="absolute top-0 right-0 size-1.5 rounded-full bg-(--ui-accent)"
+                data-slot="composer-override-indicator"
+              />
+            ) : null}
+          </Button>
+        </PopoverTrigger>
+      </Tip>
+      <PopoverContent align="end" className="w-80 space-y-3" side="top" sideOffset={8}>
+        <div>
+          <div className="text-xs font-medium text-foreground">{copy.temporaryConfig}</div>
+          <div className="mt-0.5 text-[0.68rem] text-muted-foreground">
+            {descriptor?.effectTiming === 'immediate_declared' ? copy.takesEffectImmediately : copy.takesEffectNextSend}
+          </div>
+        </div>
+        <ConfigResolutionNotice resolution={resolution} />
+        {!descriptor || descriptor.controls.length === 0 ? (
+          <div className="text-xs text-muted-foreground">{copy.temporaryConfigEmpty}</div>
+        ) : (
+          <div className="space-y-2.5">
+            {descriptor.controls.map(control => (
+              <ConfigControlField
+                control={control}
+                key={control.controlId}
+                locked={descriptor.securityLockedIds.includes(control.controlId)}
+                modelChoices={profile.modelChoices ?? []}
+                onChange={value =>
+                  profile.onOverrideChange(
+                    value === undefined
+                      ? removeOverride(profile.overrides, control.controlId)
+                      : replaceOverride(profile.overrides, control.controlId, value)
+                  )
+                }
+                overridden={profile.overrides.some(override => override.controlId === control.controlId)}
+                overrides={profile.overrides}
+                resolution={resolution}
+              />
+            ))}
+          </div>
+        )}
+        {/* The preview is not the running configuration: the run fixes its own
+            configuration only when the service accepts a send. */}
+        <div className="text-[0.62rem] text-muted-foreground">{copy.configFixesOnAccept}</div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+function ConfigControlField({
+  control,
+  locked,
+  onChange,
+  overridden,
+  overrides,
+  modelChoices,
+  resolution
+}: {
+  control: ConfigControl
+  locked: boolean
+  onChange: (value: unknown | undefined) => void
+  overridden: boolean
+  overrides: ConfigOverride[]
+  modelChoices: ComposerProviderModelChoice[]
+  resolution: ComposerConfigResolutionState
+}) {
+  const { t } = useI18n()
+  const copy = t.composer
+  const editable = control.editable && !locked
+
+  const current =
+    overrides.find(override => override.controlId === control.controlId)?.value ?? control.currentValue
+
+  const label = controlLabel(control.controlId)
+  const title = locked ? copy.securityLocked : !control.editable ? copy.configUnavailable : undefined
+
+  const isModelSlot = control.kind === 'model_slot'
+
+  const choices = useMemo(
+    () => (isModelSlot ? modelSlotChoices(control, modelChoices, overrides) : []),
+    [control, isModelSlot, modelChoices, overrides]
+  )
+
+  return (
+    <div className="space-y-1" data-control-id={control.controlId} title={title}>
+      <div className="flex items-center justify-between gap-2">
+        <label className="truncate text-[0.7rem] font-medium text-foreground">{label}</label>
+        {overridden ? (
+          <button
+            className="text-[0.62rem] text-muted-foreground hover:text-foreground"
+            onClick={() => onChange(undefined)}
+            type="button"
+          >
+            {copy.clearTemporaryValue}
+          </button>
+        ) : null}
+      </div>
+      <ConfigControlInput
+        choices={isModelSlot ? choices : undefined}
+        control={control}
+        disabled={!editable}
+        label={label}
+        modelValue={isModelSlot ? modelSlotCurrentValue(control, modelChoices, overrides) : undefined}
+        onValueChange={onChange}
+        unsetLabel={copy.clearTemporaryValue}
+        value={current}
+      />
+      <ConfigControlResolution control={control} resolution={resolution} />
+    </div>
+  )
+}
+
+/** The service's own verdict for one control: the effective value it computed,
+ *  or the reason it refused. Nothing here is derived client-side. */
+function ConfigControlResolution({
+  control,
+  resolution
+}: {
+  control: ConfigControl
+  resolution: ComposerConfigResolutionState
+}) {
+  const copy = useI18n().t.composer
+
+  if (resolution.status === 'rejected') {
+    const invalid = resolution.invalidControls.find(candidate => candidate.controlId === control.controlId)
+
+    return invalid ? (
+      <div className="text-[0.62rem] text-destructive" data-config-invalid={control.controlId}>
+        {invalid.reason}
+      </div>
+    ) : null
+  }
+
+  if (resolution.status !== 'resolved') {
+    return null
+  }
+
+  const effective = resolution.effective.find(candidate => candidate.controlId === control.controlId)
+
+  if (!effective || effective.value === null || effective.value === undefined) {
+    return null
+  }
+
+  return (
+    <div className="text-[0.62rem] text-muted-foreground" data-config-effective={control.controlId}>
+      {copy.configEffectiveValue}: {effectiveValueText(effective.value, copy)}
+    </div>
+  )
+}
+
+/** Short, data-only rendering of a service value: primitives as text, a model
+ *  reference as its two opaque ids, anything else as the neutral confirmed
+ *  wording. Nothing is executed and no markup is rendered. */
+export function effectiveValueText(value: unknown, copy: Translations['composer']): string {
+  if (typeof value === 'string') {
+    return value
+  }
+
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value)
+  }
+
+  if (value && typeof value === 'object') {
+    const candidate = value as { modelId?: unknown; providerId?: unknown }
+
+    if (typeof candidate.providerId === 'string' && typeof candidate.modelId === 'string') {
+      return `${candidate.providerId}: ${candidate.modelId}`
+    }
+  }
+
+  return copy.configEffectiveServiceConfirmed
+}
+
+function ConfigResolutionNotice({ resolution }: { resolution: ComposerConfigResolutionState }) {
+  const copy = useI18n().t.composer
+
+  if (resolution.status === 'idle') {
+    return null
+  }
+
+  if (resolution.status === 'resolving') {
+    return (
+      <div className="text-[0.68rem] text-muted-foreground" data-config-resolution="resolving">
+        {copy.configResolving}
+      </div>
+    )
+  }
+
+  if (resolution.status === 'resolved') {
+    return (
+      <div className="text-[0.68rem] text-muted-foreground" data-config-resolution="resolved">
+        {copy.configResolved}
+      </div>
+    )
+  }
+
+  if (resolution.status === 'rejected') {
+    return (
+      <div
+        className="rounded bg-destructive/10 px-2 py-1.5 text-[0.68rem] text-destructive"
+        data-config-resolution="rejected"
+      >
+        {copy.configRejected}
+      </div>
+    )
+  }
+
+  return (
+    <div className="text-[0.68rem] text-muted-foreground" data-config-resolution="unavailable">
+      {copy.configResolveUnavailable} {resolution.detail}
+    </div>
+  )
+}

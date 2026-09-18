@@ -17,14 +17,12 @@ import { appViewForPath, isOverlayView } from '@/app/routes'
 import {
   $workspaceIsPage,
   AGENTS_ROUTE,
-  ARTIFACTS_ROUTE,
   CRON_ROUTE,
   navigateToWorkspacePage,
   NEW_CHAT_ROUTE,
   PROFILES_ROUTE,
   sessionRoute,
-  SETTINGS_ROUTE,
-  SKILLS_ROUTE
+  SETTINGS_ROUTE
 } from '@/app/routes'
 import { useKeybindingHost } from '@/app/shell/hooks/use-keybinding-host'
 import { cycleProfile, switchProfileToSlot, switchToDefaultProfile } from '@/application/profile/navigation'
@@ -210,8 +208,7 @@ export function useAppKeybindings(deps: KeybindRuntimeDeps): void {
     'nav.commandCenter': deps.toggleCommandCenter,
     'nav.settings': () => navigate(SETTINGS_ROUTE),
     'nav.profiles': () => navigate(PROFILES_ROUTE),
-    'nav.skills': () => navigateToWorkspacePage(navigate, SKILLS_ROUTE),
-    'nav.artifacts': () => navigateToWorkspacePage(navigate, ARTIFACTS_ROUTE),
+    'nav.skills': () => navigateToWorkspacePage(navigate, `${SETTINGS_ROUTE}?tab=product:resources`),
     'nav.cron': () => navigate(CRON_ROUTE),
     'nav.agents': () => navigate(AGENTS_ROUTE),
 

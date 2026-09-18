@@ -30,6 +30,17 @@ function clampProgress(value: number) {
 
 export function applyDesktopBootProgress(progress: DesktopBootProgress) {
   const current = $desktopBoot.get()
+
+  // failDesktopBoot() is terminal for this boot cycle. Main-process progress
+  // can arrive after the renderer has classified the failure; retaining only
+  // current.error while accepting `running: true` produces an impossible
+  // state (failed and running) and hides the recovery panel. A deliberate
+  // retry/success uses resumeDesktopBootForRetry()/completeDesktopBoot(), so a
+  // generic error-free progress event has no authority to revive this cycle.
+  if (current.error !== null && !current.running && progress.error === null) {
+    return
+  }
+
   const nextProgress = clampProgress(progress.progress)
   const mergedProgress = progress.running ? Math.max(current.progress, nextProgress) : nextProgress
 
@@ -115,4 +126,22 @@ export function failDesktopBoot(message: string) {
     timestamp: Date.now(),
     visible: true
   })
+}
+
+// ── P02A: the recovery surface is non-blocking ──────────────────────────────
+// The product stays usable while the backend is down (product decision §1:
+// startup, service connection and tool availability are different facts).
+// The failure panel can be dismissed; dismissal is session-scoped and tied
+// to the FAILED BOOT ITSELF — a different error re-arms the surface.
+
+export const $bootFailureDismissed = atom<null | string>(null)
+
+/** Pure rule: the surface stays hidden only while the current error is the
+ *  one the user dismissed. A new failure (different message) is visible. */
+export function isBootFailureDismissed(error: string, dismissed: null | string): boolean {
+  return dismissed !== null && dismissed === error
+}
+
+export function dismissBootFailure(error: string): void {
+  $bootFailureDismissed.set(error)
 }

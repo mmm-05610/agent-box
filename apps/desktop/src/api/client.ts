@@ -1,5 +1,6 @@
 import { JsonRpcGatewayClient } from '@hermes/shared'
 
+import { isLegacyRestAllowed, legacyRestDisabledError } from '@/api/legacy-rest'
 import type { HermesApiRequest } from '@/global'
 
 // Desktop startup fires a burst of read-only data calls (config, profiles,
@@ -29,7 +30,7 @@ export class HermesGateway extends JsonRpcGatewayClient {
   constructor() {
     super({
       closedErrorMessage: 'Hermes gateway connection closed',
-      connectErrorMessage: 'Could not connect to Hermes gateway',
+      connectErrorMessage: 'Could not connect to the AgentBox service',
       createRequestId: nextId => nextId,
       notConnectedErrorMessage: 'Hermes gateway is not connected',
       requestTimeoutMs: DEFAULT_GATEWAY_REQUEST_TIMEOUT_MS
@@ -94,6 +95,13 @@ export function connectionScoped(): { connectionId?: string } {
  *  address: swapping the transport, or tagging a new call shape, is a change
  *  in one file instead of a search across `window.hermesDesktop.api`. */
 export function requestHermesApi<T>(request: HermesApiRequest): Promise<T> {
+  // The product runtime does not serve this surface: refuse at the door instead
+  // of sending an IPC request the main process would reject anyway. See
+  // api/legacy-rest for why the authority decides and the log stays honest.
+  if (!isLegacyRestAllowed()) {
+    return Promise.reject(legacyRestDisabledError(request))
+  }
+
   return window.hermesDesktop.api<T>(request)
 }
 

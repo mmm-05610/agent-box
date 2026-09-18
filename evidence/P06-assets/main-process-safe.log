@@ -1,0 +1,37 @@
+(electron) 'console-message' arguments are deprecated and will be removed. Please use Event<WebContentsConsoleMessageEventParams> object instead.
+Error occurred in handler for 'agentbox:wire:request': AgentBoxWireHostUnavailableError: AgentBox service is unavailable
+    at file:///C:/Users/maoqh/agentbox-wsl-round1/apps/desktop/dist/electron-main.mjs:19169:13
+    at file:///C:/Users/maoqh/agentbox-wsl-round1/apps/desktop/dist/electron-main.mjs:32364:12
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:115338)
+    at Session.emit (node:events:509:28) {
+  cause: undefined,
+  code: 'UNAVAILABLE'
+}
+[hermes] install-stamp.json found at C:\Users\maoqh\agentbox-wsl-round1\apps\desktop\node_modules\electron\dist\resources\install-stamp.json , but parsing failed with Error: ENOENT: no such file or directory, open 'C:\Users\maoqh\agentbox-wsl-round1\apps\desktop\node_modules\electron\dist\resources\install-stamp.json'
+[hermes] install-stamp.json found at C:\Users\maoqh\agentbox-wsl-round1\apps\desktop\node_modules\electron\dist\resources\install-stamp.json , but parsing failed with Error: ENOENT: no such file or directory, open 'C:\Users\maoqh\agentbox-wsl-round1\apps\desktop\node_modules\electron\dist\resources\install-stamp.json'
+Error occurred in handler for 'agentbox:wire:request': AgentBoxWireHostUnavailableError: AgentBox service is unavailable
+    at file:///C:/Users/maoqh/agentbox-wsl-round1/apps/desktop/dist/electron-main.mjs:19169:13
+    at file:///C:/Users/maoqh/agentbox-wsl-round1/apps/desktop/dist/electron-main.mjs:32364:12
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:115338)
+    at Session.emit (node:events:509:28) {
+  cause: undefined,
+  code: 'UNAVAILABLE'
+}
+Error occurred in handler for 'agentbox:wire:request': AgentBoxWireHostUnavailableError: AgentBox service is unavailable
+    at file:///C:/Users/maoqh/agentbox-wsl-round1/apps/desktop/dist/electron-main.mjs:19169:13
+    at file:///C:/Users/maoqh/agentbox-wsl-round1/apps/desktop/dist/electron-main.mjs:32364:12
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:115338)
+    at Session.emit (node:events:509:28) {
+  cause: undefined,
+  code: 'UNAVAILABLE'
+}
+Error occurred in handler for 'agentbox:wire:request': AgentBoxWireHostUnavailableError: AgentBox service is unavailable
+    at file:///C:/Users/maoqh/agentbox-wsl-round1/apps/desktop/dist/electron-main.mjs:19169:13
+    at file:///C:/Users/maoqh/agentbox-wsl-round1/apps/desktop/dist/electron-main.mjs:32364:12
+    at Session.<anonymous> (node:electron/js2c/browser_init:2:115338)
+    at Session.emit (node:events:509:28) {
+  cause: undefined,
+  code: 'UNAVAILABLE'
+}
+Debugger ending on ws://127.0.0.1:58391/98408062-25a1-48b4-a494-86bd437a7af6
+For help, see: https://nodejs.org/en/docs/inspector

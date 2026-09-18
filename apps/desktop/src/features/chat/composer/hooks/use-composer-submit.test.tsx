@@ -6,6 +6,7 @@ import { type ComposerTarget, requestComposerSubmit } from '@/components/compose
 import { ComposerScopeProvider, ComposerSurfaceProvider, MAIN_COMPOSER_SCOPE } from '@/components/composer/scope'
 import { PaneVisibleContext } from '@/components/pane-shell/pane-visibility'
 import { $clarifyRequests } from '@/store/clarify'
+import { clearSessionDraft, stashSessionDraft, takeSessionDraft } from '@/store/composer'
 import { $gateway } from '@/store/gateway'
 import {
   clearAllPrompts,
@@ -23,9 +24,11 @@ interface SubmitHarnessOptions {
   busy?: boolean
   compacting?: boolean
   inputDisabled?: boolean
+  runtimeAuthority?: 'agentbox' | 'hermes'
   scopeTarget?: ComposerTarget
   sessionKey?: string | null
   submitOnHide?: boolean
+  submitResult?: Promise<boolean>
   surfaceId?: string | null
   text?: string
   visible?: boolean
@@ -38,9 +41,11 @@ function renderSubmitHook({
   busy = false,
   compacting = false,
   inputDisabled = false,
+  runtimeAuthority = 'hermes',
   scopeTarget = 'main',
   sessionKey = 'stored-session',
   submitOnHide = false,
+  submitResult,
   surfaceId,
   text = '',
   visible = true
@@ -53,7 +58,7 @@ function renderSubmitHook({
   const editorRef = { current: editor }
   const onCancel = vi.fn()
   const onSteer = vi.fn(async () => true)
-  const onSubmit = vi.fn(async () => true)
+  const onSubmit = vi.fn(() => submitResult ?? Promise.resolve(true))
   const queueCurrentDraft = vi.fn(() => true)
   let updatePaneVisible: Dispatch<SetStateAction<boolean>> | undefined
 
@@ -112,15 +117,17 @@ function renderSubmitHook({
         queueCurrentDraft,
         queueEdit: null,
         queuedPrompts: [],
+        runtimeAuthority,
         sessionId: 'runtime-session',
         setComposerText: vi.fn(),
-        stashAt: vi.fn()
+        stashAt: (scope, value = '', items = []) => stashSessionDraft(scope, value, items)
       }),
     { wrapper: Wrapper }
   )
 
   return {
     clearDraft,
+    draftRef,
     hook,
     onCancel,
     onSteer,
@@ -266,6 +273,7 @@ describe('useComposerSubmit external request routing', () => {
 describe('useComposerSubmit busy-turn routing', () => {
   afterEach(() => {
     cleanup()
+    clearSessionDraft('stored-session')
     vi.restoreAllMocks()
   })
 
@@ -353,6 +361,45 @@ describe('useComposerSubmit busy-turn routing', () => {
     expect(queueCurrentDraft).not.toHaveBeenCalled()
   })
 
+  it('submits a busy AgentBox follow-up to the server boundary without steering or local queueing', async () => {
+    const { hook, onCancel, onSteer, onSubmit, queueCurrentDraft } = renderSubmitHook({
+      busy: true,
+      runtimeAuthority: 'agentbox',
+      text: 'follow up after this'
+    })
+
+    act(() => hook.result.current.submitDraft())
+
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith('follow up after this', {
+        attachments: [],
+        composerScope: 'stored-session',
+        draftVersion: expect.any(Number)
+      })
+    )
+    expect(onSteer).not.toHaveBeenCalled()
+    expect(queueCurrentDraft).not.toHaveBeenCalled()
+    expect(onCancel).not.toHaveBeenCalled()
+  })
+
+  it('does not route AgentBox slash-shaped text through the Hermes inline command branch', async () => {
+    const { hook, onSubmit } = renderSubmitHook({
+      busy: true,
+      runtimeAuthority: 'agentbox',
+      text: '/status'
+    })
+
+    act(() => hook.result.current.submitDraft())
+
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith('/status', {
+        attachments: [],
+        composerScope: 'stored-session',
+        draftVersion: expect.any(Number)
+      })
+    )
+  })
+
   it('submits a normal turn while idle', async () => {
     const { hook, onCancel, onSteer, onSubmit, queueCurrentDraft } = renderSubmitHook({ text: 'ordinary question' })
 
@@ -381,6 +428,26 @@ describe('useComposerSubmit busy-turn routing', () => {
     await waitFor(() =>
       expect(onSubmit).toHaveBeenCalledWith('hello', expect.objectContaining({ composerScope: 'stored-session' }))
     )
+  })
+
+  it('does not let a late accepted response clear text typed after submit', async () => {
+    let accept!: (accepted: boolean) => void
+
+    const submitResult = new Promise<boolean>(resolve => {
+      accept = resolve
+    })
+
+    const { draftRef, hook } = renderSubmitHook({ submitResult, text: 'first request' })
+
+    act(() => hook.result.current.submitDraft())
+
+    act(() => {
+      draftRef.current = 'typed while waiting'
+      stashSessionDraft('stored-session', draftRef.current, [])
+      accept(true)
+    })
+
+    await waitFor(() => expect(takeSessionDraft('stored-session').text).toBe('typed while waiting'))
   })
 })
 

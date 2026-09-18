@@ -23,7 +23,16 @@ export function SidebarSessionSkeletons() {
   )
 }
 
-export function SidebarBlankState({ onNewProject }: { onNewProject: () => void }) {
+export function SidebarBlankState({
+  onNewProject,
+  onRemoteConnection
+}: {
+  onNewProject: () => void
+  /** Remote-connection entry (round 36: simplified WSL wizard). Absent on
+   *  skins that hide the feature; the empty sidebar must still offer both
+   *  add entries so the ＋ menu is reachable with zero workspaces. */
+  onRemoteConnection?: () => void
+}) {
   const { t } = useI18n()
   const s = t.sidebar
 
@@ -32,10 +41,18 @@ export function SidebarBlankState({ onNewProject }: { onNewProject: () => void }
       <div className="flex flex-col items-center gap-2">
         <Codicon className="text-(--ui-text-quaternary)" name="root-folder" size="1.25rem" />
         <p className="text-xs text-(--ui-text-tertiary)">{s.noSessions}</p>
+        {/* Exactly the two ＋-menu entries (round 36): local completes
+            directly; remote opens the WSL wizard. */}
         <Button className="mt-0.5 text-(--ui-text-secondary)" onClick={onNewProject} size="sm" variant="ghost">
-          <Codicon name="add" size="0.75rem" />
-          {s.projects.newButton}
+          <Codicon name="folder-opened" size="0.75rem" />
+          {t.wslWorkspace.menuOpenFolder}
         </Button>
+        {onRemoteConnection && (
+          <Button className="text-(--ui-text-secondary)" onClick={onRemoteConnection} size="sm" variant="ghost">
+            <Codicon name="vm-connect" size="0.75rem" />
+            {t.wslWorkspace.menuOpenRemoteFolder}
+          </Button>
+        )}
       </div>
     </div>
   )

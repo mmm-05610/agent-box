@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 
 import { saveHermesConfig } from '@/api/config'
 import { setHermesConfigCache, useHermesConfigRecord } from '@/application/config/use-config-record'
+import { $resumeLastSession, setResumeLastSession } from '@/application/desktop-preferences/resume-last-session'
 import { installVscodeThemeFromMarketplace } from '@/application/theme/adapters/install'
 import { $marketplaceInstalls, getBaseColors, isUserTheme, removeUserTheme } from '@/application/theme/adapters/user-themes'
 import { useDebounced } from '@/components/hooks/use-debounced'
@@ -62,14 +63,20 @@ import { MODE_OPTIONS } from './constants'
 import { setNested } from './helpers'
 import { PetSettings } from './pet-settings'
 import { APPEARANCE_SETTING_IDS } from './settings-search'
-import { TerminalFontSetting } from './terminal-font-setting'
+import { LocalTerminalFontSetting, TerminalFontSetting } from './terminal-font-setting'
+import type { SettingsAuthority } from './types'
 import { useDeepLinkHighlight } from './use-deep-link-highlight'
 
 // display.resume_last_session lives in the backend config record (shared with
 // config.yaml and the cold-start restore in use-desktop-integrations), not a
 // renderer store. Saves write through the shared react-query cache so the
 // restore gate sees the new value on the next launch.
-function ResumeLastSessionSetting() {
+//
+// This is the Hermes-authority component: it reads and writes the legacy
+// config record, so it is only ever constructed under `authority === 'hermes'`
+// (see AppearanceSettings). An agentbox mount must not reach the legacy REST
+// surface, refused or not.
+function HermesResumeLastSessionSetting() {
   const { t } = useI18n()
   const a = t.settings.appearance
   const configQuery = useHermesConfigRecord()
@@ -96,13 +103,47 @@ function ResumeLastSessionSetting() {
   }
 
   return (
-    <ToggleRow
-      checked={checked}
-      description={a.resumeLastSessionDesc}
-      disabled={!config}
-      label={a.resumeLastSessionTitle}
-      onChange={update}
-    />
+    <div data-setting="resume-last-session">
+      <ToggleRow
+        checked={checked}
+        description={a.resumeLastSessionDesc}
+        disabled={!config}
+        label={a.resumeLastSessionTitle}
+        onChange={update}
+      />
+    </div>
+  )
+}
+
+/**
+ * The AgentBox binding: the restore decision is a Desktop-local preference
+ * (default: on), shared through `$resumeLastSession` with the cold-start gate
+ * in the product composition root. Nothing here touches the backend config.
+ */
+function LocalResumeLastSessionSetting() {
+  const { t } = useI18n()
+  const a = t.settings.appearance
+  const checked = useStore($resumeLastSession)
+
+  const update = (on: boolean) => {
+    try {
+      setResumeLastSession(on)
+    } catch (error) {
+      // The atom keeps its previous value (persist-then-publish), so the
+      // switch snaps back to what will actually happen on the next launch.
+      notifyError(error, t.settings.config.autosaveFailed)
+    }
+  }
+
+  return (
+    <div data-setting="resume-last-session">
+      <ToggleRow
+        checked={checked}
+        description={a.resumeLastSessionDesc}
+        label={a.resumeLastSessionTitle}
+        onChange={update}
+      />
+    </div>
   )
 }
 
@@ -389,7 +430,18 @@ function GlassRow({ children, label }: GlassRowProps) {
   )
 }
 
-export function AppearanceSettings() {
+export interface AppearanceSettingsProps {
+  /**
+   * Which runtime this page is mounted for. The two controls that used to be
+   * backend-config fields (resume-last-session, terminal font) branch on it, and
+   * which one is constructed is the whole decision — an agentbox mount must not
+   * even mount the Hermes-config components, not merely have their requests
+   * refused.
+   */
+  authority: SettingsAuthority
+}
+
+export function AppearanceSettings({ authority }: AppearanceSettingsProps) {
   const { t, isSavingLocale } = useI18n()
   const { themeName, mode, resolvedMode, availableThemes, setTheme, setMode } = useTheme()
   const toolViewMode = useStore($toolViewMode)
@@ -628,7 +680,9 @@ export function AppearanceSettings() {
             title={a.uiScaleTitle}
           />
 
-          <TerminalFontSetting />
+          {/* The Hermes-config-backed variant is never constructed under the
+              agentbox authority — the local one owns the row there. */}
+          {authority === 'agentbox' ? <LocalTerminalFontSetting /> : <TerminalFontSetting />}
 
           <ListRow
             action={
@@ -807,7 +861,7 @@ export function AppearanceSettings() {
             onChange={setComposerPopoutGesturesEnabled}
           />
 
-          <ResumeLastSessionSetting />
+          {authority === 'agentbox' ? <LocalResumeLastSessionSetting /> : <HermesResumeLastSessionSetting />}
 
           <ListRow
             action={

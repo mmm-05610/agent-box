@@ -8,10 +8,10 @@ import { LogView } from '@/components/ui/log-view'
 import type { DesktopConnectionConfig } from '@/global'
 import { useI18n } from '@/i18n'
 import { openExternalLink } from '@/lib/external-link'
-import { ChevronLeft, ExternalLink, FileText, Loader2, LogIn, RefreshCw, SlidersHorizontal, Wrench } from '@/lib/icons'
-import { $desktopBoot } from '@/store/boot'
+import { ChevronLeft, ExternalLink, FileText, Loader2, LogIn, RefreshCw, SlidersHorizontal, Wrench, X } from '@/lib/icons'
+import { $bootFailureDismissed, $desktopBoot, dismissBootFailure, isBootFailureDismissed } from '@/store/boot'
 import { notify, notifyError } from '@/store/notifications'
-import { $desktopOnboarding } from '@/store/onboarding'
+import { $desktopOnboarding, doesDesktopOnboardingOwnScreen } from '@/store/onboarding'
 
 import type { RemoteReauth } from './boot-failure-reauth'
 import {
@@ -28,6 +28,8 @@ interface BootFailureOverlayProps {
    *  the overlay never imports an app screen and the code-split stays put.
    *  Absent — or not yet resolved — the slot renders nothing. */
   GatewaySettingsView?: ComponentType<{ embedded?: boolean }>
+  /** Matches DesktopOnboardingOverlay.enabled at the composition seam. */
+  onboardingEnabled?: boolean
 }
 
 type BusyAction = 'local' | 'repair' | 'retry' | 'signin' | null
@@ -44,8 +46,9 @@ type RecoveryView = 'connect' | 'recovery'
 // exited during startup, bootstrap latched, …). Without this the app shell
 // renders dead — "gateway offline", no composer, only a toast — with no way
 // to retry, repair the install, switch the gateway, or find the logs.
-export function BootFailureOverlay({ GatewaySettingsView }: BootFailureOverlayProps) {
+export function BootFailureOverlay({ GatewaySettingsView, onboardingEnabled = false }: BootFailureOverlayProps) {
   const boot = useStore($desktopBoot)
+  const dismissed = useStore($bootFailureDismissed)
   const onboarding = useStore($desktopOnboarding)
   const { t } = useI18n()
   const [busy, setBusy] = useState<BusyAction>(null)
@@ -61,11 +64,23 @@ export function BootFailureOverlay({ GatewaySettingsView }: BootFailureOverlayPr
   // juggling, no second connection form to maintain).
   const [view, setView] = useState<RecoveryView>('recovery')
 
-  const visible = Boolean(boot.error) && !boot.running
-  // While first-run onboarding owns the picker/flow we let it surface its own
-  // progress; the recovery overlay is for hard failures, which it covers via a
-  // higher z-index regardless of onboarding state.
-  const suppressed = onboarding.flow.status !== 'idle' && onboarding.flow.status !== 'error'
+  // Non-blocking (P02A): the panel floats over the working shell instead of
+  // masking it. Dismissal hides it only for THIS failed boot — a different
+  // error re-arms the surface.
+  const visible =
+    boot.error !== null && !boot.running && !isBootFailureDismissed(boot.error, dismissed)
+
+  // While first-run onboarding ACTIVELY owns a flow we let it surface its own
+  // progress. P02A tightened this: the setup surface now yields an unresolved
+  // readiness check (no mask, no question nobody can answer), so suppression
+  // must require the setup flow to really be running against a confirmed
+  // first-run — otherwise a dead backend with a fresh profile would show no
+  // honest state at all.
+  const suppressed =
+    doesDesktopOnboardingOwnScreen(onboarding, onboardingEnabled) &&
+    onboarding.flow.status !== 'idle' &&
+    onboarding.flow.status !== 'error' &&
+    onboarding.flow.status !== 'success'
 
   useEffect(() => {
     if (!visible) {
@@ -251,12 +266,21 @@ export function BootFailureOverlay({ GatewaySettingsView }: BootFailureOverlayPr
     busy?: Exclude<BusyAction, null>
   }
 
-  const settingsAction: RecoveryAction = {
-    key: 'settings',
-    label: copy.gatewaySettings,
-    onClick: () => setView('connect'),
-    icon: <SlidersHorizontal />
-  }
+  // The gateway/connection panel belongs to the legacy runtime and is handed in
+  // only by the shell that owns it. Without it there is nothing to open, so the
+  // action must not render a button that leads to an empty card — and the
+  // AgentBox product must not offer a legacy gateway/connection surface at all.
+  const settingsAction: RecoveryAction | null = GatewaySettingsView
+    ? {
+        key: 'settings',
+        label: copy.gatewaySettings,
+        onClick: () => setView('connect'),
+        icon: <SlidersHorizontal />
+      }
+    : null
+
+  const withSettings = (variant?: RecoveryVariant): RecoveryAction[] =>
+    settingsAction ? (variant ? [{ ...settingsAction, variant }] : [settingsAction]) : []
 
   const retryAction: RecoveryAction = {
     key: 'retry',
@@ -297,11 +321,10 @@ export function BootFailureOverlay({ GatewaySettingsView }: BootFailureOverlayPr
         icon: <LogIn />,
         busy: 'signin'
       },
-      { ...settingsAction, variant: 'secondary' },
+      ...withSettings('secondary'),
       localAction
     ]
-    hint = copy.remoteSignInHint(label)
-  } else if (cloudDown) {
+    hint = copy.remoteSignInHint(label)  } else if (cloudDown) {
     // A Nous Cloud agent is down — the user cannot restart the managed
     // instance and Repair is local-only. Lead with the paths that actually
     // resolve it: check the portal (status/instance controls), switch to the
@@ -323,11 +346,11 @@ export function BootFailureOverlay({ GatewaySettingsView }: BootFailureOverlayPr
         onClick: () => openExternalLink('https://discord.gg/NousResearch'),
         variant: 'ghost'
       },
-      { ...settingsAction, variant: 'ghost' }
+      ...withSettings('ghost')
     ]
     hint = copy.cloudDownHint
   } else if (remoteFailure) {
-    actions = [settingsAction, { ...retryAction, variant: 'secondary' }, localAction]
+    actions = [...withSettings(), { ...retryAction, variant: 'secondary' }, localAction]
     hint = copy.remoteFailureHint
   } else {
     // Local failure: Use-local is redundant with Retry (both re-target local), so
@@ -342,20 +365,17 @@ export function BootFailureOverlay({ GatewaySettingsView }: BootFailureOverlayPr
         variant: 'secondary',
         busy: 'repair'
       },
-      { ...settingsAction, variant: 'ghost' }
+      ...withSettings('ghost')
     ]
     hint = notFound ? copy.notFoundHint : copy.repairHint
   }
 
   if (view === 'connect') {
     return (
-      <div
-        className="fixed inset-0 z-(--z-setup) flex items-center justify-center bg-(--ui-chat-surface-background) p-6"
-        // Masks the whole app on boot failure — must stay filled under window
-        // glass. Contract: `[data-glass-opaque]` in styles.css.
-        data-glass-opaque=""
-      >
-        <div className="flex max-h-[86vh] w-full max-w-[46rem] flex-col overflow-hidden rounded-xl border border-(--stroke-nous) bg-(--ui-chat-bubble-background) shadow-nous">
+      // P02A: recovery surfaces float — no full-screen mask, the shell stays
+      // interactive (sidebar, settings, offline-capable views all work).
+      <div className="pointer-events-none fixed inset-0 z-(--z-setup) flex items-end justify-end p-4">
+        <div className="pointer-events-auto flex max-h-[86vh] w-full max-w-[46rem] flex-col overflow-hidden rounded-xl border border-(--stroke-nous) bg-(--ui-chat-bubble-background) shadow-nous">
           {/* Subtle back affordance (projects/overlay idiom): muted → foreground
               on hover, no divider. */}
           <button
@@ -379,16 +399,14 @@ export function BootFailureOverlay({ GatewaySettingsView }: BootFailureOverlayPr
   }
 
   return (
-    <div
-      className="fixed inset-0 z-(--z-setup) flex items-center justify-center bg-(--ui-chat-surface-background) p-6"
-      // Masks the whole app on boot failure — must stay filled under window
-      // glass. Contract: `[data-glass-opaque]` in styles.css.
-      data-glass-opaque=""
-    >
-      <div className="w-full max-w-[40rem] overflow-hidden rounded-xl border border-(--stroke-nous) bg-(--ui-chat-bubble-background) shadow-nous">
+    <div className="pointer-events-none fixed inset-0 z-(--z-setup) flex items-end justify-end p-4">
+      <div
+        className="pointer-events-auto w-full max-w-[40rem] overflow-hidden rounded-xl border border-(--stroke-nous) bg-(--ui-chat-bubble-background) shadow-nous"
+        data-boot-failure-panel=""
+      >
         <div className="flex items-start gap-3 px-5 py-4">
           <ErrorIcon className="mt-0.5" size="1.25rem" />
-          <div>
+          <div className="min-w-0 flex-1">
             <h2 className="text-[0.9375rem] font-semibold tracking-tight">
               {remoteReauth
                 ? copy.remoteTitle
@@ -408,6 +426,16 @@ export function BootFailureOverlay({ GatewaySettingsView }: BootFailureOverlayPr
                     : copy.description}
             </p>
           </div>
+          <button
+            aria-label={copy.dismiss}
+            className="grid size-6 shrink-0 place-items-center rounded-sm text-(--ui-text-tertiary) transition-colors hover:bg-(--ui-control-hover-background) hover:text-foreground"
+            data-boot-failure-dismiss=""
+            onClick={() => boot.error && dismissBootFailure(boot.error)}
+            title={copy.dismiss}
+            type="button"
+          >
+            <X className="size-3.5" />
+          </button>
         </div>
 
         <div className="grid gap-4 p-5 pt-0">

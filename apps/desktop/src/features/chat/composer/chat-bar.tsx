@@ -41,7 +41,7 @@ import { Slot as ContribSlot } from '@/extension/contrib/react/slot'
 import { useTourMarker } from '@/features/chat/tour-marker'
 import { useI18n } from '@/i18n'
 import { chatMessageText } from '@/lib/chat-messages'
-import { PR_COMMENT_URL_RE } from '@/lib/chat-runtime'
+import { PR_COMMENT_URL_RE, SLASH_COMMAND_RE } from '@/lib/chat-runtime'
 import { sanitizeComposerInput } from '@/lib/composer-input-sanitize'
 import { COMPOSER_DROP_ACTIVE_CLASS, COMPOSER_DROP_FADE_CLASS } from '@/lib/composer/drop-affordance'
 import { useEmojiCompletions } from '@/lib/composer/hooks/use-emoji-completions'
@@ -51,6 +51,7 @@ import { DATA_IMAGE_URL_RE } from '@/lib/embedded-images'
 import { triggerHaptic } from '@/lib/haptics'
 import { useStoresSelector } from '@/lib/use-session-slice'
 import { cn } from '@/lib/utils'
+import { $agentBoxHello, agentBoxQueueControlsAvailable } from '@/store/agentbox-service'
 import { sessionCompacting } from '@/store/compaction'
 import { browseBackward, browseForward, deriveUserHistory, isBrowsingHistory } from '@/store/composer-input-history'
 import { POPOUT_WIDTH_REM } from '@/store/composer-popout'
@@ -65,6 +66,7 @@ import { useTheme } from '@/themes'
 
 import { AttachmentList } from './attachments'
 import { ContextMenu } from './context-menu'
+import { ComposerAccessChip } from './access-chip'
 import { ComposerControls } from './controls'
 import { HelpHint } from './help-hint'
 import { useComposerBranch } from './hooks/use-composer-branch'
@@ -90,10 +92,13 @@ export function ChatBar({
   busy,
   cwd,
   disabled,
+  draftScopeKey,
   focusKey,
   gateway,
   maxRecordingSeconds = 120,
   queueSessionKey,
+  runtimeAuthority = 'hermes',
+  serverQueue,
   sessionId,
   state,
   onCancel,
@@ -150,7 +155,10 @@ export function ChatBar({
   // busy submit routes text to the queue instead of a steer (which would sit
   // undelivered behind the blocked tool batch). Drives the button affordance.
   const blockingPrompt = useStore(useMemo(() => sessionBlockingPrompt(sessionId ?? null), [sessionId]))
-  const activeQueueSessionKey = queueSessionKey || sessionId || null
+  const activeQueueSessionKey = queueSessionKey || sessionId || draftScopeKey || null
+  const agentBoxAuthority = runtimeAuthority === 'agentbox'
+  const serverQueueSupported = agentBoxQueueControlsAvailable(useStore($agentBoxHello), state.queue?.authority)
+  const localQueueSessionKey = agentBoxAuthority ? null : activeQueueSessionKey
 
   // Status items (subagents, background processes) are keyed by the RUNTIME
   // session id — gateway events and process.list both speak that id. Only the
@@ -198,8 +206,8 @@ export function ChatBar({
 
   const { t } = useI18n()
   const gatewayState = useStore($gatewayState)
-  const reconnecting = gatewayState !== 'open'
-  const inputDisabled = shouldDisableComposerInput(disabled, gatewayState)
+  const reconnecting = agentBoxAuthority ? disabled : gatewayState !== 'open'
+  const inputDisabled = agentBoxAuthority ? disabled : shouldDisableComposerInput(disabled, gatewayState)
 
   // The draft engine — detached source of truth (DOM + draftRef + edge
   // selectors); typing never re-renders the chrome. ChatBar owns `queueEditRef`
@@ -280,7 +288,7 @@ export function ChatBar({
     steerQueuedNow,
     stepQueuedEdit
   } = useComposerQueue({
-    activeQueueSessionKey,
+    activeQueueSessionKey: localQueueSessionKey,
     attachments,
     busy,
     clearDraft,
@@ -291,11 +299,11 @@ export function ChatBar({
     onSteer,
     onSubmit,
     queueEditRef,
-    queueSessionKey,
+    queueSessionKey: agentBoxAuthority ? null : queueSessionKey,
     sessionId
   })
 
-  const statusStackVisible = queuedPrompts.length > 0 || statusPresent
+  const statusStackVisible = queuedPrompts.length > 0 || Boolean(serverQueue) || (!agentBoxAuthority && statusPresent)
 
   // Halt vs. reach-the-queue: every interrupt lands on onCancel, but only the
   // gestures that MEAN "stop working" (Stop button, Esc) go through this
@@ -306,10 +314,12 @@ export function ChatBar({
   // busy) call the raw onCancel and keep draining on settle. Parked entries
   // stay in the panel until resumed, sent, edited, or deleted.
   const haltRun = useCallback(() => {
-    parkQueuedPrompts(activeQueueSessionKeyRef.current)
+    if (!agentBoxAuthority) {
+      parkQueuedPrompts(localQueueSessionKey)
+    }
 
     return onCancel()
-  }, [activeQueueSessionKeyRef, onCancel])
+  }, [agentBoxAuthority, localQueueSessionKey, onCancel])
 
   const { compactPill, minimal, stacked } = useComposerMetrics({
     composerDockRef,
@@ -320,19 +330,36 @@ export function ChatBar({
   })
 
   const hasComposerPayload = hasText || attachments.length > 0
-  const canSubmit = busy || hasComposerPayload
 
   // Steer only makes sense mid-turn, text-only (the gateway can't carry images
   // into a tool result) and never for a slash command (those execute inline).
   // A blocking prompt (approval/sudo/secret) also rules it out: the tool batch
   // is parked on the user, so a steer can't reach the model — text queues.
-  const canSteer = busy && !compacting && !blockingPrompt && !!onSteer && attachments.length === 0 && isSteerableText
+  const canSteer =
+    !agentBoxAuthority &&
+    busy &&
+    !compacting &&
+    !blockingPrompt &&
+    !!onSteer &&
+    attachments.length === 0 &&
+    isSteerableText
+
+  const canSubmit = agentBoxAuthority
+    ? busy || hasComposerPayload
+    : busy
+    ? !hasComposerPayload ||
+      canSteer ||
+      serverQueueSupported ||
+      (attachments.length === 0 && SLASH_COMMAND_RE.test(draftRef.current))
+    : hasComposerPayload
 
   // While busy: text redirects the live turn (Cursor-style stop-and-correct),
   // attachments queue for the next turn, an empty composer stops.
-  const busyAction: 'steer' | 'queue' | 'stop' = canSteer
+  const busyAction: 'steer' | 'queue' | 'stop' = agentBoxAuthority
+    ? 'stop'
+    : canSteer
     ? 'steer'
-    : compacting || hasComposerPayload
+    : serverQueueSupported && (compacting || hasComposerPayload)
       ? 'queue'
       : 'stop'
 
@@ -361,6 +388,7 @@ export function ChatBar({
     queueCurrentDraft,
     queueEdit,
     queuedPrompts,
+    runtimeAuthority,
     sessionId,
     setComposerText,
     stashAt
@@ -368,7 +396,15 @@ export function ChatBar({
 
   // Resting / reconnecting / starting placeholder text, re-rolled only on a real
   // conversation change.
-  const placeholder = useComposerPlaceholder({ disabled, reconnecting, sessionId })
+  const legacyPlaceholder = useComposerPlaceholder({ disabled, reconnecting, sessionId })
+
+  const placeholder = agentBoxAuthority
+    ? disabled
+      ? t.composer.disabledPlaceholder
+      : sessionId
+        ? t.composer.placeholderFollowUp
+        : t.composer.message
+    : legacyPlaceholder
 
   // Trigger / completion engine: @// detection, the adapter-driven item list,
   // popover selection, and chip insertion. The keydown nav block below consumes
@@ -1120,8 +1156,8 @@ export function ChatBar({
               5px transparent grab margin — so both strips carry the same inset
               and share one left edge with it. */}
           <div className={cn(composerFloatingStrip, 'px-[5px] pb-1.5 empty:hidden')}>
-            <ActionBadges sessionId={statusSessionId} />
-            <SuggestionPills sessionId={statusSessionId} />
+            {!agentBoxAuthority && <ActionBadges sessionId={statusSessionId} />}
+            {!agentBoxAuthority && <SuggestionPills sessionId={statusSessionId} />}
           </div>
           {/* Session-scoped status stack (todos, subagents, background tasks,
               queue). An in-flow dock child: the dock is bottom-anchored, so it
@@ -1130,7 +1166,9 @@ export function ChatBar({
           <ComposerStatusStack
             onSubmit={onSubmit}
             queue={
-              activeQueueSessionKey && queuedPrompts.length > 0 ? (
+              agentBoxAuthority ? (
+                serverQueue
+              ) : activeQueueSessionKey && queuedPrompts.length > 0 ? (
                 <QueuePanel
                   busy={busy}
                   editingId={queueEdit?.entryId ?? null}
@@ -1314,6 +1352,7 @@ export function ChatBar({
                   >
                     <div className="flex translate-y-[3px] items-start gap-(--composer-control-gap) self-start [grid-area:menu]">
                       {contextMenu}
+                      {agentBoxAuthority && state.profile ? <ComposerAccessChip profile={state.profile} /> : null}
                       <ContribSlot area={COMPOSER_AREAS.leading} />
                     </div>
                     <div className="min-w-0 [grid-area:input]">{input}</div>

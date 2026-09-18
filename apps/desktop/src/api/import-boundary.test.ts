@@ -40,7 +40,12 @@ const API_DIR = dirname(fileURLToPath(import.meta.url))
 const SRC_DIR = resolve(API_DIR, '..')
 /** This file names every forbidden specifier on purpose — it is not a module
  *  the app loads, and its fixtures are the point. */
-const SELF = relative(SRC_DIR, fileURLToPath(import.meta.url))
+/** `src/`-relative, forward-slashed: the sanctioned-door list is written that
+ *  way, and a Windows checkout would otherwise compare `api\client.ts` against
+ *  `api/client.ts` and flag the one permitted address. */
+const srcRelative = (absolute: string): string => relative(SRC_DIR, absolute).replaceAll('\\', '/')
+
+const SELF = srcRelative(fileURLToPath(import.meta.url))
 
 /** Upper layers of the renderer, by directory under `src/`. */
 const UPPER_ZONES = ['store', 'app', 'components', 'themes', 'i18n', 'extension/contrib'] as const
@@ -155,7 +160,7 @@ export function bridgeViolations(modules: readonly Module[]): Violation[] {
   }
 
   for (const candidate of [base, `${base}.ts`, `${base}.tsx`, join(base, 'index.ts'), join(base, 'index.tsx')]) {
-    const path = relative(SRC_DIR, candidate)
+    const path = srcRelative(candidate)
 
     if (known.has(path)) {
       return path
@@ -227,7 +232,7 @@ function modulesUnder(dir: string): Module[] {
     })
 
   return collect(dir)
-    .map(full => relative(SRC_DIR, full))
+    .map(full => srcRelative(full))
     .filter(path => path !== SELF)
     .map(path => ({ path, source: readFileSync(join(SRC_DIR, path), 'utf8') }))
 }

@@ -36,10 +36,12 @@ import {
 } from './app/persisted-flags'
 import { createKeepAwake } from './app/power-save'
 import { createPowerState } from './app/power-state'
+import { DESKTOP_PRODUCT_RUNTIME, shouldAutostartLegacyHermes } from './app/product-runtime-policy'
 import { type ActiveWork } from './app/quit-guard'
 import { createQuitPrompt } from './app/quit-prompt'
 import { configureSpellChecker as configureSpellCheckerImpl } from './app/spellcheck'
 import { USER_DATA_OVERRIDE } from './app/user-data'
+import { agentBoxServiceComposition } from './composition/agentbox-service-composition'
 import {
   closePreviewWatchers,
   dispatchRegistryApiRequest,
@@ -103,11 +105,14 @@ import {
 import { installWindowsSystemCaTrust } from './host-capabilities/platform/windows-system-ca'
 import { ensureWslWindowsFonts } from './host-capabilities/platform/wsl-fonts'
 import { setActiveGatewayProfile, setWslBridgeProfileState } from './host-capabilities/platform/wsl-path-bridge'
+import { createDefaultWslWorkspaceHost } from './host-capabilities/platform/wsl-workspace'
+import { createWslWorkspaceStore } from './host-capabilities/platform/wsl-workspace-store'
 import { createFaviconCache } from './host-capabilities/preview/favicon-cache'
 import {
   initMediaProtocolBridge
 } from './host-capabilities/preview/media-bridge'
 import { registerMediaProtocol as registerMediaProtocolImpl } from './host-capabilities/preview/media-registration'
+import { registerAgentBoxCredentialsIpc } from './ipc/agentbox-credentials-ipc'
 import { registerApiProxyIpc } from './ipc/api-proxy-ipc'
 import { registerBackendIpc } from './ipc/backend-ipc'
 import { registerConnectionIpc } from './ipc/connection-ipc'
@@ -119,6 +124,8 @@ import { registerPreviewIpc } from './ipc/preview-ipc'
 import { registerSystemIpc } from './ipc/system-ipc'
 import { registerThemeIpc } from './ipc/theme-ipc'
 import { registerWindowIpc } from './ipc/window-ipc'
+import { registerWorkCoreWireIpc } from './ipc/workcore-wire-ipc'
+import { registerWorkspaceIpc } from './ipc/workspace-ipc'
 import { destroyKeepaliveAgents } from './legacy-hermes/api-transport'
 import { cloudAgentSilentSignIn } from './legacy-hermes/cloud-agents'
 import { sshQuitShouldBlock } from './legacy-hermes/connection-apply'
@@ -235,6 +242,7 @@ import {
   setQuickEntryLastState,
   setQuickEntryWindow,
 } from './windows/windows-composition'
+import { installAgentBoxServerConnection } from './workcore/agentbox-server-connection'
 
 
 
@@ -567,6 +575,16 @@ registerFsIpc({
 
 registerGitIpc({ resolveGitBinary, resolveGhBinary })
 
+// WSL Workspace (work order 35): the host service owns distribution
+// discovery, connection verification, directory browsing and the versioned
+// workspace store in this app's (isolated) userData. Round-1 ownership of
+// that store is temporary by design; it moves to the Work Core later.
+registerWorkspaceIpc({
+  wslWorkspaceHost: createDefaultWslWorkspaceHost(
+    createWslWorkspaceStore(path.join(app.getPath('userData'), 'wsl-workspaces.json'))
+  )
+})
+
 registerMcpOauthCallbackIpc()
 
 const disposeTerminalSession = terminalIpc.disposeTerminalSession
@@ -787,7 +805,51 @@ registerApiProxyIpc({
   handleHermesApiRequest,
   getDataUrlReadMaxMb: () => getDataUrlReadMaxMb(),
   persistDataUrlReadMaxMb,
+  // Same runtime decision the window lifecycle uses for eager autostart, read
+  // as one boolean here: the legacy REST surface is served exactly when the
+  // product runtime IS the legacy Hermes runtime.
+  legacyApiAllowed: shouldAutostartLegacyHermes(DESKTOP_PRODUCT_RUNTIME),
 })
+
+const disposeWorkCoreWireIpc = registerWorkCoreWireIpc({
+  requestWire: agentBoxServiceComposition.requestWire,
+  subscribeWireEvents: agentBoxServiceComposition.subscribeWireEvents
+})
+
+app.on('will-quit', disposeWorkCoreWireIpc)
+
+// Credential records and the entry path: the main process owns both the records
+// file and the import, so the renderer only ever sends a value to store and
+// receives a record back.
+const disposeAgentBoxCredentialsIpc = registerAgentBoxCredentialsIpc({
+  connection: agentBoxServiceComposition.connectionSlot.current
+})
+
+app.on('will-quit', disposeAgentBoxCredentialsIpc)
+
+// The Work Core lifecycle connection, installed before any window exists so the
+// renderer's first wire call already sees the real service or a typed
+// `UNAVAILABLE` — never a race between "the window loaded" and "the connection
+// arrived". The AgentBox runtime is the only product runtime that speaks the
+// Work Core wire, so nothing is installed for the legacy runtime.
+//
+// It is installed from data the Desktop can legitimately read (its own data
+// root's token file, written by the Server) rather than minted here, and the
+// reason for an absent connection is logged as a stable category: the endpoint
+// and the token are main-only facts and never reach a log line.
+if (DESKTOP_PRODUCT_RUNTIME === 'agentbox') {
+  const installed = installAgentBoxServerConnection({ slot: agentBoxServiceComposition.connectionSlot })
+
+  if (installed.endpoint) {
+    rememberLog('[agentbox-wire] lifecycle connection installed')
+  } else {
+    rememberLog(`[agentbox-wire] lifecycle connection unavailable: ${installed.reason}`)
+  }
+
+  app.on('will-quit', () => {
+    agentBoxServiceComposition.connectionSlot.install(null)
+  })
+}
 
 registerFilesIpc({
   IS_WINDOWS,

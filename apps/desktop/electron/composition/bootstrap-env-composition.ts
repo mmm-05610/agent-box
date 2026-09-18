@@ -30,6 +30,10 @@ import {
   getRecentHermesLogLines,
   rememberLog
 } from '../app/log-buffer'
+import {
+  autostartDesktopProductRuntime,
+  DESKTOP_PRODUCT_RUNTIME
+} from '../app/product-runtime-policy'
 import { missingRendererAssets } from '../app/renderer-bundle'
 import { attachRendererConsoleCapture } from '../app/renderer-log'
 import {
@@ -7184,14 +7188,13 @@ export function createWindow() {
     )
   }
 
-  // Start the Python backend NOW, in parallel with the renderer load — not on
-  // did-finish-load. The backend cold boot (spawn → port announce → /api/status)
-  // is the dominant startup cost, and serializing it behind Chromium's load
-  // added the whole renderer load time to first-usable-composer. The promise is
-  // shared (backendConnectionState), so the renderer's getConnection() joins
-  // this in-flight boot instead of duplicating it; early boot-progress events
-  // the renderer misses are recovered by its getBootProgress() pull on mount.
-  startHermes().catch(error => rememberLog(error.stack || error.message))
+  // AgentBox is the product runtime. Its infrastructure lifecycle is injected
+  // by the later composition seam; opening the primary window never falls back
+  // to a legacy Hermes cold start.
+  void autostartDesktopProductRuntime(DESKTOP_PRODUCT_RUNTIME, {
+    onError: error => rememberLog(error instanceof Error ? error.stack || error.message : String(error)),
+    startLegacyHermes: () => startHermes()
+  })
 
   mainWindow.webContents.once('did-finish-load', () => {
     // Zoom restore is handled by wireCommonWindowHandlers (shared with session

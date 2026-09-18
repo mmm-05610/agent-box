@@ -1,0 +1,66 @@
+{
+  "allOk": true,
+  "counts": {
+    "PASS": 8,
+    "FAIL": 0,
+    "SKIP": 0,
+    "PENDING": 0
+  },
+  "executed": 8,
+  "unknownStatuses": [],
+  "detail": [
+    {
+      "detail": "family=pi; sandbox=C:\\Users\\maoqh\\agentbox-ui-gate-pi-sandbox; model=deepseek-flash",
+      "id": "driver-target",
+      "status": "PASS",
+      "step": "driver target"
+    },
+    {
+      "detail": "harnesses=[\"pi\"]",
+      "id": "server-started-with-real-harness",
+      "status": "PASS",
+      "step": "the Server is live with the family-s production deployment"
+    },
+    {
+      "detail": "serverId=server_3e59fc868a5a4962a14dcda800a28f9e",
+      "id": "lifecycle-connection-installed",
+      "status": "PASS",
+      "step": "the product reached the Server through its own lifecycle connection"
+    },
+    {
+      "detail": "credentialId=credential_233c3729ff684336a600890162e397ab",
+      "id": "credential-added-through-the-app",
+      "status": "PASS",
+      "step": "the interface-s own entry path imported the credential and recorded its id"
+    },
+    {
+      "detail": "providerModel=provider_9537cd6b451f42a0b033199c4202b8b8 credentialAttached=true",
+      "id": "provider-model-and-role-created",
+      "status": "PASS",
+      "step": "the model configuration carries the credential and the role selects it"
+    },
+    {
+      "detail": "answerChars=17 nonceRecalled=true terminal=true",
+      "id": "first-turn-answered-by-the-real-model",
+      "status": "PASS",
+      "step": "the first turn was answered by the real model and streamed before it finished"
+    },
+    {
+      "detail": "answerChars=104 nonceOccurrences=3",
+      "id": "second-turn-carries-the-first",
+      "status": "PASS",
+      "step": "the second turn-s answer recalls the first turn-s content"
+    },
+    {
+      "detail": "portFree=true recordsFile=present (records only)",
+      "id": "clean-shutdown",
+      "status": "PASS",
+      "step": "the app and the Server stop, and no credential material was written to the evidence"
+    }
+  ],
+  "family": "pi",
+  "model": "deepseek-flash",
+  "notes": [],
+  "sandbox": "C:\\Users\\maoqh\\agentbox-ui-gate-pi-sandbox",
+  "serverPort": 18761
+}

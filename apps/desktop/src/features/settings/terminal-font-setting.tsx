@@ -1,8 +1,11 @@
+import { useStore } from '@nanostores/react'
 import { useEffect, useRef, useState } from 'react'
 
 import { saveHermesConfig } from '@/api/config'
 import { setHermesConfigCache, useHermesConfigRecord } from '@/application/config/use-config-record'
+import { setTerminalFontFamilyPreference } from '@/application/desktop-preferences/terminal-font-preference'
 import {
+  $terminalFontFamily,
   normalizeTerminalFontFamily,
   resolveTerminalFontFamily,
   setTerminalFontFamilyFromConfig,
@@ -133,6 +136,7 @@ export function TerminalFontSetting() {
             <Input
               aria-label={copy.terminalFontTitle}
               className="flex-1"
+              data-setting="terminal-font"
               disabled={draft === null}
               list="hermes-terminal-font-families"
               onChange={event => update(event.target.value)}
@@ -140,6 +144,75 @@ export function TerminalFontSetting() {
               value={value}
             />
             <Button disabled={!value || draft === null} onClick={() => update('')} size="inline" variant="text">
+              {copy.terminalFontReset}
+            </Button>
+          </div>
+          <datalist id="hermes-terminal-font-families">
+            {TERMINAL_FONT_SUGGESTIONS.map(font => (
+              <option key={font} value={font} />
+            ))}
+          </datalist>
+          <div
+            aria-label={copy.terminalFontPreview}
+            className="overflow-hidden px-1 py-2 text-sm text-(--ui-text-secondary)"
+            style={{ fontFamily: previewFontFamily }}
+          >
+            <span className="mr-2 text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary)">
+              {copy.terminalFontPreview}
+            </span>
+            <span> ~/project git:main ❯</span>
+          </div>
+        </div>
+      }
+      description={copy.terminalFontDesc}
+      title={copy.terminalFontTitle}
+      wide
+    />
+  )
+}
+
+/**
+ * The AgentBox binding of the same row: the font is a Desktop-local preference,
+ * not a backend config field, so this component never mounts the config-record
+ * read/write the Hermes component owns (the split is literal — see
+ * appearance-settings.tsx).
+ *
+ * `$terminalFontFamily` is the shared authority the terminal itself consumes
+ * (`useTerminalFontController`), so updating it applies the font live. A failed
+ * storage write throws before the atom moves, leaving the previous font in
+ * place and the failure reported — the row never shows a font the next launch
+ * will not have.
+ */
+export function LocalTerminalFontSetting() {
+  const { t } = useI18n()
+  const copy = t.settings.appearance
+  const value = useStore($terminalFontFamily)
+
+  const update = (next: string) => {
+    try {
+      setTerminalFontFamilyPreference(next)
+    } catch (error) {
+      notifyError(error, t.settings.config.autosaveFailed)
+    }
+  }
+
+  const previewFontFamily = resolveTerminalFontFamily(value)
+
+  return (
+    <ListRow
+      below={
+        <div className="mt-3 space-y-2">
+          <div className="flex items-center gap-3">
+            <Input
+              aria-label={copy.terminalFontTitle}
+              className="flex-1"
+              data-setting="terminal-font"
+              list="hermes-terminal-font-families"
+              onChange={event => update(event.target.value)}
+              placeholder={copy.terminalFontPlaceholder}
+              value={value}
+            />
+            <Button disabled={!value} onClick={() => update('')} size="inline" variant="text">
               {copy.terminalFontReset}
             </Button>
           </div>

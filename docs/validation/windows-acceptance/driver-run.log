@@ -1,0 +1,16 @@
+PASS  app opens  window title: Hermes
+PASS  first-run setup  gate not shown; runtime already set up
+PASS  provider onboarding dismissed  no provider overlay present
+PASS  project overview sidebar  add-project button visible
+PASS  add-project entry  blank-state remote connection button
+PASS  wsl discovery  Ubuntu offered by the real discovery
+PASS  connect + browse step  directory browser visible
+PASS  browse CJK + spaces + up-level  sub-directory navigation worked
+PASS  workspace saved as sidebar entry  remote row visible in the sidebar
+PASS  connection info + reconnect  reconnect re-verified the saved workspace
+PASS  unknown path typed error  error surfaced, nothing saved
+PASS  cancel saves nothing  rows before=[wsl_ws_66fa0e088b498d61] after=[wsl_ws_66fa0e088b498d61]; host records unchanged=true
+PASS  host store written  [{"id":"wsl_ws_66fa0e088b498d61","root":"/home/maoqh/wsl-round1-验收 目录","user":"maoqh"}]
+PASS  reopen: workspace persisted  remote row visible after restart
+PASS  reopen: re-verification works  saved record re-verified against the real distribution
+ACCEPTANCE: ALL STEPS PASSED

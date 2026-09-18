@@ -1,3 +1,4 @@
+import { isLegacyRestAllowed } from '@/api/legacy-rest'
 import { deleteProfile } from '@/api/profiles'
 import { refreshProfiles } from '@/application/profile/catalog'
 import { ensureGatewayAgent } from '@/application/profile/gateway-routing'
@@ -343,11 +344,21 @@ export const hostProfileRouting = {
 
     let profiles = $profiles.get()
 
-    try {
-      profiles = await refreshProfiles()
-    } catch {
-      // Route inventory is a read: a transient backend failure falls back to
-      // the last cache. Electron always adds the primary Desktop profile.
+    // The route inventory is derived from the legacy profile catalog, and
+    // `refreshProfiles()` is a legacy REST read (`GET /api/profiles`). Under
+    // the AgentBox product runtime the renderer's legacy REST door is closed
+    // (`applyProductRuntimePolicy`), so the fetch is guaranteed to be refused:
+    // it must not be ISSUED at all. The cached inventory is exactly what the
+    // failure path below already falls back to — and Electron always adds the
+    // primary Desktop profile — so the returned route set is the same one the
+    // doomed request used to produce.
+    if (isLegacyRestAllowed()) {
+      try {
+        profiles = await refreshProfiles()
+      } catch {
+        // Route inventory is a read: a transient backend failure falls back to
+        // the last cache. Electron always adds the primary Desktop profile.
+      }
     }
 
     return getProfileRoutes(profiles.map(profile => profile.name))

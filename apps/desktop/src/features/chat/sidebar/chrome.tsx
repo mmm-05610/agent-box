@@ -1,5 +1,6 @@
 import { useStore } from '@nanostores/react'
 import type * as React from 'react'
+import { useState } from 'react'
 
 import {
   SIDEBAR_ROW_INSET,
@@ -11,6 +12,7 @@ import { SidebarRowLead } from '@/components/chat/sidebar/row-lead'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import { DisclosureCaret } from '@/components/ui/disclosure-caret'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { RowButton } from '@/components/ui/row-button'
 import { Tip } from '@/components/ui/tooltip'
 import { type NewSessionSplitHandler, startNewProjectDrag, startNewSessionDrag } from '@/features/chat/new-session-drag'
@@ -52,6 +54,7 @@ const HEADER_ACTION_BTN =
 // (only the nav "New session" row resets it, since it navigates to the draft
 // composer instead).
 export function SidebarSectionAddButton({
+  addMenu,
   ariaLabel,
   onNewProjectDrag,
   onNewSessionSplit,
@@ -71,16 +74,33 @@ export function SidebarSectionAddButton({
    *  supplied. */
   onNewSessionSplit?: NewSessionSplitHandler
   onPlainClick: () => void
+  /** When present, a plain click opens this menu instead of running
+   *  `onPlainClick` directly (the add-project menu: open folder / remote
+   *  connection). Drag semantics are untouched — a drag still arms its
+   *  placement, and a sub-threshold tap falls through to the menu. */
+  addMenu?: React.ReactNode
 }) {
+  const [menuOpen, setMenuOpen] = useState(false)
+
   return (
     <Tip label={ariaLabel}>
-      <Button
-        aria-label={ariaLabel}
-        className={HEADER_ACTION_BTN}
-        onClick={event => {
-          event.stopPropagation()
-          onPlainClick()
-        }}
+      <DropdownMenu onOpenChange={setMenuOpen} open={menuOpen}>
+        <DropdownMenuTrigger asChild>
+          <Button
+            aria-expanded={addMenu ? menuOpen : undefined}
+            aria-haspopup={addMenu ? 'menu' : undefined}
+            aria-label={ariaLabel}
+            className={HEADER_ACTION_BTN}
+            onClick={event => {
+              event.stopPropagation()
+
+              // With an add menu, the plain click's job is ONLY to open that
+              // menu (Radix owns it via the trigger) — running onPlainClick
+              // here too would fire the menu AND the direct flow at once.
+              if (!addMenu) {
+                onPlainClick()
+              }
+            }}
         onPointerDown={
           onNewProjectDrag
             ? event => {
@@ -97,8 +117,11 @@ export function SidebarSectionAddButton({
         size="icon-xs"
         variant="ghost"
       >
-        <Codicon name="add" size="0.75rem" />
-      </Button>
+          <Codicon name="add" size="0.75rem" />
+        </Button>
+      </DropdownMenuTrigger>
+      {addMenu ? <DropdownMenuContent align="start" side="bottom">{addMenu}</DropdownMenuContent> : null}
+      </DropdownMenu>
     </Tip>
   )
 }
@@ -142,7 +165,7 @@ export function SidebarDateDivider({
   return (
     // group/workspace: a divider heads a group the same way a repo header does,
     // so it borrows the header's hover-revealed "+" verbatim.
-    <div className={cn('group/workspace flex select-none items-center gap-2 px-2 pb-0.5 pt-2', className)} {...props}>
+    <div className={cn('group/workspace flex select-none items-center gap-2 px-2 pb-0.5 pt-1.5', className)} {...props}>
       {toggle ? (
         <button
           aria-expanded={toggle.open}
@@ -245,6 +268,7 @@ export interface SidebarGroupTotals {
  */
 export function SidebarGroupRow({
   actions,
+  actionsOverlay = false,
   className,
   label,
   lead,
@@ -253,9 +277,19 @@ export function SidebarGroupRow({
   ...props
 }: React.ComponentProps<'div'> & {
   actions?: React.ReactNode
+  /** Overlay the actions on the row's trailing idle space instead of letting
+   *  them hold width in flow. The workspace list turns this on: hidden
+   *  (hover-revealed) controls must not continuously squeeze the row's name —
+   *  the column collapses to zero while idle, and the controls float over the
+   *  label's tail only while they are actually reachable (hover, keyboard
+   *  focus, or an open menu). Callers whose actions are always visible keep
+   *  the default, which lays them out in flow. */
+  actionsOverlay?: boolean
   label: React.ReactNode
   lead: React.ReactNode
-  toggle?: { ariaLabel: string; onToggle: () => void; open: boolean }
+  /** `data` rides the disclosure button so a row kind can mark its own expand
+   *  control (e.g. the workspace list's per-row expand test hook). */
+  toggle?: { ariaLabel: string; data?: Record<string, string>; onToggle: () => void; open: boolean }
   totals?: SidebarGroupTotals
 }) {
   const rowMeta = useStore($sidebarRowMeta)
@@ -267,6 +301,62 @@ export function SidebarGroupRow({
     totals && rowMeta.includes('cost') && totals.costUsd >= 0.01 ? `$${totals.costUsd.toFixed(2)}` : null
   ].filter(Boolean) as string[]
 
+  // The overlay mode's reveal lives on the container, not on each button: one
+  // place owns "hidden but reachable", and a control that opens floating UI
+  // (the kebab's menu) keeps the cluster visible through `has-[[data-state=open]]`
+  // even after the pointer moves into the portal'd menu. Hovering the row's
+  // disclosure caret makes the overlay yield (hide + click-through) — the
+  // caret is a primary gesture and must never fight the floating controls.
+  const OVERLAY_REVEAL =
+    'pointer-events-none opacity-0 transition-opacity group-hover/workspace:pointer-events-auto group-hover/workspace:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100 has-[[data-state=open]]:pointer-events-auto has-[[data-state=open]]:opacity-100 group-has-[[data-row-toggle]:hover]:pointer-events-none group-has-[[data-row-toggle]:hover]:opacity-0'
+
+  const caretButton = toggle ? (
+    <Tip label={toggle.ariaLabel}>
+      <button
+        aria-label={toggle.ariaLabel}
+        className={cn(
+          'flex items-center self-stretch bg-transparent p-0',
+          // Overlay mode: a FIXED-width caret parked at the row's trailing
+          // edge, outside the actions overlay. The first Windows run failed
+          // here: the stretched caret's click surface ran under the
+          // hover-revealed controls — a primary gesture and an action cluster
+          // cannot share the same pixels.
+          actionsOverlay ? 'w-5 shrink-0' : 'flex-1'
+        )}
+        data-row-actions
+        data-row-toggle
+        {...toggle.data}
+        onClick={toggle.onToggle}
+        type="button"
+      >
+        <DisclosureCaret
+          className="shrink-0 text-(--ui-text-tertiary) opacity-0 transition group-hover/workspace:opacity-100"
+          open={toggle.open}
+        />
+      </button>
+    </Tip>
+  ) : null
+
+  // Overlay mode: the caret lives in the trailing column, so the overlay's
+  // right edge (`right-5` = the caret's width) stops exactly at the caret's
+  // left edge by construction — the expand target is never covered, at any
+  // row width. The facts figures keep their in-flow slot ahead of the caret.
+  const trailing = actionsOverlay ? (
+    <div className="relative flex items-center">
+      {facts.length ? (
+        <span className="min-w-9 whitespace-nowrap text-right text-[0.625rem] leading-none text-(--ui-text-tertiary) transition-opacity group-hover/workspace:opacity-0">
+          {facts.join(' · ')}
+        </span>
+      ) : null}
+      {caretButton}
+      {actions ? (
+        <div className={cn('absolute right-5 flex items-center', OVERLAY_REVEAL)} data-row-actions>
+          {actions}
+        </div>
+      ) : null}
+    </div>
+  ) : null
+
   return (
     <SidebarRowShell
       actions={
@@ -274,8 +364,11 @@ export function SidebarGroupRow({
         // flow they hold their width open at all times, which reads as a gap
         // torn between the total and the row's edge. Same trade the session row
         // makes with its kebab and age — you read the number or you act on the
-        // group, never both at once.
-        facts.length ? (
+        // group, never both at once. Overlay mode extends the same overlay to
+        // the no-facts case, where in-flow actions would hold their width open
+        // against nothing and steal it from the name.
+        trailing ??
+        (facts.length ? (
           <div className="relative flex items-center">
             <span className="min-w-9 whitespace-nowrap text-right text-[0.625rem] leading-none text-(--ui-text-tertiary) transition-opacity group-hover/workspace:opacity-0">
               {facts.join(' · ')}
@@ -284,7 +377,7 @@ export function SidebarGroupRow({
           </div>
         ) : (
           actions
-        )
+        ))
       }
       className={cn('group/workspace', className)}
       {...props}
@@ -292,24 +385,7 @@ export function SidebarGroupRow({
       <SidebarRowCluster className="min-w-0 flex-1">
         {lead}
         {label}
-        {toggle ? (
-          <Tip label={toggle.ariaLabel}>
-            <button
-              aria-label={toggle.ariaLabel}
-              className="flex flex-1 items-center self-stretch bg-transparent p-0"
-              data-row-actions
-              onClick={toggle.onToggle}
-              type="button"
-            >
-              <DisclosureCaret
-                className="shrink-0 text-(--ui-text-tertiary) opacity-0 transition group-hover/workspace:opacity-100"
-                open={toggle.open}
-              />
-            </button>
-          </Tip>
-        ) : (
-          <span className="flex-1" />
-        )}
+        {!actionsOverlay && (toggle ? caretButton : <span className="flex-1" />)}
       </SidebarRowCluster>
     </SidebarRowShell>
   )

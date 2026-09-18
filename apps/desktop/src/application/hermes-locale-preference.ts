@@ -1,4 +1,5 @@
 import { getHermesConfigRecord, saveHermesConfig } from '@/api/config'
+import { isLegacyRestAllowed } from '@/api/legacy-rest'
 import { type Locale, localeConfigValue, type LocalePreferencePort } from '@/i18n'
 import { type HermesConfigRecord } from '@/types/hermes'
 
@@ -40,8 +41,19 @@ export function withConfigDisplayLanguage(config: HermesConfigRecord, locale: Lo
 // browser dev shell) where there is no config bridge at all. Reading then
 // yields nothing and writing is a no-op, which is exactly how the pre-port
 // `defaultConfigClient` behaved — a missing bridge is not a failure to report.
+//
+// The same is true of the AgentBox product runtime: `window.hermesDesktop.api`
+// exists, but the legacy Hermes REST surface behind it is deliberately not
+// served (the renderer door is closed by `applyProductRuntimePolicy`), so
+// issuing a config read/write there can only ever be refused. A bridge that
+// cannot serve the surface is not a bridge, which keeps this port's declared
+// contract true: `load()` resolves "nothing stored" and `save()` is a no-op
+// instead of a guaranteed-failure request (and its 10×3s startup retry chain).
+// The language switcher lives on the legacy appearance surface; giving the
+// product an honest "locale persistence unavailable" UI is a separate product
+// decision, not something this port may fake.
 function hasConfigBridge(): boolean {
-  return typeof window !== 'undefined' && Boolean(window.hermesDesktop?.api)
+  return typeof window !== 'undefined' && Boolean(window.hermesDesktop?.api) && isLegacyRestAllowed()
 }
 
 export const hermesLocalePreference: LocalePreferencePort = {

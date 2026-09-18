@@ -60,6 +60,8 @@ import { $unreadFinishedSessionIds, markAllSessionsRead } from '@/store/session'
 import type { SessionStatusBucket } from '@/store/session-dot-state'
 import { $sessionsHaveCost } from '@/store/sidebar-archive'
 
+import type { SessionAuthority } from './sidebar-constants'
+
 interface Option<T extends string = string> {
   /** A status dot's full className, from the row's own vocabulary. */
   dot?: string
@@ -145,7 +147,15 @@ function OptionRadio({ option }: { option: Option }) {
   )
 }
 
-export function SidebarFilterMenu({ className }: { className?: string }) {
+interface SidebarFilterMenuProps {
+  className?: string
+  /** Required: the session data authority for this mount — the same value the
+   *  sidebar itself is mounted with, never inferred from gateway state, cache
+   *  contents or capability presence. */
+  sessionAuthority: SessionAuthority
+}
+
+export function SidebarFilterMenu({ className, sessionAuthority }: SidebarFilterMenuProps) {
   const { t } = useI18n()
   const grouping = useStore($sidebarGrouping)
   const ordering = useStore($sidebarOrdering)
@@ -342,10 +352,15 @@ export function SidebarFilterMenu({ className }: { className?: string }) {
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>Profile</DropdownMenuSubTrigger>
             <DropdownMenuSubContent className="max-h-80 overflow-y-auto">
-              {/* Scoped to one profile the rail is already the filter, so the
-                  per-profile boxes only appear where they can narrow something.
-                  The actions below stand on their own. */}
-              {narrowsByProfile && (
+              {/* The per-profile boxes list the legacy profile store, so they
+                  are shown only where that store IS the authority. Under
+                  AgentBox the profile manager page owns profiles, and a legacy
+                  list must not stand in for it — not even when the cache (which
+                  nothing in the product refreshes) happens to hold rows.
+                  Scoped to one profile the rail is already the filter, so the
+                  boxes only appear where they can narrow something. The actions
+                  below stand on their own. */}
+              {sessionAuthority === 'hermes' && narrowsByProfile && (
                 <>
                   {profileNames.map(name => (
                     <OptionCheckbox
@@ -358,10 +373,18 @@ export function SidebarFilterMenu({ className }: { className?: string }) {
                   <DropdownMenuSeparator />
                 </>
               )}
+              {/* Creating a profile is an AgentBox capability (the manager page
+                  is service-backed), so this row stays under both authorities. */}
               <DropdownMenuItem onSelect={requestProfileCreate}>{t.profiles.newProfile}</DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => void runImportProfileFlow()}>
-                {t.profiles.importProfile}
-              </DropdownMenuItem>
+              {/* Import/export a profile bundle has no wire-v1 method behind it,
+                  so AgentBox does not offer it at all rather than opening a
+                  native picker whose request the runtime refuses. The helper
+                  stays for the legacy authority. */}
+              {sessionAuthority === 'hermes' && (
+                <DropdownMenuItem onSelect={() => void runImportProfileFlow()}>
+                  {t.profiles.importProfile}
+                </DropdownMenuItem>
+              )}
             </DropdownMenuSubContent>
           </DropdownMenuSub>
 

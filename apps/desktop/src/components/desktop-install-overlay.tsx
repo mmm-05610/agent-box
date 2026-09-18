@@ -373,10 +373,10 @@ export function DesktopInstallOverlay({ enabled = true }: DesktopInstallOverlayP
       return true
     }
 
-    if (state.error) {
-      return true
-    }
-
+    // A completed-failed bootstrap no longer holds this gate open (P02A: the
+    // install experience must not block the product). The failure surfaces
+    // through the non-blocking boot-failure panel, whose Retry/Repair actions
+    // drive the same resetBootstrap/repairBootstrap host calls.
     if (state.unsupportedPlatform) {
       return true
     }
@@ -386,7 +386,7 @@ export function DesktopInstallOverlay({ enabled = true }: DesktopInstallOverlayP
     }
 
     return false
-  }, [enabled, state.active, state.error, state.setupChoice, state.unsupportedPlatform])
+  }, [enabled, state.active, state.setupChoice, state.unsupportedPlatform])
 
   if (!shouldShow) {
     return null

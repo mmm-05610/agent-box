@@ -1,0 +1,66 @@
+{
+  "allOk": true,
+  "counts": {
+    "PASS": 8,
+    "FAIL": 0,
+    "SKIP": 0,
+    "PENDING": 0
+  },
+  "executed": 8,
+  "unknownStatuses": [],
+  "detail": [
+    {
+      "detail": "family=codex; sandbox=C:\\Users\\maoqh\\agentbox-ui-gate-codex-sandbox; model=deepseek-flash",
+      "id": "driver-target",
+      "status": "PASS",
+      "step": "driver target"
+    },
+    {
+      "detail": "harnesses=[\"codex\"]",
+      "id": "server-started-with-real-harness",
+      "status": "PASS",
+      "step": "the Server is live with the family-s production deployment"
+    },
+    {
+      "detail": "serverId=server_d314a03ea56649a793ef5e1fa05589c7",
+      "id": "lifecycle-connection-installed",
+      "status": "PASS",
+      "step": "the product reached the Server through its own lifecycle connection"
+    },
+    {
+      "detail": "credentialId=credential_d31f3aa4161c4a4e85dd362a904833af",
+      "id": "credential-added-through-the-app",
+      "status": "PASS",
+      "step": "the interface-s own entry path imported the credential and recorded its id"
+    },
+    {
+      "detail": "providerModel=provider_3a4aad8ac70f4134b02392127a40084a credentialAttached=true",
+      "id": "provider-model-and-role-created",
+      "status": "PASS",
+      "step": "the model configuration carries the credential and the role selects it"
+    },
+    {
+      "detail": "answerChars=10 nonceRecalled=true terminal=true answer=\"P42-1F4A9C\"",
+      "id": "first-turn-answered-by-the-real-model",
+      "status": "PASS",
+      "step": "the first turn was answered by the real model and streamed before it finished"
+    },
+    {
+      "detail": "answerChars=60 nonceOccurrences=3 answer=\"P42-1F4A9CP42-1F4A9CYou asked me to remember **P42-1F4A9C**.\"",
+      "id": "second-turn-carries-the-first",
+      "status": "PASS",
+      "step": "the second turn-s answer recalls the first turn-s content"
+    },
+    {
+      "detail": "portFree=true recordsFile=present (records only)",
+      "id": "clean-shutdown",
+      "status": "PASS",
+      "step": "the app and the Server stop, and no credential material was written to the evidence"
+    }
+  ],
+  "family": "codex",
+  "model": "deepseek-flash",
+  "notes": [],
+  "sandbox": "C:\\Users\\maoqh\\agentbox-ui-gate-codex-sandbox",
+  "serverPort": 18764
+}

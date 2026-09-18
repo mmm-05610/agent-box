@@ -4,10 +4,12 @@ import {
 import { isMissingRpcMethod } from '@/lib/gateway-rpc'
 import { normalizeProfileKey } from '@/lib/profile-identity'
 import { setSidebarAgentsGrouped } from '@/store/layout'
+import { $profileScope } from '@/store/profile'
 import { requestFreshSession } from '@/store/profile/request-atoms'
 import { $activeGatewayProfile } from '@/store/profile/runtime-route-state'
 import { liveSessionProjectId, type SidebarProjectTree } from '@/store/projects/membership'
 import { $selectedStoredSessionId, $sessions, sessionMatchesStoredId } from '@/store/session'
+import { selectWorkspaceView, unhideLocalWorkspace, workspaceHiddenKey } from '@/store/workspace-view'
 import type { ProjectInfo, ProjectsPayload } from '@/types/hermes'
 import type { NewSessionPlacement } from '@/types/session-placement'
 
@@ -38,6 +40,12 @@ import {
  *  snapshot/rollback discipline for those writes. */
 export function enterProject(id: string): void {
   $projectScope.set(id)
+
+  // The unified workspace list highlights ONE current selection (36R/P01):
+  // entering a project through ANY path — a main row, a search hit, ⌘O —
+  // writes the same neutral atom the WSL rows read, so a local row never
+  // stays highlighted beside a selected WSL row.
+  selectWorkspaceView(id)
 
   // Only explicit, persisted projects (ids are `p_<hex>`) become active. Auto
   // projects (ids are filesystem paths) and the Home bucket have no durable row
@@ -246,6 +254,11 @@ export async function createProject(input: CreateProjectInput): Promise<ProjectI
       $projectTree.set([projectInfoToTreeNode(created), ...$projectTree.get()])
     }
 
+    // 36R: a create that the backend answered with an EXISTING record (the
+    // same folder re-opened) must also UNHIDE it — the sidebar-hidden view
+    // pref never blocks a reopen, and the record's id is the identity.
+    unhideLocalWorkspace(workspaceHiddenKey({ backend: 'local', id: created.id, profile: $profileScope.get() }))
+
     if (input.use) {
       $activeProjectId.set(created.id)
     }
@@ -431,6 +444,13 @@ export async function deleteProject(id: string): Promise<void> {
 export async function setActiveProject(id: null | string): Promise<void> {
   const res = await gatewayRequest<{ active_id: null | string }>('projects.set_active', projectParams({ id }))
   $activeProjectId.set(res.active_id ?? null)
+
+  // The backend's answer is the active pointer's truth; the list's single
+  // selection follows it when it names a row (a rejected pointer change
+  // doesn't move the highlight the user is looking at).
+  if (res.active_id) {
+    selectWorkspaceView(res.active_id)
+  }
 }
 
 // ── Project management dialog ────────────────────────────────────────────────

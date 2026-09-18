@@ -38,12 +38,10 @@ function makeSidebarActions(): SidebarActions {
     onBranchSession: vi.fn(),
     onDeleteSession: vi.fn(),
     onLoadMoreSessions: vi.fn(),
-    onManageCronJob: vi.fn(),
     onNavigate: vi.fn(),
     onNewSessionInWorkspace: vi.fn(),
     onNewSessionSplit: vi.fn(),
     onResumeSession: vi.fn(),
-    onTriggerCronJob: vi.fn()
   }
 }
 

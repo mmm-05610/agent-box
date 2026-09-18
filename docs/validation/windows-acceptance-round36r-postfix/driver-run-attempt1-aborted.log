@@ -1,0 +1,28 @@
+PASS  app opens  window title: Hermes
+PASS  isolated app identity  exe=C:\Users\maoqh\agentbox-wsl-round1\apps\desktop\node_modules\electron\dist\electron.exe (electron=true, in-worktree=true); userData isolated=true; name=Hermes (productName match=true; HERMES_DESKTOP_APP_NAME is a label-only override, app.setName is never called); build=0.17.2 (match=true)
+PASS  single-instance blocks reuse  second instance failed to start: Error: electron.launch: Process failed to launch!
+Call log:
+[2m  - <launching> "C:\Users\maoqh\agentbox-wsl-round1\apps; original window still live (readyState=complete, title="Hermes")
+PASS  backend this run drives  no gate (saved connection); boot log: remote backend http://127.0.0.1:9127 ready
+PASS  unified sidebar  Capabilities:gone, Artifacts:gone, Scheduled jobs:gone, BotsTab:gone; profilesEntry=true; settingsEntry=true
+node.exe : DRIVER FAILED: page.screenshot: Timeout 30000ms exceeded.
+所在位置 行:1 字符: 167
++ ... s\desktop'; & 'C:\Program Files\nodejs\node.exe' 'e2e\workspace-sideb ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (DRIVER FAILED: ...000ms exceeded.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Call log:
+[2m  - taking page screenshot[22m
+[2m  - waiting for fonts to load...[22m
+[2m  - fonts loaded[22m
+
+    at screenshot (C:\Users\maoqh\agentbox-wsl-round1\apps\desktop\e2e\workspace-sidebar-round36-driver.mjs:97:14)
+    at main (C:\Users\maoqh\agentbox-wsl-round1\apps\desktop\e2e\workspace-sidebar-round36-driver.mjs:440:9) {
+  log: [
+    '  - taking page screenshot',
+    '  - waiting for fonts to load...',
+    '  - fonts loaded'
+  ],
+  name: 'TimeoutError'
+}

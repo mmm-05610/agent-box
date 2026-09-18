@@ -1,0 +1,205 @@
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+import type { WireV1Client } from '@/api/wire-v1-client'
+import { $agentBoxSessions } from '@/store/agentbox-service'
+import { asRequestId, asWireId, type SessionRecord } from '@/types/wire/wire-v1'
+
+import { archiveAgentBoxSession, refreshAgentBoxSessions, updateAgentBoxSession } from './wire-session-catalog'
+
+const session = (overrides: Partial<SessionRecord> = {}): SessionRecord => ({
+  archivedAt: null,
+  createdAt: '2026-09-14T00:00:00.000Z',
+  displayName: 'Session',
+  id: asWireId('session-1'),
+  pinned: false,
+  profileId: asWireId('profile-1'),
+  updatedAt: '2026-09-14T00:00:00.000Z',
+  version: 1,
+  workspaceId: asWireId('workspace-1'),
+  ...overrides
+})
+
+afterEach(() => $agentBoxSessions.set({}))
+
+describe('AgentBox Session catalog', () => {
+  it('merges a partial server page without clobbering other live projections', async () => {
+    $agentBoxSessions.set({ 'session-live': session({ id: asWireId('session-live') }) })
+    const call = vi.fn(async () => ({ items: [session()], nextCursor: null }))
+
+    await refreshAgentBoxSessions({ call } as unknown as WireV1Client, {
+      workspaceId: asWireId('workspace-1')
+    })
+
+    expect($agentBoxSessions.get()).toMatchObject({
+      'session-1': { id: 'session-1' },
+      'session-live': { id: 'session-live' }
+    })
+    expect(call).toHaveBeenCalledWith('sessions.list', {
+      includeArchived: false,
+      workspaceId: 'workspace-1'
+    })
+  })
+
+  it('never lets a stale list page roll a newer record back', async () => {
+    $agentBoxSessions.set({ 'session-1': session({ displayName: 'Newer', version: 7 }) })
+
+    const call = vi.fn(async () => ({ items: [session({ displayName: 'Stale', version: 6 })], nextCursor: null }))
+
+    await refreshAgentBoxSessions({ call } as unknown as WireV1Client)
+
+    expect($agentBoxSessions.get()['session-1']?.displayName).toBe('Newer')
+    expect($agentBoxSessions.get()['session-1']?.version).toBe(7)
+  })
+
+  it('adopts the same or a newer version from a list page', async () => {
+    $agentBoxSessions.set({ 'session-1': session({ displayName: 'Old', version: 1 }) })
+
+    const call = vi.fn(async () => ({ items: [session({ displayName: 'Normalized', version: 1 })], nextCursor: null }))
+
+    await refreshAgentBoxSessions({ call } as unknown as WireV1Client)
+
+    expect($agentBoxSessions.get()['session-1']?.displayName).toBe('Normalized')
+  })
+
+  it('adopts only server-confirmed shared metadata and archive records', async () => {
+    const responses = [
+      { session: session({ displayName: 'Renamed', pinned: true, version: 2 }) },
+      { session: session({ archivedAt: '2026-09-14T01:00:00.000Z', version: 3 }) }
+    ]
+
+    const call = vi.fn(async () => responses.shift()!)
+    const client = { call } as unknown as WireV1Client
+    const ids = ['request-update', 'request-archive'].map(asRequestId)
+    const options = { createRequestId: () => ids.shift()! }
+
+    await updateAgentBoxSession(
+      client,
+      { displayName: 'Renamed', expectedVersion: 1, pinned: true, sessionId: 'session-1' },
+      options
+    )
+    await archiveAgentBoxSession(client, { expectedVersion: 2, sessionId: 'session-1' }, options)
+
+    expect(call.mock.calls).toEqual([
+      [
+        'sessions.update',
+        {
+          displayName: 'Renamed',
+          expectedVersion: 1,
+          pinned: true,
+          requestId: 'request-update',
+          sessionId: 'session-1'
+        }
+      ],
+      [
+        'sessions.archive',
+        { expectedVersion: 2, requestId: 'request-archive', sessionId: 'session-1' }
+      ]
+    ])
+    expect($agentBoxSessions.get()['session-1']?.archivedAt).not.toBeNull()
+  })
+
+  it('keeps the archived record cached and never rolls it back from a lower version', async () => {
+    const archived = session({ archivedAt: '2026-09-14T01:00:00.000Z', version: 3 })
+
+    const responses = [
+      { session: archived },
+      { items: [session({ displayName: 'Stale page', version: 2 })], nextCursor: null },
+      { session: session({ displayName: 'Stale update', version: 1 }) }
+    ]
+
+    const call = vi.fn(async () => responses.shift()!)
+    const client = { call } as unknown as WireV1Client
+
+    await archiveAgentBoxSession(client, { expectedVersion: 2, sessionId: 'session-1' })
+
+    // The cache retains the record: hiding archived rows is the sidebar
+    // projection's business, not the store's.
+    expect('session-1' in $agentBoxSessions.get()).toBe(true)
+
+    // A stale list page (lower version, unarchived) cannot resurrect it…
+    await refreshAgentBoxSessions(client)
+
+    expect($agentBoxSessions.get()['session-1']?.archivedAt).toBe('2026-09-14T01:00:00.000Z')
+    expect($agentBoxSessions.get()['session-1']?.displayName).toBe('Session')
+    expect($agentBoxSessions.get()['session-1']?.version).toBe(3)
+
+    // …and neither can a stale mutation answer, even though it is returned.
+    await expect(
+      updateAgentBoxSession(client, { displayName: 'Stale update', expectedVersion: 2, sessionId: 'session-1' })
+    ).resolves.toMatchObject({ displayName: 'Stale update', version: 1 })
+
+    expect($agentBoxSessions.get()['session-1']?.archivedAt).toBe('2026-09-14T01:00:00.000Z')
+    expect($agentBoxSessions.get()['session-1']?.displayName).toBe('Session')
+    expect($agentBoxSessions.get()['session-1']?.version).toBe(3)
+  })
+
+  it('adopts the same or a newer version over the archived record', async () => {
+    const responses = [
+      { session: session({ archivedAt: '2026-09-14T01:00:00.000Z', version: 3 }) },
+      {
+        items: [
+          session({ archivedAt: '2026-09-14T01:00:00.000Z', displayName: 'Normalized', version: 3 })
+        ],
+        nextCursor: null
+      },
+      {
+        items: [
+          session({ archivedAt: '2026-09-14T02:00:00.000Z', displayName: 'Restored then archived again', version: 5 })
+        ],
+        nextCursor: null
+      }
+    ]
+
+    const call = vi.fn(async () => responses.shift()!)
+    const client = { call } as unknown as WireV1Client
+
+    await archiveAgentBoxSession(client, { expectedVersion: 2, sessionId: 'session-1' })
+    await refreshAgentBoxSessions(client)
+
+    expect($agentBoxSessions.get()['session-1']?.displayName).toBe('Normalized')
+    expect($agentBoxSessions.get()['session-1']?.version).toBe(3)
+
+    await refreshAgentBoxSessions(client)
+
+    expect($agentBoxSessions.get()['session-1']?.archivedAt).toBe('2026-09-14T02:00:00.000Z')
+    expect($agentBoxSessions.get()['session-1']?.displayName).toBe('Restored then archived again')
+    expect($agentBoxSessions.get()['session-1']?.version).toBe(5)
+  })
+
+  it('sends exactly the archive CAS payload with a fresh requestId per intent', async () => {
+    const archived = session({ archivedAt: '2026-09-14T02:00:00.000Z', version: 2 })
+    const requestIds: string[] = []
+
+    const call = vi.fn(async (_method: string, params: { requestId: string }) => {
+      requestIds.push(params.requestId)
+
+      return { session: archived }
+    })
+
+    const client = { call } as unknown as WireV1Client
+
+    await archiveAgentBoxSession(client, { expectedVersion: 1, sessionId: 'session-1' })
+    await archiveAgentBoxSession(client, { expectedVersion: 1, sessionId: 'session-2' })
+
+    expect(call.mock.calls).toEqual([
+      [
+        'sessions.archive',
+        {
+          expectedVersion: 1,
+          requestId: expect.stringMatching(/^desktop-/),
+          sessionId: 'session-1'
+        }
+      ],
+      [
+        'sessions.archive',
+        {
+          expectedVersion: 1,
+          requestId: expect.stringMatching(/^desktop-/),
+          sessionId: 'session-2'
+        }
+      ]
+    ])
+    expect(requestIds).toHaveLength(2)
+    expect(requestIds[0]).not.toBe(requestIds[1])
+  })
+})

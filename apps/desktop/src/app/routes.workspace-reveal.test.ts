@@ -1,5 +1,5 @@
 /**
- * A full page (Capabilities/Artifacts/a contributed route) renders
+ * A full page (Skills / a contributed route) renders
  * INSIDE the `workspace` pane, so navigating to one has to front that pane —
  * otherwise a main zone parked on a session tile keeps the tile on screen and
  * the click looks dead until the app restarts (#72602).
@@ -17,7 +17,6 @@ import {
   $workspaceIsPage,
   AGENTS_ROUTE,
   appViewForPath,
-  ARTIFACTS_ROUTE,
   CRON_ROUTE,
   navigateToWorkspacePage,
   NEW_CHAT_ROUTE,
@@ -111,14 +110,23 @@ describe('syncWorkspaceRoute', () => {
   })
 
   it('fronts when moving between two pages — the atom never changes, the tab must', () => {
-    syncWorkspaceRoute(ARTIFACTS_ROUTE)
-    vi.mocked(revealTreePane).mockClear()
-    vi.mocked(noteActiveTreeGroup).mockClear()
+    // Two WORKSPACE pages: the built-in Skills page and a contributed route.
+    // Both classify as pages, so the atom stays true across the move and only
+    // the tab-fronting call can keep the target visible.
+    const dispose = contributeRoute()
 
-    syncWorkspaceRoute(SKILLS_ROUTE)
+    try {
+      syncWorkspaceRoute(SKILLS_ROUTE)
+      vi.mocked(revealTreePane).mockClear()
+      vi.mocked(noteActiveTreeGroup).mockClear()
 
-    expect($workspaceIsPage.get()).toBe(true)
-    expect(fronted()).toBe(true)
+      syncWorkspaceRoute(CONTRIBUTED_ROUTE)
+
+      expect($workspaceIsPage.get()).toBe(true)
+      expect(fronted()).toBe(true)
+    } finally {
+      dispose()
+    }
   })
 
   it('fronts on a contributed page route', () => {
@@ -171,9 +179,9 @@ describe('navigateToWorkspacePage', () => {
   it('passes navigation options through', () => {
     const navigate = vi.fn()
 
-    navigateToWorkspacePage(navigate, ARTIFACTS_ROUTE, { replace: true })
+    navigateToWorkspacePage(navigate, SKILLS_ROUTE, { replace: true })
 
-    expect(navigate).toHaveBeenCalledWith(ARTIFACTS_ROUTE, { replace: true })
+    expect(navigate).toHaveBeenCalledWith(SKILLS_ROUTE, { replace: true })
   })
 
   it('navigates without fronting for chat and overlay targets', () => {

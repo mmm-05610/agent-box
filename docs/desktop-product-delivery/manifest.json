@@ -10,9 +10,268 @@
   "default_execution": "serial; capability-level progress may bypass waiting subitems",
   "orders": [
     {
+      "id": "P09",
+      "file": "work-orders/P09-transcript-process-view.md",
+      "depends_on": [
+        "P08"
+      ],
+      "exclusive_group": "desktop-product",
+      "scope": [
+        "docs/desktop-product-delivery/**",
+        "apps/desktop/src/components/assistant-ui/**",
+        "apps/desktop/src/features/chat/**",
+        "apps/desktop/src/i18n/**",
+        "apps/desktop/e2e/**",
+        "tests-js/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "requires_approved_contract": false,
+      "note": "Transcript process view (thought rows with duration, tool rows with lifecycle and grouped summaries, streaming status tail, worked-for timer) built from external copy-in components. Lights up only the facts that exist today - message stream, tool failure rows, status tail, elapsed time from event timestamps - and waits for the backend's shared wire relock (orders 51 and 52) before showing thoughts, tool lifecycles, plans and usage. Nothing is faked for waiting data, and durations come from event timestamps rather than estimates."
+    },
+    {
+      "id": "P10",
+      "file": "work-orders/P10-sidebar-restructure.md",
+      "depends_on": [
+        "P07"
+      ],
+      "exclusive_group": "desktop-product",
+      "scope": [
+        "docs/desktop-product-delivery/**",
+        "apps/desktop/src/features/chat/sidebar/**",
+        "apps/desktop/src/features/chat/index.tsx",
+        "apps/desktop/src/store/**",
+        "apps/desktop/src/i18n/**",
+        "apps/desktop/e2e/**",
+        "tests-js/**"
+      ],
+      "requires_approved_contract": false,
+      "note": "Sidebar restructure: an action row (new task, search via the existing command palette), a group-by switch limited to dimensions that have real data (project, recent), and a two-level project-to-session list with per-row relative time and a status dot. Built from existing shadcn/radix and repository components - no new dependency, since a sidebar is not a conversational component. Existing behaviour (reorder, drag, load more, filter menu, context menu, profile and connection switching) is preserved with its tests. Unread uses a client-local cursor and is labelled as local visibility rather than a server fact; the plugin market from the reference is not built because no backend surface exists."
+    },
+    {
+      "id": "P11",
+      "file": "work-orders/P11-provider-model-config-ux.md",
+      "depends_on": [
+        "P07"
+      ],
+      "exclusive_group": "desktop-product",
+      "scope": [
+        "docs/desktop-product-delivery/**",
+        "apps/desktop/src/features/settings/**",
+        "apps/desktop/src/features/profiles/**",
+        "apps/desktop/src/api/**",
+        "apps/desktop/src/types/**",
+        "apps/desktop/src/i18n/**",
+        "apps/desktop/e2e/**",
+        "tests-js/**"
+      ],
+      "requires_approved_contract": true,
+      "note": "Provider/model configuration interaction rework: choose a provider preset (endpoint, auth style, wire style, credential reference) with explicit overrides instead of free-text fields, pick models from a fetched list or by hand, each carrying display name, context window and capability toggles with their provenance, test the connection, then bind the record plus model to a profile's model slot. Credentials stay references and never appear in any surface. Fields without a source show unknown. The fetch and test buttons must render as unavailable until the backend order 55 provides them - no fake buttons."
+    },
+    {
+      "id": "P12",
+      "file": "work-orders/P12-subscription-accounts.md",
+      "depends_on": [
+        "P11"
+      ],
+      "exclusive_group": "desktop-product",
+      "scope": [
+        "docs/desktop-product-delivery/**",
+        "apps/desktop/src/features/settings/**",
+        "apps/desktop/src/features/profiles/**",
+        "apps/desktop/src/api/**",
+        "apps/desktop/src/types/**",
+        "apps/desktop/src/i18n/**",
+        "apps/desktop/e2e/**",
+        "tests-js/**"
+      ],
+      "requires_approved_contract": true,
+      "note": "Subscriptions as first-class credentials, managed apart from the native home and hot switched per the user ruling: the login state is a managed asset held by the control plane (backend order 56), materialised into the profile home per turn as a writable working copy and reclaimed at the end, so changing the bound account takes effect on the NEXT turn - which is what hot means here, not a mid-turn swap. Because every turn is a fresh process reading a freshly materialised home, no CLI restart is involved. The UI shows family, account identity, status and last verification, binds a profile default plus an optional override, and keeps credentials out of every surface: never displayed, filled in or scraped, with the host login state untouched."
+    },
+    {
+      "id": "P13",
+      "file": "work-orders/P13-harness-program-manager.md",
+      "depends_on": [
+        "P12"
+      ],
+      "exclusive_group": "desktop-product",
+      "scope": [
+        "docs/desktop-product-delivery/**",
+        "apps/desktop/src/features/settings/**",
+        "apps/desktop/src/features/profiles/**",
+        "apps/desktop/src/api/**",
+        "apps/desktop/src/types/**",
+        "apps/desktop/src/i18n/**",
+        "apps/desktop/e2e/**",
+        "tests-js/**"
+      ],
+      "requires_approved_contract": true,
+      "note": "Harness program management: one row per family showing the current version, other installed versions, size, source, install time and digest, an update badge that comes from the backend rather than being inferred, and one-click install, update, rollback and set-current with visible progress and readable errors. Modelled on Applite's pattern verified this round - paint the catalog from local data immediately, annotate installed and outdated state asynchronously, never block the list on a slow backend call - while importing only our own records and never the host's configuration. Two negative findings recorded in backend order 57 are why there is no UI to copy: claude-squad tells users to update the underlying program themselves, and vibe-kanban assumes installed agents and is sunsetting."
+    },
+    {
+      "id": "P14",
+      "file": "work-orders/P14-empty-state-and-semantics.md",
+      "depends_on": [
+        "P08"
+      ],
+      "exclusive_group": "desktop-product",
+      "scope": [
+        "docs/desktop-product-delivery/**",
+        "apps/desktop/src/**",
+        "apps/desktop/e2e/**",
+        "tests-js/**"
+      ],
+      "requires_approved_contract": false,
+      "note": "Four surfaces, one root cause behind two of them. The empty state becomes branding plus greeting plus the same composer as P08 (never a second implementation) plus suggestion chips that must actually work. The bare 'Unavailable' and the 'Gateway offline' row share their origin: the readiness and connection model was inherited from the Hermes desktop line (runtime-readiness.ts derives 'unavailable' from provider_configured and a runtime check, while our facts are the Server lifecycle connection with its typed reasons, hello and whether a workspace is chosen), so both are re-derived from our facts with a reason and a next step, never a bare word - and if nothing in our product corresponds to the gateway object, the row and its popover are deleted rather than left half-dead. Finally the branding sweep: 222 non-test source files mention Hermes and the locales have many more, so the rule is split - user-visible text must be product-neutral, internal identifiers are not bundled, and the harness family named hermes stays exactly as it is, because that word denotes a family rather than the product."
+    },
+    {
+      "id": "P15",
+      "file": "work-orders/P15-skill-mcp-hubs-and-settings-prune.md",
+      "depends_on": [
+        "P14"
+      ],
+      "exclusive_group": "desktop-product",
+      "scope": [
+        "docs/desktop-product-delivery/**",
+        "apps/desktop/src/features/settings/**",
+        "apps/desktop/src/features/**",
+        "apps/desktop/src/api/**",
+        "apps/desktop/src/types/**",
+        "apps/desktop/src/i18n/**",
+        "apps/desktop/e2e/**",
+        "tests-js/**"
+      ],
+      "requires_approved_contract": true,
+      "note": "Settings pruning plus the two asset hubs. Every existing settings section gets a ledger row saying which product capability it serves and a keep, merge or delete verdict, where delete means the code and entry point go away rather than being hidden - the criterion being whether it relates to our Server plus Profile/Session plus family plus assets semantics. Skill Hub lists assets by name, description, source, digest and revision with install, update and delete as user actions, reusing P13's catalog-first pattern, and a family whose registry slot does not support skills says so instead of offering a switch that does nothing. MCP Hub manages stdio and remote servers with credential references only, a test connection that writes nothing, and per-profile enablement. Hooks get no management surface because the convergence does not exist, and commands are described as two different things - our command palette versus text sent to the model - so the UI cannot confuse them."
+    },
+    {
+      "id": "P16",
+      "file": "work-orders/P16-hook-manager.md",
+      "depends_on": [
+        "P15"
+      ],
+      "exclusive_group": "desktop-product",
+      "scope": [
+        "docs/desktop-product-delivery/**",
+        "apps/desktop/src/features/settings/**",
+        "apps/desktop/src/features/**",
+        "apps/desktop/src/api/**",
+        "apps/desktop/src/types/**",
+        "apps/desktop/src/i18n/**",
+        "apps/desktop/e2e/**",
+        "tests-js/**"
+      ],
+      "requires_approved_contract": true,
+      "note": "Hook management: one shell with a family selector whose form is rebuilt per family from the backend's declared schema, because the three models are genuinely different kinds - Claude Code declarative events and matchers and handlers with official default timeouts, OpenCode user-supplied plugin source treated as a code asset with digest and preview rather than assembled from form fields, and Codex rendered only after backend order 59's stage A observes its event model instead of guessing. Hooks stay disabled until the user enables them and can see the full command; the UI states they run inside the sandbox with that execution's isolation and network posture. Trigger records show name, event, time, exit code and a bounded output summary, and a blocking exit code is labelled as blocking rather than shown as an ordinary success. Two standing rules from the user: every setting must be editable - a family that genuinely cannot accept something says so instead of showing a dead control - and credentials appear only as reference state, never as content."
+    },
+    {
+      "id": "P17",
+      "file": "work-orders/P17-profile-settings.md",
+      "depends_on": [
+        "P16"
+      ],
+      "exclusive_group": "desktop-product",
+      "scope": [
+        "docs/desktop-product-delivery/**",
+        "apps/desktop/src/features/profiles/**",
+        "apps/desktop/src/features/settings/**",
+        "apps/desktop/src/features/chat/**",
+        "apps/desktop/src/api/**",
+        "apps/desktop/src/types/**",
+        "apps/desktop/src/i18n/**",
+        "apps/desktop/e2e/**",
+        "tests-js/**"
+      ],
+      "requires_approved_contract": true,
+      "note": "The role page becomes the single binding point - instruction asset, model slot, credential or account, skill/MCP/hook selection, and a per-tool permission table replacing the single mode chip, with ask/allow/deny, glob maps, last-match-wins stated in the UI, presets that per-tool rules override, and ask explained as the approvals round trip it already is. Every section is editable; a family that does not support a slot says so instead of showing a dead control. The order also carries the user's ownership correction: a session belongs to the workspace, never to a profile, so no surface may say 'this profile's sessions' - the current binding and the per-turn attribution are what get shown, and rebinding is an action on the session. Consequences are stated before the action, not after: within one harness the family's storage shape decides whether the native session moves along (file-per-session journals) or restarts (shared databases), and changing family is only offered as cloning into a new profile, listing what migrates and what cannot, with session-type assets explicitly excluded and no claim of inheriting the old native session."
+    },
+    {
+      "id": "P18",
+      "file": "work-orders/P18-ordessa-rebrand.md",
+      "depends_on": [
+        "P17"
+      ],
+      "exclusive_group": "desktop-product",
+      "scope": [
+        "docs/branding/**",
+        "apps/desktop/src/**",
+        "apps/desktop/electron/**",
+        "apps/desktop/package.json",
+        "package-lock.json",
+        "apps/desktop/public/**",
+        "apps/desktop/assets/**",
+        "apps/desktop/e2e/**",
+        "tests-js/**",
+        "scripts/**",
+        "README.md"
+      ],
+      "requires_approved_contract": false,
+      "note": "Route (a) per the user: the rename queues behind this worktree's current orders and is not urgent. The app becomes Ordessa while the service it connects to stays Pacthold - backend errors and service names are not relabelled Ordessa - and Workspace, Session and Profile keep their product meaning, with no new governance navigation and no workflow rewrite. The audit is already in hand and its sharpest finding is that the identity layer is still upstream: name hermes, productName Hermes, author Nous Research, appId com.nousresearch.hermes, executableName Hermes, artifactName Hermes-*, and a registered hermes:// scheme. Changing appId therefore starts a fresh desktop userData while the Server's data root - which holds profiles, sessions and credentials - is unaffected, and that trade is stated before the change rather than discovered after it. There is no auto-update channel at all (no electron-updater, --publish never), so the order reports that instead of inventing a feed. Hard gates: AGENTBOX_SERVER_ROOT, AGENTBOX_SERVER_PORT, secrets/http-token, port 8732, IPC channels and existing storage keys stay untouched with ORDESSA_* only as aliases, the wire digests stay byte-identical, and verification ends with a real launch smoke running the app under its new name against Pacthold for one no-model turn. No migration of old data, no push, no remote rename, no release, no paid calls."
+    },
+    {
+      "id": "P19",
+      "file": "work-orders/P19-composer-sidebar-density.md",
+      "depends_on": [
+        "P18"
+      ],
+      "exclusive_group": "desktop-product",
+      "scope": [
+        "docs/desktop-product-delivery/**",
+        "apps/desktop/src/features/chat/**",
+        "apps/desktop/src/components/assistant-ui/**",
+        "apps/desktop/src/i18n/**",
+        "apps/desktop/e2e/**",
+        "tests-js/**"
+      ],
+      "requires_approved_contract": false,
+      "note": "Density and control-placement alignment to the user's reference shots, not a rewrite. The transcript keeps the plain Hermes style per the user's ruling - the AI Elements re-skin is demoted to optional per-component adoption. The composer keeps its single-container anatomy (text above, one control row below) with the access chip on the left next to +, the context ring, model chip and send on the right, and the disabled state must show its reason visibly instead of pointing at a note that does not render. The sidebar tightens to the reference density - action row, group switch, dense two-level project-to-session list with relative time and status dots - while P10's existing behaviours and tests stay. Stage A seeds a session over the wire and measures the populated state against the reference before any styling changes."
+    },
+    {
+      "id": "P20",
+      "file": "work-orders/P20-work-status-panel.md",
+      "depends_on": [
+        "P19"
+      ],
+      "exclusive_group": "desktop-product",
+      "scope": [
+        "docs/desktop-product-delivery/**",
+        "apps/desktop/src/app/**",
+        "apps/desktop/src/components/**",
+        "apps/desktop/src/features/chat/**",
+        "apps/desktop/src/i18n/**",
+        "apps/desktop/e2e/**",
+        "tests-js/**"
+      ],
+      "requires_approved_contract": false,
+      "note": "A new floating work-status panel: collapsed to one line by default, expanding into stacked cards for Git, goals, processes, subagents and background programs. Two rules bound it. Visually it must belong - the user's requirement is consistency with the rest of the app, not a specific style, so it reuses the existing primitives and tokens with no new dependency and no new visual language, and a side-by-side screenshot is the gate. Interaction-wise only the logic is borrowed, with the sources recorded: Goose's GitBranchIndicator for the branch chip that refreshes on window focus with a searchable dropdown and a check on the current branch plus an uncommitted-changes warning; OpenHands' budget progress bar for a thin clamped bar that turns red past eighty percent and only renders numbers it is given; and claudecodeui's SubagentPanel for the shape of grouping subagent activity out of the main transcript - that repository is AGPL, so form only, never code. No reference project's code appears in ours. Cards without facts do not render rather than showing empty shells, and the Git card's field set is declared here for a future backend surface."
+    },
+    {
+      "id": "P08",
+      "file": "work-orders/P08-composer-input-bar.md",
+      "depends_on": [
+        "P07"
+      ],
+      "exclusive_group": "desktop-product",
+      "scope": [
+        "docs/desktop-product-delivery/**",
+        "apps/desktop/src/features/chat/composer/**",
+        "apps/desktop/src/features/profiles/**",
+        "apps/desktop/src/components/assistant-ui/**",
+        "apps/desktop/src/i18n/**",
+        "apps/desktop/e2e/**",
+        "tests-js/**",
+        "package.json",
+        "package-lock.json"
+      ],
+      "requires_approved_contract": false,
+      "note": "Composer input bar only: keep the profile selector, add a provider/model selector, render the profile's declared controls dynamically (reuse the existing renderer), a permission chip only when the backend declares such a control, and a context-usage container that shows unknown unless the backend supplies real data (estimation is forbidden). Adopt an external copy-in component library for the shapes with a licence check; consume the locked wire only - no wire or backend changes."
+    },
+    {
       "id": "P07",
       "file": "work-orders/P07-core-contract-and-handoff.md",
-      "depends_on": ["P00"],
+      "depends_on": [
+        "P00"
+      ],
       "exclusive_group": "desktop-product",
       "scope": [
         "docs/desktop-product-delivery/**",

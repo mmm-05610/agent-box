@@ -1,0 +1,85 @@
+{
+  "allOk": true,
+  "steps": [
+    {
+      "step": "app opens",
+      "ok": true,
+      "detail": "window title: Hermes"
+    },
+    {
+      "step": "first-run setup",
+      "ok": true,
+      "detail": "gate not shown; runtime already set up"
+    },
+    {
+      "step": "unified sidebar",
+      "ok": true,
+      "detail": "Capabilities:gone, Artifacts:gone, Scheduled jobs:gone, BotsTab:gone; profilesEntry=true; settingsEntry=true"
+    },
+    {
+      "step": "add menu entries",
+      "ok": true,
+      "detail": "open-folder=1, open-remote=1 (no naming page behind the menu)"
+    },
+    {
+      "step": "menu item selected",
+      "ok": true,
+      "detail": "menu closed after select=true"
+    },
+    {
+      "step": "local open completes directly",
+      "ok": true,
+      "detail": "local-acceptance row in the workspace list, no naming page"
+    },
+    {
+      "step": "wizard opens on config (no method page)",
+      "ok": true,
+      "detail": "distribution select visible on the first page"
+    },
+    {
+      "step": "connect → browse on one page",
+      "ok": true,
+      "detail": "directory browser visible, no separate connecting page"
+    },
+    {
+      "step": "local and WSL in one list",
+      "ok": true,
+      "detail": "the WSL row renders inside the same workspace section as the local row"
+    },
+    {
+      "step": "switch within the list (WSL info opens)",
+      "ok": true,
+      "detail": "WSL row and local row drive from the same list"
+    },
+    {
+      "step": "rename persists",
+      "ok": true,
+      "detail": "row shows the new name; host record=[{\"id\":\"wsl_ws_ccd0a97fc3de6a7e\",\"name\":\"round36-验收\"}]"
+    },
+    {
+      "step": "second WSL workspace saved",
+      "ok": true,
+      "detail": "host records=[{\"id\":\"wsl_ws_9952b63f57251f3b\",\"name\":\"子目录\"},{\"id\":\"wsl_ws_ccd0a97fc3de6a7e\",\"name\":\"round36-验收\"}]"
+    },
+    {
+      "step": "remove drops only the record",
+      "ok": true,
+      "detail": "rows before=[wsl_ws_9952b63f57251f3b,wsl_ws_ccd0a97fc3de6a7e] after=[wsl_ws_ccd0a97fc3de6a7e]; host=[{\"id\":\"wsl_ws_ccd0a97fc3de6a7e\",\"name\":\"round36-验收\"}]; dir still on disk=true"
+    },
+    {
+      "step": "pinned/search on Windows",
+      "ok": true,
+      "detail": "SKIPPED — no real session exists in the isolated sandbox (no model request allowed); behavior tests cover pin/unpin and search attribution on the dev side"
+    },
+    {
+      "step": "reopen: both workspaces restored",
+      "ok": true,
+      "detail": "local=true, wsl(renamed)=true"
+    },
+    {
+      "step": "reopen: reconnect re-verifies",
+      "ok": true,
+      "detail": "connection info reports the verified identity"
+    }
+  ]
+}

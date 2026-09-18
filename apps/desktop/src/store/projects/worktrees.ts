@@ -1,5 +1,6 @@
 import { atom } from 'nanostores'
 
+import { judgeWorkspacePathScope } from '@/application/workspace/path-scope'
 import type { HermesGitBaseBranch, HermesGitBranch } from '@/global'
 import { translateNow } from '@/i18n'
 import {
@@ -11,7 +12,9 @@ import { desktopGit } from '@/lib/desktop-git'
 import { isMissingRestEndpoint } from '@/lib/gateway-rpc'
 import { setSidebarAgentsGrouped } from '@/store/layout'
 import { notify } from '@/store/notifications'
+import { $profileScope } from '@/store/profile'
 import { requestFreshSession } from '@/store/profile/request-atoms'
+import { unhideLocalWorkspace, workspaceHiddenKey } from '@/store/workspace-view'
 
 import { createProject, enterProject } from './crud'
 import { projectIdForCwd } from './cwd-identity'
@@ -20,18 +23,14 @@ import { $projectTree, projectRootCwd } from './scope'
 
 /** Worktree/git doors: start work in a repo, branch listing and switching,
  *  worktree dialogs, and path reveal/copy. */
-export function goToProject(id: string, options?: { newSession?: boolean }): void {
+export function goToProject(id: string): void {
   setSidebarAgentsGrouped(true)
   enterProject(id)
-
-  if (!options?.newSession) {
-    return
-  }
 
   const cwd = projectRootCwd($projectTree.get().find(node => node.id === id))
 
   if (cwd) {
-    requestStartWorkSession(cwd, undefined, { openTab: true })
+    requestStartWorkSession(cwd)
   } else {
     requestFreshSession()
   }
@@ -149,8 +148,6 @@ export async function switchBranchInRepo(repoPath: string, branch: string): Prom
 // effect even if the path repeats.
 export interface StartWorkSessionRequest {
   draft?: string
-  /** Stack the fresh session as a tab when main already holds a chat (palette/⌘O opens-from-nowhere). */
-  openTab?: boolean
   path: string
   token: number
 }
@@ -194,7 +191,7 @@ export function closeWorktreeDialog(): void {
 
 let startWorkToken = 0
 
-export function requestStartWorkSession(path: string, draft?: string, options?: { openTab?: boolean }): void {
+export function requestStartWorkSession(path: string, draft?: string): void {
   const target = path.trim()
 
   if (!target) {
@@ -204,7 +201,6 @@ export function requestStartWorkSession(path: string, draft?: string, options?: 
   startWorkToken += 1
   $startWorkSessionRequest.set({
     draft: draft?.trim() || undefined,
-    openTab: options?.openTab || undefined,
     path: target,
     token: startWorkToken
   })
@@ -265,6 +261,28 @@ export async function openFolderAsProject(dir?: string): Promise<void> {
     return
   }
 
+  // 36R path boundary — BEFORE any create or session start: a local pick may
+  // only become a project/session when it lives in the backend's path space.
+  // The backend FS probe is the existing verified capability (remote mode
+  // answers /api/fs/default-cwd); when it can't verify, or the pick is a
+  // Windows path that only a local dialog could have produced, the open is
+  // refused with zero creation and zero launch. No /mnt/c guessing.
+  const remote = isDesktopFsRemoteMode()
+  const backendFsVerified = remote ? Boolean(await desktopDefaultCwd().catch(() => null)) : true
+
+  const scope = judgeWorkspacePathScope({ backendFsVerified, fsMode: remote ? 'remote' : 'local', pickedPath: target })
+
+  if (!scope.ok) {
+    notify({
+      kind: 'warning',
+      message: translateNow(
+        scope.reason === 'windows-path' ? 'sidebar.projects.pathScopeWindowsPath' : 'sidebar.projects.pathScopeUnverified'
+      )
+    })
+
+    return
+  }
+
   // Refresh first so the membership check runs against live truth — a repo
   // cloned since the last scan should enter its auto project, not double-create.
   await refreshProjectTree()
@@ -272,6 +290,9 @@ export async function openFolderAsProject(dir?: string): Promise<void> {
   const existing = projectIdForCwd(target)
 
   if (existing) {
+    // Re-opening the folder unhides a sidebar-hidden project — the SAME
+    // record and id (36R); nothing is re-created.
+    unhideLocalWorkspace(workspaceHiddenKey({ backend: 'local', id: existing, profile: $profileScope.get() }))
     setSidebarAgentsGrouped(true)
     enterProject(existing)
   } else {
@@ -294,5 +315,5 @@ export async function openFolderAsProject(dir?: string): Promise<void> {
     }
   }
 
-  requestStartWorkSession(target, undefined, { openTab: true })
+  requestStartWorkSession(target)
 }

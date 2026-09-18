@@ -3,6 +3,7 @@ import { atom } from 'nanostores'
 import { deriveDraftTitle } from '@/lib/draft-title'
 import { triggerHaptic } from '@/lib/haptics'
 import type { ComposerAttachment, ComposerAttachmentPatch } from '@/types/composer'
+import type { ConfigOverride } from '@/types/wire/wire-v1'
 
 export const $composerDraft = atom('')
 export const $composerAttachments = atom<ComposerAttachment[]>([])
@@ -128,45 +129,161 @@ export function createComposerAttachmentScope($attachments = atom<ComposerAttach
  *  `$composerAttachments` reader/writer IS this scope. */
 export const mainComposerScope = createComposerAttachmentScope($composerAttachments)
 
-// Per-thread draft stash for the decoupled composer. Session lifecycle never
-// touches this — only ChatBar's scope swap reads/writes it. Text mirrors to
-// localStorage; attachments are memory-only (blobs, upload state).
-export const SESSION_DRAFTS_STORAGE_KEY = 'hermes:composer-drafts:v3'
+// Per-session / per-workspace draft stash for the decoupled composer. Session
+// lifecycle never owns this — only ChatBar's scope swap reads/writes it.
+// Persist only serializable attachment references; previews and transient
+// upload state stay renderer-local.
+export const SESSION_DRAFTS_STORAGE_KEY = 'agentbox:composer-drafts:v4'
+export const LEGACY_SESSION_DRAFTS_STORAGE_KEY = 'hermes:composer-drafts:v3'
 
 const NEW_SESSION_DRAFT_KEY = '__new__'
 const MAX_PERSISTED_DRAFTS = 50
 const EMPTY_SESSION_DRAFT: SessionDraft = { attachments: [], text: '' }
+const EMPTY_DRAFT_EXECUTION_CONTEXT: SessionDraftExecutionContext = { overrides: [], profileId: null }
+const PERSISTED_DRAFT_SCHEMA_VERSION = 4
 
 export interface SessionDraft {
   attachments: ComposerAttachment[]
   text: string
 }
 
+export interface SessionDraftExecutionContext {
+  overrides: ConfigOverride[]
+  profileId: null | string
+}
+
+interface VersionedSessionDraft extends SessionDraft, SessionDraftExecutionContext {
+  version: number
+}
+
+interface PersistedDraftEnvelope {
+  drafts: Record<string, VersionedSessionDraft>
+  schemaVersion: typeof PERSISTED_DRAFT_SCHEMA_VERSION
+}
+
 const draftKey = (scope: string | null | undefined) => scope?.trim() || NEW_SESSION_DRAFT_KEY
+
+export const composerDraftScopeKey = draftKey
+
+export const workspaceDraftScope = (workspaceId: string): string => `workspace:${encodeURIComponent(workspaceId)}`
 
 const cloneDraft = (draft: SessionDraft): SessionDraft => ({
   attachments: draft.attachments.map(attachment => ({ ...attachment })),
   text: draft.text
 })
 
-function loadPersistedDraftTexts(): [string, SessionDraft][] {
-  try {
-    const raw = window.localStorage.getItem(SESSION_DRAFTS_STORAGE_KEY)
+const cloneExecutionContext = (draft: SessionDraftExecutionContext): SessionDraftExecutionContext => ({
+  overrides: draft.overrides.map(override => ({ ...override })),
+  profileId: draft.profileId
+})
 
-    if (!raw) {
+function persistedAttachment(attachment: ComposerAttachment): ComposerAttachment {
+  const { previewUrl: _previewUrl, thumbnailUrl: _thumbnailUrl, uploadState: _uploadState, ...reference } = attachment
+
+  return reference
+}
+
+function isConfigOverride(value: unknown): value is ConfigOverride {
+  return Boolean(value && typeof value === 'object' && typeof (value as Partial<ConfigOverride>).controlId === 'string')
+}
+
+function isVersionedDraft(value: unknown): value is VersionedSessionDraft {
+  if (!value || typeof value !== 'object') {
+    return false
+  }
+
+  const draft = value as Partial<VersionedSessionDraft>
+
+  return (
+    typeof draft.text === 'string' &&
+    Array.isArray(draft.attachments) &&
+    Number.isSafeInteger(draft.version) &&
+    (draft.profileId === undefined || draft.profileId === null || typeof draft.profileId === 'string') &&
+    (draft.overrides === undefined || (Array.isArray(draft.overrides) && draft.overrides.every(isConfigOverride)))
+  )
+}
+
+function normalizeVersionedDraft(draft: VersionedSessionDraft): VersionedSessionDraft {
+  return {
+    attachments: draft.attachments,
+    overrides: draft.overrides?.map(override => ({ ...override })) ?? [],
+    profileId: draft.profileId ?? null,
+    text: draft.text,
+    version: draft.version
+  }
+}
+
+function parsePersistedDrafts(raw: string): [string, VersionedSessionDraft][] {
+  const parsed = JSON.parse(raw) as unknown
+
+  if (parsed && typeof parsed === 'object' && (parsed as Partial<PersistedDraftEnvelope>).schemaVersion === 4) {
+    const drafts = (parsed as Partial<PersistedDraftEnvelope>).drafts
+
+    if (!drafts || typeof drafts !== 'object') {
       return []
     }
 
-    return Object.entries(JSON.parse(raw) as Record<string, string>).map(([key, text]) => [
+    return Object.entries(drafts)
+      .filter((entry): entry is [string, VersionedSessionDraft] => isVersionedDraft(entry[1]))
+      .map(([key, draft]) => [key, normalizeVersionedDraft(draft)])
+  }
+
+  // v3 was a plain { scope: text } dictionary. Keep accepting it so an update
+  // never strands the user's unsent words.
+  return Object.entries(parsed as Record<string, unknown>)
+    .filter((entry): entry is [string, string] => typeof entry[1] === 'string')
+    .map(([key, text], index) => [
       key,
-      { attachments: [], text }
+      { attachments: [], overrides: [], profileId: null, text, version: index + 1 }
     ])
+}
+
+function loadPersistedDrafts(): [string, VersionedSessionDraft][] {
+  try {
+    const current = window.localStorage.getItem(SESSION_DRAFTS_STORAGE_KEY)
+
+    if (current) {
+      return parsePersistedDrafts(current)
+    }
+
+    const legacy = window.localStorage.getItem(LEGACY_SESSION_DRAFTS_STORAGE_KEY)
+
+    if (!legacy) {
+      return []
+    }
+
+    return parsePersistedDrafts(legacy)
   } catch {
     return []
   }
 }
 
-const draftsBySession = new Map<string, SessionDraft>(loadPersistedDraftTexts())
+const draftsBySession = new Map<string, VersionedSessionDraft>(loadPersistedDrafts())
+let nextDraftVersion = Math.max(0, ...[...draftsBySession.values()].map(draft => draft.version)) + 1
+
+export const $draftExecutionContexts = atom<Record<string, SessionDraftExecutionContext>>(
+  Object.fromEntries(
+    [...draftsBySession].map(([key, draft]) => [key, cloneExecutionContext(draft)])
+  )
+)
+
+export const draftExecutionContextIn = (
+  contexts: Record<string, SessionDraftExecutionContext>,
+  scope: string | null | undefined
+): SessionDraftExecutionContext => contexts[draftKey(scope)] ?? EMPTY_DRAFT_EXECUTION_CONTEXT
+
+function publishDraftExecutionContext(key: string, context?: SessionDraftExecutionContext): void {
+  const current = $draftExecutionContexts.get()
+  const next = { ...current }
+
+  if (context && (context.profileId !== null || context.overrides.length > 0)) {
+    next[key] = cloneExecutionContext(context)
+  } else {
+    delete next[key]
+  }
+
+  $draftExecutionContexts.set(next)
+}
 
 /**
  * Patch one asynchronous attachment occurrence wherever the main composer owns
@@ -254,19 +371,33 @@ function publishDraftTitle(key: string, title: string): void {
  * that the incoming text-only snapshot can't know about.
  */
 export function reloadPersistedDrafts(): void {
-  const incoming = new Map(loadPersistedDraftTexts())
+  const incoming = new Map(loadPersistedDrafts())
 
   for (const [key, draft] of incoming) {
     const local = draftsBySession.get(key)
-    draftsBySession.set(key, local?.attachments.length ? { ...local, text: draft.text } : draft)
+
+    // A lower version is an older window's delayed storage event. Never let it
+    // overwrite newer local intent. Preserve transient attachment fields only
+    // when the versions are identical.
+    if (local && local.version > draft.version) {
+      continue
+    }
+
+    draftsBySession.set(
+      key,
+      local?.attachments.length && local.version === draft.version ? { ...draft, attachments: local.attachments } : draft
+    )
+    publishDraftExecutionContext(key, draft)
+    nextDraftVersion = Math.max(nextDraftVersion, draft.version + 1)
     publishDraftTitle(key, deriveDraftTitle(draft.text))
   }
 
   // A key that vanished from storage was cleared (sent) in the other window.
-  for (const key of [...draftsBySession.keys()]) {
-    if (!incoming.has(key)) {
+  for (const [key, local] of [...draftsBySession]) {
+    if (!incoming.has(key) && window.localStorage.getItem(SESSION_DRAFTS_STORAGE_KEY) && local.version < nextDraftVersion) {
       draftsBySession.delete(key)
       publishDraftTitle(key, '')
+      publishDraftExecutionContext(key)
     }
   }
 }
@@ -324,32 +455,71 @@ export function onComposerDraftSyncRequest(handler: (detail: ComposerDraftSyncDe
 function persistDraftTexts() {
   try {
     const entries = [...draftsBySession]
-      .filter(([, draft]) => draft.text)
+      .filter(
+        ([, draft]) =>
+          draft.text.trim() || draft.attachments.length > 0 || draft.profileId !== null || draft.overrides.length > 0
+      )
       .slice(-MAX_PERSISTED_DRAFTS)
-      .map(([key, draft]) => [key, draft.text] as const)
+      .map(
+        ([key, draft]) =>
+          [
+            key,
+            {
+              attachments: draft.attachments.map(persistedAttachment),
+              overrides: draft.overrides,
+              profileId: draft.profileId,
+              text: draft.text,
+              version: draft.version
+            }
+          ] as const
+      )
 
     if (entries.length === 0) {
       window.localStorage.removeItem(SESSION_DRAFTS_STORAGE_KEY)
+      window.localStorage.removeItem(LEGACY_SESSION_DRAFTS_STORAGE_KEY)
     } else {
-      window.localStorage.setItem(SESSION_DRAFTS_STORAGE_KEY, JSON.stringify(Object.fromEntries(entries)))
+      const envelope: PersistedDraftEnvelope = {
+        drafts: Object.fromEntries(entries),
+        schemaVersion: PERSISTED_DRAFT_SCHEMA_VERSION
+      }
+
+      window.localStorage.setItem(SESSION_DRAFTS_STORAGE_KEY, JSON.stringify(envelope))
+      window.localStorage.removeItem(LEGACY_SESSION_DRAFTS_STORAGE_KEY)
     }
   } catch {
     // Best-effort only — quota/private-mode must never break typing.
   }
 }
 
-export function stashSessionDraft(scope: string | null | undefined, text: string, attachments: ComposerAttachment[]) {
+export function stashSessionDraft(
+  scope: string | null | undefined,
+  text: string,
+  attachments: ComposerAttachment[]
+): number {
   const key = draftKey(scope)
+  const version = nextDraftVersion++
+  const previousContext = draftsBySession.get(key) ?? EMPTY_DRAFT_EXECUTION_CONTEXT
 
   // Delete-then-set keeps MRU order for MAX_PERSISTED_DRAFTS eviction.
   draftsBySession.delete(key)
 
-  if (text.trim() || attachments.length > 0) {
-    draftsBySession.set(key, cloneDraft({ attachments, text }))
+  if (
+    text.trim() ||
+    attachments.length > 0 ||
+    previousContext.profileId !== null ||
+    previousContext.overrides.length > 0
+  ) {
+    draftsBySession.set(key, {
+      ...cloneDraft({ attachments, text }),
+      ...cloneExecutionContext(previousContext),
+      version
+    })
   }
 
   persistDraftTexts()
   publishDraftTitle(key, deriveDraftTitle(text))
+
+  return version
 }
 
 export function takeSessionDraft(scope: string | null | undefined): SessionDraft {
@@ -358,7 +528,64 @@ export function takeSessionDraft(scope: string | null | undefined): SessionDraft
   return stashed ? cloneDraft(stashed) : EMPTY_SESSION_DRAFT
 }
 
-export const clearSessionDraft = (scope: string | null | undefined) => stashSessionDraft(scope, '', [])
+export function sessionDraftExecutionContext(scope: string | null | undefined): SessionDraftExecutionContext {
+  const stashed = draftsBySession.get(draftKey(scope))
+
+  return stashed ? cloneExecutionContext(stashed) : cloneExecutionContext(EMPTY_DRAFT_EXECUTION_CONTEXT)
+}
+
+export function setSessionDraftExecutionContext(
+  scope: string | null | undefined,
+  context: SessionDraftExecutionContext
+): number {
+  const key = draftKey(scope)
+  const version = nextDraftVersion++
+  const previous = draftsBySession.get(key)
+  const draft = previous ? cloneDraft(previous) : EMPTY_SESSION_DRAFT
+
+  draftsBySession.delete(key)
+
+  if (draft.text.trim() || draft.attachments.length > 0 || context.profileId !== null || context.overrides.length > 0) {
+    draftsBySession.set(key, {
+      ...cloneDraft(draft),
+      ...cloneExecutionContext(context),
+      version
+    })
+  }
+
+  persistDraftTexts()
+  publishDraftExecutionContext(key, context)
+
+  return version
+}
+
+export function clearSessionDraft(scope: string | null | undefined): number {
+  const key = draftKey(scope)
+  const version = nextDraftVersion++
+
+  draftsBySession.delete(key)
+  persistDraftTexts()
+  publishDraftTitle(key, '')
+  publishDraftExecutionContext(key)
+
+  return version
+}
+
+export const sessionDraftVersion = (scope: string | null | undefined): number | null =>
+  draftsBySession.get(draftKey(scope))?.version ?? null
+
+/** Clear only the exact draft generation that was submitted. */
+export function clearSessionDraftIfVersion(scope: string | null | undefined, expectedVersion: number): boolean {
+  const key = draftKey(scope)
+
+  if (draftsBySession.get(key)?.version !== expectedVersion) {
+    return false
+  }
+
+  clearSessionDraft(scope)
+
+  return true
+}
 
 /**
  * Move a stashed composer draft from one session key onto another.
@@ -379,18 +606,33 @@ export function migrateSessionDraft(fromKey: string | null | undefined, toKey: s
 
   const source = draftsBySession.get(from)
 
-  if (!source || (!source.text.trim() && source.attachments.length === 0)) {
+  if (
+    !source ||
+    (!source.text.trim() &&
+      source.attachments.length === 0 &&
+      source.profileId === null &&
+      source.overrides.length === 0)
+  ) {
     return false
   }
 
   const dest = draftsBySession.get(to)
 
-  if (dest && (dest.text.trim() || dest.attachments.length > 0)) {
+  if (dest && (dest.text.trim() || dest.attachments.length > 0 || dest.profileId !== null || dest.overrides.length > 0)) {
     return false
   }
 
-  stashSessionDraft(toKey, source.text, source.attachments)
-  clearSessionDraft(fromKey)
+  draftsBySession.delete(from)
+  draftsBySession.set(to, {
+    ...cloneDraft(source),
+    ...cloneExecutionContext(source),
+    version: nextDraftVersion++
+  })
+  persistDraftTexts()
+  publishDraftTitle(from, '')
+  publishDraftTitle(to, deriveDraftTitle(source.text))
+  publishDraftExecutionContext(from)
+  publishDraftExecutionContext(to, source)
 
   return true
 }

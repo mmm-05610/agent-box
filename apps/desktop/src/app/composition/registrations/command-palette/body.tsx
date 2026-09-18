@@ -1,23 +1,19 @@
 // Extracted verbatim from index.tsx (see docs/desktop-megafile-decomposition.md).
 
 import { useStore } from '@nanostores/react'
-import { useQuery } from '@tanstack/react-query'
 import { Dialog as DialogPrimitive } from 'radix-ui'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 
-import { getHermesConfigRecord } from '@/api/config'
 import { SESSION_IMPORT_ROUTE } from '@/app/routes'
 import {
   AGENTS_ROUTE,
-  ARTIFACTS_ROUTE,
   COMMAND_CENTER_ROUTE,
   CRON_ROUTE,
   navigateToWorkspacePage,
   NEW_CHAT_ROUTE,
   PROFILES_ROUTE,
   SETTINGS_ROUTE,
-  SKILLS_ROUTE,
   STARMAP_ROUTE
 } from '@/app/routes'
 import { usePaletteContributions } from '@/app/shell/layers/command-palette/contrib'
@@ -30,12 +26,11 @@ import {
   paletteValue,
   rankGroups,
 } from '@/app/shell/layers/command-palette/palette-model'
-import { listAllProfileSessions } from '@/application/session-lists'
 import { openSession, openSessionIntentFromModifiers } from '@/application/session/open-session'
 import { codiconIcon } from '@/components/ui/codicon'
 import { Command, CommandInput, CommandList } from '@/components/ui/command'
+import type { SessionAuthority } from '@/features/chat/sidebar/sidebar-constants'
 import { PetInlineToggle, PetPalettePage } from '@/features/pet-generate/command-palette/pet-palette-page'
-import { SECTIONS } from '@/features/settings/constants'
 import { type SettingsSearchEntry, settingsSearchTargetQuery } from '@/features/settings/settings-search'
 import { useSettingsSearchCatalog } from '@/features/settings/use-settings-search'
 import { MarketplaceThemePage } from '@/features/theme/command-palette/marketplace-theme-page'
@@ -57,24 +52,20 @@ import {
   Download,
   Egg,
   GitBranch,
-  Layers3,
   MessageCircle,
-  Package,
   Palette,
   PawPrint,
   Plus,
   RefreshCw,
   Settings,
-  SlidersHorizontal,
   Starmap,
   Sun,
   Users,
-  Wrench,
   Zap
 } from '@/lib/icons'
-import { getServers } from '@/lib/mcp-servers'
 import { cn } from '@/lib/utils'
 import { resolveVersionStatus } from '@/lib/version-status'
+import { $agentBoxSessions } from '@/store/agentbox-service'
 import { $repoWorktrees } from '@/store/coding-status'
 import {
   $commandPaletteOpen,
@@ -102,9 +93,9 @@ import { type ThemeMode, useTheme } from '@/themes/context'
 
 import {
   FOLDER_PATH_RE,
+  projectAgentBoxPaletteSessions,
   SESSION_ID_RE,
-  THEME_MODES,
-  toSessionEntry,
+  THEME_MODES
 } from './palette-helpers'
 import {
   NON_CONFIG_SETTINGS,
@@ -116,7 +107,45 @@ import {
 
 
 
-export function CommandPaletteBody({ onExited }: { onExited: () => void }) {
+export interface CommandPaletteBodyProps {
+  /** Required: which runtime owns this mount. Under `'agentbox'` the palette
+   *  never offers or runs the legacy Hermes data-plane shortcuts (restart
+   *  gateway / update Hermes) — the authority alone decides, never gateway
+   *  state or cache contents. */
+  authority: SessionAuthority
+  onExited: () => void
+}
+
+/**
+ * Contributed palette rows that belong to the legacy Hermes runtime rather than
+ * to AgentBox, so the AgentBox palette neither renders nor runs them.
+ *
+ * - `logs.toggle` only summons the logs pane, and that pane polls
+ *   `GET /api/logs`.
+ * - `profile.export` / `profile.import` share a profile as a CLI tar.gz bundle
+ *   through `api/profiles.ts`. wire-v1 has no Profile bundle method, so there is
+ *   nothing for AgentBox to stand behind them with — and the product does not
+ *   offer a fake "not supported yet" row in their place. The profile manager
+ *   page keeps create/edit/archive, and `nav-profiles` still navigates there.
+ *
+ * Declared here, by id, because the contributions themselves are registered by
+ * the composition root (which is not this module's to change). Filters are the
+ * authority for what the palette offers; nothing is inferred from the gateway,
+ * the cache or whether a legacy call would happen to succeed.
+ */
+export const LEGACY_PALETTE_ROW_IDS: readonly string[] = ['logs.toggle', 'profile.export', 'profile.import']
+
+/**
+ * Navigation rows for the views the AgentBox product does not mount: Agents (the
+ * management entry the product retires), Starmap and Webhooks (no approved
+ * product surface) and Cron (whose AgentBox contract does not exist yet). Their
+ * views read the legacy Hermes REST plane, so under `'agentbox'` the palette
+ * must not offer a route to them — the same rule as `LEGACY_PALETTE_ROW_IDS`,
+ * applied to the built-in "go to" group rather than the contribution group.
+ */
+export const LEGACY_VIEW_PALETTE_ROW_IDS: readonly string[] = ['nav-agents', 'nav-cron', 'nav-starmap']
+
+export function CommandPaletteBody({ authority, onExited }: CommandPaletteBodyProps) {
   const { t } = useI18n()
   const pendingPage = useStore($commandPalettePage)
   const pendingSeed = useStore($commandPaletteSeed)
@@ -209,31 +238,14 @@ export function CommandPaletteBody({ onExited }: { onExited: () => void }) {
     }
   }, [])
 
-  // Server-backed sources for the type-to-search groups. This component only
-  // exists while the palette is open, so the queries are inherently lazy — no
-  // `enabled` gate needed. react-query handles caching/dedup/staleness, so a
-  // reopen paints from cache and revalidates in the background.
-  const configQuery = useQuery({
-    queryKey: ['command-palette', 'config'],
-    queryFn: () => getHermesConfigRecord()
-  })
+  // Session rows come from the AgentBox service cache and nothing else: the
+  // palette has no legacy session enumeration to fall back to, so an empty
+  // cache is an empty list, not a prompt to go ask Hermes. There is also no
+  // second copy to protect — a late response to some other backend cannot
+  // overwrite a row, because the only writer is the service's own record.
+  const agentBoxSessions = useStore($agentBoxSessions)
 
-  const sessionsQuery = useQuery({
-    queryKey: ['command-palette', 'sessions'],
-    queryFn: () => listAllProfileSessions(200, 1, 'exclude')
-  })
-
-  const archivedQuery = useQuery({
-    queryKey: ['command-palette', 'archived'],
-    queryFn: () => listAllProfileSessions(200, 0, 'only')
-  })
-
-  // getServers is the shared choke point that also drops malformed (null/
-  // scalar) entries, so the palette never lists a server the MCP tab dropped.
-  const mcpServers = useMemo(() => Object.keys(getServers(configQuery.data ?? null)).sort(), [configQuery.data])
-
-  const sessions = useMemo(() => (sessionsQuery.data?.sessions ?? []).map(toSessionEntry), [sessionsQuery.data])
-  const archivedSessions = useMemo(() => (archivedQuery.data?.sessions ?? []).map(toSessionEntry), [archivedQuery.data])
+  const sessions = useMemo(() => projectAgentBoxPaletteSessions(agentBoxSessions), [agentBoxSessions])
 
   // Search/sub-page are local to a mount, and this component remounts per open
   // (keyed by open count), so each open starts clean without a reset effect.
@@ -284,9 +296,10 @@ export function CommandPaletteBody({ onExited }: { onExited: () => void }) {
     setPage(prev => (prev ? (PAGE_PARENTS[prev] ?? null) : null))
   }, [])
 
-  const settingsSectionLabel = useCallback(
-    (section: (typeof SECTIONS)[number]) => t.settings.sections[section.id] ?? section.label,
-    [t.settings.sections]
+  const settingsEntryLabel = useCallback(
+    (entry: (typeof NON_CONFIG_SETTINGS)[number]) =>
+      entry.labelKey === 'about' ? t.settings.nav.about : t.settings.product[entry.labelKey].title,
+    [t]
   )
 
   // Running a keepOpen row (a toggle) changes state the rows themselves report,
@@ -295,6 +308,26 @@ export function CommandPaletteBody({ onExited }: { onExited: () => void }) {
   const [selectTick, setSelectTick] = useState(0)
 
   const contributedItems = usePaletteContributions()
+
+  // Contributed rows a plugin or the composition root registered are offered as
+  // given, with one exception: a shortcut onto the legacy Hermes runtime is not
+  // an AgentBox row, so under `'agentbox'` it is dropped before it can render or
+  // be run. See LEGACY_PALETTE_ROW_IDS.
+  const visibleContributedItems = useMemo(
+    () =>
+      authority === 'agentbox'
+        ? contributedItems.filter(item => !LEGACY_PALETTE_ROW_IDS.includes(item.id))
+        : contributedItems,
+    [authority, contributedItems]
+  )
+
+  // The built-in "go to" rows for the views AgentBox does not mount are dropped
+  // the same way — a navigation row is how most users would reach them. See
+  // LEGACY_VIEW_PALETTE_ROW_IDS.
+  const hiddenLegacyViewRowIds = useMemo(
+    () => new Set(authority === 'agentbox' ? LEGACY_VIEW_PALETTE_ROW_IDS : []),
+    [authority]
+  )
 
   // The active repo's worktrees → "new conversation in <branch>". This is the
   // ⌘K-typed "I want to work on <branch>" reflex: each entry seeds a fresh
@@ -328,11 +361,10 @@ export function CommandPaletteBody({ onExited }: { onExited: () => void }) {
     const cc = t.commandCenter
 
     // Projects are the primary way the desktop scopes work, so they're jumpable
-    // from the palette. Plain select is a pure scope switch (sidebar enters the
-    // project — never spends main); ⌘-Enter / ⌘-click also starts a new session
-    // at the project root (stacked as a tab when main holds a chat), previewed
-    // by the label swap while ⌘ is held. Rows carry the project's own codicon,
-    // matching the sidebar. The pinned "Open folder…" row is the ⌘O upsert.
+    // from the palette. Selecting one opens its local new-session draft; the
+    // backend Session does not exist until the first Send. Rows carry the
+    // project's own codicon, matching the sidebar. The pinned "Open folder…"
+    // row is the ⌘O upsert.
     const projectGroup: PaletteGroup = {
       heading: cc.projects,
       items: [
@@ -345,14 +377,11 @@ export function CommandPaletteBody({ onExited }: { onExited: () => void }) {
           run: () => void openFolderAsProject()
         },
         ...filterVisibleProjects(projectTree, dismissedAutoProjects).map(project => ({
-          comboHint: 'mod+enter',
           icon: codiconIcon(project.icon || (project.isNoProject ? 'home' : 'folder-library')),
           id: `project-${project.id}`,
           keywords: ['project', 'workspace', 'go to', project.label, ...(project.path ? [project.path] : [])],
           label: project.label,
-          modLabel: cc.newSessionInProject(project.label),
-          runWithEvent: (event?: { ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean }) =>
-            goToProject(project.id, { newSession: Boolean(event?.metaKey || event?.ctrlKey) })
+          run: () => goToProject(project.id)
         }))
       ]
     }
@@ -392,48 +421,35 @@ export function CommandPaletteBody({ onExited }: { onExited: () => void }) {
             label: cc.nav.settings.title,
             run: go(SETTINGS_ROUTE)
           },
-          {
-            action: 'nav.skills',
-            icon: Wrench,
-            id: 'nav-skills',
-            keywords: ['skills', 'tools', 'toolsets', 'mcp', 'capabilities'],
-            label: cc.nav.skills.title,
-            run: go(SKILLS_ROUTE)
-          },
-          {
-            action: 'nav.artifacts',
-            icon: Package,
-            id: 'nav-artifacts',
-            label: cc.nav.artifacts.title,
-            run: go(ARTIFACTS_ROUTE)
-          },
-          {
-            action: 'nav.cron',
-            icon: Clock,
-            id: 'nav-cron',
-            keywords: ['schedule', 'jobs'],
-            label: t.shell.statusbar.cron,
-            run: go(CRON_ROUTE)
-          },
-          { action: 'nav.profiles', icon: Users, id: 'nav-profiles', label: t.profiles.title, run: go(PROFILES_ROUTE) },
-          { action: 'nav.agents', icon: Cpu, id: 'nav-agents', label: t.agents.title, run: go(AGENTS_ROUTE) },
-          {
-            icon: Starmap,
-            id: 'nav-starmap',
-            keywords: ['star map', 'memory', 'memories', 'skills', 'graph', 'learning', 'constellation'],
-            label: t.starmap.title,
-            run: go(STARMAP_ROUTE)
-          }
+          ...[
+            {
+              action: 'nav.cron',
+              icon: Clock,
+              id: 'nav-cron',
+              keywords: ['schedule', 'jobs'],
+              label: t.shell.statusbar.cron,
+              run: go(CRON_ROUTE)
+            },
+            { action: 'nav.profiles', icon: Users, id: 'nav-profiles', label: t.profiles.title, run: go(PROFILES_ROUTE) },
+            { action: 'nav.agents', icon: Cpu, id: 'nav-agents', label: t.agents.title, run: go(AGENTS_ROUTE) },
+            {
+              icon: Starmap,
+              id: 'nav-starmap',
+              keywords: ['star map', 'memory', 'memories', 'skills', 'graph', 'learning', 'constellation'],
+              label: t.starmap.title,
+              run: go(STARMAP_ROUTE)
+            }
+          ].filter(row => !hiddenLegacyViewRowIds.has(row.id))
         ]
       },
       projectGroup,
       // Registry-contributed rows (core features + plugins) — one group,
       // omitted while nothing contributes.
-      ...(contributedItems.length > 0
+      ...(visibleContributedItems.length > 0
         ? [
             {
               heading: cc.commands,
-              items: contributedItems.map(item => ({
+              items: visibleContributedItems.map(item => ({
                 action: item.action,
                 // Read on mount and after every select (the deps below), so a
                 // row that reports state can't show the state it just left.
@@ -466,35 +482,44 @@ export function CommandPaletteBody({ onExited }: { onExited: () => void }) {
             label: t.sessionImport.action,
             run: go(SESSION_IMPORT_ROUTE)
           },
-          {
-            icon: Activity,
-            id: 'cc-system',
-            keywords: ['command center', 'system', 'status', 'logs'],
-            label: cc.sections.system,
-            run: go(`${COMMAND_CENTER_ROUTE}?section=system`)
-          },
-          {
-            icon: BarChart3,
-            id: 'cc-usage',
-            keywords: ['command center', 'usage', 'tokens', 'cost'],
-            label: cc.sections.usage,
-            run: go(`${COMMAND_CENTER_ROUTE}?section=usage`)
-          },
-          {
-            icon: RefreshCw,
-            id: 'cc-restart-gateway',
-            keywords: ['gateway', 'restart', 'messaging', 'reconnect', 'system'],
-            label: cc.restartGateway,
-            run: () => void runGatewayRestart()
-          },
-          {
-            detail: updateVersionLabel,
-            icon: Download,
-            id: 'cc-update-hermes',
-            keywords: ['update', 'upgrade', 'hermes', 'version', 'system', 'restart'],
-            label: cc.updateHermes,
-            run: () => requestActiveUpdate()
-          },
+          // The legacy Hermes data-plane shortcuts: the system/usage panels and
+          // the restart/update actions belong to the legacy runtime, so only
+          // the `hermes` authority offers them. Under `agentbox` they neither
+          // render nor can run — the authority alone decides, and these
+          // actions are never called.
+          ...(authority === 'hermes'
+            ? [
+                {
+                  icon: Activity,
+                  id: 'cc-system',
+                  keywords: ['command center', 'system', 'status', 'logs'],
+                  label: cc.sections.system,
+                  run: go(`${COMMAND_CENTER_ROUTE}?section=system`)
+                },
+                {
+                  icon: BarChart3,
+                  id: 'cc-usage',
+                  keywords: ['command center', 'usage', 'tokens', 'cost'],
+                  label: cc.sections.usage,
+                  run: go(`${COMMAND_CENTER_ROUTE}?section=usage`)
+                },
+                {
+                  icon: RefreshCw,
+                  id: 'cc-restart-gateway',
+                  keywords: ['gateway', 'restart', 'messaging', 'reconnect', 'system'],
+                  label: cc.restartGateway,
+                  run: () => void runGatewayRestart()
+                },
+                {
+                  detail: updateVersionLabel,
+                  icon: Download,
+                  id: 'cc-update-hermes',
+                  keywords: ['update', 'upgrade', 'hermes', 'version', 'system', 'restart'],
+                  label: cc.updateHermes,
+                  run: () => requestActiveUpdate()
+                }
+              ]
+            : []),
           {
             icon: RefreshCw,
             id: 'cc-reload-window',
@@ -551,18 +576,18 @@ export function CommandPaletteBody({ onExited }: { onExited: () => void }) {
       {
         heading: cc.settings,
         items: [
-          ...SECTIONS.map(section => ({
-            icon: section.icon,
-            id: `set-config-${section.id}`,
-            keywords: ['settings', section.label, settingsSectionLabel(section)],
-            label: settingsSectionLabel(section),
-            run: go(settingsTab(`config:${section.id}`))
-          })),
+          {
+            icon: Palette,
+            id: 'set-appearance',
+            keywords: ['settings', 'appearance', 'theme'],
+            label: t.settings.sections.appearance,
+            run: go(settingsTab('appearance'))
+          },
           ...NON_CONFIG_SETTINGS.map(entry => ({
             icon: entry.icon,
             id: `set-${entry.tab}`,
             keywords: ['settings', ...(entry.keywords ?? [])],
-            label: t.settings.nav[entry.labelKey],
+            label: settingsEntryLabel(entry),
             run: go(settingsTab(entry.tab))
           }))
         ]
@@ -573,14 +598,16 @@ export function CommandPaletteBody({ onExited }: { onExited: () => void }) {
     // that kept the palette open — eslint only sees an unused dep.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    contributedItems,
+    authority,
     dismissedAutoProjects,
     go,
+    hiddenLegacyViewRowIds,
     projectTree,
     selectTick,
-    settingsSectionLabel,
+    settingsEntryLabel,
     t,
-    updateVersionLabel
+    updateVersionLabel,
+    visibleContributedItems
   ])
 
   // The long, granular lists (settings fields, API keys, MCP servers, archived
@@ -648,38 +675,6 @@ export function CommandPaletteBody({ onExited }: { onExited: () => void }) {
       })
     }
 
-    // Deep-link straight to a Capabilities sub-tab. The root "Go to" entry only
-    // lands on the top-level Skills view; typing "mcp"/"tools"/"skills" should
-    // jump to the exact tab (matches the "not just the top lvl" ask).
-    const capLabel = t.commandCenter.nav.skills.title
-
-    result.push({
-      heading: capLabel,
-      items: [
-        {
-          icon: Wrench,
-          id: 'cap-skills',
-          keywords: ['skills', 'capabilities'],
-          label: `${capLabel}: ${t.skills.tabSkills}`,
-          run: go(`${SKILLS_ROUTE}?tab=skills`)
-        },
-        {
-          icon: SlidersHorizontal,
-          id: 'cap-toolsets',
-          keywords: ['tools', 'toolsets', 'capabilities'],
-          label: `${capLabel}: ${t.skills.tabToolsets}`,
-          run: go(`${SKILLS_ROUTE}?tab=toolsets`)
-        },
-        {
-          icon: Layers3,
-          id: 'cap-mcp',
-          keywords: ['mcp', 'servers', 'tools', 'capabilities', 'model context protocol'],
-          label: `${capLabel}: ${t.skills.tabMcp}`,
-          run: go(`${SKILLS_ROUTE}?tab=mcp`)
-        }
-      ]
-    })
-
     // Apply a theme directly from the root search (e.g. "nous" → Nous). Live
     // preview via keepOpen, mirroring the nested theme picker. If the theme
     // can't render the current light/dark mode, flip to the one it supports.
@@ -735,13 +730,11 @@ export function CommandPaletteBody({ onExited }: { onExited: () => void }) {
         items: sessions.map(session => ({
           icon: MessageCircle,
           id: `session-${session.id}`,
-          keywords: [
-            'chat',
-            'session',
-            ...(session.preview ? [session.preview] : []),
-            ...(session.git_branch ? [session.git_branch] : [])
-          ],
-          label: session.title,
+          // Only the service record's own facts: displayName names the row and
+          // the id opens it. There is no preview/branch/model/cost to search —
+          // those fields do not exist on a SessionRecord.
+          keywords: ['chat', 'session'],
+          label: session.displayName,
           runWithEvent: goSession(session.id)
         }))
       })
@@ -767,45 +760,10 @@ export function CommandPaletteBody({ onExited }: { onExited: () => void }) {
       })
     }
 
-    if (mcpServers.length > 0) {
-      result.push({
-        heading: t.commandCenter.mcpServers,
-        items: mcpServers.map(name => ({
-          icon: Wrench,
-          id: `mcp-${name}`,
-          keywords: ['mcp', 'server', 'tool'],
-          label: name,
-          run: go(`${SKILLS_ROUTE}?tab=mcp&server=${encodeURIComponent(name)}`)
-        }))
-      })
-    }
-
-    if (archivedSessions.length > 0) {
-      result.push({
-        heading: t.commandCenter.archivedChats,
-        items: archivedSessions.map(session => ({
-          icon: Archive,
-          id: `archived-${session.id}`,
-          keywords: [
-            'archived',
-            'chat',
-            'session',
-            ...(session.preview ? [session.preview] : []),
-            ...(session.git_branch ? [session.git_branch] : [])
-          ],
-          label: session.title,
-          run: go(`${SETTINGS_ROUTE}?tab=sessions&session=${encodeURIComponent(session.id)}`)
-        }))
-      })
-    }
-
     return result
   }, [
-    archivedSessions,
     availableThemes,
-    go,
     goSession,
-    mcpServers,
     mode,
     previewTheme,
     resolvedMode,
@@ -841,18 +799,18 @@ export function CommandPaletteBody({ onExited }: { onExited: () => void }) {
       {
         heading: cc.settings,
         items: [
-          ...SECTIONS.map(section => ({
-            icon: section.icon,
-            id: `sp-config-${section.id}`,
-            keywords: ['settings', section.label, settingsSectionLabel(section)],
-            label: settingsSectionLabel(section),
-            run: go(settingsTab(`config:${section.id}`))
-          })),
+          {
+            icon: Palette,
+            id: 'sp-appearance',
+            keywords: ['settings', 'appearance', 'theme'],
+            label: t.settings.sections.appearance,
+            run: go(settingsTab('appearance'))
+          },
           ...NON_CONFIG_SETTINGS.map(entry => ({
             icon: entry.icon,
             id: `sp-${entry.tab}`,
             keywords: ['settings', ...(entry.keywords ?? [])],
-            label: t.settings.nav[entry.labelKey],
+            label: settingsEntryLabel(entry),
             run: go(settingsTab(entry.tab))
           }))
         ]
@@ -881,7 +839,7 @@ export function CommandPaletteBody({ onExited }: { onExited: () => void }) {
     }
 
     return result
-  }, [go, search, settingsCatalog, settingsEntryItem, settingsSectionLabel, t])
+  }, [go, search, settingsCatalog, settingsEntryItem, settingsEntryLabel, t])
 
   // Nested palette pages (VS Code-style submenus). Reusable: add an entry here
   // and point a root item at it via `to`.

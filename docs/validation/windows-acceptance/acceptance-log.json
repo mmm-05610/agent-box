@@ -1,0 +1,80 @@
+{
+  "allOk": true,
+  "steps": [
+    {
+      "step": "app opens",
+      "ok": true,
+      "detail": "window title: Hermes"
+    },
+    {
+      "step": "first-run setup",
+      "ok": true,
+      "detail": "gate not shown; runtime already set up"
+    },
+    {
+      "step": "provider onboarding dismissed",
+      "ok": true,
+      "detail": "no provider overlay present"
+    },
+    {
+      "step": "project overview sidebar",
+      "ok": true,
+      "detail": "add-project button visible"
+    },
+    {
+      "step": "add-project entry",
+      "ok": true,
+      "detail": "blank-state remote connection button"
+    },
+    {
+      "step": "wsl discovery",
+      "ok": true,
+      "detail": "Ubuntu offered by the real discovery"
+    },
+    {
+      "step": "connect + browse step",
+      "ok": true,
+      "detail": "directory browser visible"
+    },
+    {
+      "step": "browse CJK + spaces + up-level",
+      "ok": true,
+      "detail": "sub-directory navigation worked"
+    },
+    {
+      "step": "workspace saved as sidebar entry",
+      "ok": true,
+      "detail": "remote row visible in the sidebar"
+    },
+    {
+      "step": "connection info + reconnect",
+      "ok": true,
+      "detail": "reconnect re-verified the saved workspace"
+    },
+    {
+      "step": "unknown path typed error",
+      "ok": true,
+      "detail": "error surfaced, nothing saved"
+    },
+    {
+      "step": "cancel saves nothing",
+      "ok": true,
+      "detail": "rows before=[wsl_ws_66fa0e088b498d61] after=[wsl_ws_66fa0e088b498d61]; host records unchanged=true"
+    },
+    {
+      "step": "host store written",
+      "ok": true,
+      "detail": "[{\"id\":\"wsl_ws_66fa0e088b498d61\",\"root\":\"/home/maoqh/wsl-round1-验收 目录\",\"user\":\"maoqh\"}]"
+    },
+    {
+      "step": "reopen: workspace persisted",
+      "ok": true,
+      "detail": "remote row visible after restart"
+    },
+    {
+      "step": "reopen: re-verification works",
+      "ok": true,
+      "detail": "saved record re-verified against the real distribution"
+    }
+  ]
+}
