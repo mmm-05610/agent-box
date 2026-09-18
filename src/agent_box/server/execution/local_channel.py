@@ -65,15 +65,46 @@ def _safe_relative(value: str) -> str:
     return value
 
 
-def home_locator_segments(locator: str) -> list[str]:
-    """`<role>` or `<role>/<native-home>`, each a short safe name.
+def _seed_store_entries(store: Path, entries: Sequence[tuple[str, str]]) -> None:
+    """Order 66: create the declared shared entries in the family library.
 
-    The same rule the Worker enforces for its own homes: one rule, two
-    implementations, and `.` / `..` refused even though the character class
-    alone would admit them.
+    A room can only bind a name that exists; the library is ours, so seeding
+    it creates empty mount points (a zero-byte file or an empty directory) and
+    never moves data. A name that already exists must be the declared kind and
+    a real file/directory - a link or a foreign type is refused, not bound.
+    """
+    for name, kind in entries:
+        relative = _safe_relative(name)
+        target = store.joinpath(*relative.split("/"))
+        if kind == "directory":
+            target.mkdir(parents=True, exist_ok=True)
+            if not stat.S_ISDIR(os.lstat(target).st_mode):
+                raise LocalChannelError(
+                    "SESSION_STORE_INVALID", f"{name} is not a directory")
+            continue
+        target.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            info = os.lstat(target)
+        except FileNotFoundError:
+            handle = os.open(
+                target, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+            os.close(handle)
+            continue
+        if not stat.S_ISREG(info.st_mode):
+            raise LocalChannelError(
+                "SESSION_STORE_INVALID", f"{name} is not a regular file")
+
+
+def home_locator_segments(locator: str) -> list[str]:
+    """`<role>` plus the registry's native home, each a short safe name.
+
+    The same rule the Worker enforces for its own homes: one role segment plus
+    a native home that may itself be nested (`.config/opencode`), so up to six
+    segments are well-formed, and `.` / `..` are refused even though the
+    character class alone would admit them.
     """
     segments = locator.split("/") if isinstance(locator, str) else []
-    if not segments or len(segments) > 2 or any(not segment for segment in segments):
+    if not segments or len(segments) > 6 or any(not segment for segment in segments):
         raise LocalChannelError("HOME_LOCATOR_INVALID", "home locator is invalid")
     for segment in segments:
         if (len(segment) > 64 or segment in {".", ".."}
@@ -257,6 +288,7 @@ class LocalSidecarLauncher:
         sandbox_port: "object | None" = None,
         session_store_harness: str | None = None,
         session_store_target: str | None = None,
+        session_store_shared: Sequence[str] = (),
         usage_probe: Mapping[str, str] | None = None,
     ) -> None:
         if len(bundle) > MAX_BUNDLE_FILES or sum(map(len, bundle.values())) > MAX_BUNDLE_BYTES:
@@ -283,6 +315,9 @@ class LocalSidecarLauncher:
         )
         self.session_store_harness = session_store_harness
         self.session_store_target = session_store_target
+        #: Order 66's whole-db names and kinds (see the Worker-hosted launcher).
+        self.session_store_shared = tuple(
+            (str(name), str(kind)) for name, kind in session_store_shared)
         #: Order 55's probe rides the port (the backend reads it from here) and
         #: the read itself happens through the channels below; a deployment
         #: without a probe leaves every usage column NULL.
@@ -321,17 +356,37 @@ class LocalSidecarLauncher:
         home_dir = None
         native_bind_target = None
         window_host = None
+        store_overlays: tuple[tuple[str, str], ...] = ()
         if self.home is not None:
             home_dir = str(self.home.prepare())
+            if (self.session_store_shared and self.home.store is not None):
+                _seed_store_entries(self.home.store, self.session_store_shared)
             # Two read-write binds: the native home at its guest target, and —
             # when the deployment declared a window elsewhere — the window at
             # its own guest target.
             native_bind_target = f"/runtime/home/{self.native_home}"
             if self.session_store_harness is not None and self.home.store is not None:
-                # §14: the session library replaces the in-home session subtree;
-                # the profile home still binds whole, and the deeper store bind
-                # wins by the existing depth ordering.
-                window_host = str(self.home.store)
+                if self.session_store_shared:
+                    # Order 66's whole-db: the library owns the named entries
+                    # only; the profile's own data directory stays the window
+                    # and each shared name is bound from the library over it.
+                    if not self.home.window:
+                        raise LocalChannelError(
+                            "SESSION_STORE_INVALID",
+                            "a whole-db session store needs a state target "
+                            "outside the native home",
+                        )
+                    window_host = str(self.home.role_dir / self.home.window)
+                    store_overlays = tuple(
+                        (str(self.home.store.joinpath(*name.split("/"))),
+                         f"{self.session_store_target}/{name}")
+                        for name, _kind in self.session_store_shared
+                    )
+                else:
+                    # §14: the session library replaces the in-home session
+                    # subtree; the profile home still binds whole, and the
+                    # deeper store bind wins by the existing depth ordering.
+                    window_host = str(self.home.store)
             elif self.home.window and self.home.window != self.native_home:
                 window_host = str(self.home.role_dir / self.home.window)
         window_target = (
@@ -347,6 +402,7 @@ class LocalSidecarLauncher:
             native_home=self.native_home,
             state_window_source=window_host,
             state_window_target=window_target,
+            state_overlays=store_overlays,
             state_ephemeral_paths=tuple(self.state_ephemeral_paths),
         ))
         # stderr goes to a file, not a pipe: a pipe nobody drains would block

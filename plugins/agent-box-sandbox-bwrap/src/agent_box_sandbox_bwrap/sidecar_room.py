@@ -64,6 +64,7 @@ def compose_sidecar_room(
     state_target: str | None = None,
     state_window_source: str | None = None,
     state_window_target: str | None = None,
+    state_overlays: Sequence[tuple[str, str]] = (),
     state_ephemeral_paths: Sequence[str] = (),
     entrypoint: str = "/runtime/view/agentbox-sidecar/runtime/worker-entry.mjs",
 ) -> SandboxRoom:
@@ -115,6 +116,11 @@ def compose_sidecar_room(
         mount for mount in (writable_state_mount, writable_window_mount)
         if mount is not None
     ]
+    # Order 66: the whole-db overlays ride the same writable class as the state
+    # home; they sit deeper, so the depth rule already makes each one win.
+    overlay_mounts = tuple(
+        (str(source), str(target)) for source, target in state_overlays
+    )
     argv = compile_remote_sidecar_bwrap_argv(
         workspace=workspace,
         runtime_view=staged_view,
@@ -126,6 +132,7 @@ def compose_sidecar_room(
         ),
         runtime_artifact_mounts=runtime_artifact_mounts,
         writable_projection_mounts=tuple(writable_mounts),
+        state_overlay_mounts=overlay_mounts,
         ephemeral_state_mounts=ephemeral_state_mounts,
         entrypoint=entrypoint,
     )

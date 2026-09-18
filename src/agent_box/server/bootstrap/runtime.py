@@ -551,15 +551,43 @@ def build_runtime_from_sidecar_deployment(
         # per-harness store on the host. The default ("profile-home") keeps the
         # pre-§14 binding byte for byte - shared-DB families (the library holds
         # credential/account tables next to its session tables) must stay there.
+        # Order 66 adds `whole-db`: the family library owns the live session
+        # files named in `shared` (db + wal + shm + the revert/diff lands) and
+        # everything else in the state directory stays in the profile home.
         session_store = item.get("sessionStore")
         session_store_kind = "profile-home"
+        session_store_shared: tuple[tuple[str, str], ...] = ()
         if session_store is not None:
             if (not isinstance(session_store, dict)
-                    or not set(session_store) <= {"kind"}
+                    or not set(session_store) <= {"kind", "shared"}
                     or not isinstance(session_store.get("kind"), str)
-                    or session_store["kind"] not in {"profile-home", "sessions-subtree"}):
+                    or session_store["kind"] not in
+                    {"profile-home", "sessions-subtree", "whole-db"}):
                 raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
             session_store_kind = session_store["kind"]
+            if session_store_kind == "whole-db":
+                declared = session_store.get("shared")
+                if (not isinstance(declared, list) or not declared
+                        or len(declared) > 16):
+                    raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
+                entries: list[tuple[str, str]] = []
+                for entry in declared:
+                    if (not isinstance(entry, dict)
+                            or set(entry) != {"name", "kind"}
+                            or not isinstance(entry.get("name"), str)
+                            or entry.get("kind") not in {"file", "directory"}):
+                        raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
+                    # The same sandbox spelling rule as every other relative
+                    # declaration: safe names, no escape, bounded depth.
+                    _home_projection_target(
+                        f"/runtime/home/{entry['name']}", kind="file",
+                    )
+                    entries.append((entry["name"], entry["kind"]))
+                if len({name for name, _kind in entries}) != len(entries):
+                    raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
+                session_store_shared = tuple(entries)
+            elif "shared" in session_store:
+                raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
         state_target: str | None = None
         state_ephemeral_paths: tuple[str, ...] = ()
         if state_projection is not None:
@@ -590,7 +618,7 @@ def build_runtime_from_sidecar_deployment(
         deployment["_protected_state_paths"] = _protected_state_paths(
             tuple(projection_targets), state_target,
         )
-        if session_store_kind == "sessions-subtree" and state_target is None:
+        if session_store_kind in {"sessions-subtree", "whole-db"} and state_target is None:
             raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
         if state_target is not None:
             deployment["_state_target"] = state_target
@@ -614,6 +642,7 @@ def build_runtime_from_sidecar_deployment(
         else:
             deployment["_usage_probe"] = None
         deployment["_session_store"] = session_store_kind
+        deployment["_session_store_shared"] = session_store_shared
         # Order 67's narrowed lock: a family whose home cannot be certified for
         # concurrent writers declares `homeConcurrency = "exclusive"`, and
         # admission then admits one active Turn per Profile for that family
@@ -752,12 +781,13 @@ def build_runtime_from_sidecar_deployment(
                     sandbox_port=sandbox_port,
                     session_store_harness=(
                         context["harness_type"]
-                        if deployment["_session_store"] == "sessions-subtree" else None
+                        if deployment["_session_store"] in {"sessions-subtree", "whole-db"} else None
                     ),
                     session_store_target=(
                         deployment["_state_target"]
-                        if deployment["_session_store"] == "sessions-subtree" else None
+                        if deployment["_session_store"] in {"sessions-subtree", "whole-db"} else None
                     ),
+                    session_store_shared=deployment["_session_store_shared"],
                     usage_probe=deployment["_usage_probe"],
                 )
             else:
@@ -769,6 +799,7 @@ def build_runtime_from_sidecar_deployment(
                     projection_mounts=deployment["_projection_mounts"],
                     home_root=local_home_root,
                     home_locator=home_locator,
+                    native_home=native_home,
                     profile_id=context["profile_id"],
                     harness_type=context["harness_type"],
                     state_target=deployment["_state_target"],
@@ -777,12 +808,13 @@ def build_runtime_from_sidecar_deployment(
                     sandbox_port=sandbox_port,
                     session_store_harness=(
                         context["harness_type"]
-                        if deployment["_session_store"] == "sessions-subtree" else None
+                        if deployment["_session_store"] in {"sessions-subtree", "whole-db"} else None
                     ),
                     session_store_target=(
                         deployment["_state_target"]
-                        if deployment["_session_store"] == "sessions-subtree" else None
+                        if deployment["_session_store"] in {"sessions-subtree", "whole-db"} else None
                     ),
+                    session_store_shared=deployment["_session_store_shared"],
                     usage_probe=deployment["_usage_probe"],
                 )
             capability_documents, capability_grants, authorized, binding = (

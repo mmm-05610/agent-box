@@ -1,0 +1,96 @@
+# 工单 66 阶段 A —— 声明与绑定（whole-db 共享会话库）
+
+执行：2026-09-18，env-provider 工作树。范围：把 kilo/opencode 的会话库声明为
+`sessionStore.kind = "whole-db"`，把共享集收窄到"会话真正落的地方"，并把共享集绑到
+按家族共享的公共库。阶段 B–E（物化与切换 / 守卫与审计 / 门 / 收口）不在本文。
+
+## 1. 声明 diff（部署模板）
+
+| 家族 | 之前 | 现在 |
+| --- | --- | --- |
+| kilo | `profile-home`（缺省） | `whole-db`：`kilo.db`(file)、`kilo.db-wal`(file)、`kilo.db-shm`(file)、`storage/session_diff`(dir)、`kilo`(dir) |
+| opencode | `profile-home`（缺省） | `whole-db`：`opencode.db`(file)、`-wal`(file)、`-shm`(file)、`snapshot`(dir) |
+
+- **明确不共享**：`log/`、`repos/`、`telemetry-id`（kilo）、`opencode` 的 `auth.json`
+  （凭据载体，留在 profile home）——与工单 §2.1 一致。
+- 条目带 `kind`（file/directory）：房间绑定的目标必须由库侧"播种"出正确的类型，
+  否则 bwrap 会在错误类型上建挂载点。
+
+## 2. 绑定实现（四层）
+
+1. **中立 seam**（`runtime_composition/sandbox_port.py`）：`SidecarRoomRequest.state_overlays`
+   ——`(host_source, guest_target)` 列表，语义为"在 state home 之后叠加，深的胜"。
+2. **bwrap 编译器**（`provider.py` / `sidecar_room.py`）：新增 `state_overlay_mounts`；
+   每个目标用同一套 home 语法校验，且**必须严格落在已声明的可写 state 目标之内**
+   （越界 = `ProjectionRejected`）；以与 state home 同级的可写类发出，靠既有
+   `(depth, class, …)` 排序让它晚于 state home 绑定。实测（本机）：
+   `bwrap --bind src.txt dst.txt`（dst 不存在、父可写）**会自行创建挂载点**，
+   目录绑定的中间目录同样自动创建——所以 profile home 里不需要预置占位文件。
+3. **Worker 通道**（`sidecar.py`）：whole-db 时先 `home.prepare(kind="session-store",
+   entries=[…])` 取得公共库并**播种**；窗口仍绑 profile 自己的数据目录
+   （`<role dir>/<state 相对路径>`），再把库里的每个共享名以 overlay 绑到 state 目标之下。
+4. **本机通道**（`local_channel.py`）：同一语义的 Python 实现（`_seed_store_entries`）。
+5. **装配解析**（`runtime.py`）：`shared` 逐条 = `{name, kind}`（键集严格、名字走同一套
+   沙箱语法、≤16 条、重名拒绝）；`whole-db` 要求 stateProjection（与 sessions-subtree 同）。
+   `homeConcurrency` 与 `sessionStore` 正交（kilo/opencode 仍是 shared）。
+
+**为什么必须播种**：房间只能绑"存在的名字"。库是产品自己的目录，播种=创建空挂载点
+（0 字节文件 / 空目录），**不搬任何数据**；已存在的名字必须是声明的类型（符号链接或
+异类一律类型化拒绝，不跟随、不覆盖）。Worker 侧同一规则（`home.prepare` 的 `entries`），
+新增单测覆盖：播种幂等、`kilo.db` 播种为空文件、同名符号链接被拒。
+
+## 3. 第一手证据（本机，真 bwrap + 真节点桥）
+
+新测试 `tests/server/test_shared_session_store.py`（3 条，全绿）：
+
+- **编译器叠加**：whole-db 房间的 argv 里，`--bind <库>/kilo.db <state>/kilo.db`
+  **晚于** state home 的 `--bind`（深的胜）；越界目标（`/runtime/home/.config/kilo/x`
+  落在声明 state 之外）被 `ProjectionRejected` 拒绝。
+- **共享名落公共库**（参数化 case 1）：夹具把它的状态目录指向 `<state>/kilo`
+  （声明中的 dir 共享名）。整轮（workspaces.open → createAndSend → 终态）完成后：
+  `profiles/_sessions/kilo/kilo/native-state.json` **存在**，
+  `profiles/<role>/.local/share/kilo/kilo/native-state.json` **不存在**。
+- **非共享名留 profile home**（参数化 case 2）：同一轮把状态目录指向 `<state>/log`
+  （未声明共享）：`profiles/<role>/.local/share/kilo/log/native-state.json` 存在，
+  公共库里**没有**该文件。
+
+## 4. 顺带修复（本机通道的既有断口，均为 kilo/opencode 本机轮必需）
+
+- `home_locator_segments` 的段数上限 2 → **6**：与 Worker 的规则对齐
+  （Worker 注释即写明"role 段 + 可嵌套的 native home（`.config/opencode`）"）；
+  否则 `.config/kilo` / `.config/opencode` 这类两段 native home 的**本机轮直接
+  `HOME_LOCATOR_INVALID`**。
+- 装配给本机 launcher **显式传 `native_home`**：此前它从 locator 末段推导，
+  对 `.config/kilo` 会得到 `kilo`，房间会把 profile home 绑到错误的 guest 路径。
+
+## 5. 审计范围的诚实记录（事实，非缺陷）
+
+whole-db 下**审计树=公共库**（locator `_sessions/<family>`，整树，只读），与
+sessions-subtree 同规；profile home 里未共享的文件（`log/`、`repos/`、`telemetry-id`、
+`auth.json`）按绑定仍**按 profile 隔离**（工单 G3 的断言），但**不再落在本轮审计树内**
+——这是 66 §2.1 收窄共享集的直接后果，记账于此，供阶段 C 的守卫设计与后续评估。
+
+## 6. 回归计数
+
+- Python 全量：**794 passed / 0 failed**（新增 3 条 whole-db 测试 + 5 条守卫测试；其余既有）。
+- Worker（Rust）单测：**41 passed**（新增 1 条：播种与符号链接拒绝）；debug 与 release
+  二进制均已重建（测试会断言二进制不陈旧）。
+- c11 worker 二进制随 `home.prepare` 的 `entries` 扩展重建（`sha256:aa65e919…`），
+  四家全链门以新二进制复验：**pi/codex/hermes exit 0**、opencode PREPARED（其过态）；
+  pi 门记录 `checkpointNativeIdStable: true`、两轮 completed、delta 归属 1/1。
+
+## 6b. 阶段 C 的第一块（已落地，供 C 接线）
+
+`session_store_guard.py`（新模块，子代理实现，5 条测试）：只读打开共享库
+（`mode=ro` + 短连接超时，**禁止 `immutable=1`**、禁止任何写与写锁），逐表 `COUNT(*)`，
+`credential`/`account`/`control_account`/`account_state` 任一非空 → 类型化
+`SESSION_STORE_CREDENTIALS_PRESENT`（只报表名，不读值）；结构未知/不可开 → fail-closed；
+库不存在 = 正向通过。**WAL 反例已钉**：只在 WAL 里的行，`immutable=1` 读到 0 而守卫仍拒绝。
+
+## 7. 未做项（阶段 B–E）
+
+- B：切换（`sessions.switchProfile` 前置校验=同家族+两侧锁空闲+守卫通过）、按绑定物化。
+- C：空凭据守卫（**读穿 WAL**、只读行数、fail-closed；禁止 `immutable=1` 与任何写锁）
+  + 凭据处置改写（命中共享库=类型化失败+不删共享文件+记账）。
+- D：G1–G5 真跑（含 66 修订后的冷启动竞态四条）。
+- E：60 的 G6/E 修订落地、51 附带更正已做（见 `d1f7431`）、status 与收口报告。

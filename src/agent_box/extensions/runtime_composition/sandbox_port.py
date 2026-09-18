@@ -113,6 +113,12 @@ class SidecarRoomRequest:
     native_home: str = ""
     state_window_source: str | None = None
     state_window_target: str | None = None
+    #: Order 66's whole-db stores: extra read-write binds layered over the
+    #: state home *after* it, each entry (host_source, guest_target). The
+    #: family library owns the live session files/directories; everything the
+    #: deployment did not name stays in the profile home. Later binds win on
+    #: the providers that implement the ordering rule.
+    state_overlays: tuple[tuple[str, str], ...] = ()
     state_ephemeral_paths: tuple[str, ...] = ()
     #: The guest executable entrypoint the room will run. It must be the
     #: template's own fixed entry (the view supplies its bytes), so callers

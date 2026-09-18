@@ -234,6 +234,18 @@ def harness_deployment(
             if projection_files_override is not None else projection_files()
         )],
         "stateProjection": {"target": STATE_TARGET},
+        # Order 66: the family library owns the live session database and the
+        # revert/diff snapshots; log/, repos/ and auth.json stay in the
+        # profile home (auth.json is a credential carrier and is never shared).
+        "sessionStore": {
+            "kind": "whole-db",
+            "shared": [
+                       {"name": "opencode.db", "kind": "file"},
+                       {"name": "opencode.db-wal", "kind": "file"},
+                       {"name": "opencode.db-shm", "kind": "file"},
+                       {"name": "snapshot", "kind": "directory"},
+                   ],
+        },
         "adapter": {
             "command": BINARY_TARGET,
             "args": list(BINARY_ARGV),

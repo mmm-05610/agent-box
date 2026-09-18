@@ -282,6 +282,7 @@ class WorkerSidecarLauncher:
         sandbox_port: "SandboxPort | None" = None,
         session_store_harness: str | None = None,
         session_store_target: str | None = None,
+        session_store_shared: Sequence[str] = (),
         usage_probe: dict[str, str] | None = None,
     ) -> None:
         self.connector = connector
@@ -328,6 +329,11 @@ class WorkerSidecarLauncher:
         #: The declared session-subtree guest path the store binds at (the
         #: deployment's state target when the family split its store out).
         self.session_store_target = session_store_target
+        #: Order 66's whole-db names and kinds: the entries the family library
+        #: owns, bound over the profile home's own copies. Empty means the
+        #: store (if any) is the §14 subtree shape.
+        self.session_store_shared = tuple(
+            (str(name), str(kind)) for name, kind in session_store_shared)
         #: Order 51: a declared usage probe turns the audited journal into the
         #: neutral usage fact after the attempt (tokens only, no estimates).
         self.usage_probe = dict(usage_probe) if usage_probe else None
@@ -409,6 +415,7 @@ class WorkerSidecarLauncher:
             # bind read-write. Nothing is uploaded; nothing is restored.
             home_path = None
             window_host = None
+            store_overlays: tuple[tuple[str, str], ...] = ()
             if self.home_locator:
                 home_path = client.request("home.prepare", {
                     "locator": self.home_locator,
@@ -422,11 +429,41 @@ class WorkerSidecarLauncher:
                     # marker: the library is harness-scoped). The room binds the
                     # library at that deeper target, so it wins over the profile
                     # home's own subtree by the existing depth ordering.
-                    window_host = client.request("home.prepare", {
+                    seed = (
+                        [{"name": name, "kind": kind}
+                         for name, kind in self.session_store_shared]
+                        if self.session_store_shared else None
+                    )
+                    library_host = client.request("home.prepare", {
                         "locator": self.session_store_harness,
                         "harness": self.session_store_harness,
                         "kind": "session-store",
+                        **({"entries": seed} if seed else {}),
                     })["path"]
+                    if self.session_store_shared:
+                        # Order 66's whole-db: the library owns the named
+                        # entries only. The profile's own data directory stays
+                        # the window (log/, repos/, telemetry-id, auth.json
+                        # live there), and each shared name is bound from the
+                        # library over it.
+                        if not self.audit_window:
+                            raise SidecarError(
+                                "SESSION_STORE_INVALID",
+                                "a whole-db session store needs a state target "
+                                "outside the native home",
+                            )
+                        suffix = f"/{self.native_home}"
+                        role_dir = (
+                            home_path[: -len(suffix)] if home_path.endswith(suffix) else home_path
+                        )
+                        window_host = f"{role_dir}/{self.audit_window}"
+                        store_overlays = tuple(
+                            (f"{library_host}/{name}",
+                             f"{self.session_store_target}/{name}")
+                            for name, _kind in self.session_store_shared
+                        )
+                    else:
+                        window_host = library_host
                 elif self.audit_window and self.audit_window != self.native_home:
                     # The prepared path ends with the locator's segments, so the
                     # role directory it belongs to is the prefix above the
@@ -455,6 +492,7 @@ class WorkerSidecarLauncher:
                     self.session_store_target if self.session_store_harness
                     else (f"/runtime/home/{self.audit_window}" if window_host else None)
                 ),
+                state_overlays=store_overlays,
                 state_ephemeral_paths=tuple(self.state_ephemeral_paths),
             ))
             argv = list(room.argv)

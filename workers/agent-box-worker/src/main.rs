@@ -1975,8 +1975,95 @@ fn handle_home(
                 fs::create_dir_all(&dir)
                     .map_err(|_| ("HOME_IO", "session store creation failed"))?;
                 ensure_inside_home_root(home_root, &dir)?;
+                // Order 66 (whole-db): the deployment's shared entries are
+                // seeded in the library so the room can bind each one. A file
+                // is created empty (0600, O_NOFOLLOW, never over a link); a
+                // directory with its parents. An existing name must already be
+                // the declared kind; anything else is refused, not replaced.
+                let mut seeded: Vec<String> = Vec::new();
+                if let Some(entries) = args.get("entries") {
+                    let entries = entries.as_array().ok_or((
+                        "HOME_LOCATOR_INVALID",
+                        "session-store entries must be a list",
+                    ))?;
+                    if entries.len() > 16 {
+                        return Err((
+                            "HOME_LOCATOR_INVALID",
+                            "too many session-store entries",
+                        ));
+                    }
+                    for entry in entries {
+                        let name = entry
+                            .get("name")
+                            .and_then(Value::as_str)
+                            .ok_or(("HOME_LOCATOR_INVALID", "entry name is invalid"))?;
+                        let kind = entry
+                            .get("kind")
+                            .and_then(Value::as_str)
+                            .ok_or(("HOME_LOCATOR_INVALID", "entry kind is invalid"))?;
+                        let relative = safe_relative(name)?;
+                        let target = dir.join(&relative);
+                        if let Some(parent) = target.parent() {
+                            fs::create_dir_all(parent).map_err(|_| {
+                                ("HOME_IO", "session-store entry creation failed")
+                            })?;
+                            // The parent exists now: canonicalizing it here
+                            // refuses a symlinked component that would put the
+                            // leaf outside the home root.
+                            ensure_inside_home_root(home_root, parent)?;
+                        }
+                        match kind {
+                            "directory" => {
+                                fs::create_dir_all(&target).map_err(|_| {
+                                    ("HOME_IO", "session-store entry creation failed")
+                                })?;
+                                ensure_inside_home_root(home_root, &target)?;
+                                let info = fs::symlink_metadata(&target).map_err(|_| {
+                                    ("HOME_IO", "session-store entry stat failed")
+                                })?;
+                                if !info.is_dir() {
+                                    return Err((
+                                        "HOME_LOCATOR_INVALID",
+                                        "a declared directory entry is not a directory",
+                                    ));
+                                }
+                            }
+                            "file" => {
+                                match fs::symlink_metadata(&target) {
+                                    Ok(info) => {
+                                        if !info.is_file() {
+                                            return Err((
+                                                "HOME_LOCATOR_INVALID",
+                                                "a declared file entry is not a regular file",
+                                            ));
+                                        }
+                                    }
+                                    Err(_) => {
+                                        fs::OpenOptions::new()
+                                            .write(true)
+                                            .create_new(true)
+                                            .mode(0o600)
+                                            .custom_flags(libc::O_NOFOLLOW)
+                                            .open(&target)
+                                            .map_err(|_| {
+                                                ("HOME_IO", "session-store entry creation failed")
+                                            })?;
+                                    }
+                                }
+                            }
+                            _ => {
+                                return Err((
+                                    "HOME_LOCATOR_INVALID",
+                                    "a session-store entry kind is unknown",
+                                ));
+                            }
+                        }
+                        seeded.push(name.to_string());
+                    }
+                }
                 return Ok(json!({
                     "path": dir, "created": created, "markerState": "session-store",
+                    "seeded": seeded,
                 }));
             }
             let marker: HomeMarker =
@@ -2856,6 +2943,53 @@ mod home_tests {
         )
         .unwrap();
         assert!(!listed["files"].as_array().unwrap().is_empty());
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_whole_db_store_seeds_the_declared_entries_and_refuses_a_link() {
+        // Order 66: the room can only bind a name that exists, so prepare
+        // creates the declared shared entries (empty file / directory) and
+        // refuses a name that is a link rather than binding it.
+        let root = scratch("store-seeded");
+        let prepared = handle_home(
+            &root,
+            "home.prepare",
+            &json!({"locator": "kilo", "harness": "kilo", "kind": "session-store",
+                    "entries": [
+                        {"name": "kilo.db", "kind": "file"},
+                        {"name": "storage/session_diff", "kind": "directory"},
+                    ]}),
+        )
+        .unwrap();
+        assert_eq!(prepared["seeded"].as_array().unwrap().len(), 2);
+        let store = root.join("_sessions").join("kilo");
+        let db = store.join("kilo.db");
+        assert!(db.is_file());
+        assert_eq!(fs::symlink_metadata(&db).unwrap().len(), 0, "seeded empty");
+        assert!(store.join("storage").join("session_diff").is_dir());
+
+        // Idempotent: a second prepare keeps the existing names.
+        handle_home(
+            &root,
+            "home.prepare",
+            &json!({"locator": "kilo", "harness": "kilo", "kind": "session-store",
+                    "entries": [{"name": "kilo.db", "kind": "file"}]}),
+        )
+        .unwrap();
+        assert!(db.is_file());
+
+        // A symlink where the declaration says file is refused, not followed.
+        std::fs::remove_file(&db).unwrap();
+        std::os::unix::fs::symlink("/etc/hostname", &db).unwrap();
+        let refused = handle_home(
+            &root,
+            "home.prepare",
+            &json!({"locator": "kilo", "harness": "kilo", "kind": "session-store",
+                    "entries": [{"name": "kilo.db", "kind": "file"}]}),
+        )
+        .unwrap_err();
+        assert_eq!(refused.0, "HOME_LOCATOR_INVALID");
         let _ = fs::remove_dir_all(&root);
     }
 

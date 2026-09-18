@@ -196,6 +196,20 @@ def harness_deployment(
             if projection_files_override is not None else projection_files()
         )],
         "stateProjection": {"target": STATE_TARGET},
+        # Order 66: the family library owns the live session database and the
+        # revert/diff lands; log/, repos/ and telemetry-id stay in the profile
+        # home. The db needs its WAL sidecars shared with it or a second
+        # writer would not see committed rows.
+        "sessionStore": {
+            "kind": "whole-db",
+            "shared": [
+                       {"name": "kilo.db", "kind": "file"},
+                       {"name": "kilo.db-wal", "kind": "file"},
+                       {"name": "kilo.db-shm", "kind": "file"},
+                       {"name": "storage/session_diff", "kind": "directory"},
+                       {"name": "kilo", "kind": "directory"},
+                   ],
+        },
         "adapter": {
             # The platform binary is the ACP server: no node launcher needed.
             "command": ADAPTER_ARTIFACT_ENTRY,

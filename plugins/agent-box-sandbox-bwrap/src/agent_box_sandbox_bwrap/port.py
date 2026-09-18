@@ -62,6 +62,9 @@ class BwrapSidecarRoomPort:
             state_target=request.state_target,
             state_window_source=request.state_window_source,
             state_window_target=request.state_window_target,
+            state_overlays=tuple(
+                (str(source), str(target)) for source, target in request.state_overlays
+            ),
             state_ephemeral_paths=tuple(request.state_ephemeral_paths),
             entrypoint=request.entrypoint,
         )

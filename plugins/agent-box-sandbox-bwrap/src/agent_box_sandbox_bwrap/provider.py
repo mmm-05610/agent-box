@@ -211,6 +211,7 @@ def compile_remote_sidecar_bwrap_argv(
     executable_mounts: Sequence[tuple[str, str]] = (),
     projection_mounts: Sequence[tuple[str, str]] = (),
     writable_projection_mounts: Sequence[tuple[str, str]] = (),
+    state_overlay_mounts: Sequence[tuple[str, str]] = (),
     runtime_artifact_mounts: Sequence[tuple[str, str]] = (),
     ephemeral_state_mounts: Sequence[str] = (),
     entrypoint: str = "/runtime/view/agentbox-sidecar/runtime/worker-entry.mjs",
@@ -263,6 +264,23 @@ def compile_remote_sidecar_bwrap_argv(
         # durable directory on this machine - prepared and marker-verified by
         # the channel - and its being outside the view is the point.
         writable_targets.append(home_projection_target(target, kind=PROJECTION_DIRECTORY))
+    # Order 66's whole-db overlays: the family library's live files and
+    # directories are bound read-write *over* the state home at their own
+    # names. Each target must sit strictly inside a declared writable state
+    # target - the shared set can never reach outside the directory the
+    # deployment declared - and the depth ordering below makes each overlay
+    # win over the profile home's own copy of that name. bwrap creates a
+    # missing file or intermediate directory for the mount point itself, so
+    # a fresh profile home needs no placeholder files.
+    overlay_mounts: list[tuple[str, str]] = []
+    for source, target in state_overlay_mounts:
+        _validate_remote_path(source)
+        validated = home_projection_target(target, kind=PROJECTION_DIRECTORY)
+        if not any(validated.startswith(writable + "/") for writable in writable_targets):
+            raise ProjectionRejected(
+                "a state overlay target is not inside a declared writable state directory"
+            )
+        overlay_mounts.append((source, validated))
     ephemeral_targets: list[str] = []
     for target in ephemeral_state_mounts:
         validated = home_projection_target(target, kind=PROJECTION_DIRECTORY)
@@ -341,6 +359,8 @@ def compile_remote_sidecar_bwrap_argv(
     for source, target in runtime_artifact_mounts:
         entries.append((3, len(PurePosixPath(target).parts), "--ro-bind", source, target))
     for source, target in writable_projection_mounts:
+        entries.append((4, len(PurePosixPath(target).parts), "--bind", source, target))
+    for source, target in overlay_mounts:
         entries.append((4, len(PurePosixPath(target).parts), "--bind", source, target))
     if secret is not None:
         entries.append((5, len(PurePosixPath(secret_target).parts), "--ro-bind", secret, secret_target))
