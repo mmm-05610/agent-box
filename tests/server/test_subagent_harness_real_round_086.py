@@ -24,11 +24,12 @@ Two deliberate differences from the reviewed
 `claude-production-chain-gate.py` whose parts this reuses (that script is not
 touched - `scripts/**` is outside this order's write paths):
 
-  * `permissions.allow` carries the bridge tool in the projected settings file.
-    The ACP adapter routes every tool permission check through `canUseTool`
-    (acp-agent.js:6084), which asks the client `session/request_permission`, and
-    the Worker has no answer path for that method (order 086 §9 of the evidence
-    file). Without pre-approval the round stalls on a request nobody can answer.
+  * `permissions.allow` carries **both** bridge tools in the projected settings
+    file - `list_subagents` and `run_subagent`. The ACP adapter routes every
+    tool permission check through `canUseTool` (acp-agent.js:6084), which asks
+    the client `session/request_permission`, and the Worker has no answer path
+    for that method (order 086 §9 of the evidence file). Without pre-approval
+    the round stalls on a request nobody can answer.
   * `timeoutMs` stays at the family default. The Server bounds it at 1..120 000
     (`runtime.py:530`, `SIDECAR_DEPLOYMENT_INVALID` above that - measured here, first
     run), while a delegated child turn may wait up to
@@ -58,13 +59,18 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[2]
 GATE = REPO / "scripts" / "server-round1" / "claude-production-chain-gate.py"
+#: The Worker this round runs against is the one order 099 fixed (`home.put` on the
+#: dispatch line). The pre-fix bundle stays pinned by name in
+#: `test_worker_home_put_wire_099.py`, which is where the counter-example belongs -
+#: a default here would make the root suite red on purpose.
 WORKER = Path(os.environ.get("AGENTBOX_W43_WORKER") or
-              REPO / "workers" / "agent-box-worker" / ".acceptance-bundle-c11" / "agent-box-worker")
+              REPO / "workers" / "agent-box-worker" / ".acceptance-bundle-c12" / "agent-box-worker")
 #: An already-built runtime artifact may be handed over (the reviewed gate's
 #: `--artifact` mode); otherwise the reviewed builder runs.
 PREBUILT = os.environ.get("AGENTBOX_086_ARTIFACT")
 
 BRIDGE_TOOL = "mcp__agentbox-subagents__run_subagent"
+LIST_TOOL = "mcp__agentbox-subagents__list_subagents"
 CHILD_TASK_MARK = "086-REAL-ROUND-CHILD-DONE"
 PARENT_MARK = "086-REAL-ROUND-PARENT-SAW"
 
@@ -88,6 +94,7 @@ class DelegationEndpoint:
         self.token = token
         self.observed: list[dict] = []
         self.unauthorized = 0
+        self.delegations = 0
         self._lock = threading.Lock()
         endpoint = self
 
@@ -108,6 +115,7 @@ class DelegationEndpoint:
                 carried = _tool_result_text(body)
                 authorized = (self.headers.get("Authorization") == f"Bearer {endpoint.token}"
                               or self.headers.get("x-api-key") == endpoint.token)
+                payload, resolved = _scripted_reply(endpoint, names, carried)
                 with endpoint._lock:
                     observation = {
                         "index": len(endpoint.observed) + 1,
@@ -118,23 +126,15 @@ class DelegationEndpoint:
                                                if isinstance(name, str)
                                                and name.startswith("mcp__")),
                         "carriesToolResult": carried,
+                        "resolvedSubagent": resolved,
                         "messageCount": len(body.get("messages") or []),
+                        "historyToolCalls": _history_tool_calls(body),
+                        "toolResults": [{**item, "text": item["text"][:220]}
+                                        for item in _tool_results(body)],
                     }
                     endpoint.observed.append(observation)
                     if not authorized:
                         endpoint.unauthorized += 1
-                if not observation["advertisesBridgeTool"]:
-                    payload = _sse({"type": "text",
-                                    "text": f"{CHILD_TASK_MARK} from the subagent"})
-                elif carried is None:
-                    payload = _sse({"type": "tool_use", "id": "toolu_086_delegation",
-                                    "name": BRIDGE_TOOL, "input": {
-                                        "subagent": "beta",
-                                        "description": "answer the question",
-                                        "prompt": f"Reply with exactly {CHILD_TASK_MARK}.",
-                                    }})
-                else:
-                    payload = _sse({"type": "text", "text": f"{PARENT_MARK} {carried[:400]}"})
                 self.send_response(200)
                 self.send_header("Content-Type", "text/event-stream")
                 self.send_header("Cache-Control", "no-cache")
@@ -156,6 +156,58 @@ class DelegationEndpoint:
     def stop(self) -> None:
         self.server.shutdown()
         self.server.server_close()
+
+
+def _first_roster_name(carried: str) -> str | None:
+    """The first name out of the roster text the bridge handed back."""
+    try:
+        roster = json.loads(carried)
+    except ValueError:
+        roster = None
+    if isinstance(roster, dict):
+        roster = roster.get("subagents") or roster.get("roster") or [roster]
+    if isinstance(roster, list):
+        for entry in roster:
+            if isinstance(entry, dict) and isinstance(entry.get("name"), str):
+                return entry["name"]
+    marker = '"name"'
+    start = carried.find(marker)
+    if start < 0:
+        return None
+    colon = carried.find(":", start)
+    first = carried.find('"', colon)
+    second = carried.find('"', first + 1)
+    return carried[first + 1:second] if 0 <= first < second else None
+
+
+def _scripted_reply(endpoint: DelegationEndpoint, names: list, carried: str | None):
+    """The canned model turn, branching on the tool surface and the last result.
+
+    Nothing here knows the child Profile's name.  The second hop takes it out of
+    the roster the bridge itself returned, so the sequence under test is
+    discovery then delegation, which is what a real model is expected to do and
+    what a hard-coded name would have hidden (the first draft of this fixture
+    hard-coded "beta" and was refused by the authorization check - correctly).
+    """
+    if BRIDGE_TOOL not in names:
+        return _sse({"type": "text", "text": f"{CHILD_TASK_MARK} from the subagent"}), None
+    if carried is None:
+        return _sse({"type": "tool_use", "id": "toolu_086_roster",
+                     "name": LIST_TOOL, "input": {}}), None
+    if CHILD_TASK_MARK in carried:
+        return _sse({"type": "text", "text": f"{PARENT_MARK} {carried[:400]}"}), None
+    if endpoint.delegations >= 2:
+        # Bounded: a refusal that repeats must end the turn, not spin it.  The
+        # text deliberately lacks PARENT_MARK, so the gate fails on it.
+        return _sse({"type": "text", "text": f"DELEGATION LOOP {carried[:200]}"}), None
+    target = _first_roster_name(carried)
+    endpoint.delegations += 1
+    return _sse({"type": "tool_use", "id": f"toolu_086_delegation_{endpoint.delegations}",
+                 "name": BRIDGE_TOOL, "input": {
+                     "subagent": target,
+                     "description": "answer the question",
+                     "prompt": f"Reply with exactly {CHILD_TASK_MARK}.",
+                 }}), target
 
 
 def _sse(block: dict) -> bytes:
@@ -191,20 +243,52 @@ def _sse(block: dict) -> bytes:
     return payload
 
 
-def _tool_result_text(body: dict) -> str | None:
-    """The tool result the native process fed back, if this request carries one."""
-    for message in reversed(body.get("messages") or []):
+def _block_text(block: dict) -> str:
+    nested = block.get("content")
+    if isinstance(nested, list):
+        return " ".join(str(item.get("text") or "") for item in nested
+                        if isinstance(item, dict))
+    return str(nested if nested is not None else block.get("text") or "")
+
+
+def _tool_results(body: dict) -> list:
+    """Every tool result in the request, oldest first, with its message index.
+
+    The whole chain rather than the newest message's first block: a Claude turn
+    that called two tools appends both results into one user message, so the
+    first block keeps returning the roster even after the delegation already
+    answered. That cost the first c12 run its child summary and made the script
+    delegate a second time.
+    """
+    out = []
+    for position, message in enumerate(body.get("messages") or []):
         content = message.get("content")
         if not isinstance(content, list):
             continue
         for block in content:
             if isinstance(block, dict) and block.get("type") == "tool_result":
-                nested = block.get("content")
-                if isinstance(nested, list):
-                    return " ".join(str(item.get("text") or "") for item in nested
-                                    if isinstance(item, dict))
-                return str(nested if nested is not None else block.get("text") or "")
-    return None
+                out.append({"message": position, "isError": bool(block.get("isError")),
+                            "text": _block_text(block)})
+    return out
+
+
+def _tool_result_text(body: dict) -> str | None:
+    """The newest tool result the native process fed back."""
+    results = _tool_results(body)
+    return results[-1]["text"] if results else None
+
+
+def _history_tool_calls(body: dict) -> list:
+    """The tool calls the native process believes it already made."""
+    out = []
+    for message in body.get("messages") or []:
+        content = message.get("content")
+        if not isinstance(content, list):
+            continue
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "tool_use":
+                out.append(str(block.get("name")))
+    return out
 
 
 def _free_port() -> int:
@@ -289,7 +373,10 @@ def test_a_real_claude_parent_round_calls_run_subagent_itself(tmp_path):
         deployment.write_text(json.dumps(document), encoding="utf-8")
 
         settings = dict(production.loopback_settings_document(endpoint.base_url))
-        settings["permissions"] = {"allow": [BRIDGE_TOOL]}
+        # Both bridge tools are pre-approved on the SDK side: this build has no
+        # answering path for `session/request_permission` (086 §8), so a tool
+        # that needs a prompt would stall the round on a request nobody can serve.
+        settings["permissions"] = {"allow": [LIST_TOOL, BRIDGE_TOOL]}
         settings_bytes = json.dumps(settings, indent=2, sort_keys=True).encode() + b"\n"
 
         def deployment_file(root, relative):
@@ -374,11 +461,16 @@ def test_a_real_claude_parent_round_calls_run_subagent_itself(tmp_path):
             "childProfileId": profiles["beta"]})
 
         # ---- the real parent round. ----
+        # The prompt never names the child. The scripted model has to read the
+        # roster the bridge gives it and delegate to a name from that roster,
+        # because roster names are Profile names ("086 beta"), not the local
+        # keys this test uses - a hard-coded name was the first draft's bug.
         started = _wire(base_url, token, "sessions.createAndSend", {
             "requestId": "086-round-parent", "workspaceId": opened["id"],
             "profileId": profiles["alpha"], "overrides": [],
-            "message": {"text": "Use your run_subagent tool on beta, then tell me "
-                                "exactly what it answered.", "attachments": []}})
+            "message": {"text": "List the subagents you may delegate to, run one of "
+                                "them, then tell me exactly what it answered.",
+                        "attachments": []}})
         session_id = started["session"]["id"]
         session = _await_state(runtime, session_id, 0, "completed", timeout=900)
         parent_turn_id = session["turns"][0]["id"]
@@ -399,9 +491,17 @@ def test_a_real_claude_parent_round_calls_run_subagent_itself(tmp_path):
         with_result = [item for item in parent_requests if item["carriesToolResult"]]
         assert with_result, (
             "the CLI never fed a tool_result back: nothing executed the MCP call")
-        quoted = str(with_result[0]["carriesToolResult"])
-        assert CHILD_TASK_MARK in quoted, (
-            f"what the parent got back is not the child's summary: {quoted[:300]}")
+        carried = [str(item["carriesToolResult"]) for item in with_result]
+        assert any(CHILD_TASK_MARK in text for text in carried), (
+            "no tool_result the parent fed back carries the child's summary "
+            f"(the roster alone is not a delegation): {json.dumps(carried)[:600]}")
+        discovered = [item["resolvedSubagent"] for item in parent_requests
+                      if item.get("resolvedSubagent")]
+        assert discovered == ["086 beta"], (
+            "the delegation did not name the roster's own entry: "
+            f"{discovered!r} - roster names are Profile names, so a match here is "
+            "what proves the parent read the bridge's list rather than a fixture "
+            "constant")
 
         # --- G2: attribution - one real child turn under this parent turn. ---
         with runtime.database.read() as conn:
