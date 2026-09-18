@@ -81,7 +81,7 @@ peer 为 harness，**无模型调用**：
 | --- | --- |
 | **G1** 一轮写目录 | ✅ home 出现 harness 持久会话事实（桥快照 `.pi/pi/<b64 session id>.json`）；对象库**无**状态字节对象（逐 digest 对照）；审计 manifest（schema 3）记录文件与摘要；`nativePlatform=local`、`homeLocator` 落记录 |
 | **G2** 二轮靠 home 续接 | ✅ 同 Session 第二轮 `session/load` 重开（reopen-method.txt 记录 `session/new`→`session/load`）、真召回首轮 nonce、native id 稳定 |
-| **G3** 并行不丢 | 〔082：**pass**——当前基线两次复跑两轮均 `completed`，见文末注记〕⚠️→✅ 其时阻塞（产品层）：同 Profile 第二个并行 Session 被产品执行锁拒绝（`TURN_CONCURRENCY_CONFLICT`）——并行放行是产品语义变更（Profile run_state/native_generation 锁），按 §6 记账交裁决；裁决已落地（工单 67：唯一性单位=会话） |
+| **G3** 并行不丢 | 〔082：**pass**——本单于基线 `4c32992` 复跑，两轮均 `completed`；`460781c` 基线两次复跑形态一致，见文末注记〕⚠️→✅ 其时阻塞（产品层）：同 Profile 第二个并行 Session 被产品执行锁拒绝（`TURN_CONCURRENCY_CONFLICT`）——并行放行是产品语义变更（Profile run_state/native_generation 锁），按 §6 记账交裁决；裁决已落地（工单 67：唯一性单位=会话） |
 | **G4** 凭据与遮蔽 | ✅ 干净轮 audit fail-closed 扫描零命中（manifest `truncated` 全 0）；tmpfs/RO 规则由沙箱测试钉住；正向注入断言覆盖于 audit 单元反例 |
 | **G8** 取消后仍连续 | ✅ 同 Session 中途取消（stop_requested）后，召回轮同 native id 重开并回出存储 nonce；取消轮输入已写入 home journal（cancel-journal.txt）|
 
@@ -159,7 +159,7 @@ port 层第一手异常为 SidecarError: SIDECAR_OP_FAILED: Harness session not 
 
 1. ~~**G3 并行双轮**~~ 〔082：**已闭合**，不再计为未做项〕——其时被产品层 Profile 执行锁阻断
    （TURN_CONCURRENCY_CONFLICT）；放行属产品语义变更，需设计裁决。裁决已由工单 67 落地
-   （唯一性单位=会话），当前基线复跑两轮均 completed（提交 `460781c`）。
+   （唯一性单位=会话）；`460781c` 基线与其后本单基线 `4c32992` 的复跑，两轮均 completed。
 2. **G5 的 Windows r4/-PostCheck（c9）复跑**——无 Windows 实机（§4 第二条）。〔已由 §8 于 2026-09-17 补齐〕
 3. **G7 人手 UI 路径**——无前端 UI 会话（§4 第二条）。〔记**部分覆盖**，不记全过；见 §8 后追记〕
 4. ~~**G3 并行双轮**、G4 正向注入、G6 漂移的端到端断言~~ 〔082：G3 项已由 67 改为真并发断言并 pass；
@@ -258,6 +258,9 @@ G3 阻塞项按原口径复跑：
 - 整门终态 `NATIVE_HOME_GATE_OK`（`native-home-gate.json`：g3.result=pass）。
 - 逐家 home 并发结论表与 claude/dsh/qwen 的收窄锁见
   [per-session-admission-67.md](per-session-admission-67.md) §4。
+- 〔082 指路〕本补记所引 `native-home-gate.json` 与 `per-session-admission-67-native-home-gate.json`
+  都是 **67 当时基线**的记录；45 转 DONE 的**收口记录**（含本单基线 `4c32992` 的实跑、复跑命令与
+  证据摘要）见文末「082 收口注记」，两处结论一致。
 
 ## 补节（56 §4 一致性）：订阅登录态是受管凭据资产，不是原生状态
 
@@ -279,7 +282,7 @@ G3 阻塞项按原口径复跑：
 **`NATIVE_HOME_STORAGE_DONE`**。转换的唯一依据是下表的第一手复跑记录——正文各节写于 G3 仍被
 阻断之时，凡与之冲突处已就地标注「〔082：…〕」，不删原文（事实分级：正文=当时实测，本注记=当前基线实测）。
 
-- **待收口的门**：G3「并行不丢」是 45 唯一未过的门（其余 G1/G2/G4/G5/G6/G8 已第一手通过，
+- **待收口的门**：收口之时，G3「并行不丢」是 45 唯一未过的门（其余 G1/G2/G4/G5/G6/G8 已第一手通过，
   G7 记部分覆盖，见下）。
 - **转 pass 的记录**：提交 **`460781c`**（`460781cc1a424e917518d66c927b030b08fc6c28`，
   2026-09-18 15:33 +0800）——"67 re-verified at the current baseline: native-home gate OK on
