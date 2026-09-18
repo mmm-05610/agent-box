@@ -29,7 +29,7 @@ WORKER_ERROR = 8
 # persistent home operation family (home.prepare / home.list / home.get) that
 # the native-home storage model requires. Every mismatch is a loud handshake
 # failure in both directions, never a silent one-shot fallback.
-PROTOCOL_VERSION = 4
+PROTOCOL_VERSION = 5
 
 
 class WorkerError(RuntimeError):

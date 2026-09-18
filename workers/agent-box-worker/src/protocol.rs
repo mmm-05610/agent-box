@@ -36,7 +36,7 @@ pub const MAX_PAYLOAD: usize = 1024 * 1024;
 /// `VIEW_CHANGED`) is additive in exactly that sense; `view_error_envelope_tests`
 /// checks the envelope frame by frame, and the fail-closed rule is pinned by
 /// `tests/server/test_state_capture_error_boundary.py`.
-pub const PROTOCOL_VERSION: u32 = 4;
+pub const PROTOCOL_VERSION: u32 = 5;
 pub const MAX_RUNTIME_ARTIFACTS: usize = 8;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

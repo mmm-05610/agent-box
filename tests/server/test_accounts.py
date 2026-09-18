@@ -391,3 +391,57 @@ def test_the_accounts_wire_face_creates_imports_binds_lists(tmp_path):
             assert "error" in refused and refused["error"]["code"] == "INVALID_REQUEST"
     finally:
         runtime_module._sidecar_deployment_file = original_file
+
+
+def test_the_worker_channel_materialises_and_reads_the_working_copy():
+    """Order 56 on the Worker channel, against a recording client.
+
+    Materialisation is one bounded home.put per declared name (nothing else is
+    ever sent); the read-back asks for exactly the declared names and treats a
+    missing one as absent. The real op's bounds and link rules live in the
+    Worker's own tests; this locks the channel's wire usage.
+    """
+    import base64 as _base64
+
+    from agent_box.server.execution.sidecar import _WorkerChannels
+
+    class _Client:
+        def __init__(self, files):
+            self.calls = []
+            self.files = files
+
+        def request(self, op, arguments=None, timeout=None):
+            self.calls.append((op, dict(arguments or {})))
+            if op == "home.put":
+                self.files[arguments["path"]] = _base64.b64decode(arguments["data"])
+                return {"bytes": len(self.files[arguments["path"]])}
+            if op == "home.get":
+                payload = self.files.get(arguments["path"])
+                if payload is None:
+                    raise KeyError(arguments["path"])
+                return {"data": _base64.b64encode(payload).decode(), "eof": True}
+            raise AssertionError(f"unexpected op {op}")
+
+    declared = (".codex/auth.json", ".codex/oauth.json")
+    asset = {".codex/auth.json": b'{"tokens": "materialised"}'}
+    client = _Client({})
+    channels = _WorkerChannels(client, "attempt_1", 1, "view_1",
+                               home_locator="role/.codex", subscription_files=declared)
+    # The channel reads back only what exists; the asset's other name is absent.
+    client.files[".codex/auth.json"] = b'{"tokens": "refreshed"}'
+    assert channels.read_subscription() == {".codex/auth.json": b'{"tokens": "refreshed"}'}
+
+    # Materialisation: exactly one home.put per name the asset carries, and
+    # nothing for a declared name the asset does not hold.
+    from agent_box.server.execution.sidecar import materialize_subscription
+
+    client.calls.clear()
+    written = materialize_subscription(
+        client, locator="role/.codex", declared=declared, asset=asset)
+    assert written == [".codex/auth.json"]
+    ops = [op for op, _args in client.calls]
+    assert ops == ["home.put"], client.calls
+    op, arguments = client.calls[0]
+    assert arguments["locator"] == "role/.codex"
+    assert arguments["path"] == ".codex/auth.json"
+    assert _base64.b64decode(arguments["data"]) == asset[".codex/auth.json"]

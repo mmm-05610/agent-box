@@ -65,3 +65,18 @@
 - **门 G1–G6 的独立脚本**（当前以测试级反例覆盖 G1 存储/G3 回收/G5 零泄漏；
   G2/G4 的"真登录→换号下一轮生效"需真机登录轮，不假装已跑）；
 - **45 文档补节**（§4 要求：订阅登录态=受管凭据资产，不属原生状态）。
+
+## Worker 侧物化落地（2026-09-18，第二腿）
+
+- **Worker 新操作 `home.put`**（role 相对路径，与 `home.list`/`home.get` 同规）：有界
+  （≤256 KiB/文件）、父级在 role 内创建（逐级 canonicalize 校验）、叶子 `O_NOFOLLOW`
+  且 0600、已存在必须是常规文件（链接一律类型化拒绝）；空载荷/超大类型化拒绝。
+- **协议版本 4→5**（Rust `protocol::PROTOCOL_VERSION` 与 Python client 的常量同步递增；
+  Rust 侧"同号"钉测随之更新）——新操作随协议版本走，client 的等值校验不会静默放行旧 Worker。
+- **通道接线**：`materialize_subscription()`（可直测：一次 `home.put`/携带的声明名，别的什么都不发）；
+  `_WorkerChannels.read_subscription()`（按声明名逐个 `home.get`，缺名=缺席，单名失败不掩其余）；
+  本机通道同前。
+- **回归**：Worker 单测 **42 passed**（新增 home.put 的 round-trip/越界/符号链接/逃逸反例）；
+  Python 全量 **811 passed**；c11 bundle 重建（`sha256:c1e353c8…`，manifest 同步）。
+- **仍缺**：真机登录轮（claude/pi/qwen/hermes 的确切文件路径要靠一次真实登录把文件钉死后再声明）、
+  前端 P12 同步与两仓重锁、G2/G4 的"登录→换号下一轮生效"实跑。

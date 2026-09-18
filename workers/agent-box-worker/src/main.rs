@@ -32,6 +32,10 @@ const MAX_ARTIFACT_BYTES: usize = 64 * 1024 * 1024;
 /// dangling links cannot be walked without limit.
 const MAX_VIEW_TRAVERSAL_ENTRIES: usize = 4096;
 const MAX_FETCH_BYTES: usize = 32 * 1024;
+/// Order 56: one subscription working-copy file the control plane may write
+/// into a home. The asset module's per-file cap, restated where it is
+/// enforced (the Worker is the only actor with the remote filesystem).
+const MAX_HOME_PUT_BYTES: usize = 256 * 1024;
 const MAX_SECRET_BYTES: usize = 1024 * 1024;
 const MAX_WORKSPACE_FILE_BYTES: usize = 8 * 1024 * 1024;
 const MAX_STDIN_BYTES: usize = 4 * 1024;
@@ -2146,6 +2150,60 @@ fn handle_home(
             }
             Ok(json!({"path": dir, "created": created, "markerState": marker_state}))
         }
+        "home.put" => {
+            // Order 56: materialise one declared subscription working-copy
+            // file. Bounded, link-free (O_NOFOLLOW on the leaf), parents
+            // created inside the role directory, 0600 - a login state is
+            // credential material even though it is not the injected secret.
+            ensure_inside_home_root(home_root, &role_dir)?;
+            if !role_dir.is_dir() {
+                return Err(("HOME_NOT_FOUND", "home does not exist"));
+            }
+            let relative = safe_relative(value_string(args, "path")?)?;
+            let data = value_string(args, "data")?;
+            let payload = BASE64
+                .decode(data.as_bytes())
+                .map_err(|_| ("PATH_INVALID", "home.put data is not base64"))?;
+            if payload.is_empty() || payload.len() > MAX_HOME_PUT_BYTES {
+                return Err(("HOME_IO", "home.put payload is empty or oversized"));
+            }
+            let target = role_dir.join(&relative);
+            if let Some(parent) = target.parent() {
+                fs::create_dir_all(parent)
+                    .map_err(|_| ("HOME_IO", "home.put directory creation failed"))?;
+                ensure_inside_home_root(home_root, parent)?;
+            }
+            match fs::symlink_metadata(&target) {
+                Ok(info) => {
+                    if !info.is_file() {
+                        return Err((
+                            "PATH_INVALID",
+                            "home.put target is not a regular file",
+                        ));
+                    }
+                }
+                Err(_) => {}
+            }
+            let handle = fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .mode(0o600)
+                .custom_flags(libc::O_NOFOLLOW)
+                .open(&target)
+                .map_err(|_| ("HOME_IO", "home.put write failed"))?;
+            {
+                use std::io::Write as _;
+                let mut writer = io::BufWriter::new(handle);
+                writer
+                    .write_all(&payload)
+                    .map_err(|_| ("HOME_IO", "home.put write failed"))?;
+                writer
+                    .flush()
+                    .map_err(|_| ("HOME_IO", "home.put write failed"))?;
+            }
+            Ok(json!({"path": value_string(args, "path")?, "bytes": payload.len()}))
+        }
         "home.list" | "home.get" => {
             ensure_inside_home_root(home_root, &role_dir)?;
             let dir_fd =
@@ -2740,7 +2798,7 @@ mod view_error_envelope_tests {
     async fn the_worker_still_answers_at_the_control_protocol_version_it_announces() {
         // The client compares this number on handshake, so it is checked against
         // the constant the same frame encoder uses rather than a literal here.
-        assert_eq!(protocol::PROTOCOL_VERSION, 4);
+        assert_eq!(protocol::PROTOCOL_VERSION, 5);
         let mut buffer = Vec::new();
         write_error(&mut buffer, 4, "VIEW_CHANGED", "a view refusal")
             .await
@@ -2990,6 +3048,79 @@ mod home_tests {
         )
         .unwrap_err();
         assert_eq!(refused.0, "HOME_LOCATOR_INVALID");
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn home_put_writes_one_bounded_link_free_file_and_refuses_escapes() {
+        // Order 56: the subscription working copy is written through this op.
+        let root = scratch("home-put");
+        let marker = marker();
+        handle_home(&root, "home.prepare", &json!({"locator": "role/.codex", "marker": marker}))
+            .unwrap();
+        let payload = BASE64.encode(b"{\"tokens\": \"x\"}");
+        let written = handle_home(
+            &root,
+            "home.put",
+            &json!({"locator": "role/.codex", "path": "auth.json", "data": payload}),
+        )
+        .unwrap();
+        assert_eq!(written["bytes"], 15);
+        let role = root.join("role");
+        // Home-op paths are role-relative (the same rule home.list/home.get
+        // follow), so the declared name's first segment is the role itself.
+        let file = role.join("auth.json");
+        assert!(file.is_file());
+        assert_eq!(fs::symlink_metadata(&file).unwrap().permissions().mode() & 0o777, 0o600);
+        // Round trip through the ordinary read op.
+        let read = handle_home(
+            &root,
+            "home.get",
+            &json!({"locator": "role/.codex", "path": "auth.json"}),
+        )
+        .unwrap();
+        assert_eq!(read["data"], payload);
+
+        // A nested declared path creates its parents inside the role directory.
+        let nested = BASE64.encode(b"nested");
+        handle_home(
+            &root,
+            "home.put",
+            &json!({"locator": "role/.codex", "path": ".local/share/kilo/auth.json",
+                    "data": nested}),
+        )
+        .unwrap();
+        assert!(role.join(".local/share/kilo/auth.json").is_file());
+
+        // Oversized and empty payloads are typed refusals.
+        let oversized = BASE64.encode(vec![b'x'; MAX_HOME_PUT_BYTES + 1]);
+        let refused = handle_home(
+            &root,
+            "home.put",
+            &json!({"locator": "role/.codex", "path": "auth.json", "data": oversized}),
+        )
+        .unwrap_err();
+        assert_eq!(refused.0, "HOME_IO");
+
+        // A link at the leaf is refused, never followed.
+        std::fs::remove_file(&file).unwrap();
+        std::os::unix::fs::symlink("/etc/hostname", &file).unwrap();
+        let refused = handle_home(
+            &root,
+            "home.put",
+            &json!({"locator": "role/.codex", "path": "auth.json", "data": payload}),
+        )
+        .unwrap_err();
+        assert_eq!(refused.0, "PATH_INVALID");
+
+        // An escaping path is refused before anything is written.
+        let refused = handle_home(
+            &root,
+            "home.put",
+            &json!({"locator": "role/.codex", "path": "../escape.json", "data": payload}),
+        )
+        .unwrap_err();
+        assert_eq!(refused.0, "PATH_INVALID");
         let _ = fs::remove_dir_all(&root);
     }
 

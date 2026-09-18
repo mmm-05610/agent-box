@@ -249,9 +249,20 @@ def test_a_real_worker_symlink_escape_is_refused(worker, tmp_path):
     assert refused.value.code == "HOME_OUTSIDE_ROOT"
 
 
-def test_the_control_protocol_is_named_in_the_worker_source():
+def test_the_control_protocol_is_named_in_both_sources():
+    """The Rust constant and the Python client constant must agree.
+
+    The literal is deliberately not pinned here: the invariant is that the two
+    sides move together (the client refuses a mismatch at handshake), so a
+    one-sided bump fails this test instead of shipping.
+    """
+    from agent_box_runtime_wsl.client import PROTOCOL_VERSION as CLIENT_VERSION
+
     protocol_source = (
         REPO_ROOT / "workers" / "agent-box-worker" / "src" / "protocol.rs"
     ).read_text(encoding="utf-8")
     match = re.search(r"PROTOCOL_VERSION: u32 = (\d+)", protocol_source)
-    assert match and match.group(1) == "4"
+    assert match, "the Worker source must name its control protocol version"
+    assert match.group(1) == str(CLIENT_VERSION), (
+        f"Worker protocol {match.group(1)} != client protocol {CLIENT_VERSION}"
+    )

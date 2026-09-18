@@ -348,13 +348,6 @@ class WorkerSidecarLauncher:
             SandboxPortUnavailable, SidecarRoomRequest,
         )
 
-        if self.subscription_files:
-            raise SidecarError(
-                "SUBSCRIPTION_MATERIALIZE_UNSUPPORTED",
-                "this channel cannot write the subscription working copy into "
-                "the home yet (Worker home-write op pending); the turn is "
-                "refused rather than run without its login state",
-            )
         if self.sandbox_port is None:
             raise SidecarError(
                 "SANDBOX_PORT_UNAVAILABLE",
@@ -435,6 +428,15 @@ class WorkerSidecarLauncher:
                                "nativeHome": self.native_home},
                     **({"window": self.audit_window} if self.audit_window else {}),
                 })["path"]
+                if self.subscription_files:
+                    # Order 56: the working copy is written through home.put
+                    # (role-relative, like every home op) before the room
+                    # exists; only the declared names, only this turn's asset.
+                    materialize_subscription(
+                        client, locator=self.home_locator,
+                        declared=self.subscription_files,
+                        asset=self.subscription_asset,
+                    )
                 if self.session_store_harness:
                     # §14: the declared state target is the session subtree, and
                     # its host side is the per-harness library (no profile
@@ -526,6 +528,7 @@ class WorkerSidecarLauncher:
                 forbidden_content=(credential_material or b"").strip(),
                 usage_probe=self.usage_probe,
                 workspace_before_snapshot=before_snapshot,
+                subscription_files=self.subscription_files,
             )
             channels.subscribe()
             client.request(
@@ -556,6 +559,28 @@ class WorkerSidecarLauncher:
 WslSidecarLauncher = WorkerSidecarLauncher
 
 
+def materialize_subscription(
+    client, *, locator: str, declared: Sequence[str], asset: Mapping[str, bytes],
+) -> list[str]:
+    """Write this turn's subscription working copy through `home.put`.
+
+    One bounded call per declared name the asset actually carries; nothing
+    else is ever sent, and a name the asset does not hold is left alone (the
+    Harness may create it, and the reclaim decides what that means).
+    """
+    written: list[str] = []
+    for name in declared:
+        payload = asset.get(name)
+        if payload is None:
+            continue
+        client.request("home.put", {
+            "locator": locator, "path": name,
+            "data": base64.b64encode(payload).decode("ascii"),
+        }, timeout=30.0)
+        written.append(name)
+    return written
+
+
 class _WorkerChannels:
     def __init__(
         self, client, attempt_id: str, generation: int, view_id: str,
@@ -567,6 +592,7 @@ class _WorkerChannels:
         protected_state_paths: Sequence[str] = (),
         state_ephemeral_paths: Sequence[str] = (),
         forbidden_content: bytes = b"",
+        subscription_files: Sequence[str] = (),
     ) -> None:
         self.client = client
         self.attempt_id = attempt_id
@@ -593,6 +619,8 @@ class _WorkerChannels:
         self.protected_state_paths = frozenset(protected_state_paths)
         self.state_ephemeral_paths = tuple(state_ephemeral_paths)
         self._forbidden_content = forbidden_content
+        #: Order 56's declared working-copy names, read back for the reclaim.
+        self._subscription_files = tuple(subscription_files)
         self._chunks: queue.Queue = queue.Queue()
         self._unsubscribe = None
         self._disconnect_unsubscribe = None
@@ -804,6 +832,38 @@ class _WorkerChannels:
                 except (SidecarError, KeyError):
                     sidecars.pop(suffix_name, None)
         return parse_usage(usage_format, content, sidecars=sidecars or None)
+
+    def read_subscription(self) -> dict[str, bytes]:
+        """Read the declared subscription working files back (order 56).
+
+        Role-relative, like every home op: the declared name is the path.
+        A missing file is simply absent; one unreadable name does not hide the
+        others, and the reclaim treats the result as "no working copy".
+        """
+        files: dict[str, bytes] = {}
+        for name in self._subscription_files:
+            chunks = bytearray()
+            try:
+                while True:
+                    item = self.client.request("home.get", {
+                        "locator": self.home_locator, "path": name,
+                        "offset": len(chunks), "maxLength": 32 * 1024,
+                    })
+                    if not isinstance(item.get("data"), str):
+                        raise SidecarError("SIDECAR_STATE_INVALID", "home fetch data is invalid")
+                    chunks.extend(base64.b64decode(item["data"], validate=True))
+                    if item.get("eof") is True:
+                        break
+                    if len(chunks) > 512 * 1024:
+                        raise SidecarError(
+                            "SIDECAR_STATE_OUTSIDE_BOUNDS",
+                            "subscription file exceeds the read bound",
+                        )
+            except (SidecarError, KeyError, ValueError):
+                continue
+            if chunks:
+                files[name] = bytes(chunks)
+        return files
 
     def workspace_change_set(self) -> dict[str, Any] | None:
         """Order 54: diff the workspace against the launcher's before-snapshot.
