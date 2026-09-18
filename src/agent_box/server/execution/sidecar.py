@@ -757,24 +757,41 @@ class _WorkerChannels:
             return None
         path = max(candidates)  # journal names carry the newest timestamp last
         full = f"{self.audit_window}/{path}" if self.audit_window else path
-        chunks = bytearray()
-        while True:
-            item = self.client.request("home.get", {
-                "locator": self.home_locator, "path": full,
-                # The Worker's own fetch bound is 32 KiB per response; asking
-                # for more is a typed range refusal, not a shorter answer.
-                "offset": len(chunks), "maxLength": 32 * 1024,
-            })
-            if not isinstance(item.get("data"), str):
-                raise SidecarError("SIDECAR_STATE_INVALID", "home fetch data is invalid")
-            chunks.extend(base64.b64decode(item["data"], validate=True))
-            if item.get("eof") is True:
-                break
-            if len(chunks) > 4 * 1024 * 1024:
-                raise SidecarError(
-                    "SIDECAR_STATE_OUTSIDE_BOUNDS", "usage journal exceeds the read bound",
-                )
-        return parse_usage(usage_format, bytes(chunks))
+        def fetch(relative_path: str) -> bytes | None:
+            chunks = bytearray()
+            while True:
+                item = self.client.request("home.get", {
+                    "locator": self.home_locator, "path": relative_path,
+                    # The Worker's own fetch bound is 32 KiB per response; asking
+                    # for more is a typed range refusal, not a shorter answer.
+                    "offset": len(chunks), "maxLength": 32 * 1024,
+                })
+                if not isinstance(item.get("data"), str):
+                    raise SidecarError("SIDECAR_STATE_INVALID", "home fetch data is invalid")
+                chunks.extend(base64.b64decode(item["data"], validate=True))
+                if item.get("eof") is True:
+                    break
+                if len(chunks) > 4 * 1024 * 1024:
+                    raise SidecarError(
+                        "SIDECAR_STATE_OUTSIDE_BOUNDS", "usage journal exceeds the read bound",
+                    )
+            return bytes(chunks)
+
+        content = fetch(full)
+        # A live SQLite carrier keeps recently committed rows in its -wal
+        # sidecar; fetching only the main file would read a stale database and
+        # report "no usage" for a family that did report it.
+        listed = {str(entry.get("path", "")) for entry in listing.get("files", ())}
+        sidecars: dict[str, bytes] = {}
+        for suffix_name in ("-wal", "-shm"):
+            relative = f"{path}{suffix_name}"
+            if relative in listed:
+                full_sidecar = f"{self.audit_window}/{relative}" if self.audit_window else relative
+                try:
+                    sidecars[suffix_name] = fetch(full_sidecar)
+                except (SidecarError, KeyError):
+                    sidecars.pop(suffix_name, None)
+        return parse_usage(usage_format, content, sidecars=sidecars or None)
 
     def workspace_change_set(self) -> dict[str, Any] | None:
         """Order 54: diff the workspace against the launcher's before-snapshot.

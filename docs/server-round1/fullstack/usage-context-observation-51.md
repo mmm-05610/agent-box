@@ -83,3 +83,29 @@ bytes=None、kilo 列子集）；全量 **784 passed / 0 failed**（loopback pro
 
 **51 剩余（不变）**：hermes/claude 的门级观测轮（43 代门 marker 维护债）、
 dsh/qwen 仍无本地样本。
+
+## 阶段 C 增量（2026-09-18）：hermes/claude 门级观测轮 + WAL 侧车根因
+
+**门级观测轮（真 bwrap + c11 worker `sha256:aa65e919…`，假端点，零真实模型调用）**：
+
+| 家 | 轮 | 账本用量（in/out/total/source）| 备注 |
+| --- | --- | --- | --- |
+| hermes | 轮1 | (11, 7, None, `hermes-state-db`) | total 缺失=该家只报 input/output（诚实 NULL，非 0） |
+| hermes | 轮2 | (22, 14, None, `hermes-state-db`) | 与 `sessions` 表最新行逐字段一致 |
+| claude | 轮2 | (11, 7, None, `claude-projects-line`) | 三轮中一轮有 journal；无 journal 的轮保持 NULL |
+| claude | 轮1/轮3 | (None, …, None) | 捕获时该轮 journal 未落盘 ⇒ 未知（不猜） |
+
+两家的 `usage_source` 均等于部署声明的探针格式 ⇒ **逐家解析器在真实家族链路上端到端成立**。
+
+**根因（第一手，本轮定位并修复）**：hermes 首跑全 NULL——现场库里 `sessions` 最新行
+明明白白 (22,14)，但探针只取主文件 `state.db`，而该行**只在 `-wal` 侧车里**
+（现场 `-wal` 1,034,152 字节）；解析器对"只有主文件"的字节如实返回 None。修复：
+`read_usage`（Worker 与本机两条通道）在清单里发现 `<journal>-wal`/`-shm` 时**一并取回**，
+解析器把侧车写到临时主文件旁再打开（`usage.py` 的 `write_scratch_sqlite`）；
+`parse_usage` 只对 SQLite 类格式转送侧车。回归测试：
+`test_a_wal_resident_row_is_read_with_its_sidecar`（主文件单读=陈旧 None，带侧车= (22,14)）。
+
+**51 收口的剩余（不变为"未知"，不写成通过）**：`dsh`/`qwen` 的模板未声明 `usageProbe`
+（门的 sessions 表形态未采样本，解析器与格式名已有但未启用）；`kilo`/`opencode` 的
+`kilo-state-db`/`opencode-state-db` 解析器已就绪、模板亦未声明探针（其库为 whole-db 共享库，
+启用时探针会读公共库——与 66 的只读守卫同规）。

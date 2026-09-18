@@ -601,7 +601,20 @@ class _LocalChannels:
             content, _digest = self.home.read(path)
         except (LocalChannelError, StateCaptureError, OSError):
             return None
-        return parse_usage(usage_format, content)
+        # A live SQLite carrier keeps recently committed rows in its -wal
+        # sidecar; without it the parse reads a stale database and reports
+        # "no usage" for a family that did report it.
+        listed = {str(entry.get("path", "")) for entry in files}
+        sidecars: dict[str, bytes] = {}
+        for suffix_name in ("-wal", "-shm"):
+            relative = f"{path}{suffix_name}"
+            if relative in listed:
+                try:
+                    payload, _sidecar_digest = self.home.read(relative)
+                except (LocalChannelError, StateCaptureError, OSError):
+                    continue
+                sidecars[suffix_name] = payload
+        return parse_usage(usage_format, content, sidecars=sidecars or None)
 
     # -- diagnostics -------------------------------------------------------
     def stderr_tail(self, maximum: int = 2000) -> str:

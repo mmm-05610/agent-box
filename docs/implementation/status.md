@@ -635,7 +635,7 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 
 | 单 | 已落地 | 剩余 |
 | --- | --- | --- |
-| 51 | USAGE_FACT_PARTIAL：pi/codex 端到端含 wire（11/7/18→22/14/36 累计）、四家解析器就绪经真实数据验证、schema 7 usage 列 | hermes/claude 观测轮（门 marker 维护债）、dsh/qwen 无本地样本（opencode/kilo 解析器已落地） |
+| 51 | USAGE_FACT_DONE：pi/codex/hermes/claude 门级观测轮全部产出事实（hermes (11,7)/(22,14)、claude (11,7)，source=声明格式）；WAL 侧车根因修复；六家解析器就绪 | kilo/opencode/dsh/qwen 模板未声明 usageProbe（解析器已备，未启用；kilo/opencode 启用时读共享库，走 66 只读规则） |
 | 52 | B/D+E 完成：thought/plan/mode 三新 wire kind + 四类映射入账本 + process-facts 端到端 | 真 harness 观测轮（假 peer 已定向验证，真 harness 轮待跑） |
 | 66 | SHARED_SESSION_STORE_PARTIAL：A/B/C 落地、G1–G5（G5 夹具级）、43 代门 marker 债解除 | dc65731 + e394f09 |
 | 53 | USAGE_AGGREGATION_DONE：聚合模块 + usage.aggregate/export wire 方法 + 未知即未知反例 | hermes/claude 观测轮（opencode/kilo 解析器已落地，聚合面可直接消费其 fact） |

@@ -403,3 +403,40 @@ def test_pull_models_rejects_oversized_and_shapeless_responses():
         assert shapeless.value.code == "PROBE_FORMAT_INVALID"
     finally:
         probe_module._open_request = original
+
+
+def test_a_wal_resident_row_is_read_with_its_sidecar(tmp_path):
+    """The hermes observation round's root cause, as a regression test.
+
+    A live SQLite journal keeps committed rows in its -wal sidecar. Handing
+    the parser only the main file reads a stale database (the observation
+    round's NULL); handing the -wal beside it reads the row the writer
+    committed."""
+    import sqlite3
+
+    from agent_box.server.execution.usage import parse_hermes_state_db, parse_usage
+
+    db = tmp_path / "state.db"
+    writer = sqlite3.connect(db)
+    writer.execute("PRAGMA journal_mode=WAL")
+    writer.execute(
+        "CREATE TABLE sessions (id TEXT PRIMARY KEY, input_tokens INTEGER, "
+        "output_tokens INTEGER)"
+    )
+    writer.commit()
+    reader = sqlite3.connect(db)
+    reader.execute("BEGIN")
+    assert reader.execute("SELECT COUNT(*) FROM sessions").fetchone()[0] == 0
+    writer.execute("INSERT INTO sessions VALUES ('s1', 22, 14)")
+    writer.commit()
+    writer.close()
+    main = db.read_bytes()
+    wal = (tmp_path / "state.db-wal").read_bytes()
+    assert parse_hermes_state_db(main) is None, "the main file alone is stale"
+    assert parse_hermes_state_db(main, sidecars={"-wal": wal}) == {
+        "inputTokens": 22, "outputTokens": 14,
+    }
+    assert parse_usage("hermes-state-db", main, sidecars={"-wal": wal}) == {
+        "inputTokens": 22, "outputTokens": 14,
+    }
+    reader.close()

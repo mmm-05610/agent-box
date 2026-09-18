@@ -152,40 +152,64 @@ def parse_claude_projects_line(content: bytes) -> dict[str, Any] | None:
     return fact
 
 
-@contextmanager
-def _scratch_sqlite(content: bytes):
-    """Open fetched bytes as a read-only scratch database, or yield None.
+def write_scratch_sqlite(content: bytes, sidecars=None) -> "object":
+    """Spool fetched bytes (and any -wal/-shm sidecars) under a unique name.
 
-    The three SQLite-backed families (hermes, opencode, kilo) all parse
-    through here: bytes are spooled under a unique scratch name, opened with
-    ``mode=ro`` (never the live store), and unlinked afterwards.
+    A live SQLite store keeps recently committed rows in its ``-wal`` sidecar;
+    a fetch that takes only the main file silently loses them. Callers that
+    can see the sidecar in their listing fetch it too and hand the bytes here,
+    where they are written *next to* the scratch main file so the open sees
+    the same database the writer had.
     """
     import os
-    import sqlite3
     import tempfile
     import uuid
     from pathlib import Path
 
     scratch = (Path(tempfile.gettempdir())
                / f"agentbox-usage-{os.getpid()}-{uuid.uuid4().hex}.db")
-    connection = None
+    scratch.write_bytes(content)
+    for suffix in ("-wal", "-shm"):
+        payload = (sidecars or {}).get(suffix)
+        if payload:
+            scratch.with_name(scratch.name + suffix).write_bytes(payload)
+    return scratch
+
+
+@contextmanager
+def _scratch_sqlite(content: bytes, sidecars=None):
+    """Open fetched bytes as a read-only scratch database, or yield None.
+
+    The three SQLite-backed families (hermes, opencode, kilo) all parse
+    through here: bytes are spooled under a unique scratch name, opened with
+    ``mode=ro`` (never the live store), and unlinked afterwards.
+    """
+    import sqlite3
+
     try:
-        scratch.write_bytes(content)
-        connection = sqlite3.connect(f"file:{scratch}?mode=ro", uri=True)
-    except (OSError, sqlite3.Error):
-        connection = None
+        scratch = write_scratch_sqlite(content, sidecars)
+    except OSError:
+        scratch = None
+    connection = None
+    if scratch is not None:
+        try:
+            connection = sqlite3.connect(f"file:{scratch}?mode=ro", uri=True)
+        except sqlite3.Error:
+            connection = None
     try:
         yield connection
     finally:
         if connection is not None:
             connection.close()
-        try:
-            scratch.unlink()
-        except OSError:
-            pass
+        if scratch is not None:
+            for suffix in ("", "-wal", "-shm"):
+                try:
+                    scratch.with_name(scratch.name + suffix).unlink()
+                except OSError:
+                    pass
 
 
-def parse_hermes_state_db(content: bytes) -> dict[str, Any] | None:
+def parse_hermes_state_db(content: bytes, *, sidecars=None) -> dict[str, Any] | None:
     """The Hermes session database (SQLite) opened from the fetched bytes.
 
     ``sessions`` carries the family's own per-session counters
@@ -196,7 +220,7 @@ def parse_hermes_state_db(content: bytes) -> dict[str, Any] | None:
     """
     import sqlite3
 
-    with _scratch_sqlite(content) as connection:
+    with _scratch_sqlite(content, sidecars) as connection:
         if connection is None:
             return None
         try:
@@ -239,7 +263,7 @@ def _tokens_blob(tokens: Any) -> dict[str, int] | None:
     )
 
 
-def parse_opencode_db(content: bytes) -> dict[str, Any] | None:
+def parse_opencode_db(content: bytes, *, sidecars=None) -> dict[str, Any] | None:
     """The opencode state database (SQLite) opened from the fetched bytes.
 
     Assistant rows of ``message`` carry the family's own per-call ``tokens``
@@ -249,7 +273,7 @@ def parse_opencode_db(content: bytes) -> dict[str, Any] | None:
     """
     import sqlite3
 
-    with _scratch_sqlite(content) as connection:
+    with _scratch_sqlite(content, sidecars) as connection:
         if connection is None:
             return None
         try:
@@ -270,7 +294,7 @@ def parse_opencode_db(content: bytes) -> dict[str, Any] | None:
     return fact
 
 
-def parse_kilo_db(content: bytes) -> dict[str, Any] | None:
+def parse_kilo_db(content: bytes, *, sidecars=None) -> dict[str, Any] | None:
     """The kilo state database (SQLite) opened from the fetched bytes.
 
     ``session`` carries the family's own per-session totals in dedicated
@@ -288,7 +312,7 @@ def parse_kilo_db(content: bytes) -> dict[str, Any] | None:
         ("tokens_cache_read", "cache_read_tokens"),
         ("tokens_cache_write", "cache_write_tokens"),
     )
-    with _scratch_sqlite(content) as connection:
+    with _scratch_sqlite(content, sidecars) as connection:
         if connection is None:
             return None
         try:
@@ -321,13 +345,22 @@ FORMATS = {
 }
 
 
-def parse_usage(usage_format: str, content: bytes) -> dict[str, int] | None:
+#: The parsers whose carrier is a live SQLite database: their sidecars must
+#: travel with the main file or WAL-resident rows are invisible.
+SQLITE_FORMATS = frozenset({"hermes-state-db", "opencode-state-db", "kilo-state-db"})
+
+
+def parse_usage(
+    usage_format: str, content: bytes, *, sidecars=None,
+) -> dict[str, int] | None:
     parser = FORMATS.get(usage_format)
     if parser is None:
         raise UsageParseError(
             "USAGE_FORMAT_UNREGISTERED",
             f"no parser is registered for usage format {usage_format!r}",
         )
+    if usage_format in SQLITE_FORMATS:
+        return parser(content, sidecars=sidecars)
     return parser(content)
 
 
