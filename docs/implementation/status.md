@@ -921,6 +921,7 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 | 单 | 阶段 | 门 | 回归 | 真实模型 | 提交 |
 | --- | --- | --- | --- | --- | --- |
 | 086 | 1 选家并核对工具播发 | 本阶段的门 = **读路径一手钉死 + 发散即失败**：claude CLI 的 `tools` 数组里，探针工具**只在** `.claude.json` 与 `.mcp.json` 声明时出现，**在 `settings.json`（= 65/58 的渲染落点）声明时缺席**；空白对照三文件皆无 ⇒ 断言空。生产形态组装门：有出向授予 ⇒ 桥条目**真的落进** `.claude.json` 且轮次 `completed`；无授予（反例）⇒ 角色目录里**没有** `.claude.json`；只读投影 `settings.json` 存在且**不含**桥条目 | 本单新增 **9** 条（`-k mcp_config_source` 5 / `-k subagent` 面内新 4）；Validation `python3 -m pytest -q tests/server -k subagent` → **8 passed / 633 deselected**（= 本单 4 ＋ 65 既有 4）；根套件 **941 passed / 0 failed / 0 error**（356 s，= 085 的 932 ＋ 本单 9，**零退化**） | **0 次 / ¥0** | 本提交（阶段 1） |
+| 086 | 2 真 harness 父轮一轮 | **未过——被一条真缺陷挡住，已开 099 处理**。跑出来的部分（全一手）：真 Server 起 uvicorn 真监听 → 两个 Profile → **播种轮 completed 且没有任何一次请求播发桥工具**（"条目不是恒常存在"的反例成立）→ 授予 → 父轮**失败** `EXECUTION_FAILED`，根因 `WorkerError: operation is unsupported`（`sidecar.py:593` 发 `home.put`）| 本阶段新增 1 条真实链路用例（`tests/server/test_subagent_harness_real_round_086.py`；无 Worker 二进制或无 bwrap 时**跳过**，故根套件计数不变 **941**） | **0 次 / ¥0**（假端点只在 loopback，凭据是 gate 的假令牌） | 本提交（登记）＋ 099 |
 
 - **本阶段跑出来的不是"绿了一圈"，是一条真缺陷**：65 把桥渲染进 claude 的 `mcp_target =
   `/runtime/home/.claude/settings.json`，而**该家根本不从这个文件读 MCP 服务器** ⇒ 条落进没人读的文件；
@@ -962,3 +963,24 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   `authorized` 字段核对本注入令牌）；探针 CLI 运行全程 `HOME`/`CLAUDE_CONFIG_DIR` 指向临时目录，
   **未读也未写**用户真实 `~/.claude`；凭据 locator 全程未访问；临时件 `/tmp/086-pin.json` 已入库为证据副本、
   基线副本 `/tmp/086-baseline` 已删除并核实缺席。
+
+
+## 工单 099 — Worker 的 `home.put` 从未接上分发线（2026-09-18，调度者投递）
+
+> 本单是 **086 阶段 2 的硬前置**：086 的 `write_paths` 不含 `workers/**`，故 086 只把缺陷如实跑出来并开单，
+> 不在本单范围内偷修。证据：[worker-home-put-dispatch-099.md](../server-round1/fullstack/worker-home-put-dispatch-099.md)
+
+| 单 | 阶段 | 门 | 回归 | 真实模型 | 提交 |
+| --- | --- | --- | --- | --- | --- |
+| 099 | 1 观测 | 本阶段的门 = **真二进制上一手复现**：`home.prepare` 成功、`home.put` ⇒ `OP_UNSUPPORTED "operation is unsupported"`（不是夹具里的手写 JSON）。作用域钉死三处行号：实现在 `main.rs:2153` **完整存在**、分发臂 `main.rs:355` **缺 `"home.put"`**、兜底臂 `main.rs:491` 产该码 | 本阶段无新增测试（观测 + 契约）；根套件计数不变 **941** | **0 次 / ¥0** | 本提交 |
+
+- **为什么它活得下来**：Worker 侧的 `home` 单测直接调 `handle_home`（绕过分发），Server 侧的资产写入用例走
+  `TestClient`/内存实现（不经真 wire），于是"实现了但没接上"这条缝两侧都看不见。这与 58 的账行为何是
+  `ASSET_HUBS_PARTIAL` 而非 DONE 是同一件事的两半——58 早就登记了真实链路未通，只是没定位到这一行。
+- **影响面（分三级，不混）**：**实测** = 65 的子代理桥（阶段 1 把 `mcp_target` 改到可读物后，父 Profile 的
+  资产集第一次真的非空，`sidecar.py:593` 的 `home.put` 才在真实链路上被走到）；**引用** = 58 的资产枢纽与
+  56 的订阅文件（同一调用点，只是先前没有用例走到）；**未验证** = 其余通道。
+- **顺手的一条契约卫生**：`082-ledger-45-closeout.md` 的三行 Stages 各带一个游离的起始 `^`，
+  使 `validate_order.py --strict` 在全目录上失败；已用 `od -c` 逐字核对后删掉，勾选状态与文字一字未动。
+- **本单不做**：不改 `home.put` 的边界语义（空/超限仍 `HOME_IO`、非普通文件仍拒、逃逸仍 `PATH_INVALID`）、
+  不改 wire 形状、不动既有 bundle 目录（`c11` 留作反例样本，重建只写进新目录 `c12`）。
