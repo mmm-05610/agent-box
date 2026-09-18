@@ -87,10 +87,11 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 | [38](work-orders/38-harness-extension-selection.md) | **HARNESS_EXTENSION_SELECTION_READY_FOR_DECISION** | 两轮 A/B/C 完成：[最终建议与边界](../server-round1/harness-selection/boundary.md)。保留有条件首选 `harness-remote v3.0.2`；零模型/凭据 | 首选已由40消费进入有门禁接入；不再等待决定 |
 | [60](work-orders/60-profile-settings.md) | **PROFILE_SETTINGS_PARTIAL**（A–F 落地 + 两项补记；姿态逐家翻译 claude/codex 已落地，只收紧或拒绝） | [60 报告](../server-round1/fullstack/profile-settings-60.md)：逐工具权限求解（键/动作闭集、last-match-wins、预设回落，绝不默认 allow）+ **schema 16** 冻结进轮；归属纠正测试（会话属工作区、跨家族切换拒绝 `PROFILE_HARNESS_MISMATCH`）；克隆与逐家迁移表 + `profiles.clone`；资产重绑（`reboundAssets` 与迁移报告同源，测试断言一致）与 `profiles.setPermissions` wire；`posture_translation.py`（claude 工具名表、codex 最严格 sandbox+审批；不可表达即 `PERMISSION_POSTURE_UNEXPRESSIBLE`，laxer 永不静默）；提交 f8ed9d2（840）→03c210d（844）→8b73c7d→27dfa26（845）→e39959f（879，八家全链门 exit 0） | 翻译产物**写入**各家配置文档待逐家钉死设置键（60 报告 §附）；`ask`↔审批往返端到端；P17 前端同步与两仓重锁 |
 | [61](work-orders/61-pacthold-rebrand.md) | **PACTHOLD_REBRAND_DONE**（基础设施侧；合同 ID/环境变量/import 路径零变化） | [改名报告](../branding/REBRANDING_REPORT.md)：审计计数与四类处理表、新旧映射（分发名 `pacthold`、六条 CLI 新旧同源一 main）、兼容保留清单（entry-point group/`agent-box.*@1`/`AGENTBOX_*`/数据目录）、本地 wheel `Name: pacthold` + 新名真实启动冒烟；提交 ff0c578（848）+ 30adedf（docs 拼写修正） | 插件分发名改名留后续单；发布/远端改名/数据迁移明示不做；P18 桌面侧一致性归桌面工作树 |
-| [62](work-orders/62-workspace-git-status.md) | **WORKSPACE_GIT_STATUS_DONE**（本机侧完整；WSL 侧接线完成待真机轮） | [62 报告](../server-round1/fullstack/workspace-git-status-62.md)：`workspaces.gitStatus` 六字段 + reason（null=拿不到不是 0；二进制在场 ⇒ 增删行 null + `GIT_BINARY_DIFF`）；porcelain v2 + numstat；流式上限超限即杀；只读性逐字节证明（index mtime 未变）；提交 76e7c35（854） | WSL 真机轮；P20 前端同步与两仓重锁（新增 1 个只读方法） |
+| [62](work-orders/62-workspace-git-status.md) | **WORKSPACE_GIT_STATUS_PARTIAL**（本机侧完整；62 §3 DoD 明示"本机与 WSL 各一次"，WSL 真机轮未跑——报告 §5 自记；报告自述词为 DONE，068 G3 按 DoD 证据口径下调） | [62 报告](../server-round1/fullstack/workspace-git-status-62.md)：`workspaces.gitStatus` 六字段 + reason（null=拿不到不是 0；二进制在场 ⇒ 增删行 null + `GIT_BINARY_DIFF`）；porcelain v2 + numstat；流式上限超限即杀；只读性逐字节证明（index mtime 未变）；提交 76e7c35（854） | WSL 真机轮（可搭 069 的 WSL 轮一并取证）；P20 前端同步与两仓重锁（新增 1 个只读方法） |
 | [63](work-orders/63-profile-memory-read.md) | **PROFILE_MEMORY_READ_DONE**（本机侧完整；WSL 侧未接，如实记账） | [63 报告](../server-round1/fullstack/profile-memory-63.md)：注册表 `memory_paths`（claude/codex 一手钉住；未声明不画假分区）；`profiles.memory` 只读有界 + 扫描（`MEMORY_CONTAINS_SECRET` 拒绝项无 content）；声明了但缺失=缺席不报错；提交 4d7b0e0（858） | WSL 侧读（按 62 同族设计）；P17 前端同步与两仓重锁（新增 1 个只读方法） |
-| [64](work-orders/64-execution-inventory.md) | **EXECUTION_INVENTORY_DONE**（本机 pid 已接；远端按规则 null+reason，不假装） | [64 报告](../server-round1/fullstack/execution-inventory-64.md)：账本同源（完成后行即刻消失）、本机 `pid` 三态（无端口/报值/报 null）、上限 200 类型化失败、零宿主路径；`executions.list` wire；提交 faaeedf（862） | WSL pid（Worker 协议不传，需 Worker 单）；`adapterPid` 不做；P20 前端同步与两仓重锁 |
+| [64](work-orders/64-execution-inventory.md) | **EXECUTION_INVENTORY_PARTIAL**（本机 pid 已接；64 §3 DoD 明示"本机与 WSL 各一次，含 pid 有/无"，WSL 真机轮未跑——报告只给协议结论；068 G3 按 DoD 证据口径下调） | [64 报告](../server-round1/fullstack/execution-inventory-64.md)：账本同源（完成后行即刻消失）、本机 `pid` 三态（无端口/报值/报 null）、上限 200 类型化失败、零宿主路径；`executions.list` wire；提交 faaeedf（862） | WSL 真机轮（可搭 069 的 WSL 轮；预期 pid=null+`PID_NOT_REPORTED`，待一手证实）；`adapterPid` 不做；P20 前端同步与两仓重锁 |
 | [65](work-orders/65-profile-as-subagent.md) | **SUBAGENT_DELEGATION_PARTIAL**（A/B + C 三块：授权边与两工具契约、委派服务、真桥端到端与并发） | [65 报告](../server-round1/fullstack/profile-as-subagent-65.md)：**schema 17/18**；授予即拒环（`SUBAGENT_CYCLE`）、未授权名零泄露（只内联被授权名）、可选参数只收紧（`SUBAGENT_PERMISSION_WIDENED`/`SUBAGENT_MODEL_WIDENED`）、扇出 ≤4、10 分钟有界；真桥进程→按次令牌→真本机通道子轮→有界摘要（≤4096 字符）+ 用量同源；父 deny 继承（`inheritedFrom`）与审批镜像（同 id 到父轮）；授权 CRUD wire；提交 75253fa（865）→701ae20（872）→6854e4c（875）→07b43fa（877）→e39959f（879） | 真 harness（非夹具）父轮自己发起 `tools/call` 的一圈；P17/P20 前端（授权分区 UI 与"智能体"卡） |
+| [68](work-orders/068-ledger-catchup.md) | **LEDGER_CATCHUP_DONE** | 本行即本单产物：主表补 60–65 六行（22dc823）+ 刷新 52/54/55（cfa9eba）+ 计数口径节刷新 + G3 下调 62/64（本轮提交）；自查与反例演练见文末 §068 | 068 范围内无剩余；两个发现已如实记录（48 行两处断链证据在主树分支；62/64 的 WSL 真机腿待搭 WSL 轮） |
 
 ## 当前长期goal状态字段（执行者每阶段维护）
 
@@ -674,3 +675,30 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
    **四家生产链门全 exit 0**。
 2. 48 AppContainer 恢复 spike 需管理员权限（Windows 11 限制 IL 标签写入）。
 3. terminal 短名能力词汇未版本化（slots.py 已记录，收敛待后续）。
+
+---
+
+## 068 账务补齐自查（2026-09-19，执行者）
+
+**范围**：本树 `status.md` —— 主表补 60–65 六行（提交 22dc823）、刷新 52/54/55 三行（cfa9eba）；另有 1 条偏离与 2 处 G3 下调（见下）。
+
+**G1 行数**：`grep -c '^| \[6[0-5]\]' docs/implementation/status.md` → **6** ✓
+反例演练：在副本上删掉一行 60 → 同命令得 **5**（缺行即失败，守卫非零命中）✓
+
+**G2 可追溯**：六行引用的 14 个提交（f8ed9d2 / 03c210d / 8b73c7d / 27dfa26 / e39959f / ff0c578 / 30adedf / 76e7c35 / 4d7b0e0 / faaeedf / 75253fa / 701ae20 / 6854e4c / 07b43fa）逐个 `git cat-file -e` **全部 OK**。
+反例演练：对不存在的 `deadbeefcafe` 跑同一检查 → **`MISSING deadbeefcafe`**（守卫能抓到正例）✓
+说明：工单 Validation 那条通用 hex 循环会把**非提交型 hex**（工件/合同摘要，如 182e7adb、08e4e057、0cdc459c 等）一并抓出报 MISSING——G2 的实质断言是"六行引用的提交"，已全过；摘要型 hex 在各行已标明其性质（TS/工件/前端提交），不是本树提交。
+
+**G3 不冒充**：逐单按 DoD/门对照证据，**下调两行**（报告自述词与自身 DoD 不符，按证据口径记，行内已注明）：
+- **62**：`WORKSPACE_GIT_STATUS_DONE`（报告自述）→ **PARTIAL**：62 §3 DoD 明示"真机证据（至少 WSL 与本机各一次）"，WSL 真机轮未跑（报告 §5 自记"本机无该侧"）。
+- **64**：`EXECUTION_INVENTORY_DONE`（报告自述）→ **PARTIAL**：64 §3 DoD 明示"本机与 WSL 各一次，含 pid 有/无两种"，WSL 真机轮未跑（报告只给"协议不传"的结论）。
+- 61/63 维持 DONE（各自 DoD 全项有证据；未做项是工单明示范围外/远端受限，行内已标）；60/65 维持 PARTIAL（各自剩余项来自其报告）。
+反例演练：对"DONE 行 + 证据文件缺失"的合成副本跑链接核查 → 报 `MISSING EVIDENCE`（假 DONE 会被抓住）✓
+
+**发现的既有缺陷（超出 068 九个行的范围，如实记录、未擅自修）**：主表 48 行的两个证据链接（`sandbox-conformance-windows.json` 与其反例）**在本树分支不存在**——文件实际提交在主树分支（主树 `c1b32fb`，路径 `docs/server-round1/fullstack/`）。全表链接核查：28 行中仅此 2 处断链。处理建议：由调度者决定（把文件带进本树，或把该行指向主树）。
+
+**偏离说明（1 条，理由）**：068 scope 表写"补 6 行 + 刷新 3 行"，实际另刷新了"计数口径"节——不刷新则新行的套件数字会被该节宣布为"历史/已被取代"，账不自洽；改动只把"现行计数"改为"最近一次有记录的全量计数"并标明来源提交（e39959f），未新增未验证数字。
+
+**投递回执**：已纳入 work order 070 投递 @111bf4d（批内排 067 之后、069 之前；章程 §3 顺序已更新）——按新队列继续，不为检查点停下。
+
+**Validation**：`git diff --check` 干净；阶段提交后 `git status --short` 无输出。
