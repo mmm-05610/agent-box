@@ -77,6 +77,7 @@
 > 批末打 `checkpoint/b4` tag + 写检查点报告，然后继续。
 > **已投递（b4 追加，R-0013 订阅登录）**：`094-subscription-login-engine`（登录引擎跑在 Server 上：device-code 流 + 有界轮询 + 令牌只进秘密存储 + **codex 的 harness 型登录**端到端；未登记的家 `LOGIN_FLOW_UNSUPPORTED`）→
 > `095-provider-logins-and-account-lifecycle`（**provider 型登录** copilot/xai/google → `credential.kind=oauth` 原地轮换；取用自动刷新 + `relogin_required`；额度按家钉死、传输保旧/鉴权清空；订阅 provider 的模型列表走订阅端点）。
+> **已投递（b4 追加，R-0013 思考旋钮）**：`096-native-reasoning-controls`（逐家**声明**思考/推理旋钮 + **取值域动态**（模型事实 ∪ 家钉死枚举，方言翻译后）+ 校验拒绝 + 093 写入器落盘；**旋钮 harness 级、档位模型级**）。
 > **修订 v2（2026-09-19，R-0013 追加）**：092/093 各追加一节——**一个 harness 多个模型槽**
 > （claude-code：主模型 / opus / sonnet / haiku / fable / **子代理**；opencode·kilo：主模型 / 小模型）
 > 与**逐模型限额**（上下文/输出，覆盖与事实分离、缺席不写键）。以单文件里的 §修订 v2 为准。
