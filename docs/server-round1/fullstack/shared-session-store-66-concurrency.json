@@ -1,0 +1,203 @@
+{
+ "attempts": [
+  {
+   "cold": {
+    "code": "STORE_GATE_RUN_FAILED",
+    "failed": true,
+    "message": "cold-start race: {\"processes\": {\"alpha\": {\"exit\": 1, \"seconds\": 0.65, \"stdoutTail\": \"\", \"stderrTail\": \"\\u001b[91m\\u001b[1mError: \\u001b[0mUnexpected error\\n\\ndatabase is locked\"}, \"bravo\": {\"exit\": 0, \"seconds\": 2.47, \"stdoutTail\": \"STORE-GATE-ACK ONE TWO\", \"stderrTail\": \"\\u001b[0m\\n> build · deepseek-flash\\n\\u001b[0m\"}}, \"library\": {\"tables\": [\"account\", \"account_state\", \"control_account\", \"credential\", \"data_migration\", \"event\", \"event_sequence\", \"message\", \"migration\", \"part\", \"permission\", \"project\", \"project_directory\", \"session\", \"session_context_epoch\", \"session_input\", \"session_message\", \"session_share\", \"todo\", \"workspace\"], \"projectRows\": [[\"global\", \"/\"]], \"projectWorktrees\": 1, \"projectGlobals\": 1, \"projectDirectoryRows\": 0, \"projectDirectoryDistinct\": 0, \"sessionRows\": 1}, \"lockedMentions\": [\"database is locked\"], \"providerRequests\": 2}"
+   },
+   "initialized": {
+    "library": {
+     "projectDirectoryDistinct": 0,
+     "projectDirectoryRows": 0,
+     "projectGlobals": 1,
+     "projectRows": [
+      [
+       "global",
+       "/"
+      ]
+     ],
+     "projectWorktrees": 1,
+     "sessionRows": 3,
+     "tables": [
+      "account",
+      "account_state",
+      "control_account",
+      "credential",
+      "data_migration",
+      "event",
+      "event_sequence",
+      "message",
+      "migration",
+      "part",
+      "permission",
+      "project",
+      "project_directory",
+      "session",
+      "session_context_epoch",
+      "session_input",
+      "session_message",
+      "session_share",
+      "todo",
+      "workspace"
+     ]
+    },
+    "lockedMentions": [],
+    "processes": {
+     "alpha": {
+      "exit": 0,
+      "seconds": 2.62,
+      "stderrTail": "\u001b[0m\n> build · deepseek-flash\n\u001b[0m",
+      "stdoutTail": "STORE-GATE-ACK ONE TWO"
+     },
+     "bravo": {
+      "exit": 0,
+      "seconds": 2.66,
+      "stderrTail": "\u001b[0m\n> build · deepseek-flash\n\u001b[0m",
+      "stdoutTail": "STORE-GATE-ACK ONE TWO"
+     }
+    },
+    "providerRequests": 4
+   }
+  },
+  {
+   "cold": {
+    "code": "STORE_GATE_RUN_FAILED",
+    "failed": true,
+    "message": "cold-start race: {\"processes\": {\"alpha\": {\"exit\": 1, \"seconds\": 0.82, \"stdoutTail\": \"\", \"stderrTail\": \"\\u001b[91m\\u001b[1mError: \\u001b[0mUnexpected error\\n\\ndatabase is locked\"}, \"bravo\": {\"exit\": 0, \"seconds\": 3.05, \"stdoutTail\": \"STORE-GATE-ACK ONE TWO\", \"stderrTail\": \"\\u001b[0m\\n> build · deepseek-flash\\n\\u001b[0m\"}}, \"library\": {\"tables\": [\"account\", \"account_state\", \"control_account\", \"credential\", \"data_migration\", \"event\", \"event_sequence\", \"message\", \"migration\", \"part\", \"permission\", \"project\", \"project_directory\", \"session\", \"session_context_epoch\", \"session_input\", \"session_message\", \"session_share\", \"todo\", \"workspace\"], \"projectRows\": [[\"global\", \"/\"]], \"projectWorktrees\": 1, \"projectGlobals\": 1, \"projectDirectoryRows\": 0, \"projectDirectoryDistinct\": 0, \"sessionRows\": 1}, \"lockedMentions\": [\"database is locked\"], \"providerRequests\": 2}"
+   },
+   "initialized": {
+    "library": {
+     "projectDirectoryDistinct": 0,
+     "projectDirectoryRows": 0,
+     "projectGlobals": 1,
+     "projectRows": [
+      [
+       "global",
+       "/"
+      ]
+     ],
+     "projectWorktrees": 1,
+     "sessionRows": 3,
+     "tables": [
+      "account",
+      "account_state",
+      "control_account",
+      "credential",
+      "data_migration",
+      "event",
+      "event_sequence",
+      "message",
+      "migration",
+      "part",
+      "permission",
+      "project",
+      "project_directory",
+      "session",
+      "session_context_epoch",
+      "session_input",
+      "session_message",
+      "session_share",
+      "todo",
+      "workspace"
+     ]
+    },
+    "lockedMentions": [],
+    "processes": {
+     "alpha": {
+      "exit": 0,
+      "seconds": 2.57,
+      "stderrTail": "\u001b[0m\n> build · deepseek-flash\n\u001b[0m",
+      "stdoutTail": "STORE-GATE-ACK ONE TWO"
+     },
+     "bravo": {
+      "exit": 0,
+      "seconds": 2.58,
+      "stderrTail": "\u001b[0m\n> build · deepseek-flash\n\u001b[0m",
+      "stdoutTail": "STORE-GATE-ACK ONE TWO"
+     }
+    },
+    "providerRequests": 4
+   }
+  },
+  {
+   "cold": {
+    "code": "STORE_GATE_RUN_FAILED",
+    "failed": true,
+    "message": "cold-start race: {\"processes\": {\"bravo\": {\"exit\": 1, \"seconds\": 0.69, \"stdoutTail\": \"\", \"stderrTail\": \"\\u001b[91m\\u001b[1mError: \\u001b[0mUnexpected error\\n\\ndatabase is locked\"}, \"alpha\": {\"exit\": 0, \"seconds\": 2.32, \"stdoutTail\": \"STORE-GATE-ACK ONE TWO\", \"stderrTail\": \"\\u001b[0m\\n> build · deepseek-flash\\n\\u001b[0m\"}}, \"library\": {\"tables\": [\"account\", \"account_state\", \"control_account\", \"credential\", \"data_migration\", \"event\", \"event_sequence\", \"message\", \"migration\", \"part\", \"permission\", \"project\", \"project_directory\", \"session\", \"session_context_epoch\", \"session_input\", \"session_message\", \"session_share\", \"todo\", \"workspace\"], \"projectRows\": [[\"global\", \"/\"]], \"projectWorktrees\": 1, \"projectGlobals\": 1, \"projectDirectoryRows\": 0, \"projectDirectoryDistinct\": 0, \"sessionRows\": 1}, \"lockedMentions\": [\"database is locked\"], \"providerRequests\": 2}"
+   },
+   "initialized": {
+    "library": {
+     "projectDirectoryDistinct": 0,
+     "projectDirectoryRows": 0,
+     "projectGlobals": 1,
+     "projectRows": [
+      [
+       "global",
+       "/"
+      ]
+     ],
+     "projectWorktrees": 1,
+     "sessionRows": 3,
+     "tables": [
+      "account",
+      "account_state",
+      "control_account",
+      "credential",
+      "data_migration",
+      "event",
+      "event_sequence",
+      "message",
+      "migration",
+      "part",
+      "permission",
+      "project",
+      "project_directory",
+      "session",
+      "session_context_epoch",
+      "session_input",
+      "session_message",
+      "session_share",
+      "todo",
+      "workspace"
+     ]
+    },
+    "lockedMentions": [],
+    "processes": {
+     "alpha": {
+      "exit": 0,
+      "seconds": 2.42,
+      "stderrTail": "\u001b[0m\n> build · deepseek-flash\n\u001b[0m",
+      "stdoutTail": "STORE-GATE-ACK ONE TWO"
+     },
+     "bravo": {
+      "exit": 0,
+      "seconds": 2.46,
+      "stderrTail": "\u001b[0m\n> build · deepseek-flash\n\u001b[0m",
+      "stdoutTail": "STORE-GATE-ACK ONE TWO"
+     }
+    },
+    "providerRequests": 4
+   }
+  }
+ ],
+ "binary": "/home/maoqh/.npm-global/lib/node_modules/opencode-ai/bin/opencode.exe",
+ "failure": {
+  "attempts": 3,
+  "codes": [
+   "STORE_GATE_RUN_FAILED"
+  ],
+  "coldStartAttemptsFailed": 3,
+  "note": "the cold-start race failed; Order 66 G5 iii asked for a first-run lock scheme and the accounting in that case"
+ },
+ "providerRequests": 20,
+ "result": "SHARED_STORE_CONCURRENCY_FAILED",
+ "script": "scripts/server-round1/shared-store-concurrency-gate.py",
+ "version": "1.18.21",
+ "warmUp": {
+  "exit": 0,
+  "seconds": 2.45,
+  "stderrTail": "\u001b[0m\n> build · deepseek-flash\n\u001b[0m",
+  "stdoutTail": "STORE-GATE-ACK ONE TWO"
+ }
+}

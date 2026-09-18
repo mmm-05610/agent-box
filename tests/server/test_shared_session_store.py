@@ -529,17 +529,30 @@ def test_the_guard_refuses_credential_rows_at_the_switch(tmp_path):
         # Control: an empty seeded store passes.
         assert switch("guard-clean")["result"]["outcome"] == "confirmed"
 
-        # 1) A synthetic credential row (committed) refuses the switch.
+        # 1) A synthetic credential row (committed) refuses the switch. The
+        #    other Profile's session row in the same library must survive the
+        #    refusal: the shared file is kept, never deleted (Order 66 §2.5;
+        #    deleting it would destroy every other Profile's sessions).
         writer = sqlite3.connect(db)
         writer.execute("PRAGMA journal_mode=WAL")
         writer.execute("CREATE TABLE IF NOT EXISTS credential (id TEXT PRIMARY KEY, value TEXT)")
         writer.execute("INSERT INTO credential VALUES ('synthetic', 'not-a-real-secret')")
+        writer.execute("CREATE TABLE IF NOT EXISTS session (id TEXT PRIMARY KEY, owner TEXT)")
+        writer.execute("INSERT INTO session VALUES ('ses_alpha', 'role-a')")
         writer.commit()
         writer.close()
         refusal = switch("guard-hit")
         assert "error" in refusal, refusal
         assert refusal["error"]["code"] == "CONFLICT_REQUEST"
         assert refusal["error"]["details"]["internalCode"] == "SESSION_STORE_CREDENTIALS_PRESENT"
+        assert db.exists(), "the credential-hit refusal deleted the shared library"
+        intact = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+        try:
+            readable = intact.execute(
+                "SELECT owner FROM session WHERE id = 'ses_alpha'").fetchone()
+        finally:
+            intact.close()
+        assert readable == ("role-a",), readable
 
         # 2) The WAL variant: rows that live only in the -wal file still
         #    refuse. A held read snapshot keeps the committed rows

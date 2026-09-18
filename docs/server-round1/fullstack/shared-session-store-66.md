@@ -183,3 +183,39 @@ identity"），并定位到**两个叠加的陈旧假设**：
 各家"未知模型拒绝"负相位的设计行为，报告内记为 `failed` 子项）。连带影响：51 的
 "hermes/claude 观测轮"与"dsh/qwen 无本地样本"两项阻塞随之解除（claude/dsh/qwen 门现在
 可跑；hermes 门此前已绿）。
+
+## 15 G5 真并发轮（2026-09-18/19 本树执行；含一手缺陷与首发锁方案）
+
+**门脚本**：`scripts/server-round1/shared-store-concurrency-gate.py`（sha256 `05a40996c25fca5e…`，18858 B；真 opencode **1.18.21** = 本机 npm-global 安装、版本探针核对；loopback 假端点，**零真实模型调用**）。
+**场景**：一个全新共享库（0 字节 `opencode.db` 占位 = 房间播种语义）+ 两个真进程**同时首跑**；随后跑一轮"初始化完成后并发"对照。两者同用一个数据目录（db/`-wal`/`-shm` 即同一批文件，与 bind 挂载的锁身份一致；per-profile 物化由本单 A/B 与夹具级 G5 覆盖）。
+**证据**：[JSON 报告](shared-session-store-66-concurrency.json)（sha256 `99a90c6226ad7bc5…`）。
+
+| 阶段 | 实测 |
+| --- | --- |
+| 冷启动并发（全新库） | **6/7 次失败**（跨 3 次运行）：5× `database is locked`（SQLite busy 类，0.65–0.82 s 即死）、1× `workspace` 外键/模式竞态 |
+| 初始化完成后并发 | **3/3 双绿**：无 locked 提及、每轮 2 个新 session 落库、`project`/`project_directory` 无重复 |
+
+- ⇒ **§1.7 的"首次并发运行窗口"由推测变实测缺陷**：整库共享下两个 profile 的**首轮**并发，输的一方以 harness 自己的错误失败（"database is locked"），不是我们的错误面。
+- ⇒ **事实更正（取代 §1.7 的"单例"表述）**：`project` 表**不止一行**——实测除字面量 `global` 外还有按 worktree 的哈希行（VCS 目录才有；`/tmp` 无 VCS 目录只出现 `global` 且 `project_directory` 为空）。竞态不变量应写为：**每 worktree 恰一行 + `global` 恰一行 + `project_directory` 无重复**（门已按此断言）。
+
+**首发锁方案（按 §5-G5③"若上浮则给方案并记账"交付；本单未实施）**：
+
+1. **只锁首轮**：键 =（放置侧 home root，家族）。"首轮" = 该键上**第一次派发**的轮次；其余轮次保持现有并发（本轮"初始化后 3/3 双绿"证明其安全，无需全串行）。
+2. **落点**：Server 侧执行准入口（`SidecarExecutionBackend` 派发前）；进程内 per-key 锁 + **Server DB 记账**（新表如 `server_session_store_init(key, initialized_at)`）。无记录 ⇒ 本轮持锁至其终态（成功或失败都释放）；成功终态后写记录；有记录 ⇒ 直接并发。崩溃在"初始化完成但未记账"之间 ⇒ 下一次首轮再串行一次，无害。
+3. **为什么不用文件标记/库状态探测**：库的物理位置在放置侧（本机=Server 数据根可见；WSL=worker home root，**Server 不可见**），而 Worker 没有"看库状态"的 op；Server DB 是两侧都有的单一事实源。
+4. **代价与边界**：首发轮排队有界（= 该轮时长）；失败首轮也放锁（不毒化），极端情况下（失败轮没把库初始化好）下一次仍可能再撞——已知边界，如实记账。
+5. **更窄的替代（未选）**：只锁"库未初始化"窗口（库一旦可读即放锁）——需要跨通道库状态探测（新 Worker op），且窗口判定自身有竞态。
+
+**G3 逐项可见内容清单（库内非会话内容对同族其它 profile 可见——事实，非缺陷）**：
+kilo 库内 `project`（worktree 路径、vcs、name、sandboxes、commands）、`project_directory`（目录登记）、
+`workspace`（branch、directory）、`permission`（project_id、action、resource）、
+`event_sequence`/`event`（聚合 id、seq、type、data）、`kilo_board`/`kilo_board_message`、
+`migration`/`data_migration`。**仍按 profile 隔离**：`log/`、`repos/`、`telemetry-id`、
+opencode `auth.json`（库外同目录，绑定留 profile home）。
+
+**G4 端到端补断言**：`test_the_guard_refuses_credential_rows_at_the_switch` 现断言命中拒绝后
+**共享文件仍在**且**他 profile 的 session 行仍可读**（`tests/server/test_shared_session_store.py`）。
+
+**未做（如实）**：首发锁的**实施**与复跑（需新单）；远端守卫（Worker 侧读库）仍 fail-closed
+（`SESSION_STORE_GUARD_UNAVAILABLE`，放行才是撒谎）；冷启动缺陷在真实房间里由本方案覆盖的
+证明（本轮是进程级直跑，不经 Server/Worker 编排——编排侧由夹具级 G5 与 A/B 覆盖）。
