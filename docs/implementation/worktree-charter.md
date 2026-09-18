@@ -66,6 +66,8 @@
 > `084-usage-parsers-remaining`（hermes/claude 观测轮 + opencode/kilo blob）→ `085-posture-config-write`（60：先钉键再写配置）→
 > `086-subagent-harness-round`（65 最后一圈：真 harness 父侧自发起 tools/call）→ `087-cancel-recall-flake`（G8 间歇）→
 > `088-windows-wsl-decode`（试用抓到的真 bug：Windows 宿主读 `wsl.exe` 输出被非 UTF-8 打挂）。
+> **已投递（b2 追加，R-0012 相关）**：`090-placement-routing`（WSL 工作区的执行必须路由到 WSL worker；无环境 ⇒ **派发前**类型化拒绝）→
+> `091-control-plane-sync`（控制面以 Windows 为准：首次连接部署 + 变更增量 + 凭据只留 Windows 按执行一次性投影；原生 home/会话仍按平台）。
 > **已投递（b3，b2 收口后）**：`089-four-real-ui-gates`（四家真实 UI 门＝最终验收路径；**Server 须跑在 WSL 侧**，
 > 见主树 `docs/server-round1/try-checkpoints.md` 的教训）。
 > **队列不空规则（调度者失误的如实标记）**：`080-first-run-lock` 与 `081-relock-register-frontend` **已投递**，可执行；
