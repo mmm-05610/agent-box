@@ -73,6 +73,14 @@ for await (const line of rl) {
       mkdirSync(stateDir, { recursive: true })
       appendFileSync(`${stateDir}/journal.txt`, `${label}\n`)
     }
+    // Order 80: a span per turn, in its own file so the journal assertions of
+    // order 66 keep their exact shape. Two windows that do not intersect are
+    // the observable form of "the first run is serialised".
+    const window = text.match(/window:([A-Za-z0-9-]+)/)?.[1]
+    if (window) {
+      mkdirSync(stateDir, { recursive: true })
+      appendFileSync(`${stateDir}/windows.txt`, `start:${window}:${Date.now()}\n`)
+    }
     if (!nonce) {
       nonce = text.match(/STATEFUL-NONCE-[A-Z0-9-]+/)?.[0] ?? "STATEFUL-NONCE-MISSING"
       saveState({ nativeSessionId: sessionId, nonce })
@@ -83,6 +91,7 @@ for await (const line of rl) {
         update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: nonce } },
       } })
       send({ jsonrpc: "2.0", id, result: { stopReason: "end_turn" } })
+      if (window) appendFileSync(`${stateDir}/windows.txt`, `end:${window}:${Date.now()}\n`)
     }
     // A deterministic overlap window for the concurrency gates.
     if (text.includes("hold-for-window")) setTimeout(answer, 500)

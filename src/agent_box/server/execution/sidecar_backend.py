@@ -14,6 +14,7 @@ from typing import Any, Callable, Mapping
 
 from agent_box.extensions import capability
 from agent_box.resource_contracts import AgentBoxProfileV1, PromptFragmentV1, WorkspaceV1
+from agent_box.server.execution.first_run_lock import first_run_gate
 from agent_box.server.execution.sidecar import SidecarError, SidecarHarnessPort
 from agent_box.work_core import (
     ExecutionFinalizationRequest, ExecutionProjection, ExecutionStartReceipt,
@@ -42,6 +43,10 @@ class _Run:
     #: means unknown (and the ledger must keep it unknown, never estimate).
     usage_fact: dict[str, int] | None = None
     usage_source: str | None = None
+    #: Order 80: the exclusive hold on this library's *first* run (only the run
+    #: that opened a whole-db store while it was still fresh carries one);
+    #: released when this run reaches its terminal.
+    first_run_hold: Any = None
     #: The worker that persists the durable turn result. It outlives the prompt
     #: worker by design, so a runtime is only really stopped once it is done:
     #: the Work Core connection is shared and is not safe to use after shutdown.
@@ -287,18 +292,34 @@ class SidecarExecutionBackend:
         # 实际副作用（client.start()/spawn）前的唯一强制门：需求来自 launcher 当前
         # 计划，授权/声明/绑定来自装配边界注入；不满足即类型化拒绝，零 launcher/spawn。
         _capability_gate(port, turn_id)
-        native_id = port.open_execution(turn_id)
-        if attachments and not _effective_attachment_support(port, turn_id):
-            # 拒绝时不留一个没有归属的原生会话（否则 _complete 永远不会回收它）。
-            try:
-                port.close_execution(turn_id)
-            except BaseException:
-                pass
-            raise SidecarError(
-                "ATTACHMENT_UNSUPPORTED",
-                "this execution has no effective 'attach' capability",
-            )
+        # Order 80: the first run on a fresh whole-db library is exclusive; a
+        # concurrent first run waits for it (bounded, typed on timeout) and
+        # every later run passes straight through. The gate is taken before the
+        # room exists, because the race is in the harness's own initialisation.
+        hold = None
+        if getattr(port, "whole_db_store", False):
+            hold = first_run_gate().acquire(
+                f"{port.native_platform or 'local'}:{port.profile}")
+        try:
+            native_id = port.open_execution(turn_id)
+            if attachments and not _effective_attachment_support(port, turn_id):
+                # 拒绝时不留一个没有归属的原生会话（否则 _complete 永远不会回收它）。
+                try:
+                    port.close_execution(turn_id)
+                except BaseException:
+                    pass
+                raise SidecarError(
+                    "ATTACHMENT_UNSUPPORTED",
+                    "this execution has no effective 'attach' capability",
+                )
+        except BaseException:
+            # An acquisition that never produced a run must not hold the
+            # library hostage (the attachment refusal above is one such path).
+            if hold is not None:
+                hold.release()
+            raise
         run = _Run(turn_id, "", core_execution_id, dispatch_id, port, native_id, threading.Event())
+        run.first_run_hold = hold
         prompt_content = prompt.content
         if file_refs:
             prompt_content += "\n\nWorkspace attachments (validated):\n" + "\n".join(
@@ -544,6 +565,10 @@ class SidecarExecutionBackend:
         try:
             self._complete(run)
         finally:
+            # Order 80: this run's terminal is what makes the library "ready" —
+            # every later run (and anyone waiting) passes through from here.
+            if run.first_run_hold is not None:
+                run.first_run_hold.release()
             with self._lock:
                 self._completion_threads.discard(threading.current_thread())
 
@@ -596,6 +621,14 @@ class SidecarExecutionBackend:
         for thread in list(self._completion_threads):
             thread.join(max(0, deadline - time.monotonic()))
         prompts_done = all(run.done.is_set() for run in runs)
+        # Order 80: a run that never reached its terminal must not keep its
+        # library's first-run lock (a later runtime in this process, or a
+        # restart of the same data root, would wait on a dead owner).
+        with self._lock:
+            leftovers = [run for run in self._active.values()
+                         if run.first_run_hold is not None]
+        for run in leftovers:
+            run.first_run_hold.release()
         with self._lock:
             # Keep the set meaning "workers still running": a finished worker is
             # retired here even if it was not started through the wrapper.

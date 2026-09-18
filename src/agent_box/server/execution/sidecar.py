@@ -1376,6 +1376,18 @@ class SidecarHarnessPort:
         """
         return bool(getattr(self.launcher, "session_store_harness", None))
 
+    @property
+    def whole_db_store(self) -> bool:
+        """Whether this execution opens one shared *whole* library (order 80).
+
+        `shared_store` is true for sessions-subtree as well, where every
+        session has its own files and no harness initialises a shared database;
+        only a whole-db store carries `shared` entries, and only there does the
+        first run need the exclusive lock.
+        """
+        return self.shared_store and bool(
+            getattr(self.launcher, "session_store_shared", ()))
+
     def delete_home_file(self, execution_id: str, relative: str) -> None:
         """Remove one leaked file from the home (the credential rule)."""
         envelope = self._require(execution_id)
