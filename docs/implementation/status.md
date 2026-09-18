@@ -753,7 +753,47 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 
 | # | 阻塞 | 证据（指针） | 建议 | 不拍的后果 |
 | --- | --- | --- | --- | --- |
-| B1 | 066-G5 **首发锁实施**未做 | [66 报告 §15](../server-round1/fullstack/shared-session-store-66.md)（方案）+ 并发门 6/7 失败 | b2 首单实施：键=（放置侧 home root，家族）；Server DB 记账 + 准入锁；**只锁首轮**，成功终态后放行后续并发 | 两个 profile 首次共用新库**必有一方 failed**（确定性，非偶发） |
+| ~~B1~~ | ~~066-G5 首发锁实施~~ **已由 080 关闭**（`FIRST_RUN_LOCK_DONE`；真 harness 7/7 有锁绿 / 2/3 无锁败） | [080 报告](../server-round1/fullstack/first-run-lock-80.md) | — | — |
 | B2 | `providerModels.update` 合同/实现不齐（合同 `displayName`/`credentialId` 可选；实现必填且 `params[...]` 直接取值） | [070 报告 §6.1](../server-round1/fullstack/provider-model-55.md)；`handlers._provider_model_body` | 定语义：**省略即保留原值**（改实现 + 测试）或收紧合同（改工件 + 重锁） | 合法请求被 400；若只放开校验则变 500 |
 | B3 | 54 的 `sidecar.py:631-632` 一行修（空快照折叠） | [069 报告 §3-4](../server-round1/fullstack/wsl-change-set-observation-069.md)（插桩 + 三态探针） | 并入 b2 的 066-G5 收尾单（同文件族）一起改 + 空快照测试 + 复跑观测轮 | WSL 通道变更集**恒 unknown**（首轮必现，且"正例只需审计文件"） |
-| B4 | P17/P20 两仓重锁（前端交回值 `b284f70c`） | b2 计划第 2 项；55/62/63/64 行"待重锁" | 按 b2 计划收口：登记前端工件摘要并与后端逐字一致 | strict 工件 5 项既有失败持续；前端面缺新字段/新方法 |
+| B4 | **两仓仍未锁定**（081 已登记差异）：前端交回阶段 2 对 `6e8ae84a`/`f5d27269`（59 方法）≠ 后端登记 `64dc9961`/`42a164a4` ≠ 本树副本 `a1bd52a4`（33 方法）；摘要在两工具链间不可复现 ⇒ 需**换工件本体** | [wire-review Order 81 节](../server-round1/wire-review.md) | 拍四件：①后端发布 64 方法工件（或前端补 5 个后重生成）并**交换本体**；②替换本树旧副本（strict 5 项失败之因）；③定生成/比较口径；④补 Order 57/58/59/65 的 wire-review 小节（当前 0 命中） | 摘要永远对不上；前端按 59 方法实现、后端跑 64 方法，落后 5 个面的差异继续分叉 |
+
+---
+
+## CHECKPOINT b2（2026-09-19）
+
+**QUEUE_EMPTY_AT 2026-09-19**（章程"队列不空规则"）：080 与 081 均已收口，`work-orders/` 里
+**没有属于 b2 的下一张**（b2 计划其余 7 项：45 收口、62/64 的 WSL 真腿、53 解析器、60 配置写入、
+65 最后一圈、G8 间歇、四家真实 UI 模型门——契约待调度者逐单投递）。合法停止，如实报出。
+
+**CHECKPOINT b2 [PARTIAL]**（080 DONE；081 为"差异已登记、两端仍未锁定"的 PARTIAL——见 §5）
+
+**1 现在能试什么**（入口/命令 + 期望）
+
+- 批次结构门：`python3 …/validate_order.py docs/implementation/work-orders/ --batch b2 --strict` → 080/081 **OK、exit 0**。
+- 回归：`PYTHONPATH=src:plugins/... pytest tests/ -q` → **887 passed / 0 failed**（233 s，本批末实测；b1 基线 882 + 080 新增 5）。
+- 首跑锁（080）：`pytest tests/server/test_first_run_lock.py -q` →
+  门语义（独占/有界/类型化超时）+ 接线（两首跑窗口不相交）+ 反例（去门即相交）+ **真 opencode 7 轮冷库双首跑 7/7**；
+  无锁反例常备：`python3 scripts/server-round1/shared-store-concurrency-gate.py --attempts 3`（**设计上无锁**，仍会失败——这就是反例）。
+- 两仓重锁登记（081）：[wire-review Order 81 节](../server-round1/wire-review.md)（三个摘要、方法集差、四项交回）。
+- 66 行已由 080 翻绿：`SHARED_SESSION_STORE_DONE`（G5 补齐）。
+
+**2 要你拍的**（见本节末「阻塞（待人拍）」更新表：B1 已由 080 关闭；B2/B3 仍开；新增 B5）
+
+**3 花了什么**
+
+- 真实模型调用：**0 次**（080 用本地 opencode 1.18.21 + loopback 假端点；081 只读两仓文件）。
+- 批：全量套件 1 次（887）、首跑锁测试多批、无锁反例演练 1 批（2/3 失败）、真 harness 7 轮（36 s）。
+- 清理：测试用 tmp_path 自清；临时根无新增残留（b1 保留的 069 证据根仍在）。
+
+**4 恢复点**
+
+- 下一批：**b2 剩余 7 项待投递**（契约到即按序执行）；baseline = `checkpoint/b2` 指向的 commit；工作树提交后 clean。
+
+**5 不含糊**
+
+- **081 = RELOCK_REGISTERED_PARTIAL**：差异已登记，**两端仍未锁定**（三个摘要互不相等）；订正工单前提——
+  前端 P21 交回的是**阶段 2 对**（`6e8ae84a`/`f5d27269`，59 方法），不是 `b284f70c`。
+- **080 = FIRST_RUN_LOCK_DONE**，但两处取舍必须知道：就绪=**首轮终态**（每库一次等待；不是"库就绪探测"）；
+  同键的**新库**（数据根重建）不会再被锁——已知边界。
+- **QUEUE_EMPTY_AT 已写**（见上）——这是调度者的投递缺口，不是执行者停工理由的托词。
