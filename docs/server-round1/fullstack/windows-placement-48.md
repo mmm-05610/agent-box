@@ -106,3 +106,23 @@
 **与 Linux 侧的关系（明示）**：Windows 侧是**低于 Linux 侧**的形态——Linux 侧有 bwrap 的读写隔离
 （只读 EROFS、宿主 /home 不可见、RO 绑定等）与一致性门背书；Windows 侧只有 Job 的生命/树杀与
 真实目录物化，**写隔离与读隔离声明均为 false**（见 §八 核对记录），不得按对等能力描述。
+
+## 八、声明核对记录（072 stage 2，2026-09-19；只读核对，未改实现）
+
+工单 072 G2 要求：写/读隔离声明**仍为 false**，且不得被夸大。逐处第一手核对：
+
+| 落点 | 内容 | 判定 |
+| --- | --- | --- |
+| `plugins/agent-box-sandbox-windows/src/agent_box_sandbox_windows/provider.py:11` | "read isolation: **false** (no boundary exists: the harness process is an …)" | false ✓ |
+| 同文件 `:13` | "write isolation: **false** (same reason; \"bounded write\" means the …)" | false ✓ |
+| 同文件 `:181` | 声明文档自述 "This platform's declaration: life-cycle yes, isolation no." | 一致 ✓ |
+| 同文件 `:200` | 能力声明 `("filesystem.readonly@1", "unavailable", ())`（网络同族 unavailable） | 未夸大 ✓ |
+| 同文件 `:253` | 房间姿态 `"isolation": "none"` | 未夸大 ✓ |
+| 本文档 §二 | 降级形态明示"声明隔离半边**不可用**（`filesystem.readonly@1` / `network.none@1` = unavailable）——一条不自报" | 一致 ✓ |
+| 本文档 §七 | "**低于 Linux 侧**"明示（Linux 有 bwrap 读写隔离与一致性门；Windows 只有 Job + 真实目录） | 已写 ✓ |
+
+**结论**：无任一处变为正向声明 ⇒ 无需类型化停下/交回；G2 通过。
+（若将来有任一处改为 true，本核对即为那个时点的反例基线：先停下、类型化失败、交回调度者。）
+
+**G3 只写证据**：`git diff --stat -- src plugins tests` 为空（本单三个阶段均只碰 `docs/**`）。
+**零真实模型调用**；回归沿用既有门结论（§五：一致性门 Windows 真机 OK、反例 FAILED，c10 提交）。
