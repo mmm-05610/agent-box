@@ -39,3 +39,35 @@
 - **`task_id` 续接**（=子 native session 引用；跨家族续接类型化拒绝）与**并发扇出**（每轮 ≤4）；
 - **继承规则实现点**（父的 deny 与工作区限制传播到子；允许集仍由子自己决定）；
 - **授权分区的 wire 面**（父 profile 的"可调用哪些 profile"）与 P20 的"智能体"卡接入。
+
+## 阶段 C 首块（已落地）：真实桥与子执行编排
+
+- **委派服务**（`server/execution/delegation.py`）：
+  - `list_for()`：零授权 ⇒ `{tools: [], roster: []}`；有授权 ⇒ 两工具（描述含**实时花名册**）。
+  - `run()`：授权→`validate_run_arguments`（只收紧/上限/3–5 词）→ 可用性检查 →
+    **深度链**（`check_depth`，环与超深各自类型化）→ 每轮扇出 ≤4（`SUBAGENT_TURNS_EXCEEDED`）→
+    解析 `task_id`（=子会话 native 引用；**跨家族拒绝** `SUBAGENT_TASK_FAMILY_MISMATCH`；
+    未知句柄 `SUBAGENT_TASK_UNKNOWN`）→ 建**正常子轮**（新会话或续接同会话）→
+    **链接 `parent_turn_id`**（schema 18）→ 现有执行链起轮 → 10 分钟内有界等待 →
+    **有界最终消息**（≤4096 字符，子结果不直接对用户可见）+ **同源用量**（子轮自己的 usage 列，
+    父的归并=一次 join，不搬数字）+ `task_id` 句柄 + `canDelegate`（子的授权边，如实转述）。
+  - 失败子轮 ⇒ `state=failed + errorCode`（类型化结果，不吐裸输出）。
+  - **取消传播**：`cancel_children(parent_turn_id)` 列出活动子轮（父取消时逐个取消）。
+- **桥**（`plugins/agent-box-harnesses/runtime/subagent-bridge.mjs`，入 sidecar bundle）：
+  最小 stdio MCP server——`initialize`/`tools/list`（**实时向 Server 要花名册**，
+  描述不携带未授权名）/`tools/call`（两个工具转发，类型化错误带 `available` 内联）；
+  env=`AGENTBOX_BRIDGE_URL`（loopback）+`AGENTBOX_BRIDGE_TOKEN`（**按次令牌**，非用户令牌）。
+- **端点**（`POST /internal/delegation/{token}`，FastAPI 内、非 wire/1）：令牌→(父轮, 父 profile)；
+  未知令牌 404；服务类型化拒绝以 409 + 码 + available 返回。
+- **渲染**：装配时父 profile **有授权边才**合成 `agentbox-subagents` 条目（claude=JSON
+  `mcpServers`、codex=TOML `[mcp_servers.*]`），并铸一次性令牌；**零授权零条目**
+  （端到端测试断言两种形态）。
+- **测试**：7 条（服务级 5 + 端点 1 + 渲染 1），全量见提交记录。
+
+## 65 仍未做（如实）
+
+1. **真实沙箱端到端**：桥在 guest 内实际起进程 → 打到 Server 端点 → 子轮完成回摘要（本机通道一趟）；
+2. **审批中断浮到父轮次**（子的 `ask` 以父会话事件镜像）；
+3. **继承规则实现点**：父的 `deny` 与工作区/外部目录限制传播进子轮的冻结姿态；
+4. **授权分区的 wire 面**（`profiles.subagentGrants` 增删查）与 P20"智能体"卡；
+5. 并发扇出的真机证据（服务级已覆盖调用路径；真实并行两子调用未跑）。

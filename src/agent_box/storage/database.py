@@ -8,7 +8,7 @@ import threading
 from typing import Iterator
 
 
-PRODUCT_SCHEMA_VERSION = 17
+PRODUCT_SCHEMA_VERSION = 18
 
 
 class FutureSchemaError(RuntimeError):
@@ -116,6 +116,7 @@ CREATE TABLE IF NOT EXISTS server_turns (
     result_object_digest TEXT,
     error_code TEXT,
     change_set_object_digest TEXT,
+    parent_turn_id TEXT,
     usage_input_tokens INTEGER,
     usage_output_tokens INTEGER,
     usage_total_tokens INTEGER,
@@ -305,6 +306,16 @@ def _add_columns(conn: sqlite3.Connection, table: str, additions: dict[str, str]
     for name, declaration in additions.items():
         if name not in columns:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {declaration}")
+
+
+def _migrate_17_to_18(conn: sqlite3.Connection) -> None:
+    """Order 65 C: the sub-execution link.
+
+    A delegated turn names the parent turn that started it, so attribution
+    (usage roll-up, cancellation propagation, the parent's relay) is one join
+    away - the child stays a normal execution in every other respect.
+    """
+    _add_columns(conn, "server_turns", {"parent_turn_id": "TEXT"})
 
 
 def _migrate_16_to_17(conn: sqlite3.Connection) -> None:
@@ -648,6 +659,8 @@ class Database:
                 _migrate_15_to_16(conn)
             if current in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16):
                 _migrate_16_to_17(conn)
+            if current in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17):
+                _migrate_17_to_18(conn)
             conn.executescript(_SCHEMA)
             conn.execute(
                 "INSERT OR IGNORE INTO agentbox_product_schema(singleton, version, applied_at) "

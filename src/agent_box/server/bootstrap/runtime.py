@@ -434,6 +434,15 @@ def build_runtime(
     runtime.plugin_assets = plugin_assets
     runtime.hook_records = hook_records
     runtime.hook_triggers = hook_triggers
+    # Order 65 C: the delegation service and the per-attempt token registry the
+    # bridge's loopback calls resolve through.
+    from agent_box.server.execution.delegation import DelegationService
+
+    runtime.delegation_service = DelegationService(
+        records=session_records, profiles=profile_records, sessions=session_service,
+        execution=execution, registry=registry, data_root=root,
+    )
+    runtime.delegation_tokens = {}
     return runtime
 
 
@@ -938,6 +947,70 @@ def build_runtime_from_sidecar_deployment(
                                 "HOOK_TARGET_UNSUPPORTED: hooks need a JSON target"
                             )
 
+                # Order 65 C: a Profile that may delegate gets the bridge as a
+                # synthesized MCP server entry, carrying an attempt-scoped
+                # token. Zero grants: no entry (no always-failing tools).
+                bridge_entry = None
+                if profile_id_for_assets:
+                    from agent_box.server.profiles.subagents import (
+                        grant_edges, has_delegation,
+                    )
+
+                    edges = grant_edges(
+                        runtime.delegation_service.profiles.subagent_grants())
+                    if has_delegation(edges, profile_id_for_assets):
+                        import uuid as _uuid
+
+                        token = _uuid.uuid4().hex
+                        runtime.delegation_tokens[token] = {
+                            "turnId": context.get("id"),
+                            "profileId": profile_id_for_assets,
+                        }
+                        bridge_command = [
+                            "/usr/bin/node",
+                            "/runtime/view/agentbox-sidecar/runtime/subagent-bridge.mjs",
+                        ]
+                        bridge_entry = {
+                            "command": bridge_command[0],
+                            "args": bridge_command[1:],
+                            "env": {
+                                "AGENTBOX_BRIDGE_URL": self_url_of(),
+                                "AGENTBOX_BRIDGE_TOKEN": token,
+                            },
+                            "name": "agentbox-subagents",
+                            "target": _bridge_target(profile_spec),
+                        }
+
+                # The bridge creates its own document when the turn has no
+                # other MCP content: a granted Profile always gets the tools.
+                if bridge_entry is not None:
+                    bridge_target = str(bridge_entry["target"] or "")
+                    if bridge_target.endswith(".json"):
+                        key = getattr(profile_spec, "mcp_key", None) or "mcpServers"
+                        json_documents.setdefault(bridge_target, {}).setdefault(key, {})[
+                            bridge_entry["name"]
+                        ] = {
+                            "command": bridge_entry["command"],
+                            "args": list(bridge_entry["args"]),
+                            "env": dict(bridge_entry["env"]),
+                        }
+                    elif bridge_target.endswith(".toml"):
+                        lines = [
+                            f"[mcp_servers.{bridge_entry['name']}]",
+                            f'command = "{bridge_entry["command"]}"',
+                            "args = [" + ", ".join(
+                                f'"{item}"' for item in bridge_entry["args"]) + "]",
+                        ]
+                        for env_name, env_value in sorted(bridge_entry["env"].items()):
+                            lines.append(f'{env_name} = "{env_value}"')
+                        toml_fragments.setdefault(bridge_target, []).append(
+                            "\n".join(lines) + "\n")
+                    else:
+                        raise RuntimeError(
+                            "SUBAGENT_BRIDGE_TARGET_UNSUPPORTED: this family "
+                            "declares no MCP document for the bridge"
+                        )
+
                 projected = {
                     str(target_value)
                     for _source, target_value in deployment.get("_projection_mounts", ())
@@ -1406,6 +1479,25 @@ def _sidecar_deployment_file(root: Path, relative: Any) -> bytes:
     if not resolved.is_file() or resolved.stat().st_size > 8 * 1024 * 1024:
         raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
     return resolved.read_bytes()
+
+
+def _bridge_target(profile_spec) -> str | None:
+    """The file the bridge entry belongs in, per the family's MCP declaration."""
+    return getattr(profile_spec, "mcp_target", None)
+
+
+def self_url_of() -> str:
+    """The loopback URL the bridge dials back on.
+
+    The Server's own bind address is a machine-local fact; the bridge runs in
+    the same machine's network namespace, so the loopback address is the one
+    that is always right. The port comes from the environment when the
+    embedding process set one, and defaults to the documented port.
+    """
+    import os as _os
+
+    port = _os.environ.get("AGENT_BOX_HTTP_PORT") or "8732"
+    return f"http://127.0.0.1:{port}"
 
 
 def _registry_profile_spec(harness_type: str):

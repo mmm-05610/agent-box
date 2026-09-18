@@ -166,6 +166,43 @@ def create_app(runtime: ServerRuntime) -> FastAPI:
         response.headers["X-Wire-Version"] = WIRE_VERSION
         return encode_result(request_id, result)
 
+    # -- delegation bridge (order 65 C) ------------------------------------
+    #
+    # The bridge inside the sandbox is not a bearer of the user's token: it
+    # carries an attempt-scoped token minted when the parent turn was
+    # assembled, and this surface resolves it to that one turn. Reads only the
+    # two delegation operations, loops back to the same policy as every other
+    # route (the loopback middleware above), and answers nothing else.
+    @app.post("/internal/delegation/{token}")
+    async def delegation(token: str, request: Request) -> JSONResponse:
+        body = await request.json()
+        registry = getattr(runtime, "delegation_tokens", None)
+        grant = (registry or {}).get(token)
+        if grant is None:
+            return JSONResponse({"error": "DELEGATION_TOKEN_UNKNOWN"}, status_code=404)
+        op = body.get("op")
+        service = getattr(runtime, "delegation_service", None)
+        if service is None:
+            return JSONResponse({"error": "DELEGATION_UNAVAILABLE"}, status_code=503)
+        try:
+            if op == "list":
+                payload = service.list_for(parent_profile_id=grant["profileId"])
+                return JSONResponse({"result": payload})
+            if op == "run":
+                payload = service.run(
+                    parent_turn_id=grant["turnId"], parent_profile_id=grant["profileId"],
+                    arguments=dict(body.get("arguments") or {}),
+                    calls_this_turn=int(body.get("callsThisTurn") or 0),
+                )
+                return JSONResponse({"result": payload})
+        except Exception as refusal:  # noqa: BLE001 - typed by the service
+            return JSONResponse({
+                "error": getattr(refusal, "code", type(refusal).__name__),
+                "message": getattr(refusal, "message", str(refusal)),
+                "available": list(getattr(refusal, "available", ()) or ()),
+            }, status_code=409)
+        return JSONResponse({"error": "DELEGATION_OP_UNKNOWN"}, status_code=400)
+
     @app.get("/api/v1/readiness", dependencies=protected)
     def readiness():
         return runtime.service.readiness()

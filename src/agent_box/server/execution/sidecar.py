@@ -234,6 +234,11 @@ def sidecar_bundle_files(
         "agentbox-sidecar/runtime/profile_extensions.mjs": (
             runtime / "profile_extensions.mjs"
         ).read_bytes(),
+        # Order 65 C: the delegation bridge - the stdio MCP server a parent
+        # Harness starts when its Profile holds delegation grants.
+        "agentbox-sidecar/runtime/subagent-bridge.mjs": (
+            runtime / "subagent-bridge.mjs"
+        ).read_bytes(),
         "agentbox-sidecar/third_party/harness_remote/SOURCE.json": (
             snapshot / "SOURCE.json"
         ).read_bytes(),
