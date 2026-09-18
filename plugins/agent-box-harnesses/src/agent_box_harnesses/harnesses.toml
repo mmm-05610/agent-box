@@ -36,6 +36,10 @@ mcp_key = "mcp_servers"
 # Order 59 stage A (first-hand): codex reads `hooks/hooks.json` with the
 # same event names as claude (SessionStart…SubagentStop, hook_event_name).
 hooks_target = "/runtime/home/.codex/hooks/hooks.json"
+# Order 63 stage A (first-hand): the pinned binary names
+# `memories/MEMORY.md` and `memories/memory_summary.md`, i.e. under
+# $CODEX_HOME/memories/.
+memory_paths = [".codex/memories/MEMORY.md", ".codex/memories/memory_summary.md"]
 [[harness.inputs]]
 contract_id = "agent-box.skill@1"
 minimum = 0
@@ -108,6 +112,9 @@ mcp_key = "mcpServers"
 # (PreToolUse 108 refs, disableAllHooks 30).
 hooks_target = "/runtime/home/.claude/settings.json"
 hooks_key = "hooks"
+# Order 63 stage A (first-hand): `.claude/CLAUDE.md` (17 refs) is the
+# user-level memory/instruction file the harness itself writes and reads.
+memory_paths = [".claude/CLAUDE.md"]
 [[harness.launch_modes]]
 name = "acp"
 argv = ["claude-agent-acp"]

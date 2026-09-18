@@ -74,6 +74,7 @@ _PARAM_SHAPES = {
     "profiles.updateConfig": ({"requestId", "profileId", "expectedVersion", "values"}, set()),
     "profiles.archive": ({"requestId", "profileId", "expectedVersion"}, set()),
     "profiles.clone": ({"requestId", "profileId", "displayName"}, {"harness"}),
+    "profiles.memory": ({"requestId", "profileId"}, set()),
     "profiles.setPermissions": (
         {"requestId", "profileId", "expectedVersion", "preset", "rules"}, set()),
     "providerModels.list": ({"includeArchived"}, set()),
@@ -270,6 +271,7 @@ class WireService:
         hooks=None,
         hook_triggers=None,
         connectors=None,
+        data_root=None,
     ) -> None:
         self._server_id_provider = server_id_provider
         self.artifact_store = artifact_store
@@ -292,6 +294,8 @@ class WireService:
         #: Order 62: the placement connectors (the WSL one answers a Git
         #: status through its own fixed command).
         self.connectors = connectors
+        #: Order 63: the local home root, for the read-only memory face.
+        self.data_root = data_root
         #: Order 56: harness -> its declared subscription login-state files,
         #: read from the deployment set the composition loaded.
         self.subscription_files_for = subscription_files_for or (lambda _harness: ())
@@ -320,6 +324,7 @@ class WireService:
             "profiles.archive": self.profiles_archive,
             "profiles.clone": self.profiles_clone,
             "profiles.setPermissions": self.profiles_set_permissions,
+            "profiles.memory": self.profiles_memory,
             "providerModels.list": self.provider_models_list,
             "providerModels.create": self.provider_models_create,
             "providerModels.update": self.provider_models_update,
@@ -894,6 +899,49 @@ class WireService:
             credential_id=credential_id,
         )
         return {"profile": self._profile(row)}
+
+    def profiles_memory(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        """Read the Profile's declared memory files (order 63).
+
+        The home is resolved the same way a turn resolves it (name + identity
+        + the registry's native home); a family that declares no memory paths
+        answers `available: false` so the UI hides the partition. Only the
+        local placement can be read here; a remote home answers the typed
+        unavailable reason instead of pretending.
+        """
+        from pathlib import Path as _Path
+
+        from agent_box.server.bootstrap.runtime import (
+            _profile_home_locator, _registry_native_homes, _registry_profile_spec,
+        )
+        from agent_box.server.profiles.memory import memory_paths_for, read_memory
+
+        _require(params, "requestId", "profileId")
+        profile = self.profiles.records.get(_bounded(params["profileId"], "profileId"))
+        harness = str(profile["harness_type"])
+        spec = _registry_profile_spec(harness)
+        declared = memory_paths_for(spec)
+        if not declared:
+            return {"memory": {"available": False, "reason": None, "files": [],
+                               "note": "this family declares no memory paths"}}
+        native_home = _registry_native_homes().get(harness)
+        if not native_home:
+            return {"memory": {"available": False, "reason": "MEMORY_HOME_MISSING",
+                               "files": []}}
+        locator = profile.get("home_locator") or _profile_home_locator(
+            profile.get("name") or harness, native_home,
+            profile_id=profile.get("id"))
+        if self.data_root is None:
+            return {"memory": {"available": False, "reason": "MEMORY_UNAVAILABLE",
+                               "files": []}}
+        # The declared paths are guest-home-relative, which is exactly the
+        # role-relative mapping every other home face uses.
+        role_segment = locator.split("/", 1)[0]
+        home = _Path(self.data_root) / "profiles" / role_segment
+        if not home.is_dir():
+            return {"memory": {"available": False, "reason": "MEMORY_HOME_MISSING",
+                               "files": []}}
+        return {"memory": read_memory(home, declared=declared)}
 
     def profiles_set_permissions(self, params: Mapping[str, Any]) -> dict[str, Any]:
         """Write the profile's permission posture (order 60 A/G2).

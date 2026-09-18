@@ -547,3 +547,13 @@ ProviderModelConfigRecord = {
 - 只读且固定 argv（`--no-optional-locks status --porcelain=v2 --branch` + `diff --numstat HEAD`）；
   答案与记录里**无宿主路径**；不改 Worker/Rust 协议；`ssh` 侧返回 `GIT_UNAVAILABLE`。
 - 需前端同步（P20）与两仓重锁。
+
+## Order 63 — Profile 记忆读取（2026-09-18，env-provider）
+
+- **新方法（+1，纯只读）**：`profiles.memory {requestId, profileId} → {memory}`；
+  `memory = {available, reason, files[], note?}`，文件项含 `{path, size, digest, content}`，
+  凭据命中项为 `{path, size, reason: "MEMORY_CONTAINS_SECRET", refused: true}`（无内容）。
+- **注册表新字段** `memory_paths`（≤8、guest-home 相对）；未声明的家 `available:false`
+  且前端**隐藏分区**（不画假开关）。
+- 只从 profile 的原生 home 读、符号链接不跟随、答案零宿主路径；WSL 侧返回 `MEMORY_UNAVAILABLE`。
+- 需前端同步（P17 修订）与两仓重锁。
