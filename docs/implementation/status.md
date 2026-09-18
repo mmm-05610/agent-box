@@ -909,3 +909,56 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   ② 上一轮挂的"893 vs 898 差 5 条"**是我这边的算术假象**：我把 `-k posture` 的选中面当成了本单文件的条数。
   一手复核后 084 的 898 **逐字成立**（`git diff --stat 873a6d4..HEAD -- tests/ src/` 只含本单两个新文件），
   本单 34 条 ⇒ 932，无悬案。详见证据 §7.6(b)。
+
+
+## 工单 086 — 65 最后一圈：真 harness 父侧自发起 tools/call（2026-09-18，执行者）
+
+> **进行中**：本记本单**阶段 1**（选家并核对工具播发）。终态行（含 G1/G2/G3 与 65 收口）在阶段 3 提交时补。
+> 证据：[subagent-harness-round-086.md](../server-round1/fullstack/subagent-harness-round-086.md)
+> ＋ 原始事实 [subagent-harness-round-086-pin.json](../server-round1/fullstack/subagent-harness-round-086-pin.json)
+> （sha256 `0d2aad5e30a936cf5bd6801c58c2f45fd9fa8d9b4dd85402a0feebb0033de95f`）。
+
+| 单 | 阶段 | 门 | 回归 | 真实模型 | 提交 |
+| --- | --- | --- | --- | --- | --- |
+| 086 | 1 选家并核对工具播发 | 本阶段的门 = **读路径一手钉死 + 发散即失败**：claude CLI 的 `tools` 数组里，探针工具**只在** `.claude.json` 与 `.mcp.json` 声明时出现，**在 `settings.json`（= 65/58 的渲染落点）声明时缺席**；空白对照三文件皆无 ⇒ 断言空。生产形态组装门：有出向授予 ⇒ 桥条目**真的落进** `.claude.json` 且轮次 `completed`；无授予（反例）⇒ 角色目录里**没有** `.claude.json`；只读投影 `settings.json` 存在且**不含**桥条目 | 本单新增 **9** 条（`-k mcp_config_source` 5 / `-k subagent` 面内新 4）；Validation `python3 -m pytest -q tests/server -k subagent` → **8 passed / 633 deselected**（= 本单 4 ＋ 65 既有 4）；根套件 **941 passed / 0 failed / 0 error**（356 s，= 085 的 932 ＋ 本单 9，**零退化**） | **0 次 / ¥0** | 本提交（阶段 1） |
+
+- **本阶段跑出来的不是"绿了一圈"，是一条真缺陷**：65 把桥渲染进 claude 的 `mcp_target =
+  `/runtime/home/.claude/settings.json`，而**该家根本不从这个文件读 MCP 服务器** ⇒ 条落进没人读的文件；
+  生产模板又把同一文件声明为**只读投影**，于是"授予子代理的父 Profile"在真实部署形态下**组装期就
+  `ASSET_SLOT_CONFLICT`**（`runtime.py:1020`）。65 的端到端用例之所以绿：其部署 `projectionFiles` 为空、
+  且父侧由测试进程**自己写 JSON-RPC 驱动桥**——正是本单要补的那一圈的夹具限制。
+- **改了什么（1 行事实，Server 零改动）**：`harnesses.toml` 的 claude-code `mcp_target`
+  → `/runtime/home/.claude/.claude.json`（实测可读、落在执行期覆盖层、不是投影目标；`mcp_key` 仍 `mcpServers`）。
+  落点选注册表而非 Server，是守 `runtime.py:_registry_profile_spec` 的原则"槽位是这个家自己的事实"。
+  不选项目级 `.mcp.json`：那要往**用户的真实工作区**写配置。
+- **连带改的三处断言（都是随事实走，不是为凑绿）**：`tests/server/test_asset_hubs.py`（58 的槽位钉值＋读取路径，
+  hooks 仍留 `settings.json`）、`tests/server/test_delegation.py`（65 的两处 `.claude/settings.json` → `.claude.json`）。
+  改前两处**如实失败**（`KeyError: 'mcpServers'` / "a granted parent must materialise the bridge"），改后转绿。
+- **家与排除（注册表派生，非按感觉）**：工单建议"最省的一家例如 pi"这条**前提不成立**——`pi/dsh/hermes/kilo/opencode`
+  **未声明 MCP 文档** ⇒ `SUBAGENT_BRIDGE_TARGET_UNSUPPORTED`，结构上不能承载桥；`qwen` 的 CLI 本宿主未安装（无法一手钉死）；
+  `codex` 承载但**与自家只读投影相撞**（本单只写成断言，不越界修）。⇒ 本轮选 **claude-code**。
+- **两条一手限制（不允许绕过）**：
+  ① **版本漂移**：读路径观测用的是宿主 CLI **2.1.274**，本部署钉死 **2.1.270** ⇒ 对钉死版本属**未验证**，
+  只能由阶段 2 的**沙箱内真 CLI** 给出最终确认（仓内工件二进制不得手跑，本轮该尝试被拒）；
+  ② **`hooks_target` 同一形状**属**推导**（59 的 `settings.json` 走 `runtime.py:1018` 同一道检查）——本单**未**为
+  hooks 做读路径观测，故不改、只登记。
+- **一条基线既有失败（本单不修，见证据 §8）**：
+  `plugins/agent-box-harnesses/tests/test_skill_projection.py::test_all_five_registry_targets_are_lossless_and_read_only`
+  在**基线逐字节副本**（`git archive 4c32992 \| tar -x` 后原地复跑）上以**同一断言、同一两个字符串**失败 ⇒
+  一手判定为**基线既有**、非本单回归。根因：该用例把一家的技能路径写死成 `/runtime/home/skills/{skill_id}`，
+  而注册表（基线如此）里 claude 是 `.claude/skills`、qwen 是 `.qwen/skills`；根套件 `testpaths = tests` 不含
+  `plugins/**/tests`，所以它一直没被跑到。**不顺手修**：属 52/58 技能投影事实，且钉正确期望要一次技能读路径的一手观测。
+- **阶段 2 的硬前置（本阶段末已核实的三条事实）**：桥拨回的是 `self_url_of()`
+  = `http://127.0.0.1:$AGENT_BOX_HTTP_PORT` ⇒ 必须**真监听**（`test_delegation.py:596` 的 uvicorn＋线程写法），
+  `TestClient` 不算；出口守护只放 loopback ⇒ 拨回允许、审计里出现 `denied` 即本次运行不干净；
+  `scripts/**` 不在本单 `write_paths` ⇒ 评审过的 `claude-production-chain-gate.py` **一个字不改**，
+  在 `tests/**` 里以 `importlib` 按路径复用其部件。
+- **阶段 2 探到的新约束（登记，留给阶段 3 的"审批"一项）**：ACP 适配器把工具权限检查交给
+  `canUseTool` → 发 `session/request_permission`，而**Worker 侧没有该方法的应答路径**
+  （`grep -rn request_permission workers/agent-box-worker/src/` 只命中 `fs::set_permissions` 两处无关项、
+  `src/agent_box` 亦无）。⇒ 真父轮里的桥工具**必须在 SDK 侧就被预批准**（`permissions.allow`/`defaultMode`），
+  否则这圈会卡在权限往返上；这与 085 登记的 **B5** 是相邻的两件事，阶段 2 用实测决定怎么说。
+- **账务与清理**：真实模型调用 **0 次 / ¥0**（探针全走 loopback 假端点，CLI 的每次运行都记在 pin JSON 里，
+  `authorized` 字段核对本注入令牌）；探针 CLI 运行全程 `HOME`/`CLAUDE_CONFIG_DIR` 指向临时目录，
+  **未读也未写**用户真实 `~/.claude`；凭据 locator 全程未访问；临时件 `/tmp/086-pin.json` 已入库为证据副本、
+  基线副本 `/tmp/086-baseline` 已删除并核实缺席。

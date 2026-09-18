@@ -331,7 +331,9 @@ def test_a_granted_parent_renders_the_bridge_entry_and_zero_grants_does_not(tmp_
                 time.sleep(0.05)
             role = next(item for item in (tmp_path / "server" / "profiles").iterdir()
                         if item.is_dir() and item.name != "_sessions")
-            candidate = role / ".claude" / "settings.json"
+            # 086 stage 1: this family's `mcpServers` slot is `.claude.json` -
+            # settings.json is a file the CLI never reads for MCP servers.
+            candidate = role / ".claude" / ".claude.json"
             rendered = (json.loads(candidate.read_text(encoding="utf-8"))
                         if candidate.is_file() else {})
             assert "agentbox-subagents" not in rendered.get("mcpServers", {}), \
@@ -346,12 +348,12 @@ def test_a_granted_parent_renders_the_bridge_entry_and_zero_grants_does_not(tmp_
                 if session["turns"] and session["turns"][0]["state"] in {"completed", "failed"}:
                     break
                 time.sleep(0.05)
-            # The second session's role directory holds its own settings.json.
+            # The second session's role directory holds its own `.claude.json`.
             role_dirs = [item for item in (tmp_path / "server" / "profiles").iterdir()
                          if item.is_dir() and item.name != "_sessions"]
             found = None
             for role in sorted(role_dirs, key=lambda item: item.stat().st_mtime, reverse=True):
-                candidate = role / ".claude" / "settings.json"
+                candidate = role / ".claude" / ".claude.json"
                 if candidate.is_file():
                     document_value = json.loads(candidate.read_text(encoding="utf-8"))
                     if "agentbox-subagents" in document_value.get("mcpServers", {}):

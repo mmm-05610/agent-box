@@ -1,0 +1,30 @@
+{
+  ".claude.json": {
+    "advertised": [
+      "mcp__agentbox-probe__probe_tool_086"
+    ],
+    "authorizedRequests": 1,
+    "claudeVersion": "2.1.274 (Claude Code)",
+    "requestCount": 1
+  },
+  ".mcp.json": {
+    "advertised": [
+      "mcp__agentbox-probe__probe_tool_086"
+    ],
+    "authorizedRequests": 1,
+    "claudeVersion": "2.1.274 (Claude Code)",
+    "requestCount": 1
+  },
+  "control-none": {
+    "advertised": [],
+    "authorizedRequests": 1,
+    "claudeVersion": "2.1.274 (Claude Code)",
+    "requestCount": 1
+  },
+  "settings.json": {
+    "advertised": [],
+    "authorizedRequests": 1,
+    "claudeVersion": "2.1.274 (Claude Code)",
+    "requestCount": 1
+  }
+}

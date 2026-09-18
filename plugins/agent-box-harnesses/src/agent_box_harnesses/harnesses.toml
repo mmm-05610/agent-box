@@ -106,7 +106,11 @@ slots = ["provider", "instruction", "mcp", "skill", "hooks"]
 # Order 58 stage A (first-hand): `.claude/skills` (52 refs), `mcpServers` in
 # settings.json (100 refs).
 skill_target = "/runtime/home/.claude/skills/{skill_id}"
-mcp_target = "/runtime/home/.claude/settings.json"
+# Order 086 stage 1 (first-hand, CLI 2.1.274): an MCP server declared in
+# settings.json never reaches the model request's `tools` array; declared in
+# `$CLAUDE_CONFIG_DIR/.claude.json` it does (and with neither file, not). The
+# project `.mcp.json` also works but the workspace belongs to the user.
+mcp_target = "/runtime/home/.claude/.claude.json"
 mcp_key = "mcpServers"
 # Order 59 stage A (first-hand): claude declares hooks in settings.json
 # (PreToolUse 108 refs, disableAllHooks 30).

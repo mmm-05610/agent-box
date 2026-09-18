@@ -181,7 +181,10 @@ def test_the_two_observed_spellings_render_and_unsupported_families_refuse():
     target, text = render_for_family(
         canonical, profile_spec=spec("claude-code"),
         resolved_env={"API_KEY": "resolved-value"})
-    assert target == "/runtime/home/.claude/settings.json"
+    # 086 stage 1 (first-hand, CLI 2.1.274): the CLI reads `mcpServers` from
+    # `$CLAUDE_CONFIG_DIR/.claude.json`, not from settings.json, so 58's slot
+    # for this family moved; the render rule itself is unchanged.
+    assert target == "/runtime/home/.claude/.claude.json"
     assert json.loads(text)["mcpServers"]["web-tools"]["command"] == "/bin/web-tools"
     assert json.loads(text)["mcpServers"]["web-tools"]["env"] == {"API_KEY": "resolved-value"}
 
@@ -345,15 +348,21 @@ def test_a_bound_mcp_asset_is_rendered_and_materialised_without_writeback(tmp_pa
 
         role = next(item for item in (tmp_path / "server" / "profiles").iterdir()
                     if item.is_dir() and item.name != "_sessions")
+        # 086 stage 1: MCP servers and hooks are two different files for this
+        # family - `mcpServers` in `.claude.json` (the path the CLI reads),
+        # `hooks` in `settings.json` (59's pin, unchanged).
+        mcp_document = json.loads(
+            (role / ".claude" / ".claude.json").read_text(encoding="utf-8"))
+        assert mcp_document["mcpServers"]["web-tools"]["command"] == "/bin/web-tools"
+        assert mcp_document["mcpServers"]["web-tools"]["args"] == ["--stdio"]
         rendered = json.loads((role / ".claude" / "settings.json").read_text(encoding="utf-8"))
-        assert rendered["mcpServers"]["web-tools"]["command"] == "/bin/web-tools"
-        assert rendered["mcpServers"]["web-tools"]["args"] == ["--stdio"]
         hook_document = rendered["hooks"]["PreToolUse"][0]
         assert hook_document["matcher"] == "Bash"
         assert hook_document["hooks"][0]["command"] == "/bin/guard --check"
         # Nothing in the file is a credential value, and the audit (which
         # scans the home for the injected material) passed on this turn.
         assert "resolved-secret" not in (role / ".claude" / "settings.json").read_text()
+        assert "resolved-secret" not in (role / ".claude" / ".claude.json").read_text()
 
         # A server that carries credential references is refused until the
         # family's injection path is pinned: the value must never land in a
