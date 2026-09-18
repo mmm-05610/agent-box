@@ -3124,6 +3124,96 @@ mod home_tests {
         let _ = fs::remove_dir_all(&root);
     }
 
+    /// Quoted `home.<op>` tokens on one line. The prose inside `handle_home`'s
+    /// own error messages (`"home.put payload is empty or oversized"`) names an
+    /// operation without being one, so a token carrying a space never counts.
+    fn home_operation_names(line: &str) -> Vec<String> {
+        let mut names = Vec::new();
+        let mut rest = line;
+        while let Some(start) = rest.find('"') {
+            rest = &rest[start + 1..];
+            let Some(end) = rest.find('"') else { break };
+            let token = &rest[..end];
+            if token.starts_with("home.") && !token.contains(' ') {
+                names.push(token.to_string());
+            }
+            rest = &rest[end + 1..];
+        }
+        names
+    }
+
+    #[test]
+    fn the_dispatch_arm_and_handle_home_cover_one_home_operation_set() {
+        // Order 59-era defect, closed by 099: `home.put` was implemented here and
+        // never routed, and every layer stayed green - the request loop lists
+        // operation names by hand, `handle_home` answers anything else with
+        // `unreachable!()`, and the tests in this module call the handler
+        // directly, so they cannot see the seam. Behavioural coverage of the
+        // handler is therefore not coverage of the wire; the two name sets are
+        // read out of this file's text and compared, and a set that cannot be
+        // read fails rather than passing empty.
+        let source = std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"), "/src/main.rs"
+        ))
+        .expect("this file is readable at test time");
+        let lines: Vec<&str> = source.lines().collect();
+        let handler_start = lines
+            .iter()
+            .position(|line| line.starts_with("fn handle_home("))
+            .expect("handle_home is declared in this file");
+        let handler_end = lines[handler_start..]
+            .iter()
+            .skip(1)
+            .position(|line| *line == "}")
+            .map(|offset| handler_start + 1 + offset)
+            .expect("handle_home closes at column zero");
+
+        let mut implemented: Vec<String> = Vec::new();
+        let mut dispatched: Vec<String> = Vec::new();
+        for (index, line) in lines.iter().enumerate() {
+            let head = line.trim_end();
+            if !(head.ends_with("=> {") || head.ends_with("=>")) || !head.contains("\"home.") {
+                continue;
+            }
+            let names = home_operation_names(head);
+            if names.is_empty() {
+                continue;
+            }
+            if index > handler_start && index < handler_end {
+                implemented.extend(names);
+            } else if lines
+                .get(index + 1)
+                .is_some_and(|next| next.contains("handle_home("))
+            {
+                dispatched.extend(names);
+            }
+        }
+        assert!(
+            !dispatched.is_empty(),
+            "no home.* dispatch arm was found, so this guard read nothing and proved nothing"
+        );
+        assert!(
+            !implemented.is_empty(),
+            "no home.* arm was found inside handle_home, so this guard read nothing and proved nothing"
+        );
+        implemented.sort();
+        implemented.dedup();
+        dispatched.sort();
+        dispatched.dedup();
+        assert_eq!(
+            dispatched, implemented,
+            "the request loop routes {:?} while handle_home implements {:?}; a name in the \
+             second set only and not the first answers OP_UNSUPPORTED on the wire, and a \
+             name in the first only and not the second reaches unreachable!()",
+            dispatched,
+            implemented,
+        );
+        assert!(
+            implemented.contains(&"home.put".to_string()),
+            "home.put must stay implemented and dispatched (099)"
+        );
+    }
+
     #[test]
     fn a_profile_locator_may_not_claim_the_reserved_store_segment() {
         let root = scratch("store-reserved");
