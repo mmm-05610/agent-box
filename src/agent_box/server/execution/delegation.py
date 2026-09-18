@@ -162,8 +162,12 @@ class DelegationService:
         task_id = validated.get("task_id")
         if task_id is None:
             workspace_id = self._shared_workspace_id(child_profile)
+            # A unique key per call: two concurrent subagent calls in the same
+            # millisecond must not collide on the idempotency record.
+            import uuid as _uuid
+
             session = self.sessions.create_session(
-                f"subagent-{int(time.time()*1000)}",
+                f"subagent-{_uuid.uuid4().hex}",
                 {"workspace_id": workspace_id, "profile_id": chosen["profileId"]},
             )[1]
             return session["session_id"], None, False
@@ -244,14 +248,25 @@ class DelegationService:
 
         turn_id = opaque_id("turn")
         timestamp = now()
+        # The turn's input is a real published object (the delegated prompt),
+        # and its effective configuration starts from the child Profile's own
+        # frozen configuration - the model slot and every other control are the
+        # child's - with the merged permission posture on top.
+        input_digest = None
         effective_digest: str | None = None
-        if self.objects is not None and posture is not None:
-            child_value = {
-                "schema_version": 1,
-                "harness_type": str(child_profile["harness_type"]),
-                "configuration": {},
-                "permissions": dict(posture),
-            }
+        if self.objects is not None:
+            input_digest = self.objects.publish(json.dumps(
+                {"schema_version": 1, "message": {"text": prompt}},
+                ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+            ).encode()).digest
+            child_value = json.loads(self.objects.read(str(child_profile["config_object_digest"])))
+            if not isinstance(child_value, dict):
+                child_value = {}
+            child_value = dict(child_value)
+            child_value.setdefault("schema_version", 1)
+            child_value["harness_type"] = str(child_profile["harness_type"])
+            if posture is not None:
+                child_value["permissions"] = dict(posture)
             effective_digest = self.objects.publish(json.dumps(
                 child_value, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
             ).encode()).digest
@@ -260,9 +275,9 @@ class DelegationService:
                 "INSERT INTO server_turns(id,session_id,profile_id,profile_revision,"
                 "native_generation,state,capture_state,cleanup_state,input_object_digest,"
                 "effective_config_object_digest,parent_turn_id,created_at,updated_at) "
-                "VALUES (?,?,?,1,0,'accepted','pending','pending','x',?,?,?,?)",
-                (turn_id, session_id, child_profile["id"], effective_digest,
-                 parent_turn_id, timestamp, timestamp),
+                "VALUES (?,?,?,1,0,'accepted','pending','pending',?,?,?,?,?)",
+                (turn_id, session_id, child_profile["id"], input_digest,
+                 effective_digest, parent_turn_id, timestamp, timestamp),
             )
             conn.execute(
                 "UPDATE server_sessions SET status='active',version=version+1,"

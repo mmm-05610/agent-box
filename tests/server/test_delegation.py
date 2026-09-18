@@ -65,20 +65,34 @@ def _pieces(tmp_path):
 
 def _setup(tmp_path):
     database, profiles, workspaces, records, sessions, execution, service = _pieces(tmp_path)
+    objects = service.objects
+
+    def config_for(harness: str) -> str:
+        # A real published configuration object: every Profile in the product
+        # has one, and the delegation path reads it to start the child turn
+        # with the child's own controls.
+        return objects.publish(
+            f'{{"schema_version":1,"harness_type":"{harness}","configuration":{{}}}}'.encode()
+        ).digest
+
+    digest = config_for("codex")
     parent = profiles.create(key="p", request_digest="p", name="alpha", harness_type="codex",
-                             config_digest="sha256:" + "0" * 64, credential_id=None)[1]
+                             config_digest=digest, credential_id=None)[1]
     child = profiles.create(key="c", request_digest="c", name="beta", harness_type="codex",
-                            config_digest="sha256:" + "1" * 64, credential_id=None)[1]
+                            config_digest=digest, credential_id=None)[1]
     other = profiles.create(key="o", request_digest="o", name="gamma", harness_type="codex",
-                            config_digest="sha256:" + "2" * 64, credential_id=None)[1]
+                            config_digest=digest, credential_id=None)[1]
     workspace = workspaces.create(
         key="w", request_digest="w", distribution="Ubuntu", remote_user="tester",
         remote_path="/workspace", connection_id="c")[1]
     session = sessions.create_session("parent-session", {
         "workspace_id": workspace["workspace_id"], "profile_id": parent["profile_id"]})[1]
-    # A workspace for the child, so a fresh child session has somewhere to run.
-    sessions.create_session("child-seed", {
-        "workspace_id": workspace["workspace_id"], "profile_id": child["profile_id"]})
+    # A workspace for each callable Profile, so a fresh child session has
+    # somewhere to run.
+    for callable_profile in (child, other):
+        sessions.create_session(f"seed-{callable_profile['profile_id']}", {
+            "workspace_id": workspace["workspace_id"],
+            "profile_id": callable_profile["profile_id"]})
     with database.transaction() as conn:
         conn.execute(
             "INSERT INTO server_turns(id,session_id,profile_id,profile_revision,"
@@ -142,9 +156,11 @@ def test_continuation_depends_on_family_and_unknown_handles_refuse(tmp_path):
 
     # A handle from another family refuses rather than silently opening a new
     # session: create a claude-code session and hand its native id over.
+    claude_digest = service.objects.publish(
+        b'{"schema_version":1,"harness_type":"claude-code","configuration":{}}').digest
     claude = profiles.create(key="cl", request_digest="cl", name="claude-role",
                              harness_type="claude-code",
-                             config_digest="sha256:" + "3" * 64, credential_id=None)[1]
+                             config_digest=claude_digest, credential_id=None)[1]
     workspace_id = service._shared_workspace_id(profiles.get(child["profile_id"]))
     foreign = service.sessions.create_session("foreign", {
         "workspace_id": workspace_id, "profile_id": claude["profile_id"]})[1]
@@ -194,7 +210,7 @@ def test_a_failed_child_returns_its_typed_code_not_raw_output(tmp_path):
                                     records, IdempotentRecords(database), ObjectStore(tmp_path / "data"),
                                     harnesses=None, profiles=profiles, credentials=None,
                                     execution=failing),
-                                execution=failing)
+                                execution=failing, objects=ObjectStore(tmp_path / "data"))
     result = service.run(parent_turn_id="parent-turn", parent_profile_id=parent["profile_id"],
                          arguments={"subagent": "beta", "description": "do some work",
                                     "prompt": "x"})
@@ -485,3 +501,196 @@ class _Backend:
     from agent_box.server.execution.sidecar_backend import SidecarExecutionBackend as _B
 
     _native_event = _B._native_event
+
+
+def test_the_real_bridge_process_runs_a_child_turn_end_to_end(tmp_path, monkeypatch):
+    """Order 65 C: the bridge, un-faked.
+
+    A real `subagent-bridge.mjs` process speaks stdio MCP to this test, dials
+    the Server's loopback delegation surface with an attempt token, and the
+    delegated turn runs on the *real* local channel (bwrap + the fixture
+    adapter) - so the summary this test reads back is one a genuine execution
+    produced. Zero model calls: the fixture answers.
+    """
+    import json
+    import os
+    import shutil
+    import subprocess
+    import threading
+    import time
+
+    import uvicorn
+
+    from agent_box.server.bootstrap import build_runtime_from_sidecar_deployment
+    from agent_box.server.transport.http import create_app
+    from agent_box.storage.secrets import MemorySecretStore
+
+    import agent_box.server.bootstrap.runtime as runtime_module
+
+    if shutil.which("bwrap") is None or shutil.which("node") is None:
+        pytest.skip("bwrap and node are required")
+
+    REPO = __import__("pathlib").Path(__file__).resolve().parents[2]
+    PLUGIN = REPO / "plugins" / "agent-box-harnesses"
+    peer_source = "tests/harness_remote/home_probe_acp_peer.mjs"
+    peer_bytes = REPO / "tests" / "server" / "fixtures" / "home_probe_acp_peer.mjs"
+    harness = "claude-code"
+    deployment = {"schemaVersion": 1, "harnesses": [{
+        "id": harness, "capabilityClaims": {"stream": True},
+        "adapter": {"command": "/usr/bin/node", "args": [], "source": peer_source},
+        "stateProjection": {"target": f"/runtime/home/.{harness}"},
+        "timeoutMs": 60_000}]}
+    original_file = runtime_module._sidecar_deployment_file
+
+    def deployment_file(root, relative):
+        if relative == peer_source:
+            return peer_bytes.read_bytes()
+        return original_file(root, relative)
+
+    runtime_module._sidecar_deployment_file = deployment_file
+    port = 18760
+    monkeypatch.setenv("AGENT_BOX_HTTP_PORT", str(port))
+    try:
+        (tmp_path / "project").mkdir(exist_ok=True)
+        document = tmp_path / "deployment.json"
+        document.write_text(json.dumps(deployment), encoding="utf-8")
+        runtime = build_runtime_from_sidecar_deployment(
+            tmp_path / "server", document, plugin_root=PLUGIN,
+            secret_store=MemorySecretStore(values={}))
+        runtime.start()
+
+        from agent_box.server.idempotency import IdempotentRecords
+        from agent_box.server.sessions import SessionService
+
+        sessions = SessionService(
+            runtime.repository.sessions, IdempotentRecords(runtime.database),
+            runtime.objects, harnesses=runtime.harnesses,
+            profiles=runtime.repository.profiles,
+            credentials=runtime.repository.credentials, execution=runtime.execution)
+        parent = runtime.repository.profiles.create(
+            key="p", request_digest="p", name="alpha", harness_type=harness,
+            config_digest=runtime.objects.publish(
+                f'{{"schema_version":1,"harness_type":"{harness}","configuration":{{}}}}'.encode()
+            ).digest, credential_id=None)[1]
+        child = runtime.repository.profiles.create(
+            key="c", request_digest="c", name="beta", harness_type=harness,
+            config_digest=runtime.objects.publish(
+                f'{{"schema_version":1,"harness_type":"{harness}","configuration":{{}}}}'.encode()
+            ).digest, credential_id=None)[1]
+        workspace = runtime.repository.workspaces.create(
+            key="w", request_digest="w", distribution="Ubuntu", remote_user="tester",
+            remote_path=str(tmp_path / "project"), connection_id="conn")[1]
+        with runtime.database.transaction() as conn:
+            conn.execute(
+                "UPDATE server_workspaces SET env_kind='local', normalized_path=? WHERE id=?",
+                (str(tmp_path / "project"), workspace["workspace_id"]),
+            )
+        sessions.create_session("child-seed", {
+            "workspace_id": workspace["workspace_id"], "profile_id": child["profile_id"]})
+        runtime.repository.profiles.grant_subagent(
+            parent_id=parent["profile_id"], child_id=child["profile_id"])
+        runtime.delegation_tokens["e2e-token"] = {
+            "turnId": "parent-turn-e2e", "profileId": parent["profile_id"],
+        }
+
+        server = uvicorn.Server(uvicorn.Config(
+            create_app(runtime), host="127.0.0.1", port=port, log_level="warning"))
+        thread = threading.Thread(target=server.run, daemon=True)
+        thread.start()
+        deadline = time.monotonic() + 15
+        while not server.started and time.monotonic() < deadline:
+            time.sleep(0.05)
+        assert server.started, "the loopback server did not start"
+
+        bridge = REPO / "plugins" / "agent-box-harnesses" / "runtime" / "subagent-bridge.mjs"
+        process = subprocess.Popen(
+            ["/usr/bin/node", str(bridge)],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            env={**os.environ, "AGENTBOX_BRIDGE_URL": f"http://127.0.0.1:{port}",
+                 "AGENTBOX_BRIDGE_TOKEN": "e2e-token"},
+            text=True,
+        )
+
+        def exchange(payload: dict) -> dict:
+            process.stdin.write(json.dumps(payload) + "\n")
+            process.stdin.flush()
+            line = process.stdout.readline()
+            assert line, process.stderr.read()[:400]
+            return json.loads(line)
+
+        try:
+            hello = exchange({"jsonrpc": "2.0", "id": 0, "method": "initialize",
+                              "params": {"protocolVersion": "2024-11-05"}})
+            assert hello["result"]["serverInfo"]["name"] == "agentbox-subagents"
+            tools = exchange({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
+            names = [tool["name"] for tool in tools["result"]["tools"]]
+            assert names == ["list_subagents", "run_subagent"]
+            assert "beta" in tools["result"]["tools"][1]["description"]
+
+            listed = exchange({"jsonrpc": "2.0", "id": 2, "method": "tools/call",
+                               "params": {"name": "list_subagents", "arguments": {}}})
+            assert "beta" in listed["result"]["content"][0]["text"]
+
+            ran = exchange({"jsonrpc": "2.0", "id": 3, "method": "tools/call",
+                            "params": {"name": "run_subagent", "arguments": {
+                                "subagent": "beta", "description": "answer the question",
+                                "prompt": "Say hello and return it."}}})
+            payload = json.loads(ran["result"]["content"][0]["text"])
+            assert payload["state"] == "completed", payload
+            assert payload["summary"], "the child's bounded summary came back"
+            assert payload["task_id"], "a continuable handle came back"
+
+            # The child turn really ran through the local channel: its record
+            # names the parent, and the summary is its own streamed text.
+            with runtime.database.read() as conn:
+                row = conn.execute(
+                    "SELECT parent_turn_id,state FROM server_turns "
+                    "WHERE parent_turn_id='parent-turn-e2e'").fetchone()
+            assert row is not None and row["state"] == "completed"
+        finally:
+            process.kill()
+            process.wait(timeout=5)
+            server.should_exit = True
+            thread.join(timeout=5)
+    finally:
+        runtime_module._sidecar_deployment_file = original_file
+
+
+def test_two_subagent_calls_in_one_turn_both_complete_and_attribute(tmp_path):
+    """Order 65 G8 (service level): the same message may fan out two calls;
+    both complete, both are linked to the parent turn, and neither overwrites
+    the other's record."""
+    import threading
+
+    database, profiles, records, _sessions, _execution, service, parent, child, other = _setup(tmp_path)
+    profiles.grant_subagent(parent_id=parent["profile_id"], child_id=child["profile_id"])
+    profiles.grant_subagent(parent_id=parent["profile_id"], child_id=other["profile_id"])
+
+    results: dict[str, dict] = {}
+    errors: list[str] = []
+
+    def run(name: str) -> None:
+        try:
+            results[name] = service.run(
+                parent_turn_id="parent-turn", parent_profile_id=parent["profile_id"],
+                arguments={"subagent": name, "description": "do some work", "prompt": "x"})
+        except BaseException as exc:  # noqa: BLE001
+            errors.append(f"{name}: {exc}")
+
+    threads = [threading.Thread(target=run, args=(name,)) for name in ("beta", "gamma")]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert errors == [], errors
+    assert set(results) == {"beta", "gamma"}
+    assert all(result["state"] == "completed" for result in results.values())
+    turn_ids = {result["turnId"] for result in results.values()}
+    assert len(turn_ids) == 2
+    with database.read() as conn:
+        linked = [
+            row[0] for row in conn.execute(
+                "SELECT id FROM server_turns WHERE parent_turn_id='parent-turn' ORDER BY id"
+            ).fetchall()
+        ]
+    assert sorted(turn_ids) == linked
