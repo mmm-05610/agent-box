@@ -117,10 +117,10 @@ _PARAM_SHAPES = {
     "accounts.bind": ({"requestId", "profileId", "expectedVersion", "accountId"}, set()),
     "accounts.importAsset": ({"requestId", "accountId", "sourcePath"}, set()),
     "providerModels.probeModels": (
-        {"requestId", "baseUrl", "credentialId"}, {"provenance"},
+        {"requestId", "baseUrl"}, {"credentialId", "provenance"},
     ),
     "providerModels.probeConnection": (
-        {"requestId", "baseUrl", "credentialId"}, set(),
+        {"requestId", "baseUrl"}, {"credentialId"},
     ),
     "providerArtifacts.list": (
         {"harness"}, set(),

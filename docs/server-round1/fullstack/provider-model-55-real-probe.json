@@ -1,0 +1,53 @@
+{
+ "configAfter": {
+  "digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "providerModelRows": 0
+ },
+ "configBefore": {
+  "digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "providerModelRows": 0
+ },
+ "configUnchanged": true,
+ "credentialHitsInArgv": [],
+ "credentialHitsInRunArtifacts": [],
+ "credentialValueLength": 35,
+ "endpoint": "https://api.deepseek.com",
+ "importStatus": 201,
+ "locator": {
+  "bytes": 36,
+  "mode": "0o600",
+  "path": "/home/maoqh/.agentbox-acceptance-secret.CnsAonj6/deepseek-api-key"
+ },
+ "probeConnection": {
+  "response": {
+   "id": "providerModels.probeConnection",
+   "jsonrpc": "2.0",
+   "result": {
+    "detail": "endpoint answered",
+    "status": "reachable"
+   }
+  },
+  "seconds": 0.176
+ },
+ "probeModels": {
+  "response": {
+   "id": "providerModels.probeModels",
+   "jsonrpc": "2.0",
+   "result": {
+    "models": [
+     "deepseek-flash",
+     "deepseek-v4-pro"
+    ],
+    "status": "ok"
+   }
+  },
+  "seconds": 0.218
+ },
+ "requests": {
+  "count": 2,
+  "kind": "GET (models list)",
+  "note": "probeModels + probeConnection; R-0011 itemisation: no tokens billed on the models list",
+  "target": "https://api.deepseek.com/models"
+ },
+ "script": "order-070-real-probe"
+}

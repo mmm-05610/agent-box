@@ -3,7 +3,7 @@
 Two one-shot outbound actions, both bounded and auditable:
 
 * ``pull_models`` — GET ``{base_url}/models`` and return the parsed model ids;
-* ``test_connection`` — the same lightweight request used only for its status.
+* ``probe_connection`` — the same lightweight request used only for its status.
 
 Hard boundaries (order 55 §1/§2):
 
@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import ipaddress
 import json
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -99,9 +100,22 @@ def _fetch_models_response(base_url: str, api_key: str | None) -> bytes:
     if api_key:
         request.add_header("Authorization", f"Bearer {api_key}")
     request.add_header("Accept", "application/json")
+    deadline = time.monotonic() + TOTAL_TIMEOUT_SECONDS
     try:
         with _open_request(request, CONNECT_TIMEOUT_SECONDS) as response:
-            return response.read(MAX_RESPONSE_BYTES + 1)
+            # The socket timeout bounds each read; the total deadline bounds a
+            # slow-drip answer, so the probe always returns within the budget.
+            chunks: list[bytes] = []
+            read = 0
+            while read <= MAX_RESPONSE_BYTES:
+                if time.monotonic() > deadline:
+                    raise ProbeError("PROBE_TIMEOUT", "the endpoint did not answer in time")
+                chunk = response.read(min(65536, MAX_RESPONSE_BYTES + 1 - read))
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                read += len(chunk)
+            return b"".join(chunks)
     except urllib.error.HTTPError as error:
         if error.code in {401, 403}:
             raise ProbeError("PROBE_AUTH_FAILED", "the endpoint rejected the credential") from error
@@ -146,7 +160,7 @@ def pull_models(base_url: str, api_key: str | None) -> ProbeResult:
     return ProbeResult(status="ok", detail=f"{len(models)} model ids", models=models)
 
 
-def test_connection(base_url: str, api_key: str | None) -> ProbeResult:
+def probe_connection(base_url: str, api_key: str | None) -> ProbeResult:
     """A lightweight reachability check: same endpoint, status-only verdict."""
     base, _host = _validate_endpoint(base_url)
     try:
@@ -169,5 +183,5 @@ __all__ = [
     "ProbeError",
     "ProbeResult",
     "pull_models",
-    "test_connection",
+    "probe_connection",
 ]

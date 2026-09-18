@@ -319,7 +319,7 @@ def test_pull_models_parses_a_loopback_fake(tmp_path):
         from agent_box.server.model_configs.probe import (
             ProbeError,
             pull_models,
-            test_connection,
+            probe_connection,
         )
 
         base = f"http://127.0.0.1:{server.server_port}"
@@ -340,7 +340,7 @@ def test_pull_models_parses_a_loopback_fake(tmp_path):
         assert result is not None and result.status == "ok"
         assert result.models == ("model-a", "model-b")  # the shapeless entry drops
 
-        check = test_connection(base, "secret-key")
+        check = probe_connection(base, "secret-key")
         assert check.status == "reachable"
     finally:
         server.shutdown()
@@ -359,9 +359,14 @@ def test_pull_models_rejects_oversized_and_shapeless_responses():
     class FakeResponse:
         def __init__(self, content):
             self._content = content
+            self._offset = 0
 
         def read(self, limit):
-            return self._content[:limit]
+            # A real stream advances and ends (b"" at EOF); the earlier fake
+            # re-served its prefix forever, which no response ever does.
+            chunk = self._content[self._offset:self._offset + limit]
+            self._offset += len(chunk)
+            return chunk
 
         def __enter__(self):
             return self
@@ -440,3 +445,124 @@ def test_a_wal_resident_row_is_read_with_its_sidecar(tmp_path):
         "inputTokens": 22, "outputTokens": 14,
     }
     reader.close()
+
+
+def test_a_slow_drip_answer_hits_the_total_deadline():
+    """Order 70 G1: the total deadline bounds a drip-feeding endpoint.
+
+    The socket timeout alone cannot: every read arrives inside it. With the
+    module's total budget shrunk, a drip must surface the typed
+    PROBE_TIMEOUT - not the size cap, which this body never reaches."""
+    import agent_box.server.model_configs.probe as probe_module
+
+    class _SlowDrip:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_exc):
+            return False
+
+        def read(self, _size):
+            time.sleep(0.05)
+            return b"x" * 16
+
+    original_total = probe_module.TOTAL_TIMEOUT_SECONDS
+    original_open = probe_module._open_request
+    try:
+        probe_module.TOTAL_TIMEOUT_SECONDS = 0.05
+        probe_module._open_request = lambda _request, _timeout: _SlowDrip()
+        with pytest.raises(probe_module.ProbeError) as caught:
+            probe_module.pull_models("https://api.example.test", "not-a-real-key")
+        assert caught.value.code == "PROBE_TIMEOUT"
+    finally:
+        probe_module.TOTAL_TIMEOUT_SECONDS = original_total
+        probe_module._open_request = original_open
+
+
+def test_a_probe_invents_no_window_capability_or_price_values():
+    """Order 70 G4: unknown stays unknown - there is nothing to invent from.
+
+    First-hand: the probe result carries exactly status/detail/models, and the
+    module holds no built-in window, capability or price table. A mutation that
+    introduces a default (e.g. a 4096/128000 literal or a context_window key)
+    turns this red - that is the counter-example drill recorded in the report.
+    """
+    from dataclasses import fields
+
+    import agent_box.server.model_configs.probe as probe_module
+
+    names = {field.name for field in fields(probe_module.ProbeResult)}
+    assert names == {"status", "detail", "models"}, names
+    text = pathlib.Path(probe_module.__file__).read_text(encoding="utf-8")
+    for banned in ("context_window", "contextWindow", "price", "4096", "128000", "8192"):
+        assert banned not in text, f"a built-in default leaked into the probe: {banned}"
+
+
+def test_both_probe_methods_answer_through_the_wire_face(tmp_path):
+    """Order 70 stage 2: the wiring itself, through the real Server.
+
+    First-hand defect this locks: `providerModels.probeConnection` raised
+    ImportError at call time (the service imported a name the module never
+    had) because every earlier test called the probe functions directly and
+    never the wire path. Both methods now go through Server -> wire -> service
+    -> probe against a loopback fake."""
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    from fastapi.testclient import TestClient
+
+    from agent_box.server.bootstrap import build_runtime
+    from agent_box.server.transport.http import create_app
+
+    body = json.dumps({"data": [{"id": "deepseek-chat"}]}).encode()
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    server = HTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{server.server_port}"
+    runtime = build_runtime(tmp_path / "data")
+    runtime.start()
+    try:
+        with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
+            headers = {"Authorization": f"Bearer {runtime.token}"}
+
+            def wire(method, params):
+                response = client.post(f"/wire/v1/{method}", headers=headers, json={
+                    "jsonrpc": "2.0", "id": method, "method": method, "params": params})
+                return response.json()
+
+            pulled = wire("providerModels.probeModels", {
+                "requestId": "wire-probe-models", "baseUrl": base})
+            assert pulled["result"]["status"] == "ok", pulled
+            assert pulled["result"]["models"] == ["deepseek-chat"], pulled
+
+            checked = wire("providerModels.probeConnection", {
+                "requestId": "wire-probe-connection", "baseUrl": base})
+            assert checked["result"]["status"] == "reachable", checked
+
+            # The published schema allows credentialId to be absent or null
+            # (`credentialId?`); the runtime must not be stricter than its own
+            # contract (first-hand defect: it demanded the key and refused a
+            # legal request).
+            explicit_null = wire("providerModels.probeConnection", {
+                "requestId": "wire-probe-connection-null", "baseUrl": base,
+                "credentialId": None})
+            assert explicit_null["result"]["status"] == "reachable", explicit_null
+            refused = wire("providerModels.probeConnection", {
+                "requestId": "wire-probe-connection-extra", "baseUrl": base,
+                "surprise": 1})
+            assert refused["error"]["code"] == "INVALID_REQUEST", refused
+    finally:
+        runtime.stop()
+        server.shutdown()
+        server.server_close()
