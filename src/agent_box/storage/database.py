@@ -8,7 +8,7 @@ import threading
 from typing import Iterator
 
 
-PRODUCT_SCHEMA_VERSION = 13
+PRODUCT_SCHEMA_VERSION = 14
 
 
 class FutureSchemaError(RuntimeError):
@@ -206,6 +206,16 @@ CREATE TABLE IF NOT EXISTS server_profile_assets (
     updated_at TEXT NOT NULL,
     PRIMARY KEY (profile_id, asset_id)
 );
+CREATE TABLE IF NOT EXISTS server_hooks (
+    id TEXT PRIMARY KEY,
+    family TEXT NOT NULL,
+    name TEXT NOT NULL,
+    enabled INTEGER NOT NULL DEFAULT 0,
+    model_json TEXT NOT NULL,
+    source TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS server_bootstrap (
     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
     server_id TEXT NOT NULL,
@@ -274,6 +284,21 @@ def _add_columns(conn: sqlite3.Connection, table: str, additions: dict[str, str]
     for name, declaration in additions.items():
         if name not in columns:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {declaration}")
+
+
+def _migrate_13_to_14(conn: sqlite3.Connection) -> None:
+    """Order 59: the managed-hook ledger.
+
+    One row per hook: its family, its name, whether the user enabled it, and
+    the model (the family's own declarative shape, validated before storage).
+    Disabled is the default: a hook only runs once a user enabled it.
+    """
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS server_hooks ("
+        "id TEXT PRIMARY KEY, family TEXT NOT NULL, name TEXT NOT NULL, "
+        "enabled INTEGER NOT NULL DEFAULT 0, model_json TEXT NOT NULL, "
+        "source TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)"
+    )
 
 
 def _migrate_12_to_13(conn: sqlite3.Connection) -> None:
@@ -547,6 +572,8 @@ class Database:
                 _migrate_11_to_12(conn)
             if current in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12):
                 _migrate_12_to_13(conn)
+            if current in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13):
+                _migrate_13_to_14(conn)
             conn.executescript(_SCHEMA)
             conn.execute(
                 "INSERT OR IGNORE INTO agentbox_product_schema(singleton, version, applied_at) "
