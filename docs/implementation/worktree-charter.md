@@ -70,6 +70,11 @@
 > `091-control-plane-sync`（控制面以 Windows 为准：首次连接部署 + 变更增量 + 凭据只留 Windows 按执行一次性投影；原生 home/会话仍按平台）。
 > **已投递（b3，b2 收口后）**：`089-four-real-ui-gates`（四家真实 UI 门＝最终验收路径；**Server 须跑在 WSL 侧**，
 > 见主树 `docs/server-round1/try-checkpoints.md` 的教训）。
+> **已投递（b4，b3 收口后按序）**：`092-provider-registry-and-protocols`（R-0013 第 1 层：provider 记录中立化 ——
+> `harness` 可空、canonical 四协议词汇、模型事实、描述符 `wireProtocols`、读时派生 `compatibility`、冻结时
+> `PROTOCOL_INCOMPATIBLE`）→ `093-native-config-materialization`（R-0013 第 1 层的执行侧：冻结配置落进各家原生文件，
+> 逐家钉键、钉不死就类型化拒绝）。两单引用主树 `docs/server-round1/model-settings-two-layer-design.md`（R-0013 设计全文）。
+> 批末打 `checkpoint/b4` tag + 写检查点报告，然后继续。
 > **队列不空规则（调度者失误的如实标记）**：`080-first-run-lock` 与 `081-relock-register-frontend` **已投递**，可执行；
 > 若我在做完当前单后发现 `work-orders/` 里**没有属于 b2 的下一张**，就在本树 status 写一行 `QUEUE_EMPTY_AT <日期>`——
 > 这是**合法停止**但要如实报出来；调度者把它视为自己的失误并在下一次边界补齐投递。
