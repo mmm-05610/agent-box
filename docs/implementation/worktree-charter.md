@@ -75,6 +75,8 @@
 > `PROTOCOL_INCOMPATIBLE`）→ `093-native-config-materialization`（R-0013 第 1 层的执行侧：冻结配置落进各家原生文件，
 > 逐家钉键、钉不死就类型化拒绝）。两单引用主树 `docs/server-round1/model-settings-two-layer-design.md`（R-0013 设计全文）。
 > 批末打 `checkpoint/b4` tag + 写检查点报告，然后继续。
+> **已投递（b4 追加，R-0013 订阅登录）**：`094-subscription-login-engine`（登录引擎跑在 Server 上：device-code 流 + 有界轮询 + 令牌只进秘密存储 + **codex 的 harness 型登录**端到端；未登记的家 `LOGIN_FLOW_UNSUPPORTED`）→
+> `095-provider-logins-and-account-lifecycle`（**provider 型登录** copilot/xai/google → `credential.kind=oauth` 原地轮换；取用自动刷新 + `relogin_required`；额度按家钉死、传输保旧/鉴权清空；订阅 provider 的模型列表走订阅端点）。
 > **修订 v2（2026-09-19，R-0013 追加）**：092/093 各追加一节——**一个 harness 多个模型槽**
 > （claude-code：主模型 / opus / sonnet / haiku / fable / **子代理**；opencode·kilo：主模型 / 小模型）
 > 与**逐模型限额**（上下文/输出，覆盖与事实分离、缺席不写键）。以单文件里的 §修订 v2 为准。
