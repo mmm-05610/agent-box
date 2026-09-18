@@ -7,11 +7,16 @@
 
 ## 0. 结论
 
-**NATIVE_HOME_STORAGE_PARTIAL**（最终；本会话到此为止，阻塞项按 §4 记账交裁决）。阶段 A/B/C 的实现与定向测试全部落地、全量套件与四家
+**NATIVE_HOME_STORAGE_DONE**（终态；2026-09-19 由工单 082 收口。本报告正文写于 G3 仍被阻断时，
+其时的 **PARTIAL** 判定与文末 67/082 的实测记录冲突，**以实测为准**——冲突逐处就地标注，不删原文。
+阶段 A/B/C 的实现与定向测试全部落地、全量套件与四家
 假端点门不退化；端到端门的 **G1、G2、G6、G8、G4(净轮) 全部第一手通过**——
 含同 Session 续接真召回、取消后召回不断（F4）、审计窗口漂移可见；
-**G3 被产品层 Profile 执行锁阻断**（`TURN_CONCURRENCY_CONFLICT`，放行属产品语义裁决）；
-G7（人手 UI 路径）与 Windows r4(c9) 复跑因外部资源缺席未跑（§7）。
+**G3 曾在产品层 Profile 执行锁上被阻断**（`TURN_CONCURRENCY_CONFLICT`，其时放行属产品语义裁决）；
+〔082：**G3 已转 pass**——裁决落地为工单 67（唯一性单位=会话）；`460781c` 基线上两次复跑
+与本单在基线 `4c32992` 上的复跑均为 `turnStates: ["completed","completed"]`，
+见文末「082 收口注记」〕；
+G7（人手 UI 路径）记部分覆盖，Windows r4(c9) 复跑已于 §8 补齐。
 
 ## 1. 阶段 A —— Worker home 操作族 + 协议 4（完成，已提交）
 
@@ -76,7 +81,7 @@ peer 为 harness，**无模型调用**：
 | --- | --- |
 | **G1** 一轮写目录 | ✅ home 出现 harness 持久会话事实（桥快照 `.pi/pi/<b64 session id>.json`）；对象库**无**状态字节对象（逐 digest 对照）；审计 manifest（schema 3）记录文件与摘要；`nativePlatform=local`、`homeLocator` 落记录 |
 | **G2** 二轮靠 home 续接 | ✅ 同 Session 第二轮 `session/load` 重开（reopen-method.txt 记录 `session/new`→`session/load`）、真召回首轮 nonce、native id 稳定 |
-| **G3** 并行不丢 | ⚠️ 阻塞（产品层）：同 Profile 第二个并行 Session 被产品执行锁拒绝（`TURN_CONCURRENCY_CONFLICT`）——并行放行是产品语义变更（Profile run_state/native_generation 锁），按 §6 记账交裁决 |
+| **G3** 并行不丢 | 〔082：**pass**——当前基线两次复跑两轮均 `completed`，见文末注记〕⚠️→✅ 其时阻塞（产品层）：同 Profile 第二个并行 Session 被产品执行锁拒绝（`TURN_CONCURRENCY_CONFLICT`）——并行放行是产品语义变更（Profile run_state/native_generation 锁），按 §6 记账交裁决；裁决已落地（工单 67：唯一性单位=会话） |
 | **G4** 凭据与遮蔽 | ✅ 干净轮 audit fail-closed 扫描零命中（manifest `truncated` 全 0）；tmpfs/RO 规则由沙箱测试钉住；正向注入断言覆盖于 audit 单元反例 |
 | **G8** 取消后仍连续 | ✅ 同 Session 中途取消（stop_requested）后，召回轮同 native id 重开并回出存储 nonce；取消轮输入已写入 home journal（cancel-journal.txt）|
 
@@ -152,13 +157,14 @@ port 层第一手异常为 SidecarError: SIDECAR_OP_FAILED: Harness session not 
 
 ## 7. 未做项（逐条，含原因）
 
-1. **G3 并行双轮**——被产品层 Profile 执行锁阻断（TURN_CONCURRENCY_CONFLICT）；
-   放行属产品语义变更（run_state/native_generation 锁与并行审计的合并规则），需设计裁决。
-2. **G5 的 Windows r4/-PostCheck（c9）复跑**——无 Windows 实机（§4 第二条）。
-3. **G7 人手 UI 路径**——无前端 UI 会话（§4 第二条）。
-4. **G3 并行双轮、G4 正向注入、G6 漂移的端到端断言**——脚本骨架已就位
-   （native-home-gate.py），被 G2 的续接语义问题阻塞在同一脚本内；
-   定向层（audit_snapshot 反例、LocalHome 审计）已有单元级覆盖。
+1. ~~**G3 并行双轮**~~ 〔082：**已闭合**，不再计为未做项〕——其时被产品层 Profile 执行锁阻断
+   （TURN_CONCURRENCY_CONFLICT）；放行属产品语义变更，需设计裁决。裁决已由工单 67 落地
+   （唯一性单位=会话），当前基线复跑两轮均 completed（提交 `460781c`）。
+2. **G5 的 Windows r4/-PostCheck（c9）复跑**——无 Windows 实机（§4 第二条）。〔已由 §8 于 2026-09-17 补齐〕
+3. **G7 人手 UI 路径**——无前端 UI 会话（§4 第二条）。〔记**部分覆盖**，不记全过；见 §8 后追记〕
+4. ~~**G3 并行双轮**、G4 正向注入、G6 漂移的端到端断言~~ 〔082：G3 项已由 67 改为真并发断言并 pass；
+   其时脚本骨架已就位（native-home-gate.py），被 G2 的续接语义问题阻塞在同一脚本内；
+   定向层（audit_snapshot 反例、LocalHome 审计）已有单元级覆盖。G4/G6 该项维持原状〕
 5. **资产层抽离、Windows 原生放置、配额策略**——设计文档明示不在本单。
 
 ## 8. 追记（2026-09-17）：Windows 腿补跑完成——G5 的 r4(c9) 项闭合
@@ -201,8 +207,10 @@ port 层第一手异常为 SidecarError: SIDECAR_OP_FAILED: Harness session not 
 停止/重启续接未单独立跑，但同一能力已有 r4 C/D（REST/SSE 层）与 E（wire 层）
 两层第一手证据。按 §8 如实记账：G7 记"部分覆盖"，不记全过。
 
-**仍未决**：G3 并行双轮（产品语义裁决；现行行为是类型化拒绝 TURN_CONCURRENCY_CONFLICT，
-满足"绝不静默换地方"的底线，但"两轮都完成"的完整断言未达成）。
+**曾未决、现由 082 记为已决**：G3 并行双轮（其时产品语义未裁决；当时的行为是类型化拒绝
+TURN_CONCURRENCY_CONFLICT，满足"绝不静默换地方"的底线，但"两轮都完成"的完整断言当时未达成）。
+裁决已落地（工单 67：唯一性单位=会话）且"两轮都完成"在当前基线复跑达成——详见文末「082 收口注记」，
+**上一句描述的是裁决前的状态，不是现状**。
 
 ## 9. 追记（2026-09-17）：§1b / 落地设计 §14 —— session 库独立于 profile home
 
@@ -264,3 +272,58 @@ G3 阻塞项按原口径复跑：
   （注入值精确匹配、命中类型化、命中处置按树定分）都不因此放宽；56 的回收是**唯一**的
   写回路径，且只写回**账号资产**，绝不写回配置或 profile home 的其它面。
 - 逐家形态与可用性裁断见 [subscription-credentials-56.md](subscription-credentials-56.md) §阶段 A。
+
+## 082 收口注记（2026-09-19，工单 082）：45 转 DONE
+
+**只写账与本注记，零代码改动。** 45 的账行终态由 `NATIVE_HOME_STORAGE_PARTIAL` 转为
+**`NATIVE_HOME_STORAGE_DONE`**。转换的唯一依据是下表的第一手复跑记录——正文各节写于 G3 仍被
+阻断之时，凡与之冲突处已就地标注「〔082：…〕」，不删原文（事实分级：正文=当时实测，本注记=当前基线实测）。
+
+- **待收口的门**：G3「并行不丢」是 45 唯一未过的门（其余 G1/G2/G4/G5/G6/G8 已第一手通过，
+  G7 记部分覆盖，见下）。
+- **转 pass 的记录**：提交 **`460781c`**（`460781cc1a424e917518d66c927b030b08fc6c28`，
+  2026-09-18 15:33 +0800）——"67 re-verified at the current baseline: native-home gate OK on
+  re-run (G3/45-G3 pass in both runs …), 38 targeted + 879 root-suite green; ledger row DONE"。
+  该提交把 67 的账行记为 `PER_SESSION_ADMISSION_DONE（45-G3 转 pass）`。
+- **基线（如实修正本单的书写前提）**：`460781c` 的复跑是在**它自己的**基线上（068 轮之后），
+  而本单书写时的当前基线已推进到 `4c32992`。两者之间有**两次代码改动**——`cd03ada`（070：
+  真端点探测，修 3 个缺陷）与 `30012ad`（080：整库首次运行锁，**改在
+  `SidecarExecutionBackend`**，正是 G3 走的路径）。因此 082 不沿用旧记录，而在 `4c32992` 上
+  **本人重跑**（下条）。工单 082 的"45-G3 在当前基线通过"这一前提按其字面表述并不成立，
+  此处以重跑结果为准。
+- **复跑命令**（本机门；`AGENT_BOX_SANDBOX_MODULE` 是 PYTHONPATH 运行下的沙箱端口解析入口，
+  缺它门会以 `LOCAL_SANDBOX_UNAVAILABLE` 拒开工作区，与 67/45 无关）：
+
+  ```bash
+  AGENT_BOX_SANDBOX_MODULE=agent_box_sandbox_bwrap \
+  PYTHONPATH=src:plugins/agent-box-harnesses/src:plugins/agent-box-runtime-wsl/src:plugins/agent-box-runtime-local/src:plugins/agent-box-sandbox-bwrap/src:plugins/agent-box-skills/src:plugins/agent-box-terminal-session/src \
+  python3 scripts/server-round1/native-home-gate.py --report <path>
+  ```
+
+- **本单复跑结论（082 本人于基线 `4c32992` 实跑，一次通过）**：
+  终态 **`NATIVE_HOME_GATE_OK`**，证据
+  [native-home-45-082-rerun.json](native-home-45-082-rerun.json)（sha256 `0501467351fe…`），
+  退出码 0；**G1/G2/G3/G4/G6/G8 全 pass**。**45-G3 判定**：
+  `turnStates: ["completed","completed"]`、`nativeIdsDiffer: true`、`deltasPerSession: [1,1]`、
+  `sameSessionOutcome: queued`（同会话第二条消息入队而非第二执行，`queue_2275de33…`）、
+  `switchWhileRunning: rejected / execution_running`——与 `460781c` 两次的形态**逐项一致**。
+  该次 stderr 里仍出现 `SIDECAR_CLOSED: sidecar exited before answering`（G8 的已知竞态形态），
+  但 G8 本轮仍判 pass（`recallDeltas: ["STATEFUL-NONCE-7A21"]`），竞态本体归 **087**。
+- **历史复跑（引用，非本单实跑）**：[per-session-admission-67.md](per-session-admission-67.md) §9 记录
+  `460781c` 基线上两次复跑——第 1 次 `NATIVE_HOME_GATE_FAILED` 仅停在 **G8**（G1–G6 含 G3 全 pass），
+  第 2 次 `NATIVE_HOME_GATE_OK`；证据
+  [per-session-admission-67-native-home-gate.json](per-session-admission-67-native-home-gate.json)。
+- **回归计数**：**引自 `460781c`**——定向 38 passed（test_server_boundaries / test_stage_a_server /
+  test_usage_aggregate / test_execution_inventory / test_delegation）、根套件 879 passed / 0 failed。
+  本单**零代码改动**，故不重跑套件（本单实跑的是上条那座门）；差值如实标注：套件计数属 `460781c`
+  基线、门计数属 `4c32992` 基线。
+- **G7 维持「部分覆盖」**（本次不改动）：真实应用二轮上下文由 46-G3 八家 8/8 覆盖，
+  续接能力由 r4 C/D+E 双层覆盖；应用驱动的停止/重启续接未单独立跑。**不记全过。**
+- **仍开放的两项（不属 45 的门，随本单如实移交）**：
+  ① G8 取消/召回间歇（2 次复跑 1 败，形态=召回轮 completed 但 `recallDeltas: []`）→ 工单 **087**；
+  ② claude/dsh/qwen 的 43 代门 marker 冲突根因 → 67 §4 记账，kilo 项已由 `e394f09` 关闭。
+- **费用**：真实模型调用 **0 次**、**¥0**（本单实跑的那座门全程假端点；
+  证据 JSON `cost: {authorizedRealModelCalls: 0, estimatedCny: 0}`）。
+- **清理**：该次运行的临时根 `/tmp/agentbox-native-home-gate-nzx_gyhk` 由门自身删除
+  （`temporaryRootRemoved: true`）、home 在尝试之外保留；`/tmp` 下其余
+  `agentbox-native-home-gate-*` 目录**先于本单存在**，非本单所造，未触碰。
