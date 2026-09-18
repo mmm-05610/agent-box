@@ -10,6 +10,7 @@ refusal, not a silent fallback.
 from __future__ import annotations
 
 import json
+import re
 from contextlib import contextmanager
 from typing import Any
 
@@ -152,6 +153,24 @@ def parse_claude_projects_line(content: bytes) -> dict[str, Any] | None:
     return fact
 
 
+#: The native stores keep their secret-bearing tables right next to the
+#: session rows a probe does read. Work Order 084 G2 makes that boundary a
+#: machine-checked fact: a statement that reaches for a credential or account
+#: table is refused as a typed failure rather than quietly producing a fact
+#: that cost the user their secret material.
+_FORBIDDEN_QUERY = re.compile(r"\b(?:credentials?|accounts?)\b", re.IGNORECASE)
+
+
+def _refuse_credential_queries(statements) -> None:
+    for sql in statements:
+        if _FORBIDDEN_QUERY.search(sql):
+            raise UsageParseError(
+                "USAGE_PROBE_CREDENTIAL_QUERY",
+                "the usage probe issued a statement naming a credential or "
+                f"account table; the probe reads session rows only: {sql!r}",
+            )
+
+
 def write_scratch_sqlite(content: bytes, sidecars=None) -> "object":
     """Spool fetched bytes (and any -wal/-shm sidecars) under a unique name.
 
@@ -182,7 +201,10 @@ def _scratch_sqlite(content: bytes, sidecars=None):
 
     The three SQLite-backed families (hermes, opencode, kilo) all parse
     through here: bytes are spooled under a unique scratch name, opened with
-    ``mode=ro`` (never the live store), and unlinked afterwards.
+    ``mode=ro`` (never the live store), and unlinked afterwards. Every
+    statement issued while that handle is open is recorded and checked on the
+    way out: a probe that reaches for the secret-bearing tables the same store
+    keeps is a typed refusal, not a fact that happens to look correct.
     """
     import sqlite3
 
@@ -191,9 +213,11 @@ def _scratch_sqlite(content: bytes, sidecars=None):
     except OSError:
         scratch = None
     connection = None
+    executed: list[str] = []
     if scratch is not None:
         try:
             connection = sqlite3.connect(f"file:{scratch}?mode=ro", uri=True)
+            connection.set_trace_callback(executed.append)
         except sqlite3.Error:
             connection = None
     try:
@@ -207,6 +231,7 @@ def _scratch_sqlite(content: bytes, sidecars=None):
                     scratch.with_name(scratch.name + suffix).unlink()
                 except OSError:
                     pass
+    _refuse_credential_queries(executed)
 
 
 def parse_hermes_state_db(content: bytes, *, sidecars=None) -> dict[str, Any] | None:

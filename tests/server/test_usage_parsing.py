@@ -259,6 +259,136 @@ def test_kilo_db_copies_only_the_columns_the_store_reports(tmp_path):
                                        ("CREATE TABLE unrelated (x INTEGER)",))) is None
 
 
+#: Order 51 阶段 A recorded this row verbatim; it is pinned here as the shape a
+#: real store carries (a total the family itself computed, plus reasoning).
+REAL_OPENCODE_ASSISTANT_ROW = {
+    "role": "assistant", "modelID": "deepseek-chat", "providerID": "deepseek",
+    "tokens": {"total": 10587, "input": 10446, "output": 110, "reasoning": 31,
+               "cache": {"read": 0, "write": 0}},
+}
+
+
+def test_the_recorded_real_opencode_row_still_maps_to_the_recorded_fact(tmp_path):
+    """The blob mapping holds for the values copied off the live store."""
+    from agent_box.server.execution.usage import parse_opencode_db
+
+    content = _sqlite_bytes(tmp_path, "opencode.db", (
+        "CREATE TABLE message (id TEXT PRIMARY KEY, session_id TEXT, "
+        "time_created INTEGER, time_updated INTEGER, data TEXT)",
+        "INSERT INTO message VALUES ('m9', 'ses_76Rof0H', 9, 9, "
+        "'" + json.dumps(REAL_OPENCODE_ASSISTANT_ROW) + "')",
+    ))
+    assert parse_opencode_db(content) == {
+        "inputTokens": 10446, "outputTokens": 110, "reasoningTokens": 31,
+        "totalTokens": 10587, "cacheReadTokens": 0, "cacheWriteTokens": 0,
+    }
+
+
+def test_a_null_column_is_unknown_and_never_becomes_a_zero(tmp_path):
+    """G3: a column that exists but carries no value is an unknown field.
+
+    The counter-example is a parser that defaults a missing value to 0: this
+    store row has input reported and output/reasoning left unreported, so a
+    zero would be an invented number in the ledger.
+    """
+    from agent_box.server.execution.usage import parse_hermes_state_db
+
+    content = _sqlite_bytes(tmp_path, "state.db", (
+        "CREATE TABLE sessions (id TEXT PRIMARY KEY, input_tokens INTEGER, "
+        "output_tokens INTEGER, cache_read_tokens INTEGER, "
+        "cache_write_tokens INTEGER, reasoning_tokens INTEGER)",
+        "INSERT INTO sessions VALUES ('partial', 41, NULL, NULL, 0, NULL)",
+    ))
+    fact = parse_hermes_state_db(content)
+    assert fact == {"inputTokens": 41, "cacheWriteTokens": 0}
+    assert "outputTokens" not in fact and "reasoningTokens" not in fact
+
+
+_SECRET_BEARING_TABLES = (
+    "CREATE TABLE credential (id TEXT PRIMARY KEY, token TEXT)",
+    "INSERT INTO credential VALUES ('c1', 'a-token-that-must-never-be-read')",
+    "CREATE TABLE account (id TEXT PRIMARY KEY, email TEXT)",
+    "INSERT INTO account VALUES ('a1', 'someone@example.invalid')",
+)
+
+
+def test_the_probe_own_statements_name_no_secret_bearing_table(tmp_path, monkeypatch):
+    """G2: the carrier keeps credentials in the same file; the probe never
+    issues a statement that names those tables, and the fact still parses."""
+    from agent_box.server.execution import usage as usage_module
+
+    recorded: list[str] = []
+    refuse = usage_module._refuse_credential_queries
+
+    def spy(statements):
+        recorded.extend(list(statements))
+        return refuse(statements)
+
+    monkeypatch.setattr(usage_module, "_refuse_credential_queries", spy)
+    content = _sqlite_bytes(tmp_path, "state.db", (
+        "CREATE TABLE sessions (id TEXT PRIMARY KEY, input_tokens INTEGER, "
+        "output_tokens INTEGER, cache_read_tokens INTEGER, "
+        "cache_write_tokens INTEGER, reasoning_tokens INTEGER)",
+        "INSERT INTO sessions VALUES ('newest', 7, 3, 0, 0, 0)",
+        *_SECRET_BEARING_TABLES,
+    ))
+    assert usage_module.parse_hermes_state_db(content) == {
+        "inputTokens": 7, "outputTokens": 3, "cacheReadTokens": 0,
+        "cacheWriteTokens": 0, "reasoningTokens": 0,
+    }
+    assert recorded, "the guard saw no statement at all"
+    assert not [sql for sql in recorded
+                if usage_module._FORBIDDEN_QUERY.search(sql)]
+
+
+def test_a_statement_that_reaches_for_the_credential_table_is_refused(tmp_path):
+    """G2's counter-example, with teeth: one extra statement is a typed
+    refusal, and the scratch copy is still taken away afterwards."""
+    from agent_box.server.execution.usage import _scratch_sqlite
+
+    content = _sqlite_bytes(tmp_path, "state.db", _SECRET_BEARING_TABLES)
+    with pytest.raises(UsageParseError) as refusal:
+        with _scratch_sqlite(content) as connection:
+            connection.execute("SELECT token FROM credential").fetchall()
+    assert refusal.value.code == "USAGE_PROBE_CREDENTIAL_QUERY"
+    assert "credential" in str(refusal.value)
+    import os
+
+    scratch_root = pathlib.Path(tempfile.gettempdir())
+    pattern = f"agentbox-usage-{os.getpid()}-*"
+    assert sorted(p.name for p in scratch_root.glob(pattern)) == []
+
+
+def test_a_failed_usage_read_keeps_the_fact_unknown_and_records_why(caplog):
+    """G3 at the read path: a probe that could not answer leaves the turn
+    unknown with its reason recorded, and never a substituted zero."""
+    import logging
+    import threading
+
+    from agent_box.server.execution import sidecar_backend
+
+    class _Port:
+        usage_probe = {"journalSuffix": "state.db", "format": "hermes-state-db"}
+
+        def capture_execution(self, _turn_id):
+            return {"files": []}, True
+
+        def read_usage(self, _turn_id, _probe):
+            raise RuntimeError("the carrier vanished before capture")
+
+    run = sidecar_backend._Run(
+        turn_id="turn-084", work_id="work-084", core_execution_id="core-084",
+        dispatch_id="dispatch-084", port=_Port(), native_id="native-084",
+        done=threading.Event(),
+    )
+    with caplog.at_level(logging.WARNING):
+        audit, resumable = sidecar_backend._audited_home(run)
+    assert (audit, resumable) == ({"files": []}, True)
+    assert run.usage_fact is None and run.usage_source is None
+    assert "usage stays unknown" in caplog.text
+    assert "the carrier vanished before capture" in caplog.text
+
+
 def test_probe_validates_the_endpoint_before_any_network_call():
     """SSRF/Order-55 §2: only https (loopback http exempt), no private nets."""
     from agent_box.server.model_configs.probe import ProbeError, pull_models

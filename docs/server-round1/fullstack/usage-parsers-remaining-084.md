@@ -121,3 +121,68 @@ python3 scripts/server-round1/claude-production-chain-gate.py \
 - G2（零凭据查询）与 G3（缺字段 ⇒ unknown 而非 0）的**可证伪门**尚未落成本单的测试与反例 ⇒ 阶段 3。
 - 51/53 账行对齐（`status.md:78` 仍是旧的 `USAGE_FACT_PARTIAL`）⇒ 阶段 4。
 - `dsh`/`qwen`/`kilo`/`opencode` 的模板仍**未声明 `usageProbe`**（沿用 51 阶段 C 的"未知"，本单不扩协议）。
+
+## 7 阶段 3：把 G2/G3 落成能被打断的门（实测）
+
+**代码（`src/agent_box/server/execution/usage.py`，本单 write_paths 内）**
+
+`_scratch_sqlite` 现在给临时库句柄挂 `set_trace_callback`，**逐条记录**该次解析执行过的语句，
+在 with 块正常退出时过一遍 `_refuse_credential_queries`：任何点名
+`credential(s)` / `account(s)` 的语句 ⇒ `UsageParseError("USAGE_PROBE_CREDENTIAL_QUERY", …)`（类型化拒绝，
+且临时主文件/侧车照常删除）。三家 SQLite 载体（hermes/opencode/kilo）都走这一条，因为它就是它们的共同助手。
+
+**阶段 3 的"blob 解析"这一项，实况是**已在基线里落地**：`parse_opencode_db`（读 `message.data` JSON 里的
+`tokens` blob，取最后一条 assistant 行）与 `parse_kilo_db`（读 `session` 的专用列，按 `PRAGMA table_info`
+只取存在的列）都由 **51 的 `eb0c307`** 写入，且各有 2 条测试在基线上就绿。所以本阶段**没有重复实现**，
+补的是工单这一行真正缺的东西：**缺字段 ⇒ unknown 的反例**（下表第 3、4 条）与 G2 的守卫。
+账面因此要在阶段 4 更正（51/53 行仍写着"blob 解析待续"）。
+
+**测试（`tests/server/test_usage_parsing.py`，新增 5 条）**
+
+| 测试 | 钉住什么 |
+| --- | --- |
+| `test_the_probe_own_statements_name_no_secret_bearing_table` | 载体里**放了** `credential`/`account` 两表（含哨兵值）时解析照常出 fact，且守卫亲眼看到的语句集合里没有任何一条点名它们 |
+| `test_a_statement_that_reaches_for_the_credential_table_is_refused` | G2 反例：多加一句 `SELECT token FROM credential` ⇒ 类型化拒绝 + 临时文件不残留 |
+| `test_a_null_column_is_unknown_and_never_becomes_a_zero` | G3 反例：列存在但值为 NULL ⇒ 该字段**缺席**，不会被补成 0（`(41, NULL, NULL, 0, NULL)` → `{inputTokens:41, cacheWriteTokens:0}`） |
+| `test_a_failed_usage_read_keeps_the_fact_unknown_and_records_why` | G3 的"unknown + 原因"：读取抛错时 `usage_fact/usage_source` 保持 None，WARNING 日志带原因（`sidecar_backend.py:743`），该行不会变成 0 |
+| `test_the_recorded_real_opencode_row_still_maps_to_the_recorded_fact` | opencode blob 的**真机形状**（51 阶段 A 逐字抄下的 10587 = 10446 in + 110 out + 31 reasoning，cache 0/0）作为回归钉住 |
+
+**反例真的会咬（一次性演示，不改仓库代码）**：
+
+```text
+1) 守卫在场，凭据查询 -> 类型化拒绝 USAGE_PROBE_CREDENTIAL_QUERY
+2) 守卫摘掉后同一句 -> 读到 [('a-token-that-must-never-be-read',)] （无拒绝 ⇒ 测试即失败）
+3) 若把缺失值补 0 -> {'inputTokens': 41, 'outputTokens': 0, 'cacheReadTokens': 0, …}（正是要拦的冒充）
+4) 现状            -> {'inputTokens': 41, 'cacheWriteTokens': 0}
+```
+
+即：G2 的失败**来自守卫**（把匹配面清空就漏），G3 的失败**来自不补 0**（补 0 的写法会被断言抓住）。
+演示临时目录 `/tmp/084ce` 已删。
+
+**工单自带的 Validation**：
+
+```text
+grep -rn "credential\|account" src/agent_box/server/usage*.py | grep -i "select\|from"  ->  零凭据查询 ✓
+python3 -m pytest -q tests/server -k usage  ->  27 passed, 571 deselected in 2.49s
+```
+
+**回归计数（同一棵工作树、同一命令，`PYTHONPATH` 见 §1）**：
+
+```text
+python3 -m pytest -q                ->  898 passed in 239.53s        （根套件）
+python3 -m pytest -q tests/server   ->  598 passed in 213.78s        （083 时为 593；+本单 5）
+```
+
+898 = 083 记录的 893 + 本单新增 5 条，**零退化、零 error**。顺带一个第一手事实：083 交回的
+`test_opencode_gate_cleanup.py:388` 那 1 个 teardown error **本轮两根套件均未复现**——不声称修好，
+只记录它在这两跑里缺席（该 fixture 断言"主仓状态前后逐字节相同"，对本单这种带脏树的运行敏感）。
+
+**尚未做（G2 的诚实边界）**：守卫只覆盖**解析路径的 SQL**（工单 G2 的字面范围）。Worker 侧
+`read_usage` 的**文件清单/取字节**不受它约束（那是文件读，不是 SQL）；本单未扩到那里。
+
+## 8 阶段 3 剩余
+
+- 51/53 账行对齐与 084 终态行 ⇒ 阶段 4。
+- `kilo`/`opencode`/`dsh`/`qwen` 模板仍未声明 `usageProbe`（沿用"未知"）。
+- 现场真库的再观测：本轮**未**重跑（读取他树/用户库不在本单必要面上）；
+  51 阶段 A 的现场值以 `eb0c307` 证据为**引用**，本轮把其中逐字抄录的行值钉成了回归测试。
