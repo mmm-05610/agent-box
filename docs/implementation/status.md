@@ -637,7 +637,7 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 | --- | --- | --- |
 | 51 | USAGE_FACT_DONE：pi/codex/hermes/claude 门级观测轮全部产出事实（hermes (11,7)/(22,14)、claude (11,7)，source=声明格式）；WAL 侧车根因修复；六家解析器就绪 | kilo/opencode/dsh/qwen 模板未声明 usageProbe（解析器已备，未启用；kilo/opencode 启用时读共享库，走 66 只读规则） |
 | 52 | B/D+E 完成：thought/plan/mode 三新 wire kind + 四类映射入账本 + process-facts 端到端 | 真 harness 观测轮（假 peer 已定向验证，真 harness 轮待跑） |
-| 60 | PROFILE_SETTINGS_PARTIAL：阶段 B 权限求解（闭集键/动作、last-match-wins、预设+覆盖、不默认 allow）、阶段 A 记录（schema 16 预设+按序规则+克隆出处）、冻结进下一轮配置、profile 投影；5 条测试 | C 归属纠正、D 克隆与迁移表、E 换绑定分档复述、F 收口、姿态逐家翻译、setPermissions wire 与 P17 | 本轮 |
+| 60 | PROFILE_SETTINGS_PARTIAL：A/B（schema 16、冻结进轮）、**C 归属纠正（测试钉住）**、**D 克隆+逐家迁移表+不可迁移项（profiles.clone wire）**、E 分档结论；9 条测试 | F 收口（回归已绿）、权限姿态逐家翻译与 ask↔审批端到端、setPermissions wire、P17 同步与重锁 | f8ed9d2 + 本轮 |
 | 59 | HOOK_MODELS_PARTIAL：A 观测、逐家 schema、账本、物化 G3、触发账本 G5、hooks.* wire（+6）、**代码资产 publishPlugin（+1，逐字存储+有界预览）**；10 条测试 | 触发事实生产端未接、P16 同步与重锁、G4 端到端、OpenCode 插件物化槽位（未钉死）、Windows 差异 | 0babb42 + 5801556 + 3179535 + 本轮 |
 | 58 | ASSET_HUBS_PARTIAL：A 槽位观测、skill/MCP 存储、逐家渲染、目录+绑定（schema 13）、物化进执行、**G7 目录式来源**（快照/安装/失败不落地）、**G6 MCP 有界探测**、assets.* wire（+10 方法）；15 条测试 | 凭据注入逐家钉死、P15 前端同步与重锁、commands/hooks 声明 | bddbba5…本轮 |
 | 56 | SUBSCRIPTION_CREDENTIALS_PARTIAL：资产存储+锁+乐观摘要、物化/回收本机端到端、schema 12、accounts.* wire 面（+4 方法）、codex 声明、45 补节；8 条测试 | **前端 P12 同步与两仓重锁**、Worker 侧物化（home.put）、其余家登录文件路径（需真机登录轮）、G2/G4 真机登录轮 | 1299275 + 本轮 |

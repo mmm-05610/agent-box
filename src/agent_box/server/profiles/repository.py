@@ -103,6 +103,40 @@ class ProfileRecords:
             assignments={"archived_at": now()},
         )
 
+    def clone_from(
+        self, *, source_id: str, name: str, harness_type: str,
+        report: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Write the clone row from a plan computed by the caller.
+
+        Only what the plan says travels: the family, the configuration object
+        (same family), the credential/account references (same family), the
+        permission posture, and the origin (source id + time). Native session
+        material is not in this list by construction.
+        """
+        source = self.get(source_id)
+        same_family = str(source["harness_type"]) == harness_type
+        timestamp = now()
+        profile_id = opaque_id("profile")
+        with self.database.transaction() as conn:
+            conn.execute(
+                "INSERT INTO server_profiles(id,version,name,harness_type,config_revision,"
+                "native_generation,config_object_digest,credential_id,account_id,"
+                "permission_preset,permission_rules_json,origin_profile_id,cloned_at,"
+                "display_name,created_at,updated_at) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (profile_id, 1, name, harness_type, 1, 0,
+                 source["config_object_digest"] if same_family else "",
+                 source.get("credential_id") if same_family else None,
+                 source.get("account_id") if same_family else None,
+                 source.get("permission_preset"),
+                 source.get("permission_rules_json"),
+                 source_id, timestamp, name, timestamp, timestamp),
+            )
+            return dict(conn.execute(
+                "SELECT * FROM server_profiles WHERE id=?", (profile_id,),
+            ).fetchone())
+
     def set_permissions(
         self, *, profile_id: str, preset: str, rules: Sequence[Any],
         expected_version: int, key: str, request_digest: str,

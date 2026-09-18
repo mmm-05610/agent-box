@@ -135,3 +135,237 @@ def test_the_posture_is_stored_validated_and_frozen_into_the_next_turn(tmp_path)
     assert posture["keys"]["edit"] == "deny" and posture["keys"]["bash"] == "deny"
     assert posture["keys"]["read"] == "ask"
     assert written["profile"]["id"] == profile["profile_id"]
+
+
+def test_sessions_belong_to_the_workspace_and_turns_carry_the_profile(tmp_path):
+    """Order 60 C: the corrected ownership, pinned as a rule.
+
+    A Session is listed by its *workspace*; the Profile is the current binding
+    and each Turn records its own. So: two Sessions of one workspace bound to
+    two different Profiles both list; switching one Session's Profile changes
+    the binding field, not which workspace owns it; and the wire's session
+    listing accepts no profile as a query axis.
+    """
+    from fastapi.testclient import TestClient
+
+    from agent_box.server.bootstrap import build_runtime
+    from agent_box.server.transport.http import create_app
+
+    runtime = build_runtime(tmp_path / "server")
+    runtime.start()
+    profiles = runtime.repository.profiles
+    workspaces = runtime.repository.workspaces
+    workspace = workspaces.create(
+        key="w", request_digest="w", distribution="Ubuntu", remote_user="tester",
+        remote_path="/workspace", connection_id="connection")[1]
+    digests = {}
+    for harness in ("claude-code", "codex"):
+        digests[harness] = runtime.objects.publish(
+            f'{{"schema_version":1,"harness_type":"{harness}","configuration":{{}}}}'.encode()
+        ).digest
+    first = profiles.create(key="p1", request_digest="p1", name="role-a",
+                            harness_type="claude-code", config_digest=digests["claude-code"],
+                            credential_id=None)[1]
+    second = profiles.create(key="p2", request_digest="p2", name="role-b",
+                             harness_type="codex", config_digest=digests["codex"],
+                             credential_id=None)[1]
+    from agent_box.server.sessions import SessionService
+    from agent_box.server.idempotency import IdempotentRecords
+
+    service = SessionService(runtime.repository.sessions, IdempotentRecords(runtime.database),
+                             runtime.objects, harnesses=runtime.harnesses,
+                             profiles=profiles, credentials=runtime.repository.credentials,
+                             execution=None)
+    session_a = service.create_session("s1", {
+        "workspace_id": workspace["workspace_id"], "profile_id": first["profile_id"]})[1]
+    session_b = service.create_session("s2", {
+        "workspace_id": workspace["workspace_id"], "profile_id": second["profile_id"]})[1]
+
+    with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
+        token = runtime.token
+
+        listed = client.post("/wire/v1/sessions.list", headers={
+            "Authorization": f"Bearer {token}"}, json={
+            "jsonrpc": "2.0", "id": "l", "method": "sessions.list",
+            "params": {"includeArchived": False,
+                       "workspaceId": workspace["workspace_id"]},
+        }).json()["result"]["items"]
+        assert sorted(item["id"] for item in listed) == sorted(
+            [session_a["session_id"], session_b["session_id"]])
+        # The binding is visible, per session, and two bindings coexist.
+        assert {item["id"]: item["profileId"] for item in listed} == {
+            session_a["session_id"]: first["profile_id"],
+            session_b["session_id"]: second["profile_id"],
+        }
+        # There is no profile axis: asking for one is an invalid parameter,
+        # not a filter that silently returns someone's "own" sessions.
+        refused = client.post("/wire/v1/sessions.list", headers={
+            "Authorization": f"Bearer {token}"}, json={
+            "jsonrpc": "2.0", "id": "l2", "method": "sessions.list",
+            "params": {"includeArchived": False, "profileId": first["profile_id"]},
+        }).json()
+        assert "error" in refused and refused["error"]["code"] == "INVALID_REQUEST"
+
+    # A same-family switch moves the binding; the workspace still owns the
+    # session. A cross-family one is refused - changing family is the clone
+    # rule (order 60 G5), not a switch.
+    third = profiles.create(key="p3", request_digest="p3", name="role-c",
+                            harness_type="claude-code", config_digest=digests["claude-code"],
+                            credential_id=None)[1]
+    with pytest.raises(Exception) as cross_family:
+        runtime.repository.sessions.switch_profile(
+            session_id=session_a["session_id"], profile_id=second["profile_id"],
+            expected_version=runtime.repository.sessions.get_session(
+                session_a["session_id"])["version"],
+            request_id="switch-c0", request_digest="switch-c0")
+    assert cross_family.value.code == "PROFILE_HARNESS_MISMATCH"
+    runtime.repository.sessions.switch_profile(
+        session_id=session_a["session_id"], profile_id=third["profile_id"],
+        expected_version=runtime.repository.sessions.get_session(
+            session_a["session_id"])["version"],
+        request_id="switch-c1", request_digest="switch-c1")
+    moved = runtime.repository.sessions.get_session(session_a["session_id"])
+    assert moved["profile_id"] == third["profile_id"]
+    assert moved["workspace_id"] == workspace["workspace_id"]
+
+
+def test_clone_plans_what_travels_and_never_pretends_about_sessions():
+    """Order 60 D: the migration plan, item by item.
+
+    Same family reuses the family-specific records; another family translates
+    the neutral ones (skills, MCP where the target declares the slot, hooks the
+    target's schema accepts) and lists everything else with its reason. Native
+    sessions never travel.
+    """
+    from agent_box.server.profiles.clone import CloneError, plan_migration
+    from agent_box_harnesses.registry.loader import load_builtin_registry
+
+    registry = load_builtin_registry()
+
+    def spec(name):
+        return registry.get(name).profile
+
+    source = {
+        "harness_type": "claude-code", "credential_id": "credential_1",
+        "account_id": "account_1", "permission_preset": "plan",
+        "permission_rules_json": '[{"key": "edit", "pattern": "docs/**", "action": "allow"}]',
+    }
+    bindings = [
+        {"kind": "skill", "name": "my-skill", "revision": 1},
+        {"kind": "mcp", "name": "web-tools", "revision": 1},
+        {"kind": "plugin", "name": "guard", "revision": 1},
+    ]
+    hooks = [
+        {"name": "guard-bash", "model": {"event": "PreToolUse", "matcher": "Bash",
+         "handlers": [{"type": "command", "command": "/bin/guard", "timeout": 60,
+                       "async": False}]}},
+        {"name": "notify-hook", "model": {"event": "Notification",
+         "handlers": [{"type": "prompt", "prompt": "say hi", "timeout": 60, "async": False}]}},
+    ]
+
+    # Same family: everything family-specific travels.
+    same = plan_migration(source=source, target_harness="claude-code",
+                          asset_bindings=bindings, hooks=hooks,
+                          registry_profile=spec("claude-code"))
+    assert same["sameFamily"] is True
+    by_item = {entry["item"]: entry for entry in same["items"]}
+    assert by_item["configuration"]["migrated"] and by_item["credential"]["migrated"]
+    assert by_item["account"]["migrated"] and by_item["permissions"]["migrated"]
+    assert same["permissions"]["preset"] == "plan"
+    assert same["permissions"]["rules"][-1]["pattern"] == "docs/**"
+    assert by_item["hook:guard-bash"]["migrated"] and by_item["hook:notify-hook"]["migrated"]
+    assert by_item["native-sessions"]["migrated"] is False
+
+    # Cross family to codex: the family-specific records are listed, not moved.
+    cross = plan_migration(source=source, target_harness="codex",
+                           asset_bindings=bindings, hooks=hooks,
+                           registry_profile=spec("codex"))
+    entries = {entry["item"]: entry for entry in cross["items"]}
+    assert entries["configuration"]["migrated"] is False
+    assert entries["credential"]["migrated"] is False
+    assert entries["account"]["migrated"] is False
+    assert entries["permissions"]["migrated"] is True          # neutral by design
+    assert entries["skill:my-skill"]["migrated"] is True       # Agent Skills shape
+    assert entries["mcp:web-tools"]["migrated"] is True        # codex declares the mcp slot
+    assert entries["plugin:guard"]["migrated"] is True         # delivered as a code asset
+    # codex declares only command handlers, so the prompt hook is refused with
+    # a reason instead of vanishing.
+    assert entries["hook:guard-bash"]["migrated"] is True
+    assert entries["hook:notify-hook"]["migrated"] is False
+    assert "handler" in entries["hook:notify-hook"]["reason"]
+    assert cross["refusedCount"] >= 4 and cross["migratedCount"] >= 4
+
+
+def test_a_clone_row_records_its_origin_and_carries_only_what_the_plan_allows(tmp_path):
+    from agent_box.server.idempotency import IdempotentRecords
+    from agent_box.server.profiles import ProfileRecords
+    from agent_box.storage import Database
+
+    database = Database(tmp_path / "data")
+    database.initialize()
+    profiles = ProfileRecords(database, IdempotentRecords(database))
+    source = profiles.create(key="s", request_digest="s", name="role",
+                             harness_type="claude-code",
+                             config_digest="sha256:" + "1" * 64,
+                             credential_id=None)[1]
+    profiles.set_permissions(
+        profile_id=source["profile_id"], preset="plan", rules=[],
+        expected_version=profiles.get(source["profile_id"])["version"],
+        key="perm", request_digest="perm")
+
+    clone = profiles.clone_from(
+        source_id=source["profile_id"], name="clone", harness_type="codex",
+        report={"sameFamily": False})
+    assert clone["origin_profile_id"] == source["profile_id"]
+    assert clone["cloned_at"] and clone["harness_type"] == "codex"
+    # Cross family: the configuration object is *not* reused and the (absent)
+    # credential is not invented; the neutral posture travels.
+    assert clone["config_object_digest"] == ""
+    assert clone["credential_id"] is None and clone["account_id"] is None
+    assert clone["permission_preset"] == "plan"
+    rules_json = clone["permission_rules_json"]
+    assert rules_json and "deny" in rules_json
+
+
+def test_the_clone_wire_face_returns_the_migration_report(tmp_path):
+    from fastapi.testclient import TestClient
+
+    from agent_box.server.bootstrap import build_runtime
+    from agent_box.server.transport.http import create_app
+
+    runtime = build_runtime(tmp_path / "server")
+    runtime.start()
+    profile = runtime.repository.profiles.create(
+        key="p", request_digest="p", name="role", harness_type="claude-code",
+        config_digest=runtime.objects.publish(
+            b'{"schema_version":1,"harness_type":"claude-code","configuration":{}}').digest,
+        credential_id=None)[1]
+    with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
+        token = runtime.token
+        cloned = client.post("/wire/v1/profiles.clone", headers={
+            "Authorization": f"Bearer {token}"}, json={
+            "jsonrpc": "2.0", "id": "c", "method": "profiles.clone",
+            "params": {"requestId": "clone-request-1", "profileId": profile["profile_id"],
+                       "displayName": "role clone", "harness": "codex"},
+        }).json()["result"]
+        assert cloned["profile"]["harness"] == "codex"
+        assert cloned["profile"]["originProfileId"] == profile["profile_id"]
+        report = cloned["migration"]
+        assert report["sameFamily"] is False
+        items = {entry["item"]: entry for entry in report["items"]}
+        assert items["native-sessions"]["migrated"] is False
+        assert items["credential"]["migrated"] is False
+        assert report["migratedCount"] + report["refusedCount"] == len(report["items"])
+
+        # The same family reuses the configuration object and the credential
+        # reference; the report says so.
+        same = client.post("/wire/v1/profiles.clone", headers={
+            "Authorization": f"Bearer {token}"}, json={
+            "jsonrpc": "2.0", "id": "c2", "method": "profiles.clone",
+            "params": {"requestId": "clone-request-2", "profileId": profile["profile_id"],
+                       "displayName": "role clone same"},
+        }).json()["result"]
+        assert same["migration"]["sameFamily"] is True
+        same_items = {entry["item"]: entry for entry in same["migration"]["items"]}
+        assert same_items["configuration"]["migrated"] is True
+        assert same_items["native-sessions"]["migrated"] is False

@@ -527,3 +527,14 @@ ProviderModelConfigRecord = {
   （≤24 行/4096 字符，自带截断标记），**绝不由表单拼装代码**。
 - 反例：二进制（`PLUGIN_NOT_TEXT`）、符号链接、后缀不符、超限、重复修订各有类型化码。
 - 逐家物化槽位（opencode 的 plugins 目录）**未一手钉死 ⇒ 不声明、不物化**（如实记账）。
+
+## Order 60 — Profile 绑定点（2026-09-18，env-provider）
+
+- **新方法（+1）**：`profiles.clone {requestId, profileId, displayName, harness?} →
+  {profile, migration}`——`migration` 是逐项 `{item, migrated, reason}` 报告（含
+  `native-sessions` 恒为未迁移）。
+- **profiles 投影 +3 字段**：`permissionPreset`、`permissionRules`、`originProfileId`
+  （P17 需要编辑权限姿态与显示克隆出处）。
+- **权限姿态进冻结配置**：该轮 effective config 增 `permissions`（`resolve_all` 的逐键/逐目标
+  动作集）；`ask` 仍走既有审批往返，不新增审批面。
+- 需前端同步（P17）与两仓重锁。

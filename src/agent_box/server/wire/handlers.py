@@ -72,6 +72,7 @@ _PARAM_SHAPES = {
     "profiles.update": ({"requestId", "profileId", "expectedVersion", "displayName"}, set()),
     "profiles.updateConfig": ({"requestId", "profileId", "expectedVersion", "values"}, set()),
     "profiles.archive": ({"requestId", "profileId", "expectedVersion"}, set()),
+    "profiles.clone": ({"requestId", "profileId", "displayName"}, {"harness"}),
     "providerModels.list": ({"includeArchived"}, set()),
     "providerModels.create": (
         {"requestId", "displayName", "harness", "provider", "credentialId",
@@ -309,6 +310,7 @@ class WireService:
             "profiles.update": self.profiles_update,
             "profiles.updateConfig": self.profiles_update_config,
             "profiles.archive": self.profiles_archive,
+            "profiles.clone": self.profiles_clone,
             "providerModels.list": self.provider_models_list,
             "providerModels.create": self.provider_models_create,
             "providerModels.update": self.provider_models_update,
@@ -883,6 +885,54 @@ class WireService:
             credential_id=credential_id,
         )
         return {"profile": self._profile(row)}
+
+    def profiles_clone(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        """Clone one Profile into a new one, with the migration report.
+
+        The report is the product surface: what traveled, what did not, and
+        why. Session material never appears as migrated (order 60 D).
+        """
+        from agent_box.server.profiles.clone import plan_migration
+
+        source_id = _bounded(params["profileId"], "profileId")
+        name = _bounded(params["displayName"], "displayName", 128)
+        records = self.profiles.records
+        source = records.get(source_id)
+        harness = params.get("harness") or source["harness_type"]
+        if not isinstance(harness, str):
+            raise WireError("INVALID_REQUEST", "harness must be a string")
+        harness = _bounded(harness, "harness", 64)
+        from agent_box.server.bootstrap.runtime import _registry_profile_spec
+
+        profile_spec = _registry_profile_spec(harness)
+        if profile_spec is None:
+            raise WireError("INVALID_REQUEST", f"the {harness!r} family is not registered")
+        bindings = self._asset_bindings_for(source_id)
+        hooks = self.hooks.list() if self.hooks is not None else []
+        try:
+            report = plan_migration(
+                source=source, target_harness=harness, asset_bindings=bindings,
+                hooks=hooks, registry_profile=profile_spec,
+            )
+            clone = records.clone_from(
+                source_id=source_id, name=name, harness_type=harness, report=report)
+        except ServerError as exc:
+            raise self._profile_error(exc) from exc
+        return {"profile": self._profile(clone), "migration": report}
+
+    def _asset_bindings_for(self, profile_id: str) -> list[dict[str, Any]]:
+        """The (kind, name, revision) triples a clone's plan needs."""
+        if self.asset_records is None:
+            return []
+        with self.asset_records.database.read() as conn:
+            return [
+                {"kind": row["kind"], "name": row["name"], "revision": int(row["revision"])}
+                for row in conn.execute(
+                    "SELECT a.kind,a.name,b.revision FROM server_profile_assets b "
+                    "JOIN server_assets a ON a.id=b.asset_id WHERE b.profile_id=?",
+                    (profile_id,),
+                ).fetchall()
+            ]
 
     def profiles_update(self, params: Mapping[str, Any]) -> dict[str, Any]:
         try:
