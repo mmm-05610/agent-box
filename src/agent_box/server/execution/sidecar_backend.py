@@ -534,6 +534,25 @@ class SidecarExecutionBackend:
             with self._lock:
                 self._completion_threads.discard(threading.current_thread())
 
+    def pid_for(self, turn_id: str) -> int | None:
+        """The execution-side pid for one in-flight turn, if this side has it.
+
+        A local run's process object is the only source; a Worker-hosted run
+        has none here, and an unknown turn is simply "not reported" - the
+        inventory shows null rather than a guess.
+        """
+        with self._lock:
+            run = self._active.get(turn_id)
+        if run is None:
+            return None
+        pid = getattr(run.port, "pid", None)
+        if not callable(pid):
+            return None
+        try:
+            return pid(turn_id)
+        except BaseException:  # noqa: BLE001 - unknown is the honest answer
+            return None
+
     def cancel(self, turn_id: str) -> bool:
         with self._lock:
             run = self._active.get(turn_id)

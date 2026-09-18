@@ -557,3 +557,12 @@ ProviderModelConfigRecord = {
   且前端**隐藏分区**（不画假开关）。
 - 只从 profile 的原生 home 读、符号链接不跟随、答案零宿主路径；WSL 侧返回 `MEMORY_UNAVAILABLE`。
 - 需前端同步（P17 修订）与两仓重锁。
+
+## Order 64 — 运行中执行清单（2026-09-18，env-provider）
+
+- **新方法（+1，纯只读）**：`executions.list {requestId, limit?} → {executions[]}`；
+  行含 `executionId/turnId/sessionId/profileId/profile/harness/placement/state/startedAt/
+  workspaceId/workspace/queueItemId/pid/pidReason/adapterPid/adapterPidReason`。
+- 只从执行账本读（活动 turn），**无机器级进程枚举、无取消面**；`pid` 仅本机通道填，
+  否则 `null + PID_NOT_REPORTED`；答案零宿主路径；上限 200 行（超限类型化失败）。
+- 需前端同步（P20）与两仓重锁。

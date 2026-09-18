@@ -1376,6 +1376,18 @@ class SidecarHarnessPort:
         envelope = self._require(execution_id)
         envelope.delete_state_file(relative)
 
+    def pid(self, execution_id: str) -> int | None:
+        """The execution-side pid, or None when this side has not reported one.
+
+        Only the local channel's process object is readable here; a
+        Worker-hosted run has no pid on this machine, and the order's rule is
+        that the field stays null rather than being guessed.
+        """
+        envelope = self._require(execution_id)
+        process = getattr(envelope, "process", None)
+        pid = getattr(process, "pid", None)
+        return pid if isinstance(pid, int) and not isinstance(pid, bool) else None
+
     def read_subscription(self, execution_id: str) -> dict[str, bytes]:
         """Read the declared subscription working files back (order 56)."""
         envelope = self._require(execution_id)

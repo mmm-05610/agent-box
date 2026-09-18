@@ -68,6 +68,7 @@ _PARAM_SHAPES = {
     "workspaces.browse": ({"requestId", "environment", "path"}, set()),
     "workspaces.archive": ({"requestId", "workspaceId", "expectedVersion"}, set()),
     "workspaces.gitStatus": ({"requestId", "workspaceId"}, set()),
+    "executions.list": ({"requestId"}, {"limit"}),
     "profiles.list": ({"includeArchived"}, set()),
     "profiles.create": ({"requestId", "displayName", "harness"}, {"credentialId"}),
     "profiles.update": ({"requestId", "profileId", "expectedVersion", "displayName"}, set()),
@@ -317,6 +318,7 @@ class WireService:
             "workspaces.list": self.workspaces_list,
             "workspaces.archive": self.workspaces_archive,
             "workspaces.gitStatus": self.workspaces_git_status,
+            "executions.list": self.executions_list,
             "profiles.list": self.profiles_list,
             "profiles.create": self.profiles_create,
             "profiles.update": self.profiles_update,
@@ -967,6 +969,27 @@ class WireService:
         except ServerError as exc:
             raise self._profile_error(exc) from exc
         return {"profile": self._profile(updated[1]["profile"])}
+
+    def executions_list(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        """The in-flight executions of ours, straight from the ledger.
+
+        Read-only: no cancellation surface, no machine-level process view, and
+        a bounded row count (over the bound is a typed refusal, never a
+        silently shorter list).
+        """
+        from agent_box.server.execution.inventory import (
+            MAX_EXECUTIONS, InventoryError, list_executions,
+        )
+
+        _require(params, "requestId")
+        limit = params.get("limit", MAX_EXECUTIONS)
+        try:
+            rows = list_executions(
+                self.sessions.records.database, execution_port=self.execution,
+                limit=limit)
+        except InventoryError as refusal:
+            raise WireError("INVALID_REQUEST", f"{refusal.code}: {refusal.message}") from refusal
+        return {"executions": rows}
 
     def workspaces_git_status(self, params: Mapping[str, Any]) -> dict[str, Any]:
         """Read-only Git status of one workspace, on the side that owns it.
