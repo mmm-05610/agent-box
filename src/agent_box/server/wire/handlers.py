@@ -67,6 +67,7 @@ _PARAM_SHAPES = {
     "workspaces.list": ({"includeArchived"}, set()),
     "workspaces.browse": ({"requestId", "environment", "path"}, set()),
     "workspaces.archive": ({"requestId", "workspaceId", "expectedVersion"}, set()),
+    "workspaces.gitStatus": ({"requestId", "workspaceId"}, set()),
     "profiles.list": ({"includeArchived"}, set()),
     "profiles.create": ({"requestId", "displayName", "harness"}, {"credentialId"}),
     "profiles.update": ({"requestId", "profileId", "expectedVersion", "displayName"}, set()),
@@ -268,6 +269,7 @@ class WireService:
         catalogs=None,
         hooks=None,
         hook_triggers=None,
+        connectors=None,
     ) -> None:
         self._server_id_provider = server_id_provider
         self.artifact_store = artifact_store
@@ -287,6 +289,9 @@ class WireService:
         #: Order 59: the managed-hook ledger and its trigger facts.
         self.hooks = hooks
         self.hook_triggers = hook_triggers
+        #: Order 62: the placement connectors (the WSL one answers a Git
+        #: status through its own fixed command).
+        self.connectors = connectors
         #: Order 56: harness -> its declared subscription login-state files,
         #: read from the deployment set the composition loaded.
         self.subscription_files_for = subscription_files_for or (lambda _harness: ())
@@ -307,6 +312,7 @@ class WireService:
             "workspaces.open": self.workspaces_open,
             "workspaces.list": self.workspaces_list,
             "workspaces.archive": self.workspaces_archive,
+            "workspaces.gitStatus": self.workspaces_git_status,
             "profiles.list": self.profiles_list,
             "profiles.create": self.profiles_create,
             "profiles.update": self.profiles_update,
@@ -913,6 +919,50 @@ class WireService:
         except ServerError as exc:
             raise self._profile_error(exc) from exc
         return {"profile": self._profile(updated[1]["profile"])}
+
+    def workspaces_git_status(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        """Read-only Git status of one workspace, on the side that owns it.
+
+        `local` runs the fixed porcelain command here; `wsl` runs it through
+        the connector's own fixed command (no Worker protocol change); `ssh`
+        is not wired yet and answers the typed unavailable reason - the six
+        fields stay null rather than guessing. No path enters the answer.
+        """
+        from agent_box.server.workspaces.git_status import (
+            DEFAULT_MAX_BYTES, DEFAULT_TIMEOUT_SECONDS, GitStatus, local_git_status,
+            parse_porcelain_v2,
+        )
+
+        _require(params, "requestId", "workspaceId")
+        row = self.workspaces.records.get(_bounded(params["workspaceId"], "workspaceId"))
+        kind = str(row.get("env_kind") or "wsl")
+        if kind == "local":
+            path = row.get("normalized_path") or row.get("remote_path")
+            status = local_git_status(
+                str(path), timeout=DEFAULT_TIMEOUT_SECONDS, max_bytes=DEFAULT_MAX_BYTES)
+            return {"git": status.as_wire()}
+        if kind == "wsl" and self.connectors is not None:
+            connector = self.connectors.get("wsl")
+            read = getattr(connector, "read_only_git_status", None)
+            if callable(read):
+                stdout, reason = read(
+                    distribution=str(row["distribution"]),
+                    user=row.get("remote_user"),
+                    path=str(row["remote_path"]),
+                    timeout=DEFAULT_TIMEOUT_SECONDS, max_bytes=DEFAULT_MAX_BYTES,
+                )
+                if reason is not None:
+                    return {"git": GitStatus(reason=reason, reasons=(reason,)).as_wire()}
+                try:
+                    branch, changed, ahead, behind = parse_porcelain_v2(stdout)
+                except (ValueError, TypeError):
+                    return {"git": GitStatus(
+                        reason="GIT_PARSE_FAILED", reasons=("GIT_PARSE_FAILED",)).as_wire()}
+                return {"git": GitStatus(
+                    branch=branch, changed_files=changed, ahead=ahead, behind=behind,
+                ).as_wire()}
+        return {"git": GitStatus(
+            reason="GIT_UNAVAILABLE", reasons=("GIT_UNAVAILABLE",)).as_wire()}
 
     def profiles_clone(self, params: Mapping[str, Any]) -> dict[str, Any]:
         """Clone one Profile into a new one, with the migration report.

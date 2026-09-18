@@ -415,6 +415,7 @@ def build_runtime(
         mcp_assets=mcp_assets, plugin_assets=plugin_assets,
         catalogs=asset_catalogs,
         hooks=hook_records, hook_triggers=hook_triggers,
+        connectors=connectors,
     )
     runtime = ServerRuntime(
         root, database, objects, repository, service, owner, token, token_path,

@@ -136,6 +136,41 @@ class WslConnector:
             raise WorkerError("ATTACHMENT_DIGEST_MISMATCH", "workspace attachment digest changed")
         return content, actual
 
+    GIT_STATUS_ARGV = ("--no-optional-locks", "status", "--porcelain=v2", "--branch")
+
+    def read_only_git_status(
+        self, *, distribution: str, user: str | None, path: str,
+        timeout: float, max_bytes: int,
+    ) -> tuple[bytes, str | None]:
+        """Run the *fixed* porcelain command on the WSL side; bounded.
+
+        The argv is fixed here on purpose: the Server asks for one read-only
+        fact and never supplies a command line. `--no-optional-locks` keeps the
+        query from refreshing the index (a write) while the harness may be
+        using the repository, and nothing in the invocation reaches the
+        network.
+        """
+        if not isinstance(path, str) or not path.startswith("/") or "\x00" in path:
+            raise WorkerError("GIT_WORKSPACE_MISSING", "the workspace path is invalid")
+        command = ["wsl.exe", "--distribution", distribution]
+        if user:
+            command += ["--user", user]
+        command += ["--exec", "/usr/bin/git", "-C", path, *self.GIT_STATUS_ARGV]
+        try:
+            result = subprocess.run(
+                command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, timeout=timeout,
+            )
+        except subprocess.TimeoutExpired:
+            return b"", "GIT_TIMEOUT"
+        except OSError:
+            return b"", "GIT_UNAVAILABLE"
+        if len(result.stdout) > max_bytes:
+            return b"", "GIT_OUTPUT_LIMIT"
+        if result.returncode != 0 and not result.stdout.strip():
+            return b"", "GIT_NOT_A_REPOSITORY"
+        return result.stdout, None
+
     def _probe(self, probe_id: str) -> Probe:
         probe = self._probes.get(probe_id)
         if probe is None or time.monotonic() >= probe.expires_at:

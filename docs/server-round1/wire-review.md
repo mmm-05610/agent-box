@@ -538,3 +538,12 @@ ProviderModelConfigRecord = {
 - **权限姿态进冻结配置**：该轮 effective config 增 `permissions`（`resolve_all` 的逐键/逐目标
   动作集）；`ask` 仍走既有审批往返，不新增审批面。
 - 需前端同步（P17）与两仓重锁。
+
+## Order 62 — 工作区 Git 状态（2026-09-18，env-provider）
+
+- **新方法（+1，纯只读）**：`workspaces.gitStatus {requestId, workspaceId} → {git}`；
+  `git` = `{branch, changedFiles, additions, deletions, ahead, behind, reason}`，
+  **六字段各自可为 null**（null=拿不到），`reason` 为类型化码之一。
+- 只读且固定 argv（`--no-optional-locks status --porcelain=v2 --branch` + `diff --numstat HEAD`）；
+  答案与记录里**无宿主路径**；不改 Worker/Rust 协议；`ssh` 侧返回 `GIT_UNAVAILABLE`。
+- 需前端同步（P20）与两仓重锁。
