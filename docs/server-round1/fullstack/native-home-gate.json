@@ -1,7 +1,7 @@
 {
  "cleanup": {
   "homePreservedOutsideAttempts": true,
-  "temporaryRoot": "/tmp/agentbox-native-home-gate-w0s2o22a"
+  "temporaryRoot": "/tmp/agentbox-native-home-gate-0yge9f_s"
  },
  "cost": {
   "authorizedRealModelCalls": 0,
@@ -48,9 +48,24 @@
   "result": "pass"
  },
  "g3": {
-  "code": "TURN_CONCURRENCY_CONFLICT",
-  "note": "same-Profile parallel Sessions are refused by the Profile execution lock; enabling them is a product decision recorded in the evidence document",
-  "result": "blocked"
+  "deltasPerSession": [
+   1,
+   1
+  ],
+  "nativeIdsDiffer": true,
+  "result": "pass",
+  "sameSessionOutcome": {
+   "held": "queued",
+   "queueItemId": "queue_259c8a881c464790a2eaffb03dce03df"
+  },
+  "switchWhileRunning": {
+   "outcome": "rejected",
+   "reason": "execution_running"
+  },
+  "turnStates": [
+   "completed",
+   "completed"
+  ]
  },
  "g4": {
   "cleanTurnsFailedWithCredential": false,
@@ -91,6 +106,6 @@
  "reportPath": "docs/server-round1/fullstack/native-home-gate.json",
  "result": "NATIVE_HOME_GATE_OK",
  "script": "scripts/server-round1/native-home-gate.py",
- "temporaryRoot": "/tmp/agentbox-native-home-gate-w0s2o22a",
+ "temporaryRoot": "/tmp/agentbox-native-home-gate-0yge9f_s",
  "temporaryRootRemoved": true
 }

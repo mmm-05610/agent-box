@@ -44,9 +44,39 @@ class SessionRecords:
     ACTIVE_TURN_STATES = ACTIVE_TURN_STATES
     TERMINAL_TURN_STATES = TERMINAL_TURN_STATES
 
-    def __init__(self, database: Database, idempotency: IdempotentRecords) -> None:
+    def __init__(self, database: Database, idempotency: IdempotentRecords, *,
+                 home_concurrency: Mapping[str, str] | None = None) -> None:
         self.database = database
         self.idempotency = idempotency
+        #: Order 67's narrowed lock, per Harness family: a family whose home
+        #: cannot be proven safe for concurrent writers declares "exclusive"
+        #: in its deployment, and admission then holds the pre-67 rule for
+        #: that family alone (one active Turn per Profile). "shared" - every
+        #: family with first-hand evidence of safe concurrent turns - leaves
+        #: the Session as the only uniqueness unit. Families absent from this
+        #: mapping keep "shared": the lock is declared, never guessed.
+        self.home_concurrency = dict(home_concurrency or {})
+
+    def _refuse_exclusive_home_concurrency(self, conn, profile) -> None:
+        """The narrowed lock: refuse a second active Turn for one Profile.
+
+        Only families that declared `homeConcurrency = "exclusive"` reach the
+        check; the refusal names the asset (the Harness home), so a client can
+        tell this apart from the Session-scoped admission above.
+        """
+        if self.home_concurrency.get(str(profile["harness_type"]), "shared") != "exclusive":
+            return
+        active = conn.execute(
+            "SELECT 1 FROM server_turns WHERE profile_id=? AND state IN (?,?,?,?) LIMIT 1",
+            (profile["id"], *ACTIVE_TURN_STATES),
+        ).fetchone()
+        if active is not None:
+            raise ServerError(
+                "TURN_CONCURRENCY_CONFLICT",
+                "Profile already has an active execution: this Harness's home "
+                "permits one execution at a time",
+                status=409,
+            )
 
     # -- session records -------------------------------------------------
 
@@ -210,6 +240,7 @@ class SessionRecords:
     ) -> str:
         execution_id = opaque_id("execution")
         timestamp = now()
+        self._refuse_exclusive_home_concurrency(conn, profile)
         try:
             conn.execute(
                 "INSERT INTO server_turns(id,session_id,profile_id,profile_revision,native_generation,"
@@ -224,7 +255,7 @@ class SessionRecords:
             if "UNIQUE constraint failed" in str(exc):
                 raise ServerError(
                     "TURN_CONCURRENCY_CONFLICT",
-                    "Session or Profile already has an active execution",
+                    "Session already has an active execution",
                     status=409,
                 ) from exc
             raise
@@ -488,6 +519,7 @@ class SessionRecords:
                 )
             turn_id = opaque_id("turn")
             timestamp = now()
+            self._refuse_exclusive_home_concurrency(conn, profile)
             try:
                 conn.execute(
                     "INSERT INTO server_turns(id,session_id,profile_id,profile_revision,native_generation,state,capture_state,cleanup_state,input_object_digest,created_at,updated_at) "
@@ -499,7 +531,7 @@ class SessionRecords:
                 if "UNIQUE constraint failed" in str(exc):
                     raise ServerError(
                         "TURN_CONCURRENCY_CONFLICT",
-                        "Session or Profile already has an active Turn",
+                        "Session already has an active Turn",
                         status=409,
                     ) from exc
                 raise
@@ -544,9 +576,8 @@ class SessionRecords:
                     "UPDATE server_sessions SET status='recovery_required',updated_at=? WHERE id=?",
                     (timestamp, row["session_id"]),
                 )
-                conn.execute(
-                    "UPDATE server_profiles SET run_state='idle',recovery_pending=1,updated_at=? WHERE id=?",
-                    (timestamp, row["profile_id"]),
+                self._settle_profile_after_turn(
+                    conn, row["profile_id"], row["id"], timestamp, recovery_pending=1,
                 )
                 self._append_session_event(
                     conn, row["session_id"], row["id"], "turn.capture",
@@ -603,6 +634,38 @@ class SessionRecords:
                 raise ServerError("TURN_NOT_FOUND", "Turn was not found", status=404)
             return self._append_session_event(conn, row["session_id"], turn_id, kind, data)
 
+    def _settle_profile_after_turn(
+        self, conn, profile_id: str, turn_id: str, timestamp: str, *,
+        recovery_pending: int | None = None,
+    ) -> bool:
+        """Set the Profile idle only when no *other* active Turn remains.
+
+        Order 67: the uniqueness unit is the Session, so two different
+        Sessions of one Profile may run at the same time. A finishing Turn
+        must therefore not stamp the Profile idle while its sibling is still
+        in flight - the last active Turn settles the Profile. Returns whether
+        the Profile was settled by this call.
+        """
+        other = conn.execute(
+            "SELECT 1 FROM server_turns WHERE profile_id=? AND id<>? "
+            "AND state IN (?,?,?,?) LIMIT 1",
+            (profile_id, turn_id, *ACTIVE_TURN_STATES),
+        ).fetchone()
+        if other is not None:
+            return False
+        if recovery_pending is None:
+            conn.execute(
+                "UPDATE server_profiles SET run_state='idle',updated_at=? WHERE id=?",
+                (timestamp, profile_id),
+            )
+        else:
+            conn.execute(
+                "UPDATE server_profiles SET run_state='idle',recovery_pending=?,"
+                "updated_at=? WHERE id=?",
+                (recovery_pending, timestamp, profile_id),
+            )
+        return True
+
     def complete_turn(
         self, turn_id: str, *, checkpoint_object_digest: str,
         checkpoint_native_id: str, result_object_digest: str, queue_records=None,
@@ -657,17 +720,18 @@ class SessionRecords:
                 (checkpoint_object_digest, checkpoint_native_id, native_platform, home_locator,
                  latest_usage, timestamp, row["session_id"]),
             )
-            updated_profile = conn.execute(
-                "UPDATE server_profiles SET run_state='idle',native_generation=native_generation+1,"
-                "updated_at=? WHERE id=? AND native_generation=?",
-                (timestamp, row["profile_id"], row["native_generation"]),
+            # Order 67: two different Sessions of one Profile may complete
+            # concurrently, so the optimistic generation check would refuse
+            # the second legal Turn. The counter is monotonic - one advance
+            # per completed Turn - and nothing reads its parity, so it
+            # advances unconditionally; the Profile settles only when this
+            # was its last active Turn.
+            conn.execute(
+                "UPDATE server_profiles SET native_generation=native_generation+1,"
+                "updated_at=? WHERE id=?",
+                (timestamp, row["profile_id"]),
             )
-            if updated_profile.rowcount != 1:
-                raise ServerError(
-                    "PROFILE_GENERATION_CONFLICT",
-                    "Profile native generation changed during the Turn",
-                    status=409,
-                )
+            self._settle_profile_after_turn(conn, row["profile_id"], turn_id, timestamp)
             if latest_usage:
                 self._append_session_event(
                     conn, row["session_id"], turn_id, "usage.updated",
@@ -776,10 +840,7 @@ class SessionRecords:
                 (checkpoint_object_digest, checkpoint_native_id, native_platform,
                  home_locator, timestamp, row["session_id"]),
             )
-            conn.execute(
-                "UPDATE server_profiles SET run_state='idle',updated_at=? WHERE id=?",
-                (timestamp, row["profile_id"]),
-            )
+            self._settle_profile_after_turn(conn, row["profile_id"], turn_id, timestamp)
             if queue_records is not None:
                 if row["queue_item_id"] is not None:
                     queue_records.mark_terminal(conn, row["queue_item_id"], "cancelled")
@@ -811,9 +872,9 @@ class SessionRecords:
                 "UPDATE server_sessions SET status=?,updated_at=? WHERE id=?",
                 ("recovery_required" if recovery_required else "ready", timestamp, row["session_id"]),
             )
-            conn.execute(
-                "UPDATE server_profiles SET run_state='idle',recovery_pending=?,updated_at=? WHERE id=?",
-                (1 if recovery_required else 0, timestamp, row["profile_id"]),
+            self._settle_profile_after_turn(
+                conn, row["profile_id"], turn_id, timestamp,
+                recovery_pending=1 if recovery_required else 0,
             )
             if queue_records is not None:
                 if row["queue_item_id"] is not None:

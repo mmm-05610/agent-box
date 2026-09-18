@@ -76,13 +76,14 @@ def alpha_beta_registry():
     return registry
 
 
-def build_pieces(tmp_path, execution):
+def build_pieces(tmp_path, execution, *, home_concurrency=None):
     database = Database(tmp_path / "data")
     database.initialize()
     idempotency = IdempotentRecords(database)
     credentials = CredentialRecords(database)
     profiles = ProfileRecords(database, idempotency)
-    sessions_records = SessionRecords(database, idempotency)
+    sessions_records = SessionRecords(database, idempotency,
+                                      home_concurrency=home_concurrency)
     workspaces = WorkspaceRecords(database, idempotency)
     sessions = SessionService(
         sessions_records, idempotency, ObjectStore(tmp_path / "data"),
@@ -240,3 +241,146 @@ def test_capability_answers_reflect_registration_only(tmp_path):
 
         # Nothing is invented for an unregistered harness type or absent execution.
         assert client.get("/api/v1/profiles", headers=headers).json() == {"items": []}
+
+
+def test_same_profile_two_sessions_admitted_and_settled_in_order(tmp_path):
+    """Order 67: the uniqueness unit is the Session, not the Profile.
+
+    Two different Sessions of one Profile each get a Turn (the dropped
+    per-profile index no longer refuses the second); a second Turn for the
+    *same* Session is still refused with the unchanged wire code; the
+    Profile's run_state stays active until the last of its Turns finishes,
+    and its generation advances once per completed Turn.
+    """
+    import pytest
+
+    from agent_box.server.errors import ServerError
+
+    execution = RecordingExecution()
+    database, idempotency, sessions, repository = build_pieces(tmp_path, execution)
+    credentials, profiles, records = (
+        repository.credentials, repository.profiles, repository.sessions,
+    )
+    objects = ObjectStore(tmp_path / "data")
+    credentials.register("credential-1", "alpha-key", "locator")
+    config = objects.publish(b'{"schema_version":1,"harness_type":"alpha","configuration":{}}')
+    profile = profiles.create(
+        key="p", request_digest="p", name="role", harness_type="alpha",
+        config_digest=config.digest, credential_id="credential-1",
+    )[1]
+    workspace = repository.workspaces.create(
+        key="w", request_digest="w", distribution="Ubuntu", remote_user="tester",
+        remote_path="/workspace", connection_id="connection",
+    )[1]
+    first = sessions.create_session("s1", {
+        "workspace_id": workspace["workspace_id"], "profile_id": profile["profile_id"],
+    })[1]
+    second = sessions.create_session("s2", {
+        "workspace_id": workspace["workspace_id"], "profile_id": profile["profile_id"],
+    })[1]
+
+    body = {"text": "one intent", "expected_profile_revision": 1}
+    _, turn_a = sessions.create_turn(first["session_id"], "key-a", body)
+    _, turn_b = sessions.create_turn(second["session_id"], "key-b", body)
+    assert turn_a["turn_id"] != turn_b["turn_id"]
+    assert set(execution.accepted) == {turn_a["turn_id"], turn_b["turn_id"]}
+
+    # The same Session's second Turn is refused - and the code is unchanged.
+    with pytest.raises(ServerError) as refusal:
+        sessions.create_turn(first["session_id"], "key-a2", body)
+    assert refusal.value.code == "TURN_CONCURRENCY_CONFLICT"
+    assert "Session" in refusal.value.message and "Profile" not in refusal.value.message
+
+    # Cross-profile protection: while the Session has an active Turn, another
+    # role cannot take it over - the switch is rejected with the running
+    # reason, so no second writer can enter the same native session.
+    other_profile = profiles.create(
+        key="p2", request_digest="p2", name="other", harness_type="alpha",
+        config_digest=config.digest, credential_id="credential-1",
+    )[1]
+    with database.read() as conn:
+        session_version = conn.execute(
+            "SELECT version FROM server_sessions WHERE id=?", (first["session_id"],),
+        ).fetchone()[0]
+    outcome, switch_body = records.switch_profile(
+        session_id=first["session_id"], profile_id=other_profile["profile_id"],
+        expected_version=session_version, request_id="switch-key", request_digest="switch",
+    )
+    assert outcome == "rejected"
+    assert switch_body["reason"] == "execution_running"
+
+    records.set_turn_dispatch(
+        turn_a["turn_id"], work_id="w-a", execution_id="e-a", dispatch_id="d-a")
+    records.set_turn_dispatch(
+        turn_b["turn_id"], work_id="w-b", execution_id="e-b", dispatch_id="d-b")
+    records.complete_turn(
+        turn_a["turn_id"], checkpoint_object_digest="sha256:a",
+        checkpoint_native_id="native-a", result_object_digest="sha256:ra")
+    with database.read() as conn:
+        row = conn.execute(
+            "SELECT run_state FROM server_profiles WHERE id=?", (profile["profile_id"],),
+        ).fetchone()
+    assert row["run_state"] == "active", "a sibling Turn is still in flight"
+
+    records.complete_turn(
+        turn_b["turn_id"], checkpoint_object_digest="sha256:b",
+        checkpoint_native_id="native-b", result_object_digest="sha256:rb")
+    with database.read() as conn:
+        row = conn.execute(
+            "SELECT run_state,native_generation FROM server_profiles WHERE id=?",
+            (profile["profile_id"],),
+        ).fetchone()
+    assert row["run_state"] == "idle", "the last active Turn settles the Profile"
+    assert row["native_generation"] == 2, "one advance per completed Turn"
+
+
+def test_exclusive_home_families_keep_one_active_turn_per_profile(tmp_path):
+    """Order 67's narrowed lock, per family declaration.
+
+    A family whose home cannot be certified for concurrent writers declares
+    `homeConcurrency = "exclusive"`: for it alone, a second Session of one
+    Profile is refused - and the refusal names the asset (the Harness home),
+    distinct from the Session-scoped admission.
+    """
+    import pytest
+
+    from agent_box.server.errors import ServerError
+
+    execution = RecordingExecution()
+    database, idempotency, sessions, repository = build_pieces(
+        tmp_path, execution, home_concurrency={"beta": "exclusive"},
+    )
+    credentials, profiles = repository.credentials, repository.profiles
+    objects = ObjectStore(tmp_path / "data")
+    config = objects.publish(b'{"schema_version":1,"harness_type":"beta","configuration":{"required":true}}')
+    profile = profiles.create(
+        key="p", request_digest="p", name="exclusive role", harness_type="beta",
+        config_digest=config.digest, credential_id=None,
+    )[1]
+    workspace = repository.workspaces.create(
+        key="w", request_digest="w", distribution="Ubuntu", remote_user="tester",
+        remote_path="/workspace", connection_id="connection",
+    )[1]
+    first = sessions.create_session("s1", {
+        "workspace_id": workspace["workspace_id"], "profile_id": profile["profile_id"],
+    })[1]
+    second = sessions.create_session("s2", {
+        "workspace_id": workspace["workspace_id"], "profile_id": profile["profile_id"],
+    })[1]
+
+    body = {"text": "one intent", "expected_profile_revision": 1}
+    _, first_turn = sessions.create_turn(first["session_id"], "key-a", body)
+    with pytest.raises(ServerError) as refusal:
+        sessions.create_turn(second["session_id"], "key-b", body)
+    assert refusal.value.code == "TURN_CONCURRENCY_CONFLICT"
+    assert "home" in refusal.value.message, refusal.value.message
+
+    # Once the first Turn is terminal, the sibling Session proceeds.
+    records = repository.sessions
+    records.set_turn_dispatch(
+        first_turn["turn_id"], work_id="w-a", execution_id="e-a", dispatch_id="d-a")
+    records.complete_turn(
+        first_turn["turn_id"], checkpoint_object_digest="sha256:a",
+        checkpoint_native_id="native-a", result_object_digest="sha256:ra")
+    _, second_turn = sessions.create_turn(second["session_id"], "key-c", body)
+    assert second_turn["turn_id"] != first_turn["turn_id"]

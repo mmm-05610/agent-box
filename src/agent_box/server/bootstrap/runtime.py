@@ -285,6 +285,7 @@ def build_runtime(
     secret_store: SecretStore | None = None,
     execution: TurnExecutionPort | None = None,
     execution_factory=None,
+    home_concurrency: Mapping[str, str] | None = None,
 ) -> ServerRuntime:
     """Assemble a provider-neutral Server runtime.
 
@@ -321,7 +322,8 @@ def build_runtime(
     workspace_records = WorkspaceRecords(database, idempotency)
     profile_records = ProfileRecords(database, idempotency)
     provider_model_records = ProviderModelRecords(database, idempotency)
-    session_records = SessionRecords(database, idempotency)
+    session_records = SessionRecords(database, idempotency,
+                                     home_concurrency=home_concurrency)
     queue_records = QueueRecords(
         database, idempotency, append_event=session_records._append_session_event,
         objects=objects,
@@ -612,6 +614,15 @@ def build_runtime_from_sidecar_deployment(
         else:
             deployment["_usage_probe"] = None
         deployment["_session_store"] = session_store_kind
+        # Order 67's narrowed lock: a family whose home cannot be certified for
+        # concurrent writers declares `homeConcurrency = "exclusive"`, and
+        # admission then admits one active Turn per Profile for that family
+        # alone. The default stays "shared": the Session is the uniqueness
+        # unit, and the lock is declared per family, never guessed.
+        home_concurrency_value = item.get("homeConcurrency", "shared")
+        if home_concurrency_value not in {"shared", "exclusive"}:
+            raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
+        deployment["_home_concurrency"] = home_concurrency_value
         deployment["_state_ephemeral_paths"] = state_ephemeral_paths
         deployments[harness_id] = deployment
         # 能力声明是部署座位上的唯一入口：canonical id + 真 bool，其它一律类型化拒绝。
@@ -822,7 +833,11 @@ def build_runtime_from_sidecar_deployment(
         )
 
     runtime = build_runtime(data_root, harnesses=registry, execution_factory=factory,
-                            secret_store=secret_store)
+                            secret_store=secret_store,
+                            home_concurrency={
+                                harness_id: deployment["_home_concurrency"]
+                                for harness_id, deployment in deployments.items()
+                            })
     runtime.declared_credentials = tuple(declared_credentials)
     return runtime
 

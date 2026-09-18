@@ -306,7 +306,18 @@ def test_schema_one_migrates_turn_identity_columns_idempotently(tmp_path):
     with database.read() as conn:
         assert conn.execute(
             "SELECT version FROM agentbox_product_schema WHERE singleton=1"
-        ).fetchone()[0] == 9
+        ).fetchone()[0] == 10
+        # Order 67: the uniqueness unit is the Session. The migration drops
+        # the per-profile partial index (idempotently, forward-only) and the
+        # schema script no longer re-creates it - a second initialize (above)
+        # must not bring it back.
+        indexes = {
+            row["name"] for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='server_turns'"
+            ).fetchall()
+        }
+        assert "server_one_active_turn_per_session" in indexes
+        assert "server_one_active_turn_per_profile" not in indexes
         row = conn.execute("SELECT * FROM server_turns WHERE id='turn-old'").fetchone()
         assert row["profile_id"] == "profile-old"
         assert {"work_id", "execution_id", "dispatch_id", "result_object_digest",

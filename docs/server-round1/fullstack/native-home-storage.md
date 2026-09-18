@@ -236,3 +236,17 @@ port 层第一手异常为 SidecarError: SIDECAR_OP_FAILED: Harness session not 
   这些门自 44/45 起从未在 Linux 复跑，属 43 代门的维护债。产品路径不受影响
   （port_factory 的 home 准备/审计由全量套件覆盖）。
 - 费用：真实模型调用 0 次（全部假端点）。
+
+## 补记（2026-09-18，工单 67 落地后）：G3 由阻塞转为通过
+
+产品裁决（用户 2026-09-18）：唯一性单位是**会话**；"同一 profile 不能跑两个会话"被改正。
+本单落地后（schema 10：删 per-profile 部分唯一索引，保留 per-session），45 报告里的
+G3 阻塞项按原口径复跑：
+
+- `native-home-gate.py` 的 G3 占位已改为真并发断言（同 profile 两会话各一轮，echo 座
+  `delay-success` 提供 500ms 确定性窗）：**两轮都 completed**、native id 各自独立、
+  每会话 delta 按自身 turn_id 归属；同会话第二条消息=入队（非第二执行）、运行中
+  switchProfile=rejected/execution_running。
+- 整门终态 `NATIVE_HOME_GATE_OK`（`native-home-gate.json`：g3.result=pass）。
+- 逐家 home 并发结论表与 claude/dsh/qwen 的收窄锁见
+  [per-session-admission-67.md](per-session-admission-67.md) §4。

@@ -8,7 +8,7 @@ import threading
 from typing import Iterator
 
 
-PRODUCT_SCHEMA_VERSION = 9
+PRODUCT_SCHEMA_VERSION = 10
 
 
 class FutureSchemaError(RuntimeError):
@@ -122,8 +122,6 @@ CREATE TABLE IF NOT EXISTS server_turns (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS server_one_active_turn_per_session
 ON server_turns(session_id) WHERE state IN ('accepted', 'dispatching', 'running', 'capturing');
-CREATE UNIQUE INDEX IF NOT EXISTS server_one_active_turn_per_profile
-ON server_turns(profile_id) WHERE state IN ('accepted', 'dispatching', 'running', 'capturing');
 CREATE TABLE IF NOT EXISTS server_session_events (
     session_id TEXT NOT NULL REFERENCES server_sessions(id),
     seq INTEGER NOT NULL,
@@ -207,11 +205,6 @@ def _migrate_1_to_2(conn: sqlite3.Connection) -> None:
         "UPDATE server_turns SET profile_id=(SELECT profile_id FROM server_sessions "
         "WHERE server_sessions.id=server_turns.session_id) WHERE profile_id IS NULL"
     )
-    conn.execute(
-        "CREATE UNIQUE INDEX IF NOT EXISTS server_one_active_turn_per_profile "
-        "ON server_turns(profile_id) WHERE state IN "
-        "('accepted','dispatching','running','capturing')"
-    )
 
 
 def _has_table(conn: sqlite3.Connection, table: str) -> bool:
@@ -249,6 +242,18 @@ def _add_columns(conn: sqlite3.Connection, table: str, additions: dict[str, str]
     for name, declaration in additions.items():
         if name not in columns:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {declaration}")
+
+
+def _migrate_9_to_10(conn: sqlite3.Connection) -> None:
+    """Order 67: the uniqueness unit is the Session, not the Profile.
+
+    The per-profile partial unique index enforced "one active Turn per
+    Profile", which the 2026-09-18 ruling corrected: a Profile may run
+    several different Sessions at once (the per-session index remains the
+    real writer invariant). Dropping is idempotent and forward-only; the
+    schema script no longer re-creates it, so no startup can bring it back.
+    """
+    conn.execute("DROP INDEX IF EXISTS server_one_active_turn_per_profile")
 
 
 def _migrate_8_to_9(conn: sqlite3.Connection) -> None:
@@ -452,6 +457,8 @@ class Database:
                 _migrate_7_to_8(conn)
             if current in (1, 2, 3, 4, 5, 6, 7, 8):
                 _migrate_8_to_9(conn)
+            if current in (1, 2, 3, 4, 5, 6, 7, 8, 9):
+                _migrate_9_to_10(conn)
             conn.executescript(_SCHEMA)
             conn.execute(
                 "INSERT OR IGNORE INTO agentbox_product_schema(singleton, version, applied_at) "

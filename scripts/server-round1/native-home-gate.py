@@ -337,10 +337,10 @@ def main() -> int:
             REPORT["g2"]["result"] = "pass"
 
             # ---- G3: two parallel turns of one Profile, neither lost ---------
-            # Two concurrent Sessions of the echo profile run side by side;
-            # both must complete and both must capture. (The durable-continuity
-            # recall is G2's claim; G3 proves the placement machinery
-            # parallelizes across concurrent Sessions.)
+            # Order 67 (2026-09-18 ruling): the uniqueness unit is the Session.
+            # Two concurrent Sessions of one Profile run side by side - both
+            # must complete, each keeping its own facts - while a second Turn
+            # for the *same* Session is refused mid-flight.
             echo_profile = client.post("/api/v1/profiles", headers={
                 "Authorization": f"Bearer {token}", "Idempotency-Key": "nh-gate-profile-echo",
             }, json={"name": "native-home-gate-echo", "harness_type": "hermes",
@@ -356,16 +356,77 @@ def main() -> int:
                     "message": {"text": text, "attachments": []},
                 })
 
-            # G3's parallel turn pair is recorded as a product gap, not a pass:
-            # the per-Profile execution lock refuses a second concurrent Session
-            # (TURN_CONCURRENCY_CONFLICT), so same-Profile parallelism needs a
-            # product-semantics decision and is documented in the evidence.
+            def wire_try(method: str, params: dict) -> dict:
+                """The parsed body (result or error) - the refusal is data."""
+                response = client.post(f"/wire/v1/{method}", headers={
+                    "Authorization": f"Bearer {token}",
+                }, json={"jsonrpc": "2.0", "id": method, "method": method, "params": params})
+                return response.json()
+
+            # The echo seat holds its answer for 500 ms once the prompt carries
+            # `delay-success`, which makes the overlap window deterministic.
+            parallel_a = echo_send("nh-gate-parallel-a", "parallel alpha delay-success")
+            # While A's Turn is active, a second message on the *same* Session
+            # must not become a second concurrent execution: the product path
+            # queues it (executionId null, queueItemId set), and the per-Session
+            # admission index stays the hard backstop beneath the queue.
+            same_session = wire_try("sessions.send", {
+                "requestId": "nh-gate-parallel-same",
+                "sessionId": parallel_a["session"]["id"], "overrides": [],
+                "message": {"text": "second message, same session", "attachments": []},
+            })
+            # A different role cannot take the running Session over.
+            switch = wire_try("sessions.switchProfile", {
+                "requestId": "nh-gate-parallel-switch",
+                "sessionId": parallel_a["session"]["id"],
+                "profileId": echo_profile_id,
+                "expectedVersion": parallel_a["session"]["version"],
+            })
+            parallel_b = echo_send("nh-gate-parallel-b", "parallel bravo delay-success")
+            session_a = wait_turn(runtime, parallel_a["session"]["id"], 0, {"completed", "failed"})
+            session_b = wait_turn(runtime, parallel_b["session"]["id"], 0, {"completed", "failed"})
+            states = [session_a["turns"][0]["state"], session_b["turns"][0]["state"]]
+            if states != ["completed", "completed"]:
+                fail("NATIVE_HOME_GATE_PARALLEL_FAILED",
+                     f"parallel turns did not both complete: {states}")
+
+            def turn_deltas(session, index):
+                turn_id = session["turns"][index]["id"]
+                return [item for item in session["events"]
+                        if item["kind"] == "message.delta" and item.get("turn_id") == turn_id]
+
+            deltas_a, deltas_b = turn_deltas(session_a, 0), turn_deltas(session_b, 0)
+            native_a = session_a["checkpoint"]["native_id"]
+            native_b = session_b["checkpoint"]["native_id"]
+            if not deltas_a or not deltas_b:
+                fail("NATIVE_HOME_GATE_PARALLEL_NO_STREAM",
+                     f"a parallel session streamed nothing: {len(deltas_a)}/{len(deltas_b)}")
+            if native_a == native_b:
+                fail("NATIVE_HOME_GATE_PARALLEL_NATIVE_ID_SHARED",
+                     f"both Sessions report native id {native_a}")
+            same_body = same_session.get("result") or {}
+            same_error = same_session.get("error") or {}
+            queued = bool(same_body.get("queueItemId")) and same_body.get("executionId") is None
+            conflicted = (same_error.get("details") or {}).get("internalCode") == "TURN_CONCURRENCY_CONFLICT"
+            if not (queued or conflicted):
+                fail("NATIVE_HOME_GATE_SAME_SESSION_NOT_HELD",
+                     f"a same-Session second execution was neither queued nor refused: "
+                     f"{json.dumps(same_session)}")
+            switch_body = switch.get("result") or {}
+            if switch_body.get("outcome") != "rejected" or switch_body.get("reason") != "execution_running":
+                fail("NATIVE_HOME_GATE_RUNNING_SESSION_SWITCHED",
+                     f"the running Session accepted another role: {json.dumps(switch)}")
             REPORT["g3"] = {
-                "result": "blocked",
-                "code": "TURN_CONCURRENCY_CONFLICT",
-                "note": "same-Profile parallel Sessions are refused by the "
-                        "Profile execution lock; enabling them is a product "
-                        "decision recorded in the evidence document",
+                "result": "pass",
+                "turnStates": states,
+                "sameSessionOutcome": (
+                    {"held": "queued", "queueItemId": same_body.get("queueItemId")} if queued
+                    else {"held": "conflict", "internalCode": same_error.get("details", {}).get("internalCode")}
+                ),
+                "switchWhileRunning": {"outcome": switch_body.get("outcome"),
+                                       "reason": switch_body.get("reason")},
+                "nativeIdsDiffer": native_a != native_b,
+                "deltasPerSession": [len(deltas_a), len(deltas_b)],
             }
 
             # ---- G6: the audit reflects the home's current content -----------

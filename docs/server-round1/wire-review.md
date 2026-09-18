@@ -437,3 +437,17 @@ ProviderModelConfigRecord = {
   （后端证据副本：`docs/server-round1/fullstack/generated/wire-v1.schema.json`）。
 - **定向测试**：13 项（探测器反例：SSRF 三形态拒绝、loopback 假端点的
   认证失败/成功/可达、超大响应上限、格式不符）——`tests/server/test_usage_parsing.py`。
+
+## Order 67 — 准入按会话（2026-09-18，env-provider）
+
+- **方法集与两摘要不变**（仍 30 方法；无新方法、无签名变化）。
+- **触发条件收窄（语义变更，形状不变）**：`TURN_CONCURRENCY_CONFLICT`（family
+  CONFLICT_REQUEST）由"Session 或 Profile 已有活跃执行"收窄为**只讲会话**——同 profile
+  的不同会话不再触发它；两处 409 文案改为 `Session already has an active execution` /
+  `Session already has an active Turn`。错误码与 family 映射不变。
+- **内部码消失**：`PROFILE_GENERATION_CONFLICT` 不再有抛出点（完成轮改无条件推进
+  `native_generation`）；它从未出现在 wire 映射表中，故 wire 面无变化。
+- **忙会话的客户端可见路径**：第二条消息回到既有**队列**语义（回执含 `queueItemId`，
+  `executionId: null`），不是错误——这与 60 的队列面一致，非本单新增。
+- **部署面新增非 wire 字段**：`homeConcurrency: "shared" | "exclusive"`（装配解析，
+  默认 shared；其它值 `SIDECAR_DEPLOYMENT_INVALID`）——不进 wire 契约。

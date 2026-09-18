@@ -257,6 +257,7 @@ class LocalSidecarLauncher:
         sandbox_port: "object | None" = None,
         session_store_harness: str | None = None,
         session_store_target: str | None = None,
+        usage_probe: Mapping[str, str] | None = None,
     ) -> None:
         if len(bundle) > MAX_BUNDLE_FILES or sum(map(len, bundle.values())) > MAX_BUNDLE_BYTES:
             raise ValueError("LOCAL_CHANNEL_BUNDLE_OUTSIDE_BOUNDS")
@@ -282,6 +283,10 @@ class LocalSidecarLauncher:
         )
         self.session_store_harness = session_store_harness
         self.session_store_target = session_store_target
+        #: Order 55's probe rides the port (the backend reads it from here) and
+        #: the read itself happens through the channels below; a deployment
+        #: without a probe leaves every usage column NULL.
+        self.usage_probe = dict(usage_probe) if usage_probe else None
         self.state_target = state_target
         self.state_ephemeral_paths = tuple(state_ephemeral_paths)
         self.protected_state_paths = tuple(protected_state_paths)
@@ -507,6 +512,40 @@ class _LocalChannels:
     def delete_state_file(self, relative: str) -> None:
         if self.home is not None:
             self.home.delete(relative)
+
+    # -- usage (Order 55) --------------------------------------------------
+    def read_usage(self, usage_probe: Mapping[str, str] | None) -> dict[str, int] | None:
+        """Read the declared journal from the local home and parse the fact.
+
+        The same rule as the Worker-hosted channel: the journal is one of the
+        files the audit already lists (same window, same bounds), the newest
+        name wins, and the parse copies the family's own numbers - nothing
+        here estimates and a family that reports nothing stays NULL.
+        """
+        from agent_box.server.execution.usage import parse_usage
+
+        if not usage_probe or self.home is None:
+            return None
+        suffix = usage_probe.get("journalSuffix")
+        usage_format = usage_probe.get("format")
+        if not suffix or not usage_format:
+            return None
+        try:
+            files, _truncated, _skipped = self.home.audit_facts()
+        except LocalChannelError:
+            return None
+        candidates = [
+            str(entry.get("path", "")) for entry in files
+            if str(entry.get("path", "")).endswith(suffix)
+        ]
+        if not candidates:
+            return None
+        path = max(candidates)  # journal names carry the newest timestamp last
+        try:
+            content, _digest = self.home.read(path)
+        except (LocalChannelError, StateCaptureError, OSError):
+            return None
+        return parse_usage(usage_format, content)
 
     # -- diagnostics -------------------------------------------------------
     def stderr_tail(self, maximum: int = 2000) -> str:

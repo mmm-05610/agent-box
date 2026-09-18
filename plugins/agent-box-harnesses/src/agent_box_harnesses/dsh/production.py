@@ -225,6 +225,10 @@ def harness_deployment(
             if projection_files_override is not None else projection_files()
         )],
         "stateProjection": {"target": STATE_TARGET},
+        # Order 67's narrowed lock: no local run has observed this family's
+        # per-turn home writes beyond the declared session subtree, so
+        # admission holds one active execution per Profile until a gate does.
+        "homeConcurrency": "exclusive",
         "adapter": {
             "command": "/usr/bin/node",
             "args": [ADAPTER_ARTIFACT_ENTRY, "--profile", "acp"],

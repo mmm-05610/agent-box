@@ -208,6 +208,11 @@ def harness_deployment(
             if projection_files_override is not None else projection_files()
         )],
         "stateProjection": {"target": STATE_TARGET},
+        # Order 67's narrowed lock: this family writes shared files outside the
+        # session store (`.claude.json`, todos/, shell-snapshots/) whose
+        # concurrent-writer safety is not established first-hand, so admission
+        # holds one active execution per Profile for it.
+        "homeConcurrency": "exclusive",
         "usageProbe": {"journalSuffix": ".jsonl", "format": "claude-projects-line"},
         "adapter": {
             "command": "/usr/bin/node",

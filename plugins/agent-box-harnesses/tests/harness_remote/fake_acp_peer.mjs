@@ -53,8 +53,14 @@ for await (const line of rl) {
     send({ jsonrpc: "2.0", id, result: {} })
   } else if (method === "session/new") {
     sessions += 1
+    // Each room gets its own PID namespace, so `process.pid` alone repeats
+    // across concurrent rooms (both children can be pid 13). A random token
+    // keeps two live native identities distinct, as a real Harness's
+    // generated ids are; the `fake-native-` prefix stays the assertion anchor.
+    const token = createHash("sha256")
+      .update(`${Math.random()}-${Date.now()}`).digest("hex").slice(0, 8)
     send({ jsonrpc: "2.0", id, result: {
-      sessionId: `fake-native-${process.pid}-${sessions}`,
+      sessionId: `fake-native-${process.pid}-${sessions}-${token}`,
       configOptions: [MODEL_OPTION],
     } })
   } else if (method === "session/load") {
