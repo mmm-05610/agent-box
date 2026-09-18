@@ -201,6 +201,18 @@ class SidecarExecutionBackend:
             "schema_version": 1, "harness_type": context["harness_type"],
             "configuration": configuration,
         }
+        # Order 60 A/B: the profile's permission posture is part of what this
+        # turn freezes - the next turn picks up an edited rule set.
+        rules_json = context.get("permission_rules_json")
+        preset = context.get("permission_preset")
+        if rules_json or preset:
+            import json as _json
+
+            from agent_box.server.profiles.permissions import resolve_all
+
+            rules = _json.loads(rules_json) if rules_json else []
+            effective_value["permissions"] = resolve_all(
+                rules, preset=preset or "default")
         if profile_value.get("execution") is not None:
             effective_value["execution"] = profile_value["execution"]
         effective = self.objects.publish(json.dumps(

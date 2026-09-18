@@ -6,6 +6,8 @@ so an unregistered or unverified Harness can never look capable.
 """
 from __future__ import annotations
 
+import json
+
 from typing import Any
 
 from agent_box.server.errors import ServerError
@@ -99,6 +101,34 @@ class ProfileRecords:
             profile_id=profile_id, expected_version=expected_version, key=key,
             request_digest=request_digest, operation="archive",
             assignments={"archived_at": now()},
+        )
+
+    def set_permissions(
+        self, *, profile_id: str, preset: str, rules: Sequence[Any],
+        expected_version: int, key: str, request_digest: str,
+    ) -> tuple[int, dict[str, Any]]:
+        """Write the profile's permission posture (order 60 A).
+
+        The rules are validated against the closed key/action sets before
+        anything is stored, and stored in order: the resolution is
+        last-match-wins, so the order *is* part of the configuration.
+        """
+        from agent_box.server.profiles.permissions import (
+            PermissionRuleError,
+            effective_rules,
+        )
+
+        try:
+            expanded = effective_rules(preset, rules)
+        except PermissionRuleError as refusal:
+            raise ServerError(refusal.code, refusal.message, status=409) from refusal
+        return self._mutate(
+            profile_id=profile_id, expected_version=expected_version, key=key,
+            request_digest=request_digest, operation="update", bump_config=True,
+            assignments={
+                "permission_preset": preset,
+                "permission_rules_json": json.dumps(expanded, sort_keys=False),
+            },
         )
 
     def bind_account(

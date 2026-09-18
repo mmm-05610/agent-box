@@ -116,6 +116,13 @@ def profile_record(row: Mapping[str, Any]) -> dict[str, Any]:
         # Order 56: the bound subscription account, or null. The locator and
         # the digest stay server-side; the client needs the reference only.
         "accountId": row.get("account_id"),
+        # Order 60: the permission posture and, for a clone, where it came from.
+        "permissionPreset": row.get("permission_preset"),
+        "permissionRules": (
+            json.loads(row["permission_rules_json"])
+            if row.get("permission_rules_json") else []
+        ),
+        "originProfileId": row.get("origin_profile_id"),
         "archivedAt": row.get("archived_at"),
         "createdAt": row["created_at"],
         "updatedAt": row["updated_at"],

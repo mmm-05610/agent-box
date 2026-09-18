@@ -8,7 +8,7 @@ import threading
 from typing import Iterator
 
 
-PRODUCT_SCHEMA_VERSION = 15
+PRODUCT_SCHEMA_VERSION = 16
 
 
 class FutureSchemaError(RuntimeError):
@@ -47,6 +47,10 @@ CREATE TABLE IF NOT EXISTS server_profiles (
     config_object_digest TEXT NOT NULL,
     credential_id TEXT,
     account_id TEXT,
+    permission_preset TEXT,
+    permission_rules_json TEXT,
+    origin_profile_id TEXT,
+    cloned_at TEXT,
     run_state TEXT NOT NULL DEFAULT 'idle',
     recovery_pending INTEGER NOT NULL DEFAULT 0,
     display_name TEXT,
@@ -295,6 +299,22 @@ def _add_columns(conn: sqlite3.Connection, table: str, additions: dict[str, str]
     for name, declaration in additions.items():
         if name not in columns:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {declaration}")
+
+
+def _migrate_15_to_16(conn: sqlite3.Connection) -> None:
+    """Order 60 A: the profile's permission posture and clone origin.
+
+    `permission_preset` names the starting preset, `permission_rules_json` the
+    ordered overrides (last match wins); `origin_profile_id`/`cloned_at` mark a
+    clone and its source, so a clone never has to pretend it inherited native
+    sessions.
+    """
+    _add_columns(conn, "server_profiles", {
+        "permission_preset": "TEXT",
+        "permission_rules_json": "TEXT",
+        "origin_profile_id": "TEXT",
+        "cloned_at": "TEXT",
+    })
 
 
 def _migrate_14_to_15(conn: sqlite3.Connection) -> None:
@@ -603,6 +623,8 @@ class Database:
                 _migrate_13_to_14(conn)
             if current in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14):
                 _migrate_14_to_15(conn)
+            if current in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15):
+                _migrate_15_to_16(conn)
             conn.executescript(_SCHEMA)
             conn.execute(
                 "INSERT OR IGNORE INTO agentbox_product_schema(singleton, version, applied_at) "

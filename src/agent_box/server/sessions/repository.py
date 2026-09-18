@@ -677,6 +677,7 @@ class SessionRecords:
                 "p.config_object_digest AS profile_config_object_digest,"
                 "COALESCE(t.effective_config_object_digest,p.config_object_digest) "
                 "AS config_object_digest,p.credential_id,p.account_id,"
+                "p.permission_preset,p.permission_rules_json,p.origin_profile_id,"
                 "w.connection_id,w.distribution,w.remote_user,w.remote_path,"
                 "w.env_kind,w.env_host,w.normalized_path "
                 "FROM server_turns t JOIN server_sessions s ON s.id=t.session_id "
