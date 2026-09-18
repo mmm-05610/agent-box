@@ -1,0 +1,215 @@
+# 085 阶段 1：逐家钉死设置键（只写证据，不写代码）
+
+基线 `4c32992`。本阶段**未改任何实现文件**；全部一手观测都在**隔离配置目录**里跑，
+凭据一律未装载（两家探针都**不读**用户真实的 `~/.codex` / `~/.claude`）。
+
+- claude：`CLAUDE_CONFIG_DIR=/tmp/085claude-config`、`HOME=/tmp/085claude-proj`
+- codex：`CODEX_HOME=/tmp/085cx147`
+
+## 0 被钉的是哪个二进制（版本一致性是本单的地基）
+
+| 家 | 钉死版本 | 一手定位 |
+| --- | --- | --- |
+| claude | CLI **2.1.270**（Claude Code），SDK `@anthropic-ai/claude-agent-sdk` **0.3.270**，ACP 适配器 **0.77.0** | `plugins/agent-box-harnesses/runtime-claude/node_modules/@anthropic-ai/claude-agent-sdk-linux-x64/claude --version` → `2.1.270 (Claude Code)`；`doctor` 的 `Running: npm-global (2.1.270)`、`Commit: 97ecbf7abeb4` |
+| codex | CLI **0.147.0** | `runtime/node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/bin/codex --version` → `codex-cli 0.147.0`；与 `scripts/server-round1/build-codex-runtime-artifact.mjs:81` 的 `CODEX_CLI_VERSION = "0.147.0"` 一致 |
+
+**为什么要写这一节**：宿主上另装有 `codex-cli 0.154.0`（`~/.npm-global`），它**已经收紧了取值**。
+用系统安装当依据会把一个"本部署版本接受"的键判成"未知键"。全部钉键观测因此**只用仓内钉死工件**。
+
+| 取值 | 0.147.0（本部署钉死） | 0.154.0（宿主另有） |
+| --- | --- | --- |
+| `approval_policy = "untrusted"` | **接受** ⇒ `approval policy UnlessTrusted` | **拒绝**（配置加载失败） |
+
+⇒ 版本漂移是一条**事实**，不是缺陷。写入实现必须对着 0.147.0 的词汇表，且**不得**把 0.154.0 的收紧当成"更安全的默认"偷偷扩大写入面。
+
+## 1 两家的零成本效果 oracle（这是本阶段真正的产出）
+
+钉键要的 not 是"文档这么写"，而是"**写进去之后能在不改代码、不花模型调用的前提下看到它生效**"。
+
+### 1.1 claude：`claude doctor` 的 `Invalid settings` 段
+
+`doctor` 会读设置文件且**不弹信任提示**（`--help`：*"Reads settings files in the current directory without a trust prompt"*），
+无需凭据、零模型调用。它对**已钉键的坏值**给类型化错误（带路径 + 期望集合 + 建议），对**未知键静默容忍**：
+
+| 写入 | doctor 输出（逐字） |
+| --- | --- |
+| `permissions.defaultMode = "not-a-mode"` | `permissions.defaultMode: Invalid value. Expected one of: "acceptEdits", "auto", "bypassPermissions", "default", "dontAsk", "plan"` + `Suggested fix: Valid modes: …` |
+| `permissions.allow = "Bash"`（不是数组） | `permissions.allow: Expected array, but received undefined` + `Suggested fix: Permission rules must be in an array. Format: ["Tool(specifier)"]. Examples: ["Bash(npm run build)", "Edit(docs/**)", "Read(~/.zshrc)"]. Use * for wildcards.` |
+| `permissions.deny = [123]` | `permissions.deny: Non-string value in deny array was removed`（**清洗而非拒绝**） |
+| `permissions.ask = "Bash"` | `permissions.ask: Expected array, but received undefined` |
+| `permissions.additionalDirectories = "/tmp"` | `permissions.additionalDirectories: Expected array, but received undefined` + `Must be an array of directory paths…` |
+| `{"totallyBogusKey":{...}}` | **无输出**（容忍） |
+| `{"allowedTools":[…],"disallowedTools":[…]}`（顶层） | **无输出**（容忍）⇒ **不能据此认定它是真键**，见 §2.3 |
+| `permissions.allow/ask/deny` 合法规则串 | **无输出**（接受） |
+
+⇒ claude 的 oracle **能咬形状与取值**，但**咬不到未知键**。所以工单 G3（"未知键 ⇒ 类型化拒绝"）的牙**只能长在我们自己的写入器里**，不能外包给 harness。
+
+### 1.2 codex：`doctor` 判形状 + `debug prompt-input` 回显**已解析**的取值
+
+- `codex doctor`：坏枚举 ⇒ `config could not be loaded` + `failed to load Codex config`（**硬失败**，但**不打印**具体是哪个键/期望什么——serde 的 "expected one of" 列表是运行时拼的，`strings` 里没有）。未知键 ⇒ `config.toml parse ok`（**容忍**，同 claude）。
+- **`codex debug prompt-input '<text>'`** 才是本单要的效果 oracle：它把**已解析**的配置渲染进模型可见提示并原样回显，**零模型调用**：
+
+```text
+sandbox_mode = "read-only"          => "`sandbox_mode` is `read-only`: The sandbox on…"
+sandbox_mode = "workspace-write"    => "`sandbox_mode` is `workspace-write`: The sand…" + "Network access is restricted."
+sandbox_mode = "danger-full-access" => "`sandbox_mode` is `danger-full-access`: No fi…"
+approval_policy = "never"           => "Approval policy is currently never."
+```
+
+**这条推翻了我在阶段 1 中途的一个结论**：`doctor` 分不开 `read-only` 与 `workspace-write`（两者都报 `restricted fs + restricted network`），
+`prompt-input` **分得开**——它直接印出解析后的枚举名。取值矩阵因此是**三档全可观测**。
+
+`doctor` 那侧的可观测面（保留，因为它更便宜且能判形状）：
+
+| 键 | 值 | `doctor` 的 `sandbox` 行 |
+| --- | --- | --- |
+| `sandbox_mode` | `read-only` | `restricted fs + restricted network` |
+| `sandbox_mode` | `workspace-write` | `restricted fs + restricted network`（**与上一行不可分**） |
+| `sandbox_mode` | `danger-full-access` | `unrestricted fs + enabled network`（**可分**） |
+| `approval_policy` | `untrusted` | `approval policy UnlessTrusted` |
+| `approval_policy` | `on-request` | `approval policy OnRequest` |
+| `approval_policy` | `on-failure` | `approval policy OnRequest`（**与 `on-request` 不可分**；`prompt-input` 的 "Approval policy is currently …" 句只在 `never` 时出现，因此这对也不可分） |
+| `approval_policy` | `never` | `approval policy Never`（**可分**） |
+
+⇒ **证据边界如实写在这**：`on-request` 与 `on-failure` 在两个 oracle 上都不可区分。本单的写入因此**只写能被区分的取值**，
+`on-failure` 不进入写入词汇表（§4）。
+
+**另一条被排除的 oracle**：`codex sandbox <cmd>` **不读** `sandbox_mode`——三种模式下 `touch` 一律
+`Read-only file system`（它有自己的 `--sandbox-state-json` 策略入口），故不能用它做沙箱效果证明。
+
+## 2 claude 的键：位置 / 形状 / 合并语义 / 来源
+
+### 2.1 位置
+
+`{CLAUDE_CONFIG_DIR}/settings.json`（默认 `~/.claude/settings.json`）= **user 源**。
+本部署的物化点已是这条：`plugins/agent-box-harnesses/…/claude/production.py:167` 把
+`deploy/claude/settings.json` 写成 `{CONFIG_HOME}/settings.json`，且四家真实模型门里
+该文件的 `env.ANTHROPIC_BASE_URL` 与 `model` **已被证明生效**（`live-model-preflight.md` §6）⇒
+"这个文件会被读"不是推测，是本树既有实测。
+
+### 2.2 形状（来源＝钉死二进制里内嵌的 schema 文档，逐字）
+
+从 `claude`（2.1.270）二进制内嵌的设置参考文档原文抄出（偏移 `199204527` 附近，`## Settings Schema Reference`）：
+
+```json
+{
+  "permissions": {
+    "allow": ["Bash(npm *)", "Edit(.claude)", "Read"],
+    "deny": ["Bash(rm -rf *)"],
+    "ask": ["Edit(//etc/*)"],
+    "defaultMode": "default" | "plan" | "acceptEdits" | "dontAsk",
+    "additionalDirectories": ["/extra/dir"]
+  }
+}
+```
+
+> **Permission Rule Syntax:** Exact match `"Bash(npm run test)"`；Prefix wildcard `"Bash(git *)"`；Tool only `"Read"`。
+
+（内嵌文档原文即如此；抄录时只做了反斜杠转义还原，无改写。）
+
+三处交叉印证，不是单一来源：
+- **读取点**：`permissions?.allow` / `permissions?.ask` / `permissions?.deny` / `permissions?.additionalDirectories`、
+  `xf(e.permissions?.defaultMode)` —— 运行时确实按这个路径取值（非数组时 `if(!Array.isArray(…))` 早退）。
+- **枚举源**：`defaultMode` 的期望集以 `doctor` 的错误文本为准（6 值，见 §1.1），
+  比内嵌文档的 4 值**多** `auto` 与 `bypassPermissions` ⇒ 取 **doctor 的 6 值**当依据（一手效果 > 文档）。
+- **越权收紧**：`defaultMode "bypassPermissions" ignored — only policy/user/flag settings may grant bypass mode
+  (projectSettings and localSettings are repo-controlled)`、`defaultMode "auto" ignored — only policy/user/flag…`
+  ⇒ user 源**有权**写这两值；project/local 源写了会被忽略。**本部署写的是 user 源**，所以这两值技术上可写，
+  但 `bypassPermissions`/`auto`/`dontAsk` 都是**放宽**方向 ⇒ §4 一律拒绝。
+
+### 2.3 `allowedTools` / `disallowedTools` **不是** settings.json 的键（本阶段最重要的否定结论）
+
+`posture_translation.translate_claude()` 产出的正是这两个名字（工单 60 的词汇）。它们的一手证据只有两处，
+**都不是设置文件**：
+1. **CLI flag**：`--allowedTools, --allowed-tools <tools...>` / `--disallowedTools, --disallowed-tools <tools...>`（`--help` 第 22/74 行）；
+2. **agent / skill 前置元数据**：`r.allowedTools==="string")r.allowedTools=vt(r.allowedTools)??[]`、
+   `Skill '${d}' declared allowed-tools in f…`。
+
+对 settings.json 的读取点搜索里，**没有** `settings.allowedTools` 这一条；而顶层写 `allowedTools` 时 `doctor` 无输出
+——§1.1 已证"无输出"同样是未知键的表现，**不构成接受证据**。
+
+⇒ **按工单"钉不死的家类型化拒绝，不许把未验证的键拼进真 harness 配置"**：claude 的写入**不能**用顶层
+`allowedTools`/`disallowedTools`。可钉死的落点是 `permissions.allow` / `permissions.ask` / `permissions.deny`。
+
+### 2.4 合并语义
+
+| 事实 | 来源 |
+| --- | --- |
+| 源顺序 **user → project → local，后者覆盖前者** | 内嵌文档逐字：`Settings load in order: user → project → local (later overrides earlier).`；文件表：`~/.claude/settings.json`=Global、`.claude/settings.json`=Project、`.claude/settings.local.json`=Project+Gitignore |
+| 可只加载部分源 | `--setting-sources <sources>` "Comma-separated list of setting sources to load (user, project, local)"（`--help:219`）；`--settings <file-or-json>` 追加一个 flag 源（`--help:221`） |
+| 三条规则列表**汇池后按严重度裁决**，不是整体覆盖 | `var rDe={deny:3,ask:2,allow:1,none:0}`；`_e()` 同时算 `matchingDenyRules`/`matchingAskRules`/`matchingAllowRules`；`{deny:d}:…{ask:m}:…{allow:!0}` 的取值次序也是 deny→ask→allow |
+| 标量 `defaultMode` 按源覆盖，且 bypass/auto 只有 policy/user/flag 能授予 | §2.2 的 ignored 文案 |
+| 非数组的规则键被当作**缺席**（不是报错给运行时） | `if(!Array.isArray(R))return c=!0,D()` |
+
+⇒ 对写入器的含义（G2 的可执行形式）：**deny 是"加严"，不会被 project/local 的 allow 洗掉**（汇池 + `deny:3` 最高）；
+而 `allow` 与 `defaultMode` 是"放宽"通道，会被**后加载的源覆盖**，也在 user 源里就授予了自动放行。
+所以"只收紧"在 claude 侧的实现形式是：**只写 `deny` 与 `ask`，永不写 `allow`，永不写 `defaultMode` 的放宽值**。
+
+## 3 codex 的键：位置 / 形状 / 合并语义 / 来源
+
+### 3.1 位置
+
+`{CODEX_HOME}/config.toml`，本部署 `CODEX_HOME = "/runtime/home/.codex"`（`codex/production.py:93`）、
+`CONFIG_TARGET = f"{CODEX_HOME}/config.toml"`（同文件 123/261），模板 `deploy/codex/config.toml`
+（含 `model`、`model_provider`、`[model_providers.deepseek]`、`[features]`…，`ADAPTER_VERSION 1.1.14`）。
+该文件的生效有既有实测背书（四家真实模型门 + `codex doctor` 在本仓门日志里报 `config.toml parse ok`）。
+
+### 3.2 形状（来源＝钉死 0.147.0 的一手接受/拒绝矩阵，§1.2）
+
+```toml
+sandbox_mode    = "read-only" | "workspace-write" | "danger-full-access"
+approval_policy = "untrusted" | "on-request" | "on-failure" | "never"
+```
+
+两个键都是**顶层标量**（不是表）；坏枚举 ⇒ 整个配置**加载失败**（比 claude 更硬：claude 只是不采纳）。
+
+### 3.3 合并语义（三条一手实测，优先级从低到高）
+
+```text
+config.toml 顶层   <   <CODEX_HOME>/<profile>.config.toml （由 -p/--profile 选中）   <   -c key=value （CLI）
+```
+
+| 实验 | 结果 |
+| --- | --- |
+| 文件 `sandbox_mode="read-only"` + `-c sandbox_mode='"danger-full-access"'` | 解析值 = **`danger-full-access`** ⇒ `-c` 覆盖文件（**放宽通道**） |
+| 顶层 `danger-full-access` + `-p tight`（`tight.config.toml` 写 `workspace-write`） | 解析值 = **`workspace-write`** ⇒ profile 层覆盖顶层 |
+| `-p tight` + `-c sandbox_mode='"read-only"'` | 解析值 = **`read-only`** ⇒ `-c` 覆盖 profile |
+| `-p missing`（不存在的 profile 名） | **静默回落**到顶层（不报错）⇒ 选了个不存在的 profile **不会失败**，这条不能当收紧手段 |
+| `[profiles.tight]` 写在同一个 `config.toml` 里再用 `-p tight` | **硬错误**：`Error: --profile \`tight\` cannot be used while …/config.toml contains legacy \`profile = "tight"\` or \`[profiles.tight]\` config; move those settings into …/tight.config.toml and remove the legacy profile selector/table.` ⇒ 0.147.0 已废除内联 profile 表；写入器**绝不可**产出 `[profiles.*]` |
+| 未知键 `totally_bogus_key = 7` | `config.toml parse ok`（**容忍**）⇒ 同 claude，G3 的牙只能长在自己写入器里 |
+
+⇒ 对写入器的含义：codex 侧唯一由本单控制的落点是**顶层 `config.toml`**；本部署的 argv 也由我们生成
+（`-c` 若被用来放宽，写入器管不到），故实现必须**同时**把"顶层键 + 我们自己的 argv"当一面来看，
+并在证据里写明：`-c` 与不存在的 `-p` 是两条**能绕过本文件**的放宽通道，本单不引入它们。
+
+## 4 钉死后的写入词汇表（阶段 2/3 的实现契约，本阶段只登记）
+
+| 中立姿态 | claude（`permissions.*`） | codex（顶层 toml） |
+| --- | --- | --- |
+| `deny` | `permissions.deny += "<Tool>"` | `sandbox_mode="read-only"`（写被拒时）；`bash`/`webfetch`/`skill`/`task` 的 deny ⇒ **沿用 60 的 `PERMISSION_POSTURE_UNEXPRESSIBLE`** |
+| `ask` | `permissions.ask += "<Tool>"` | `approval_policy="untrusted"`（= 观察到的 `UnlessTrusted`） |
+| `allow` | **不写**（写 `allow` 即放宽，且会被后源覆盖） | 取该键当前默认即可；无逐工具 allow 旋钮 ⇒ 不发明 |
+| 任何 | **永不写** `defaultMode`、顶层 `allowedTools`/`disallowedTools` | **永不写** `danger-full-access`、`on-failure`（不可区分）、`never`（放宽）；**绝不用** `[profiles.*]` |
+
+与工单 60 既有翻译的**分歧登记**（本单不改契约、只记）：
+`translate_claude()` 现在把 `ask` 映射进 `allowedTools` 并附注 "maps to claude's own approval round-trip"。
+在 **CLI flag 语义**下 `--allowedTools` 是"预先批准、免提示"，而 settings 层的 `permissions.allow` 同义 ⇒
+把 `ask` 放进 allow 列表相对中立姿态是**放宽**，与 60 自己的"只收紧"规则和 G2 相冲。
+`permissions.ask` 才是能钉死的对应落点。⇒ 交回调度者：要么 60 的 claude 表改成 `ask→permissions.ask`（一处映射修正，
+不是扩协议），要么在 085 之后另开一单收口；**本阶段只登记，不动 `posture_translation.py`**。
+
+## 5 本阶段账务与清理
+
+- 真实模型调用：**0 次**；费用：**¥0**。两家探针都无凭据（claude 的 `doctor` 自报
+  `no usable credentials for the settings fetch`；codex 未装载 `CODEX_API_KEY`）。
+- `codex debug prompt-input` 会把**当前工作目录的 AGENTS.md** 渲进提示；因此该探针**只在 `/tmp` 下运行**，
+  输出经 `tr -cd '[:print:]'` + 关键词过滤后才进本文件，未整段落盘、未复述仓库内容。
+- 凭据 locator 未被读、未被删（`/home/maoqh/.agentbox-acceptance-secret.CnsAonj6/` 全程未访问）。
+- 临时件：`/tmp/085cx147`、`/tmp/085claude-config`、`/tmp/085claude-proj`、`/tmp/085claude`、
+  `/tmp/085claude-help.txt`、`/tmp/085codex`、`/tmp/085cxws`、`/tmp/085cx-pro.txt` —— 本单阶段 4 前删除。
+- 未验证项（**不伪装成钉死**）：
+  1. claude `permissions.ask` 的**运行时效果**（真的会弹提示吗）只有读取点与形状校验证据，无效果证据——
+     要一条真实工具调用来证明，属模型轮，本单不花；
+  2. codex `on-request` vs `on-failure` 不可区分（§1.2）；
+  3. 内嵌文档只列 4 个 `defaultMode`，doctor 收 6 个 ⇒ 采 doctor，差集未向官方文档二次核对（离线，不外发）；
+  4. 除 claude/codex 外的家（pi/hermes/opencode/kilo/dsh/qwen）**没有姿态键**可钉 ⇒ 阶段 4 走类型化拒绝。
