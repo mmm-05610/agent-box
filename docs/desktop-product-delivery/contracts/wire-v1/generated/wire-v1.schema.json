@@ -2622,6 +2622,291 @@
     ],
     "additionalProperties": false
   },
+  "workspaces.gitStatus#params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "requestId": {
+        "type": "string",
+        "minLength": 8
+      },
+      "workspaceId": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "required": [
+      "requestId",
+      "workspaceId"
+    ],
+    "additionalProperties": false
+  },
+  "workspaces.gitStatus#result": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "git": {
+        "type": "object",
+        "properties": {
+          "branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "changedFiles": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "additions": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "deletions": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ahead": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "behind": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "branch",
+          "changedFiles",
+          "additions",
+          "deletions",
+          "ahead",
+          "behind",
+          "reason"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "git"
+    ],
+    "additionalProperties": false
+  },
+  "executions.list#params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "requestId": {
+        "type": "string",
+        "minLength": 8
+      },
+      "limit": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 200
+      }
+    },
+    "required": [
+      "requestId"
+    ],
+    "additionalProperties": false
+  },
+  "executions.list#result": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "executions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "executionId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "turnId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sessionId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "profileId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "profile": {
+              "type": "string"
+            },
+            "harness": {
+              "type": "string"
+            },
+            "placement": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "queued",
+                "dispatched",
+                "running",
+                "stopping",
+                "stopped",
+                "completed",
+                "failed",
+                "unknown"
+              ]
+            },
+            "startedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+            },
+            "workspaceId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "workspace": {
+              "type": "string"
+            },
+            "queueItemId": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "pid": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "pidReason": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "adapterPid": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "adapterPidReason": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "executionId",
+            "turnId",
+            "sessionId",
+            "profileId",
+            "profile",
+            "harness",
+            "placement",
+            "state",
+            "startedAt",
+            "workspaceId",
+            "workspace",
+            "queueItemId",
+            "pid",
+            "pidReason",
+            "adapterPid",
+            "adapterPidReason"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [
+      "executions"
+    ],
+    "additionalProperties": false
+  },
   "profiles.list#params": {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "type": "object",
@@ -2669,6 +2954,82 @@
               "additionalProperties": {
                 "type": "boolean"
               }
+            },
+            "accountId": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "permissionPreset": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "permissionRules": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "enum": [
+                      "read",
+                      "edit",
+                      "bash",
+                      "task",
+                      "external_directory",
+                      "webfetch",
+                      "skill"
+                    ]
+                  },
+                  "pattern": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "allow",
+                      "ask",
+                      "deny"
+                    ]
+                  }
+                },
+                "required": [
+                  "key",
+                  "pattern",
+                  "action"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "originProfileId": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "archivedAt": {
               "anyOf": [
@@ -2790,6 +3151,82 @@
               "type": "boolean"
             }
           },
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "permissionPreset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "permissionRules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "enum": [
+                    "read",
+                    "edit",
+                    "bash",
+                    "task",
+                    "external_directory",
+                    "webfetch",
+                    "skill"
+                  ]
+                },
+                "pattern": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "allow",
+                    "ask",
+                    "deny"
+                  ]
+                }
+              },
+              "required": [
+                "key",
+                "pattern",
+                "action"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "originProfileId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "archivedAt": {
             "anyOf": [
               {
@@ -2893,6 +3330,82 @@
               "type": "boolean"
             }
           },
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "permissionPreset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "permissionRules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "enum": [
+                    "read",
+                    "edit",
+                    "bash",
+                    "task",
+                    "external_directory",
+                    "webfetch",
+                    "skill"
+                  ]
+                },
+                "pattern": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "allow",
+                    "ask",
+                    "deny"
+                  ]
+                }
+              },
+              "required": [
+                "key",
+                "pattern",
+                "action"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "originProfileId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "archivedAt": {
             "anyOf": [
               {
@@ -2990,6 +3503,82 @@
             "additionalProperties": {
               "type": "boolean"
             }
+          },
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "permissionPreset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "permissionRules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "enum": [
+                    "read",
+                    "edit",
+                    "bash",
+                    "task",
+                    "external_directory",
+                    "webfetch",
+                    "skill"
+                  ]
+                },
+                "pattern": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "allow",
+                    "ask",
+                    "deny"
+                  ]
+                }
+              },
+              "required": [
+                "key",
+                "pattern",
+                "action"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "originProfileId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "archivedAt": {
             "anyOf": [
@@ -3107,6 +3696,82 @@
               "type": "boolean"
             }
           },
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "permissionPreset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "permissionRules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "enum": [
+                    "read",
+                    "edit",
+                    "bash",
+                    "task",
+                    "external_directory",
+                    "webfetch",
+                    "skill"
+                  ]
+                },
+                "pattern": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "allow",
+                    "ask",
+                    "deny"
+                  ]
+                }
+              },
+              "required": [
+                "key",
+                "pattern",
+                "action"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "originProfileId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "archivedAt": {
             "anyOf": [
               {
@@ -3156,6 +3821,654 @@
       "profile",
       "configVersion",
       "effectiveFor"
+    ],
+    "additionalProperties": false
+  },
+  "profiles.clone#params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "requestId": {
+        "type": "string",
+        "minLength": 8
+      },
+      "profileId": {
+        "type": "string",
+        "minLength": 1
+      },
+      "displayName": {
+        "type": "string",
+        "minLength": 1
+      },
+      "harness": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "required": [
+      "requestId",
+      "profileId",
+      "displayName"
+    ],
+    "additionalProperties": false
+  },
+  "profiles.clone#result": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "profile": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "harness": {
+            "type": "string"
+          },
+          "capabilities": {
+            "default": {},
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "boolean"
+            }
+          },
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "permissionPreset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "permissionRules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "enum": [
+                    "read",
+                    "edit",
+                    "bash",
+                    "task",
+                    "external_directory",
+                    "webfetch",
+                    "skill"
+                  ]
+                },
+                "pattern": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "allow",
+                    "ask",
+                    "deny"
+                  ]
+                }
+              },
+              "required": [
+                "key",
+                "pattern",
+                "action"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "originProfileId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "archivedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "displayName",
+          "harness",
+          "capabilities",
+          "archivedAt",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "migration": {
+        "type": "object",
+        "properties": {
+          "targetFamily": {
+            "type": "string"
+          },
+          "sourceFamily": {
+            "type": "string"
+          },
+          "sameFamily": {
+            "type": "boolean"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "item": {
+                  "type": "string"
+                },
+                "migrated": {
+                  "type": "boolean"
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "detail": {}
+              },
+              "required": [
+                "item",
+                "migrated",
+                "reason"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "permissions": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "preset": {
+                    "type": "string"
+                  },
+                  "rules": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "key": {
+                          "type": "string",
+                          "enum": [
+                            "read",
+                            "edit",
+                            "bash",
+                            "task",
+                            "external_directory",
+                            "webfetch",
+                            "skill"
+                          ]
+                        },
+                        "pattern": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "action": {
+                          "type": "string",
+                          "enum": [
+                            "allow",
+                            "ask",
+                            "deny"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "key",
+                        "pattern",
+                        "action"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "preset",
+                  "rules"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reboundAssets": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "migratedCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "refusedCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "targetFamily",
+          "sourceFamily",
+          "sameFamily",
+          "items",
+          "permissions",
+          "reboundAssets",
+          "migratedCount",
+          "refusedCount"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "profile",
+      "migration"
+    ],
+    "additionalProperties": false
+  },
+  "profiles.setPermissions#params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "requestId": {
+        "type": "string",
+        "minLength": 8
+      },
+      "profileId": {
+        "type": "string",
+        "minLength": 1
+      },
+      "expectedVersion": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      },
+      "preset": {
+        "type": "string",
+        "minLength": 1
+      },
+      "rules": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "enum": [
+                "read",
+                "edit",
+                "bash",
+                "task",
+                "external_directory",
+                "webfetch",
+                "skill"
+              ]
+            },
+            "pattern": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "action": {
+              "type": "string",
+              "enum": [
+                "allow",
+                "ask",
+                "deny"
+              ]
+            }
+          },
+          "required": [
+            "key",
+            "pattern",
+            "action"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [
+      "requestId",
+      "profileId",
+      "expectedVersion",
+      "preset",
+      "rules"
+    ],
+    "additionalProperties": false
+  },
+  "profiles.setPermissions#result": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "profile": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "harness": {
+            "type": "string"
+          },
+          "capabilities": {
+            "default": {},
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "boolean"
+            }
+          },
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "permissionPreset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "permissionRules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "enum": [
+                    "read",
+                    "edit",
+                    "bash",
+                    "task",
+                    "external_directory",
+                    "webfetch",
+                    "skill"
+                  ]
+                },
+                "pattern": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "allow",
+                    "ask",
+                    "deny"
+                  ]
+                }
+              },
+              "required": [
+                "key",
+                "pattern",
+                "action"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "originProfileId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "archivedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "displayName",
+          "harness",
+          "capabilities",
+          "archivedAt",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "profile"
+    ],
+    "additionalProperties": false
+  },
+  "profiles.memory#params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "requestId": {
+        "type": "string",
+        "minLength": 8
+      },
+      "profileId": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "required": [
+      "requestId",
+      "profileId"
+    ],
+    "additionalProperties": false
+  },
+  "profiles.memory#result": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "memory": {
+        "type": "object",
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "size": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "digest": {
+                      "type": "string"
+                    },
+                    "content": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "size",
+                    "digest",
+                    "content"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "size": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "reason": {
+                      "type": "string",
+                      "const": "MEMORY_CONTAINS_SECRET"
+                    },
+                    "refused": {
+                      "type": "boolean",
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "size",
+                    "reason",
+                    "refused"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "available",
+          "reason",
+          "files"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "memory"
     ],
     "additionalProperties": false
   },
@@ -4472,6 +5785,2212 @@
     },
     "required": [
       "harness"
+    ],
+    "additionalProperties": false
+  },
+  "assets.list#params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "assets.list#result": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "assets": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "assetId": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "skill",
+                "mcp",
+                "plugin"
+              ]
+            },
+            "name": {
+              "type": "string"
+            },
+            "description": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "latestRevision": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "digest": {
+              "type": "string"
+            },
+            "source": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "createdAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+            },
+            "updatedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+            }
+          },
+          "required": [
+            "assetId",
+            "kind",
+            "name",
+            "description",
+            "latestRevision",
+            "digest",
+            "source",
+            "createdAt",
+            "updatedAt"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [
+      "assets"
+    ],
+    "additionalProperties": false
+  },
+  "assets.publishSkill#params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "requestId": {
+        "type": "string",
+        "minLength": 8
+      },
+      "assetId": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+      },
+      "revision": {
+        "type": "integer",
+        "exclusiveMinimum": 0,
+        "maximum": 9007199254740991
+      },
+      "sourcePath": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "required": [
+      "requestId",
+      "assetId",
+      "revision",
+      "sourcePath"
+    ],
+    "additionalProperties": false
+  },
+  "assets.publishSkill#result": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "asset": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "skill",
+              "mcp",
+              "plugin"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "latestRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "digest": {
+            "type": "string"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          }
+        },
+        "required": [
+          "assetId",
+          "kind",
+          "name",
+          "description",
+          "latestRevision",
+          "digest",
+          "source",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "asset"
+    ],
+    "additionalProperties": false
+  },
+  "assets.publishMcp#params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "requestId": {
+        "type": "string",
+        "minLength": 8
+      },
+      "assetId": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+      },
+      "revision": {
+        "type": "integer",
+        "exclusiveMinimum": 0,
+        "maximum": 9007199254740991
+      },
+      "definition": {
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    "required": [
+      "requestId",
+      "assetId",
+      "revision",
+      "definition"
+    ],
+    "additionalProperties": false
+  },
+  "assets.publishMcp#result": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "asset": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "skill",
+              "mcp",
+              "plugin"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "latestRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "digest": {
+            "type": "string"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          }
+        },
+        "required": [
+          "assetId",
+          "kind",
+          "name",
+          "description",
+          "latestRevision",
+          "digest",
+          "source",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "asset"
+    ],
+    "additionalProperties": false
+  },
+  "assets.publishPlugin#params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "requestId": {
+        "type": "string",
+        "minLength": 8
+      },
+      "assetId": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+      },
+      "revision": {
+        "type": "integer",
+        "exclusiveMinimum": 0,
+        "maximum": 9007199254740991
+      },
+      "sourcePath": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "required": [
+      "requestId",
+      "assetId",
+      "revision",
+      "sourcePath"
+    ],
+    "additionalProperties": false
+  },
+  "assets.publishPlugin#result": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "asset": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "skill",
+              "mcp",
+              "plugin"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "latestRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "digest": {
+            "type": "string"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          }
+        },
+        "required": [
+          "assetId",
+          "kind",
+          "name",
+          "description",
+          "latestRevision",
+          "digest",
+          "source",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "preview": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "asset",
+      "preview"
+    ],
+    "additionalProperties": false
+  },
+  "assets.bind#params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "requestId": {
+        "type": "string",
+        "minLength": 8
+      },
+      "profileId": {
+        "type": "string",
+        "minLength": 1
+      },
+      "assetId": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+      },
+      "revision": {
+        "type": "integer",
+        "exclusiveMinimum": 0,
+        "maximum": 9007199254740991
+      },
+      "enabled": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "requestId",
+      "profileId",
+      "assetId"
+    ],
+    "additionalProperties": false
+  },
+  "assets.bind#result": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "binding": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "skill",
+              "mcp",
+              "plugin"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "digest": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "assetId",
+          "kind",
+          "name",
+          "revision",
+          "digest",
+          "enabled"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "binding"
+    ],
+    "additionalProperties": false
+  },
+  "assets.unbind#params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "requestId": {
+        "type": "string",
+        "minLength": 8
+      },
+      "profileId": {
+        "type": "string",
+        "minLength": 1
+      },
+      "assetId": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+      }
+    },
+    "required": [
+      "requestId",
+      "profileId",
+      "assetId"
+    ],
+    "additionalProperties": false
+  },
+  "assets.unbind#result": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "unbound": {
+        "type": "boolean",
+        "const": true
+      }
+    },
+    "required": [
+      "unbound"
+    ],
+    "additionalProperties": false
+  },
+  "assets.bindings#params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "profileId": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "required": [
+      "profileId"
+    ],
+    "additionalProperties": false
+  },
+  "assets.bindings#result": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "bindings": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "assetId": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "skill",
+                "mcp",
+                "plugin"
+              ]
+            },
+            "name": {
+              "type": "string"
+            },
+            "revision": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "digest": {
+              "type": "string"
+            },
+            "enabled": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "assetId",
+            "kind",
+            "name",
+            "revision",
+            "digest",
+            "enabled"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [
+      "bindings"
+    ],
+    "additionalProperties": false
+  },
+  "assets.syncCatalog#params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "requestId": {
+        "type": "string",
+        "minLength": 8
+      },
+      "sourceId": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+      },
+      "sourcePath": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "required": [
+      "requestId",
+      "sourceId",
+      "sourcePath"
+    ],
+    "additionalProperties": false
+  },
+  "assets.syncCatalog#result": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "catalog": {
+        "type": "object",
+        "properties": {
+          "sourcePath": {
+            "type": "string"
+          },
+          "digest": {
+            "type": "string"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "skill",
+                    "mcp"
+                  ]
+                },
+                "name": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "origin": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "installed": {
+                  "type": "boolean"
+                },
+                "installedDigest": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "kind",
+                "name",
+                "path",
+                "origin",
+                "installed",
+                "installedDigest"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "sourcePath",
+          "digest",
+          "entries"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "catalog"
+    ],
+    "additionalProperties": false
+  },
+  "assets.catalog#params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "sourceId": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+      }
+    },
+    "required": [
+      "sourceId"
+    ],
+    "additionalProperties": false
+  },
+  "assets.catalog#result": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "catalog": {
+        "type": "object",
+        "properties": {
+          "sourcePath": {
+            "type": "string"
+          },
+          "digest": {
+            "type": "string"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "skill",
+                    "mcp"
+                  ]
+                },
+                "name": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "origin": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "installed": {
+                  "type": "boolean"
+                },
+                "installedDigest": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "kind",
+                "name",
+                "path",
+                "origin",
+                "installed",
+                "installedDigest"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "sourcePath",
+          "digest",
+          "entries"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "catalog"
+    ],
+    "additionalProperties": false
+  },
+  "assets.installFromCatalog#params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "requestId": {
+        "type": "string",
+        "minLength": 8
+      },
+      "sourceId": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+      },
+      "entryName": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+      },
+      "revision": {
+        "type": "integer",
+        "exclusiveMinimum": 0,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "requestId",
+      "sourceId",
+      "entryName",
+      "revision"
+    ],
+    "additionalProperties": false
+  },
+  "assets.installFromCatalog#result": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "installed": {
+        "type": "object",
+        "properties": {
+          "asset_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "skill",
+              "mcp"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "digest": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "asset_id",
+          "kind",
+          "name",
+          "revision",
+          "digest",
+          "source"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "installed"
+    ],
+    "additionalProperties": false
+  },
+  "assets.probe#params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "definition": {
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    "required": [
+      "definition"
+    ],
+    "additionalProperties": false
+  },
+  "assets.probe#result": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "probe": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "ok"
+          },
+          "serverName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "serverVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "protocolVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "status",
+          "serverName",
+          "serverVersion",
+          "protocolVersion"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "probe"
+    ],
+    "additionalProperties": false
+  },
+  "hooks.list#params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "requestId": {
+        "type": "string",
+        "minLength": 8
+      },
+      "family": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "requestId"
+    ],
+    "additionalProperties": false
+  },
+  "hooks.list#result": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "hooks": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "hookId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "family": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "model": {
+              "type": "object",
+              "properties": {
+                "event": {
+                  "type": "string"
+                },
+                "matcher": {
+                  "type": "string"
+                },
+                "handlers": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string"
+                      },
+                      "command": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string"
+                      },
+                      "tool": {
+                        "type": "string"
+                      },
+                      "prompt": {
+                        "type": "string"
+                      },
+                      "timeout": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "async": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "timeout",
+                      "async"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "event",
+                "handlers"
+              ],
+              "additionalProperties": false
+            },
+            "commands": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "source": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "createdAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+            },
+            "updatedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+            }
+          },
+          "required": [
+            "hookId",
+            "family",
+            "name",
+            "enabled",
+            "model",
+            "commands",
+            "source",
+            "createdAt",
+            "updatedAt"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [
+      "hooks"
+    ],
+    "additionalProperties": false
+  },
+  "hooks.create#params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "requestId": {
+        "type": "string",
+        "minLength": 8
+      },
+      "family": {
+        "type": "string",
+        "minLength": 1
+      },
+      "name": {
+        "type": "string",
+        "minLength": 1
+      },
+      "model": {
+        "type": "object",
+        "properties": {
+          "event": {
+            "type": "string"
+          },
+          "matcher": {
+            "type": "string"
+          },
+          "handlers": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string"
+                },
+                "command": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "tool": {
+                  "type": "string"
+                },
+                "prompt": {
+                  "type": "string"
+                },
+                "timeout": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "async": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "type",
+                "timeout",
+                "async"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "event",
+          "handlers"
+        ],
+        "additionalProperties": false
+      },
+      "source": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "requestId",
+      "family",
+      "name",
+      "model"
+    ],
+    "additionalProperties": false
+  },
+  "hooks.create#result": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "hook": {
+        "type": "object",
+        "properties": {
+          "hookId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "family": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "model": {
+            "type": "object",
+            "properties": {
+              "event": {
+                "type": "string"
+              },
+              "matcher": {
+                "type": "string"
+              },
+              "handlers": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "command": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "tool": {
+                      "type": "string"
+                    },
+                    "prompt": {
+                      "type": "string"
+                    },
+                    "timeout": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "async": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "timeout",
+                    "async"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "event",
+              "handlers"
+            ],
+            "additionalProperties": false
+          },
+          "commands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          }
+        },
+        "required": [
+          "hookId",
+          "family",
+          "name",
+          "enabled",
+          "model",
+          "commands",
+          "source",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "hook"
+    ],
+    "additionalProperties": false
+  },
+  "hooks.update#params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "requestId": {
+        "type": "string",
+        "minLength": 8
+      },
+      "hookId": {
+        "type": "string",
+        "minLength": 1
+      },
+      "model": {
+        "type": "object",
+        "properties": {
+          "event": {
+            "type": "string"
+          },
+          "matcher": {
+            "type": "string"
+          },
+          "handlers": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string"
+                },
+                "command": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "tool": {
+                  "type": "string"
+                },
+                "prompt": {
+                  "type": "string"
+                },
+                "timeout": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "async": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "type",
+                "timeout",
+                "async"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "event",
+          "handlers"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "requestId",
+      "hookId",
+      "model"
+    ],
+    "additionalProperties": false
+  },
+  "hooks.update#result": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "hook": {
+        "type": "object",
+        "properties": {
+          "hookId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "family": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "model": {
+            "type": "object",
+            "properties": {
+              "event": {
+                "type": "string"
+              },
+              "matcher": {
+                "type": "string"
+              },
+              "handlers": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "command": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "tool": {
+                      "type": "string"
+                    },
+                    "prompt": {
+                      "type": "string"
+                    },
+                    "timeout": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "async": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "timeout",
+                    "async"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "event",
+              "handlers"
+            ],
+            "additionalProperties": false
+          },
+          "commands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          }
+        },
+        "required": [
+          "hookId",
+          "family",
+          "name",
+          "enabled",
+          "model",
+          "commands",
+          "source",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "hook"
+    ],
+    "additionalProperties": false
+  },
+  "hooks.setEnabled#params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "requestId": {
+        "type": "string",
+        "minLength": 8
+      },
+      "hookId": {
+        "type": "string",
+        "minLength": 1
+      },
+      "enabled": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "requestId",
+      "hookId",
+      "enabled"
+    ],
+    "additionalProperties": false
+  },
+  "hooks.setEnabled#result": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "hook": {
+        "type": "object",
+        "properties": {
+          "hookId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "family": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "model": {
+            "type": "object",
+            "properties": {
+              "event": {
+                "type": "string"
+              },
+              "matcher": {
+                "type": "string"
+              },
+              "handlers": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "command": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "tool": {
+                      "type": "string"
+                    },
+                    "prompt": {
+                      "type": "string"
+                    },
+                    "timeout": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "async": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "timeout",
+                    "async"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "event",
+              "handlers"
+            ],
+            "additionalProperties": false
+          },
+          "commands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          }
+        },
+        "required": [
+          "hookId",
+          "family",
+          "name",
+          "enabled",
+          "model",
+          "commands",
+          "source",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "hook"
+    ],
+    "additionalProperties": false
+  },
+  "hooks.delete#params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "requestId": {
+        "type": "string",
+        "minLength": 8
+      },
+      "hookId": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "required": [
+      "requestId",
+      "hookId"
+    ],
+    "additionalProperties": false
+  },
+  "hooks.delete#result": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "deleted": {
+        "type": "boolean",
+        "const": true
+      },
+      "triggersRemoved": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "deleted",
+      "triggersRemoved"
+    ],
+    "additionalProperties": false
+  },
+  "hooks.triggers#params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "requestId": {
+        "type": "string",
+        "minLength": 8
+      },
+      "hookId": {
+        "type": "string",
+        "minLength": 1
+      },
+      "limit": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 500
+      }
+    },
+    "required": [
+      "requestId"
+    ],
+    "additionalProperties": false
+  },
+  "hooks.triggers#result": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "triggers": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "triggerId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "hookId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "event": {
+              "type": "string"
+            },
+            "at": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+            },
+            "exitCode": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "outputSummary": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "truncated": {
+              "type": "boolean"
+            },
+            "blocking": {
+              "type": "boolean"
+            },
+            "effect": {
+              "type": "string",
+              "enum": [
+                "blocked",
+                "ran",
+                "failed"
+              ]
+            }
+          },
+          "required": [
+            "triggerId",
+            "hookId",
+            "event",
+            "at",
+            "exitCode",
+            "outputSummary",
+            "truncated",
+            "blocking",
+            "effect"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [
+      "triggers"
+    ],
+    "additionalProperties": false
+  },
+  "accounts.list#params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "accounts.list#result": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "accounts": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "accountId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "harnessType": {
+              "type": "string"
+            },
+            "accountIdentifier": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string"
+            },
+            "hasAsset": {
+              "type": "boolean"
+            },
+            "lastVerifiedAt": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "createdAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+            },
+            "updatedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+            }
+          },
+          "required": [
+            "accountId",
+            "harnessType",
+            "accountIdentifier",
+            "state",
+            "hasAsset",
+            "lastVerifiedAt",
+            "createdAt",
+            "updatedAt"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [
+      "accounts"
+    ],
+    "additionalProperties": false
+  },
+  "accounts.create#params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "requestId": {
+        "type": "string",
+        "minLength": 8
+      },
+      "harness": {
+        "type": "string",
+        "minLength": 1
+      },
+      "accountIdentifier": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "required": [
+      "requestId",
+      "harness",
+      "accountIdentifier"
+    ],
+    "additionalProperties": false
+  },
+  "accounts.create#result": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "account": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "harnessType": {
+            "type": "string"
+          },
+          "accountIdentifier": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "hasAsset": {
+            "type": "boolean"
+          },
+          "lastVerifiedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          }
+        },
+        "required": [
+          "accountId",
+          "harnessType",
+          "accountIdentifier",
+          "state",
+          "hasAsset",
+          "lastVerifiedAt",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "account"
+    ],
+    "additionalProperties": false
+  },
+  "accounts.bind#params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "requestId": {
+        "type": "string",
+        "minLength": 8
+      },
+      "profileId": {
+        "type": "string",
+        "minLength": 1
+      },
+      "expectedVersion": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      },
+      "accountId": {
+        "anyOf": [
+          {
+            "type": "string",
+            "minLength": 1
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "required": [
+      "requestId",
+      "profileId",
+      "expectedVersion",
+      "accountId"
+    ],
+    "additionalProperties": false
+  },
+  "accounts.bind#result": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "profile": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "harness": {
+            "type": "string"
+          },
+          "capabilities": {
+            "default": {},
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "boolean"
+            }
+          },
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "permissionPreset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "permissionRules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "enum": [
+                    "read",
+                    "edit",
+                    "bash",
+                    "task",
+                    "external_directory",
+                    "webfetch",
+                    "skill"
+                  ]
+                },
+                "pattern": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "allow",
+                    "ask",
+                    "deny"
+                  ]
+                }
+              },
+              "required": [
+                "key",
+                "pattern",
+                "action"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "originProfileId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "archivedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "displayName",
+          "harness",
+          "capabilities",
+          "archivedAt",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "profile"
+    ],
+    "additionalProperties": false
+  },
+  "accounts.importAsset#params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "requestId": {
+        "type": "string",
+        "minLength": 8
+      },
+      "accountId": {
+        "type": "string",
+        "minLength": 1
+      },
+      "sourcePath": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "required": [
+      "requestId",
+      "accountId",
+      "sourcePath"
+    ],
+    "additionalProperties": false
+  },
+  "accounts.importAsset#result": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "account": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "harnessType": {
+            "type": "string"
+          },
+          "accountIdentifier": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "hasAsset": {
+            "type": "boolean"
+          },
+          "lastVerifiedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          }
+        },
+        "required": [
+          "accountId",
+          "harnessType",
+          "accountIdentifier",
+          "state",
+          "hasAsset",
+          "lastVerifiedAt",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "account"
     ],
     "additionalProperties": false
   },

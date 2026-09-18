@@ -272,6 +272,16 @@ export const SessionRecordSchema = z.object({
 })
 export type SessionRecord = z.infer<typeof SessionRecordSchema>
 
+/** Order 60: one permission rule, as the record layer stores it. The rule set
+ *  is ordered and family-neutral (it travels across a clone); `pattern` is the
+ *  glob a rule speaks about, and null means "every target of this key". */
+export const PermissionRuleSchema = z.strictObject({
+  key: z.enum(['read', 'edit', 'bash', 'task', 'external_directory', 'webfetch', 'skill']),
+  pattern: z.string().nullable(),
+  action: z.enum(['allow', 'ask', 'deny'])
+})
+export type PermissionRule = z.infer<typeof PermissionRuleSchema>
+
 export const ProfileRecordSchema = z.object({
   id: WireIdSchema,
   version: RecordVersionSchema,
@@ -282,6 +292,19 @@ export const ProfileRecordSchema = z.object({
   /** Native capabilities are server claims. Missing/unknown harnesses expose
    *  an empty map; the client never invents brand defaults. */
   capabilities: z.record(z.string(), z.boolean()).default({}),
+  /** Order 56: the subscription account this role is bound to, or null. The
+   *  locator and the digest stay server-side — the client needs the reference
+   *  only (core v1 §3: never the material, never the locator). */
+  accountId: WireIdSchema.nullable().optional(),
+  /** Order 60: the permission posture. `permissionRules` is the rule set in
+   *  effect, last match wins, in order — preset rules first, the user's own
+   *  appended. An empty list on a preset is honest: that preset declares no
+   *  explicit rules (its fallback action is the posture). */
+  permissionPreset: z.string().nullable().optional(),
+  permissionRules: z.array(PermissionRuleSchema).optional(),
+  /** Order 60: for a clone, the role it came from; null for a role created
+   *  from scratch. Display fact only — ids stay opaque. */
+  originProfileId: WireIdSchema.nullable().optional(),
   archivedAt: WireTimestampSchema.nullable(),
   createdAt: WireTimestampSchema,
   updatedAt: WireTimestampSchema
@@ -1003,6 +1026,502 @@ export const HistorySnapshotResultSchema = z.discriminatedUnion('outcome', [
 ])
 export type HistorySnapshotResult = z.infer<typeof HistorySnapshotResultSchema>
 
+// ─── Order 62: a workspace's Git status (read-only, six nullable fields) ────
+
+/** Six fields, each independently null — null means "not obtainable", never
+ *  zero, and `reason` carries the typed cause. A repository with no upstream
+ *  has no ahead/behind (the absence IS the fact); a binary diff has no line
+ *  counts. The client renders the reason; it never fills a gap with 0. */
+export const WorkspaceGitStatusSchema = z.strictObject({
+  branch: z.string().nullable(),
+  changedFiles: z.number().int().nonnegative().nullable(),
+  additions: z.number().int().nonnegative().nullable(),
+  deletions: z.number().int().nonnegative().nullable(),
+  ahead: z.number().int().nonnegative().nullable(),
+  behind: z.number().int().nonnegative().nullable(),
+  /** Typed code among GIT_UNAVAILABLE / GIT_NOT_A_REPOSITORY / GIT_TIMEOUT /
+   *  GIT_OUTPUT_LIMIT / GIT_PARSE_FAILED / GIT_NO_COMMITS / GIT_BINARY_DIFF /
+   *  GIT_WORKSPACE_MISSING — null when every field above was obtainable. */
+  reason: z.string().nullable()
+})
+export type WorkspaceGitStatus = z.infer<typeof WorkspaceGitStatusSchema>
+
+export const WorkspacesGitStatusParamsSchema = z.strictObject({
+  requestId: RequestIdSchema,
+  workspaceId: WireIdSchema
+})
+export type WorkspacesGitStatusParams = z.infer<typeof WorkspacesGitStatusParamsSchema>
+export const WorkspacesGitStatusResultSchema = z.strictObject({ git: WorkspaceGitStatusSchema })
+export type WorkspacesGitStatusResult = z.infer<typeof WorkspacesGitStatusResultSchema>
+
+// ─── Order 64: the in-flight executions we own (read-only inventory) ────────
+
+/** One row per active turn, straight from the ledger: no machine-level
+ *  process enumeration, no cancellation surface. `pid` is filled only where
+ *  the platform can report it; otherwise it is null WITH a `pidReason` — a
+ *  null pid is never rendered as 0 and never guessed. */
+export const ExecutionInventoryRowSchema = z.strictObject({
+  executionId: WireIdSchema,
+  turnId: WireIdSchema,
+  sessionId: WireIdSchema,
+  profileId: WireIdSchema,
+  /** Display facts for a list that must stand alone. */
+  profile: z.string(),
+  harness: z.string(),
+  placement: z.string(),
+  state: z.enum(['queued', 'dispatched', 'running', 'stopping', 'stopped', 'completed', 'failed', 'unknown']),
+  startedAt: WireTimestampSchema,
+  workspaceId: WireIdSchema,
+  workspace: z.string(),
+  queueItemId: WireIdSchema.nullable(),
+  pid: z.number().int().nullable(),
+  pidReason: z.string().nullable(),
+  adapterPid: z.number().int().nullable(),
+  adapterPidReason: z.string().nullable()
+})
+export type ExecutionInventoryRow = z.infer<typeof ExecutionInventoryRowSchema>
+
+/** The server refuses a shorter list rather than truncating silently, so the
+ *  client's own bound is the server's. */
+export const EXECUTION_INVENTORY_LIMIT = 200
+
+export const ExecutionsListParamsSchema = z.strictObject({
+  requestId: RequestIdSchema,
+  limit: z.number().int().min(1).max(EXECUTION_INVENTORY_LIMIT).optional()
+})
+export type ExecutionsListParams = z.infer<typeof ExecutionsListParamsSchema>
+export const ExecutionsListResultSchema = z.strictObject({ executions: z.array(ExecutionInventoryRowSchema) })
+export type ExecutionsListResult = z.infer<typeof ExecutionsListResultSchema>
+
+// ─── Order 63: a role's declared memory files (read-only) ───────────────────
+
+/** A declared memory file, either delivered or refused as a whole. A file
+ *  whose bytes hit the credential rule carries a reason and NO content — the
+ *  material never crosses this wire, not even to be hidden by the UI. */
+export const MemoryFileSchema = z.union([
+  z.strictObject({
+    path: z.string(),
+    size: z.number().int().nonnegative(),
+    digest: z.string(),
+    content: z.string()
+  }),
+  z.strictObject({
+    path: z.string(),
+    size: z.number().int().nonnegative(),
+    reason: z.literal('MEMORY_CONTAINS_SECRET'),
+    refused: z.literal(true)
+  })
+])
+export type MemoryFile = z.infer<typeof MemoryFileSchema>
+
+/** `available:false` is the honest answer for a family that declares no
+ *  memory paths, a home that is not there, or a remote home we cannot read —
+ *  the client HIDES the partition rather than drawing an empty one. */
+export const ProfileMemorySchema = z.strictObject({
+  available: z.boolean(),
+  reason: z.string().nullable(),
+  files: z.array(MemoryFileSchema),
+  note: z.string().optional()
+})
+export type ProfileMemory = z.infer<typeof ProfileMemorySchema>
+
+export const ProfilesMemoryParamsSchema = z.strictObject({
+  requestId: RequestIdSchema,
+  profileId: WireIdSchema
+})
+export type ProfilesMemoryParams = z.infer<typeof ProfilesMemoryParamsSchema>
+export const ProfilesMemoryResultSchema = z.strictObject({ memory: ProfileMemorySchema })
+export type ProfilesMemoryResult = z.infer<typeof ProfilesMemoryResultSchema>
+
+// ─── Order 60: cloning a role, and writing its permission posture ───────────
+
+/** What traveled, what did not, and why — computed BEFORE anything is
+ *  written, so the report and the rows cannot disagree. Native session
+ *  material never travels (`native-sessions` is always unmigrated). */
+export const ProfileMigrationEntrySchema = z.strictObject({
+  item: z.string(),
+  migrated: z.boolean(),
+  reason: z.string(),
+  detail: z.unknown().optional()
+})
+export type ProfileMigrationEntry = z.infer<typeof ProfileMigrationEntrySchema>
+
+export const ProfileMigrationSchema = z.strictObject({
+  targetFamily: z.string(),
+  sourceFamily: z.string(),
+  sameFamily: z.boolean(),
+  items: z.array(ProfileMigrationEntrySchema),
+  /** The permission posture the clone receives (family-neutral, re-expanded
+   *  so the stored order is preserved), or null when it no longer validates. */
+  permissions: z.strictObject({
+    preset: z.string(),
+    rules: z.array(PermissionRuleSchema)
+  }).nullable(),
+  reboundAssets: z.array(z.string()),
+  migratedCount: z.number().int().nonnegative(),
+  refusedCount: z.number().int().nonnegative()
+})
+export type ProfileMigration = z.infer<typeof ProfileMigrationSchema>
+
+export const ProfilesCloneParamsSchema = z.strictObject({
+  requestId: RequestIdSchema,
+  profileId: WireIdSchema,
+  displayName: z.string().min(1),
+  harness: z.string().min(1).optional()
+})
+export type ProfilesCloneParams = z.infer<typeof ProfilesCloneParamsSchema>
+export const ProfilesCloneResultSchema = z.strictObject({
+  profile: ProfileRecordSchema,
+  migration: ProfileMigrationSchema
+})
+export type ProfilesCloneResult = z.infer<typeof ProfilesCloneResultSchema>
+
+/** The rules are validated before storage: an illegal key or action answers
+ *  its own typed code and nothing is saved. */
+export const ProfilesSetPermissionsParamsSchema = z.strictObject({
+  requestId: RequestIdSchema,
+  profileId: WireIdSchema,
+  expectedVersion: RecordVersionSchema,
+  preset: z.string().min(1),
+  rules: z.array(PermissionRuleSchema)
+})
+export type ProfilesSetPermissionsParams = z.infer<typeof ProfilesSetPermissionsParamsSchema>
+export const ProfilesSetPermissionsResultSchema = z.strictObject({ profile: ProfileRecordSchema })
+export type ProfilesSetPermissionsResult = z.infer<typeof ProfilesSetPermissionsResultSchema>
+
+// ─── Order 58: managed assets (catalogue, revisions, bindings, catalogues) ──
+
+/** The stable identity every store, directory row and binding shares. */
+export const AssetSlugSchema = z.string().regex(/^[a-z0-9][a-z0-9._-]{0,63}$/)
+export type AssetSlug = z.infer<typeof AssetSlugSchema>
+
+/** The catalogue shape: no content, no host paths — a directory entry, not
+ *  the asset itself. */
+export const AssetViewSchema = z.strictObject({
+  assetId: AssetSlugSchema,
+  kind: z.enum(['skill', 'mcp', 'plugin']),
+  name: z.string(),
+  description: z.string().nullable(),
+  latestRevision: z.number().int().nonnegative(),
+  digest: z.string(),
+  source: z.string().nullable(),
+  createdAt: WireTimestampSchema,
+  updatedAt: WireTimestampSchema
+})
+export type AssetView = z.infer<typeof AssetViewSchema>
+
+export const AssetBindingSchema = z.strictObject({
+  assetId: AssetSlugSchema,
+  kind: z.enum(['skill', 'mcp', 'plugin']),
+  name: z.string(),
+  revision: z.number().int().positive(),
+  digest: z.string(),
+  /** A disabled binding is still a binding — the UI must show the state, not
+   *  drop the row. */
+  enabled: z.boolean()
+})
+export type AssetBinding = z.infer<typeof AssetBindingSchema>
+
+/** A standard MCP server definition. The store owns its canonical shape and
+ *  the rules that refuse a bad one, so the contract carries the object as
+ *  data instead of restating a second authority. */
+export const McpServerDefinitionSchema = z.record(z.string(), z.unknown())
+export type McpServerDefinition = z.infer<typeof McpServerDefinitionSchema>
+
+export const CatalogEntrySchema = z.strictObject({
+  kind: z.enum(['skill', 'mcp']),
+  name: z.string(),
+  /** Relative to the source the snapshot names; never a host path. */
+  path: z.string(),
+  origin: z.string(),
+  description: z.string().optional(),
+  /** Where the entry stands against what is already published. */
+  installed: z.boolean(),
+  installedDigest: z.string().nullable()
+})
+export type CatalogEntry = z.infer<typeof CatalogEntrySchema>
+
+export const CatalogSchema = z.strictObject({
+  sourcePath: z.string(),
+  digest: z.string(),
+  entries: z.array(CatalogEntrySchema)
+})
+export type Catalog = z.infer<typeof CatalogSchema>
+
+export const AssetsListParamsSchema = z.strictObject({})
+export type AssetsListParams = z.infer<typeof AssetsListParamsSchema>
+export const AssetsListResultSchema = z.strictObject({ assets: z.array(AssetViewSchema) })
+export type AssetsListResult = z.infer<typeof AssetsListResultSchema>
+
+export const AssetsPublishSkillParamsSchema = z.strictObject({
+  requestId: RequestIdSchema,
+  assetId: AssetSlugSchema,
+  revision: z.number().int().positive(),
+  sourcePath: z.string().min(1)
+})
+export type AssetsPublishSkillParams = z.infer<typeof AssetsPublishSkillParamsSchema>
+export const AssetsPublishSkillResultSchema = z.strictObject({ asset: AssetViewSchema })
+export type AssetsPublishSkillResult = z.infer<typeof AssetsPublishSkillResultSchema>
+
+export const AssetsPublishMcpParamsSchema = z.strictObject({
+  requestId: RequestIdSchema,
+  assetId: AssetSlugSchema,
+  revision: z.number().int().positive(),
+  definition: McpServerDefinitionSchema
+})
+export type AssetsPublishMcpParams = z.infer<typeof AssetsPublishMcpParamsSchema>
+export const AssetsPublishMcpResultSchema = AssetsPublishSkillResultSchema
+export type AssetsPublishMcpResult = z.infer<typeof AssetsPublishMcpResultSchema>
+
+/** Code assets are stored verbatim (the digest covers the original bytes) and
+ *  answered with a bounded preview — no form ever assembles this code. */
+export const AssetsPublishPluginParamsSchema = z.strictObject({
+  requestId: RequestIdSchema,
+  assetId: AssetSlugSchema,
+  revision: z.number().int().positive(),
+  sourcePath: z.string().min(1)
+})
+export type AssetsPublishPluginParams = z.infer<typeof AssetsPublishPluginParamsSchema>
+export const AssetsPublishPluginResultSchema = z.strictObject({
+  asset: AssetViewSchema,
+  preview: z.string()
+})
+export type AssetsPublishPluginResult = z.infer<typeof AssetsPublishPluginResultSchema>
+
+export const AssetsBindParamsSchema = z.strictObject({
+  requestId: RequestIdSchema,
+  profileId: WireIdSchema,
+  assetId: AssetSlugSchema,
+  revision: z.number().int().positive().optional(),
+  enabled: z.boolean().optional()
+})
+export type AssetsBindParams = z.infer<typeof AssetsBindParamsSchema>
+export const AssetsBindResultSchema = z.strictObject({ binding: AssetBindingSchema })
+export type AssetsBindResult = z.infer<typeof AssetsBindResultSchema>
+
+export const AssetsUnbindParamsSchema = z.strictObject({
+  requestId: RequestIdSchema,
+  profileId: WireIdSchema,
+  assetId: AssetSlugSchema
+})
+export type AssetsUnbindParams = z.infer<typeof AssetsUnbindParamsSchema>
+export const AssetsUnbindResultSchema = z.strictObject({ unbound: z.literal(true) })
+export type AssetsUnbindResult = z.infer<typeof AssetsUnbindResultSchema>
+
+export const AssetsBindingsParamsSchema = z.strictObject({ profileId: WireIdSchema })
+export type AssetsBindingsParams = z.infer<typeof AssetsBindingsParamsSchema>
+export const AssetsBindingsResultSchema = z.strictObject({ bindings: z.array(AssetBindingSchema) })
+export type AssetsBindingsResult = z.infer<typeof AssetsBindingsResultSchema>
+
+export const AssetsSyncCatalogParamsSchema = z.strictObject({
+  requestId: RequestIdSchema,
+  sourceId: AssetSlugSchema,
+  sourcePath: z.string().min(1)
+})
+export type AssetsSyncCatalogParams = z.infer<typeof AssetsSyncCatalogParamsSchema>
+export const AssetsCatalogResultSchema = z.strictObject({ catalog: CatalogSchema })
+export type AssetsCatalogResult = z.infer<typeof AssetsCatalogResultSchema>
+
+export const AssetsCatalogParamsSchema = z.strictObject({ sourceId: AssetSlugSchema })
+export type AssetsCatalogParams = z.infer<typeof AssetsCatalogParamsSchema>
+
+export const AssetsInstallFromCatalogParamsSchema = z.strictObject({
+  requestId: RequestIdSchema,
+  sourceId: AssetSlugSchema,
+  entryName: AssetSlugSchema,
+  revision: z.number().int().positive()
+})
+export type AssetsInstallFromCatalogParams = z.infer<typeof AssetsInstallFromCatalogParamsSchema>
+/** The published row, plus the pinned provenance `<snapshot digest>:<origin>`
+ *  — an install never silently switches source. */
+export const AssetsInstallFromCatalogResultSchema = z.strictObject({
+  installed: z.strictObject({
+    asset_id: AssetSlugSchema,
+    kind: z.enum(['skill', 'mcp']),
+    name: z.string(),
+    revision: z.number().int().positive(),
+    digest: z.string(),
+    source: z.string()
+  })
+})
+export type AssetsInstallFromCatalogResult = z.infer<typeof AssetsInstallFromCatalogResultSchema>
+
+/** One bounded stdio handshake: no configuration is written, no credential is
+ *  read, no completion is attempted. */
+export const McpProbeFactsSchema = z.strictObject({
+  status: z.literal('ok'),
+  serverName: z.string().nullable(),
+  serverVersion: z.string().nullable(),
+  protocolVersion: z.string().nullable()
+})
+export type McpProbeFacts = z.infer<typeof McpProbeFactsSchema>
+
+export const AssetsProbeParamsSchema = z.strictObject({ definition: McpServerDefinitionSchema })
+export type AssetsProbeParams = z.infer<typeof AssetsProbeParamsSchema>
+export const AssetsProbeResultSchema = z.strictObject({ probe: McpProbeFactsSchema })
+export type AssetsProbeResult = z.infer<typeof AssetsProbeResultSchema>
+
+// ─── Order 59: managed hooks (models, enablement, trigger history) ──────────
+
+/** The hook model is the target family's shape; these are the canonical keys
+ *  the ledger stores, and `commands` is derived from them so the UI can show
+ *  the exact commands an enable would run. */
+export const HookHandlerSchema = z.object({
+  type: z.string(),
+  command: z.string().optional(),
+  url: z.string().optional(),
+  tool: z.string().optional(),
+  prompt: z.string().optional(),
+  timeout: z.number().int().positive(),
+  async: z.boolean()
+})
+export type HookHandler = z.infer<typeof HookHandlerSchema>
+
+export const HookModelSchema = z.object({
+  event: z.string(),
+  matcher: z.string().optional(),
+  handlers: z.array(HookHandlerSchema).min(1)
+})
+export type HookModel = z.infer<typeof HookModelSchema>
+
+export const HookViewSchema = z.strictObject({
+  hookId: WireIdSchema,
+  family: z.string(),
+  name: z.string(),
+  enabled: z.boolean(),
+  model: HookModelSchema,
+  /** Every command this hook would run, in order — visible before enabling. */
+  commands: z.array(z.string()),
+  source: z.string().nullable(),
+  createdAt: WireTimestampSchema,
+  updatedAt: WireTimestampSchema
+})
+export type HookView = z.infer<typeof HookViewSchema>
+
+/** `exit 2` blocks: the trigger row says so, and the UI must not soften it. */
+export const HookTriggerViewSchema = z.strictObject({
+  triggerId: WireIdSchema,
+  hookId: WireIdSchema,
+  event: z.string(),
+  at: WireTimestampSchema,
+  exitCode: z.number().int(),
+  outputSummary: z.string().nullable(),
+  truncated: z.boolean(),
+  blocking: z.boolean(),
+  effect: z.enum(['blocked', 'ran', 'failed'])
+})
+export type HookTriggerView = z.infer<typeof HookTriggerViewSchema>
+
+export const HooksListParamsSchema = z.strictObject({
+  requestId: RequestIdSchema,
+  family: z.string().optional()
+})
+export type HooksListParams = z.infer<typeof HooksListParamsSchema>
+export const HooksListResultSchema = z.strictObject({ hooks: z.array(HookViewSchema) })
+export type HooksListResult = z.infer<typeof HooksListResultSchema>
+
+export const HooksCreateParamsSchema = z.strictObject({
+  requestId: RequestIdSchema,
+  family: z.string().min(1),
+  name: z.string().min(1),
+  model: HookModelSchema,
+  source: z.string().optional()
+})
+export type HooksCreateParams = z.infer<typeof HooksCreateParamsSchema>
+export const HooksCreateResultSchema = z.strictObject({ hook: HookViewSchema })
+export type HooksCreateResult = z.infer<typeof HooksCreateResultSchema>
+
+export const HooksUpdateParamsSchema = z.strictObject({
+  requestId: RequestIdSchema,
+  hookId: WireIdSchema,
+  model: HookModelSchema
+})
+export type HooksUpdateParams = z.infer<typeof HooksUpdateParamsSchema>
+export const HooksUpdateResultSchema = HooksCreateResultSchema
+export type HooksUpdateResult = z.infer<typeof HooksUpdateResultSchema>
+
+export const HooksSetEnabledParamsSchema = z.strictObject({
+  requestId: RequestIdSchema,
+  hookId: WireIdSchema,
+  enabled: z.boolean()
+})
+export type HooksSetEnabledParams = z.infer<typeof HooksSetEnabledParamsSchema>
+export const HooksSetEnabledResultSchema = HooksCreateResultSchema
+export type HooksSetEnabledResult = z.infer<typeof HooksSetEnabledResultSchema>
+
+export const HooksDeleteParamsSchema = z.strictObject({
+  requestId: RequestIdSchema,
+  hookId: WireIdSchema
+})
+export type HooksDeleteParams = z.infer<typeof HooksDeleteParamsSchema>
+/** The cascade is explicit: deleting a hook removes its trigger history, and
+ *  the count is answered rather than implied. */
+export const HooksDeleteResultSchema = z.strictObject({
+  deleted: z.literal(true),
+  triggersRemoved: z.number().int().nonnegative()
+})
+export type HooksDeleteResult = z.infer<typeof HooksDeleteResultSchema>
+
+export const HooksTriggersParamsSchema = z.strictObject({
+  requestId: RequestIdSchema,
+  hookId: WireIdSchema.optional(),
+  limit: z.number().int().min(1).max(500).optional()
+})
+export type HooksTriggersParams = z.infer<typeof HooksTriggersParamsSchema>
+export const HooksTriggersResultSchema = z.strictObject({ triggers: z.array(HookTriggerViewSchema) })
+export type HooksTriggersResult = z.infer<typeof HooksTriggersResultSchema>
+
+// ─── Order 56: managed subscription accounts (references only) ──────────────
+
+/** Zero tokens, zero locators, zero digests: `hasAsset` says whether a login
+ *  state exists, and the material itself stays in the platform secret store. */
+export const AccountViewSchema = z.strictObject({
+  accountId: WireIdSchema,
+  harnessType: z.string(),
+  accountIdentifier: z.string(),
+  state: z.string(),
+  hasAsset: z.boolean(),
+  lastVerifiedAt: WireTimestampSchema.nullable(),
+  createdAt: WireTimestampSchema,
+  updatedAt: WireTimestampSchema
+})
+export type AccountView = z.infer<typeof AccountViewSchema>
+
+export const AccountsListParamsSchema = z.strictObject({})
+export type AccountsListParams = z.infer<typeof AccountsListParamsSchema>
+export const AccountsListResultSchema = z.strictObject({ accounts: z.array(AccountViewSchema) })
+export type AccountsListResult = z.infer<typeof AccountsListResultSchema>
+
+export const AccountsCreateParamsSchema = z.strictObject({
+  requestId: RequestIdSchema,
+  harness: z.string().min(1),
+  accountIdentifier: z.string().min(1)
+})
+export type AccountsCreateParams = z.infer<typeof AccountsCreateParamsSchema>
+export const AccountsCreateResultSchema = z.strictObject({ account: AccountViewSchema })
+export type AccountsCreateResult = z.infer<typeof AccountsCreateResultSchema>
+
+/** A null accountId unbinds; the write is versioned like every other profile
+ *  write, so a concurrent edit answers CONFLICT_VERSION instead of winning. */
+export const AccountsBindParamsSchema = z.strictObject({
+  requestId: RequestIdSchema,
+  profileId: WireIdSchema,
+  expectedVersion: RecordVersionSchema,
+  accountId: WireIdSchema.nullable()
+})
+export type AccountsBindParams = z.infer<typeof AccountsBindParamsSchema>
+export const AccountsBindResultSchema = z.strictObject({ profile: ProfileRecordSchema })
+export type AccountsBindResult = z.infer<typeof AccountsBindResultSchema>
+
+export const AccountsImportAssetParamsSchema = z.strictObject({
+  requestId: RequestIdSchema,
+  accountId: WireIdSchema,
+  sourcePath: z.string().min(1)
+})
+export type AccountsImportAssetParams = z.infer<typeof AccountsImportAssetParamsSchema>
+export const AccountsImportAssetResultSchema = z.strictObject({ account: AccountViewSchema })
+export type AccountsImportAssetResult = z.infer<typeof AccountsImportAssetResultSchema>
+
 // ─── Method registry ─────────────────────────────────────────────────────────
 
 /** Method name → [params, result]. The registry is the review surface: one
@@ -1014,11 +1533,16 @@ export const WireMethods = {
   'workspaces.list': [WorkspacesListParamsSchema, WorkspacesListResultSchema],
   'workspaces.browse': [WorkspacesBrowseParamsSchema, WorkspacesBrowseResultSchema],
   'workspaces.archive': [WorkspacesArchiveParamsSchema, WorkspacesArchiveResultSchema],
+  'workspaces.gitStatus': [WorkspacesGitStatusParamsSchema, WorkspacesGitStatusResultSchema],
+  'executions.list': [ExecutionsListParamsSchema, ExecutionsListResultSchema],
   'profiles.list': [ProfilesListParamsSchema, ProfilesListResultSchema],
   'profiles.create': [ProfilesCreateParamsSchema, ProfilesCreateResultSchema],
   'profiles.update': [ProfilesUpdateParamsSchema, ProfilesUpdateResultSchema],
   'profiles.archive': [ProfilesArchiveParamsSchema, ProfilesArchiveResultSchema],
   'profiles.updateConfig': [ProfilesUpdateConfigParamsSchema, ProfilesUpdateConfigResultSchema],
+  'profiles.clone': [ProfilesCloneParamsSchema, ProfilesCloneResultSchema],
+  'profiles.setPermissions': [ProfilesSetPermissionsParamsSchema, ProfilesSetPermissionsResultSchema],
+  'profiles.memory': [ProfilesMemoryParamsSchema, ProfilesMemoryResultSchema],
   'providerModels.list': [ProviderModelsListParamsSchema, ProviderModelsListResultSchema],
   'providerModels.create': [ProviderModelsCreateParamsSchema, ProviderModelsCreateResultSchema],
   'providerModels.update': [ProviderModelsUpdateParamsSchema, ProviderModelsUpdateResultSchema],
@@ -1028,6 +1552,27 @@ export const WireMethods = {
   'providerArtifacts.list': [ProviderArtifactsListParamsSchema, ProviderArtifactsListResultSchema],
   'providerArtifacts.install': [ProviderArtifactsInstallParamsSchema, ProviderArtifactsMutateResultSchema],
   'providerArtifacts.rollback': [ProviderArtifactsRollbackParamsSchema, ProviderArtifactsMutateResultSchema],
+  'assets.list': [AssetsListParamsSchema, AssetsListResultSchema],
+  'assets.publishSkill': [AssetsPublishSkillParamsSchema, AssetsPublishSkillResultSchema],
+  'assets.publishMcp': [AssetsPublishMcpParamsSchema, AssetsPublishMcpResultSchema],
+  'assets.publishPlugin': [AssetsPublishPluginParamsSchema, AssetsPublishPluginResultSchema],
+  'assets.bind': [AssetsBindParamsSchema, AssetsBindResultSchema],
+  'assets.unbind': [AssetsUnbindParamsSchema, AssetsUnbindResultSchema],
+  'assets.bindings': [AssetsBindingsParamsSchema, AssetsBindingsResultSchema],
+  'assets.syncCatalog': [AssetsSyncCatalogParamsSchema, AssetsCatalogResultSchema],
+  'assets.catalog': [AssetsCatalogParamsSchema, AssetsCatalogResultSchema],
+  'assets.installFromCatalog': [AssetsInstallFromCatalogParamsSchema, AssetsInstallFromCatalogResultSchema],
+  'assets.probe': [AssetsProbeParamsSchema, AssetsProbeResultSchema],
+  'hooks.list': [HooksListParamsSchema, HooksListResultSchema],
+  'hooks.create': [HooksCreateParamsSchema, HooksCreateResultSchema],
+  'hooks.update': [HooksUpdateParamsSchema, HooksUpdateResultSchema],
+  'hooks.setEnabled': [HooksSetEnabledParamsSchema, HooksSetEnabledResultSchema],
+  'hooks.delete': [HooksDeleteParamsSchema, HooksDeleteResultSchema],
+  'hooks.triggers': [HooksTriggersParamsSchema, HooksTriggersResultSchema],
+  'accounts.list': [AccountsListParamsSchema, AccountsListResultSchema],
+  'accounts.create': [AccountsCreateParamsSchema, AccountsCreateResultSchema],
+  'accounts.bind': [AccountsBindParamsSchema, AccountsBindResultSchema],
+  'accounts.importAsset': [AccountsImportAssetParamsSchema, AccountsImportAssetResultSchema],
   'config.describe': [ConfigDescribeParamsSchema, ConfigDescribeResultSchema],
   'config.resolve': [ConfigResolveParamsSchema, ConfigResolveResultSchema],
   'sessions.list': [SessionsListParamsSchema, SessionsListResultSchema],

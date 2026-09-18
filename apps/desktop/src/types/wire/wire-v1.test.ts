@@ -1,15 +1,24 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  AccountViewSchema,
   ApprovalRequestSchema,
   ApprovalsDecideParamsSchema,
   ApprovalsDecideResultSchema,
+  AssetBindingSchema,
+  AssetsPublishPluginResultSchema,
   asCursor,
   asRequestId,
   asWireId,
   ConfigDescribeResultSchema,
   EventFrameSchema,
+  ExecutionInventoryRowSchema,
+  ExecutionsListParamsSchema,
   HistorySnapshotResultSchema,
+  HookTriggerViewSchema,
+  ProfileRecordSchema,
+  ProfilesCloneResultSchema,
+  ProfilesMemoryResultSchema,
   ProfilesUpdateConfigResultSchema,
   ProviderModelConfigRecordSchema,
   QueueGetResultSchema,
@@ -26,6 +35,7 @@ import {
   WireMethods,
   WireRequestSchema,
   WireResponseSchema,
+  WorkspacesGitStatusResultSchema,
   WorkspacesOpenParamsSchema
 } from './wire-v1'
 import type {
@@ -374,6 +384,219 @@ describe('wire v1 core behaviors pinned by schema shape', () => {
 
     expect(EventFrameSchema.parse({ ...base, event: { kind: 'message.delta', sessionId: asWireId('ses_1'), messageId: asWireId('msg_1'), role: 'assistant', text: 'he' } }).seq).toBe(41)
     expect(() => EventFrameSchema.parse({ ...base, event: { kind: 'message.delta', sessionId: asWireId('ses_1'), messageId: asWireId('msg_1') } })).toThrow()
+  })
+})
+
+describe('wire v1 relock: the additive faces (orders 56 / 58 / 59 / 60 / 62 / 63 / 64)', () => {
+  it('a Git status that cannot be obtained says so field by field, and 0 stays a real count', () => {
+    const unavailable = WorkspacesGitStatusResultSchema.parse({
+      git: { branch: null, changedFiles: null, additions: null, deletions: null, ahead: null, behind: null, reason: 'GIT_UNAVAILABLE' }
+    })
+
+    expect(unavailable.git).toMatchObject({ changedFiles: null, additions: null, reason: 'GIT_UNAVAILABLE' })
+
+    const clean = WorkspacesGitStatusResultSchema.parse({
+      git: { branch: 'main', changedFiles: 0, additions: 0, deletions: 0, ahead: 0, behind: 0, reason: null }
+    })
+
+    expect(clean.git.changedFiles).toBe(0)
+  })
+
+  it('a refused memory file is refused as a whole — no content rides along', () => {
+    const refused = { path: 'MEMORY.md', size: 12, reason: 'MEMORY_CONTAINS_SECRET', refused: true }
+
+    expect(
+      ProfilesMemoryResultSchema.safeParse({ memory: { available: true, reason: null, files: [refused] } }).success
+    ).toBe(true)
+    expect(
+      ProfilesMemoryResultSchema.safeParse({
+        memory: { available: true, reason: null, files: [{ ...refused, content: 'sk-not-a-real-value' }] }
+      }).success
+    ).toBe(false)
+  })
+
+  it('a family that declares no memory paths answers available:false — nothing to draw', () => {
+    const hidden = ProfilesMemoryResultSchema.parse({
+      memory: { available: false, reason: null, files: [], note: 'this family declares no memory paths' }
+    })
+
+    expect(hidden.memory.available).toBe(false)
+    expect(hidden.memory.files).toHaveLength(0)
+  })
+
+  it('the inventory carries a reason wherever the pid is absent, and refuses an over-long read', () => {
+    const pidless = ExecutionInventoryRowSchema.parse({
+      executionId: asWireId('execution_1'),
+      turnId: asWireId('turn_1'),
+      sessionId: asWireId('session_1'),
+      profileId: asWireId('profile_1'),
+      profile: 'Builder',
+      harness: 'opaque-alpha',
+      placement: 'wsl',
+      state: 'running',
+      startedAt: '2026-09-18T00:00:00.000Z',
+      workspaceId: asWireId('workspace_1'),
+      workspace: 'fixture',
+      queueItemId: null,
+      pid: null,
+      pidReason: 'PID_NOT_REPORTED',
+      adapterPid: null,
+      adapterPidReason: 'ADAPTER_PID_NOT_REPORTED'
+    })
+
+    expect(pidless.pid).toBeNull()
+    expect(pidless.pidReason).toBe('PID_NOT_REPORTED')
+    expect(
+      ExecutionsListParamsSchema.safeParse({ requestId: asRequestId('req-12345678-inv'), limit: 201 }).success
+    ).toBe(false)
+    expect(ExecutionsListParamsSchema.parse({ requestId: asRequestId('req-12345678-inv'), limit: 200 }).limit).toBe(200)
+  })
+
+  it('an account view carries references only — a locator never crosses the wire', () => {
+    const view = {
+      accountId: asWireId('account_1'),
+      harnessType: 'opaque-alpha',
+      accountIdentifier: 'person@example.invalid',
+      state: 'ready',
+      hasAsset: true,
+      lastVerifiedAt: null,
+      createdAt: '2026-09-18T00:00:00.000Z',
+      updatedAt: '2026-09-18T00:00:00.000Z'
+    }
+
+    expect(AccountViewSchema.safeParse(view).success).toBe(true)
+    expect(AccountViewSchema.safeParse({ ...view, assetLocator: 'keyring://account_1' }).success).toBe(false)
+  })
+
+  it('a clone report states what did not travel, and sessions never travel', () => {
+    const parsed = ProfilesCloneResultSchema.parse({
+      profile: {
+        id: asWireId('profile_2'),
+        version: 1,
+        displayName: 'Cloned role',
+        harness: 'opaque-alpha',
+        capabilities: {},
+        archivedAt: null,
+        createdAt: '2026-09-18T00:00:00.000Z',
+        updatedAt: '2026-09-18T00:00:00.000Z'
+      },
+      migration: {
+        targetFamily: 'opaque-alpha',
+        sourceFamily: 'opaque-beta',
+        sameFamily: false,
+        items: [
+          { item: 'configuration', migrated: false, reason: 'families differ: configuration keys are family-specific' },
+          { item: 'native-sessions', migrated: false, reason: 'native sessions belong to the source; a clone starts with none' }
+        ],
+        permissions: null,
+        reboundAssets: [],
+        migratedCount: 0,
+        refusedCount: 2
+      }
+    })
+
+    expect(parsed.migration.items.filter(entry => entry.migrated)).toHaveLength(0)
+    expect(parsed.migration.permissions).toBeNull()
+  })
+
+  it('a hook trigger that blocked says so, and only the three effects exist', () => {
+    const blocked = {
+      triggerId: asWireId('trigger_1'),
+      hookId: asWireId('hook_1'),
+      event: 'pre_tool',
+      at: '2026-09-18T00:00:00.000Z',
+      exitCode: 2,
+      outputSummary: 'refused',
+      truncated: false,
+      blocking: true,
+      effect: 'blocked'
+    }
+
+    expect(HookTriggerViewSchema.parse(blocked).blocking).toBe(true)
+    expect(HookTriggerViewSchema.safeParse({ ...blocked, effect: 'ignored' }).success).toBe(false)
+  })
+
+  it('a plugin publish answers a bounded preview beside the stored asset', () => {
+    const asset = {
+      assetId: 'fixture-plugin',
+      kind: 'plugin',
+      name: 'fixture-plugin',
+      description: null,
+      latestRevision: 1,
+      digest: 'sha256:0000',
+      source: 'local:fixture.js',
+      createdAt: '2026-09-18T00:00:00.000Z',
+      updatedAt: '2026-09-18T00:00:00.000Z'
+    }
+
+    expect(AssetsPublishPluginResultSchema.parse({ asset, preview: 'export default {}' }).preview).toContain('export')
+    expect(AssetsPublishPluginResultSchema.safeParse({ asset }).success).toBe(false)
+  })
+
+  it('a disabled binding is still a binding row', () => {
+    expect(
+      AssetBindingSchema.parse({
+        assetId: 'fixture-skill',
+        kind: 'skill',
+        name: 'Fixture skill',
+        revision: 2,
+        digest: 'sha256:1111',
+        enabled: false
+      }).enabled
+    ).toBe(false)
+  })
+
+  it('a role carries its permission posture and clone origin as data', () => {
+    const profile = ProfileRecordSchema.parse({
+      id: asWireId('profile_3'),
+      version: 4,
+      displayName: 'Planner',
+      harness: 'opaque-alpha',
+      capabilities: {},
+      accountId: null,
+      permissionPreset: 'plan',
+      permissionRules: [{ key: 'bash', pattern: null, action: 'deny' }],
+      originProfileId: asWireId('profile_1'),
+      archivedAt: null,
+      createdAt: '2026-09-18T00:00:00.000Z',
+      updatedAt: '2026-09-18T00:00:00.000Z'
+    })
+
+    expect(profile.permissionRules?.[0]).toEqual({ key: 'bash', pattern: null, action: 'deny' })
+    expect(profile.originProfileId).toBe('profile_1')
+  })
+
+  it('the landed faces are registered as wire/1 methods', () => {
+    for (const method of [
+      'workspaces.gitStatus',
+      'executions.list',
+      'profiles.clone',
+      'profiles.setPermissions',
+      'profiles.memory',
+      'assets.list',
+      'assets.publishSkill',
+      'assets.publishMcp',
+      'assets.publishPlugin',
+      'assets.bind',
+      'assets.unbind',
+      'assets.bindings',
+      'assets.syncCatalog',
+      'assets.catalog',
+      'assets.installFromCatalog',
+      'assets.probe',
+      'hooks.list',
+      'hooks.create',
+      'hooks.update',
+      'hooks.setEnabled',
+      'hooks.delete',
+      'hooks.triggers',
+      'accounts.list',
+      'accounts.create',
+      'accounts.bind',
+      'accounts.importAsset'
+    ]) {
+      expect(Object.keys(WireMethods), method).toContain(method)
+    }
   })
 })
 

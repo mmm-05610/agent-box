@@ -1553,3 +1553,46 @@ Appearance（8 套主题 + 语言 + UI Scale + 终端字体）与 Keyboard Short
 - **给后端的交付物**：本目录 `generated/wire-v1.schema.json`（本次重生成后的本体）+ 上面那对摘要；
   后端按它重新登记即为阶段 2 之后的锁定候选。
 - 提交：`P21 stage 1`（pathspec 提交，只含本目录 README、generated 工件、evidence、本文件）。
+
+## P21 阶段 2（2026-09-18）：合同编入 56/58/59/60/62/63/64 的新面 — `P21_STAGE2_CONTRACT_ADDED`
+
+- **方法数**：33 → **59**（28 锁定核心不动 + 31 增量面）。新增 26 个方法：
+  `workspaces.gitStatus`、`executions.list`、`profiles.clone`、`profiles.setPermissions`、
+  `profiles.memory`、`assets.*`(10)、`hooks.*`(6)、`accounts.*`(4)。
+- **profile 投影 +4 字段**：`accountId`(56)、`permissionPreset` / `permissionRules` /
+  `originProfileId`(60)。
+- **形状来源 = 后端实现（第一手读代码），不是后端小节的转述**：
+  - Git：`workspaces/git_status.py` 的 `GitStatus.as_wire()` + `handlers.py:1042-1084`
+    （六字段 + `reason`；`local` 跑固定 porcelain v2，`ssh` 回 `GIT_UNAVAILABLE`）。
+  - 执行清单：`execution/inventory.py:39-95`（`STATE_MAP`/`MAX_EXECUTIONS=200`；
+    `pid` 缺省 `null` + `pidReason="PID_NOT_REPORTED"`；超限抛 `INVENTORY_LIMIT_EXCEEDED`）。
+  - 记忆：`profiles/memory.py:37-98`（拒绝项 `{path,size,reason,refused}` 无 `content`）+
+    `handlers.py:953-999`（未声明路径 ⇒ `available:false` + `note`）。
+  - 克隆：`profiles/clone.py:50-145`（`items[]`/`permissions`/`migratedCount`/`refusedCount`）
+    + handler 追加 `reboundAssets`。
+  - 资产：`assets/records.py:100-240`（`asset_view`/`_binding_view`）、`assets/catalog.py`
+    （条目 `{kind,name,path,origin,description?}` + `installed/installedDigest`）、
+    `assets/plugins.py:37-46`（`preview` 是字符串）、`assets/mcp_probe.py:101-106`。
+  - hooks：`hooks/records.py:151-173`、`hooks/triggers.py:39-49,120-140`（`effect` 三值
+    `blocked/ran/failed`——模块 docstring 只写了两值，以 `classify_exit` 为准）、
+    `hooks/model.py:109-199`（canonical model）。
+  - 权限：`profiles/permissions.py:34-123`（`TOOL_KEYS` 七键 × `allow/ask/deny`）。
+  - 摘要：`accounts/records.py:100-111`（零 token/零 locator/零 digest）。
+- **核对时发现两条后端事实**（只登记，不改后端仓）：
+  1. `providerArtifacts.install` 参数表与自己的 handler 不一致——handler 读 `params["digest"]`
+     （`handlers.py:1236`），参数表却不列它（`handlers.py:128-130`），`dispatch()` 把
+     `digest` 当 unexpected 拒（`handlers.py:388-393`）⇒ **该方法当前不可能调用成功**。
+     本树合同保留 `digest`（与 handler 一致），等后端修参数表。
+  2. `assets.installFromCatalog` 的 `installed.asset_id` 是全 wire 唯一 snake_case 字段
+     （`assets/catalog.py:198-200`）；本树如实编码并登记待统一。
+- **刻意不编入**：`profiles.subagentGrants/grantSubagent/revokeSubagent`（Order 65 在飞）、
+  `usage.aggregate/export`（Order 53 未收口）——未收口的单不冻进合同。
+- **门**：
+  - `tsc --noEmit`（renderer 项目）exit 0；三项目全量见阶段 4。
+  - 合同套件 `wire-v1.test.ts`：**28 passed / 1 file**（原 17 + 本单 11 条新断言：
+    Git null≠0、拒绝项无内容、未声明路径 `available:false`、pid 缺省带 reason、账户视图拒绝
+    locator、克隆报告不迁会话、trigger 三值、插件 preview、禁用绑定仍是绑定行、
+    profile 权限/克隆出处、26 个新方法在册）。
+- **证据**：`evidence/P21-stage2-contract.md`；工件重生成后
+  TS `6e8ae84a…` / 工件 `f5d27269…`（59 方法），已写进 `contracts/wire-v1/README.md`。
+- 提交：`P21 stage 2`（pathspec）。
