@@ -331,6 +331,14 @@ def build_runtime(
     from agent_box.server.accounts.records import AccountRecords
 
     account_records = AccountRecords(database, idempotency)
+    from agent_box.server.assets.mcp import McpAssetStore
+    from agent_box.server.assets.records import AssetRecords
+    from agent_box.server.assets.skills import SkillAssetStore
+
+    asset_records = AssetRecords(database, idempotency)
+    assets_root = root / "assets"
+    skill_assets = SkillAssetStore(assets_root)
+    mcp_assets = McpAssetStore(assets_root)
     # Order 56's encryption-at-rest requirement is the platform SecretStore's:
     # without one, a bound subscription account is a typed refusal at the turn
     # boundary rather than an unencrypted asset.
@@ -403,6 +411,9 @@ def build_runtime(
     # the product and the acceptance gates need it (records + assets).
     runtime.account_records = account_records
     runtime.account_assets = account_assets
+    runtime.asset_records = asset_records
+    runtime.skill_assets = skill_assets
+    runtime.mcp_assets = mcp_assets
     return runtime
 
 
@@ -824,6 +835,66 @@ def build_runtime_from_sidecar_deployment(
                 or os.environ.get("AGENT_BOX_SANDBOX_PROVIDER")
                 or _default_provider
             )
+            asset_files: dict[str, bytes] = {}
+            profile_id_for_assets = context.get("profile_id")
+            # A composition whose ledger has never been opened cannot hold a
+            # binding: the ownership check is the file itself, not a guess.
+            if (profile_id_for_assets
+                    and getattr(runtime, "asset_records", None) is not None
+                    and Path(runtime.database.path).exists()):
+                from agent_box.server.assets.rendering import McpRenderError, render_for_family
+
+                for binding in runtime.asset_records.bindings(
+                        profile_id_for_assets, enabled_only=True):
+                    if binding["kind"] != "mcp":
+                        continue
+                    definition = runtime.mcp_assets.read(
+                        asset_id=binding["assetId"], revision=binding["revision"])
+                    if binding["digest"] != "" and not runtime.mcp_assets.verify(
+                            asset_id=binding["assetId"], revision=binding["revision"],
+                            expected_digest=binding["digest"]):
+                        raise RuntimeError(
+                            "ASSET_DIGEST_MISMATCH: the stored MCP definition "
+                            "no longer matches its recorded digest"
+                        )
+                    stdio = definition.get("transport", {}).get("stdio")
+                    references = dict((stdio or {}).get("env") or {})
+                    if references:
+                        # Order 58 G5: a credential value must not be written
+                        # into a durable config file (the audit refuses it,
+                        # correctly), and resolving it into the file is exactly
+                        # what "references, never values" forbids. Until each
+                        # family's own injection path is pinned first-hand,
+                        # such a binding is refused rather than half-rendered.
+                        raise RuntimeError(
+                            "MCP_CREDENTIAL_INJECTION_UNVERIFIED: this server "
+                            f"carries credential references {sorted(references)} "
+                            "and this family's injection path is not pinned yet"
+                        )
+                    try:
+                        target, rendered = render_for_family(
+                            definition,
+                            profile_spec=_registry_profile_spec(context["harness_type"]),
+                            resolved_env={},
+                        )
+                    except McpRenderError as refusal:
+                        raise RuntimeError(f"{refusal.code}: {refusal.message}") from refusal
+                    if not target.startswith("/runtime/home/"):
+                        raise RuntimeError(
+                            "ASSET_SLOT_UNSUPPORTED: the declared MCP target is "
+                            "outside the guest home"
+                        )
+                    role_relative = target[len("/runtime/home/"):]
+                    projected = {
+                        str(target_value)
+                        for _source, target_value in deployment.get("_projection_mounts", ())
+                    }
+                    if target in projected:
+                        raise RuntimeError(
+                            "ASSET_SLOT_CONFLICT: a read-only projection already "
+                            "covers the declared MCP target"
+                        )
+                    asset_files[role_relative] = rendered.encode("utf-8")
             subscription = None
             subscription_asset: dict[str, bytes] = {}
             account_id = context.get("account_id")
@@ -882,6 +953,7 @@ def build_runtime_from_sidecar_deployment(
                     ),
                     session_store_shared=deployment["_session_store_shared"],
                     subscription_files=(subscription or {}).get("files", ()),
+                    asset_files=asset_files,
                     usage_probe=deployment["_usage_probe"],
                 )
             else:
@@ -911,6 +983,7 @@ def build_runtime_from_sidecar_deployment(
                     session_store_shared=deployment["_session_store_shared"],
                     subscription_files=(subscription or {}).get("files", ()),
                     subscription_asset=subscription_asset,
+                    asset_files=asset_files,
                     usage_probe=deployment["_usage_probe"],
                 )
             capability_documents, capability_grants, authorized, binding = (
@@ -1265,6 +1338,24 @@ def _sidecar_deployment_file(root: Path, relative: Any) -> bytes:
     if not resolved.is_file() or resolved.stat().st_size > 8 * 1024 * 1024:
         raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
     return resolved.read_bytes()
+
+
+def _registry_profile_spec(harness_type: str):
+    """The Harness's own `[harness.profile]` declaration, from the registry.
+
+    Asset slots are the family's own facts (target path, key spelling), so
+    they come from the registry the family ships - never from this module and
+    never from the deployment, which describes a room, not a family.
+    """
+    try:
+        from agent_box_harnesses.registry import load_builtin_registry
+    except ImportError:
+        return None
+    try:
+        definition = load_builtin_registry().get(harness_type)
+        return getattr(definition, "profile", None)
+    except BaseException:  # noqa: BLE001 - an unknown family has no slots
+        return None
 
 
 def _registry_native_homes() -> dict[str, str]:

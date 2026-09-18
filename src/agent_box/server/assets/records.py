@@ -8,6 +8,7 @@ verified against.
 """
 from __future__ import annotations
 
+import re
 from typing import Any, Mapping
 
 from agent_box.server.errors import ServerError
@@ -16,6 +17,7 @@ from agent_box.server.ids import now, opaque_id
 from agent_box.storage import Database
 
 KINDS = ("skill", "mcp", "command")
+_ASSET_ID = re.compile(r"[a-z0-9][a-z0-9._-]{0,63}\Z")
 
 
 class AssetRecords:
@@ -49,7 +51,17 @@ class AssetRecords:
                     "SELECT * FROM server_assets WHERE id=?", (asset_id,),
                 ).fetchone()
             if row is None:
-                asset_id = opaque_id("asset")
+                # A caller-chosen id is honoured on first publish: the store
+                # directory, the catalogue row and every binding then share
+                # one identity. Without one, the row gets an opaque id and the
+                # caller installs under it.
+                if asset_id is not None:
+                    if _ASSET_ID.fullmatch(asset_id) is None:
+                        raise ServerError(
+                            "ASSET_INVALID", "asset_id must be a lowercase slug", status=400,
+                        )
+                else:
+                    asset_id = opaque_id("asset")
                 conn.execute(
                     "INSERT INTO server_assets(id,kind,name,description,latest_revision,"
                     "digest,source,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)",

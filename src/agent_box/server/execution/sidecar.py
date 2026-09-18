@@ -284,6 +284,7 @@ class WorkerSidecarLauncher:
         session_store_target: str | None = None,
         session_store_shared: Sequence[str] = (),
         subscription_files: Sequence[str] = (),
+        asset_files: Mapping[str, bytes] | None = None,
         usage_probe: dict[str, str] | None = None,
     ) -> None:
         self.connector = connector
@@ -335,6 +336,10 @@ class WorkerSidecarLauncher:
         #: store (if any) is the §14 subtree shape.
         self.session_store_shared = tuple(
             (str(name), str(kind)) for name, kind in session_store_shared)
+        #: Order 58: rendered asset files (role-relative name -> text). They
+        #: are written once per turn and never read back - assets have zero
+        #: writeback by construction.
+        self.asset_files = dict(asset_files or {})
         #: Order 56: a bound subscription account's working-copy names. The
         #: Worker-hosted channel has no home-write op yet, so a bound account
         #: on this channel is a typed refusal rather than a silent no-op.
@@ -436,6 +441,13 @@ class WorkerSidecarLauncher:
                         client, locator=self.home_locator,
                         declared=self.subscription_files,
                         asset=self.subscription_asset,
+                    )
+                if self.asset_files:
+                    # Order 58: the rendered asset files take the same path.
+                    materialize_subscription(
+                        client, locator=self.home_locator,
+                        declared=tuple(sorted(self.asset_files)),
+                        asset=self.asset_files,
                     )
                 if self.session_store_harness:
                     # §14: the declared state target is the session subtree, and

@@ -371,6 +371,7 @@ class LocalSidecarLauncher:
         session_store_shared: Sequence[str] = (),
         subscription_files: Sequence[str] = (),
         subscription_asset: Mapping[str, bytes] | None = None,
+        asset_files: Mapping[str, bytes] | None = None,
         usage_probe: Mapping[str, str] | None = None,
     ) -> None:
         if len(bundle) > MAX_BUNDLE_FILES or sum(map(len, bundle.values())) > MAX_BUNDLE_BYTES:
@@ -404,6 +405,8 @@ class LocalSidecarLauncher:
         #: account asset bytes this turn materialises (empty when unbound).
         self.subscription_files = tuple(str(name) for name in subscription_files)
         self.subscription_asset = dict(subscription_asset or {})
+        #: Order 58: rendered asset files, written once and never read back.
+        self.asset_files = {str(name): bytes(text) for name, text in (asset_files or {}).items()}
         #: Order 55's probe rides the port (the backend reads it from here) and
         #: the read itself happens through the channels below; a deployment
         #: without a probe leaves every usage column NULL.
@@ -453,6 +456,12 @@ class LocalSidecarLauncher:
                 write_subscription_files(
                     self.home.role_dir, self.subscription_asset,
                     declared=self.subscription_files,
+                )
+            if self.asset_files:
+                # Order 58: the rendered asset files take the same path.
+                write_subscription_files(
+                    self.home.role_dir, self.asset_files,
+                    declared=tuple(sorted(self.asset_files)),
                 )
             # Two read-write binds: the native home at its guest target, and —
             # when the deployment declared a window elsewhere — the window at

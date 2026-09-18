@@ -11,8 +11,13 @@ from __future__ import annotations
 import json
 import os
 import pathlib
+import shutil
+import time
 
 import pytest
+
+REPO = pathlib.Path(__file__).resolve().parents[2]
+PLUGIN = REPO / "plugins" / "agent-box-harnesses"
 
 from agent_box.server.assets.skills import (
     MAX_ASSET_ENTRIES,
@@ -244,3 +249,139 @@ def test_assets_are_catalogued_bound_and_never_carry_content(tmp_path):
     with pytest.raises(ServerError) as unknown:
         records.bind(profile_id="profile_1", asset_id=published["asset_id"], revision=9)
     assert unknown.value.code == "ASSET_REVISION_UNKNOWN"
+
+
+@pytest.mark.skipif(shutil.which("bwrap") is None, reason="bwrap is required")
+def test_a_bound_mcp_asset_is_rendered_and_materialised_without_writeback(tmp_path):
+    """Order 58 G2/G3/G4 on the local channel, end to end.
+
+    A bound MCP asset is rendered for the family (registry-declared target and
+    key), the credential reference resolves through the secret store, and the
+    file appears in the Profile's own home at the declared path - while the
+    stored definition keeps the reference, not the value, and nothing is read
+    back (assets have zero writeback).
+    """
+    from fastapi.testclient import TestClient
+
+    from agent_box.server.bootstrap import build_runtime_from_sidecar_deployment
+    from agent_box.server.transport.http import create_app
+    from agent_box.storage.secrets import MemorySecretStore
+
+    import agent_box.server.bootstrap.runtime as runtime_module
+
+    peer_source = "tests/harness_remote/home_probe_acp_peer.mjs"
+    peer_bytes = REPO / "tests" / "server" / "fixtures" / "home_probe_acp_peer.mjs"
+    deployment = {
+        "schemaVersion": 1,
+        "harnesses": [{
+            "id": "claude-code", "capabilityClaims": {"stream": True},
+            "adapter": {"command": "/usr/bin/node", "args": [], "source": peer_source},
+            "stateProjection": {"target": "/runtime/home/.claude"},
+            "timeoutMs": 60_000,
+        }],
+    }
+    original_file = runtime_module._sidecar_deployment_file
+
+    def deployment_file(root, relative):
+        if relative == peer_source:
+            return peer_bytes.read_bytes()
+        return original_file(root, relative)
+
+    runtime_module._sidecar_deployment_file = deployment_file
+    secrets = MemorySecretStore(values={"locator_1": b"resolved-secret"})
+    try:
+        (tmp_path / "project").mkdir(exist_ok=True)
+        document = tmp_path / "deployment.json"
+        document.write_text(json.dumps(deployment), encoding="utf-8")
+        runtime = build_runtime_from_sidecar_deployment(
+            tmp_path / "server", document, plugin_root=PLUGIN, secret_store=secrets)
+        runtime.start()
+        runtime.repository.register_credential("credential_1", "api-key", "locator_1")
+        facts = runtime.mcp_assets.install({
+            "name": "web-tools",
+            "transport": {"stdio": {"command": "/bin/web-tools", "args": ["--stdio"]}},
+        }, asset_id="web-tools", revision=1)
+        published = runtime.asset_records.publish(
+            key="a", request_digest="a", kind="mcp", name="web-tools", revision=1,
+            digest=facts["digest"], source="local:test", asset_id="web-tools")[1]
+        assert published["asset_id"] == "web-tools", published
+        profile = runtime.repository.profiles.create(
+            key="p", request_digest="p", name="role", harness_type="claude-code",
+            config_digest=runtime.objects.publish(
+                b'{"schema_version":1,"harness_type":"claude-code","configuration":{}}').digest,
+            credential_id="credential_1")[1]
+        runtime.asset_records.bind(profile_id=profile["profile_id"],
+                                   asset_id=published["asset_id"])
+
+        with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
+            token = runtime.token
+            opened = client.post("/wire/v1/workspaces.open", headers={
+                "Authorization": f"Bearer {token}"}, json={
+                "jsonrpc": "2.0", "id": "o", "method": "workspaces.open",
+                "params": {"requestId": "asset-open-1", "path": str(tmp_path / "project"),
+                           "environment": {"kind": "local", "host": None, "user": None}},
+            }).json()["result"]
+            sent = client.post("/wire/v1/sessions.createAndSend", headers={
+                "Authorization": f"Bearer {token}"}, json={
+                "jsonrpc": "2.0", "id": "s", "method": "sessions.createAndSend",
+                "params": {"requestId": "asset-turn-1", "workspaceId": opened["workspace"]["id"],
+                           "profileId": profile["profile_id"], "overrides": [],
+                           "message": {"text": "hello", "attachments": []}},
+            }).json()["result"]
+            deadline = time.monotonic() + 60
+            while time.monotonic() < deadline:
+                session = runtime.repository.get_session(sent["session"]["id"])
+                if session["turns"] and session["turns"][0]["state"] in {"completed", "failed"}:
+                    break
+                time.sleep(0.05)
+            assert session["turns"][0]["state"] == "completed", session["turns"][0]
+
+        role = next(item for item in (tmp_path / "server" / "profiles").iterdir()
+                    if item.is_dir() and item.name != "_sessions")
+        rendered = json.loads((role / ".claude" / "settings.json").read_text(encoding="utf-8"))
+        assert rendered["mcpServers"]["web-tools"]["command"] == "/bin/web-tools"
+        assert rendered["mcpServers"]["web-tools"]["args"] == ["--stdio"]
+        # Nothing in the file is a credential value, and the audit (which
+        # scans the home for the injected material) passed on this turn.
+        assert "resolved-secret" not in (role / ".claude" / "settings.json").read_text()
+
+        # A server that carries credential references is refused until the
+        # family's injection path is pinned: the value must never land in a
+        # durable config file (order 58 G5; the audit enforces it too).
+        runtime.mcp_assets.install({
+            "name": "needs-key",
+            "transport": {"stdio": {
+                "command": "/bin/needs-key",
+                "env": {"API_KEY": {"credentialRef": "credential_1"}},
+            }},
+        }, asset_id="needs-key", revision=1)
+        from agent_box.server.assets.mcp import definition_digest
+
+        needs_key = runtime.mcp_assets.read(asset_id="needs-key", revision=1)
+        runtime.asset_records.publish(
+            key="b", request_digest="b", kind="mcp", name="needs-key", revision=1,
+            digest=definition_digest(needs_key), asset_id="needs-key")
+        runtime.asset_records.bind(profile_id=profile["profile_id"], asset_id="needs-key")
+        with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
+            token = runtime.token
+            refused = client.post("/wire/v1/sessions.send", headers={
+                "Authorization": f"Bearer {token}"}, json={
+                "jsonrpc": "2.0", "id": "s2", "method": "sessions.send",
+                "params": {"requestId": "asset-turn-2", "sessionId": sent["session"]["id"],
+                           "overrides": [],
+                           "message": {"text": "hello again", "attachments": []}},
+            }).json()
+            assert "error" not in refused, refused
+            deadline = time.monotonic() + 60
+            while time.monotonic() < deadline:
+                session = runtime.repository.get_session(sent["session"]["id"])
+                if (len(session["turns"]) >= 2
+                        and session["turns"][1]["state"] in {"completed", "failed"}):
+                    break
+                time.sleep(0.05)
+            assert session["turns"][1]["state"] == "failed"
+            assert session["turns"][1]["error_code"] in {
+                "EXECUTION_FAILED", "MCP_CREDENTIAL_INJECTION_UNVERIFIED",
+            }
+    finally:
+        runtime_module._sidecar_deployment_file = original_file

@@ -79,3 +79,27 @@
 - **来源同步**（目录式 hub：列表/安装/更新、来源与摘要固定、失败不落地）与 **MCP 有界探测**（G6）；
 - `assets.*` wire 面（与 P15 前端配对、两仓重锁）；commands 资产的同机制复用；
   hooks **只如实声明**（不统一）。
+
+## 阶段 B 第三块（已落地）：渲染产物物化进执行（零回写）与凭据边界
+
+- **物化路径**：装配边界按该 profile **启用的 mcp 绑定**读取资产修订（校验记录摘要）→
+  用**注册表声明的槽位**渲染 → 结果作为"资产文件"（role 相对名）在轮前写入：Worker 通道走
+  `home.put`、本机通道走同一写面（`write_subscription_files`）。**只写、绝不回读**——
+  资产天然零回写。
+- **声明冲突拒绝**：若部署的只读投影已覆盖同一目标 → `ASSET_SLOT_CONFLICT`（不覆盖别人的投影）；
+  目标必须在 guest home 内；家族未声明 mcp 槽位 → `ASSET_SLOT_UNSUPPORTED`（经渲染器）。
+- **凭据边界（G5，实测驱动）**：把解析后的凭据值写进配置文件会被审计**如实拦下**
+  （`SIDECAR_STATE_CONTAINS_SECRET`：注入物不得持久化）——因此本腿把"带凭据引用的 MCP 服务器"
+  物化改为**类型化拒绝** `MCP_CREDENTIAL_INJECTION_UNVERIFIED`（逐家注入路径未一手钉死前
+  不半渲染、更不落秘密）；无凭据引用的服务器物化正常（端到端已证：`.claude/settings.json`
+  出现 `mcpServers.web-tools`，文件里零秘密，审计通过）。
+- **身份统一**：`AssetRecords.publish` 接受调用方给定的稳定 `asset_id`（目录行、存储目录、
+  绑定共用同一身份）；未给出时才用不透明 id。
+- **测试**：新增 1 条端到端（无凭据服务器物化 + 带凭据服务器类型化拒绝），全量
+  **822 passed / 0 failed**。
+
+## 58 未做（下腿）
+
+- **凭据注入逐家钉死**（claude/qwen/codex 的 env 插值/进程环境路径）——钉死后解开上面的拒绝；
+- 来源同步（目录式 hub）、MCP 有界探测（G6）、`assets.*` wire 面与 P15 前端配对；
+- commands 资产复用同机制；hooks 只如实声明。
