@@ -47,7 +47,7 @@ TERMINAL_OK = "completed"
 class DelegationService:
     def __init__(
         self, *, records, profiles, sessions, execution=None, registry=None,
-        data_root=None,
+        data_root=None, objects=None,
     ) -> None:
         self.records = records            # SessionRecords (the ledger layer)
         self.profiles = profiles
@@ -55,6 +55,7 @@ class DelegationService:
         self.execution = execution        # TurnExecutionPort (may be None)
         self.registry = registry
         self.data_root = data_root
+        self.objects = objects
 
     # -- shared resolution --------------------------------------------------
 
@@ -116,10 +117,12 @@ class DelegationService:
             child_profile=child_profile, chosen=chosen, validated=validated)
 
         # Create the child turn as a normal turn, linked to the parent.
+        merged_posture = self._merged_posture(
+            parent_profile_id=parent_profile_id, child_profile=child_profile)
         turn_id = self._create_child_turn(
             session_id=session_id, child_profile=child_profile,
             parent_turn_id=parent_turn_id, prompt=validated["prompt"],
-            model=validated.get("model"),
+            model=validated.get("model"), posture=merged_posture,
         )
         if self.execution is None:
             raise ServerError(
@@ -199,9 +202,41 @@ class DelegationService:
             "the subagent Profile has no workspace to run in yet",
         )
 
+    def _merged_posture(
+        self, *, parent_profile_id: str, child_profile: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """The child's posture, narrowed by the parent's prohibitions.
+
+        Only the parent's `deny`s (and its neutral limits, which are those
+        `deny`s) travel: the child's own allow/ask set stays the child's, so a
+        delegation can tighten a key but never widen one. The result is frozen
+        into the child turn's effective configuration, exactly where the
+        runtime reads a turn's posture from.
+        """
+        import json
+
+        from agent_box.server.profiles.permissions import resolve_all
+
+        def posture_of(row: Mapping[str, Any]) -> dict[str, Any]:
+            raw = row.get("permission_rules_json")
+            rules = json.loads(raw) if raw else []
+            return resolve_all(rules, preset=str(row.get("permission_preset") or "default"))
+
+        parent = self.profiles.get(parent_profile_id)
+        parent_posture = posture_of(parent)
+        child = self.profiles.get(str(child_profile["id"]))
+        child_posture = posture_of(child)
+        merged_keys = {
+            key: "deny" if parent_posture["keys"].get(key) == "deny" else action
+            for key, action in child_posture["keys"].items()
+        }
+        return {"preset": child_posture["preset"], "keys": merged_keys,
+                "inheritedFrom": parent_profile_id}
+
     def _create_child_turn(
         self, *, session_id: str, child_profile: Mapping[str, Any],
         parent_turn_id: str, prompt: str, model: str | None,
+        posture: Mapping[str, Any] | None = None,
     ) -> str:
         import json
 
@@ -209,13 +244,25 @@ class DelegationService:
 
         turn_id = opaque_id("turn")
         timestamp = now()
+        effective_digest: str | None = None
+        if self.objects is not None and posture is not None:
+            child_value = {
+                "schema_version": 1,
+                "harness_type": str(child_profile["harness_type"]),
+                "configuration": {},
+                "permissions": dict(posture),
+            }
+            effective_digest = self.objects.publish(json.dumps(
+                child_value, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+            ).encode()).digest
         with self.records.database.transaction() as conn:
             conn.execute(
                 "INSERT INTO server_turns(id,session_id,profile_id,profile_revision,"
                 "native_generation,state,capture_state,cleanup_state,input_object_digest,"
-                "parent_turn_id,created_at,updated_at) "
-                "VALUES (?,?,?,1,0,'accepted','pending','pending','x',?,?,?)",
-                (turn_id, session_id, child_profile["id"], parent_turn_id, timestamp, timestamp),
+                "effective_config_object_digest,parent_turn_id,created_at,updated_at) "
+                "VALUES (?,?,?,1,0,'accepted','pending','pending','x',?,?,?,?)",
+                (turn_id, session_id, child_profile["id"], effective_digest,
+                 parent_turn_id, timestamp, timestamp),
             )
             conn.execute(
                 "UPDATE server_sessions SET status='active',version=version+1,"

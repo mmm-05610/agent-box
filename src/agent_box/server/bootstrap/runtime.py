@@ -440,7 +440,7 @@ def build_runtime(
 
     runtime.delegation_service = DelegationService(
         records=session_records, profiles=profile_records, sessions=session_service,
-        execution=execution, registry=registry, data_root=root,
+        execution=execution, registry=registry, data_root=root, objects=objects,
     )
     runtime.delegation_tokens = {}
     return runtime

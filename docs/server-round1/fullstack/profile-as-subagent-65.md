@@ -71,3 +71,26 @@
 3. **继承规则实现点**：父的 `deny` 与工作区/外部目录限制传播进子轮的冻结姿态；
 4. **授权分区的 wire 面**（`profiles.subagentGrants` 增删查）与 P20"智能体"卡；
 5. 并发扇出的真机证据（服务级已覆盖调用路径；真实并行两子调用未跑）。
+
+## 阶段 C 第二块（已落地）：继承、审批镜像、授权 CRUD
+
+- **继承规则实现点**（G6）：委派时算 **merged posture** —— 子的冻结姿态 = 子自身
+  `resolve_all`（预设+按序规则）**再被父的 `deny` 逐键收紧**（"限制可继承、允许集仍是子的"；
+  不变量：委派只能收紧）；结果作为子轮的 **effective config 对象**发布并写进
+  `effective_config_object_digest`（运行时读姿态的既有位置），并在姿态里记 `inheritedFrom`。
+  测试：父 `plan`+deny webfetch、子 `default` ⇒ 子轮冻结 edit/bash/webfetch=deny、
+  read=ask（未被父的允许集放宽）。
+- **审批镜像**（G3 的 ask 部分）：子的 `approval.requested` 追加一条**同 id** 的镜像事件到
+  **父轮**（`from_subagent: {turnId, sessionId}`）——父轮用既有 `approvals.decide` 往返即可裁决，
+  **不另造机制**。测试直接驱动后端 `_native_event` 并断言父会话出现该中断。
+- **授权分区 wire**（G1 的产品面）：`profiles.subagentGrants`（授予的出边 + 被谁调用）、
+  `profiles.grantSubagent`（环/自调即拒，300 已测）、`profiles.revokeSubagent`；测试覆盖
+  空态→授予→双向可见→环拒绝→撤销。
+- **测试**：10 条（服务 5 + 端点 1 + 渲染 1 + 继承 1 + 镜像 1 + 授权 CRUD 1），全量见提交记录。
+
+## 65 仍未做（如实，收窄后）
+
+1. **真实沙箱端到端**：桥在 guest 内起进程 → 打到端点 → 子轮完成回摘要（本机通道一趟，
+   需要真实 room；当前以服务级 + 端点级 + 渲染级三段覆盖）；
+2. **并发真机证据**（服务级调用路径已覆盖；真实并行两子调用未跑）；
+3. **P20"智能体"卡**与前端同步（授权分区 UI 属 P17/P20）。

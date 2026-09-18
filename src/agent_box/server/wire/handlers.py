@@ -76,6 +76,9 @@ _PARAM_SHAPES = {
     "profiles.archive": ({"requestId", "profileId", "expectedVersion"}, set()),
     "profiles.clone": ({"requestId", "profileId", "displayName"}, {"harness"}),
     "profiles.memory": ({"requestId", "profileId"}, set()),
+    "profiles.subagentGrants": ({"profileId"}, set()),
+    "profiles.grantSubagent": ({"requestId", "profileId", "childProfileId"}, set()),
+    "profiles.revokeSubagent": ({"requestId", "profileId", "childProfileId"}, set()),
     "profiles.setPermissions": (
         {"requestId", "profileId", "expectedVersion", "preset", "rules"}, set()),
     "providerModels.list": ({"includeArchived"}, set()),
@@ -327,6 +330,9 @@ class WireService:
             "profiles.clone": self.profiles_clone,
             "profiles.setPermissions": self.profiles_set_permissions,
             "profiles.memory": self.profiles_memory,
+            "profiles.subagentGrants": self.profiles_subagent_grants,
+            "profiles.grantSubagent": self.profiles_grant_subagent,
+            "profiles.revokeSubagent": self.profiles_revoke_subagent,
             "providerModels.list": self.provider_models_list,
             "providerModels.create": self.provider_models_create,
             "providerModels.update": self.provider_models_update,
@@ -901,6 +907,48 @@ class WireService:
             credential_id=credential_id,
         )
         return {"profile": self._profile(row)}
+
+    def profiles_subagent_grants(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        """Who this Profile may call, and who may call it (order 65 A).
+
+        The list is the authorization partition's data: the UI shows exactly
+        the granted edges and nothing else.
+        """
+        profile_id = _bounded(params["profileId"], "profileId")
+        self.profiles.records.get(profile_id)
+        grants = [
+            {"childProfileId": row["child_profile_id"]}
+            for row in self.profiles.records.subagent_grants(parent_id=profile_id)
+        ]
+        with self.profiles.records.database.read() as conn:
+            callers = [
+                {"parentProfileId": row["parent_profile_id"]}
+                for row in conn.execute(
+                    "SELECT parent_profile_id FROM server_subagent_grants "
+                    "WHERE child_profile_id=? ORDER BY parent_profile_id", (profile_id,),
+                ).fetchall()
+            ]
+        return {"subagentGrants": grants, "callableBy": callers}
+
+    def profiles_grant_subagent(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        try:
+            grant = self.profiles.records.grant_subagent(
+                parent_id=_bounded(params["profileId"], "profileId"),
+                child_id=_bounded(params["childProfileId"], "childProfileId"),
+            )
+        except ServerError as exc:
+            raise self._profile_error(exc) from exc
+        return {"grant": grant}
+
+    def profiles_revoke_subagent(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        try:
+            self.profiles.records.revoke_subagent(
+                parent_id=_bounded(params["profileId"], "profileId"),
+                child_id=_bounded(params["childProfileId"], "childProfileId"),
+            )
+        except ServerError as exc:
+            raise self._profile_error(exc) from exc
+        return {"revoked": True}
 
     def profiles_memory(self, params: Mapping[str, Any]) -> dict[str, Any]:
         """Read the Profile's declared memory files (order 63).

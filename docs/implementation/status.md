@@ -637,7 +637,7 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 | --- | --- | --- |
 | 51 | USAGE_FACT_DONE：pi/codex/hermes/claude 门级观测轮全部产出事实（hermes (11,7)/(22,14)、claude (11,7)，source=声明格式）；WAL 侧车根因修复；六家解析器就绪 | kilo/opencode/dsh/qwen 模板未声明 usageProbe（解析器已备，未启用；kilo/opencode 启用时读共享库，走 66 只读规则） |
 | 52 | B/D+E 完成：thought/plan/mode 三新 wire kind + 四类映射入账本 + process-facts 端到端 | 真 harness 观测轮（假 peer 已定向验证，真 harness 轮待跑） |
-| 65 | SUBAGENT_DELEGATION_PARTIAL：A/B（授权边 schema 17、两工具契约）＋ **C 首块**：委派服务（子轮编排、`parent_turn_id` 链接 schema 18、有界摘要、用量同源、续接/深度/环/扇出、取消传播）、桥脚本入 bundle、loopback 委派端点（按次令牌）、有授权才渲染桥条目；7 条测试 | 真实沙箱端到端、审批镜像、父 deny 继承进子姿态、授权 CRUD wire 与 P20、并发真机证据 | 75253fa + 本轮 |
+| 65 | SUBAGENT_DELEGATION_PARTIAL：A/B＋C 两块（委派服务、`parent_turn_id`、有界摘要、用量同源、续接/深度/环/扇出、取消传播、桥入 bundle、loopback 端点按次令牌、有授权才渲染、**父 deny 继承进子姿态**、**审批镜像到父轮**、**授权 CRUD wire**）；10 条测试 | 真实沙箱端到端一圈、并发真机证据、P17/P20 前端 | 75253fa + 701ae20 + 本轮 |
 | 64 | EXECUTION_INVENTORY_DONE（账本同源、pid 本机可报/远端 null+reason、上限 200 类型化、零宿主路径；4 条测试） | WSL pid（需 Worker 单）；P20 同步与重锁 | 本轮 |
 | 63 | PROFILE_MEMORY_READ_DONE（本机侧完整；注册表 memory_paths、只读+有界+扫描、profiles.memory wire；4 条测试） | WSL 侧读；P17 同步与重锁 | 本轮 |
 | 62 | WORKSPACE_GIT_STATUS_DONE（本机侧完整 + WSL 接线；6 条测试含只读性证明） | WSL 真机轮；P20 同步与重锁 | 本轮 |

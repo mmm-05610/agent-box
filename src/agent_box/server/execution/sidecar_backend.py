@@ -329,6 +329,19 @@ class SidecarExecutionBackend:
             approval = self.approvals.request(
                 session_id=context["session_id"], execution_id=turn_id, request=raw,
             )
+            # Order 65: a subagent's `ask` rises into the parent turn as the
+            # same kind of interruption the parent already handles - the
+            # approval id is what the existing decide round-trip takes, so no
+            # second mechanism exists to bypass.
+            parent_turn = context.get("parent_turn_id")
+            if parent_turn:
+                self.records.append_turn_event(
+                    str(parent_turn), "approval.requested",
+                    {"approval_id": approval["approvalId"], "version": 1,
+                     "request": raw,
+                     "from_subagent": {"turnId": turn_id,
+                                       "sessionId": context["session_id"]}},
+                )
             request_id = str(raw.get("requestId") or "")
             if request_id:
                 port.register_approval(approval["approvalId"], turn_id, request_id)

@@ -59,7 +59,7 @@ def _pieces(tmp_path):
     sessions = SessionService(records, idempotency, objects, harnesses=None,
                               profiles=profiles, credentials=None, execution=execution)
     service = DelegationService(records=records, profiles=profiles, sessions=sessions,
-                                execution=execution)
+                                execution=execution, objects=objects)
     return database, profiles, workspaces, records, sessions, execution, service
 
 
@@ -353,3 +353,135 @@ def test_a_granted_parent_renders_the_bridge_entry_and_zero_grants_does_not(tmp_
     finally:
         runtime_module._sidecar_deployment_file = original_file
         del shutil
+
+
+def test_the_grant_wire_face_lists_grants_and_callers(tmp_path):
+    from fastapi.testclient import TestClient
+
+    from agent_box.server.bootstrap import build_runtime
+    from agent_box.server.transport.http import create_app
+
+    runtime = build_runtime(tmp_path / "server")
+    runtime.start()
+    profiles = runtime.repository.profiles
+    parent = profiles.create(key="p", request_digest="p", name="alpha", harness_type="codex",
+                             config_digest="sha256:" + "0" * 64, credential_id=None)[1]
+    child = profiles.create(key="c", request_digest="c", name="beta", harness_type="codex",
+                            config_digest="sha256:" + "1" * 64, credential_id=None)[1]
+    with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
+        token = runtime.token
+
+        def call(method, params):
+            return client.post(f"/wire/v1/{method}", headers={
+                "Authorization": f"Bearer {token}"}, json={
+                "jsonrpc": "2.0", "id": method, "method": method, "params": params,
+            }).json()
+
+        empty = call("profiles.subagentGrants", {"profileId": parent["profile_id"]})["result"]
+        assert empty == {"subagentGrants": [], "callableBy": []}
+
+        granted = call("profiles.grantSubagent", {
+            "requestId": "grant-req-1", "profileId": parent["profile_id"],
+            "childProfileId": child["profile_id"]})["result"]["grant"]
+        assert granted["parentProfileId"] == parent["profile_id"]
+
+        seen = call("profiles.subagentGrants", {"profileId": parent["profile_id"]})["result"]
+        assert seen["subagentGrants"] == [{"childProfileId": child["profile_id"]}]
+        # The child sees exactly one caller - the partition has both directions.
+        reverse = call("profiles.subagentGrants", {"profileId": child["profile_id"]})["result"]
+        assert reverse["callableBy"] == [{"parentProfileId": parent["profile_id"]}]
+
+        # A cycle is refused at grant time, with the same code the service uses.
+        cycle = call("profiles.grantSubagent", {
+            "requestId": "grant-req-2", "profileId": child["profile_id"],
+            "childProfileId": parent["profile_id"]})
+        assert cycle["error"]["details"]["internalCode"] == "SUBAGENT_CYCLE"
+
+        revoked = call("profiles.revokeSubagent", {
+            "requestId": "grant-req-3", "profileId": parent["profile_id"],
+            "childProfileId": child["profile_id"]})["result"]
+        assert revoked["revoked"] is True
+        assert call("profiles.subagentGrants", {
+            "profileId": parent["profile_id"]})["result"]["subagentGrants"] == []
+
+def test_the_parents_denials_narrow_the_child_and_its_own_allow_set_stands(tmp_path):
+    """Order 65 §1b: the parent's `deny`s (its neutral limits) travel into the
+    child's frozen posture; the child's own rules decide everything else."""
+    import json
+
+    database, profiles, _records, _sessions, _execution, service, parent, child, _other = _setup(tmp_path)
+    # The parent is on `plan` (edit/bash/external_directory denied) and adds
+    # its own deny on webfetch; the child is on `default` with no rules.
+    profiles.set_permissions(
+        profile_id=parent["profile_id"], preset="plan",
+        rules=[{"key": "webfetch", "action": "deny"}],
+        expected_version=profiles.get(parent["profile_id"])["version"],
+        key="pp", request_digest="pp")
+    profiles.grant_subagent(parent_id=parent["profile_id"], child_id=child["profile_id"])
+
+    result = service.run(parent_turn_id="parent-turn", parent_profile_id=parent["profile_id"],
+                         arguments={"subagent": "beta", "description": "do some work",
+                                    "prompt": "x"})
+    with database.read() as conn:
+        digest = conn.execute(
+            "SELECT effective_config_object_digest FROM server_turns WHERE id=?",
+            (result["turnId"],)).fetchone()[0]
+    assert digest, "the child turn freezes its merged posture"
+    frozen = json.loads(service.objects.read(digest))
+    posture = frozen["permissions"]
+    # The parent's denials travelled...
+    assert posture["keys"]["edit"] == "deny"
+    assert posture["keys"]["bash"] == "deny"
+    assert posture["keys"]["webfetch"] == "deny"
+    # ...and the child's own default still decides the rest (nothing widened).
+    assert posture["keys"]["read"] == "ask"
+    assert posture["inheritedFrom"] == parent["profile_id"]
+
+
+def test_a_child_approval_is_mirrored_into_the_parent_turn(tmp_path):
+    """Order 65: the subagent's `ask` rises into the parent as the same kind
+    of interruption the parent already handles (same approval id)."""
+    database, _profiles, records, _sessions, _execution, service, parent, child, _other = _setup(tmp_path)
+    _profiles.grant_subagent(parent_id=parent["profile_id"], child_id=child["profile_id"])
+    result = service.run(parent_turn_id="parent-turn", parent_profile_id=parent["profile_id"],
+                         arguments={"subagent": "beta", "description": "do some work",
+                                    "prompt": "x"}, )
+    child_turn = result["turnId"]
+
+    from agent_box.server.approvals import ApprovalRecords
+
+    class _Port:
+        def register_approval(self, approval_id, turn_id, request_id):
+            return None
+
+    backend = _Backend(records, ApprovalRecords(records.database, append_event=records._append_session_event))
+    backend._native_event(child_turn, "approval.requested",
+                          {"request": {"requestId": "req-1", "tool": "bash",
+                                       "summary": "run a command"}}, _Port())
+    with database.read() as conn:
+        parent_session_id = conn.execute(
+            "SELECT id FROM server_sessions WHERE profile_id=? ORDER BY rowid LIMIT 1",
+            (parent["profile_id"],),
+        ).fetchone()[0]
+    parent_session = records.get_session(parent_session_id)
+    mirrored = [event for event in parent_session["events"]
+                if event["kind"] == "approval.requested"
+                and event.get("turn_id") == "parent-turn"]
+    assert mirrored, "the interruption reached the parent turn"
+    assert mirrored[-1]["data"]["from_subagent"]["turnId"] == child_turn
+    assert mirrored[-1]["data"]["approval_id"].startswith("approval_")
+
+class _Backend:
+    """The minimal backend surface the approval-mirror test needs."""
+
+    def __init__(self, records, approvals) -> None:
+        self.records = records
+        self.approvals = approvals
+        self._lock = __import__("threading").RLock()
+        self._approval_ports = {}
+        self.on_event = lambda *args, **kwargs: None
+        self._message_parts = {}
+
+    from agent_box.server.execution.sidecar_backend import SidecarExecutionBackend as _B
+
+    _native_event = _B._native_event
