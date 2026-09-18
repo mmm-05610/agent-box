@@ -118,15 +118,21 @@ class HookTriggerRecords:
 
 
 def trigger_view(row: Mapping[str, Any]) -> dict[str, Any]:
-    """The wire-facing trigger shape: the same facts, camelCase."""
+    """The wire-facing trigger shape: the same facts, camelCase.
+
+    Accepts either a ledger row (``output_summary`` / ``summary_truncated``)
+    or the record layer's own view (``output_summary`` with ``truncated``),
+    so every handler projects through this one function.
+    """
+    raw = "summary_truncated" in row
     return {
-        "triggerId": row["id"],
+        "triggerId": row["id"] if raw else row["trigger_id"],
         "hookId": row["hook_id"],
         "event": row["event"],
         "at": row["at"],
         "exitCode": int(row["exit_code"]),
         "outputSummary": row["output_summary"],
-        "truncated": bool(row["summary_truncated"]),
+        "truncated": bool(row["summary_truncated"] if raw else row["truncated"]),
         "blocking": bool(row["blocking"]),
         "effect": row["effect"],
     }

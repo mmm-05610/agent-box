@@ -498,3 +498,23 @@ ProviderModelConfigRecord = {
     `PROBE_TIMEOUT`/`PROBE_FORMAT_INVALID`/`PROBE_RESPONSE_TOO_LARGE`/`PROBE_SPAWN_FAILED`；
     **不写配置、零凭据、零补全**）。
 - 需前端同步（P15）与两仓重锁。
+
+## Order 59 — 受管 hooks（hooks.*，2026-09-18，env-provider）
+
+- **新方法（+6，纯新增面）**：
+  - `hooks.list {requestId, family?} → {hooks: HookView[]}`；
+  - `hooks.create {requestId, family, name, model, source?} → {hook}`（**默认停用**；
+    非法模型在保存前以具体码拒绝：`HOOK_EVENT_UNSUPPORTED`/`HOOK_HANDLER_UNSUPPORTED`/
+    `HOOK_TIMEOUT_INVALID`/`HOOK_FIELD_INVALID`/`HOOK_FAMILY_UNSUPPORTED`）；
+  - `hooks.update {requestId, hookId, model} → {hook}`；
+  - `hooks.setEnabled {requestId, hookId, enabled} → {hook}`（无命令处理器的 hook
+    不可启用：`HOOK_NOT_EXECUTABLE`）；
+  - `hooks.delete {requestId, hookId} → {deleted, triggersRemoved}`（**显式**级联其触发历史）；
+  - `hooks.triggers {requestId, hookId?, limit?} → {triggers: TriggerView[]}`。
+- **HookView**：`{hookId, family, name, enabled, model, commands[], source, createdAt, updatedAt}`
+  ——`commands` 是该 hook 会跑的**完整命令**（与投影同源派生，启用前可见）。
+- **TriggerView**：`{triggerId, hookId, event, at, exitCode, outputSummary, truncated,
+  blocking, effect}`——`exit 2 → blocking=true, effect="blocked"`，**阻断语义如实呈现**。
+- **可观测的生产端**：本工作树交付账本与契约；hook 触发事实的采集端（各家 journal/受控包装）
+  未接线，如实记账。
+- 需前端同步（P16）与两仓重锁。

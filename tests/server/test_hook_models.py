@@ -206,3 +206,70 @@ def test_trigger_facts_are_bounded_scanned_and_blocking_is_explicit(tmp_path):
     assert classify_exit(BLOCKING_EXIT_CODE) == (True, "blocked")
     assert len(triggers.list(hook_id=hook["hook_id"])) == 4
     assert triggers.list(limit=2)  # newest first, bounded
+
+
+def test_the_hooks_wire_face_creates_edits_enables_and_lists_triggers(tmp_path):
+    """Order 59's wire face: the ledger's every product action, plus triggers.
+
+    First-hand at the wire: a hook is created disabled with its commands
+    visible; an illegal edit is refused with its own code; an unsupported
+    family is refused; enabling works only for an executable hook; and the
+    trigger query presents exit-2 as `blocked`.
+    """
+    from fastapi.testclient import TestClient
+
+    from agent_box.server.bootstrap import build_runtime
+    from agent_box.server.transport.http import create_app
+
+    runtime = build_runtime(tmp_path / "server")
+    runtime.start()
+    with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
+        token = runtime.token
+
+        def call(method, params):
+            return client.post(f"/wire/v1/{method}", headers={
+                "Authorization": f"Bearer {token}"}, json={
+                "jsonrpc": "2.0", "id": method, "method": method, "params": params,
+            }).json()
+
+        created = call("hooks.create", {
+            "requestId": "hook-create-1", "family": "claude-code", "name": "guard",
+            "model": {"event": "PreToolUse", "matcher": "Bash",
+                      "handlers": [{"type": "command", "command": "/bin/guard"}]},
+        })["result"]["hook"]
+        assert created["enabled"] is False
+        assert created["commands"] == ["/bin/guard"]
+
+        refused = call("hooks.create", {
+            "requestId": "hook-create-2", "family": "pi", "name": "nope",
+            "model": {"event": "PreToolUse",
+                      "handlers": [{"type": "command", "command": "/bin/x"}]},
+        })
+        assert "error" in refused and refused["error"]["details"]["internalCode"] == "HOOK_FAMILY_UNSUPPORTED"
+
+        illegal = call("hooks.update", {
+            "requestId": "hook-update-1", "hookId": created["hookId"],
+            "model": {"event": "NotAnEvent",
+                      "handlers": [{"type": "command", "command": "/bin/x"}]},
+        })
+        assert illegal["error"]["details"]["internalCode"] == "HOOK_EVENT_UNSUPPORTED"
+
+        enabled = call("hooks.setEnabled", {
+            "requestId": "hook-enable-1", "hookId": created["hookId"],
+            "enabled": True})["result"]["hook"]
+        assert enabled["enabled"] is True
+        listed = call("hooks.list", {"requestId": "hook-list-1"})["result"]["hooks"]
+        assert [item["hookId"] for item in listed] == [created["hookId"]]
+
+        # A trigger fact ingested into the ledger surfaces with its effect.
+        runtime.hook_triggers.record(
+            hook_id=created["hookId"], event="PreToolUse", exit_code=2,
+            output="denied\n")
+        triggers = call("hooks.triggers", {
+            "requestId": "hook-triggers-1", "hookId": created["hookId"]})["result"]["triggers"]
+        assert triggers[0]["exitCode"] == 2 and triggers[0]["blocking"] is True
+        assert triggers[0]["effect"] == "blocked" and triggers[0]["outputSummary"] == "denied\n"
+
+        removed = call("hooks.delete", {
+            "requestId": "hook-delete-1", "hookId": created["hookId"]})["result"]
+        assert removed == {"deleted": True, "triggersRemoved": 1}

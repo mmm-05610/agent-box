@@ -410,6 +410,7 @@ def build_runtime(
         subscription_files_for=subscription_files_for,
         asset_records=asset_records, skill_assets=skill_assets,
         mcp_assets=mcp_assets, catalogs=asset_catalogs,
+        hooks=hook_records, hook_triggers=hook_triggers,
     )
     runtime = ServerRuntime(
         root, database, objects, repository, service, owner, token, token_path,

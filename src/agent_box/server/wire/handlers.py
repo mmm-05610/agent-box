@@ -19,6 +19,8 @@ from agent_box.server.wire.envelope import CursorCodec
 from agent_box.server.wire.errors import WireError
 from agent_box.server.accounts.records import account_view
 from agent_box.server.assets.records import asset_view
+from agent_box.server.hooks.records import hook_view
+from agent_box.server.hooks.triggers import trigger_view
 from agent_box.server.wire.projection import (
     event_frame,
     execution_state,
@@ -94,6 +96,12 @@ _PARAM_SHAPES = {
     "assets.catalog": ({"sourceId"}, set()),
     "assets.installFromCatalog": ({"requestId", "sourceId", "entryName", "revision"}, set()),
     "assets.probe": ({"definition"}, set()),
+    "hooks.list": ({"requestId"}, {"family"}),
+    "hooks.create": ({"requestId", "family", "name", "model"}, {"source"}),
+    "hooks.update": ({"requestId", "hookId", "model"}, set()),
+    "hooks.setEnabled": ({"requestId", "hookId", "enabled"}, set()),
+    "hooks.delete": ({"requestId", "hookId"}, set()),
+    "hooks.triggers": ({"requestId"}, {"hookId", "limit"}),
     "accounts.list": (set(), set()),
     "accounts.create": ({"requestId", "harness", "accountIdentifier"}, set()),
     "accounts.bind": ({"requestId", "profileId", "expectedVersion", "accountId"}, set()),
@@ -253,6 +261,8 @@ class WireService:
         skill_assets=None,
         mcp_assets=None,
         catalogs=None,
+        hooks=None,
+        hook_triggers=None,
     ) -> None:
         self._server_id_provider = server_id_provider
         self.artifact_store = artifact_store
@@ -267,6 +277,9 @@ class WireService:
         self.mcp_assets = mcp_assets
         #: Order 58 G7: directory-shaped source snapshots.
         self.catalogs = catalogs
+        #: Order 59: the managed-hook ledger and its trigger facts.
+        self.hooks = hooks
+        self.hook_triggers = hook_triggers
         #: Order 56: harness -> its declared subscription login-state files,
         #: read from the deployment set the composition loaded.
         self.subscription_files_for = subscription_files_for or (lambda _harness: ())
@@ -307,6 +320,12 @@ class WireService:
             "assets.catalog": self.assets_catalog,
             "assets.installFromCatalog": self.assets_install_from_catalog,
             "assets.probe": self.assets_probe,
+            "hooks.list": self.hooks_list,
+            "hooks.create": self.hooks_create,
+            "hooks.update": self.hooks_update,
+            "hooks.setEnabled": self.hooks_set_enabled,
+            "hooks.delete": self.hooks_delete,
+            "hooks.triggers": self.hooks_triggers,
             "accounts.list": self.accounts_list,
             "accounts.create": self.accounts_create,
             "accounts.bind": self.accounts_bind,
@@ -465,6 +484,84 @@ class WireService:
             if isinstance(value, bool)
         }
         return item
+
+    # -- managed hooks (Order 59) ------------------------------------------
+
+    def _require_hooks(self):
+        if self.hooks is None or self.hook_triggers is None:
+            raise WireError("UNAVAILABLE", "the hook ledger is not composed")
+        return self.hooks, self.hook_triggers
+
+    def hooks_list(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        _require(params, "requestId")
+        hooks, _triggers = self._require_hooks()
+        family = params.get("family")
+        if family is not None:
+            family = _bounded(family, "family", 64)
+        return {"hooks": [hook_view(row) for row in hooks.list(family=family)]}
+
+    def hooks_create(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        hooks, _triggers = self._require_hooks()
+        model = params["model"]
+        if not isinstance(model, Mapping):
+            raise WireError("INVALID_REQUEST", "model must be an object")
+        try:
+            _kind, created = hooks.create(
+                key=_request_id(params["requestId"]),
+                request_digest=digest({
+                    "family": params["family"], "name": params["name"], "model": model}),
+                family=_bounded(params["family"], "family", 64),
+                name=_bounded(params["name"], "name", 128),
+                model=model,
+                source=params.get("source"),
+            )
+        except ServerError as exc:
+            raise WireError.from_server_error(exc) from exc
+        return {"hook": hook_view(hooks.get(created["hook_id"]))}
+
+    def hooks_update(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        hooks, _triggers = self._require_hooks()
+        model = params["model"]
+        if not isinstance(model, Mapping):
+            raise WireError("INVALID_REQUEST", "model must be an object")
+        try:
+            updated = hooks.update(
+                hook_id=_bounded(params["hookId"], "hookId"), model=model)
+        except ServerError as exc:
+            raise WireError.from_server_error(exc) from exc
+        return {"hook": hook_view(hooks.get(updated["hook_id"]))}
+
+    def hooks_set_enabled(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        hooks, _triggers = self._require_hooks()
+        enabled = params["enabled"]
+        if not isinstance(enabled, bool):
+            raise WireError("INVALID_REQUEST", "enabled must be a boolean")
+        try:
+            updated = hooks.set_enabled(
+                hook_id=_bounded(params["hookId"], "hookId"), enabled=enabled)
+        except ServerError as exc:
+            raise WireError.from_server_error(exc) from exc
+        return {"hook": hook_view(hooks.get(updated["hook_id"]))}
+
+    def hooks_delete(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        hooks, _triggers = self._require_hooks()
+        try:
+            removed_triggers = hooks.delete(hook_id=_bounded(params["hookId"], "hookId"))
+        except ServerError as exc:
+            raise WireError.from_server_error(exc) from exc
+        return {"deleted": True, "triggersRemoved": removed_triggers}
+
+    def hooks_triggers(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        _require(params, "requestId")
+        _hooks, triggers = self._require_hooks()
+        hook_id = params.get("hookId")
+        if hook_id is not None:
+            hook_id = _bounded(hook_id, "hookId")
+        limit = params.get("limit", 100)
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 500:
+            raise WireError("INVALID_REQUEST", "limit must be 1..500")
+        return {"triggers": [trigger_view(row) for row in triggers.list(
+            hook_id=hook_id, limit=limit)]}
 
     # -- managed assets (Order 58) -----------------------------------------
 

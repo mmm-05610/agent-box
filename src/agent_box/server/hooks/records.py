@@ -90,11 +90,22 @@ class HookRecords:
             )
             return self._view(conn, hook_id)
 
-    def delete(self, *, hook_id: str) -> None:
+    def delete(self, *, hook_id: str) -> int:
+        """Delete one hook and the trigger facts that belong to it.
+
+        Returns how many trigger rows went with it: a hook's history is its
+        own, and the caller states the number rather than erasing it silently.
+        """
         with self.database.transaction() as conn:
-            removed = conn.execute("DELETE FROM server_hooks WHERE id=?", (hook_id,))
-            if removed.rowcount != 1:
+            row = conn.execute("SELECT 1 FROM server_hooks WHERE id=?", (hook_id,)).fetchone()
+            if row is None:
                 raise ServerError("HOOK_NOT_FOUND", "Hook was not found", status=404)
+            removed_triggers = conn.execute(
+                "SELECT COUNT(*) FROM server_hook_triggers WHERE hook_id=?", (hook_id,),
+            ).fetchone()[0]
+            conn.execute("DELETE FROM server_hook_triggers WHERE hook_id=?", (hook_id,))
+            conn.execute("DELETE FROM server_hooks WHERE id=?", (hook_id,))
+            return int(removed_triggers)
 
     def get(self, hook_id: str) -> dict[str, Any]:
         with self.database.read() as conn:
@@ -138,16 +149,26 @@ class HookRecords:
 
 
 def hook_view(row: Mapping[str, Any]) -> dict[str, Any]:
-    """The wire-facing shape: the model and the exact commands it would run."""
-    model = json.loads(row["model_json"])
+    """The wire-facing shape: the model and the exact commands it would run.
+
+    Accepts either a ledger row (``model_json``) or the record layer's own
+    view (``model``), so every handler projects through this one function.
+    """
+    if "model_json" in row:
+        model = json.loads(row["model_json"])
+        hook_id, created_at, updated_at = row["id"], row["created_at"], row["updated_at"]
+    else:
+        model = row["model"]
+        hook_id = row.get("hook_id")
+        created_at, updated_at = row.get("created_at"), row.get("updated_at")
     return {
-        "hookId": row["id"],
+        "hookId": hook_id,
         "family": row["family"],
         "name": row["name"],
         "enabled": bool(row["enabled"]),
         "model": model,
         "commands": command_preview(model),
         "source": row.get("source"),
-        "createdAt": row["created_at"],
-        "updatedAt": row["updated_at"],
+        "createdAt": created_at,
+        "updatedAt": updated_at,
     }
