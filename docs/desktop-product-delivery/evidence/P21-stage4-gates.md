@@ -68,8 +68,8 @@ npm run --workspace apps/desktop build
 npm run --workspace apps/desktop test        # vitest run
 # VITEST_EXIT=1
 # Test Files  5 failed | 978 passed | 2 skipped (985)
-# Tests       4 failed | 10195 passed | 6 skipped (10205)
-# Duration    178.35s
+# Tests       4 failed | 10197 passed | 6 skipped (10207)   ← 阶段 4b 修复后复跑（首次 10195）
+# Duration    ~178s
 ```
 
 **5 个失败文件全部在 `|electron|` 项目，且全为宿主基线，与 P21 无交集**：
@@ -91,7 +91,7 @@ P21 触及的五个测试文件计数：
 | --- | --- |
 | `src/types/wire/wire-v1.test.ts` | 28（本单 +11） |
 | `src/features/chat/work-status.test.ts` | 16（本单 +4） |
-| `src/features/chat/work-status-panel.test.tsx` | 10（本单 +4） |
+| `src/features/chat/work-status-panel.test.tsx` | 12（本单 +6） |
 | `src/features/profiles/profile-read-facts.test.ts` | 9（新文件） |
 | `src/features/profiles/profile-role-settings.test.tsx` | 7（本单 +4） |
 
@@ -107,6 +107,8 @@ P21 触及的五个测试文件计数：
 | G2 不画假值 | 让 `profiles.memory` 答 `available:false` | `profileMemoryView` 返回 `null` ⇒ 分区与导航项都不渲染（测试断言两者皆无） |
 | G2 不画假值 | 让执行行 `pid:null, pidReason:PID_NOT_REPORTED` | 显示 `Not reported (PID_NOT_REPORTED)`，`pidIsReason=true`；断言不含 `PID: 0` |
 | G3 只读 | grep 四个面的写方法引用 | 无命中（退出码 1）；读路径只有 `workspaces.gitStatus`/`executions.list`/`profiles.memory`/`assets.bindings` |
+| G2 不静默截断 | 让 `executions.list` 以一个类型化拒绝失败（`INVENTORY_LIMIT_EXCEEDED`，>200 行） | 卡片**仍然渲染**并显示该拒绝（`[data-work-status-executions-error]`），不是消失；同理 Git 读失败显示 `[data-work-status-git-error]` 而不是六行空白 |
+| G2 不静默截断 | 读**失败**（不是"没有事实"） | 阶段 4b 修掉了初版"失败即当无事实、卡片消失"的行为（那会把拒绝藏起来）；现在失败带原因上屏 |
 
 ## 6 未跑/未验（如实登记）
 

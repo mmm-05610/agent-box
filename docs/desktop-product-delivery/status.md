@@ -1658,3 +1658,100 @@ P21 五个测试文件：`wire-v1.test.ts` 28（+11）、`work-status.test.ts` 1
 - **未跑/未验**：未对真实后端做端到端联调（不授权真实调用，且本机没有跑 58–64 的服务进程）；
   未跑 Playwright e2e（未改 e2e，且需要真实服务）。→ 合并后或后端重锁后的集成检查项。
 - 提交：`P21 stage 4`（pathspec）。
+
+## P21 阶段 4b（2026-09-18）：读失败不许被吞掉 — `P21_STAGE4B_READ_FAILURES`
+
+- **发现的问题**：初版把"读失败"和"没有事实"都变成 `null` ⇒ 卡片不渲染，于是
+  `executions.list` 的**类型化拒绝（>200 行 `INVENTORY_LIMIT_EXCEEDED`）会被静默藏起来**，
+  正是工单 §"执行清单卡"要排除的行为（"不静默截断"）。
+- **改法**：`agentbox-work-status-reads.ts` 保留失败原因（`WireRemoteError` 取
+  `code: message`，传输层失败取 message）；面板把失败**画成卡片内容**
+  （`[data-work-status-git-error]` / `[data-work-status-executions-error]`），
+  与"服务答了但没有"区分开。
+- **测试**：`work-status-panel.test.tsx` +2（超限拒绝上屏、Git 失败上屏而非六行空白）；
+  该文件 12 passed。
+- **复跑四项（最终态）**：tsc exit 0；build exit 0（阶段 4 已跑，本阶段只改渲染逻辑，构建面未变）；
+  vitest 985 文件 / **978 passed / 5 failed（全 electron 宿主基线）**，10207 用例 /
+  **10197 passed / 4 failed**；eslint 本单改动文件 **0 errors**（23 warnings，jsdom `document`）。
+- 提交：`P21 stage 4b`（pathspec）。
+
+## P21 收口（2026-09-18）：两仓重锁 + 四个只读面 — `WIRE_RELOCK_DONE`（附一条 DoD 未跑项）
+
+- **阶段**：1 摘要核对（`0980a868`）→ 2 合同编入（`2079afa7`）→ 3 四面接线（`3545335b`）→
+  4 四项检查（`db995c91`）→ 4b 读失败不吞（`27eae926`）。
+- **交付**：
+  - 合同 **33 → 59 方法**（新增 26：`workspaces.gitStatus`、`executions.list`、`profiles.clone`、
+    `profiles.setPermissions`、`profiles.memory`、`assets.*`×10、`hooks.*`×6、`accounts.*`×4），
+    profile 投影 +4 字段（`accountId`/`permissionPreset`/`permissionRules`/`originProfileId`）。
+  - 交后端的**提案摘要对**：TS `6e8ae84a1abeb32c89b6761068ec3f380991bbf8497645626b700ed70cd5dedb` /
+    工件 `f5d27269184aa387ce1227dbf8497e25b51e0d7ba5d3360f412e9b8cda33a583`（59 方法）。
+    后端最后登记值仍是 `64dc9961…`/`42a164a4…`（停在 `b284f70c`）——**两端未锁定，需后端按工件本体重新登记**。
+  - 四个只读面：Git 卡（62）、记忆分区（63）、执行清单卡（64）、角色页增量（60 只读部分）。
+- **DoD 逐条审计**：
+
+| # | 项 | 结果 |
+| --- | --- | --- |
+| 1 | 实现：合同补齐 + 四个面接线 | ✅ `2079afa7` + `3545335b` |
+| 2 | 反例：G1/G2/G3 各演练一次并写进报告 | ✅ `evidence/P21-stage4-gates.md` §5（G1 两条、G2 三条、G3 一条） |
+| 3 | 真实环境：构建产物真跑一遍应用 | ❌ **未跑**：本环境**无 electron 二进制**（`require('electron')` 失败、`node_modules/electron/dist` 不存在，e2e 三个 0-test 文件同因），也没有可用浏览器；`apps/desktop/e2e/*-driver.mjs` 的既定用法是在 **Windows 宿主**上跑 |
+| 4 | 回归：四项计数与退出码 | ✅ tsc 0 / build 0 / vitest 10197 passed（失败全为 electron 宿主基线）/ eslint 本单文件 0 error（全树 16 个既有 error 见下） |
+| 5 | 账务与清理 | ✅ 本节 + evidence；临时文件已删（`/tmp/regchk`、`_tmp_*.ts` 探针）；工作树无未提交改动 |
+| 6 | 账：终态行 + 摘要对 | ✅ 本节 |
+
+- **顺带登记的两条后端事实**（不改后端仓，交回调度者）：
+  1. `providerArtifacts.install` 参数表与自己的 handler 不一致（handler 读 `digest`，参数表把
+     `digest` 当 unexpected 拒）⇒ 该方法当前无可用调用形态。
+  2. `assets.installFromCatalog` 的 `installed.asset_id` 是全 wire 唯一 snake_case 字段。
+- **既有基线（不是本单引入）**：全树 `eslint src/ electron/` = **16 errors / 181 warnings**，
+  全落在 12 个 P21 未触碰的文件（清单见 `evidence/P21-stage4-gates.md` §2）；
+  electron 项目 vitest 5 文件失败（electron 二进制缺失 3 个 0-test + 回环监听 3 条 + live 重试 1 条）。
+
+## CHECKPOINT Q1 [PARTIAL]
+
+> PARTIAL 的唯一原因是 DoD-3（真实构建产物跑一遍）在本环境**未跑**；工单的四个需求与
+> G1–G4 门全部为绿。下面第 5 节把"没跑的"逐条写明，不写成 DONE。
+
+**1 现在能试什么**
+
+| 入口 | 命令 / 位置 | 期望看到什么 |
+| --- | --- | --- |
+| 合同与摘要 | `docs/desktop-product-delivery/contracts/wire-v1/README.md` + `generated/wire-v1.schema.json` | 后端登记值一对、本树当前值一对、59 方法、未锁定的两条实测原因 |
+| 合同测试 | `cd apps/desktop && npx vitest run src/types/wire/wire-v1.test.ts --project ui` | 28 passed（含 26 个新方法在册、Git null≠0、账户视图拒绝 locator 等） |
+| 新增面测试 | `npx vitest run src/features/chat/work-status-panel.test.tsx src/features/chat/work-status.test.ts src/features/profiles/profile-read-facts.test.ts src/features/profiles/profile-role-settings.test.tsx --project ui` | 12 + 16 + 9 + 7 passed |
+| 四项检查 | `npm run --workspace apps/desktop typecheck` / `lint` / `build` / `test` | tsc 0、build 0、vitest 见上、lint 全树红（既有 16 error） |
+| 界面（需 Electron/宿主） | 聊天视图左上角工作状态面板：展开 → `Git` 卡（六字段 + 逐字段 reason）、`执行` 卡（状态/身份/PID 或原因）、`刷新`；设置 → 角色页：`记忆`（服务声明才出现）、`权限规则`（预设 + 规则 + "被后面的规则覆盖"）、`Skills`/`MCP`（已绑定资产 + 禁用标记） | 面板在无事实时不渲染；`available:false` 无记忆分区；`pid:null` 显示 `PID_NOT_REPORTED` |
+
+**2 要你拍的**
+
+| # | 问题 | 选项与代价 | 我的建议 | 不拍的后果 |
+| --- | --- | --- | --- | --- |
+| ① | 是否把 `checkpoint/Q1` 合回主树 | 合 = 主树要重跑关键门并重算摘要（README §3.8）；不合 = 本批停在子树 | 合（按 tag sha，不按分支） | 四个面与合同停在子树，主树看不到 |
+| ② | 后端 `providerArtifacts.install` 参数表与 handler 不一致 | 需后端改它的 `_PARAM_SHAPES`（我不能写后端仓） | 交回调度者转后端修 | 该方法永远调用不成功 |
+| ③ | `installed.asset_id` 唯一 snake_case | 统一成 `assetId`（后端改）或维持（前端如实编码） | 统一（后端改，一次重锁） | 合同长期带着一处不一致的命名 |
+| ④ | 全树 16 个既有 eslint error（12 文件） | 单开一张 lint 卫生单（或一次批准 `eslint --fix`） | 单开一张小单 | `lint` 门永远红，掩盖将来真正的新错误 |
+| ⑤ | 真实环境验收（构建产物跑一遍 + 真实后端联调） | 在 Windows 宿主跑 `e2e/*-driver.mjs` 变体；本环境做不到 | 合并后在宿主侧补一次 | 四个面只经单测与类型校验，未经真实服务 |
+
+**3 花了什么**
+
+- 真实模型调用 **0 次**（工单未授权，费用 0）；本单全程为本地命令与代码。
+- 本地命令调用 ≈85 次（读后端实现、跑四项、跑测试）；未做任何跨仓写操作。
+- 清理：临时探针文件 `apps/desktop/src/types/wire/_tmp_*.ts` 已删、`/tmp/regchk` 已删；
+  工作树 committed & clean。
+- 请求数未被环境导出（无计费口径可比），如实以命令数与提交数代记：**6 个提交**（含证据与账）。
+
+**4 恢复点**
+
+- 下一单：**无**（`work-orders/` 仍是 P21 一张，队列耗尽、租约可释放）；等调度者投递。
+- baseline：建议更新为本 tag（`checkpoint/Q1`）所在提交；本树分支 `feature/agentbox-desktop-product`。
+- 未提交改动：无（tag 打在当前 HEAD 上）。
+
+**5 不含糊**
+
+- **未跑**：真实构建产物跑一遍应用（DoD-3，环境无 electron 二进制）；Playwright e2e；
+  与真实后端 58–64 服务的端到端联调（本机没有该服务进程）。
+- **两端未锁定**：本树交出的工件需后端重新登记（后端登记值仍停在 `b284f70c`）。
+- **只读边界**：`profiles.clone`/`setPermissions`/`assets.bind`/`unbind`/`publish*`/`hooks.*`/
+  `accounts.*` 已进合同但**本单一个都没调用**（G3）；它们各自的产品面属于后续单。
+- **未编入合同**：`profiles.subagent*`（Order 65 在飞）、`usage.aggregate/export`（Order 53 未收口）。
+- 全树 lint 红与 electron 测试基线是**既有**问题，不是本单引入（证据含逐文件比对）。
+
