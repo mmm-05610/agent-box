@@ -1,0 +1,101 @@
+{
+ "collapseProbe": [
+  {
+   "after_listing_calls": 0,
+   "change_set": "None",
+   "input": "{}",
+   "stored": "None"
+  },
+  {
+   "after_listing_calls": 1,
+   "change_set": "published",
+   "input": "non-empty",
+   "stored": "dict"
+  },
+  {
+   "after_listing_calls": 0,
+   "change_set": "None",
+   "input": "None",
+   "stored": "None"
+  }
+ ],
+ "date": "2026-09-19",
+ "directWorkerOp": {
+  "op": "workspace.list",
+  "result": "OK",
+  "sample": {
+   "files": [
+    {
+     "path": "changed.txt",
+     "size": 6
+    }
+   ],
+   "truncated": {
+    "bytes": 0,
+    "entries": 0,
+    "oversize": 0
+   }
+  }
+ },
+ "gate": "scripts/server-round1/pi-production-chain-gate.py",
+ "instrumentedRun": {
+  "kept": "/tmp/agentbox-pi-gate-cic2jxlk",
+  "probeLines": [
+   "PROBE workspace.list OK (0 files)",
+   "PROBE workspace.list OK (1 files)",
+   "PROBE workspace.list OK (1 files)",
+   "PROBE workspace.list OK (1 files)",
+   "PROBE workspace.list OK (1 files)"
+  ],
+  "result": "PI_PRODUCTION_CHAIN_GATE_OK"
+ },
+ "ledger": {
+  "columnsPresent": true,
+  "database": "/tmp/agentbox-pi-gate-mkb9aso9/server/state/agentbox.sqlite",
+  "query": "select id, state, change_set_object_digest, usage_source from server_turns order by created_at",
+  "rows": [
+   [
+    "execution_1831ed9a3bca4c06ab357d74df4e2d6a",
+    "completed",
+    null,
+    "pi-acp-journal"
+   ],
+   [
+    "execution_60dea00694374836abf6469378a79f7a",
+    "completed",
+    null,
+    "pi-acp-journal"
+   ],
+   [
+    "execution_397cb970a3fb44cab3807d980102d81a",
+    "failed",
+    null,
+    null
+   ]
+  ]
+ },
+ "order": "069",
+ "plainRun": {
+  "kept": "/tmp/agentbox-pi-gate-mkb9aso9",
+  "result": "PI_PRODUCTION_CHAIN_GATE_OK",
+  "turns": [
+   {
+    "error": "",
+    "state": "completed"
+   },
+   {
+    "error": "",
+    "state": "completed"
+   }
+  ]
+ },
+ "rootCause": {
+  "code": "self.workspace_before_snapshot = dict(workspace_before_snapshot) if workspace_before_snapshot else None",
+  "effect": "an empty-but-valid snapshot '{}' is stored as None; the change set then reads as unknown and no after-listing is issued (backend records NULL at sidecar_backend.py:475-496)",
+  "file": "src/agent_box/server/execution/sidecar.py",
+  "fixDirection": "test `is not None` instead of truthiness (one line), plus a test for the empty-snapshot case (every file added)",
+  "lines": "631-632 (constructor truthiness) -> 893 (early return)"
+ },
+ "workerBundle": "workers/agent-box-worker/.acceptance-bundle-c11/agent-box-worker",
+ "workerSha256": "sha256:c1e353c89609ab2feed0765205feeb3eb4c8db9679f353ba4065302df35a2457"
+}
