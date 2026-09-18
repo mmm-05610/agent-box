@@ -566,3 +566,39 @@ ProviderModelConfigRecord = {
 - 只从执行账本读（活动 turn），**无机器级进程枚举、无取消面**；`pid` 仅本机通道填，
   否则 `null + PID_NOT_REPORTED`；答案零宿主路径；上限 200 行（超限类型化失败）。
 - 需前端同步（P20）与两仓重锁。
+
+## Order 81 — 两仓重锁登记：前端 P21 交回的工件（2026-09-19，env-provider）
+
+**背景**：前端 P21（2026-09-18）把 56/58/59/60/62/63/64 的新面编入合同并交回**阶段 2 提案**；
+本单在**后端侧**逐字复核并登记（只写评审面，不改前端、不改实现）。
+前端留档：`agent-box-desktop-next-wsl-round1/docs/desktop-product-delivery/contracts/wire-v1/README.md`（§摘要登记）
++ `evidence/P21-stage2-contract.md` + 其 `status.md`。
+
+### 1 逐字复核（第一手；命令与值）
+
+```bash
+sha256sum /home/maoqh/projects/agent-box-desktop-next-wsl-round1/docs/desktop-product-delivery/contracts/wire-v1/generated/wire-v1.schema.json
+#   f5d27269184aa387ce1227dbf8497e25b51e0d7ba5d3360f412e9b8cda33a583
+sha256sum /home/maoqh/projects/agent-box-desktop-next-wsl-round1/apps/desktop/src/types/wire/wire-v1.ts
+#   6e8ae84a1abeb32c89b6761068ec3f380991bbf8497645626b700ed70cd5dedb
+sha256sum docs/server-round1/fullstack/generated/wire-v1.schema.json
+#   a1bd52a4fb68436079ae2d2e439953e8ac7f345ab5934a936a9434952bee0729
+```
+
+| 面 | 值 | 出处 |
+| --- | --- | --- |
+| **前端交回对（阶段 2，2026-09-18）** | TS `6e8ae84a1abeb32c89b6761068ec3f380991bbf8497645626b700ed70cd5dedb`；工件 `f5d27269184aa387ce1227dbf8497e25b51e0d7ba5d3360f412e9b8cda33a583`（**59 方法**） | 前端 `contracts/wire-v1/README.md` §摘要登记 + 现物本体（本单就地计算，与前端记录值**逐字一致**，前端内部自洽） |
+| 后端**最后一条**登记（55-G2，2026-09-17） | TS `64dc99610b15360d4d114cb377b9034efeab127d5d15a34da5b7db8f42d8e08f`；工件 `42a164a47697f7481f4e5a224e7e2f5241719c1fa3fa476fa54f824c2096433d` | 本文件 Order 55 G2 节（434–437 行） |
+| 后端工件副本（本树） | `a1bd52a4fb68436079ae2d2e439953e8ac7f345ab5934a936a9434952bee0729`（**33 方法**，含 `providerArtifacts.*`） | `docs/server-round1/fullstack/generated/wire-v1.schema.json`（与前端 status 记录的同一个值，互相印证） |
+
+**方法集比对（本单从两份工件与代码方法表各取一次）**：
+
+| 面 | 方法数 |
+| --- | --- |
+| 前端現物 | **59** |
+| 后端工件副本 | **33**（差 26：`accounts.*`×4、`assets.*`×10、`executions.list`、`hooks.*`×6、`profiles.clone/memory/setPermissions`、`workspaces.gitStatus`——**后端代码均已实现**，副本停在 Order 57 代） |
+| 后端代码（`_PARAM_SHAPES`） | **64** |
+| 前端 ⊂ 后端代码 | 是（无孤儿方法）；差 5 个：`profiles.subagentGrants/grantSubagent/revokeSubagent`（Order 65）与 `usage.aggregate/export`（Order 53）——前端 README **明示"刻意不编入"**（不是遗漏） |
+
+**同时记录一处评审面缺口（第一手）**：`grep -c providerArtifacts docs/server-round1/wire-review.md` = **0**；
+Order 57/58/59/65 的方法在代码与前端工件里都在，但本文件**没有对应小节**（前端也已指出 57 C 的重锁"零登记"）。
