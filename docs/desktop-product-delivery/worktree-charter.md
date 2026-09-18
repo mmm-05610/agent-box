@@ -51,8 +51,7 @@
 | 4 | 补合同 | `profiles.subagent*`（随 65 收口）与 `usage.aggregate/export`（随 53 收口）编入合同 | Q1 §5 |
 | 5 | 真实模型 UI 门的前端侧 | 与后端四家真实门配合：真实 DeepSeek 经界面走一轮（R-0011） | 长期目标 |
 
-> **Q2 队列（已投递）**：`P22-contract-faces`（五处写路径）→ `P23-runnable-app`（让当前代码真能跑起来：装 Electron、
-> 重建 Windows 运行时、两条入口脚本；补 Q1 的 DoD-3）。
+> **Q2 队列（已投递）**：`P22-contract-faces`（五处写路径）。**检查点试用链路不属开发项**，由调度者建好（见主树 runbook）。
 > **队列不空规则**：`P22-contract-faces`（五处写路径产品面）**已投递**，可执行；若做完当前单发现 `work-orders/` 里没有 Q2 的下一张，
 > 在本树 status 写 `QUEUE_EMPTY_AT <日期>`——合法停止但要如实报出，调度者下一次边界补齐。
 > 注：Q2 的**具体契约**由调度者在 Q1 收口后逐单投递（v2 内容、P 编号，过校验器）；本表只是队列计划。
