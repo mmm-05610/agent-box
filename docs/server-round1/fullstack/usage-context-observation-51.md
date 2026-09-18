@@ -14,8 +14,8 @@
 | claude-code | `~/.claude/projects/*/<uuid>.jsonl` | 行含 `input_tokens` / `output_tokens` / `cache_creation_input_tokens` 键（样本值 0，键存在）✓ | Anthropic 模型目录（各模型窗口不同，需按模型 id 查） | 同上 |
 | pi | `~/.pi/agent/sessions/<project>/*.jsonl` | 本机该项目目录为空（无样本）；载体是逐项目 jsonl | pi 的 models-store.json（模型条目） | pi-acp 是 ACP over stdio——ACP schema **无 usage/contextWindow 字段**（工单撰写时已核 vendored 定义） |
 | dsh | `~/.dsh/sessions/<project>/session-<uuid>/` | 样本仅有 `session.lock`（本机该会话无内容样本）；载体为目录式 | dsh 模型目录 | ACP（kilo 同构 fork 系）——同上 |
-| opencode | `opencode.db`：`message.data` / `part.data`（JSON blob） | **无 usage/token 专用列**；用量（若有）藏在 `data` JSON 内（需逐行解析，未读） | opencode models（供应商模型自带窗口） | 非 ACP：ManagedOpenCodeHost + 中立 driver——**driver 是否透传待 B 阶段实现时核实** |
-| kilo | `kilo.db`（同 opencode 结构） | 同 opencode（表结构同构） | kilo models | 同 opencode |
+| opencode | `opencode.db`：`message.data` / `part.data`（JSON blob） | **（更正 2026-09-18，工单 66 §8）**`session` 表**有**专用列 `cost` + `tokens_input/output/reasoning/cache_read/cache_write`（两份真库实测，18 行）；早先"无专用列"是阶段 A 未查 `session` 列所致。另：assistant 行的 `data` JSON 亦自带逐调用 `tokens` blob（解析器消费此载体，见阶段 B） | opencode models（供应商模型自带窗口） | 非 ACP：ManagedOpenCodeHost + 中立 driver——**driver 是否透传待 B 阶段实现时核实** |
+| kilo | `kilo.db`（同 opencode 结构） | **（更正 2026-09-18，工单 66 §8）**同 opencode：`session` 表有同一组 `cost` + `tokens_*` 专用列（两份真库实测）；`part` 行 `step-finish` blob 同构。解析器按 `session` 列取最新会话总计（见阶段 B） | kilo models | 同 opencode |
 | qwen | 无本机实例 | 待验证 | 待验证 | ACP |
 
 ## 结论（阶段 A 的产出）

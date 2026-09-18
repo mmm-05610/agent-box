@@ -23,7 +23,7 @@
 | hermes | `state.db` `messages` 表 | `reasoning` / `reasoning_content` / `codex_reasoning_items` 列 ✓ | `tool_calls` / `tool_name` / `tool_call_id` 列 ✓ | 无专列 |
 | codex | rollout jsonl | `response_item` 行内的 reasoning 项（本轮行类型计数：`response_item`×4、`event_msg`×3） | `event_msg` 行（工具事件族） | 无 mode |
 | claude-code | `projects/*.jsonl` | `assistant` 行（thinking 块）✓ | content 内 tool_use/tool_result | `output_style` 行近似 mode |
-| opencode / kilo | `*.db` `part.data`（JSON blob） | 待 B 阶段逐字段核实（无专用列） | 同左 | 同左 |
+| opencode / kilo | `*.db` `part.data`（JSON blob） | 待 B 阶段逐字段核实（**更正 2026-09-18，工单 66 §8**：两家的 `session` 表均有 `cost` + `tokens_input/output/reasoning/cache_read/cache_write` 专用列，真库实测；"无专用列"仅指 thoughts/工具/计划维度在此无专列） | 同左 | 同左 |
 | pi / dsh / qwen | ACP（pi-acp / dsh / qwen） | 同 ACP 词汇 | 同 ACP 词汇 | 同 ACP 词汇 |
 
 ## 结论（对阶段 B–D 的输入）
