@@ -1,0 +1,104 @@
+"""Order 58 stage A/B: the skill asset store and its refusals.
+
+The order's G1 is "one store: id / revision / tree digest / source, in the
+Agent Skills format". These tests pin the format rules and the install
+boundaries, each with the counterexample the order asks for: illegal
+frontmatter, an empty or link-bearing tree, an oversized install, a revision
+that already exists, and a digest that no longer matches.
+"""
+from __future__ import annotations
+
+import os
+import pathlib
+
+import pytest
+
+from agent_box.server.assets.skills import (
+    MAX_ASSET_ENTRIES,
+    SkillAssetError,
+    SkillAssetStore,
+    parse_skill_frontmatter,
+)
+
+
+def _skill(root: pathlib.Path, name: str = "my-skill", body: str = "Body.\n") -> pathlib.Path:
+    directory = root / name
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / "SKILL.md").write_text(
+        f"---\nname: {name}\ndescription: does a thing\n---\n\n{body}",
+        encoding="utf-8",
+    )
+    return directory
+
+
+def test_the_two_required_fields_and_nothing_guessed():
+    fields = parse_skill_frontmatter(
+        "---\nname: my-skill\ndescription: \"does a thing\"\n---\nbody\n")
+    assert fields == {"name": "my-skill", "description": "does a thing"}
+
+
+def test_illegal_frontmatter_is_a_typed_refusal():
+    with pytest.raises(SkillAssetError) as missing:
+        parse_skill_frontmatter("name: my-skill\ndescription: x\n")
+    assert missing.value.code == "SKILL_FRONTMATTER_MISSING"
+
+    with pytest.raises(SkillAssetError) as bad_name:
+        parse_skill_frontmatter("---\nname: My Skill\ndescription: x\n---\n")
+    assert bad_name.value.code == "SKILL_NAME_INVALID"
+
+    with pytest.raises(SkillAssetError) as no_description:
+        parse_skill_frontmatter("---\nname: my-skill\n---\n")
+    assert no_description.value.code == "SKILL_DESCRIPTION_MISSING"
+
+    with pytest.raises(SkillAssetError) as not_a_scalar:
+        parse_skill_frontmatter("---\nname: my-skill\ndescription: x\ntags: [a, b]\n---\n")
+    assert not_a_scalar.value.code == "SKILL_FRONTMATTER_INVALID"
+
+
+def test_install_publishes_one_revision_and_verifies_its_digest(tmp_path):
+    store = SkillAssetStore(tmp_path / "assets")
+    source = _skill(tmp_path)
+    (source / "resources").mkdir()
+    (source / "resources" / "data.json").write_text('{"a": 1}\n', encoding="utf-8")
+    facts = store.install(source, asset_id="my-skill", revision=1)
+    assert facts["files"] == 2 and facts["tree_digest"].startswith("sha256:")
+    installed = store.revision_dir("my-skill", 1)
+    assert (installed / "SKILL.md").is_file()
+    assert store.verify(asset_id="my-skill", revision=1,
+                        expected_digest=facts["tree_digest"]) is True
+    assert store.verify(asset_id="my-skill", revision=1,
+                        expected_digest="sha256:" + "0" * 64) is False
+
+
+def test_install_refuses_a_second_revision_at_the_same_number(tmp_path):
+    store = SkillAssetStore(tmp_path / "assets")
+    source = _skill(tmp_path)
+    store.install(source, asset_id="my-skill", revision=1)
+    with pytest.raises(SkillAssetError) as exists:
+        store.install(source, asset_id="my-skill", revision=1)
+    assert exists.value.code == "SKILL_REVISION_EXISTS"
+
+
+def test_a_link_bearing_or_oversized_tree_is_refused(tmp_path):
+    store = SkillAssetStore(tmp_path / "assets")
+    source = _skill(tmp_path)
+    os.symlink("/etc/hostname", source / "escape.txt")
+    with pytest.raises(SkillAssetError) as linked:
+        store.install(source, asset_id="my-skill", revision=1)
+    assert linked.value.code == "SKILL_ASSET_INVALID"
+    os.unlink(source / "escape.txt")
+
+    for index in range(MAX_ASSET_ENTRIES + 1):
+        (source / f"file-{index}.txt").write_text("x", encoding="utf-8")
+    with pytest.raises(SkillAssetError) as oversized:
+        store.install(source, asset_id="my-skill", revision=1)
+    assert oversized.value.code == "SKILL_ASSET_OUTSIDE_BOUNDS"
+
+
+def test_a_missing_skill_md_is_refused(tmp_path):
+    store = SkillAssetStore(tmp_path / "assets")
+    bare = tmp_path / "bare"
+    bare.mkdir()
+    with pytest.raises(SkillAssetError) as refused:
+        store.install(bare, asset_id="bare", revision=1)
+    assert refused.value.code == "SKILL_ASSET_INVALID"
