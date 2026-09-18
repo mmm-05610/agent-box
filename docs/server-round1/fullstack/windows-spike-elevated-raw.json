@@ -1,0 +1,22 @@
+{
+  "environment": { "elevated": true, "user": "DESKTOP-PN94S4F\\maoqh", "date": "2026-09-19",
+                   "note": "admin PowerShell; readonly dir granted ALL APPLICATION PACKAGES:(OI)(CI)(RX) and set Low Mandatory Level:(OI)(CI)(NW)" },
+  "containerName": "agentbox.w48.spike",
+  "q1_create_appcontainer_profile": { "result": "created",
+    "sid": "S-1-15-2-1227684580-4002190279-3307847958-801692164-752605689-1497433728-3591550254",
+    "question": "non-admin CreateAppContainerProfile" },
+  "q2_read_isolation": { "verdict": "inconclusive",
+    "ungrantedDirList": { "bytes": 0, "exit": -1073741502 },
+    "systemFileRead":   { "bytes": 0, "exit": -1073741502 },
+    "grantedFileRead":  { "bytes": 0, "exit": -1073741502 },
+    "question": "is an ungranted path readable from inside the container" },
+  "q4_node_in_container": { "question": "node", "note": "no NodeExe given" },
+  "q5_capability_network": { "line": "", "exit": -1073741502,
+    "question": "internetClient capability and connectivity (no model call)" },
+  "q6_write_paths": { "verdict": "no writable location observed",
+    "grantedWorkspace": -1073741502, "privateCache": -1073741502,
+    "question": "where can the container actually write" },
+  "q3b_job_kill": { "aliveBeforeKill": false, "jobTerminated": true, "aliveAfterKill": false },
+  "q7_family_artifacts": { "question": "per-family Windows artifacts (Linux-side inventory is authoritative)",
+    "note": "see docs/server-round1/fullstack/windows-spike.md" }
+}

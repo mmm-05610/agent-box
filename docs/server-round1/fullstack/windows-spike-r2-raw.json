@@ -1,0 +1,11 @@
+{
+  "round": 2,
+  "environment": { "elevated": true, "user": "DESKTOP-PN94S4F\\maoqh", "date": "2026-09-19",
+    "preconditions": ["workspace granted *S-1-15-2-…-3591550254:(OI)(CI)(RX)", "readonly dir Low IL + ALL APPLICATION PACKAGES:(OI)(CI)(RX)", "NodeExe = %ProgramFiles%\\nodejs\\node.exe"] },
+  "q1_create_appcontainer_profile": { "result": "created", "sid": "S-1-15-2-1227684580-4002190279-3307847958-801692164-752605689-1497433728-3591550254" },
+  "q2_read_isolation": { "verdict": "inconclusive", "ungrantedDirList": { "exit": -1073741502 }, "systemFileRead": { "exit": -1073741502 }, "grantedFileRead": { "exit": -1073741502 } },
+  "q4_node_in_container": { "exit": -1073741502, "line": "", "question": "does node.exe run in the container and read the granted read-only tree" },
+  "q5_capability_network": { "exit": -1073741502, "line": "" },
+  "q6_write_paths": { "verdict": "no writable location observed", "grantedWorkspace": -1073741502, "privateCache": -1073741502 },
+  "q3b_job_kill": { "aliveBeforeKill": false, "jobTerminated": true, "aliveAfterKill": false }
+}

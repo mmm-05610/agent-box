@@ -70,9 +70,39 @@
 
 - 真实模型调用 0 次、¥0。
 - 清理：spike 目录/ACL 已回收；门的临时根 `cleanup_bounded=pass`；
-  `C:gentbox-uigate46\w48-token-diag.ps1` 与 spike 报告副本留在仓库外（证据已入库）。
+  `C:gentbox-uigate46\w48-token-diag.ps1` 与 spike 报告副本留在仓库外（证据已入库）。
 - 未做项/后续：
   1. AppContainer 的恢复 spike（管理员权限下验证 IL 与 token 形态）——恢复后可把隔离能力
      从 false 升级，需重新过一致性门；
   2. Windows 侧逐家真 harness 轮（等各家有 Windows 工件）；
   3. 45 G8 的 Windows 重跑（依赖上一条）。
+
+## 七、结案（072 追记，2026-09-19）——AppContainer 承载不再追测
+
+**追记来源**（主树只读；本树已留档原始 JSON）：`windows-spike-elevated.md`（用户手跑两轮 +
+结案判据）、[windows-spike-elevated-raw.json](windows-spike-elevated-raw.json)（第一轮）与
+[windows-spike-r2-raw.json](windows-spike-r2-raw.json)（第二轮 H1 授权 + node），sha256 分别
+`4ead2bd0f841…` / `a6d9ca9bd222…`。
+
+**两轮的一手事实（逐字退出码）**：
+
+| 轮 | 前置 | 结果 |
+| --- | --- | --- |
+| 管理员轮 | `CreateAppContainerProfile` 可创建（SID `S-1-15-2-1227684580-…-3591550254`，与非提权轮**同一 SID**）；只读目录已授 `ALL APPLICATION PACKAGES:(OI)(CI)(RX)` + `Mandatory Level:(OI)(CI)(NW)` | **容器内进程全部起不来**：每个启动 `exit = -1073741502`（`0xC0000142`，`STATUS_DLL_INIT_FAILED`）；Q2/Q5/Q6 `inconclusive`；Q3 Job `jobTerminated=true` 但 `aliveBeforeKill=false`（空观察） |
+| 第二轮（H1 授权 + node） | workspace 已授同 SID 读/执行，`-NodeExe` 指真 node | node 在容器内仍 `exit=-1073741502`；四类载荷（cmd 探针 / 网络探针 / node）**同一码** ⇒ **H1（目录授权不足）被排除** |
+
+**结案判据（不只是"起不来"）**：
+
+1. **失败与提权、与目录授权无关**：非提权轮、管理员轮、有无 SID 目录授权，一律 `0xC0000142`
+   （加载器初始化失败）。剩余未测假设只有 H2/H3（探针的控制台/句柄形态、启动 API 属性表构造），
+   属**探针自身调试**，不是产品问题。
+2. **更硬的一条**：即便容器起得来，"把用户目录降到 Low IL"（写隔离）**需要管理员**
+   ——非提权轮实测 `icacls /setintegritylevel` 被拒；**产品路径不能假定管理员**。
+   ⇒ **用 AppContainer 做读写隔离对本产品无论如何都不成立。**
+
+⇒ **AppContainer 的容器承载在本环境不再追测**，降级形态（Job Object + 真实目录）为**最终形态**。
+本结案不改变 §二/§三 的任何实现与声明（本轮只写证据）。
+
+**与 Linux 侧的关系（明示）**：Windows 侧是**低于 Linux 侧**的形态——Linux 侧有 bwrap 的读写隔离
+（只读 EROFS、宿主 /home 不可见、RO 绑定等）与一致性门背书；Windows 侧只有 Job 的生命/树杀与
+真实目录物化，**写隔离与读隔离声明均为 false**（见 §八 核对记录），不得按对等能力描述。
