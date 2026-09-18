@@ -352,7 +352,7 @@ async fn serve(
                             Err((code, message)) => write_error_for(&mut output, sequence, &request.request_id, code, message).await?,
                         }
                     }
-                    "home.prepare" | "home.list" | "home.get" | "home.delete" => {
+                    "home.prepare" | "home.put" | "home.list" | "home.get" | "home.delete" => {
                         match handle_home(&home_root, &request.op, &request.arguments) {
                             Ok(value) => write_response(&mut output, sequence, &request.request_id, value).await?,
                             Err((code, message)) => write_error_for(&mut output, sequence, &request.request_id, code, message).await?,
