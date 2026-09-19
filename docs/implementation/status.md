@@ -2021,7 +2021,7 @@ python3 -m pytest tests/server/test_artifact_absence_is_not_green_118.py \
 
 | 缺口 | 现状（一手） | 验法（谁都能自己复算） |
 | --- | --- | --- |
-| `089` 的两家真实 UI 门 | 预检/预演/泄漏门/Windows 可照抄包都齐（`ui-gates-89-*`），**真机腿在人**（用户裁定交调度者派 QA）；R-0056 的两条开工判据**都成立**（`rulings.md` 有 `R-0055`；runtime 树 `091` 记着"引擎＋G1–G4 绿、终态 PARTIAL"） | 按 `docs/server-round1/fullstack/ui-gates-89-windows-handoff.md` 在 Windows 侧跑（**R-0056 护栏**：独立端口段＋独立数据根，不碰 18790/`~/.agentbox-trial-chat`）；回来把逐笔 usage 与转录落 `docs/server-round1/fullstack/ui-gates-89/**`，本树据此才能声明终态码 |
+| `089` 的两家真实 UI 门 | **口径已更新（2026-09-20 04:3x，见上一节）**：预检/预演/泄漏门/可照抄包都齐；**③ 真机部署由 QA 一手验成**（`docs/qa/ui-gates-89-windows-leg.md`，挂 sha `5abedc0`）；**seed 腿本树已交付并验到形状＋逻辑**（`ui_gates_89_seed_profile.py --self-test` 15/15 ＋ `…_shape_check.py` 10/10）；**仍缺 G1/G2（两家真发真答）与 G3（零泄漏门）** | 按跑本 **§3b** 在 Windows 侧 seed（凭据 store 只在 `os.name=="nt"` 自动装 ⇒ 这步不能在 WSL 侧做），再按 §3–§4 跑两家各一轮；**R-0056 护栏**：独立端口段（18820）＋独立数据根，不碰 18790/`~/.agentbox-trial-chat`/真实桌面根；回来把逐笔 usage 与转录落 `docs/server-round1/fullstack/ui-gates-89/**` ＋ QA 自己面一行，本树据此才能声明终态码。**接管人＝QA 线（`handoffs.md` `H-013` ②）** |
 | `124` 的写面白名单＋canonical 四值 | **不开工**：`src/agent_box/server/execution/protocols.py` 在本树不存在（`ls` 实测），全树 grep 四个 canonical 值 0 命中；值本身在 runtime 树（`openai-chat / openai-responses / anthropic-messages / gemini-generate`） | 判据一行：`test -f src/agent_box/server/execution/protocols.py`。成立即按工单三条落地（harness 可选 ＋ 三个新形状 ＋ 四值＋旧两值归一），且 G3 要求**引用**不许复制字面 |
 
 ## 147 的补做（一条更硬的门；2026-09-19 19:39 UTC，执行者）
@@ -2084,3 +2084,17 @@ CPython 会把 `OSError(13, …)` 自动提升成 `PermissionError`，**错的�
 **`089` 现在的账**：预检 ✅ · 预演 ✅（假端点，`notAcceptanceEvidence`）· **③ 真机部署 ✅（QA 一手，sha `5abedc0`）** ·
 **seed 腿 ✅（形状＋逻辑，本树一手）** · G1/G2（两家真发真答）❌ 未到 · G3（零泄漏门）❌ 未跑（要 G1/G2 的证据目录）。
 ⇒ **仍不声明终态码**；解卡入口＝**依赖 QA 线**（`H-013` 的 ②：seed 已交付，从跑本 §3b→§4 续跑第二轮）。
+
+## 队列地图（重算，2026-09-20 04:3x；`R-0069` 四列格式，取代上面那张旧表里 `089`/`145` 两行的现态）
+
+| 单 | 现态 | 卡在哪（精确） | 解卡入口 |
+| --- | --- | --- | --- |
+| `089` | 预检✅·预演✅·**③ 真机部署✅（QA 一手，sha `5abedc0`）**·**seed 腿✅（形状＋逻辑，本树 `15/15` ＋ `10/10`）**·G1/G2 ❌·G3 ❌ ⇒ **不声明终态码** | 两家的"真发真答"未跑：seed 的**真机那一腿**要 Windows 的 DPAPI store ＋ 真 key ＋ 真端点（`bootstrap/runtime.py:317-320` ⇒ 这步在 WSL 侧不可能，机制已一手核） | `依赖 QA 线`（判据＝`handoffs.md` `H-013` ②：QA 按跑本 §3b→§4 续跑，回执落 `docs/qa/windows-leg-89-r2.md` ＋ 本树 `ui-gates-89/**`）；**本树无待做项**（跑本 §3b 已备好可照抄命令与退出码口径） |
+| `124` | 未开工 | `src/agent_box/server/execution/protocols.py` 在本树不存在（本轮 `test -f` 实测），工单 G3 要求**引用**该单一真相、不许复制字面 | `依赖 该文件进本树`（判据一行：`test -f src/agent_box/server/execution/protocols.py`；成立即按三条落地） |
+| `132` | 未开工 | runtime 树 `status.md` 里 `130`/`131` 的终态码 grep 仍 0 命中 ⇒ 元门没有可对账的输入 | `依赖 130/131`（判据＝那两行出现；等待期做 §8b 清单） |
+| `116`/`145` 等历史行 | 见上面那张表 | — | `145` 已收口（`WORKSPACE_CONNECTION_NO_PRODUCER_DONE`），该行现态作废、留史不删 |
+
+**今晚队列（`087 → QA-008/QA-009 → 103 → 099 → 089`）逐条落定**：`087` `CANCEL_RECALL_FLAKE_PARTIAL` ·
+`QA-008/009`＝`115`/`117` 均 DONE · `103` DONE · `099` DONE（`8eb8ac2`）· `089` **只剩上面那一格**。
+⇒ 队列**不空**（`124`/`132`/`089` 三张在来的单）⇒ **不写 `QUEUE_EMPTY_AT`**；本轮按 §8b 交付了 `089` 的 seed 腿，
+下一轮先重读 `work-orders/**` ＋ 复算上面三行判据。
