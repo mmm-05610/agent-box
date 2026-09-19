@@ -16,6 +16,14 @@
   `docs/implementation/work-orders/**`（契约权威）、`docs/implementation/status.md`（我的执行账）、
   `docs/server-round1/**`（证据）
 - **禁止写**：主树的任何文件、其他子树、发布源、受保护路径
+- **`scripts/server-round1/**` 的唯一 owner＝本树（A）**（`QA-004`，2026-09-19 调度者裁定）：门脚本与生产链门的家在这里；
+  runtime 线**只读引用**，它要改某个门 ⇒ 交回，由调度者在那张单里开**一次性例外**（先例：`108` 的 `234fa08`）。
+  立这条的依据是实测的：两棵后端树各带一份 15 门脚本、**md5 逐个比对 15/15 逐字相同**（`docs/qa/dedup-ledger.md` D-001）
+  ⇒ 两份真相，任一侧改判据即**静默分叉**（而 `R-0032 ②` 已经在人工要求"两树同步 086 G2 字面"，说明这条通道一直在被手工维持）。
+- **计数口径（`QA-007`）**：报任何全量/门计数**必须附一行「Worker 工件在/不在」**——
+  `workers/agent-box-worker/target/{debug,release}` 与 `.acceptance-bundle-c*` 都是 git-ignore 的构建产物，缺它的树跑全量**天然 18 红**；
+  同一 sha 已用反证钉死（只补工件 ⇒ 18 passed / EXIT=0）⇒ **不写这行，红数会被别的线读成回归**。
+  批末按 `R-0040 ⑥`：不宣告"全量通过"，写 sha＋命令＋计数并标 **`待 QA 复算`**（本树 `9455b0c` 已这么做）。
 - 只显式 `git add -- <paths>`；提交**用 pathspec 形式**（`git commit -m ... -- <paths>`）；
   不 `reset`/`stash`/`clean`、不 `merge` 主干、**不 push**
 
