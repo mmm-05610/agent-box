@@ -1995,3 +1995,30 @@ HEAD 即检查点；`git status --short` 只剩本树自己的证据目录（`08
 - 一条反复出现、值得 ops 记进形制的东西：本批**四次**"红/绿由环境决定"的现场——
   128 的 `monkeypatch.undo()` 撤掉了 fixture 的替身 · 118 的工件缺席（exit 0）· 119 的墙钟判据 · 125 的缺插件 `PYTHONPATH`。
   治法也已经同批落地：118 让**套件自己**打印环境事实（`WORKER_ARTIFACT=` / `VERDICT=`）。
+
+## §8b 第 1 条（复算已收口单的门计数，按命令原文；2026-09-19 19:30 UTC，执行者）
+
+队列三张在来的单判据都不成立（`124` 要 `execution/protocols.py` 在本树、`132` 要 runtime 树 `130/131` 的终态码、
+`089` 要人/QA 跑 Windows 真机腿），按章程 §8b 先做第一条能做的：**把已收口单的门按原文重跑一遍**。
+
+```bash
+python3 -m pytest tests/server/test_artifact_absence_is_not_green_118.py \
+  tests/server/test_first_run_lock.py tests/server/test_workspace_connection_reserved_145.py \
+  tests/server/test_config_describe_slots_125.py tests/server/test_asset_surface_refusals_147.py \
+  tests/server/test_wire_seq_numbering_spaces_128.py tests/server/test_transport_boundary_wall_123.py \
+  tests/server/test_wire_error_family_closure_115.py tests/server/test_wire_error_family_101.py \
+  tests/server/test_profiles_list_sendability_117.py tests/server/test_import_asset_request_id_129.py \
+  tests/server/test_wire_drive_coverage_103.py -q
+→ 139 passed in 72.32s        # 12 个门文件，0 失败 0 跳过；自报行 VERDICT=GREEN_NO_SKIPS
+```
+
+**Worker 工件：在**（`artifact_presence.py` 现场：5/5 present；本轮这些门都不需要 Worker，只有 118 报告环境事实）。
+真实模型调用 **0 / ¥0**。命令与 `PYTHONPATH` 同 §8b 口径（含六个插件路径 ＋ `AGENT_BOX_SANDBOX_MODULE`），
+不带那套环境这一批里会有门变红（118/125 两节各记过一次现场），**所以复算必须连命令一起报**。
+
+## 已知缺口补两行（§8b 第 5 条：未验部分写清验法）
+
+| 缺口 | 现状（一手） | 验法（谁都能自己复算） |
+| --- | --- | --- |
+| `089` 的两家真实 UI 门 | 预检/预演/泄漏门/Windows 可照抄包都齐（`ui-gates-89-*`），**真机腿在人**（用户裁定交调度者派 QA）；R-0056 的两条开工判据**都成立**（`rulings.md` 有 `R-0055`；runtime 树 `091` 记着"引擎＋G1–G4 绿、终态 PARTIAL"） | 按 `docs/server-round1/fullstack/ui-gates-89-windows-handoff.md` 在 Windows 侧跑（**R-0056 护栏**：独立端口段＋独立数据根，不碰 18790/`~/.agentbox-trial-chat`）；回来把逐笔 usage 与转录落 `docs/server-round1/fullstack/ui-gates-89/**`，本树据此才能声明终态码 |
+| `124` 的写面白名单＋canonical 四值 | **不开工**：`src/agent_box/server/execution/protocols.py` 在本树不存在（`ls` 实测），全树 grep 四个 canonical 值 0 命中；值本身在 runtime 树（`openai-chat / openai-responses / anthropic-messages / gemini-generate`） | 判据一行：`test -f src/agent_box/server/execution/protocols.py`。成立即按工单三条落地（harness 可选 ＋ 三个新形状 ＋ 四值＋旧两值归一），且 G3 要求**引用**不许复制字面 |
