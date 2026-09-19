@@ -1266,3 +1266,29 @@ runtime 侧（存储/service/描述符/派生/冻结/逐家声明）已 DONE 且
 | 096 | 1 观测 | 逐家思考原生键一手实测（codex `model_reasoning_effort`@config.toml:26=high、pi `samplingParams.thinking`+`reasoning:false`@models.json:11/16、dsh `thinking:"disabled"`+`reasoningEffort:"off"`@settings.yaml:21/24、opencode/kilo per-model `options.reasoningEffort`@opencode.json:14/16、hermes `thinking`@config.yaml:16）；两层语义（旋钮=harness 级 / 值域=模型级、翻译后 ∪ 钉死枚举，两边无⇒不声明）；v2 默认翻转写死点一手定位 | **① §4 生效域投影在 `config.describe`＝A 树 wire**（与 092/122 同型：声明+校验+落盘本树做、describe 交 A）；**② §5 v2 改 `deploy/{pi,dsh,opencode}` 与 108 刚落的模板字节钉死测试同文件不同键⇒须同批改 108 期望**（R-0054 串行） | 0 | 本提交 |
 
 **剩**：阶段 2–5（描述符 controlOptions/`modelControls` 声明旋钮 + `CONTROL_VALUE_UNSUPPORTED` 校验 + 写入器键 + v2 模板翻转**与 108 钉死测试同批** + G6/G7 真 thought.delta 门）。**G6 真产生 thought.delta 需真链（本环境缺 Worker/sidecar 工件不可跑）⇒ 096 终态预期 PARTIAL**；qwen 无思考键/dsh·pi 逐模型映射不抄私表 ⇒ 类型化拒绝+逐家 status 登记。
+
+## 批 c2（runtime 线）· 本次会话边界报告 + 队列地图（2026-09-19 13:2x，执行者·runtime 线）
+
+**本次会话新落（一手账，非继承）**：`092` runtime 半**收口 +tag `checkpoint/092-provider-registry`**；`120`**收口 DONE +tag `checkpoint/120-credential-typed`**；
+`093` 阶段 3（freeze 透传 + `materialize_family` 派生器）；`094` 登录引擎（阶段 1+2，假端点）；`121` 产品侧（如实改定性 + 真实结构门）；`122` 阶段 1+5（一手核对 + wire 字段需求交回）；`096` 阶段 1（一手观测）。
+
+**全量套件（本边界，`tests/`+`plugins/harnesses/tests`，`-p no:cacheprovider`）**：**1231 passed / 19 failed / 24 skipped / EXIT=1**。
+**Worker 工件：不在**（`QA-007`）。对 092 收口那次基线（20 failed / 1211 passed）：**红 −1**（capability-path 中立门，本会话 `1cc4e8c` 修复）、**绿 +20**（本会话新增门）。
+**19 红 = 全既有环境性/继承，本会话引入回归 = 0**：`chain_gate_without_worker`(1)、`opencode_gate_cleanup`(11)、`pi_gate_cleanup`(5)、
+`production_lease`(1)（均缺 git-ignore 的 Worker/runtime 工件）＋ `test_skill_projection`（claude native-home `.claude`，继承非本会话）。**`待 QA 复算`**（`R-0040 ⑥`，不宣告"全量通过"）。
+
+**为何本边界不打 `checkpoint/c2`**：c2 = 108→110→107→111→092→093→094→095→096，其中 **095/096 未收口**（095 依 094-DONE=真登录/真链；096 的 describe 投影属 A、G6 真 `thought.delta` 需真链）⇒ c2 批次未全闭，
+按"每单收口才打检查点"（R-0053）只给已收口的 092/120 打了 tag；c2 批次 tag 留待 095/096 真收口或环境解锁。**非 QUEUE_EMPTY**（队列有未尽项）。
+
+### 队列地图（下一步入口·可判定）
+
+| 单 | 现态 | 卡在哪（精确） | 解卡入口 |
+| --- | --- | --- | --- |
+| `093` | 阶段 3 接线本树已落；真轮未跑 | 派生器接**真实 guest 写点** + 端到端真轮＝缺 Worker/sidecar 工件（本环境）；v2 逐槽落盘随 092-wire 多槽 | 有工件的树跑 production-chain-gate；092 v2 多槽 wire 那半 |
+| `094` | 引擎阶段 1+2 落（假端点） | wire `beginLogin/loginStatus/cancelLogin`＝A 树；生产 transport + 56 `pack_asset` compose；真机设备码登录要人 | A 出 wire 三方法 + 一次真登录（用户浏览器输码） |
+| `095` | 未开工 | 依 094-DONE（真链）；provider 型登录（Copilot/xAI/Google）端点**未一手钉** ⇒ 只能类型化拒 | 094 真收口 + 一手 provider OAuth 端点 |
+| `096` | 阶段 1 观测落 | `config.describe` 生效域投影＝A 线 wire；v2 模板翻转与 108 模板字节钉死测试同文件⇒须同批改；G6 真 `thought.delta` 缺真链 | describe 交 A/或一次性写权；模板+108 期望同改；真链跑 G6 |
+| `100` | 未开工 | A-089 谓词**成立**（R-0055 已入 rulings、runtime CP1 c1 绿），但逐家真实 UI 门＝真机链（本环境不可跑） | 有工件的树跑逐家真门（假端点优先） |
+| `107` | 阶段 1 交回（prior） | pi 思考"开"的合法值本环境无一手出处（pi 未装、全局 dsh 非 pin 版）⇒ 不猜值 | 提供 pin 版 pi/dsh 的 `thinking` 合法值一手 |
+| `121` | 产品侧 DONE（v1 装饰测试已如实改 + 真实结构门） | Work Core `src/agent_box/migrations/001..009`（`_run_migrations(conn)`+`schema_versions`）的升级⇔全新等价常设门；**注意 legacy-data 升级会多出 4 归档列**（AUD-B-009），非平凡等值 | 独立单元：按 W1–W4 四子实验 codify，含归档列语义反例 |
+| `122` | 阶段 1+5 交回 | 需 Worker 协议 `stopReason` 字段（ACP 枚举，字段尚不存在）+ `sessions/repository.py::complete_turn` 写 `terminal_reason`（该文件在 122 write_paths 外） | ops 另开 Worker 协议字段单（A/45）；本单届时补解析+写列+反例 |
