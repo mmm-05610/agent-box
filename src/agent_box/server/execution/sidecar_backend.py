@@ -596,22 +596,32 @@ class SidecarExecutionBackend:
                 # visible failed-cleanup fact and never turn it into a grant.
                 approval_cleanup_failed = True
             try:
-                run.port.close_execution(run.turn_id)
+                try:
+                    run.port.close_execution(run.turn_id)
+                except BaseException:
+                    # Teardown of the native channel failed; that is a cleanup
+                    # failure to record, never a reason to skip the release below.
+                    approval_cleanup_failed = True
                 self.records.mark_turn_cleanup(
                     run.turn_id, "failed" if approval_cleanup_failed else "cleaned",
                 )
             except BaseException:
-                self.records.mark_turn_cleanup(run.turn_id, "failed")
-            with self._lock:
-                self._active.pop(run.turn_id, None)
-                self._contexts.pop(run.turn_id, None)
-                self._message_parts.pop(run.turn_id, None)
-                self._turn_by_core.pop(run.core_execution_id, None)
-                self._approval_ports = {
-                    key: value for key, value in self._approval_ports.items() if value is not run.port
-                }
-            self.resources.release(run.turn_id)
-            self.provider.release_handle(run.dispatch_id)
+                # Order 109: the *fallback* record could itself fail (the shared
+                # SQLite is contended exactly when a second failure follows a
+                # first), and a bare raise here would escape the `finally` and
+                # strand the run's bookkeeping forever. Record it and fall
+                # through - the release must run no matter what.
+                logging.getLogger(__name__).exception(
+                    "turn %s: cleanup record failed", run.turn_id)
+                try:
+                    self.records.mark_turn_cleanup(run.turn_id, "failed")
+                except BaseException:
+                    logging.getLogger(__name__).exception(
+                        "turn %s: cleanup failed-record also could not be written",
+                        run.turn_id)
+            # Guaranteed release of every shared handle, independent of each
+            # other, so no failure above can leak the run or wedge the loop.
+            self._retire_run(run)
             self.on_event()
         if next_execution_id is not None:
             try:
@@ -620,6 +630,32 @@ class SidecarExecutionBackend:
                 # accept() already persisted this dispatch failure and paused
                 # any still-pending items; the completed predecessor stays final.
                 pass
+
+    def _retire_run(self, run: "_Run") -> None:
+        """Release every shared handle a run holds, so a failed turn cannot leak
+        the active maps, the bound resources, or the provider dispatch handle.
+
+        Each step is independent: one raising must not strand the others (that
+        leak is what accumulated across failures into the order-109 HTTP hang).
+        """
+        with self._lock:
+            self._active.pop(run.turn_id, None)
+            self._contexts.pop(run.turn_id, None)
+            self._message_parts.pop(run.turn_id, None)
+            self._turn_by_core.pop(run.core_execution_id, None)
+            self._approval_ports = {
+                key: value for key, value in self._approval_ports.items() if value is not run.port
+            }
+        try:
+            self.resources.release(run.turn_id)
+        except BaseException:
+            logging.getLogger(__name__).exception(
+                "turn %s: bound-resource release failed", run.turn_id)
+        try:
+            self.provider.release_handle(run.dispatch_id)
+        except BaseException:
+            logging.getLogger(__name__).exception(
+                "turn %s: provider handle release failed", run.turn_id)
 
     def _complete_then_retire(self, run: "_Run") -> None:
         """Run the durable completion and stop being a live worker afterwards."""
