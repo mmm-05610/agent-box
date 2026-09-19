@@ -9,6 +9,8 @@ forbidden: ["src/**", "plugins/**", "tests/**", "/home/maoqh/projects/agent-box-
 ruling: R-0004
 terminal: ["RELOCK_REGISTERED_DONE", "RELOCK_REGISTERED_PARTIAL"]
 waive: []
+parallelism: "none"
+parallelism_reason: "已收口的历史单：执行时未拆分单元，补记为单线程（不是本单引入的并行缺口）；再次触碰时按当时实际重declared。"
 parallel_units: []
 ---
 
