@@ -11,7 +11,7 @@ terminal: ["SUBAGENT_TASK_OWNERSHIP_DONE", "SUBAGENT_TASK_OWNERSHIP_PARTIAL"]
 waive: []
 parallel_units: ["ownership-predicates", "ambiguity-determinism", "gate-on-live-continuation", "bounded-turn-read"]
 serialize_with: ["092", "120", "121", "122", "126", "127", "130", "131", "133", "134", "135", "136", "137", "138", "140", "141"]
-revisions: [{"at": "a10b7c2", "what": "**并入 `AUD-B-029`（confirmed/**high**）**：委派取回子答复用的 `get_session` 窗口**截的是最旧 200 行**（`repository.py:1021` 默认 `event_limit=200`、`:1026-1037` 的 `turns`/`events` 两条查询都是**升序** `LIMIT` ⇒ **截掉最新、留下最旧**），而对照读法 `list_events_page`（`:1145-1160`）用的是 `DESC` 再 `reversed` ⇒ 后果三条：① **长答复被静默截头**（无标记）；② **带 `task_id` 续接必取回空摘要**（实测：库里 213 条事件、`get_session` 只回 200 ⇒ 本轮 3 条 delta 在窗外，真实答复 `ANSWER-PART-1..3` 取回 **`''`**，而 state 是 completed ⇒ 父侧**无从区分「子执行没话说」与「我们把话说丢了」**）；③ **会话轮数超窗必假超时**（`_await_terminal` 在最旧 200 条轮里找子轮终态）。**并入依据＝审阅者自己的批注**（『建议与 021/022/023/028 同批做（同一段 `delegation.py`，分开必互相覆盖）』）——与本单同段代码（`run()`/`_resolve_child_session`/取回链），且 `138` 已吸收 `028`，故本条落在本单。见正文阶段 6/7 与门 G6/G7。", "after_stage": 5, "ruling": "R-0046"}]
+revisions: [{"at": "a10b7c2", "what": "**并入 `AUD-B-029`（confirmed/**high**）**：委派取回子答复用的 `get_session` 窗口**截的是最旧 200 行**（`repository.py:1021` 默认 `event_limit=200`、`:1026-1037` 的 `turns`/`events` 两条查询都是**升序** `LIMIT` ⇒ **截掉最新、留下最旧**），而对照读法 `list_events_page`（`:1145-1160`）用的是 `DESC` 再 `reversed` ⇒ 后果三条：① **长答复被静默截头**（无标记）；② **带 `task_id` 续接必取回空摘要**（实测：库里 213 条事件、`get_session` 只回 200 ⇒ 本轮 3 条 delta 在窗外，真实答复 `ANSWER-PART-1..3` 取回 **`''`**，而 state 是 completed ⇒ 父侧**无从区分「子执行没话说」与「我们把话说丢了」**）；③ **会话轮数超窗必假超时**（`_await_terminal` 在最旧 200 条轮里找子轮终态）。**并入依据＝审阅者自己的批注**（『建议与 021/022/023/028 同批做（同一段 `delegation.py`，分开必互相覆盖）』）——与本单同段代码（`run()`/`_resolve_child_session`/取回链），且 `138` 已吸收 `028`，故本条落在本单。**⚠️ 该并入未生效**：`139` 已在 `0528f1e` 收口（早于本修订 `f44b3af`）⇒ 本单的阶段 6/7 与门 G6/G7/G8 **已移除**（避免「单里有未勾阶段、树里说全」的自相矛盾），内容**改投独立单 `146`**（`agent-box-runtime-round1`）。留此记录以防「同族别分开做」的批注被误读为「必须塞进已收口的单」。", "after_stage": 5, "ruling": "R-0046"}]
 ---
 
 # Work Order 139 — `task_id` 续接**不校验会话归属**：只比 harness **家族**，不问"这条会话是不是本次被授权的那个子 profile 的"（`AUD-B-021` **confirmed/high**）
@@ -93,36 +93,6 @@ revisions: [{"at": "a10b7c2", "what": "**并入 `AUD-B-029`（confirmed/**high**
 **WHEN** 把新补的两条归属判据注释掉
 **THEN** 本单的门**必须红**
 
-### Requirement: 取回子答复必须按「**本轮、最新**」读，不许读会话快照的前 N 行（并入 `AUD-B-029`）
-
-**来源**：`AUD-B-029`（confirmed/**high**，审阅者第 89 轮）＋ 审阅者的合并批注（与 021/022/023/028 同批，别分开）。
-
-**事实**：`repository.py:1021` 的 `get_session(self, session_id, *, event_limit: int = 200)`（默认 200，**全仓无人传别的值**），
-其 `:1026-1037` 的 `turns` 与 `events` **两条查询都是升序 `ORDER BY … LIMIT ?`** ⇒ **截掉的是最新部分、留下最旧部分**；
-对照同文件**正确的读法** `list_events_page`（`:1145-1160`）用 `ORDER BY seq DESC LIMIT ?` 再 `reversed(...)`。
-而 `delegation.py:296-307`（`_await_terminal`，每 50ms 读一次）与 `:309-320`（`_final_message`，拼 summary）
-都从**同一份快照**里读 ⇒ 合同 `65:36` 声明的上界是 **`MAX_SUMMARY_CHARS`=4096**（有界＝**摘要**而非转录），
-实测上界却是「**会话事件表的前 200 行**」这个**未声明的内部窗口**——两者不是同一件事。
-
-**实测三后果**（照抄）：① 库里 213 条事件、`get_session` 只回 200（最大 seq=200）⇒ 本轮 3 条 delta 在窗外，
-真实答复 `ANSWER-PART-1ANSWER-PART-2ANSWER-PART-3` 被取回为 **`''`**，而 state 是 `completed` ⇒
-**父侧无从区分"子执行没话说"和"我们把话说丢了"**；② 带 `task_id` 续接**必取回空摘要**；③ 会话轮数超窗 ⇒ **假超时**。
-
-#### Scenario: 单轮答复超窗（正例）
-
-**WHEN** 子轮 delta 数 > 窗口
-**THEN** summary **要么完整、要么带合同声明的截断标记**（**不得静默**）
-
-#### Scenario: 续接取回非空（正例）
-
-**WHEN** 同一子会话**第二次**带 `task_id` 续接
-**THEN** 取回的 summary **非空**（当前必空）
-
-#### Scenario: 反例（门要能咬）
-
-**WHEN** 把取回改回"读会话快照前 200 行"
-**THEN** 门**必须红**
-
 ## Stages
 
 - [ ] 1. 观测：一手复现"未授权 profile 的句柄续接成功"＋"歧义句柄取行序第一条"（提交）
@@ -130,8 +100,6 @@ revisions: [{"at": "a10b7c2", "what": "**并入 `AUD-B-029`（confirmed/**high**
 - [ ] 3. 歧义 ⇒ 确定性类型化拒绝（提交）
 - [ ] 4. 门：正例 ＋ 未授权反例 ＋ 歧义反例 ＋ 跨家族保持 ＋ 注释掉必须红（提交）
 - [ ] 5. 账与证据（提交）
-- [ ] 6. **（并入 `AUD-B-029`）**取回链改按「**本轮、最新**」读：`_final_message`/`_await_terminal` 不再读会话快照列表（复用 `list_events_page` 的 `DESC`+反转，或新增 `turn_events(turn_id, after)`）（提交）
-- [ ] 7. **（并入 `AUD-B-029`）**把 `get_session` 的**窗口语义定死**：要么明确返回「最近 N 条」并**两处查询一起改 `DESC`**，要么去掉列表、在文档里写死「只可用作标量读取」——别让下一个消费者再踩（提交）
 
 ## Gates
 
@@ -142,9 +110,6 @@ revisions: [{"at": "a10b7c2", "what": "**并入 `AUD-B-029`（confirmed/**high**
 | G3 歧义确定性 | 多行命中 ⇒ 确定性类型化报错 | 退回 `fetchone()` 取行序第一条 ⇒ 门红 | fail (typed) |
 | G4 真链 | 门经 `run_subagent` 真入口驱动 | 直调私有函数 ⇒ 门红 | fail (typed) |
 | G5 既有反例保持 | 跨家族仍 `SUBAGENT_TASK_FAMILY_MISMATCH` | 该反例变绿 ⇒ 门红 | fail (typed) |
-| G6 **取回按本轮读**（`AUD-B-029`） | 单轮 delta 数 > 窗口时 summary 完整或**带合同声明的截断标记**（不静默） | 改回读快照前 200 行 ⇒ 门红 | fail (typed) |
-| G7 **续接非空**（`AUD-B-029`） | 第二次带 `task_id` 续接取回的 summary **非空** | 仍空 ⇒ 门红 | fail (typed) |
-| G8 **窗口语义定死**（`AUD-B-029`） | `get_session` 的列表语义**明确**（最近 N 条 或 只作标量读）；机检：`grep -rn 'get_session' src/agent_box/server/execution/delegation.py` 之后**仍读 events/turns 的位点为 0** | 留模糊语义 ⇒ 门红 | fail (typed) |
 
 ## Validation
 
@@ -157,7 +122,7 @@ git diff --check && git status --short
 
 ## DoD
 
-1. 一手复现（未授权续接 ＋ 句柄歧义）· 2. 两条归属判据（复用既有码）· 3. 歧义确定性拒绝 · 4. 门（五条，含"注释掉必须红"）· 5. 账与证据 · **6. 取回按本轮读（`AUD-B-029`：不静默截头）· 7. `get_session` 窗口语义定死（`AUD-B-029`）**。缺一项 ⇒ PARTIAL。
+1. 一手复现（未授权续接 ＋ 句柄歧义）· 2. 两条归属判据（复用既有码）· 3. 歧义确定性拒绝 · 4. 门（五条，含"注释掉必须红"）· 5. 账与证据。缺一项 ⇒ PARTIAL。
 
 ## Acceptance
 
