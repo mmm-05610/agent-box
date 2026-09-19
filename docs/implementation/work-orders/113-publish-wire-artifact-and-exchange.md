@@ -10,6 +10,7 @@ ruling: R-0032
 terminal: ["WIRE_ARTIFACT_PUBLISHED_DONE", "WIRE_ARTIFACT_PUBLISHED_PARTIAL"]
 waive: []
 parallel_units: ["publish","generation-rule","stale-copy"]
+revisions: [{"at": "6df2213", "what": "修订 v2（ops \u7b2c 118 \u8f6e\uff09\uff1a\u628a 092 \u4ea4\u56de\u7684 ② \u5408\u5e76\u8fdb\u672c\u5355\uff08\u751f\u6210 wire-v1 schema/\u5de5\u4ef6 + \u4e24\u4ed3\u91cd\u9501\uff09\uff0c\u5e76\u70b9\u540d\u684c\u9762\u4fa7\u6d88\u8d39\u8005\uff08P28 \u91cd\u751f\u6210\uff09\uff1bG7 \u6750\u6599\u5df2\u5907\u3002", "after_stage": 0, "ruling": "R-0032"}]
 ---
 
 # Work Order 113 — 后端发布 64 方法工件 + 两仓交换本体 + 定生成/比较口径 + 替换本树旧副本（AQ-0008，用户选 1）
@@ -33,6 +34,22 @@ parallel_units: ["publish","generation-rule","stale-copy"]
 | 权威对（当前）：TS `58d61ebb…` / 工件 `c4255b31…`（settings 树 `ed6592b7` 登记；我复算相符） | 主树 status 第 58 轮 |
 | 门今天的入口：`AGENT_BOX_WIRE_SCHEMA` 环境变量（`tests/server/test_wire_v1.py:118-127`）；**全树无代码指向那份旧副本** | AUD-B-003 |
 | 后端 handler 方法集 = 64 | 097/101/105 的账 |
+
+
+## 修订 v2（2026-09-19 21:1x，ops；`at` = `6df2213`，**after_stage 0**）
+
+**新依据**：`092` 收口（runtime `6df2213`，终态 `PROVIDER_REGISTRY_PARTIAL`）把它的**精确剩余 ②** 明确交回：
+"**生成 wire-v1 schema/工件 ＋ P28 重生成 ＋ 两仓重锁（G7 材料已备：见 wire-review 092 节）**"。
+这与**本单**（发布 64 方法工件 ＋ 两仓交换本体 ＋ 定生成/比较口径 ＋ 替换本树旧副本）是**同一件事**（`R-0032 ④`／`AQ-0008` 的口径）
+⇒ **按 §2c「合并重复」并入本单，不要两处各做一遍**。
+
+**修订加的（只加两件，不改原 4 阶段）**：
+- **吸收 `092` 的 ②**：本单的工件生成要把 `092` 立下的 **canonical 词汇**（runtime 侧 `execution/protocols.py` 是单一真相）与**六家 `wire_protocols` 声明**纳入工件口径；
+  并在报告里**逐条引用 `092` 的 wire-review 节**（G7 材料），说明"工件里哪一段对应它的哪一条"。
+- **点名桌面侧消费者**：工件/口径发布后，**桌面 settings 线**要据此**重生成**（其 `P28` 上下文）——本单负责**把可判定的触发写清**（工件 sha／摘要对），
+  **不替它生成**（跨树只读）。触发写法：把"哪份工件、哪个摘要、settings 侧要重生成什么"写成一行可核对的事实，供 `P28` 引用。
+
+**修订回执（`README §3.5b`）**：纳入后在下一个阶段提交信息或本树 status 记一行「已纳入 work order 113 修订 @<sha>」。
 
 ## Scope
 
