@@ -1206,3 +1206,13 @@ runtime 侧（存储/service/描述符/派生/冻结/逐家声明）已 DONE 且
 | 120 | 1-4（一处提交收口） | G1 store 缺 locator⇒`SecretLocatorUnavailable`（`code=CREDENTIAL_NOT_AVAILABLE`、点名不敏感 id、**零 key 内容**）非 KeyError；G2/G3 port_factory 在 capability_gate/spawn **之前**把读失败转成 `CREDENTIAL_NOT_AVAILABLE` 并落日志⇒`_safe_code` 出**具名码**非 `EXECUTION_FAILED`；G2 反例见证 `_safe_code(KeyError(..))==EXECUTION_FAILED`（退回即门红） | 定向 `test_credential_missing_typed_120`+`test_deployment_credentials` **15 passed**；`harness_sidecar` **92 passed/6 skipped**；`runtime` import OK；**Worker 工件不在**（QA-007，环境红与本单无关）| 0 真调用 | 本提交 |
 
 **终态 `CREDENTIAL_MISSING_TYPED_FAILURE_DONE`**（runtime 射程）。边界如实：转录 reason 字段＝大写 code（wire `execution.state` 既有形状）⇒ 本单把 `EXECUTION_FAILED` 升到具名 `CREDENTIAL_NOT_AVAILABLE`；更长的自由文本"换哪个 profile"属 wire/schema 消息位（A 树），可行动细节现落服务器日志（只 id、零凭据内容，守 R-0032⑤）。`wire/**` 未动。§Spend：0 真调用 / ¥0。
+
+### 工单 093 — 阶段 3 接线（本次增量，非终态；2026-09-19，执行者·runtime 线）
+
+> 092 收口后开工判据成立。**已落**：freeze 透传 `protocols/endpoints`（`85ac5b8`）+ `native_materialization.materialize_family(harness, frozen)` 派生器
+> 把冻结执行喂给各家既有渲染器（codex/pi/claude/opencode/kilo/hermes），**记录 base_url+方言替模板常量**；无 facts⇒`None`（保模板逐字节，G6）；
+> 不支持协议⇒渲染器 `translate_protocol` 抛 `PROTOCOL_UNSUPPORTED_BY_HARNESS`（不写、不猜）；dsh/qwen⇒`None`（未钉死不猜方言）。
+> 测试 `test_native_materialization_093_stage3.py` 6 条（codex URL/方言/层级/幂等、opencode options.baseURL、claude env、拒、无facts⇒None、dsh/qwen⇒None）；
+> 定向 `materialization or native` **27 passed/2 skipped**（含 093 阶段 2 既有 25 条未退化）。
+> **剩（终态仍 `NATIVE_CONFIG_MATERIALIZATION_PARTIAL`）**：① 派生器接到**真实 guest 投影写点**（turn 期）＋ 端到端第二上游真轮＝本环境缺 Worker/sidecar
+> 工件不可跑（同 108/114 真机腿先例，只读+in-process 覆盖）；② v2 逐槽/限额落盘（`model_controls` 描述符侧 + 各家 limit 字段）尚未接（092 wire 多槽那半未落）。逐家 DONE/PARTIAL 待真轮环境补。

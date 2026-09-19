@@ -228,3 +228,61 @@ def render_hermes_config(*, base_url: str, protocol: str, model: str,
             },
         },
     }
+
+
+def _pick_protocol(harness: str, frozen: Mapping[str, object]) -> tuple[str, str] | None:
+    """First (protocol, base_url) the record declares an endpoint for, canonical order.
+
+    Returns ``None`` when the record carries no endpoint facts - the caller then
+    keeps the reviewed template bytes (093 G6: "no facts => zero regression").
+    A protocol present but with no matching endpoint is skipped, never guessed.
+    """
+    protocols = frozen.get("protocols") or ()
+    endpoints = frozen.get("endpoints") or {}
+    for protocol in CANONICAL_PROTOCOLS:
+        if protocol in protocols and protocol in endpoints:
+            return protocol, str(endpoints[protocol])
+    return None
+
+
+def materialize_family(harness: str, frozen: Mapping[str, object]) -> dict | None:
+    """Turn one frozen execution into a family's native endpoint/protocol write.
+
+    This is the 093 stage-3 link: it consumes the protocol facts layer 1 (092)
+    froze onto the execution (`protocols` + `endpoints`) and dispatches to the
+    family's renderer, so a non-DeepSeek upstream's base URL and dialect actually
+    reach the native file instead of the template constant.
+
+    * no endpoint facts on the record -> ``None`` (caller keeps reviewed bytes);
+    * a protocol the family cannot express -> ``translate_protocol`` raises
+      ``PROTOCOL_UNSUPPORTED_BY_HARNESS`` (typed refusal; caller writes nothing);
+    * output carries only the endpoint + dialect + env-reference key, never a
+      secret value. v2 per-slot / limit facts are a later wiring; this wires the
+      endpoint+protocol path the whole "second upstream is actually used" gate needs.
+    """
+    picked = _pick_protocol(harness, frozen)
+    if picked is None:
+        return None
+    protocol, base_url = picked
+    provider = str(frozen.get("provider") or "")
+    model = str(frozen.get("model") or "")
+    target = _NATIVE_TARGET.get(harness)
+    if harness == "codex":
+        content: object = render_codex_provider_section(
+            provider=provider, base_url=base_url, protocol=protocol)
+    elif harness == "pi":
+        content = render_pi_provider(provider=provider, base_url=base_url, protocol=protocol)
+    elif harness == "claude-code":
+        content = render_claude_env(base_url=base_url, protocol=protocol)
+    elif harness in ("opencode", "kilo"):
+        content = render_opencode_provider(
+            provider=provider, base_url=base_url, protocol=protocol, model=model,
+            family=harness)
+    elif harness == "hermes":
+        content = render_hermes_config(base_url=base_url, protocol=protocol, model=model)
+    else:
+        # dsh/qwen have no pinned native protocol field -> not materializable here;
+        # returning None keeps the template rather than guessing a dialect.
+        return None
+    return {"harness": harness, "target": target, "protocol": protocol,
+            "base_url": base_url, "content": content}
