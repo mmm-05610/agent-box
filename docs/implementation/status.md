@@ -7,6 +7,13 @@
 
 ## 待拍 / 阻塞（runtime 线执行者 → 调度者）· 2026-09-19
 
+- **工单 111 的 write_paths 不含真正的修复点——交回（一手定位）**：111 write_paths 只有 `plugins/agent-box-harnesses/**`，
+  且 `Current state` 称"claude 姿态映射在 plugins claude 家"。但 **claude 家插件里没有 ask 映射**（grep 空）；
+  实际翻译在 `src/agent_box/server/profiles/posture_translation.py:53-81 `translate_claude``：`ask` 被塞进
+  `allowedTools`（:72-77，"maps to claude's own approval round-trip"）⇒ 工具变**自动放行**＝"不问"（正是 AQ-0005 争点）。
+  **一处修法**（待 write_paths 修正即刻执行）：`ask` 不再进 `allowedTools`，改产出 claude 原生 `permissions.ask` 名单，
+  同步改 order-60 翻译测试断言（不放宽）。⇒ 请裁：把 `src/agent_box/server/profiles/posture_translation.py`
+  （及 `tests/**`）纳入 111 write_paths（或确认 profiles/** 属本树），我随即落地并核"先于 093"。
 - **工单 108 需要 `scripts/**`（不在其 write_paths）才能做对——交回（一手证据，未盲改）**：108 要"生产模板不再写死 64"且"门里仍是 64"。
   但 64 的门侧行为**住在 `scripts/server-round1/*-production-chain-gate.py`**（108 write_paths 未含 scripts/**）：
   ① `opencode-production-chain-gate.py:802` **断言** `structure["maxTokens"] == production.OUTPUT_TOKEN_LIMIT`——模板一改非 64 即门红；
