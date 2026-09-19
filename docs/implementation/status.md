@@ -1334,3 +1334,34 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 **恢复点更正（以现物为准）**：上表三笔之后即**本节所在提交**（写这行时它还不在表里——把它写全就会自相矛盾，故以 `git log --oneline -4` 现物为准）；`checkpoint/b2-2` 仍指 `beee590`（报告正文的那次提交）。
 两套全量计数（765/1、1066/0）对应 `df115c7` 的源码状态；`d56535f` 只加测试与文档，其门为
 `28 passed in 9.89s` ＋ 定向 `120 passed / 650 deselected`，未重跑全量（不拿局部绿冒充全量计数）。
+
+---
+
+## 按 R-0040 ⑥（公告第 106 轮）重述本批的全量计数：不宣告"通过"，标 `待 QA 复算`
+
+新规则原文：跑完全量后**不要在本树宣告"全量通过"**——把 **sha ＋ 命令 ＋ 计数** 写进本树 status 并标 `待 QA 复算`；
+跨树回归/环境归因/flaky 归 QA；**报数必须附"工件在/不在"一行**。本批两行终态里的计数因此按这个格式重述一次
+（原行不删，按本项目惯例就地加更正）：
+
+| 项 | 现物 |
+| --- | --- |
+| 被测源码状态 | `df115c7`（113 阶段 1–4 那次提交；账与文档在后三笔里，不影响被测面） |
+| 命令 A | `python3 -m pytest tests/server -q`（前置 `export PYTHONPATH=src:plugins/agent-box-harnesses/src:plugins/agent-box-runtime-wsl/src:plugins/agent-box-runtime-local/src:plugins/agent-box-sandbox-bwrap/src:plugins/agent-box-skills/src:plugins/agent-box-terminal-session/src`） |
+| 计数 A | **765 passed / 1 failed in 445.20s**（红：`test_subagent_harness_real_round_086.py::test_a_real_claude_parent_round_calls_run_subagent_itself`） |
+| 命令 B | `python3 -m pytest tests/ -q`（同一 `PYTHONPATH`） |
+| 计数 B | **1066 passed / 0 failed / 0 skipped in 547.39s** |
+| **工件** | **在**：`workers/agent-box-worker/target/release/agent-box-worker`（2 260 856 字节，Sep 18 22:41，被 git 忽略、不入库）⇒ 086 那条真实轮门在本树**能真跑**；这条直接决定两条线的计数不可横向比较（QA-007 的形状：缺工件的那棵树同一批代码天然 18 红） |
+| 本树自己的归因（**不作结论，交 QA 判**） | 那条红在同一次运行里两处为绿：根套件腿 1066 全绿含该条、单跑该条 `1 passed in 30.33s`；且它 docstring 自陈"父轮必须塞进 sidecar 的 120 s 进程上限"。本树按 §待开单登记为"疑负载敏感"，**不因此判它已通过**，也未改任何断言 |
+
+**并记两笔（公告第 106 轮点名面向 A 线）**：
+
+1. **`113` 未跑的那条腿（与桌面 settings 树现物字节对表）移交主树会话**——公告原文："只有主树会话能同时只读两棵树；
+   下一轮我做对表并把结果写进主树 status，**不改你的账**"。⇒ **本树终态码仍是 `WIRE_ARTIFACT_PUBLISHED_PARTIAL`**：
+   这一腿不在本树完成，就不把 113 改判 DONE；等主树那次的结果出现，由调度者决定 113 是否补一条收口更正。
+   本树可复跑的部分保持不变：`--compare docs/server-round1/fullstack/contract/wire-v1.schema.registered-c4255b31.json`
+   ⇒ 退出码 **1**，点名 `providerModels.update` / `probeModels` 的 `provenance`。
+2. **`scripts/server-round1/**` 的唯一 owner＝A 线**（QA-004 待投递进两棵后端树章程；runtime 只读引用，
+   要改门脚本需调度者开一次性例外，108 已是先例）。**本树不据此提前行动**——章程还没改，等调度者投递；
+   本批在该目录里新增的两个文件（`wire_drive_coverage.py`、`wire_artifact.py`）都在 103/113 的 `write_paths` 内。
+
+**真实模型调用不变**：本批六张 **0 次 / ¥0**；凭据 locator 未访问（本轮为量"工件在/不在"只 `stat` 了一个二进制，未读任何凭据）。
