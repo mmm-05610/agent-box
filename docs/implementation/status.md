@@ -2098,3 +2098,28 @@ CPython 会把 `OSError(13, …)` 自动提升成 `PermissionError`，**错的�
 `QA-008/009`＝`115`/`117` 均 DONE · `103` DONE · `099` DONE（`8eb8ac2`）· `089` **只剩上面那一格**。
 ⇒ 队列**不空**（`124`/`132`/`089` 三张在来的单）⇒ **不写 `QUEUE_EMPTY_AT`**；本轮按 §8b 交付了 `089` 的 seed 腿，
 下一轮先重读 `work-orders/**` ＋ 复算上面三行判据。
+
+## §Spend 增量（本轮：`089` seed 腿 ＋ `H-013` 落号；2026-09-20 04:3x）
+
+- **真实模型调用 0 / ¥0**；凭据内容 **0 次读取**（seed 脚本只 `stat` key 文件并把**路径**交给服务端的 store；
+  形状门里用的假 key 是本树自造的 `fake-loopback-value-not-a-secret`，从未上行）。真实上游端点**未被访问**。
+- 机时：`ui_gates_89_seed_profile.py --self-test` ×5（红→绿迭代，最后一次 **15/15**）·
+  `ui_gates_89_seed_shape_check.py` ×5（三次被真处理栈当场拒：`HARNESS_UNAVAILABLE`／`Harness does not accept credentials`／`unexpected requestId`，
+  都是**我照抄错了形状**，改完 **10/10**）· `tests/server/test_wire_drive_coverage_103.py` **9 passed / 3.75s**（生成账未变）。
+- 子代理 **0**；一次策略拦截如实记：想按 QA 现场起一次性 uvicorn 复跑真 socket，Auto 分类器判"起停服务进程"拦下
+  ⇒ 改成 in-process `TestClient`（真处理栈、无 socket），**没有降级任何断言**；
+  另一次：`ui_gates_89_leak_check.py --self-test` 被以"脚本不存在"两次拦下（`ls` 实测存在）⇒ 按纪律不重复同一调用，留到续跑轮。
+- **账本被自己改坏过一次并当场修回**：往 §待开单 追加候选行时，`Edit` 的锚点只匹配到上一行的前缀 ⇒ 两行被并成一行、
+  `_model_references` 那条差点丢。发现后用 HEAD 逐字比回（`git diff` 显示 0 行丢失）再拆回两行。**教训入形**：
+  往表格里追加行的锚点必须含**整行结尾**（`|` 收尾），不然就是"改坏别人的账还打印成功"。
+
+## §8b 第 6 条（本轮收尾：等什么 / 为什么别的不能做 / 何时醒）
+
+- **等**：① `handoffs.md` `H-013` ② ⇒ QA 线在 Windows 侧按 §3b seed 后续跑两家；② runtime 线把 canonical 词汇文件
+  （`execution/protocols.py`）带进本树（`124` 判据）；③ runtime 树落下 `130`/`131` 的终态码（`132` 判据）。
+- **为什么没有别的可做**：目录里 id≥100 的 18 张单，17 张有终态码或明确"未开工＋判据"（本轮 `validate_order --strict` 唯一 FAIL 是历史遗留的 `67` 单缺 frontmatter，未触碰）；
+  三张在来的单的判据本轮**一手复算过两次**（04:0x 与 04:3x），没有一张成立。`089` 的本树部分已交付到不能再交付：
+  剩下的是"在别人那台机器上按现成命令跑一次"。
+- **何时醒**：≤5 分钟一轮，醒来先重读 `work-orders/**` ＋ 复算上面三行判据；任一成立即按该单 §Stages 开火。
+- **一条不属于我这一腿的账**：主树 `handoffs.md` 的 `H-013` 行**未提交**（按 `R-0067 ②` 列分离与既有惯例，
+  提出者落行、ops 提交并写裁决列，如 `H-011`/`H-012` 那样）。
