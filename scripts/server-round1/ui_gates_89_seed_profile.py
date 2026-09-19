@@ -48,6 +48,10 @@ class Face:
     def __init__(self, base_url: str, token: str) -> None:
         self.base_url = base_url.rstrip("/")
         self.token = token
+        # Always talk to the Server directly. On Windows, `urllib` reads the system proxy from
+        # the registry, and a proxied loopback request is precisely how QA's run turned a `POST`
+        # into `http=400 "Invalid HTTP request received."` (`GET /live` slipped through).
+        self._opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
     def _send(self, url: str, body: dict, idempotency_key: str | None):
         headers = {"Authorization": f"Bearer {self.token}", "Content-Type": "application/json"}
@@ -56,7 +60,7 @@ class Face:
         request = urllib.request.Request(url, data=json.dumps(body).encode("utf-8"),
                                          headers=headers, method="POST")
         try:
-            with urllib.request.urlopen(request, timeout=30) as response:
+            with self._opener.open(request, timeout=30) as response:
                 return response.status, json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
             raw = exc.read().decode("utf-8", "replace")
@@ -689,6 +693,30 @@ def self_test() -> int:
                              "--state-file", str(root / "nope.json")], record(_StubFace))
         check("teardown_without_a_state_file_is_refused",
               code == 3 and "TEARDOWN_NEEDS_STATE_FILE" in text, {"exit": code, "text": text[-140:]})
+
+        # -- the loopback request must not be handed to whatever proxy the environment names
+        # (on Windows that is how QA's `POST` came back as a bare 400) --
+        saved_proxy = os.environ.get("http_proxy")
+        os.environ["http_proxy"] = "http://127.0.0.1:9"
+        try:
+            def proxy_map(opener):
+                handler = next((item for item in opener.handlers
+                                if type(item).__name__ == "ProxyHandler"), None)
+                return dict(getattr(handler, "proxies", None) or {})
+
+            probe = Face("http://127.0.0.1:18820", "tok")
+            ours = proxy_map(probe._opener)
+            theirs = proxy_map(urllib.request.build_opener())
+        finally:
+            if saved_proxy is None:
+                del os.environ["http_proxy"]
+            else:
+                os.environ["http_proxy"] = saved_proxy
+        # `theirs` non-empty is not a formality: it is what would send a loopback `POST`
+        # through the machine's proxy - the shape QA reported as `http=400`.
+        check("the_face_never_hands_a_request_to_an_environment_proxy",
+              ours == {} and theirs.get("http") == "http://127.0.0.1:9",
+              {"ours": ours, "defaultOpenerWouldUse": theirs.get("http")})
 
     passed = [name for name, ok, _ in cases if ok]
     failed = [(name, detail) for name, ok, detail in cases if not ok]
