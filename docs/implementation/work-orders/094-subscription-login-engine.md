@@ -9,7 +9,7 @@ forbidden: ["/home/maoqh/projects/agent-box-server-round1/**", "/home/maoqh/proj
 ruling: R-0013
 terminal: ["SUBSCRIPTION_LOGIN_DONE", "SUBSCRIPTION_LOGIN_PARTIAL"]
 waive: []
-parallel_units: []
+parallel_units: ["device-code","state-store"]
 ---
 
 # Work Order 094 — 订阅登录（一）：登录引擎 + codex 的 harness 型登录

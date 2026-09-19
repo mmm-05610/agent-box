@@ -9,7 +9,7 @@ forbidden: ["/home/maoqh/projects/agent-box-server-round1/**", "/home/maoqh/proj
 ruling: R-0013
 terminal: ["PROVIDER_REGISTRY_DONE", "PROVIDER_REGISTRY_PARTIAL"]
 waive: []
-parallel_units: []
+parallel_units: ["record-fields","protocol-vocabulary","compatibility-derivation"]
 ---
 
 # Work Order 092 — Provider 记录中立化 + 协议词汇 + 兼容派生（R-0013 第 1 层）

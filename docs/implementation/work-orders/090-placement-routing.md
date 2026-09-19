@@ -9,7 +9,7 @@ forbidden: ["plugins/**", "/home/maoqh/projects/agent-box-server-round1/**"]
 ruling: R-0012
 terminal: ["PLACEMENT_ROUTING_DONE", "PLACEMENT_ROUTING_PARTIAL"]
 waive: []
-parallel_units: []
+parallel_units: ["wsl-route","ssh-route"]
 ---
 
 # Work Order 090 — 放置路由：WSL 工作区的执行必须去 WSL worker（否则类型化拒绝）

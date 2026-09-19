@@ -9,7 +9,7 @@ forbidden: ["/home/maoqh/projects/agent-box-server-round1/**", "/home/maoqh/proj
 ruling: R-0012
 terminal: ["CONTROL_PLANE_SYNC_DONE", "CONTROL_PLANE_SYNC_PARTIAL"]
 waive: []
-parallel_units: []
+parallel_units: ["first-deploy","incremental-sync","credential-projection"]
 ---
 
 # Work Order 091 — 控制面同步：首次部署 + 增量 + 凭据只在 Windows（每执行投影）

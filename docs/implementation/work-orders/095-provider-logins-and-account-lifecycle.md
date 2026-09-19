@@ -9,7 +9,7 @@ forbidden: ["/home/maoqh/projects/agent-box-server-round1/**", "/home/maoqh/proj
 ruling: R-0013
 terminal: ["PROVIDER_LOGINS_DONE", "PROVIDER_LOGINS_PARTIAL"]
 waive: []
-parallel_units: []
+parallel_units: ["login-kinds","account-lifecycle"]
 ---
 
 # Work Order 095 — 订阅登录（二）：provider 型登录 + 账号生命周期（刷新 / 额度 / 订阅模型列表）
