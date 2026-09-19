@@ -7,13 +7,11 @@
 
 ## 待拍 / 阻塞（runtime 线执行者 → 调度者）· 2026-09-19
 
-- **工单 111 的 write_paths 不含真正的修复点——交回（一手定位）**：111 write_paths 只有 `plugins/agent-box-harnesses/**`，
-  且 `Current state` 称"claude 姿态映射在 plugins claude 家"。但 **claude 家插件里没有 ask 映射**（grep 空）；
-  实际翻译在 `src/agent_box/server/profiles/posture_translation.py:53-81 `translate_claude``：`ask` 被塞进
-  `allowedTools`（:72-77，"maps to claude's own approval round-trip"）⇒ 工具变**自动放行**＝"不问"（正是 AQ-0005 争点）。
-  **一处修法**（待 write_paths 修正即刻执行）：`ask` 不再进 `allowedTools`，改产出 claude 原生 `permissions.ask` 名单，
-  同步改 order-60 翻译测试断言（不放宽）。⇒ 请裁：把 `src/agent_box/server/profiles/posture_translation.py`
-  （及 `tests/**`）纳入 111 write_paths（或确认 profiles/** 属本树），我随即落地并核"先于 093"。
+- **工单 111 — 已裁定并落地**（R-0032 ① / write_paths 增补 `src/agent_box/server/profiles/**` @`015c91c`）：真正的修复点
+  在 `posture_translation.py:translate_claude`（`ask` 被塞进 `allowedTools`＝自动放行＝"不问"）。已改为三桶
+  （`allow→allowedTools`、`deny→disallowedTools`、`ask→translated["ask"]`＝claude `permissions.ask` 提问语义），
+  60 翻译测试按 §52 改新映射并写明理由、不放宽（`Bash in ask` 且 `Bash not in allowedTools`）。终态 `CLAUDE_ASK_MAPPING_DONE`，
+  **先于 093 落地**（093 阶段 1 落盘前须核到本提交 `2f46db5`）。见下方 c2/c3 表 111 行。
 - **工单 108 需要 `scripts/**`（不在其 write_paths）才能做对——交回（一手证据，未盲改）**：108 要"生产模板不再写死 64"且"门里仍是 64"。
   但 64 的门侧行为**住在 `scripts/server-round1/*-production-chain-gate.py`**（108 write_paths 未含 scripts/**）：
   ① `opencode-production-chain-gate.py:802` **断言** `structure["maxTokens"] == production.OUTPUT_TOKEN_LIMIT`——模板一改非 64 即门红；
@@ -37,10 +35,11 @@
 | [109](work-orders/109-second-delay-failure-hangs-http.md) | **HTTP_HANG_AFTER_SECOND_FAILURE_DONE** | `_complete` finally 保证释放（新增 `_retire_run`，逐步各自守护）；门=确定性触发"清理记录二次抛"⇒ run 仍退役、退回旧 finally 必红；错误码逐字不变。回归 harness+本单 94 passed。[证据](../server-round1/109-http-hang-after-second-failure.md) | 端到端"真 uvicorn 单循环被打死"受多线程真传输限制（本环境不可控复现），在**源头不变量**门住。§Spend：0 真调用 |
 | [110](work-orders/110-queue-not-adopted-after-stop.md) | **QUEUE_ADOPTION_AFTER_STOP_DONE（v2 口径）** | 67 pause 保留；`pause_reason` 落库(schema 18→19)、`queue.updated` 事件**仅在有原因时**带 `pauseReason`、queue 视图带之；门=stop 后 paused+reason==cancelled+不自动采纳，退回 `del reason` 必红。wire_v1+pause+本单门 40 passed、boundaries 21。[证据](../server-round1/110-queue-pause-visibility.md) | **合同变更（新字段，非新方法）→ 重锁链**：settings 线把 `pauseReason` 编进 `wire-v1.ts`+重生成工件+登记新摘要对；A 线 `113` 以 110 现状发布含 `pauseReason` 的工件。遗留待裁：`withdraw` 仅 pending，paused 项撤不掉（改它=队列语义，交回）。§Spend：0 真调用 |
 | [102](work-orders/102-contract-drift-two-faces.md) | **CONTRACT_DRIFT_TWO_FACES_DONE** | AUD-B-002：`v1.schema.json` op.enum 补齐 5 落后 op + golden 5 正例 + 三元门（受审常量==schema、每项在 main.rs、新 op 有 golden、golden⊆枚举，两向内建反例）。AUD-B-003：陈旧 33 方法快照改名（防假绿）+ wire-review 7 引用同步 + "门必须显式 AGENT_BOX_WIRE_SCHEMA"提示。相邻协议测试 10 passed。[证据](../server-round1/102-contract-drift-two-faces.md) | 工单"24"数字与 22+5=27 不自洽，已按分发实际为权威记账。§Spend：0 |
+| [111](work-orders/111-claude-ask-mapping-fix.md) | **CLAUDE_ASK_MAPPING_DONE** | `translate_claude` 改三桶：`ask` 不再进 `allowedTools`（＝自动放行），单独产出 `translated["ask"]`＝claude `permissions.ask` 提问语义；allow/deny 与其它家零改动。门 G1 反例＝退回"塞 allowedTools"则 `Bash not in allowedTools` 断言红。60 翻译测试按 §52 改新映射并写明理由、不放宽。`test_posture_translation`+`test_posture_config_write` 36 passed（85 落盘未受影响，独立路径）。`git diff --stat` 仅 2 文件。提交 `2f46db5`，**先于 093**。[证据](../server-round1/111-claude-ask-mapping.md) | 无剩余。§Spend：0 真调用 |
 
-**待裁阻塞（见上「待拍/阻塞」节，一手证据已交回，未越界改 write_paths 外文件）**：`108`（64 门耦合在 `scripts/server-round1/*-production-chain-gate.py`，不在其 write_paths；opencode 门 :802 断言 template==OUTPUT_TOKEN_LIMIT）；`111`（claude `ask` 映射在 `src/agent_box/server/profiles/posture_translation.py:53-81`，不在其 write_paths；一处修法已备好待路径修正即刻落地）。`107`（需 pi/dsh 原生"thinking-on"一手 schema + `thought.delta` 真机门）。`092–096`/`100` 串行等于 A 线 105/089（尚未并入本树）。
+**待裁阻塞（见上「待拍/阻塞」节，一手证据已交回，未越界改 write_paths 外文件）**：`108`（64 门耦合在 `scripts/server-round1/*-production-chain-gate.py`，不在其 write_paths；opencode 门 :802 断言 template==OUTPUT_TOKEN_LIMIT）。`107`（需 pi/dsh 原生"thinking-on"一手 schema + `thought.delta` 真机门）。`092–096`/`100` 串行等于 A 线 105/089（尚未并入本树）。
 
-**下一位（R-0036/R-0038 序）**：`114`（Qoder CLI 成一家，六部，write_paths 宽含 src/scripts，本树可施工）——待 108/111 的 write_paths 裁定回来后即收那两张，否则转入 `114` 阶段 1 观测。
+**下一位（R-0036/R-0038 序）**：`114`（Qoder CLI 成一家，六部，write_paths 宽含 src/scripts，本树可施工）——`111` 已落地；`108` 待 write_paths（`scripts/server-round1/**`）裁定回来后即收，否则转入 `114` 阶段 1 观测。
 
 ---
 
