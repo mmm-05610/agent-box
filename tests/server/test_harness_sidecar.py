@@ -1256,6 +1256,193 @@ def test_stop_or_failure_pauses_queued_turn(tmp_path, first_text, terminal):
         assert len(session["turns"]) == 1
 
 
+class _DrainRaceChannel:
+    """In-memory sidecar peer that answers the open handshake and then either
+    completes the prompt (healthy) or goes silent with the channel closed
+    (the drain the same second a sidecar exits, ACC-R2-1): the prompt boundary
+    then sees ``SIDECAR_CLOSED`` rather than a live sidecar.
+    """
+
+    def __init__(self, *, die_after_open=False, prompt_delay=0.0):
+        self._die = die_after_open
+        self._delay = prompt_delay
+        self.lines: list[str] = []
+        self.closed = False
+        self._cond = threading.Condition()
+
+    def write_line(self, value):
+        request = json.loads(value)
+        op = request.get("op")
+        if op == "prompt":
+            threading.Thread(target=self._answer_prompt, args=(request,), daemon=True).start()
+            return
+        if op == "register":
+            result = {"profile": request.get("profile"), "provenance": {"commit": "drain-fake"}}
+        elif op == "start":
+            result = {"sessionCapabilities": {}, "promptCapabilities": {}}
+        elif op in ("create", "open"):
+            result = {"sessionId": "native-drain"}
+        else:
+            result = {}
+        with self._cond:
+            self.lines.append(
+                json.dumps({"id": request["id"], "ok": True, "result": result}) + "\n")
+            # The sidecar exits right after opening: the answer to `open` still
+            # reaches the reader, then the stream ends and `_closed` is set.
+            if op in ("create", "open") and self._die:
+                self.closed = True
+            self._cond.notify_all()
+
+    def _answer_prompt(self, request):
+        if self._delay:
+            time.sleep(self._delay)
+        with self._cond:
+            if self._die:
+                self.closed = True
+            else:
+                self.lines.append(json.dumps(
+                    {"id": request["id"], "ok": True, "result": {"stopReason": "end_turn"}}) + "\n")
+            self._cond.notify_all()
+
+    def iter_chunks(self):
+        while True:
+            with self._cond:
+                while not self.lines and not self.closed:
+                    self._cond.wait(timeout=1)
+                if self.lines:
+                    yield self.lines.pop(0)
+                elif self.closed:
+                    return
+
+    def close(self):
+        with self._cond:
+            self.closed = True
+            self._cond.notify_all()
+
+
+class _DrainRaceLauncher:
+    """Counts launches so a chosen turn's sidecar comes up dead. Turn 1 (the
+    busy turn) is always healthy; the successor turns are governed by
+    ``die_counts`` (exact ordinals) and ``die_from`` (every ordinal >= N)."""
+
+    def __init__(self, *, die_counts=(), die_from=None):
+        self.count = 0
+        self._die_counts = set(die_counts)
+        self._die_from = die_from
+        self.launches: list[tuple[int, bool]] = []
+
+    def launch(self, _environment):
+        self.count += 1
+        ordinal = self.count
+        dies = ordinal in self._die_counts or (
+            self._die_from is not None and ordinal >= self._die_from)
+        self.launches.append((ordinal, dies))
+        return _DrainRaceChannel(
+            die_after_open=dies, prompt_delay=0.6 if ordinal == 1 else 0.0)
+
+
+def _drain_race_runtime(tmp_path, *, die_counts=(), die_from=None):
+    registry = HarnessRegistry()
+    registry.register(HarnessDescriptor(
+        "pi", capability_claims={"stream": True},
+        control_options={"model": ("initial", "queued", "later")}))
+
+    class Connector:
+        def distributions(self): return [{"name": "Ubuntu"}]
+        def probe(self, distribution, user):
+            return {"probe_id": "probe", "distribution": distribution, "user": user}
+        def browse(self, probe_id, path):
+            return {"path": path, "directories": [], "files": []}
+        def open_workspace(self, probe_id, path):
+            return {"connection_id": "connection", "distribution": "Ubuntu",
+                    "user": os.environ["USER"], "path": str(tmp_path)}
+
+    launcher = _DrainRaceLauncher(die_counts=die_counts, die_from=die_from)
+
+    def execution_factory(records, objects, approvals, notifier, _c, _cr, _s):
+        def port_factory(context, on_event):
+            return SidecarHarnessPort(
+                launcher, environment=sidecar_environment(tmp_path),
+                profile=context["harness_type"], adapter={},
+                state_directory=str(tmp_path / "state"), directory=str(tmp_path),
+                on_event=on_event, **_fixture_capability_material(context))
+        return SidecarExecutionBackend(
+            records, objects, approvals, port_factory=port_factory, on_event=notifier.notify)
+
+    runtime = build_runtime(
+        tmp_path / "drain-race", harnesses=registry, connector=Connector(),
+        execution_factory=execution_factory)
+    return runtime, launcher
+
+
+def _await_two_turns(runtime, session_id, expected_second_state):
+    deadline = time.monotonic() + 12
+    while time.monotonic() < deadline:
+        session = runtime.repository.get_session(session_id)
+        if (len(session["turns"]) == 2
+                and session["turns"][1]["state"] == expected_second_state):
+            return session
+        time.sleep(0.02)
+    return runtime.repository.get_session(session_id)
+
+
+def test_queue_drain_rebuilds_a_sidecar_closed_at_prompt(tmp_path):
+    """G1 (positive): the drained turn must run to completion, not to SIDECAR_CLOSED."""
+    runtime, launcher = _drain_race_runtime(tmp_path, die_counts={2})
+    try:
+        with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
+            _profile, first, second = _queue_setup(client, runtime, tmp_path, "busy first")
+            session = _await_two_turns(runtime, first["session"]["id"], "completed")
+            assert [t["state"] for t in session["turns"]] == ["completed", "completed"], session
+            assert session["turns"][1].get("error_code") is None, session
+            assert runtime.queue.list(first["session"]["id"]) == []
+            # one dead successor launch (#2) then one rebuild (#3): the queue
+            # item recovered by reusing the new-turn open path, no re-dispatch.
+            assert launcher.count == 3, launcher.launches
+    finally:
+        runtime.stop()
+
+
+def test_reverting_the_rebuild_leaves_the_drained_turn_sidecar_closed(tmp_path, monkeypatch):
+    """G2 (counter-example): with the pre-fix one-shot prompt the same race
+    reproduces the ~1s SIDECAR_CLOSED failure the user reported."""
+    def _pre_fix(self, port, turn_id, prompt_content, attachments):
+        return port.prompt(turn_id, prompt_content, attachments)
+    monkeypatch.setattr(SidecarExecutionBackend, "_prompt_with_rebuild", _pre_fix)
+
+    runtime, launcher = _drain_race_runtime(tmp_path, die_counts={2})
+    try:
+        with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
+            _profile, first, second = _queue_setup(client, runtime, tmp_path, "busy first")
+            session = _await_two_turns(runtime, first["session"]["id"], "failed")
+            assert session["turns"][1]["state"] == "failed", session
+            assert session["turns"][1]["error_code"] == "SIDECAR_CLOSED", session
+            # no rebuild happened: only the successor's own dead sidecar (#2).
+            assert launcher.count == 2, launcher.launches
+    finally:
+        runtime.stop()
+
+
+def test_rebuild_is_bounded_and_typed_when_sidecar_stays_closed(tmp_path):
+    """G4 (bounded + typed): a sidecar that never comes back fails with a typed
+    rebuild code after the bounded attempts - never a silent or unbounded wait."""
+    runtime, launcher = _drain_race_runtime(tmp_path, die_from=2)
+    try:
+        with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
+            _profile, first, _second = _queue_setup(client, runtime, tmp_path, "busy first")
+            started = time.monotonic()
+            session = _await_two_turns(runtime, first["session"]["id"], "failed")
+            assert session["turns"][1]["state"] == "failed", session
+            assert session["turns"][1]["error_code"] == "SIDECAR_REBUILD_FAILED", session
+            # bounded: exactly one initial prompt + PROMPT_REBUILD_LIMIT rebuilds.
+            assert launcher.count == 1 + (SidecarExecutionBackend.PROMPT_REBUILD_LIMIT + 1), \
+                launcher.launches
+            # and it gave up fast, not on the 600s prompt timeout.
+            assert time.monotonic() - started < 8
+    finally:
+        runtime.stop()
+
+
 def test_sidecar_permission_round_trip_uses_server_approval_store(tmp_path):
     registry = HarnessRegistry()
     registry.register(HarnessDescriptor("pi", capability_claims={
