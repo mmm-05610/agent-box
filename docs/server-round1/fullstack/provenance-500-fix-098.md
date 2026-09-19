@@ -137,3 +137,38 @@
 
 ⇒ **本单射程内的非法家族清零**；剩下 2 个字面点＝101 点名的 5 个方法，一处不剩地带进 101。
 （扫描器口径：只认字面字符串第一参，`WireError.from_server_error(...)` 不在此列——那条路本来就收敛到合法家族。）
+
+## 8 阶段 3：门（`tests/server/test_provenance_wire_098.py`，11 条）
+
+全部**穿过真实 wire**（`Wire.call` 直接看 HTTP 状态码与 JSON-RPC 信封），没有一条是"直调实现"。
+
+### 8.1 用例 ↔ 门
+
+| 用例 | 钉哪道门 | 断言的形状 |
+| --- | --- | --- |
+| `test_legal_provenance_is_accepted_and_read_back` | G1＋G2 | 200 且 `providerModel.provenance ==` 请求的四字段 |
+| `test_the_record_is_read_back_from_the_database_not_echoed_from_the_request` | **G2 的真正牙齿** | 换一次**独立调用**（`providerModels.list`）再读，只有一条记录、值一致 |
+| `test_update_writes_the_given_field_and_keeps_the_absent_ones` | G1＋G2（update 腿） | 只给 `fieldsSource` ⇒ 其余三个**保持**（COALESCE 语义），四个一起读回 |
+| `test_a_record_created_without_provenance_stays_without_provenance` | G4（不变项） | 不带 ⇒ `provenance is None`（"缺席即未知"没有被换成默认值） |
+| `test_unknown_provenance_field_is_a_typed_refusal_not_a_500` | G3 反例 1 | `http=200` ＋ `error.code=INVALID_REQUEST` ＋ 消息含 `unknown fields` |
+| `test_value_outside_the_enum_is_a_typed_refusal_naming_the_field` | G3 反例 2 | 同上，且消息点名 `provenance.authStyle` |
+| `test_a_provenance_that_is_not_an_object_is_refused_without_500` | G3 加一条 | `provenance: ["api_key"]` ⇒ 类型化，不是 500 |
+| `test_probe_models_with_provenance_does_not_500` | 第三个方法（工单未点名） | 200 ＋ `result.status ∈ {failed, unreachable}`（`baseUrl` 是本机 discard 端口，**未出站**） |
+| `test_the_handler_speaks_wire_field_names_to_the_service` | 第二缺陷单独钉 | `_provenance()` 的返回键 ⊆ wire 字段名，且与四个列名**交集为空** |
+| `test_counter_example_the_scope_bug_returns_the_500` | 反例 A | 进程内换回"裸名 `@staticmethod`" ⇒ 同一请求 `http=500`；`monkeypatch.undo()` 后**再发同一请求必须 200**（把 500 归给缺陷而不是载荷） |
+| `test_counter_example_the_half_fix_stores_nothing` | 反例 B | 进程内只把返回键换成列名 ⇒ `http=200` 而 `provenance is None`，**并断言"如果不是 None，说明读回门没起作用"** |
+
+### 8.2 反例不止在文件里，整个门对**旧源码**跑了一遍
+
+不是"我改了代码所以门是绿的"，是把门拿去咬三种源码（每次都是全文件 11 条）：
+
+| 源码 | 结果 | 读法 |
+| --- | --- | --- |
+| **旧代码**（`git show HEAD~1` 的 `handlers.py`，NameError 版） | **10 failed / 1 passed** | 唯一绿的是 `…without_provenance_stays_without_provenance`——它测的本来就是没坏的那条路（G4 不变项），**它该在旧代码上也绿**，否则它守的不是不变量 |
+| **"只修作用域"的半修法**（工单 §Scope 提的那一行改法：类限定，键仍是列名、族仍是 `INVALID_PARAMS`） | **8 failed / 3 passed** | 红的是三条接受/读回 ＋ 三条拒绝族 ＋ 单独钉第二缺陷那条；绿的三条正好是"半修法确实修好了的部分"（不带 provenance 的路、`probeModels` 不再 500、反例 A 自身） ⇒ **工单原本设想的修法会在这套门前失败 8 条**，而它自己看起来是"201 了，做完了" |
+| 本单最终源码 | **11 passed in 5.59s** | — |
+
+两次"咬旧码"的跑法都**没有动工作树**：把 `src/agent_box` 整棵复制到 `/tmp` 下，只替换副本里的
+`handlers.py`（旧版用 `git show HEAD~1:` 取；半修版在副本上做 4 处定点替换并逐处 `assert count == 1`），
+`PYTHONPATH` 把副本排在最前；跑完 `rm -rf` 并核实两个目录都不存在（`CLEAN True`）。
+工作树在这两次跑的前后都是同一份（`git status --short` 只剩待提交的门文件）。
