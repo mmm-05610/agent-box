@@ -11,13 +11,14 @@ terminal: ["DELEGATION_RECOVERY_GATE_AND_LATEST_READ_DONE", "DELEGATION_RECOVERY
 waive: []
 parallel_units: ["existing-chain-gates", "roster-availability", "latest-turn-read", "gate"]
 serialize_with: ["092", "120", "121", "122", "126", "127", "130", "131", "133", "134", "135", "136", "137", "138", "140", "141", "142", "144"]
+revisions: [{"at": "a3c3e3e", "what": "**并入 `AUD-B-034`（confirmed/low，审阅者第 90 轮）**：`67` 号 G3 那条『已实施的收窄锁』（**exclusive home 同时只允许一个执行**）挂在既有链两道门（`repository.py:259`/`:608` 的 `_refuse_exclusive_home_concurrency`），而**委派链一处都不查**（`delegation.py:277-286` 自己 `INSERT INTO server_turns`；`grep -n 'exclusive|home_concurrency|concurrency' delegation.py` **零命中**）⇒ **声明独占家目录的 profile 可被开出两条 active 轮**（实测：既有链在 s-C2 拒 `TURN_CONCURRENCY_CONFLICT`/409，**委派链建成** ⇒ 同 profile **active=2**）。`67` 号把唯一单位收窄到**会话**（`server_one_active_turn_per_session` 部分唯一索引），而这条锁的单位是 **profile** ⇒ 两条不同会话各开一条 active 轮时索引不拦、只有 `_refuse_exclusive_home_concurrency` 会拦，**委派恰好就是这么建轮的**。**并入依据＝审阅者批注**（『与 `031` **同一处代码、同一个形状**（两条路径对同一条不变式给出相反答案），**建议合成一张单**』）。", "after_stage": 1, "ruling": "R-0046"}, {"at": "a3c3e3e", "what": "**并入 `AUD-B-035`（confirmed/low，审阅者第 92 轮）**：同一条子会话上**并发/重试同一个 `task_id`** 时，委派把**裸 `sqlite3.IntegrityError`**（含表名列名）交给出口，而既有链同一处给的是**产品码** `TURN_CONCURRENCY_CONFLICT`（`repository.py:617-624` 捕获 `UNIQUE constraint failed` 后翻成 `ServerError(TURN_CONCURRENCY_CONFLICT, 人话, status=409)`）⇒ `65:36`『失败为**类型化结果**（不吐裸 stdout）』在委派路上**不成立**。**撞的是 `67` 号那条正确不变式**（`server_one_active_turn_per_session`，`database.py:129-130`）：委派用**新建子会话**避开它，但**带 `task_id` 续接走的是同一条会话**（`delegation.py:177-190`）⇒ 真会撞。**出口形状**：loopback 路由 `http/app.py:214-229` 的兜底是 `error = getattr(exc, 'code', type(exc).__name__)` ⇒ `IntegrityError` 没有 `code`/`message` ⇒ **类型名（含 `server_turns`/`session_id`）会到线上**。**可达性（不是构造）**：`029` 会让跑完的子轮被误报超时（**假超时**），而『超时后用同一 `task_id` 重试』**正是 `65:18` 写进用法说明的动作**。**并入依据＝审阅者批注**（『与 031/032/034 **同处**，建议并入同一张「建子轮必须过既有链的门」』）。", "after_stage": 1, "ruling": "R-0046"}]
 ---
 
-# Work Order 146 — **委建子轮必须过既有链的门**（recovery ＋ exclusive-home 并发）＋ roster 的「不可用」是装饰 ＋ 取回窗口**截最旧 200 行**（`AUD-B-031`/`AUD-B-034`/`AUD-B-032`/`AUD-B-029`）
+# Work Order 146 — **委建子轮必须过既有链的门**（recovery ＋ exclusive-home 并发）＋ 类型化出口 ＋ roster 的「不可用」是装饰 ＋ 取回窗口**截最旧 200 行**（`AUD-B-031`/`AUD-B-034`/`AUD-B-035`/`AUD-B-032`/`AUD-B-029`）
 
 ## Objective
 
-**来源：后端审阅者第 89/90 轮三条发现（`AUD-B-031` **confirmed/medium**、`AUD-B-032` **confirmed/low**、`AUD-B-029` **confirmed/high**）＋ ops 第 137 轮转单。**
+**来源：后端审阅者第 89–92 轮**五条发现（`AUD-B-031` **confirmed/medium**、`AUD-B-034` **confirmed/low**、`AUD-B-035` **confirmed/low**、`AUD-B-032` **confirmed/low**、`AUD-B-029` **confirmed/high**）**＋ ops 第 137/139 轮转单。**
 
 **为什么合成一张单**（判据，不是图省事）：三条**同段代码、同一判据、审阅者各自都写了"同批做"**——
 `031` 与 `032` 是**同一个洞的两头**（门被绕 ↔ 门后的"不可用"维度没供给），审阅者明写"与 `AUD-B-031` 同一批做最省（同一处代码、同一个判据）"；
@@ -25,7 +26,7 @@ serialize_with: ["092", "120", "121", "122", "126", "127", "130", "131", "133", 
 **⚠️ 一条留史说明**：`029` 原本被并入 **已收口的 `139`**（我的错——单已 `0528f1e` 收口，我 `f44b3af` 才加阶段）⇒ 我已把 `139` 复原（阶段 6/7 与门 G6/G7/G8 **移除**）并**改投本单**。
 ⇒ **教训**：**"同族别分开做"不等于"塞进已收口的单"**；收口后新发现一律新开单。
 
-## Current state（一手，四条 finding）
+## Current state（一手，五条 finding）
 
 | 事实 | 出处 |
 | --- | --- |
@@ -44,7 +45,8 @@ serialize_with: ["092", "120", "121", "122", "126", "127", "130", "131", "133", 
 | roster 的可用性 | 二选一：**① 真的喂**（把子 profile 的可判定事实注进 `availability`——至少 `archived`／`recovery_pending`／harness 未装配三类）；**② 删掉**这个恒真的形参与随之不可达的分支 | 别给后续验收留一个**恒真门**（与 `AUD-B-011`「声明有、发射点为零」同类） |
 | 取回链 | 改按「**本轮、最新**」读：复用 `list_events_page` 的 `DESC`+反转，或新增 `turn_events(turn_id, after)`；**不再读会话快照的列表** | 合同声明的上界是 `MAX_SUMMARY_CHARS`=**4096**（有界＝**摘要**），实测上界却是「会话事件表前 200 行」这个**未声明的内部窗口** |
 | `get_session` 窗口语义 | **定死**：要么明确返回「最近 N 条」并**两处查询一起改 `DESC`**，要么**去掉列表**、在文档里写死「只可用作标量读取」 | 别让下一个消费者再踩 |
-| 门 | 三条各有会红的断言（见 Gates），且**反例自证**（注释掉即红） | `OF-14`：门要走真腿 |
+| **类型化出口**（`AUD-B-035`） | 委派建子轮处**照既有链加同一条 UNIQUE 冲突翻译**（复用 `TURN_CONCURRENCY_CONFLICT`，零合同变更优先）；并把 `http/app.py:225-229` 的兜底改成**产品码白名单/前缀**（其余落 `EXECUTION_FAILED`、原文只进服务端日志） | `65:36`『失败为**类型化结果**』——裸 `sqlite3.IntegrityError`（含表名列名）到线上＝**内部结构外泄**，且与既有链同一处给出**相反答案** |
+| 门 | 四条各有会红的断言（见 Gates），且**反例自证**（注释掉即红） | `OF-14`：门要走真腿 |
 
 **必须保持不变**：既有链那两处 409 的行为（本单是让委派**也**走它）；`117` 的 recovery 语义；其它 roster 字段；`wire/**`。
 
@@ -65,6 +67,11 @@ serialize_with: ["092", "120", "121", "122", "126", "127", "130", "131", "133", 
 
 **WHEN** 家族声明为 exclusive home，先由既有链在会话 s-C1 占住该 profile，再由**委派**在另一条会话 s-C2 建子轮
 **THEN** **类型化拒绝**（与既有链同为 `TURN_CONCURRENCY_CONFLICT`/409 或同义），且该 profile 的 **active 轮数仍为 1**
+
+#### Scenario: 同一会话重试 `task_id` ⇒ 类型化码（正例，`AUD-B-035`）
+
+**WHEN** 同一子会话已有 active 轮，再 `run()` 带该会话的 `task_id`
+**THEN** 出口 `error` 是**产品码**（复用 `TURN_CONCURRENCY_CONFLICT` 或同义），`message` **不含 `server_` 字样**（当前＝裸 `IntegrityError`，消息含 `UNIQUE constraint failed: server_turns.session_id`）
 
 #### Scenario: roster 说得清（正例，`AUD-B-032`）
 
@@ -102,10 +109,12 @@ serialize_with: ["092", "120", "121", "122", "126", "127", "130", "131", "133", 
 | G1 委派过 recovery 门 | 封印后委派 ⇒ 类型化拒绝且 `server_turns` 不增 | 注释掉拒绝 ⇒ 门红 | fail (typed) |
 | G2 与既有链同源 | 同 profile、同库下，**两条路径给出同一答案**（既有链 409 / 委派拒绝） | 两者不一致 ⇒ 门红 | fail (typed) |
 | G2b **独占家目录并发**（`AUD-B-034`） | 既有链占住 profile 后，委派在**另一条会话**建轮 ⇒ 类型化拒绝且 active 轮数仍为 1 | 注释掉 `_refuse_exclusive_home_concurrency` ⇒ 门红 | fail (typed) |
+| G2c **类型化出口**（`AUD-B-035`） | 同会话重试 `task_id` ⇒ 出口 `error` 匹配 `[A-Z][A-Z0-9_]{2,127}`、`message` 不含 `server_` | 裸 `IntegrityError` 到线上 ⇒ 门红 | fail (typed) |
 | G3 availability 有据 | `available=false` ＋ 类型码 reason（或形参已删） | 仍恒 True 且未删 ⇒ 门红 | fail (typed) |
 | G4 取回按本轮读 | delta 数 > 窗口 ⇒ 完整或带截断标记（不静默） | 改回读快照前 200 行 ⇒ 门红 | fail (typed) |
 | G5 续接非空 | 第二次续接 summary 非空 | 仍空 ⇒ 门红 | fail (typed) |
 | G6 窗口语义定死 | `get_session` 列表语义明确；机检：`grep -rn 'get_session' src/agent_box/server/execution/delegation.py` 后仍读 `events`/`turns` 的位点为 **0** | 留模糊语义 ⇒ 门红 | fail (typed) |
+| G7b **类型化出口真链**（`AUD-B-035`） | 出口码经 loopback 路由真映射（非直调） | 只测内部函数 ⇒ 门红 | fail (typed) |
 | G7 真链 | 门经 `run_subagent` 真入口驱动 | 直调私有函数 ⇒ 门红 | fail (typed) |
 
 ## Validation
@@ -119,7 +128,7 @@ git diff --check && git status --short
 
 ## DoD
 
-1. 一手复现四条 · 2. **委建子轮过既有链的门**（`031` recovery ＋ **`034` exclusive-home**）· 3. `032` 二选一落地 · 4. `029` 最新读法 ＋ 窗口语义 · 5. 门与反例 · 6. 账与证据。缺一项 ⇒ PARTIAL。
+1. 一手复现五条 · 2. **委建子轮过既有链的门**（`031` recovery ＋ **`034` exclusive-home**）· 3. `032` 二选一落地 · 4. `029` 最新读法 ＋ 窗口语义 · 5. 门与反例 · 6. 账与证据。缺一项 ⇒ PARTIAL。
 
 ## Acceptance
 
