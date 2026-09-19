@@ -70,6 +70,9 @@ cat /home/maoqh/projects/agent-box-server-round1/docs/implementation/prefs.md
 ```
 
 - **阶段边界 = 每次阶段性提交之前**；纳入修订后在本树 status 记 `已纳入 work order <ID> 修订 @<sha>`
+
+> **注意（继承副本，不是真相）**：本树 `docs/implementation/manifest.json` 与 `status.md` 是**从 A 树分支时继承下来的历史**；
+> **派单真相在主树**（`agent-box-server-round1/docs/implementation/manifest.json` 与 `status.md`）——读队列/依赖/执行者一律回主树读，本树那份不要当依据。
 - **每次阶段性提交之前：先看一眼主树 `bulletin.md` 的「新条目」**（只读比上次新读到的部分）——白天节奏改短（R-0024）：
   L 每 1–2 分钟一轮、审阅者/侦察者 8–12 分钟一轮，公告可能在你两次重读之间就变了。
 - **等依赖/卡住时不长睡**（R-0024 ②）：等新单或等别的树时，单次等待**不超过 5 分钟**，醒来重读公告与工单目录。
