@@ -410,8 +410,25 @@ class DelegationService:
                 }:
                     return dict(turn)
             time.sleep(0.05)
-        raise DelegationError(
-            "SUBAGENT_TIMEOUT", f"the subagent did not finish within {timeout}s")
+        # Order 141 (`:81` resource boundary must really stop, `:90` no silent
+        # degrade): time-out was not a stop entry point, so the child kept running
+        # (and spending) while the refusal carried nothing to locate it. Stop the
+        # child first, keep the typed code, and put the locatable handle plus the
+        # usage actually incurred into the message the caller gets back.
+        usage_so_far = self._usage_of(turn_id)
+        self.sessions.cancel_turn(turn_id, f"subagent-timeout:{turn_id}")
+        handle = self._child_native_handle(session_id)
+        detail = (
+            f"the subagent did not finish within {timeout}s; the child turn was stopped. "
+            f"turnId={turn_id}; task_id={handle or 'none'}; "
+            f"usage so far: {usage_so_far if usage_so_far else 'none recorded'}"
+        )
+        raise DelegationError("SUBAGENT_TIMEOUT", detail)
+
+    def _child_native_handle(self, session_id: str) -> str | None:
+        checkpoint = self.records.get_session(session_id).get("checkpoint") or {}
+        return checkpoint.get("native_id")
+
 
     def _final_message(self, *, session_id: str, turn_id: str) -> str:
         session = self.records.get_session(session_id)

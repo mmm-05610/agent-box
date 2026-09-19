@@ -1402,3 +1402,13 @@ pi-production-chain-gate.py  runtime=dfdae54be337c45de58e44161b18880f  A(b1f6e07
 | 138 | 全 | 三处同源：`resolve_roster` 经注入 `workspace_of` 发 `workspace` 字段；`run` 取 `get_turn_context(parent_turn_id)["workspace_id"]`→候选 `[e for e in roster if e["workspace"]==parent_ws]`；fresh 放置＝`parent_workspace_id`（不再 `_shared_workspace_id(child)`）。跨区子不作候选⇒请求它走既有 `SUBAGENT_NOT_AUTHORIZED`（显式、非静默落 B）。G1 子 home==父 ws⇒子 session 落父 ws；G2 跨区⇒拒、不在 B 建子会话；G3 名册含 `workspace`；G4 全走真 `run`。反例**已树内实测**：删过滤 + 还原 child-home 放置⇒恰 2 跨区门红、同区/字段门仍绿。同工作区行为逐字不变 | `test_delegation_workspace_dimension_138.py` **4 passed**；delegation(含 `65` e2e，父轮改真实)+subagents+rule_liveness_086+harness_round_086+profile_permissions+shared_session_store+136+127 广扫 **59 passed**（`resolve_roster`/放置改动无回退）；**Worker 工件不在** | 0 | 本提交 |
 
 **同片串行（138/139/140/141 同段 `delegation.run`／`_resolve_child_session`）**：本单单独提交、按 `serialize_with` 逐单串行，未与其它三张混提。`65` e2e 原以 phantom `parent-turn-e2e`（无 `server_turns` 行）掩盖了"放置从不读父轮"——本单改为建真实父 session+turn（生产即如此），非迁就测试的 hack。
+
+## 工单 141 — 子代理超时**必须真停**并带可定位句柄（`AUD-B-023` medium·OF-14 第 6 例；2026-09-19，执行者·runtime 线）
+
+> 终态 **`SUBAGENT_TIMEOUT_STOPS_DONE`**。`_await_terminal` 轮询到 deadline **只 `raise SUBAGENT_TIMEOUT`、无任何取消、异常路径不生成返回体** ⇒ `:81` 的"资源边界"下面子代理继续跑继续花、父侧连 `turnId` 都拿不到（`:90` 静默降级）。取消能力（`sessions.cancel_turn`/`cancel_descendants`/`live_child_turn_ids`，`086` 建）就在旁边、这条路径没接（OF-14 第 6 例同形）。ops `R-0070 ①` 定案＝`:81`+`:90` 字面后果（**非新产品语义**）：先停再报、码不变、句柄+用量进拒绝体；"超时不该取消子轮"那案＝把"默认"读成可覆盖＝产品语义留用户。§Spend：0 真调用。证据 `docs/server-round1/subagent-timeout-stops-141.md`。
+
+| 单 | 阶段 | 门 | 回归 | 真实模型 | 提交 |
+| --- | --- | --- | --- | --- | --- |
+| 141 | 全 | 到期先 `self._usage_of(turn_id)` → `self.sessions.cancel_turn(turn_id, "subagent-timeout:..")`（与两 stop 门同一停法：记录+execution.cancel+级联孙）→ 读子 native 句柄 → raise `DelegationError("SUBAGENT_TIMEOUT", msg含 turnId/task_id/usage)`。端点回 `getattr(refusal,"message")` ⇒ 句柄达调用方，**未碰 wire/端点**。G1 超时后子轮离 active；G2 仍类型化 `SUBAGENT_TIMEOUT`（不降泛码）；G3 拒绝体含 `turnId=`+`usage so far`；G4 全走真 `run`（子不结束）；G5 成功体逐字不变。反例**两处已树内实测**：删 `cancel_turn`⇒G1"离 active"门红（子仍 running）；从 message 拿掉 `turnId=`⇒G3"可定位"门红 | `test_subagent_timeout_stops_141.py` **3 passed**（含 success-unchanged）；rule_liveness_086 **两条真停门测试改直建 running 子轮**（141 后超时自身即停子、不能再用作"取活子"setup；主体两停门级联覆盖不变）＋delegation+138+136+subagents 广扫 **35 passed**（无回退）；**Worker 工件不在** | 0 | 本提交 |
+
+**归批（132 新亚型）**：**『资源边界的声明』与『真的停不停』必须同一份事实**——超时曾只截断等待不截断执行；同族 `136`（约束记两处）、`139`（授权名单 vs 续接归属）。137/139/140 仍待（137 stage1 已落）。

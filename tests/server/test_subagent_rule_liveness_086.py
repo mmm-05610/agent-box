@@ -43,6 +43,30 @@ def _delegating_parent(tmp_path, *, grandchild: bool = False):
                 execution=execution, service=service, parent=parent, child=child, other=other)
 
 
+def _start_a_running_child(env, *, turn_id: str = "kid-turn") -> str:
+    """Put a live child turn in the ledger, linked to `parent-turn`.
+
+    Order 141 made the delegation *time-out* itself a stop path (it now cancels the
+    child), so `run(timeout=1)` can no longer be used to obtain a child that is still
+    running. These two tests are about the two *stop* doors reaching a live child - a
+    rule 141 must not regress - so the running child is created directly here instead.
+    """
+    records, child = env["records"], env["child"]
+    with records.database.transaction() as conn:
+        session_row = conn.execute(
+            "SELECT id FROM server_sessions WHERE profile_id=? ORDER BY rowid LIMIT 1",
+            (child["profile_id"],),
+        ).fetchone()
+        conn.execute(
+            "INSERT INTO server_turns(id,session_id,profile_id,profile_revision,"
+            "native_generation,state,capture_state,cleanup_state,input_object_digest,"
+            "parent_turn_id,created_at,updated_at) "
+            "VALUES (?,?,?,1,0,'running','pending','pending','x','parent-turn','t','t')",
+            (turn_id, str(session_row["id"]), child["profile_id"]),
+        )
+    return turn_id
+
+
 class _NeverFinishes(FakeExecution):
     """A child turn that is still running when its parent is stopped.
 
@@ -148,16 +172,13 @@ def test_cancelling_the_parent_reaches_the_child_turn_that_is_still_running(tmp_
     stalled = _NeverFinishes(records)
     service.execution = stalled
     sessions.execution = stalled
-    with pytest.raises(DelegationError) as timeout:
-        service.run(parent_turn_id="parent-turn", parent_profile_id=parent["profile_id"],
-                    arguments={"subagent": "beta", "description": "do some work",
-                               "prompt": "x", "timeout": 1})
-    assert timeout.value.code == "SUBAGENT_TIMEOUT"
-
+    # A live child turn (order 141 made the delegation time-out itself a stop path,
+    # so the running child is placed in the ledger directly rather than via a timeout).
+    _start_a_running_child(env)
     with records.database.read() as conn:
         kids = [str(row["id"]) for row in conn.execute(
             "SELECT id FROM server_turns WHERE parent_turn_id='parent-turn'").fetchall()]
-    assert kids, "the stalled delegation still created a child turn"
+    assert kids, "the ledger has a live child turn to stop"
     assert records.get_turn_context(kids[0])["state"] == "running"
 
     sessions.cancel_turn("parent-turn", "cancel-parent-1")
@@ -186,11 +207,7 @@ def test_the_wire_stop_applies_the_same_rule(tmp_path):
     stalled = _NeverFinishes(records)
     service.execution = stalled
     sessions.execution = stalled
-    with pytest.raises(DelegationError) as timeout:
-        service.run(parent_turn_id="parent-turn", parent_profile_id=parent["profile_id"],
-                    arguments={"subagent": "beta", "description": "do some work",
-                               "prompt": "x", "timeout": 1})
-    assert timeout.value.code == "SUBAGENT_TIMEOUT"
+    _start_a_running_child(env)   # see 141 note in the sibling test above
     with records.database.read() as conn:
         kids = [str(row["id"]) for row in conn.execute(
             "SELECT id FROM server_turns WHERE parent_turn_id='parent-turn'").fetchall()]
