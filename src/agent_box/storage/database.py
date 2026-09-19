@@ -8,7 +8,7 @@ import threading
 from typing import Iterator
 
 
-PRODUCT_SCHEMA_VERSION = 18
+PRODUCT_SCHEMA_VERSION = 19
 
 
 class FutureSchemaError(RuntimeError):
@@ -163,6 +163,7 @@ CREATE TABLE IF NOT EXISTS server_queue_items (
     message_object_digest TEXT NOT NULL,
     effective_config_object_digest TEXT,
     public_message_json TEXT,
+    pause_reason TEXT,
     submitted_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -316,6 +317,18 @@ def _migrate_17_to_18(conn: sqlite3.Connection) -> None:
     away - the child stays a normal execution in every other respect.
     """
     _add_columns(conn, "server_turns", {"parent_turn_id": "TEXT"})
+
+
+def _migrate_18_to_19(conn: sqlite3.Connection) -> None:
+    """Order 110: a paused queued item records *why* it paused.
+
+    Order 67 keeps stop/fail -> `paused` (no auto-adopt); the visibility fix is
+    that the pause reason (e.g. `cancelled`, or a failure code) must reach the
+    UI so the item is explainable and the user can choose to withdraw and resend.
+    Existing rows keep NULL - a pause before this build had no recorded reason,
+    which is the honest absence, not a fabricated one.
+    """
+    _add_columns(conn, "server_queue_items", {"pause_reason": "TEXT"})
 
 
 def _migrate_16_to_17(conn: sqlite3.Connection) -> None:
@@ -661,6 +674,8 @@ class Database:
                 _migrate_16_to_17(conn)
             if current in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17):
                 _migrate_17_to_18(conn)
+            if current in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18):
+                _migrate_18_to_19(conn)
             conn.executescript(_SCHEMA)
             conn.execute(
                 "INSERT OR IGNORE INTO agentbox_product_schema(singleton, version, applied_at) "

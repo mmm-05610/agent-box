@@ -132,16 +132,21 @@ class QueueRecords:
         return item
 
     def pause_pending(self, conn, session_id: str, reason: str) -> int:
-        """Pause queued work after a failure or user stop (core §6)."""
-        del reason
+        """Pause queued work after a failure or user stop (core §6).
+
+        Order 110: the reason is *recorded*, not discarded. A pause must be
+        explainable on the wire (`state=paused` + why), so the user can see it and
+        choose to withdraw-and-resend. The reason is the terminal that caused it
+        (e.g. `cancelled`, or a failure code) supplied by the caller.
+        """
         rows = conn.execute(
             "SELECT id FROM server_queue_items WHERE session_id=? AND state='pending' "
             "ORDER BY submitted_at,id", (session_id,),
         ).fetchall()
         for row in rows:
             conn.execute(
-                "UPDATE server_queue_items SET state='paused',version=version+1,updated_at=? "
-                "WHERE id=?", (now(), row["id"]),
+                "UPDATE server_queue_items SET state='paused',pause_reason=?,version=version+1,updated_at=? "
+                "WHERE id=?", (reason, now(), row["id"]),
             )
             self._append_updated(conn, self._row_to_item(conn.execute(
                 "SELECT * FROM server_queue_items WHERE id=?", (row["id"],),
@@ -172,6 +177,14 @@ class QueueRecords:
                 "configVersion", "state",
             )
         }
+        # Order 110: carry the pause reason on the event only when there is one,
+        # so non-paused `queue.updated` frames keep their exact prior shape
+        # (FIFO/CAS/withdraw semantics unchanged) while a paused item is
+        # explainable on the wire (state=paused + why -> the user can withdraw
+        # and resend). This uses the existing event object, not a new method.
+        reason = item.get("pauseReason")
+        if reason is not None:
+            public["pauseReason"] = reason
         self.append_event(
             conn, item["sessionId"], None, "queue.updated", {"item": public},
         )
@@ -192,6 +205,7 @@ class QueueRecords:
             "state": row["state"],
             "configVersion": int(row["config_version"]),
             "requestId": row["request_id"],
+            "pauseReason": row["pause_reason"],
             "_messageObjectDigest": row["message_object_digest"],
             "_effectiveConfigObjectDigest": row["effective_config_object_digest"],
         }
