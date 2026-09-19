@@ -10,6 +10,7 @@ ruling: R-0019
 terminal: ["QUEUE_ADOPTION_AFTER_STOP_DONE", "QUEUE_ADOPTION_AFTER_STOP_PARTIAL"]
 waive: []
 parallel_units: ["repro", "fix", "gate"]
+revisions: [{"at": "7445180", "what": "调度者裁定（执行者交回语义冲突后）：67 的 stop/fail ⇒ pause 语义保留；本单改为\"paused 必须可见、带类型化原因、可继续\"，不再要求停止后自动采纳", "after_stage": 1, "ruling": "R-0032"}]
 ---
 
 # Work Order 110 — 轮被 stop/cancel 之后，服务端队列**不自动采纳**下一项
@@ -24,6 +25,23 @@ parallel_units: ["repro", "fix", "gate"]
 
 **要的行为**：轮进入终态（completed / failed / cancelled）都**必须触发一次队列采纳检查**——
 被 stop/cancel 终止也算轮结束，队列应当继续往前走（或**类型化**说明为什么不能）。
+
+
+## 修订 v2（2026-09-19，调度者；执行者交回语义冲突后裁定，判据＝R-0032 ⑤）
+
+**冲突**：本单原写"任何终态（含 stop/cancel）都触发队列采纳"，与 **order 67 的既定语义**（`finish_cancelled`/`fail_turn` ⇒
+`pause_pending`，排队项转 `paused`；在册测试 `test_stop_or_failure_pauses_queued_turn` 钉着）直接对立。
+
+**裁定（改本单，不改 67）**：
+
+1. **67 的语义保留**：用户 **stop/cancel ⇒ 排队项 `paused`（带类型化 reason，如 `cancelled`）**；失败轮同理（带失败码）。
+   **不自动采纳**——用户按了停止却又自动开跑下一轮，等于把"我停了"这句话吃掉（R-0032 ⑤ 的判据）。
+2. **本单要修的变成"暂停必须是可见、带原因、可继续"**：
+   - **可见 + 类型化**：`paused` 状态与它的 `reason`（记录里已有）必须到得了 wire（`queue.list`/会话视图）；今天若只到得了状态、到不了原因，就补上（**不新增 wire 方法**，用既有形状）；
+   - **可继续**：文档化的继续路径＝**`queue.withdraw` + 重发**（两者都已存在且类型化）——UI 必须给出这个动作；若产品要"一键恢复"，那是**新 wire 方法 ⇒ 交回调度者**（不自行发明）；
+   - **采纳检查必须在该跑的地方真跑**：轮 **completed** 之后（以及任何显式继续动作之后）必须触发采纳；不能采纳时给出**类型化事实**（paused + reason），不静默。
+3. **反例门相应改写**：退回"paused 但不可见/无原因/无继续路径"的实现必须**门红**；**不再**要求"停止后自动开跑"。
+4. **P32 的 G4 口径同步更正**（在公告里点名）："排队项在轮结束后被采纳"适用于 **completed** 轮；**stop/fail 轮的正确行为是 paused + 可见 + 原因 + 可继续**。
 
 ## Current state（交回方证据，第一手）
 
