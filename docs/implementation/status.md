@@ -790,6 +790,7 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 | **`write_asset` 的 locator 命名时机要不要改成内容寻址**（一条裁决，不是清理） | 129 一手：`assets.py:176-191` 每次调用都新铸 locator（内容与 key 都不参与命名）⇒ **不同 requestId 的同一份字节 = 两个 locator**、两个都真实存在；129 只把「同一逻辑请求铸两个」变成不可达（回放根本不执行）。要不要走到「同内容 ⇒ 同 locator」是产品语义决定，它会牵动 reclaim 的摘要比对与账号资产的历史引用 | 属资产层语义 ＋ 牵动 56 的 reclaim 规则；129 §Scope 只授权修「同一请求重试」与「locator 铸造时机」两点，后者做不到 ⇒ 交回 | [129 证据 §5.4](../server-round1/import-asset-request-id-129.md) ＋ 门 `tests/server/test_import_asset_request_id_129.py::test_a_different_key_for_the_same_bytes_is_a_new_request_not_a_replay`（把现状钉成事实而不是传闻） |
 | **POSIX 侧的 Server 组合里没有 secret store ⇒「独立根永远长不出可发的 profile」是机制、不是疏忽**（要么给 Linux 一个 file-backed store，要么把"seed 只在控制面"写成产品口径） | `089` seed 腿一手：`bootstrap/runtime.py:317-320` 只在 `os.name == "nt"` 时自动装 `WindowsDpapiSecretStore`，而 `python -m agent_box.server`（`__main__.py:52-56`）**不注入**任何 store ⇒ Linux/WSL 侧起的实例对 `POST /api/v1/credentials` 一律回 **`CREDENTIAL_STORE_UNAVAILABLE`（retryable）**（`ui_gates_89_seed_shape_check.py` 把这条钉成了正例）。后果面不止 `089`：`storage` 里可选实现只有 `MemorySecretStore`（构造要预填 dict）与 Windows DPAPI 两家，所以**任何**"在 WSL 侧准备一份能发的试用环境"的路径今天都走不通——`T6-1` 的机制根因就在这 | 属数据模型/平台能力选择（新增一个受管文件存储 ＝ 加密边界的语义决定），`089` 是"只跑不改"的单；本树 `src/**` 不在其 `write_paths`，且这条也不属于 `124`/`132` 任何一张在队的单 | [跑本 §3b](../server-round1/fullstack/ui-gates-89-windows-handoff.md) ＋ 门 `scripts/server-round1/ui_gates_89_seed_shape_check.py::a_server_without_a_secret_store_refuses_the_import_typed`（`SHAPE_CHECK OK 10/10`） |
 | **`_model_references` 把 `modelId: None` 拼成字符串 `"None"` 的引用**（写入侧比读侧宽，会让一次解析注定 404） | 125 一手：`model_configs/service.py:250-258` 判"是不是引用"用的是**键在不在**（`set(value) >= {"providerId","modelId"}`）然后 `str(...)` 强转 ⇒ `{"providerId": "p", "modelId": None}` 被当成"引用了名叫 `None` 的模型"；而 wire 侧要求两者都是非空字符串（`wire/handlers.py::_model_reference_list`）⇒ 两侧在这一形上**有意不同**，125 的门把这一分歧单独钉住而不是假装相等。后果在服务层：这样的配置能通过校验、然后在 `reference()`/freeze 处必然 404 | `src/agent_box/server/model_configs/**` 不在 125 的 `write_paths`（只有 `wire/handlers.py`）；收紧键判据＝改写入侧语义（可能拒掉今天写得进去的配置），属裁决不是清理 | [125 证据 §4](../server-round1/config-describe-slots-125.md) ＋ 门 `tests/server/test_config_describe_slots_125.py::test_the_two_walks_differ_on_one_shape_and_the_wire_is_the_stricter_one` |
+| **座位层面的模型拒绝只剩一个裸 `EXECUTION_FAILED`**（真原因只活在服务端日志）——该不该翻到界面上是一条裁决 | `089` 预演第 5 段一手复算（假座位、假 key、真实模型调用 0）：把 seed 出来的 profile 改绑到"Provider 记录发布了、但座位不声明"的模型 ⇒ `sessions.createAndSend` **照收**（turn 建了），随后 `state:failed` ＋ `error_code:EXECUTION_FAILED`，而 turn 上**没有任何原因字段**（`reasonFieldsOnTheTurn:["error_code"]`、`work_id/execution_id/dispatch_id` 全空）；座位的真话 `SIDECAR_OP_FAILED: Harness model is not available: <id>` 只在日志里——`execution/sidecar_backend.py:854-856` 的链上还原**有意**只认 `ExecutionStartRejected`（注释写明"其他包装/运行期异常保持既有归一化"） | 不是清理而是**合同口径**：`115` 收的是 wire 出站的族位与 `details.internalCode`，`117` 收的是"发之前能不能发"，而这条是"发出去之后为什么死"——三方都不覆盖，且 `854-856` 的收窄是既有裁决的反面，单方放宽就是改语义 | [预演报告 `seedLeg.seatModelAuthority`](../server-round1/fullstack/ui-gates-89-rehearsal.json) ＋ 跑本 §3b 第 5 条（写给跑真机的人：撞到"失败但不知道为什么"先抄服务端日志那行）
 
 > 编号说明：上一节 `## CHECKPOINT b2`（080/081 那次）的 §2 写了"新增 B5"，但当时表里没落 B5
 > （其内容并入了 B4 的四项交回）。本表 **B5 由 085 新增**，是该编号的实际持有者；批末重写那节时一并更正引用。
@@ -2191,3 +2192,25 @@ CPython 会把 `OSError(13, …)` 自动提升成 `PermissionError`，**错的�
 **一处自己踩的坑如实记**：shape check 里我先用**固定偏移** `calls[4:]` 去切 seed 的调用序列，preflight 一变就多切了两条，
 `every_face_the_seed_uses_is_a_public_one` 当场红成"只看到一次 profiles.list"。红得对——那条断言当时在考**算术**而不是考协议；
 改成"从日志里第一处写调用起切"（`first_write`），并在注释里写明为什么不许用偏移量。**`--self-test` 24/24、shape check 12/12。**
+
+## `089` 预演第 5 段：seed 造出来的 profile **真的发得出去**（§8b；2026-09-20 05:3x）
+
+上一轮的 seed 腿只证到"读回来是 `ready`"。`ready` 是投影的意见，`089` 要的是**发一句、拿回答**。
+⇒ 给 `ui_gates_89_fake_rehearsal.py` 加第 5 段：用 `ui_gates_89_seed_profile.py`（同一条真流程、in-process face）
+在一份**生产形状的座位**上（deployment 里声明 `modelControlId`/`credentialKind`、`controlOptions.model` 走目录解析）
+真造两条 profile，然后各自发一句。
+
+- **两家都绿**：`pi`/`codex` 的 turn 都是 `completed`，各拿到 17 字符的 assistant 增量（`controlled stream`）；
+  预演检查数 **7 → 12**、`REHEARSAL_OK`、`realModelRequests: 0`、临时根删净（`seedLegRootRemoved: true`）。
+- **一次"门红得对"的现场**：这条腿第一次跑两家都 `failed / EXECUTION_FAILED`。查到的是**我自己的期望错**：
+  假座位 `fake_acp_peer.mjs:24-33` 只声明 `fixture-model` 一个模型，我 seed 时给了 `rehearsal-model`
+  ⇒ 座位回 `SIDECAR_OP_FAILED: Harness model is not available: <id>`。改成座位真声明的那个 id 就绿。
+  **顺带得到一条给跑真机的人的事实**（写进跑本 §3b 第 4 条）：`--model-id` 必须是**那家 harness 自己认的**模型，
+  先用 `providerModels.probeModels` 问上游，别拿"我以为的名字"。
+- **同一次红翻出一个不是我的错的缺陷**（已进 §待开单，不自己修：`854-856` 的收窄是既有裁决的反面）：
+  座位层面的模型拒绝**照收请求**（turn 建了）、失败后 turn 上**只剩 `error_code`**、
+  `work_id/execution_id/dispatch_id` 全空、真原因只在服务端日志。第一版我把它写成"观察＋断言"，
+  随即改成**只测不判**（两种结果都不算绿也不算红）——预演没有资格决定合同口径。
+  报告里那条事实叫 `seedLeg.seatModelAuthority`，跑真机撞到"失败但不知道为什么"时先抄日志那行。
+
+**真实模型调用 0 / ¥0；凭据内容 0 次读取**（座位是 echo peer、key 是本树自造的假值、`MemorySecretStore` 只在测试进程内）。

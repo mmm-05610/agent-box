@@ -141,6 +141,18 @@ QA 一手跑到 §3 时撞上：`R-0056` 要求独立数据根 ⇒ 全新根里 
    ⇒ 一家一条 Provider 记录（脚本就是这么写的：每个 `--harness` 各建一条）。
 3. **读面不收 `requestId`**：`profiles.list` 的形状门只允许 `{includeArchived}`（`handlers.py:47`）⇒
    带上 `requestId` 会被判 `INVALID_REQUEST: unexpected requestId`。写面（`profiles.create/updateConfig/archive`）反过来必须带。
+4. **`--model-id` 必须是那家 harness 自己认的模型**（一手：假座位 `fake_acp_peer.mjs:24-33` 只声明 `fixture-model` 一个值，
+   给它别的 ⇒ 执行段回 `SIDECAR_OP_FAILED: Harness model is not available: <id>`）。真机上先用
+   `providerModels.probeModels` 问上游有哪些模型，再拿那个 id 去 seed——别拿"我以为的名字"。
+   **并且**：这条拒绝今天**到不了用户面**（见下条），所以一旦 seed 里 model id 写错，现象是"发出去了、转圈、失败，只有一句 EXECUTION_FAILED"。
+5. **座位层面的模型拒绝只剩一个裸码**（一手，本树预演第 5 段复算）：把 seed 出来的 profile 改绑到一个
+   "Provider 记录里发布了、但座位不声明"的模型 ⇒ `sessions.createAndSend` **照收**（turn 建了），
+   随后 `state:"failed"` ＋ `error_code:"EXECUTION_FAILED"`，而 turn 上**没有任何原因字段**
+   （`reasonFieldsOnTheTurn: ["error_code"]`、`work_id/execution_id/dispatch_id` 全空），
+   真原因 `SIDECAR_OP_FAILED: Harness model is not available: <id>` 只在服务端日志里
+   （`sidecar_backend.py:854-856` 有意只还原 `ExecutionStartRejected` 的码）。
+   ⇒ 跑真机时若撞到"失败了但不知道为什么"，**先把服务端日志那行抄回来**，别按 EXECUTION_FAILED 猜。
+   该不该把它翻到界面上是裁决（已进本树 §待开单），不是跑的人自己改。
 
 **已验到哪一步（诚实口径）**：`scripts/server-round1/ui_gates_89_seed_shape_check.py` 把上面这条流程**逐面**过了一遍真实的
 Server 处理栈（in-process `TestClient`，假 key、假端点，**真实模型调用 0**）⇒ **`SHAPE_CHECK OK 10/10`**，

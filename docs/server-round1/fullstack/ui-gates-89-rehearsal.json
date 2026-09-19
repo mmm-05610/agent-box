@@ -63,7 +63,7 @@
     "profileCreateError": {
      "code": "HARNESS_UNAVAILABLE",
      "message": "Requested Harness is not configured",
-     "request_id": "req_b6669392c743446a8bc6287c3f4f1d49",
+     "request_id": "req_4951d50f6b104f2fb357854986a3097b",
      "retryable": true
     },
     "profileCreateStatus": 503,
@@ -79,6 +79,53 @@
     "turnsBefore": 2
    },
    "pass": true
+  },
+  "seed_leg_composes_a_secret_store_and_a_token_file": {
+   "detail": {
+    "expected": "secrets/http-token"
+   },
+   "pass": true
+  },
+  "seed_script_exits_zero_and_calls_both_ready": {
+   "detail": {
+    "exit": 0,
+    "verdicts": {
+     "codex": "ready",
+     "pi": "ready"
+    }
+   },
+   "pass": true
+  },
+  "seeded_profile_takes_a_message:codex": {
+   "detail": {
+    "assistantChars": 17,
+    "assistantPrefix": "controlled stream",
+    "errorCode": null,
+    "sendStatus": 200,
+    "turnState": "completed"
+   },
+   "pass": true
+  },
+  "seeded_profile_takes_a_message:pi": {
+   "detail": {
+    "assistantChars": 17,
+    "assistantPrefix": "controlled stream",
+    "errorCode": null,
+    "sendStatus": 200,
+    "turnState": "completed"
+   },
+   "pass": true
+  },
+  "unknown_model_refused_before_any_turn": {
+   "detail": {
+    "error": {
+     "code": "INVALID_REQUEST",
+     "message": "profileId must be a bounded string"
+    },
+    "turnsAfter": 2,
+    "turnsBefore": 2
+   },
+   "pass": true
   }
  },
  "cleanup": {
@@ -89,5 +136,51 @@
  "notAcceptanceEvidence": "089 \u7684\u771f\u95e8\u8bc1\u636e\u53ea\u5728 ui-gates-89/ \u91cc\uff1b\u8fd9\u4efd\u662f\u95e8\u673a\u68b0\u7684\u9884\u6f14",
  "order": "089",
  "realModelRequests": 0,
- "result": "REHEARSAL_OK"
+ "result": "REHEARSAL_OK",
+ "seedLeg": {
+  "cleanup": {
+   "seedLegRootRemoved": true
+  },
+  "counterExamples": {
+   "unknown_model_binding": {
+    "error": {
+     "code": "INVALID_REQUEST",
+     "message": "profileId must be a bounded string"
+    },
+    "turnsAfter": 2,
+    "turnsBefore": 2
+   }
+  },
+  "families": {
+   "codex": {
+    "assistantChars": 17,
+    "assistantPrefix": "controlled stream",
+    "errorCode": null,
+    "sendStatus": 200,
+    "turnState": "completed"
+   },
+   "pi": {
+    "assistantChars": 17,
+    "assistantPrefix": "controlled stream",
+    "errorCode": null,
+    "sendStatus": 200,
+    "turnState": "completed"
+   }
+  },
+  "seatModelAuthority": {
+   "accepted": true,
+   "dispatchIdsAssigned": [
+    false,
+    false,
+    false
+   ],
+   "reasonFieldsOnTheTurn": [
+    "error_code"
+   ],
+   "refusal": null,
+   "seatReason": "SIDECAR_OP_FAILED: Harness model is not available: not-on-this-seat (server log only)",
+   "turnCode": "EXECUTION_FAILED",
+   "turnState": "failed"
+  }
+ }
 }
