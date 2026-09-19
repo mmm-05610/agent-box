@@ -9,8 +9,9 @@ forbidden: ["/home/maoqh/projects/agent-box-server-round1/**", "/home/maoqh/proj
 ruling: R-0046
 terminal: ["DELEGATION_WORKSPACE_DIMENSION_DONE", "DELEGATION_WORKSPACE_DIMENSION_PARTIAL"]
 waive: []
-parallel_units: ["workspace-axis", "gate-on-live-delegation"]
+parallel_units: ["workspace-axis", "gate-on-live-delegation", "child-turn-ledger-fields"]
 serialize_with: ["092", "120", "121", "122", "126", "127", "130", "131", "133", "134", "135", "136", "137", "139", "140", "141"]
+revisions: [{"at": "58e037c", "what": "**并入 `AUD-B-028`（confirmed/low）**：子轮账本两栏是**写死的常量**——`delegation.py:281` 的 `VALUES (?,?,?,1,0,…)` 把 `profile_revision=1`/`native_generation=0` 焊死，而**同一行**的 `effective_config_object_digest` 却取自子 profile **当前**的冻结配置 ⇒ 每条委派留下一行自相矛盾的本账（摘要说『就是这份配置』、两栏说『第 1 版第 0 代』）；既有执行链写的是真值（`sessions/repository.py:253-258`/`:602-605`），`65:102` 也明写『子执行走既有执行链』。**并入依据＝审阅者自己的批注**（『与 020/022 同批…建议并入 138 那张单的归属半边，别再开第四张改同一个函数』）⇒ ops 采纳：**不新开单**，改为在 `138` 加**阶段 6 ＋ 一条 Requirement ＋ 一条门**（见正文）。", "after_stage": 5, "ruling": "R-0046"}]
 ---
 
 # Work Order 138 — 委派**根本没有工作区这一维**：子轮落到"子 profile 最近动过的会话"的工作区（`AUD-B-020` **confirmed/high**）
@@ -68,6 +69,26 @@ serialize_with: ["092", "120", "121", "122", "126", "127", "130", "131", "133", 
 **WHEN** 把放置退回"子 profile 最近动过的会话"
 **THEN** 本单的门（驱动真委派链）**必须红**
 
+### Requirement: 子轮账本的"哪份配置"多栏必须**同源**（并入 `AUD-B-028`）
+
+**来源**：`AUD-B-028`（confirmed/low，审阅者第 88 轮）＋ 审阅者的合并批注（并入本单，别开第四张改同一函数）。
+
+**事实**：`delegation.py:281` 的 `INSERT INTO server_turns(... profile_revision, native_generation ...) VALUES (?,?,?,1,0,…)`
+**把两栏焊死**，而**同一行**的 `effective_config_object_digest` 是从子 profile **当前**冻结配置**现算**的
+⇒ 同一行三个字段互相打脸（摘要说"就是现在这份配置"、两栏说"第 1 版第 0 代"）。
+既有执行链写的是**真值**（`sessions/repository.py:253-258`、`:602-605`），`65:102` 亦明写"子执行走**既有执行链**"。
+`server/persistence.py:55` 还会把 `native_generation` 带进**轮次视图** ⇒ 不是纯内部死值。
+
+#### Scenario: 两栏取真值（正例）
+
+**WHEN** 子 profile 的 `config_revision=7`、`native_generation=3` 时发起委派
+**THEN** 子轮那两栏**必须**是 `7`/`3`（与既有执行链**同型**，不新造第三种写法）
+
+#### Scenario: 反例（门要能咬）
+
+**WHEN** 把两栏改回常量 `1`/`0`
+**THEN** 本单的门**必须红**
+
 ## Stages
 
 - [ ] 1. 观测：一手复现"子轮落到别的工作区"（含名册缺字段）（提交）
@@ -75,6 +96,7 @@ serialize_with: ["092", "120", "121", "122", "126", "127", "130", "131", "133", 
 - [ ] 3. 放置由授权决定（不再推断）（提交）
 - [ ] 4. 门：同工作区正例 ＋ 跨工作区显式化 ＋ 反例（提交）
 - [ ] 5. 账与证据（提交）
+- [ ] 6. **（并入 `AUD-B-028`）**子轮账本两栏取**真值**（`profile_revision`/`native_generation`，与既有执行链同型）＋ 门（子轮＝当时子 profile 的两栏；改回常量必须红）（提交）
 
 ## Gates
 
@@ -84,6 +106,7 @@ serialize_with: ["092", "120", "121", "122", "126", "127", "130", "131", "133", 
 | G2 跨区显式 | 跨工作区请求被显式拒绝/授权（可断言） | 静默落别处 ⇒ 门红 | fail (typed) |
 | G3 名册含字段 | 名册发合同点名的「工作区」字段 | 缺字段 ⇒ 门红 | fail (typed) |
 | G4 真链 | 门驱动真委派链（不是直调私有函数） | 直调 ⇒ 门红 | fail (typed) |
+| G5 **账同源**（`AUD-B-028`） | 子轮 `profile_revision`/`native_generation` ＝**当时**子 profile 的两栏（与 `sessions/repository.py:253-258` 同型） | 改回常量 `1`/`0` ⇒ 门红 | fail (typed) |
 
 ## Validation
 
