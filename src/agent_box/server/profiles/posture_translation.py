@@ -51,10 +51,20 @@ _CLAUDE_TOOLS: dict[str, tuple[str, ...]] = {
 
 
 def translate_claude(posture: Mapping[str, Any]) -> dict[str, Any]:
-    """The `allowed-tools`/`disallowedTools` pair for a claude-family posture."""
+    """claude-code's per-tool permission lists for a neutral posture.
+
+    Three buckets, matching claude's own `permissions.{allow,ask,deny}`
+    semantics: an `allow` key becomes an auto-approved `allowedTools` entry, a
+    `deny` key becomes a `disallowedTools` entry, and an `ask` key becomes an
+    `ask` entry - claude's *questioning* path, where the tool is neither
+    pre-approved nor blocked but gated by an interactive decision. (Order 111 /
+    R-0032: `ask` used to fall into `allowedTools`, which pre-approves the tool
+    and so means "does not ask" - the exact opposite of the posture.)
+    """
     keys = dict(posture.get("keys") or {})
     allowed: list[str] = []
     disallowed: list[str] = []
+    ask: list[str] = []
     notes: list[str] = []
     for key in TOOL_KEYS:
         action = keys.get(key, "ask")
@@ -70,14 +80,15 @@ def translate_claude(posture: Mapping[str, Any]) -> dict[str, Any]:
         if action == "deny":
             disallowed.extend(tools)
         elif action == "ask":
-            # Claude's own approval path is what `ask` means there: the tool
-            # stays allowed and the interactive decision gates it.
-            allowed.extend(tools)
+            # Order 111: `ask` is claude's permissions.ask path - the tool
+            # stays out of the auto-approved set and is gated by a prompt.
+            ask.extend(tools)
             if key != "read":
-                notes.append(f"{key}=ask maps to claude's own approval round-trip")
+                notes.append(f"{key}=ask maps to claude's permissions.ask (提问)")
         else:
             allowed.extend(tools)
     return {"allowedTools": sorted(set(allowed)),
+            "ask": sorted(set(ask)),
             "disallowedTools": sorted(set(disallowed)), "notes": notes}
 
 

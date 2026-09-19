@@ -32,7 +32,13 @@ def test_claude_gets_the_tool_lists_and_only_the_unexpressible_refuses():
     assert "Edit" in translated["disallowedTools"]
     assert "Write" in translated["disallowedTools"]
     assert "WebFetch" in translated["allowedTools"]
-    assert "Bash" in translated["allowedTools"]          # ask = its own approval
+    # Order 111 (R-0032): `ask` is claude's permissions.ask path, NOT an
+    # auto-approved allowedTools entry. The old test asserted `"Bash" in
+    # allowedTools` ("ask = its own approval"), which is the bug: putting the
+    # tool in the pre-approval set means it never prompts. Tightened, not
+    # relaxed: it must be in `ask` and demonstrably NOT in `allowedTools`.
+    assert "Bash" in translated["ask"]
+    assert "Bash" not in translated["allowedTools"]
     assert any("ask" in note for note in translated["notes"])
 
     # external_directory=deny has no tool name to hang on: refuse.
