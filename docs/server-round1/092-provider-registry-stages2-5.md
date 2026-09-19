@@ -59,4 +59,26 @@
 
 ## 4 回归计数（全套件）
 
-见本文件提交时的运行；计数与退出码在下（**待 QA 复算**）。
+**全量**（`tests/` + `plugins/agent-box-harnesses/tests/`，`p no:cacheprovider`）：修复前
+**1211 passed / 20 failed / 24 skipped**（249s）。20 红里 **1 个是本单引入**：我在
+`execution/__init__.py` 的 `wire_protocols` 注释里写了品牌字面 `codex`，被中立门
+`test_the_capability_path_of_the_server_names_no_harness` 咬住（capability path 不得点名任何
+harness——正是 AGENTS.md "provider-neutral" 的机器化）。**已修**：注释去品牌字面 ⇒
+`test_harness_capability_integration.py`+`test_server_capability_contract.py` **70 passed**。
+
+余 **19 红全为既有环境性 / 继承，非本单**：
+- **Worker 工件：不在**（`QA-007`）——缺 git-ignore 构建产物 ⇒ `test_chain_gate_without_worker_fails_typed`、
+  `test_opencode_gate_cleanup`（11）、`test_pi_gate_cleanup`（5）、
+  `test_the_production_default_lease_is_five_seconds`（读 manifest 文件缺）——与 c1 交回的 18 红同族。
+- `test_skill_projection`（plugin，claude native-home `.claude` 路径）＝本树 `tests/`+plugins 合并跑才入镜，
+  系继承的非本单（本单未碰 native home / skill 投影）。
+
+修复后本单引入回归 = **0**。全套件计数标 **`待 QA 复算`**（批末按 `R-0040 ⑥` 不宣告"全量通过"）。
+定向证据：092 三张门文件 `neutralization(5)+protocols(12)+compatibility(6)=23 passed`；
+阶段 3 回归 `098+wire_v1+stage_a+092=80 passed`；阶段 4b 回归 `六模板 79 + harness_sidecar 92 + 092 compat/protocols 18 passed`。
+
+## 5 中立性教训（记一笔）
+
+capability-path 中立门会扫 `execution/__init__.py`：新注释/文档串**不得出现任何 harness 品牌字面**。
+provider_protocols.py 的方言表含 `claude/gemini/pi/hermes/mcode/cc-switch` 等**归一输入值**——那是
+边界层"接受现实方言"的必需词汇，且该文件不在 NEUTRAL_FILES 扫描集内（门复跑 70 passed 证实）。

@@ -83,9 +83,9 @@ class HarnessDescriptor:
     # overridden by a Profile default or a temporary override.
     security_locked_controls: tuple[str, ...] = ()
     # Work Order 092: the canonical protocols this Harness can speak, mapped to
-    # that family's own native dialect value (e.g. codex -> {"openai-chat":
-    # "chat"}). Declared only for families whose dialect is pinned in this repo;
-    # a family that declares none is *undeclared*, not incompatible.
+    # that family's own native dialect value (e.g. a family whose "openai-chat"
+    # is spelled "chat"). Declared only for families whose dialect is pinned in
+    # this repo; a family that declares none is *undeclared*, not incompatible.
     wire_protocols: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
