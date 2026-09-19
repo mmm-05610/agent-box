@@ -177,3 +177,44 @@ hello 说"方法存在"（真），wire 说"这个面没装配"（也真），�
   （两条路各自 500），却在合同与 hello 里都算一个方法——这类"登记齐全但从没通过一次"的面正是 103 要一网打尽的形状。
 * **给 102**：本单**没有**触碰任何工件；`digest` 那个键是**服务端形状落后于既有权威**（§3），
   102 做工件同步时应能看到服务端与权威在这一条上已一致。
+
+## 12 那条红是什么、为什么不是本单的回归（第二次复现）
+
+`tests/ -q` 第一轮里唯一的一条红：
+`tests/server/test_first_run_lock.py::test_without_the_gate_the_same_first_runs_overlap`
+（080 的反例门，断言"没有锁则两次冷跑的时间窗**必相交**"）。
+**同一台机器上第二次复现**（第一次在 104 §11，登记在 §待开单）：
+
+| 证据 | 值 |
+| --- | --- |
+| 同一份源码的 `tests/server` 那一腿（含该文件） | **714 passed / 0 failed** |
+| 该文件单跑（紧接在全量之后） | **5 passed**（104 那轮已 3×5 passed） |
+| 出问题那一轮 `tests/` 用时 | **483.97s**；同日无并发全量为 **298.45s**，另两轮 358.34s / 374.66s |
+
+⇒ 三条一起指向"负载拉长线程时序 ⇒ 相交窗口消失 ⇒ 反例门假红"，与 R-0023 点名的 11 GB 瓶颈一致。
+**本树没有为了让门绿去改那条断言**（章程 §8：门必须能被证伪，但不能被修成不会红）。
+本单的账因此按两半写：`tests/server` 全绿、`tests/` 除该条外全绿，且该条已知与本单无因果。
+
+## 13 一处**不属于本单**的账：`validate_order.py --strict` 从 31 FAIL 涨到 61
+
+本单 Validation 里那条校验器命令，结果与 097/098/104/105 记账时的 **31 FAIL** 不再一致。一手核对：
+
+| 项 | 值 |
+| --- | --- |
+| 校验器文件 mtime | `~/.agents/skills/incremental-work-order/scripts/validate_order.py`，**2026-09-19 12:40**（本单开工之后被改） |
+| 新规则（单文件跑 097 的原文） | `declare parallelism explicitly: a non-empty parallel_units list, or parallelism: "none" with a parallelism_reason (an empty or missing list used to mean single-threaded without anyone deciding it)` |
+| 命中面 | `docs/implementation/work-orders/` 共 **61** 个文件 ⇒ 现在 **61 FAIL**：31 条是 37…67 的 v1 历史单（一直如此），**新增 30 条是 068–105 里所有 `parallel_units: []` 的 v2 单** |
+| 本单引入的 FAIL | **0**（101 的 FAIL 原因就是那条新规则，且它与 097/098/104/105 同款） |
+
+⇒ 计数照记，但**本树不去逐份补那行元数据**：写哪个单能并行、并行几路是**调度裁决**
+（公告第 63 轮已经改了 runtime 线的 090/091/092/094/095/107/108 与 A 线的 **103=4**，
+"其余按既有"就留下了这 30 条 `[]`）。已登记进 §待开单，请调度者一次批量落地
+（要么 `parallelism: "none" + reason`，要么按 R-0021 给每单真分配）。
+**测量之后 3 分钟的新事实**：调度者已经在本树开始逐份补那行元数据
+（`docs/implementation/work-orders/099-worker-home-put-dispatch.md` 被改成
+`parallelism: "none"` ＋ `parallelism_reason`，并把 `depends_on: [086]` 规范成 `["086"]`；
+该改动**不在本树的提交里**，是调度者 concurrently 写的，本单只登记不代提交）。
+所以这一条不是"待开单"，是"正在被正确的所有者收尾"。
+
+在此之前，本树各单的"校验器 30 OK / 31 FAIL"账都对不上当前实测——**这是账要能咬的代价，不是被跳过的步骤**，
+所以写在这里而不是悄悄沿用旧数字。
