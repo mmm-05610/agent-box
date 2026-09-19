@@ -52,6 +52,14 @@ Validation 里那条 `POST /wire/v1/server.hello`（`Authorization: Bearer <runt
    `return True, None` 兜底或 `profiles.`/`providerModels.` 前缀分支 ⇒ **一律 `supported: true`**。
    于是"表变长"这件事在这份部署里**只增加真话**，不会把 37 个假 `true` 混进来——
    除非某个新族自己该有 blocker 判定，那是**另一件事**，本单不发明（见 §7 未做）。
+
+   **这条推论在阶段 4 被自己钉错了（实测，见 §8）**：37 条改判后并非全为 `true`——
+   `workspaces.gitStatus` 命中 `workspaces.` 前缀分支，在这份没有沙箱的部署里如实报
+   `supported=false / LOCAL_SANDBOX_UNAVAILABLE`，所以 false 行是 **12 条**而非 11 条。
+   这不是缺陷（它和另外四条 `workspaces.*` 是同一句话），但它说明本文件当时那句
+   "只增加真话、不会有多余的 false" 说得太满：**派生会把既有 blocker 规则也一并带到新方法上**，
+   而这是想要的行为——正因如此，G3 的比对范围**只钉既有 27 条**，不去断言新行的支持态
+   （断言了新行就等于把"新族该不该有 blocker"这个 §7 未做的决定偷偷做掉）。
 2. **命名空间隔离的用例读的是源码、不是这张表**：`tests/server/test_capability_namespace_boundary.py:72-76`
    用正则从 `handlers.py` 文本里抽 `"a.b"` 形式的 id，断言与 Work Core 操作、与
    `caps.CANONICAL_CAPABILITY_IDS` **两两不相交**。它覆盖的是**全部 64 条**，
@@ -100,3 +108,107 @@ Validation 里那条 `POST /wire/v1/server.hello`（`Authorization: Bearer <runt
 * **不做按客户端版本裁剪**（工单 §明确不做）。
 * 表与前端合同（59 方法）仍然**不是同一张表**，本单不产工件、不动重锁（B4 的事另计）。
 * Windows 侧真机 hello 若本宿主不可达，§8 如实写成"在 WSL 侧真监听复跑"，不冒充 Windows 侧。
+
+## 8 阶段 2–4：改了什么、门咬不咬、真机复跑、账
+
+### 8.1 实现（阶段 2，实测）
+
+* `hello()` 的循环改成 `for capability_id in self._handlers:`（`handlers.py:392`），
+  理由写进循环上方注释（存在性只看派发表 / 顺序=字面插入序 / `server.hello` 自我声明）。
+* **`CAPABILITY_IDS` 常量整条删除**，不是"留着不用"。删除后全仓 grep `CAPABILITY_IDS`
+  只剩 `CANONICAL_CAPABILITY_IDS`（`resource_contracts/harness_capabilities.py`，Harness 声明词汇，
+  与本单无关的另一套命名空间）⇒ **没有任何一侧还在读这张手工表**。
+* `_capability()` 一字未改判定分支，只加了 docstring 说明"兜底答的是支持态、不是存在性"。
+
+### 8.2 门（阶段 3）落在 `tests/server/test_hello_capability_sync_097.py`，7 条
+
+| 门 | 用例 | 断言的实质 |
+| --- | --- | --- |
+| G1 | `test_the_table_is_the_dispatch_table_and_nothing_more` | 三份"存在"的说法（hello / `_handlers` / `_PARAM_SHAPES`）两两集合相等 + 无重复 + hello 顺序==派发表顺序 |
+| G1 反例 | `test_a_method_dropped_from_dispatch_diverges_and_the_gate_bites` | 从派发表摘 `usage.export` ⇒ hello 诚实跟到 63，而形状表仍说 64 ⇒ 发散**可见** |
+| 37 条 | `test_the_37_methods_missing_at_baseline_are_all_declared_now` | 按名字断言 `declared - 27 == 那 37 条`，不比计数 |
+| 自我声明 | `test_hello_now_declares_its_own_discovery_method` | `server.hello` 逐字 `{"id", "supported": true}` |
+| G2 | `test_the_two_probe_methods_are_declared_and_supported` | 两个探测方法在场且 `supported: true` 且不带 `reason` |
+| G3 | `test_the_baseline_deployment_answers_the_pre_existing_27_verbatim` | 沙箱探针**两个分支都钉**：11 条 false 的 `{id, supported, reason}` 逐字，且 27 条里没有一条支持态移动、没有一条支持项长出 `reason` |
+| 兜底 | `test_an_id_that_no_rule_covers_still_answers_supported` | `_capability("nothing.here") == (True, None)`，而**同一份部署**上真调用 `nothing.here` 得到 `INVALID_REQUEST` 且消息含方法名 |
+
+G3 特意**只比既有 27 条**（§3 推论被钉错的理由见那里）。
+
+### 8.3 反例真的咬（缺席跑，实测）
+
+把"手工常量"放回去 = 进程内把 `WireService.hello` 换回遍历一份 27 条元组的旧形状
+（**不动任何文件**，跑完 `RESTORED True` 核实还原），然后跑同一个测试文件：
+
+```
+FFFFF..   5 failed, 2 passed in 9.89s
+```
+
+红的是 G1、37 条、G1 反例、自我声明、**G2**（`providerModels.probeModels is not declared at all`）；
+绿的是 G3 与兜底——**这正是分工**：落后于派发表时该红的就是"同步类"的门，
+而 blocker 语义与兜底本来就跟这次改动无关。反例不是装饰：它一次点亮了工单点名的那两个前端按钮。
+
+### 8.4 真机复跑（DoD 3，实测在 WSL 侧真监听）
+
+同一形态复跑（`tempfile.mkdtemp(prefix="097-probe-")` → `build_runtime` → `create_app` →
+`uvicorn` 线程真 bind `127.0.0.1:52067` → `urllib` 发 Validation 那条 `server.hello`，
+两次调用）：
+
+| 项 | 复跑实测 |
+| --- | --- |
+| 声明数 / 去重后 | **64 / 64**（与派发表键数 64 相同） |
+| 与派发表的对称差 | **`[]`** |
+| 两次调用的 id 序列 | **逐字节相同** |
+| `protocolVersion` / `auth` / 顶层键 | `wire/1` / `{"required": true, "schemes": ["session_token"]}` / `auth,capabilities,protocolVersion,serverId` —— 与 §1 基线一致 |
+| `providerModels.probeModels` | `{"id": …, "supported": true}` ✔ |
+| `providerModels.probeConnection` | `{"id": …, "supported": true}` ✔ |
+| `server.hello` | `{"id": "server.hello", "supported": true}` ✔ |
+| false 行 | **12**（基线 11 + `workspaces.gitStatus`）⇒ 见 §3 那条被钉错的推论 |
+| true 行 | 52 |
+| 临时数据根 | `TEMP_ROOT_ABSENT True` |
+
+**Windows 侧不可达（如实）**：`curl -m 4 POST http://127.0.0.1:18770/wire/v1/server.hello`
+⇒ `http=000` / curl **exit 7（connection refused）**，本宿主此刻连不上那台在跑的 Server。
+所以 DoD 3 的"真机"是**在 WSL 侧真监听复跑**，不冒充 Windows 侧；顺带一条事实要交回：
+**运行中的 Windows Server 不吃本改动，直到它从本树重新构建部署**（源码单改不了已跑起来的进程）。
+
+### 8.5 回归计数（G4）
+
+* `python3 -m pytest -q tests/server/test_hello_capability_sync_097.py` ⇒ **7 passed**
+ （首跑 15.16s，最终源码上复跑 3.83s——差的是首次 SQLite 迁移，不是用例）
+* 计数**在最终提交源码上复跑一遍**（`a8b93f3`），而不是拿阶段 2 提交前那一版数字凑：
+ `python3 -m pytest tests/server -q` 与 `python3 -m pytest tests/ -q` ⇒ 见 §8.6 的"最终计数"行。
+* `validate_order.py docs/implementation/work-orders --strict` ⇒ **30 OK / 31 FAIL**，
+  FAIL 的编号集合**恰为 37…67**（先于 v2 格式的历史单，非本单引入）；068–105 全 OK，含本单。
+* `git diff --check` ⇒ 干净（本文件所在树；`status.md` 的 EOF 空行按 §提交前自查 处理）。
+
+### 8.6 账务与清理
+
+真实模型调用 **0 次 / ¥0**：本单四个阶段全部是本地发现方法 + 本地 SQLite，没有碰任何 Provider，
+凭据 locator **未访问**。§8.3 的缺席跑是**进程内 monkeypatch**（不改文件、跑完核实还原），
+所以"反例可跑"这件事没有留下任何工作树痕迹；§9 第一条的探针同样只在临时数据根里跑，
+跑完 `TEMP_ABSENT True`。§8.4 的临时数据根已删并核实缺席（`TEMP_ROOT_ABSENT True`）。
+
+**最终计数（在 `a8b93f3` 上复跑，见 §8.5 的理由）**：`tests/server -q` = **661 passed in 323.31s**；
+`tests/ -q` = **961 passed in 374.66s**。两条都 0 失败 0 跳过，且**与先前一轮逐字相同**
+（阶段 2 提交前的源码只差 `_capability` 的 docstring 散文，测得 661 passed in 331.10s /
+961 passed in 303.07s）⇒ 复跑不是为了换个数字，是为了让这两个计数**归属于最终提交的那份源码**；
+两次一致本身就是"docstring 不动行为"的实测证据。
+**961 = 086 收口时的 954 ＋ 本单新增 7**，一条未掉 ⇒
+零回归这件事由计数本身说明，不是由"我看了下应该没事"。
+
+## 9 交回（不阻塞本单终态）
+
+* **派生把 101 的缺陷也照亮了（实测，本单一手）**：这五张刚被如实声明为存在的方法里，
+  `usage.aggregate` / `usage.export` / `providerArtifacts.list` 在**无服务的生产组合**上从
+  `WireService.dispatch` 直接抛 **`ValueError: unknown wire error family: USAGE_AGGREGATOR_UNAVAILABLE`
+  / `ARTIFACT_STORE_UNAVAILABLE`**（⇒ HTTP 500）；`providerArtifacts.install` / `rollback`
+  这一次被 `requestId` 校验先挡住（占位参数不够真），其家族位误用点是 101 点名的同一形状。
+  于是 hello 现在对这五条说 `supported: true` 是**"方法存在"为真、"叫得通"为假**。
+  本单按 §7 不发明 blocker（那是逐族语义设计），但**这条交回要跟着 101 一起看**：
+  101 落地后两者自然一致；101 未落地前，任何人拿 hello 当"可用清单"都会在这五条上被骗一次。
+* **是否需要重锁**：105 的写法是"可与 097 合并为一次重锁"。本单**没改形状**（条目仍是
+  `{id, supported, reason?}`），改的是这张表的**内容**。本树内**没有**生成的 wire 工件可核
+  （实测：`docs/contracts/` 只有 Work Core；`find` 无 `contracts/wire-v1`），
+  所以"前端那份 TS/工件里是否嵌了 capability id 清单"我在这一侧**无法第一手判定** ⇒ 交回调度者：
+  若嵌了，重锁由 105 一并做掉；没嵌，本单不产生新的一对摘要。
+* **Windows 侧复跑**：需要一个真在跑的 Windows Server（本机此刻 18770 拒连），以及重新部署才生效这件事。
