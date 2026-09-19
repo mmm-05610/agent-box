@@ -36,6 +36,8 @@ import sys
 import time
 from pathlib import Path
 
+import pytest
+
 REPO = Path(__file__).resolve().parents[2]
 GATE = REPO / "scripts" / "server-round1" / "native-home-gate.py"
 RUNS = REPO / "docs/server-round1/fullstack/087-runs"
