@@ -18,7 +18,8 @@
 - **属 A 树**：`src/agent_box/server/wire/**`（参数表/handler）、`server/model_configs/probe.py` 及其探针语义、
   **`scripts/server-round1/**`（门脚本与生产链门的唯一 owner＝A 树，`QA-004`）**——本树**只读引用**；
   确实需要改某个门脚本 ⇒ **交回**，由调度者在那张单里开**一次性例外**（先例：`108` 的 `234fa08` 把该路径写进它的 `write_paths`）。
-  依据是实测：两棵后端树各带一份 15 门脚本、**md5 逐个 15/15 逐字相同**（`docs/qa/dedup-ledger.md` D-001）⇒ 两份真相、改判据即静默分叉。
+  依据是实测：两棵后端树各带一份门脚本、**md5 逐个 15/15 逐字相同**（`docs/qa/dedup-ledger.md` D-001，**2026-09-19 15:0x 的 pin**）⇒ 两份真相、改判据即静默分叉。
+  **更正（ops 第 119 轮，据 `QA-015` 的一手复算）**：该口径**已过期**——A 树现在 **16** 个门（独有 `ui_gates_89_leak_check.py`）、本树 **15**；共同 15 个里 **13 逐个 md5 相同 / 2 已分叉**（`dsh-production-chain-gate.py`、`pi-production-chain-gate.py`，**本树侧改**）。⇒ 引用 D-001/`QA-004` 时**必须带 pin**；两份分叉由单 `127` 处置（归一 to A 或写清有据分叉）。`scripts/server-round1/**` 的 **唯一 owner 仍是 A 树**（`QA-004`）。
 - **已开的一次性例外（ops，2026-09-19 第 110 轮）**：单 **`116`**（`wire-500-fork-parity`）允许写
   `src/agent_box/server/wire/handlers.py` 里**两个 `WireError(` 调用点**（`:1196` artifact store、`:1244` usage aggregator）＋ 把守卫测试
   `tests/server/test_wire_error_family_101.py` 带进本树。**理由（实测）**：本树这两处把内部码当 family 传 ⇒ 裸 HTTP 500（live 2/2），

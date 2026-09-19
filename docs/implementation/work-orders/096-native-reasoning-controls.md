@@ -10,6 +10,7 @@ ruling: R-0013
 terminal: ["NATIVE_REASONING_CONTROLS_DONE", "NATIVE_REASONING_CONTROLS_PARTIAL"]
 waive: []
 parallel_units: ["pi","dsh"]
+revisions: [{"at": "2846fe6", "what": "转录正文已有的修订：用户批准 AQ-0001（逐家打开「思考」并做档位可配，前端把 thought.delta 接进对话流）⇒ 后端 096 修订 v2（aq 行记 sha 2846fe6、前端 P35 b7a19e7d）。本记录的 ruling 取本单 frontmatter 的 R-0013（裁决账未记 AQ-0001 的 R 编号，如实说明）。", "after_stage": 0, "ruling": "R-0013"}]
 ---
 
 # Work Order 096 — 思考/推理旋钮：逐家声明 + 取值域动态 + 落盘

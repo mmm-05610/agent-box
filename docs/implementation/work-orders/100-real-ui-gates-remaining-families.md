@@ -3,7 +3,7 @@ id: "100"
 slug: real-ui-gates-remaining-families
 batch: c3
 baseline: "b2 checkpoint"
-depends_on: [{"order": "089", "condition": "pi 与 codex 两家在 Windows 控制面上真实 UI 门已绿（R-0015）"}]
+depends_on: [{"order": "089", "condition": "agent-box-env-provider tree：089 收口行（四个真 UI 门）出现在该树 status"}]
 write_paths: ["docs/server-round1/fullstack/**", "docs/implementation/status.md", "scripts/server-round1/**"]
 forbidden: ["src/agent_box/**", "plugins/**", "tests/**", "/home/maoqh/projects/agent-box-desktop-next-wsl-round1/**"]
 ruling: R-0015
@@ -25,7 +25,7 @@ Stage 1 的广度策略是**先立住两家**（pi + codex，见 089 与 R-0015�
 
 ## Current state
 
-- 089（修订 v2）已确立：控制面＝Windows（R-0014）、广度＝授权给调度者（R-0015）、成本＝假端点优先（R-0017）。
+- 089（它的第二版修订）已确立：控制面＝Windows（R-0014）、广度＝授权给调度者（R-0015）、成本＝假端点优先（R-0017）。
 - 各家状态以本树 `status.md` 的"四家封装就绪/真实门"行与工件清单为准；**未核实项写"未验证"**，不猜。
 
 ## Scope

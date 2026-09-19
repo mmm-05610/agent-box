@@ -10,6 +10,7 @@ ruling: R-0013
 terminal: ["PROVIDER_REGISTRY_DONE", "PROVIDER_REGISTRY_PARTIAL"]
 waive: []
 parallel_units: ["record-fields","protocol-vocabulary","compatibility-derivation"]
+revisions: [{"at": "27fd2a8", "what": "转录正文已有的修订：R-0013 追加「一个 harness 多个模型槽」——逐槽模型事实与描述符声明。", "after_stage": 0, "ruling": "R-0013"}]
 ---
 
 # Work Order 092 — Provider 记录中立化 + 协议词汇 + 兼容派生（R-0013 第 1 层）

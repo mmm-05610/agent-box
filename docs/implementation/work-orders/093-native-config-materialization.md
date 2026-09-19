@@ -10,6 +10,7 @@ ruling: R-0013
 terminal: ["NATIVE_CONFIG_MATERIALIZATION_DONE", "NATIVE_CONFIG_MATERIALIZATION_PARTIAL"]
 waive: []
 parallel_units: ["claude-code","codex","opencode","hermes","dsh","qwen","kilo","pi"]
+revisions: [{"at": "27fd2a8", "what": "转录正文已有的修订：R-0013 追加「逐槽落盘 + 逐模型限额」。", "after_stage": 0, "ruling": "R-0013"}]
 ---
 > **顺序硬约束（R-0032 ①，2026-09-19）**：**先落 `111`（claude 的 `ask → permissions.ask` 修正）再落盘**；
 > 093 的阶段 1 检查点里必须核到 111 的提交——否则落盘会把错的映射写进原生配置。
