@@ -1646,7 +1646,14 @@ HEAD 即检查点；`git status --short` 只剩本树自己的证据目录（`08
 - 真实模型调用：**0**（整批）。§Spend 的机时账写在检查点报告里。
 - 待 **QA 复算**（`R-0040 ⑥`）。
 
-## QUEUE_EMPTY_AT 2026-09-19
+## QUEUE_EMPTY_AT 2026-09-19 —— **已作废（下面这条更正比它晚 6 分钟）**
+
+> **更正（14:51 实测）**：写下这行之后我重读了 `work-orders/` 与主树 manifest，发现 ops 在本轮又往**本树**投了
+> **五张 DISPATCHED**：`123`（transport 边界那道墙——正是我 115 §7 交回的那条）· `124`（provider 模型写白名单）·
+> `125`（`config.describe` 逐槽投影）· `128`（wire seq 两个编号空间，AUD-B-010）· `129`（`importAsset` 的 `requestId` 未用，AUD-B-012）；
+> 另 `132`（批末对账门）依赖 `128` ＋ runtime 的 `130/131`。⇒ **队列不空**，这行按纪律保留并就地作废（不删，那是当时的如实判断）。
+> 教训入形：**写 QUEUE_EMPTY_AT 之前必须重读 `work-orders/` ＋ manifest**，不能只看开工时那份队列切片。
+
 
 今晚队列（`087 → QA-008/QA-009(=`115`/`117`) → `103` → `099` → `089``）逐条落定：
 `087` 收口 `CANCEL_RECALL_FLAKE_PARTIAL`（剩余＝改门的写面单，提案已交）· `115` `WIRE_FAMILY_CLOSURE_DONE` ·
@@ -1682,3 +1689,34 @@ HEAD 即检查点；`git status --short` 只剩本树自己的证据目录（`08
 自己的两条红也留案（都是门咬到我，不是产品问题）：预演第一版把 REST 的 `{"error":{"code":…}}` 当字符串比 ⇒ 红；
 `SEATLESS_FAMILY` 那家在插件表里根本没登记 ⇒ 拒在建档而不是发送，于是把判据改成"**建档即类型化拒 + 一条 turn 都不许多**"
 而不是放宽断言蒙过去。
+
+## 工单 123 — 第三道墙补在 HTTP 边上（`115` 的交回被 ops 转成单，2026-09-19 14:5x–15:1x，执行者）
+
+**终态 `TRANSPORT_BOUNDARY_WALL_DONE`**。证据 [transport-boundary-wall-123.md](../server-round1/transport-boundary-wall-123.md)，
+门 `tests/server/test_transport_boundary_wall_123.py`（9 条）。前提一手复现成立：把 `decode_request` 换成抛 `RuntimeError`，
+**在 `115` 两道墙都在位的情况下**出站仍是 `500 / text/plain / 21 字节`（因为那条路径不经过 `dispatch`）。
+
+- 加了三处 catch、零重构：wire 路由的 `dispatch` 段（⇒ 200 + 完整信封）· 应用级 `exception_handler(Exception)`
+  （⇒ **500 保留**但出站是错误对象，覆盖 REST/路由/中间件）· event-stream 批次读（⇒ close 带异常**类型**）。
+  `delegation` 桥本来就 catch 一切 ⇒ 一字未动。异常文本一律不出去（门里注入的就是带宿主路径的假文本）。
+- **状态码的选择是判断不是事实**，写在报告 §2 供 ops 一行改回：`dispatch` 段用 200（同一崩溃在 `115` 的墙那里就是 200，
+  "崩在哪一层"不该改变客户端看到的合同）；应用级用 500（连信封都解不开时 `request_id` 不可知，报 200 会是假成功）。
+- 这一族现在有**四道**墙：`converge_family` · `dispatch` · wire 路由 · 应用级。凑回 QA-008 那个形状要四道一起拆。
+- **本单撞到自己埋的假反例（如实）**：第一版把 `app.exception_handlers.pop(Exception)` 用在**已 start** 的 app 上，门仍绿——
+  Starlette 在 startup 就把 handler 解析进中间件栈 ⇒ 那条"反例"什么都没证。改成 startup 之前另建实例摘除，
+  并补一条"每个 `create_app` 都带着这道墙"的正向断言。
+- **`115` 的一条反例被本单改判**（`tests/**` 在 123 写面内）：原来"退掉两道墙 ⇒ 裸 500"，现在那两道退掉会被路由墙接住
+  ⇒ 200 + 类型化，只是 `internalCode` 从域码退化成异常类型。改判后的门**仍单独钉着 `115` 的收敛**
+  （`internalCode != UNHEARD_OF` 一旦变绿就红），不是为了让计数好看。
+- 计数：`tests/server -q` = **1 failed / 805 passed / 1 skipped**（那 1 红是本单让 `103` 的生成账过期——新门多 3 条证据行；
+  重新生成后定向复跑 `103 + 123 + 115` = **33 passed / 12.61 s**）。**Worker 工件：在**。真实模型调用 **0**。
+
+## §Spend 增量（本会话批次：087 / 115 / 117 / 089 预检与预演 / 123）
+
+- **真实模型调用：0**（全程假端点/fixture；`R-0017` 的"假端点优先"在这一批是 100%）。DeepSeek 余额支出 0，估算 ¥0。
+- **子代理**：2 个（1 个 Explore 做 087 的取消/召回链路测绘；1 个 Explore 做 117 的凭据可达性测绘），深度 1，未开子子代理；
+  请求数与 token 计入本树，不另立账。
+- **机时**：40 轮 45 门（~9 min）· `tests/` 全量 4 次（325 s / 496 s / 316 s / 一次被我自己打断）·
+  定向复算 8 次（平均 ~40 s）· 1 次 20 轮计数腿被全量套件顺带重跑（已把那条腿改成 opt-in，教训见 1ea024f 的提交信息）。
+- **踩坑两条入形**：① 全量套件会**重写已提交的证据文件**（`rounds.json` 被改成两轮）⇒ 重跑型门必须 opt-in + 写明命令；
+  ② 跨 shell 传 Windows 路径**别用嵌套引号**（`"$env:…"` 被 bash 吞掉 ⇒ 我量到假的 `False/False`，差点写成"前置未就绪"）。

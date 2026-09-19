@@ -22,8 +22,22 @@
 
 ## 1 起 Windows 侧 Server（修订 v2 要的正是这条路径）
 
+> **⚠️ 先读 `R-0056` 的资源护栏，别照抄 `trial-serve.ps1` 的默认值**（本轮补读裁决时发现的问题，见 §6）：
+> `089` 的 Windows 侧 Server **必须用独立端口段 + 独立数据根**，**不得**与验收线 A 的 WSL 试用环境
+> （`18790` / `~/.agentbox-trial-chat`）抢同一份资源。而 `trial-serve.ps1` 写的是
+> `$DataRoot = %LOCALAPPDATA%\AgentBox\desktop`——**那是用户真实的桌面数据根**，
+> 拿它当验收根跑，等于在用户的真 Profile 上试错。**要改这两行再跑**：
+>
+> ```powershell
+> $DataRoot = Join-Path $env:LOCALAPPDATA "AgentBox\89-gate"   # 独立根（跑完归档/删除并留证据）
+> $Port     = 18820                                            # 独立端口段（18790/18810 已有主）
+> ```
+>
+> 端口先自己验一次空闲：`powershell.exe -NoProfile -Command "Get-NetTCPConnection -LocalPort 18820 -ErrorAction SilentlyContinue"`
+> 无输出 ＝ 可用。`trial-app.ps1` 那两条环境变量要跟着改（`-ServerRoot` / `-ServerPort` 都收参数）。
+
 ```powershell
-# 终端 A（Windows）
+# 终端 A（Windows）—— 先按上面改好 $DataRoot / $Port，再起
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\agentbox-w48-trial\trial-serve.ps1
 ```
 
@@ -106,6 +120,17 @@ PYTHONPATH=src:<六个插件 src> AGENT_BOX_SANDBOX_MODULE=agent_box_sandbox_bwr
 ③ 三种坏输入（未知方法、类型错的参数、缺参数）出站全是 JSON-RPC 错误对象，**没有一条裸 500**（`115` 的实效）；
 ④ `profiles.list` 在真装配上确实带 `sendability`+`recoveryPending`（`117` 的实效）。
 预演自己也红过一次：断言把 REST 的 `{"error":{"code":…}}` 当字符串比 ⇒ 门咬到我；修完才是上面这四条。
+
+## 4c 环境冻结与凭据映射的归属（本轮补读 `R-0056`/`R-0063`/公告 127–128 轮得到，不是推测）
+
+- **冻结已解除**：`R-0063` 把 `ACC-R4n` 记成 `superseded` ⇒ 按 `R-0054 ⑦` 环境**随之解冻**；
+  但 18790 仍是验收线 A 守的那台（同一个 `pid 4355`），**本包不动它、不在它上面跑 089**。
+- **`T6-1`（"没有一条发得出去的 profile"）已归 A 的装配面**（公告 127 轮：A 计划在窗口收口后、下一次钉环境时
+  在试用根里保留一条"能发的试用 profile"，`pi` ＋ 内存里那条 DeepSeek 凭据 ＋ model 控件绑 `provider_52cb9435/deep…`）。
+  ⇒ **跑 089 的人不要自己去补这条映射**（那是 A 的活，且红线照旧：真 key 不种到 `credential_e08793…`）。
+  用 §3 的读法先看有没有 `ready`；一条都没有就把读数交回 A/调度者，**不要**为了跑通去改装配。
+- **`091` 的"③ Windows↔WSL 真机部署+一次增量"由本单现场验并记账**（`R-0056` 明写：那是 `089` 的产出，不再是它的前置）
+  ⇒ 跑的人要把"部署成功/失败 + 第一次增量"这两件**记进 089 的证据里**，不要当成环境问题略过。
 
 ## 5 交回的三条（跑的人一定会撞到，先写在这）
 

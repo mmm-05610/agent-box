@@ -24,7 +24,7 @@ python3 scripts/server-round1/wire_drive_coverage.py --check     # 有缺口即�
 | 有真实 wire 驱动证据 | **64** |
 | 豁免 | **0** |
 | 无证据（差集） | **0** |
-| 证据行数合计 | 325（分布仍很偏；117 的新门给 `profiles.list` 与 `providerModels.*` 各添了几行）|
+| 证据行数合计 | 328（含 117 与 123 的新门；分布仍很偏）|
 | 只被**一个文件**驱动的方法 | **44** 个，列在下面当观察名单 |
 
 ## 观察名单（单源证据：删掉那一个文件，该方法即成缺口）
@@ -113,7 +113,7 @@ python3 scripts/server-round1/wire_drive_coverage.py --check     # 有缺口即�
 | `profiles.clone` | `tests/server/test_profile_permissions.py:345` — `cloned = client.post("/wire/v1/profiles.clone", headers={` | 6 |
 | `profiles.create` | `tests/server/test_harness_sidecar.py:1183` — `profile = _wire_post(client, runtime.token, "profiles.create", {` | 8 |
 | `profiles.grantSubagent` | `tests/server/test_delegation.py:402` — `granted = call("profiles.grantSubagent", {` | 3 |
-| `profiles.list` | `tests/server/test_profiles_list_sendability_117.py:73` — `items = wire(client, headers, "profiles.list", {"includeArchived": Tru` | 7 |
+| `profiles.list` | `tests/server/test_profiles_list_sendability_117.py:73` — `items = wire(client, headers, "profiles.list", {"includeArchived": Tru` | 10 |
 | `profiles.memory` | `tests/server/test_profile_memory.py:93` — `before = call("profiles.memory", {` | 3 |
 | `profiles.revokeSubagent` | `tests/server/test_delegation.py:419` — `revoked = call("profiles.revokeSubagent", {` | 1 |
 | `profiles.setPermissions` | `tests/server/test_profile_permissions.py:430` — `written = client.post("/wire/v1/profiles.setPermissions", headers={` | 4 |
@@ -121,13 +121,13 @@ python3 scripts/server-round1/wire_drive_coverage.py --check     # 有缺口即�
 | `profiles.update` | `tests/server/test_wire_v1.py:521` — `renamed = api.ok("profiles.update", {` | 2 |
 | `profiles.updateConfig` | `tests/server/test_harness_sidecar.py:1187` — `configured = _wire_post(client, runtime.token, "profiles.updateConfig"` | 5 |
 | `providerArtifacts.install` | `tests/server/test_wire_error_family_101.py:146` — `response = post(client, headers, "providerArtifacts.install",` | 4 |
-| `providerArtifacts.list` | `tests/server/test_wire_error_family_101.py:78` — `artifacts = post(client, headers, "providerArtifacts.list",` | 12 |
+| `providerArtifacts.list` | `tests/server/test_wire_error_family_101.py:78` — `artifacts = post(client, headers, "providerArtifacts.list",` | 11 |
 | `providerArtifacts.rollback` | `tests/server/test_wire_error_family_101.py:132` — `response = post(client, headers, "providerArtifacts.rollback",` | 2 |
 | `providerModels.archive` | `tests/server/test_wire_v1.py:554` — `referenced = api.err("providerModels.archive", {` | 2 |
 | `providerModels.create` | `tests/server/test_harness_sidecar.py:1175` — `provider = _wire_post(client, runtime.token, "providerModels.create", ` | 8 |
-| `providerModels.list` | `tests/server/test_provenance_wire_098.py:85` — `listed = api.ok("providerModels.list", {"includeArchived": False})` | 2 |
+| `providerModels.list` | `tests/server/test_provenance_wire_098.py:87` — `listed = api.ok("providerModels.list", {"includeArchived": False})` | 2 |
 | `providerModels.probeConnection` | `tests/server/test_usage_parsing.py:700` — `checked = wire("providerModels.probeConnection", {` | 3 |
-| `providerModels.probeModels` | `tests/server/test_provenance_wire_098.py:142` — `status, body = api.call("providerModels.probeModels", {` | 2 |
+| `providerModels.probeModels` | `tests/server/test_provenance_wire_098.py:144` — `status, body = api.call("providerModels.probeModels", {` | 2 |
 | `providerModels.update` | `tests/server/test_harness_sidecar.py:1206` — `updated = _wire_post(client, runtime.token, "providerModels.update", {` | 3 |
 | `queue.get` | `tests/server/test_wire_v1.py:742` — `queue = api.ok("queue.get", {"sessionId": session_id})` | 3 |
 | `queue.withdraw` | `tests/server/test_wire_v1.py:752` — `stale = api.err("queue.withdraw", {` | 2 |
@@ -135,7 +135,7 @@ python3 scripts/server-round1/wire_drive_coverage.py --check     # 有缺口即�
 | `sendOutcome.query` | `tests/server/test_wire_v1.py:799` — `assert api.ok("sendOutcome.query", {"requestId": "never-sent"}) == {"o` | 2 |
 | `server.hello` | `tests/server/test_hello_harnesses_105.py:65` — `response = self.client.post("/wire/v1/server.hello", headers=self.head` | 12 |
 | `sessions.archive` | `tests/server/test_wire_v1.py:953` — `archived = api.ok("sessions.archive", {` | 1 |
-| `sessions.createAndSend` | `tests/server/test_accounts.py:254` — `sent = client.post("/wire/v1/sessions.createAndSend", headers={` | 49 |
+| `sessions.createAndSend` | `tests/server/test_accounts.py:254` — `sent = client.post("/wire/v1/sessions.createAndSend", headers={` | 50 |
 | `sessions.list` | `tests/server/test_profile_permissions.py:187` — `listed = client.post("/wire/v1/sessions.list", headers={` | 9 |
 | `sessions.send` | `tests/server/test_asset_hubs.py:386` — `refused = client.post("/wire/v1/sessions.send", headers={` | 15 |
 | `sessions.switchProfile` | `tests/server/test_shared_session_store.py:443` — `switched = _wire(client, token, "sessions.switchProfile", {` | 6 |

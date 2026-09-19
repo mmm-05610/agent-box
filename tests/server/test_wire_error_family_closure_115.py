@@ -218,25 +218,32 @@ def test_counter_example_reverting_the_convergence_loses_the_original_code(serve
     assert error["details"].get("internalCode") == "ValueError", error
 
 
-def test_counter_example_reverting_both_walls_puts_the_bare_500_back(server, monkeypatch):
-    """G1's second falsifier: the QA-008 shape needs **both** walls down.
+def test_the_two_walls_of_115_are_no_longer_the_last_ones(server, monkeypatch):
+    """G1's second falsifier, rewritten by what order 123 did.
 
-    This is the measurement that says the closure is structural and not a
-    matter of one remembered call site: with the family slot raising and
-    `dispatch` unprotected, the same request answers a bare status whose body is
-    not JSON at all.
+    With both of 115's walls reverted, the request used to answer
+    `500 / text/plain`. It now answers **200 with a typed refusal**, because 123
+    added a wall around the wire route itself. The family is therefore closed at
+    three layers, and what this gate asserts is the honest remainder: reverting
+    115 still loses the *domain code* (`internalCode` becomes the exception type
+    instead of `PROVIDER_SYNC_LEDGER_CORRUPT`), so 115's own convergence is not
+    made redundant — it is what keeps the diagnostic true.
+
+    The bare-500 shape is falsified where it now actually lives: at the envelope
+    boundary, in `tests/server/test_transport_boundary_wall_123.py`.
     """
     monkeypatch.setattr(errors_module, "converge_family", _old_rule)
     monkeypatch.setattr(handlers_module.WireService, "dispatch", _dispatch_without_wall)
     monkeypatch.setattr(handlers_module.WireService, "_artifact_store", refuse_with_family_slot_code)
     _runtime, client, headers = server
     response = post(client, headers, "providerArtifacts.list")
-    assert response.status_code == 500, (
-        f"the counter-example did not bite: http={response.status_code} {response.text[:200]!r}")
-    assert not response.headers.get("content-type", "").startswith("application/json"), (
-        response.headers.get("content-type"))
-    monkeypatch.undo()
-    assert post(client, headers, "providerArtifacts.list").status_code == 200
+    assert response.status_code == 200, (
+        f"the boundary wall did not catch the reverted family: {response.text[:200]!r}")
+    error = response.json()["error"]
+    assert error["code"] == "UNAVAILABLE", error
+    assert error["details"].get("internalCode") == "ValueError", error
+    assert error["details"].get("internalCode") != UNHEARD_OF, (
+        "this gate would be green even without 115's convergence: re-check it")
 
 
 # -- the guard's presence is part of the deliverable ------------------------
