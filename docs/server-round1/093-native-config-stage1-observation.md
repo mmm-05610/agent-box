@@ -54,3 +54,22 @@ R-0022 串行点（A 105 → B 092）的下游**——092 一旦点名开工并�
 
 阶段 1＝纯观测、零代码改动 ⇒ 无新门。变更面：仅本证据文件 + `status.md` 093 行（G/接线阶段未动 `src/plugins`）。
 `git diff --stat` 应只含 docs/**。
+
+## 7 阶段 2 已落（更正"阶段 2 全阻塞于 092"的判断）
+
+复核一手后**更正**：阶段 2 的**协议方言翻译 + 类型化拒绝 + 已钉家的原生写入器**其实**现在就能做**，不必等 092——依据：
+- canonical 词汇**由 092 的工单合同固定**（四值 `openai-chat`/`openai-responses`/`anthropic-messages`/`gemini-generate` + 方言→canonical 归一表）⇒ 消费它不算发明。
+- 各家原生方言值**一手在 `deploy/<家>/` 模板**（阶段 1 已核）⇒ codex `wire_api∈{responses,chat}`、pi `api=openai-completions`、hermes `transport=chat_completions`、opencode/kilo `npm=@ai-sdk/openai-compatible`、claude `ANTHROPIC_BASE_URL`。
+- 写入器是 **harness 侧纯函数**（`plugins/agent-box-harnesses/.../native_materialization.py`，093 自己的 write_paths），**不碰 `model_configs/**`**（092 串行领土），不新建第二条真相（复用投影通道）。
+
+已落（`test_native_materialization_093.py` **18 passed**）：
+- `_FAMILY_DIALECTS` 表 + `translate_protocol`：能钉的翻成方言；钉不死的家/协议 ⇒ `PROTOCOL_UNSUPPORTED_BY_HARNESS`（指名家+协议）；非 canonical ⇒ `PROTOCOL_CANONICAL_UNKNOWN`。
+- **G1 反例门**：`render_codex_provider_section` 把 `base_url`/`wire_api` 写在 `[model_providers.<id>]` **表内**（header 之前不得有键）；顶层挪一层即红。
+- **G2 反例门**：给 claude 配 `openai-chat`、给 pi 配 `openai-responses`、dsh/qwen 全协议 ⇒ 拒。
+- **G5 幂等**：codex 渲染两次逐字节相同；**G4**：输出只含 env/locator 引用（`env_key`/`$DEEPSEEK_API_KEY`），无凭据值。
+
+**真正剩在 092 的**（阶段 3/4，非阶段 2）：`freeze_execution_configuration`（`model_configs/service.py:162-169`）目前只出
+`{provider,model,credentialId,configuration}`，**未把已存的 `base_url`/`wire_api` 透进冻结执行**给 harness；把它连同 092 的
+`protocols[]`/`endpoints{}`/描述符 `wireProtocols` 一并落到冻结投影，是**阶段 3 逐家接线**与**阶段 4 端到端第二上游真轮**的输入。
+⇒ 093 现为 **PARTIAL：阶段 1+2 落地，阶段 3/4/5 接线与真轮等 092**（092 等 A-105 公告点名）。已钉家的 `render_*` 骨架就位，
+092 一到即逐家接线 + status 逐行终态（G6）。§Spend：0 真调用（全合成输入）。
