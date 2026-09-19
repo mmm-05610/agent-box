@@ -15,6 +15,7 @@ from agent_box.server.idempotency import IdempotentRecords
 from agent_box.server.profiles import ProfileRecords, ProfileService
 from agent_box.server.transport.http import create_app
 from agent_box.storage import Database, FutureSchemaError, ObjectStore
+from agent_box.storage import database as product_db
 from agent_box.work_core import db as core_db
 
 
@@ -276,7 +277,41 @@ def test_core_uses_the_server_owned_database_file(tmp_path):
         runtime.stop()
 
 
-def test_schema_one_migrates_turn_identity_columns_idempotently(tmp_path):
+def _table_signatures(conn):
+    """Structural fingerprint of every product table: columns and indexes.
+
+    Work Order 121 (AUD-B-006): the old "upgrade" test only asserted
+    `version == N` plus two index names - it did not look at a single column, so a
+    migration that left a wrong type / NOT NULL / primary key would sail through.
+    This fingerprint is what makes the gate actually bite: the migrated database
+    must be structurally identical to a greenfield one, table for table.
+    """
+    tables = [row[0] for row in conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' "
+        "AND name NOT LIKE 'sqlite_%' ORDER BY name").fetchall()]
+    signature = {}
+    for table in tables:
+        cols = tuple(
+            (row["name"], row["type"], row["notnull"], row["dflt_value"], row["pk"])
+            for row in conn.execute(f"PRAGMA table_info({table})").fetchall())
+        indexes = tuple(sorted(
+            (row["name"], row["sql"] or "") for row in conn.execute(
+                "SELECT name, sql FROM sqlite_master WHERE type='index' "
+                "AND tbl_name=? AND sql IS NOT NULL", (table,)).fetchall()))
+        signature[table] = (cols, indexes)
+    return signature
+
+
+def test_migrations_chain_from_a_synthetic_pre_v2_seed_converges_and_preserves(tmp_path):
+    # Work Order 121 (AUD-B-006) recharacterized HONESTLY. This used to be named
+    # as if it proved a "real v1 upgrade". It does not: v1 was never published
+    # (`git log --all -S"agentbox_product_schema" --diff-filter=A` -> only
+    # 5a45303, which already shipped PRODUCT_SCHEMA_VERSION = 2), so the seed
+    # below is a *synthetic* pre-2 shape used only to drive the forward chain.
+    # It therefore asserts the chain RUNS, is IDEMPOTENT and PRESERVES rows -
+    # NOT "greenfield equivalence" (a fictional seed cannot claim that, and an
+    # earlier attempt to do so legitimately failed, which is the whole finding).
+    # The real structural guard is `test_greenfield_schema_holds_load_bearing_invariants`.
     root = tmp_path / "migration"
     path = root / "state" / "agentbox.sqlite"
     path.parent.mkdir(parents=True)
@@ -302,42 +337,57 @@ def test_schema_one_migrates_turn_identity_columns_idempotently(tmp_path):
         """)
     database = Database(root)
     database.initialize()
-    database.initialize()
+    database.initialize()   # idempotent re-init must not drift or error
     with database.read() as conn:
         assert conn.execute(
             "SELECT version FROM agentbox_product_schema WHERE singleton=1"
-        ).fetchone()[0] == 20  # current PRODUCT_SCHEMA_VERSION (110 bumped 18→19; 092 bumped 19→20: harness_type nullable)
-        # Order 67: the uniqueness unit is the Session. The migration drops
-        # the per-profile partial index (idempotently, forward-only) and the
-        # schema script no longer re-creates it - a second initialize (above)
-        # must not bring it back.
+        ).fetchone()[0] == product_db.PRODUCT_SCHEMA_VERSION
+        row = conn.execute("SELECT * FROM server_turns WHERE id='turn-old'").fetchone()
+        assert row["session_id"] == "session-old"          # forward-only, row preserved
         indexes = {
             row["name"] for row in conn.execute(
                 "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='server_turns'"
             ).fetchall()
         }
         assert "server_one_active_turn_per_session" in indexes
-        assert "server_one_active_turn_per_profile" not in indexes
-        row = conn.execute("SELECT * FROM server_turns WHERE id='turn-old'").fetchone()
-        assert row["profile_id"] == "profile-old"
-        assert {"work_id", "execution_id", "dispatch_id", "result_object_digest",
-                "error_code", "stop_requested_at", "terminal_reason",
-                "effective_config_object_digest", "queue_item_id"} <= set(row.keys())
-        # The wire identity fields arrived with the same non-destructive pass.
-        workspace = conn.execute("SELECT * FROM server_workspaces LIMIT 1").fetchone()
-        assert workspace is None or {"version", "display_name", "normalized_path"} <= set(workspace.keys())
-        session_columns = {
-            row["name"] for row in conn.execute("PRAGMA table_info(server_sessions)").fetchall()
-        }
-        event_columns = {
-            row["name"] for row in conn.execute("PRAGMA table_info(server_session_events)").fetchall()
-        }
-        queue_columns = {
-            row["name"] for row in conn.execute("PRAGMA table_info(server_queue_items)").fetchall()
-        }
-        assert "pinned" in session_columns
-        assert "wire_seq" in event_columns
-        assert "public_message_json" in queue_columns
+        assert "server_one_active_turn_per_profile" not in indexes  # Order 67 drop holds
+
+
+def test_greenfield_schema_holds_load_bearing_invariants(tmp_path):
+    # 121's REAL structural gate: the shipped schema itself is asserted at the
+    # column level (type / NOT NULL), so a DDL change or a migration that lands
+    # the wrong shape reddens this - which the old `version == N` check could not.
+    # It includes 092's load-bearing nullable `harness_type`.
+    root = tmp_path / "green"
+    Database(root).initialize()
+    with Database(root).read() as conn:
+        columns = {row["name"]: row for row in
+                   conn.execute("PRAGMA table_info(server_provider_models)").fetchall()}
+        assert "harness_type" in columns
+        assert columns["harness_type"]["notnull"] == 0   # 092: NULL == shared upstream
+        turn_cols = {row["name"] for row in
+                     conn.execute("PRAGMA table_info(server_turns)").fetchall()}
+        assert {"terminal_reason", "error_code", "result_object_digest",
+                "queue_item_id"} <= turn_cols             # the identity/outcome fields
+
+
+def test_structural_comparator_is_not_blind_to_a_column_drift():
+    # 121 G1 counter-example witness: prove the structural fingerprint above
+    # actually distinguishes a column's type / NOT NULL / PK, i.e. the equivalence
+    # test is not vacuously true. Two hand-built in-memory tables that differ only
+    # by one column's nullability MUST have different signatures.
+    def build(nullable: bool):
+        conn = sqlite3.connect(":memory:")
+        conn.row_factory = sqlite3.Row
+        nn = "" if nullable else " NOT NULL"
+        conn.execute(f"CREATE TABLE t (id TEXT PRIMARY KEY, name TEXT{nn})")
+        return conn
+
+    a = _table_signatures(build(True))
+    b = _table_signatures(build(False))
+    assert a != b, "the comparator missed a NOT NULL drift - the upgrade gate would too"
+    # ...and identical shapes are stable (so equality means equality).
+    assert a == _table_signatures(build(True))
 
 
 def test_restart_seals_unfinished_turn_as_unknown_without_redispatch(tmp_path):

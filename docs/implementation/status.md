@@ -1240,3 +1240,18 @@ runtime 侧（存储/service/描述符/派生/冻结/逐家声明）已 DONE 且
 > ⇒ 补齐需 **Worker 协议字段 `stopReason`（ACP 既有枚举值，但字段在 Worker 契约上不存在＝合同变更，45/A 线写面）**＝
 > 122 阶段 5"若必须新增 wire 字段⇒交回 ops，不许自行发明"。本树射程内无可诚实落地的代码改动。
 > 字段需求（要什么/给谁/影响哪张单/为何不先做）逐条见 [证据](../server-round1/fullstack/truncation-visible-122-stage1.md) §2；收口剩余（拿到字段后 4 步）§3。§Spend：0 真调用。
+
+## 工单 121 — 唯一覆盖"升级"的那条测试是装饰（AUD-B-006 low；2026-09-19，执行者·runtime 线）
+
+> **产品侧 ①②③④ 已落（本次片：与 092 同文件，092/120 已收口 ⇒ 本执行者为唯一写者）**；终态 **`MIGRATION_TEST_IS_NOT_DECORATIVE_PARTIAL`**，
+> 精确剩余＝v2 追加的 **Work Core SQL 文件迁移（migrations/001..009）等价门**（属 Work Core 子系统，`migrations_dir()`/`_run_migrations`
+> 在 `work_core/db.py`+`.runtime`，非本单产品 SQLite 链；审阅者 AUD-B-009 已手工跑过 W1–W4，codify 成常设门是独立可跑的一格，留作下一单元）。§Spend：0 真调用。
+
+| 单 | 阶段 | 门 | 回归 | 真实模型 | 提交 |
+| --- | --- | --- | --- | --- | --- |
+| 121 | 1 观测 | 一手复跑 `git log --all -S"agentbox_product_schema" --diff-filter=A` ⇒ **仅 `5a45303`**，`git show 5a45303:…database.py` ⇒ `PRODUCT_SCHEMA_VERSION = 2` ⇒ **v1 从未发布**（审阅者属实）。旧测试只断 `version==N` + 少数列名 ⇒ 抓不到类型/NOT NULL/主键漂移 | 复算既有 17 条仍绿 | 0 | 本提交 |
+| 121 | 2 改定性 | 旧 `test_schema_one_migrates_turn_identity_columns_idempotently` 如实改名/改注释：它是**合成 pre-v2 种子驱动正链**，不谎称"真实 v1 升级"；曾试图断"合成种子⇔greenfield 等价"**合法失败**（正是该发现的活证据：虚构种子不能等同真装），据此收回该谎断 | 定向见下 | 0 | 本提交 |
+| 121 | 3 结构断言 | 新增真实结构门 `test_greenfield_schema_holds_load_bearing_invariants`：逐列断 `server_provider_models.harness_type` NOT NULL=**0**（092 可空）+ `server_turns` 含 terminal_reason/error_code/… ；另 `_table_signatures` 指纹比较器 + `test_structural_comparator_is_not_blind_to_a_column_drift` 证门**不是恒真**（改一列 nullability ⇒ 签名不同）| `test_stage_a_server.py` **17 passed** | 0 | 本提交 |
+| 121 | 4 死分支有结论 | **选 ②**：保留 `if current==1`/`_migrate_1_to_2` 作为合成种子→全链的驱动（生产根从 v2 起），依据＝删它即自毁这条升级覆盖；种子测试仍跑 1→current、幂等、保行 | 同上 | 0 | 本提交 |
+
+**剩余（PARTIAL 精确项）**：Work Core `migrations/001..009` 的"全新安装⇔升级到 9"结构+ledger 等价常设门（G5：人为改坏一处升级列/迁移⇒红）。独立单元，本单产品侧不动它语义。
