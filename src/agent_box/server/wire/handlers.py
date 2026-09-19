@@ -1378,17 +1378,24 @@ class WireService:
     _PROVENANCE_FIELDS = ("baseUrl", "authStyle", "wireApi", "fieldsSource")
 
     @classmethod
-    def _provenance(cls, params: Mapping[str, Any]) -> dict[str, str] | None:
+    def _provenance(cls, params: Mapping[str, Any]) -> dict[str, str | None] | None:
+        """Order 112: a field the request did not name keeps its stored value;
+        a field it named as `null` is a request to *clear* it. Collapsing the
+        two is how a user's edit gets eaten: the row keeps the old fact, the
+        answer is 200, and nothing says the clear was ignored."""
         raw = params.get("provenance")
         if raw is None:
             return None
         if (not isinstance(raw, Mapping)
                 or not set(raw) <= set(cls._PROVENANCE_FIELDS)):
             raise WireError("INVALID_REQUEST", "provenance carries unknown fields")
-        provenance: dict[str, str] = {}
+        provenance: dict[str, str | None] = {}
         for field in cls._PROVENANCE_FIELDS:
-            value = raw.get(field)
+            if field not in raw:
+                continue
+            value = raw[field]
             if value is None:
+                provenance[field] = None
                 continue
             value = _bounded(str(value), f"provenance.{field}", 512)
             allowed = cls._PROVENANCE_ENUMS.get(field)

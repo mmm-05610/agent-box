@@ -53,10 +53,40 @@ CAS/`expectedVersion`/幂等 `requestId`/错误族全不变。
 
 ## 4 门（阶段 3）
 
-见 `tests/server/test_provider_update_keeps_omitted_112.py`（G1 省略即保留 ×3 面、G2 显式清空生效 ×3、
-G2b 不允许清空者仍类型化拒绝、G3 不退化（CAS/provenance 098/错误族 101）、G4 不越界（参数形状与 create 字面钉死）＋
-两条进程内反例）。反例真跑结果见 §5。
+`tests/server/test_provider_update_keeps_omitted_112.py`：**24 条**（`24 passed in 38.11s`）。
 
-## 5 反例、回归、费用、清理
+| 组 | 钉什么 | 反例方向 |
+| --- | --- | --- |
+| G1 ×4 | 省略 ⇒ 保留：不带 `provenance`／只给一列／给 `{}`；**服务层**只给 `displayName` 时其余逐字保留（`version+1`） | 保留写成清空即红 |
+| G2 ×5 | 显式 `null` ⇒ **真的清空**（四列全清 ⇒ 读回 `provenance: null`；单列清 ⇒ 只动那一列）；**同一请求里既清又改又留**；清空要看得到（`providerModels.list` 另一次调用读回，不是回显） | 把 null 当省略 ⇒ 红（旧码正是红在这里） |
+| G2b ×3 | 不允许清空者仍说话：`displayName:null` ⇒ `INVALID_REQUEST`；`models:[]` ⇒ `INVALID_REQUEST`；`configuration:[]` ⇒ 合法清空（三者区别被钉住，不是"一律拒绝"也不是"一律接受"） | 一律静默 ⇒ 红 |
+| G3 ×4 | 不退化：旧 `expectedVersion` ⇒ `CONFLICT_VERSION` 且 `error.current` 带原值；同 `requestId` 重放不双加版本；枚举外/超长仍类型化；**`create` 对本次改动中性**（混合 null 的投影与改前一字不差） | 动到 CAS/幂等/098/101 ⇒ 红 |
+| G4 ×5 | 不越界：`_PARAM_SHAPES["providerModels.update"]` 的必填/可选集**字面钉死**；省略任一必填字段仍是点名该字段的类型化拒绝（＝"部分更新在线上发不出来"这条事实的门） | 悄悄放宽必填集（＝改合同＋重锁，属 113）⇒ 红 |
+| 反例 ×3 | ① 进程内把 `if value is None: continue` 装回 `_provenance` ⇒ 同一请求 200 而旧值原样躺着（**把缺陷复现一遍，不是描述一遍**）；② 仓储四个形参的默认值必须 `is KEEP` 且源码里不再出现 `COALESCE`；③ `KEEP is not None`（若哨兵被并成 `None`，G1/G2 会塌成一条而其余门全绿） | — |
 
-（阶段 3/4 落地后补）
+### 对旧码真跑（`/tmp` 源码副本 ＋ `PYTHONPATH` 前置，不编辑工作树）
+
+把 `wire/handlers.py`、`model_configs/service.py`、`model_configs/repository.py` 三个文件退回 `0f7b865`
+（＝修复前）后跑同一个门文件：**9 failed / 15 passed**。
+
+红的是：`test_the_service_keeps_every_field_its_body_omits`（旧码 `KeyError: 'configuration'`）、
+`test_an_explicit_null_clears_only_the_field_it_names[三个参数化]`、
+`test_clearing_all_four_reads_back_as_unknown_not_as_a_guessed_default`、
+`test_keep_and_clear_happen_in_the_same_request`、
+`test_replaying_one_request_id_does_not_bump_the_version_twice`（版本没双加，红在后半：清空被吞）、
+`test_a_none_default_in_the_repository_would_make_clear_and_keep_identical`（旧默认 `None`）。
+
+绿的 15 条**按性质分两类，都必须写清**：
+① 语义未变的那一半（G1 的"省略即保留"三条、G2b 的三条拒绝、G3 的 CAS/幂等/枚举/create 中性、G4 的五条形状）
+——它们绿**正是本单的前提修正**：那部分缺陷不存在；
+② 反例 ① 那条**故意**在旧码上绿（它断言的就是缺陷行为）；
+③ 一条要如实标注：`test_the_keep_sentinel_is_not_none` 在这次退码跑里红是**脚手架造成的假红**——
+旧模块根本没有 `KEEP`，为了让门文件能 import，我在临时注入里放了一个没有 `__repr__` 的替身，
+所以红的断言是 `repr` 而非 `KEEP is not None`。它不改变结论（同组另一条真红已足够），但不写清就成了冒充证据。
+
+## 5 回归、费用、清理
+
+* 定向回归（工单 §Validation 第一条）：`pytest tests/server -k "provider or update or provenance"` ⇒
+  **68 passed / 682 deselected**，0 失败。
+* 全套件计数见本单终态行（G5 无声明，按 DoD 第 3 项入账）。
+* 真实模型 **0 次 / ¥0**；清理：`/tmp/o112` 退码副本已删并核实不存在。

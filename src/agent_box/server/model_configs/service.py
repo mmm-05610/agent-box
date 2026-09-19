@@ -5,6 +5,7 @@ import json
 from typing import Any, Mapping
 
 from agent_box.server.errors import ServerError, unavailable
+from agent_box.server.model_configs.repository import KEEP
 from agent_box.server.records import canonical, digest, reject_sensitive_keys
 
 
@@ -70,24 +71,34 @@ class ProviderModelService:
         return self.project(self.records.get(result["providerModelId"]))
 
     def update(self, record_id: str, expected_version: int, key: str, body: dict[str, Any]):
+        """Order 112: the fields a caller does not name keep their stored value,
+        and the four provenance columns distinguish "not named" (`KEEP`) from
+        "named as null" (clear). `configuration`/`models` are content-addressed,
+        so re-publishing the stored document yields the same digest: keeping is
+        expressed by writing the same bytes, not by skipping the write.
+        """
         current = self.records.get(record_id)
         merged = {
-            **body, "harness": current["harness_type"], "provider": current["provider_type"],
+            **self.project(current), **body,
+            "harness": current["harness_type"], "provider": current["provider_type"],
         }
         self._validate(merged, creating=False)
         config = self.objects.publish(canonical({
             "schema_version": 1, "configuration": {
-                item["controlId"]: item["value"] for item in body["configuration"]
+                item["controlId"]: item["value"] for item in merged["configuration"]
             },
         }))
-        models = self.objects.publish(canonical({"schema_version": 1, "models": body["models"]}))
+        models = self.objects.publish(
+            canonical({"schema_version": 1, "models": merged["models"]}))
         _status, result = self.records.update(
             record_id=record_id, expected_version=expected_version, key=key,
-            request_digest=digest(body), display_name=body["displayName"],
-            credential_id=body.get("credentialId"), config_digest=config.digest,
+            request_digest=digest(body), display_name=merged["displayName"],
+            credential_id=merged.get("credentialId"), config_digest=config.digest,
             models_digest=models.digest,
-            base_url=body.get("baseUrl"), auth_style=body.get("authStyle"),
-            wire_api=body.get("wireApi"), fields_source=body.get("fieldsSource"),
+            base_url=body["baseUrl"] if "baseUrl" in body else KEEP,
+            auth_style=body["authStyle"] if "authStyle" in body else KEEP,
+            wire_api=body["wireApi"] if "wireApi" in body else KEEP,
+            fields_source=body["fieldsSource"] if "fieldsSource" in body else KEEP,
         )
         return self.project(self.records.get(result["providerModelId"]))
 
