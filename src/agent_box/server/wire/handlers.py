@@ -31,35 +31,6 @@ from agent_box.server.wire.projection import (
 
 
 WIRE_VERSION = "wire/1"
-CAPABILITY_IDS = (
-    "workspaces.browse",
-    "workspaces.open",
-    "workspaces.list",
-    "workspaces.archive",
-    "profiles.list",
-    "profiles.create",
-    "profiles.update",
-    "profiles.updateConfig",
-    "profiles.archive",
-    "providerModels.list",
-    "providerModels.create",
-    "providerModels.update",
-    "providerModels.archive",
-    "config.describe",
-    "config.resolve",
-    "sessions.list",
-    "sessions.update",
-    "sessions.archive",
-    "sessions.createAndSend",
-    "sessions.send",
-    "sessions.switchProfile",
-    "sendOutcome.query",
-    "queue.get",
-    "queue.withdraw",
-    "runs.stop",
-    "approvals.decide",
-    "history.snapshot",
-)
 
 _PARAM_SHAPES = {
     "server.hello": ({"clientVersions", "clientPresentationSupports"}, set()),
@@ -412,7 +383,13 @@ class WireService:
                 or any(not isinstance(item, str) for item in presentations)):
             raise WireError("INVALID_REQUEST", "clientVersions must be a non-empty list")
         capabilities = []
-        for capability_id in CAPABILITY_IDS:
+        # The table is this object's dispatch table: a method the Server cannot
+        # dispatch is not a capability, and one it can must never go undeclared
+        # (a hand-maintained list had fallen 37 methods behind). Iteration order
+        # is the table's literal order, so the list stays deterministic for a
+        # client that caches it. `server.hello` declares itself - the discovery
+        # entry point that said "I do not exist" would be the one lie here.
+        for capability_id in self._handlers:
             supported, reason = self._capability(capability_id)
             entry: dict[str, Any] = {"id": capability_id, "supported": supported}
             if not supported:
@@ -427,6 +404,16 @@ class WireService:
         }
 
     def _capability(self, capability_id: str) -> tuple[bool, str | None]:
+        """Support state for one id - and an id no rule below covers is supported.
+
+        That last `return True, None` is what answers most of the table now that
+        the table is derived. So this answers two questions and no third: does the
+        method exist (the dispatch table, the only thing that can say no to a
+        call), and do the composition rules written below hold. Whether a call
+        would then *succeed* is a third question these rules do not ask - a family
+        with no blocker rule says `true` even when its call path is broken, which
+        is why an unwritten rule is a gap to file, not something to guess here.
+        """
         if capability_id.startswith("workspaces."):
             # Environments are answered per request; this is the composition's
             # one fact - whether *any* placement can be served here at all.
