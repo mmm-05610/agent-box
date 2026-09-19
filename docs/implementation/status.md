@@ -42,6 +42,7 @@
 | [111](work-orders/111-claude-ask-mapping-fix.md) | **CLAUDE_ASK_MAPPING_DONE** | `translate_claude` 改三桶：`ask` 不再进 `allowedTools`（＝自动放行），单独产出 `translated["ask"]`＝claude `permissions.ask` 提问语义；allow/deny 与其它家零改动。门 G1 反例＝退回"塞 allowedTools"则 `Bash not in allowedTools` 断言红。60 翻译测试按 §52 改新映射并写明理由、不放宽。`test_posture_translation`+`test_posture_config_write` 36 passed（85 落盘未受影响，独立路径）。`git diff --stat` 仅 2 文件。提交 `2f46db5`，**先于 093**。[证据](../server-round1/111-claude-ask-mapping.md) | 无剩余。§Spend：0 真调用 |
 | [108](work-orders/108-output-cap-deployment-parameter.md) | **OUTPUT_CAP_PARAMETERIZED_PARTIAL** | 三家生产模板输出上限从写死 64 解耦为宽松缺省 `8192`（`DEFAULT_OUTPUT_TOKEN_LIMIT`，进模板+42-D prepared 同步）；`OUTPUT_TOKEN_LIMIT=64` 重定义为门的显式上限，链门投影 fixture 显式钉 64（`gate_models_document`/`gate_settings_document`/`gate_projected_config_document`），loopback "只换 baseUrl" 性质与 `documented_differences` 审计保持。字节钉死测试同步、不放宽；三家各加"端点覆盖继承 8192 vs 门钉 64"反例门。`test_{pi,dsh,hermes}_production_template`+`test_hermes_production_chain`+capability 124 passed；扩面 358 passed/2 既有无关失败。[证据](../server-round1/108-output-cap-parameterized.md) | 真实链门端到端本环境不可跑（缺 Worker/sidecar/预置工件）＝只读源码改+in-process 反例门覆盖；**部署文档字段可声明**这条取值来源未做（工单"取一，另一个如实登记"），真实使用暂走宽松缺省。§Spend：0 真调用 |
 | [114](work-orders/114-qoder-family-integration.md) | **QODER_FAMILY_PARTIAL（#6 落地、打包可行性已证；#1/#3/#4/#5 有依赖阻塞）** | 阶段 1 一手观测（`093d36c`）+ **item #6 未知键登记已落代码+测试**（`9cfb9c6`：`qoder/native_config.py` `QODER_NATIVE_KEYS` 逐条一手出处 + `unregistered_keys` 不静默丢弃门；6 passed；unknown⇒meaning=None 不发明；`.auth` 不作配置键触碰）。**阶段 2 打包可行性一手解除**：qodercli 是自包含单 ELF（~185MB/版，curl-bash 装、非 npm）⇒ 可离线 pin。`qoder/` 包**暂不注册进 harnesses.toml**（无 production.py/记录），防"能登记≠能跑"的 G1 假绿。[证据](../server-round1/114-qoder-family-stage1-observation.md) | 家族**注册**（#1 模板+#3 登录）留待 **094/095 账号模型**（A 线 105 之后、尚未并入本树）就绪后一并落，届时 G1/G2/G3 门齐；#4 放置、#5 真机腿同 090/091/108 先例不可跑。§Spend：0 真调用 |
+| [093](work-orders/093-native-config-materialization.md) | **NATIVE_CONFIG_MATERIALIZATION_PARTIAL（阶段 1 完成；2–5 接线阻塞于 092）** | 公告第 106 轮点名"111 先于 093 前置满足 ⇒ 093 可开工"；工单 §Notes"092 未落只做阶段 1"。阶段 1＝逐家一手观测表：写点/键位层级/协议方言/限额字段（codex `[model_providers.<id>]` wire_api、claude env 六槽、opencode/kilo `npm`+`limit`、pi `api`+`maxTokens`、hermes `transport`+`model.max_tokens`、**dsh 协议方言钉不死⇒拒、qwen env 逐槽名未一手⇒拒、hermes `context_length` 层级待真机核**）；三条复用通道（guest 投影 / `codex/remote.py` 一次性物化 / `freeze_execution_configuration`）已定位，不新建第二条真相。111 前置核对 ✓。[证据](../server-round1/093-native-config-stage1-observation.md) | **一手确认阻塞**：`model_configs` provider 记录**尚不带** `protocols`/`endpoints`、描述符**无** `wireProtocols`（092 交付物）⇒ 阶段 2+「按记录写方言/第二上游落原生文件」无输入，硬接＝臆造记录字段。等 092（其自身阻塞于 A-105 公告点名）。§Spend：0 真调用 |
 
 **待裁 / 一手阻塞（本树前沿；均未越界猜值/不半拉子）**：
 - `107` 阶段 2+ 一手阻塞于 **pin 版 pi/dsh "思考开"的合法 schema**（见上「待拍/阻塞」节与 [107 观测](../server-round1/107-thinking-on-stage1-observation.md)）——不猜值。
@@ -50,12 +51,13 @@
   **更正**先前"094/095 infra 未并入本树"的措辞：账号资产底座（`server/accounts/`+`subscriptionCredential` 投影）**已在本树**（Order 56），缺的是 **094/095 登录引擎**（其自身阻塞于 092←A-105 公告点名）。
 - `092–096` / `100` 串行等于 A 线 105/089 的**公告点名**（`worktree-charter §… "按公告的点名串行"`；公告第 103 轮（最新）尚未点名放 092）——非本执行者可自决。
 
-**下一位（R-0036/R-0038 序）· 前沿已一手核验**：`111`（DONE）、`108`（PARTIAL）、`114` item #6 未知键登记（已落代码+测试）、`114` 打包可行性（qodercli＝可离线 pin 的单 ELF）均已落。**本树现无可诚实推进的在编单**——全部剩余项经代码/公告一手确认为外部依赖阻塞：
+**下一位（R-0036/R-0038 序）· 前沿已一手核验**：`111`（DONE）、`108`（PARTIAL）、`114` item #6 + 打包可行性、`093` 阶段 1 一手观测（公告第 106 轮点名放行、已落）均已推进。**本树在编单的可诚实推进面已做尽**——剩余全部经代码/公告一手确认为外部依赖阻塞：
+- `093` 阶段 2+（接线/落盘）与 `092`：阻塞于 **A 线 105 的公告点名**（charter"按公告点名串行"；`model_configs` 记录尚不带 `protocols`/`endpoints` ⇒ 093 无事实可写）。
+- `094/095/096`：串在 092/093 之后。`100`：阻塞于 A 线 089。
 - `107` 阶段 2+：缺 pin 版 pi/dsh "思考开"的合法原生 schema（不猜值）。
-- `092–096`：阻塞于 **A 线 105 的公告点名**（charter"按公告点名串行"；公告第 103 轮（最新）未放 092）；`093` 的 111 前置已满足、只等 092。
-- `100`：阻塞于 A 线 089。
 - `114` #1/#3/#4/#5：家族注册 + 登录声明阻塞于 **094/095 登录引擎** 与 **一次真 Qoder 登录钉 `.auth` 文件**（`codex:328`/manifest#894"不可 faked"）；账号底座（Order 56）已在本树。
-**解锁我的输入**：调度者点名放 092（A-105 收口并入本树后）→ 即接 092/093/094/095；或给 107 的 pin 版原生 schema 定值；或供 114 的真 Qoder 登录一手。空闲期即等新点名窗口，不自造可假绿的半成品。
+**解锁我的输入**：调度者点名放 092（A-105 收口并入本树后）→ 即接 092→093 阶段 2→094/095/096；或给 107 的 pin 版原生 schema 定值；或供 114 的真 Qoder 登录一手。空闲期即等新点名窗口，不自造可假绿的半成品。
+> **批末动作新规（公告第 106 轮 R-0040⑥ / QA-007）**：跑完全量**不在本树宣告"全量通过"**——写 sha＋命令＋计数 + **"Worker 工件在/不在"一行**，标 `待 QA 复算`；本树缺 git-ignore 的 Worker 工件 ⇒ 同码天然 ~18 红属环境类，交 QA 归因。
 
 ---
 
