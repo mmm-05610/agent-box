@@ -1229,3 +1229,14 @@ runtime 侧（存储/service/描述符/派生/冻结/逐家声明）已 DONE 且
 > **剩（终态 `SUBSCRIPTION_LOGIN_PARTIAL`）**：① `accounts.beginLogin/loginStatus/cancelLogin` 三方法在 `wire/handlers.py`＝**A 树**（越界，交 A + relock）；
 > ② 生产 transport（真 device-code 出站，复用 probe 边界）与 56 `pack_asset`+`AccountRecords` 的真实组装（本增量证明回调契约，未接生产 compose）；
 > ③ **真机一轮登录**要用户在自己浏览器输设备码（本环境无人 + 无真链工件不可跑）＋一轮执行验登录态可用＝真机腿。逐家（codex 端到端 DONE）待真机环境补。§Spend：0 真调用 / ¥0。
+
+## 工单 122 — 截断必须可见（主路径；2026-09-19，执行者·runtime 线）
+
+> **终态 `TRUNCATION_VISIBLE_PARTIAL`**：一手核对判定属"执行段手里**没有**这个事实"侧（非"有而不说"）——
+> Worker/ACP 完成事件根本不携带 stop reason（A 的 T6-4 整份快照键扫描 `trunc/stop/finish/max/cap`＝0 佐证），
+> `_complete`（`sidecar_backend.py:539-548`）无条件 `Outcome.SUCCEEDED` 且把 `run.result` 整块塞 `nativeResult` 不解析；
+> `complete_turn`（`sessions/repository.py:747`）**不写** `terminal_reason`（该文件在本单 write_paths 外）。
+> 可见下游通道 `wire/projection.py:173 reason=terminal_reason or error_code` **本就在**，只缺上游字段 + 一处写入。
+> ⇒ 补齐需 **Worker 协议字段 `stopReason`（ACP 既有枚举值，但字段在 Worker 契约上不存在＝合同变更，45/A 线写面）**＝
+> 122 阶段 5"若必须新增 wire 字段⇒交回 ops，不许自行发明"。本树射程内无可诚实落地的代码改动。
+> 字段需求（要什么/给谁/影响哪张单/为何不先做）逐条见 [证据](../server-round1/fullstack/truncation-visible-122-stage1.md) §2；收口剩余（拿到字段后 4 步）§3。§Spend：0 真调用。
