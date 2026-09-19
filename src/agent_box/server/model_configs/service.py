@@ -188,6 +188,13 @@ class ProviderModelService:
             "model": model_id,
             "credentialId": credential_id,
             "configuration": dict(stored.get("configuration") or {}),
+            # Order 093 wiring input (092's flagged residual): pass the record's
+            # declared protocol facts to the native materializer so a real turn
+            # can write the record's base URL + dialect instead of the template
+            # constant. Emitted ONLY when declared - an unchanged record freezes
+            # byte-for-byte as before (093 G6 "no facts => zero regression").
+            **({"protocols": list(stored["protocols"])} if stored.get("protocols") else {}),
+            **({"endpoints": dict(stored["endpoints"])} if stored.get("endpoints") else {}),
         }
 
     def reference(self, provider_id: str, model_id: str) -> dict[str, Any]:

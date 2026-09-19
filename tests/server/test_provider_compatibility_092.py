@@ -135,6 +135,35 @@ def test_freeze_undeclared_harness_does_not_block(tmp_path):
     assert _freeze(svc, "mystery", created["id"])["model"] == "m1"
 
 
+# ------------------------------------------------------------------ 093 wiring input
+
+def test_freeze_passes_through_record_protocol_facts(tmp_path):
+    svc = _service(tmp_path, _registry())
+    created = svc.create("k1", {
+        "displayName": "Wireable", "harness": None, "provider": "acme", "credentialId": None,
+        "configuration": [], "protocols": ["openai-chat"],
+        "endpoints": {"openai-chat": "http://127.0.0.1:9/v1"}, "models": [_model()]})
+    frozen = _freeze(svc, "codex", created["id"])
+    # the native materializer (093) needs the record's base URL + protocol on the
+    # frozen execution so it writes the record's value, not the template constant.
+    assert frozen["protocols"] == ["openai-chat"]
+    assert frozen["endpoints"] == {"openai-chat": "http://127.0.0.1:9/v1"}
+
+
+def test_freeze_without_facts_has_no_new_keys(tmp_path):
+    # 093 G6 "no facts => zero regression": an undeclared record freezes exactly
+    # the pre-092 key set (no protocols/endpoints keys injected).
+    svc = _service(tmp_path, _registry())
+    created = svc.create("k1", {
+        "displayName": "Plain", "harness": None, "provider": "acme", "credentialId": None,
+        "configuration": [], "models": [_model()]})
+    frozen = _freeze(svc, "codex", created["id"])
+    assert "protocols" not in frozen and "endpoints" not in frozen
+    assert set(frozen) == {
+        "providerModelId", "providerModelVersion", "provider", "model",
+        "credentialId", "configuration"}
+
+
 # ------------------------------------------------------------------ descriptor validation
 
 def test_descriptor_rejects_illegal_wire_protocols():
