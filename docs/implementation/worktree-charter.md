@@ -48,6 +48,20 @@
 > 契约文件在 `docs/implementation/work-orders/`；**新单与修订由调度者直接投递进来**（父树对本树有白名单写权），
 > 我每个阶段边界重读该目录即可，不需要去别处复制，也没有副本要合并。
 
+### 今晚队列（2026-09-19 19:2x 组织调整 v2；`R-0054` ⑥）
+
+| 序 | 单 | 开工条件（**可判定谓词**；每轮自己核，成立即开工，**不等任何人放行**） |
+| --- | --- | --- |
+| 1 | `087-cancel-recall-flake` | 无条件（本树重启时工作区**干净**，直接开工） |
+| 2 | `QA-008` 新单（`usage.aggregate/export` 真 HTTP 500，主路径） | 由 ops **当轮投递**（`R-0054 ⑧a`）；投递进本树 `work-orders/` 即可开工 |
+| 3 | `QA-009` 新单（`profiles.list` 不投影 `recovery_pending`，主路径） | 同上 |
+| 4 | `103-wire-drive-coverage-meta-gate` | `101` 已收口（谓词已成立） |
+| 5 | `089-four-real-ui-gates` | **等 runtime 树 `091` 收口**：判据＝runtime 树 `status.md` 里能查到 `091` 的收口行 |
+| 6 | `099-worker-home-put-dispatch` | 无条件（已投递） |
+
+> **禁止**：把"等公告点名"当开工条件（`R-0054` ④）。谓词不成立 ⇒ 先做 §8 fallback 清单第一条能做的，别长睡（单次 ≤5 分钟）。
+> **本树不做**：`092–096/100/102/107/108`（runtime 线）、`P*`（两条桌面线）。
+
 ## 3b 并行预算（执行者侧）
 
 - 允许开子代理并行：**是**；**同时在跑 ≤6**；**深度 ≤1**（子代理不再开子代理）
@@ -177,18 +191,31 @@ cat /home/maoqh/projects/agent-box-server-round1/docs/implementation/bulletin.md
 见主树 `docs/implementation/README.md §4`：单内不停、批末打 tag 写报告后继续、升级≠停下（标阻塞继续做别的）、
 事实分级（实测/引用/未验证）、门要能被证伪、凭据只作 locator。
 
+## 8b 阻塞时的 fallback 活单清单（`R-0041 ⑦` ＋ `OF-01` 的回退条款）
+
+> **规则：等依赖单次 ≤5 分钟，醒来先做下面第一条能做的**，做完在本树 `status.md` 记一行（带计数/证据）再回到等待。**不许只剩 `sleep`。**
+
+1. **复算已收口单的门计数**（按命令原文重跑；报数附命令与"工件在/不在"一行；`QA-007` 口径）。
+2. **`089` 的四个真实门先预演**：假端点优先，把门脚本与"无环境 ⇒ 派发前类型化拒绝"的反例先写好。
+3. **`103` 的元门**：把"每个方法都要被真实 wire 驱动过"的账先跑一遍，列出现在还没被驱动过的方法。
+4. **核依赖谓词**：读 runtime 树 `status.md`，确认 `091` 的收口行是否已出现；读主树 `bulletin.md` 新条目。
+5. **补本树 `status.md` 的"已知缺口"行**（未验部分要写清验法）。
+6. 以上全被阻塞 ⇒ 写"等什么 / 为什么别的都不能做 / 预计何时醒"（**这才允许长一点睡**）。
+
 ## 9 启动提示词（用户开/重开会话时粘贴；≤15 行）
 
 ```text
-/goal 你是本项目的【后端执行者】（子树 agent-box-env-provider），按队列连续施工，不写调度文档以外的文件。
+/goal 你是本项目的【后端执行者·A 线（wire / probe / 契约）】（子树 agent-box-env-provider），按队列连续施工。
 
 先完整读这些并遵守：
-- docs/implementation/worktree-charter.md（本树章程：范围/写权/批次/§3c 优先级与流程纠正）
-- docs/implementation/work-orders/**（契约权威；含 100–104 与 092–098）
-- /home/maoqh/projects/agent-box-server-round1/docs/implementation/bulletin.md（调度公告，每阶段边界必读；准序在这里）
-- 主树 README.md §3/§4（规则）与 manifest.json / status.md / rulings.md / prefs.md
+- docs/implementation/worktree-charter.md（本树章程：范围/写权/**§3「今晚队列」＝开工顺序与可判定谓词**/§8b fallback/§3c 优先级）
+- docs/implementation/work-orders/**（契约权威）
+- /home/maoqh/projects/agent-box-server-round1/docs/implementation/ 下的 bulletin.md（最新公告＝「组织调整 v2 / R-0054」）、README.md §3/§4、manifest.json、status.md、rulings.md、prefs.md
+  （**`rulings.md` 与 `approval-queue.md` 现在只有对话窗口写——你只读**）
 
-纪律：单内不停；批末 `git tag -a checkpoint/<批> …` + 把检查点报告写进本树 status 后**继续**；升级标阻塞继续做别的；
-只写工单声明的 write_paths；`git add -- <显式路径>` 与 pathspec 提交；不 merge 主干、不 push、不 reset/stash/clean；
-凭据只作 locator；真实调用按 R-0017（假端点优先、逐笔记账）。队列做完才可停，并写 `QUEUE_EMPTY_AT <日期>`。
+今晚队列：`087` → `QA-008`/`QA-009` 两张新单（由 ops 当轮投递，投进来就做）→ `103` → `099` → `089`（**谓词：runtime 树 `091` 已收口**，判据＝那棵树的 `status.md` 能查到 `091` 的收口行）。
+纪律：单内不停；批末 `git tag -a checkpoint/<批> …` + 把检查点报告写进本树 status 后**继续**；**每张用户可见单收口就打检查点（`R-0053`）**；
+升级标阻塞继续做别的；只写工单声明的 write_paths；`git add -- <显式路径>` + pathspec 提交；不 merge 主干、不 push、不 reset/stash/clean；
+凭据只作 locator；真实调用按 `R-0017`（假端点优先、逐笔记账）。队列做完才可停并写 `QUEUE_EMPTY_AT <日期>`。
+【不许只剩 sleep】等依赖时单次 ≤5 分钟，醒来先做 §8b 第一条能做的。
 ```
