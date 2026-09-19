@@ -178,3 +178,38 @@ harnesses: [{"id":"alpha","credentialKind":"api_key","modelControlId":"model"},
 **顺带照亮 102 的一条**：权威工件（`1a3604ee…`）的 `providerModels.update#params`
 **同样没有** `provenance`（本单一手读键集）⇒ 098 §9.2 发现的漂移**不是本树副本独有的陈旧**，
 两边一致地缺这一条。
+
+## 9 计数与账
+
+| 项 | 结果 |
+| --- | --- |
+| 门文件 | `10 passed in 3.91s`；旧码对照 **`10 failed`**（§7） |
+| `tests/server -q` | **697 passed in 269.87s**（**697 = 687 ＋ 本单 10**，一条未掉） |
+| `tests/ -q` | **997 passed in 289.77s**（**997 = 987 ＋ 本单 10**；本轮无并发全量，用时也比前两轮短，与 104 §11 的负载观察一致） |
+| hello 的既有消费者组合跑 | `097 ＋ 098 ＋ test_wire_v1 ＋ 105` ⇒ **65 passed** |
+| `validate_order.py --strict` | 30 OK / 31 FAIL（FAIL 恰为 37…67） |
+| `git diff --check` | 干净 |
+
+**费用**：真实模型调用 **0 次 / ¥0**（只发本地发现方法；凭据 locator 未访问）。
+**清理**：真监听的一次性数据根 `real105-` 跑后 `TEMP_ABSENT True`；
+咬旧码的 `/tmp/105-oldcode` 跑后核实缺席；假注册表是进程内对象，无落盘。
+
+## 10 终局判定与交回
+
+**本单判 `HELLO_HARNESSES_PARTIAL`**，剩余只有 G4 一半，且**为什么剩**写清楚了：
+字段、排序、空态、不泄漏、反例、真机响应都已绿；重锁要做的是**前端树的 TS 权威 ＋ 由它导出的工件**，
+本树既无生成器（§4 的 grep）也无写权（工单 `forbidden`、R-0023 的线切分）。
+交出去的是：§8 的**可直接采纳的 schema 片段**、当前三个摘要（TS 权威 / 前端工件 / 本树副本），
+以及一条会自己找上门的门——`test_the_locked_wire_artifact_still_refuses_the_new_key`
+现在要求"工件必须拒绝新键"，重锁落地后它变红，**改成正向校验这一步就是重锁完成的凭据**。
+
+**交回**：
+
+1. **给调度者/前端**：`server.hello#result` 增 `harnesses`（§8 片段，`required: ["harnesses"]`、
+   条目 `required: ["id"]`、`additionalProperties: false`）。前端 P39 的 harness 目录可以按这个渲染。
+   顺带：权威工件的 `providerModels.update#params` 缺 `provenance`（§8 末），与 098 的发现同源 ⇒ 一次重锁两件事一起做。
+2. **给 092（runtime 线）**：`wireProtocols` 今天**不是**"选择不暴露"，是**字段不存在**（§2 实测）。
+   092 加上之后，105 的钉子用例（`test_wire_protocols_is_not_published_…`）会红，
+   那一次红就是"把键集补进 hello"的入口，别顺手删测试。
+3. **给 103**：`harnesses` 是 hello 的第二个面，元门如果要按方法粒度算，
+   应把"发现面的字段级覆盖"记在 `server.hello` 上（本单的 10 条已经是字段级）。
