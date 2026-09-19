@@ -66,7 +66,7 @@ parallel_units: []
 | Gate | Assertion | Counter-example (required) | Absent / unknown ⇒ |
 | --- | --- | --- | --- |
 | G1 真 harness | 证据含该家 harness 的进程/协议痕迹（不是夹具） | 夹具冒充即失败 | fail (typed) |
-| G2 归属 | 子轮用量记在父轮、`parent_turn_id` 正确 | 归属错即失败 | fail (typed) |
+| G2 归属 | 子轮用量**留在子轮行**（不抄到父轮汇总）、`parent_turn_id` 溯源正确、并以**事实形态回进父轮的工具结果**（AQ-0006 按实现口径改正，R-0032 ②） | 把子轮用量抄进父轮汇总 ⇒ 失败 | fail (typed) |
 | G3 记账 | 真实请求逐笔（R-0011 口径） | 无记账即失败 | fail (typed) |
 
 ## Validation
