@@ -1,0 +1,412 @@
+[
+ {
+  "code": null,
+  "error": "",
+  "exitCode": 0,
+  "gateG8": {
+   "cancelOutcome": "stop_requested",
+   "cancelledTurnState": "completed",
+   "nativeIdStable": true,
+   "recallDeltas": [
+    "STATEFUL-NONCE-7A21"
+   ]
+  },
+  "gateSawNonce": true,
+  "home": {
+   "journalHasWaitForCancel": true,
+   "nativeState": "STATEFUL-NONCE-7A21",
+   "reopenMethods": [
+    "session/new",
+    "session/load",
+    "session/load",
+    "session/load",
+    "session/load"
+   ],
+   "role": "native-home-gate-ec626ac2"
+  },
+  "readWindow": {
+   "newestSeq": 36,
+   "nonceDeltaRows": [
+    {
+     "seq": 3,
+     "turnId": "execution_5ef791e2115847e0a61991f864e4b6e6"
+    },
+    {
+     "seq": 10,
+     "turnId": "execution_12bdfde8cc5741439db8e7c59e639864"
+    },
+    {
+     "seq": 17,
+     "turnId": "execution_8df79e90706340bdaa534315cf614c58"
+    },
+    {
+     "seq": 32,
+     "turnId": "execution_0e4d6aa538bc41a0bfae51dc7adaa1ef"
+    }
+   ],
+   "nonceDeltasInsideEarliest200": 10,
+   "sessionEvents": 36,
+   "tailEvents": [
+    {
+     "data": "{\"profile_revision\": 1, \"state\": \"accepted\"}",
+     "kind": "turn.accepted",
+     "seq": 16,
+     "turnId": "execution_8df79e90706340bdaa534315cf614c58"
+    },
+    {
+     "data": "{\"text\": \"STATEFUL-NONCE-7A21\"}",
+     "kind": "message.delta",
+     "seq": 17,
+     "turnId": "execution_8df79e90706340bdaa534315cf614c58"
+    },
+    {
+     "data": "{\"state\": \"running\"}",
+     "kind": "turn.state",
+     "seq": 18,
+     "turnId": "execution_8df79e90706340bdaa534315cf614c58"
+    },
+    {
+     "data": "{\"text\": \"STATEFUL-NONCE-7A21\"}",
+     "kind": "message.final",
+     "seq": 19,
+     "turnId": "execution_8df79e90706340bdaa534315cf614c58"
+    },
+    {
+     "data": "{\"checkpoint_native_id\": \"stateful-13\", \"checkpoint_object_digest\": \"sha256:633d572c4497c8f5832a18fe8e8da5904d10d6d91614966aa0b33f43fc483c0f\", \"result_object_di",
+     "kind": "turn.capture",
+     "seq": 20,
+     "turnId": "execution_8df79e90706340bdaa534315cf614c58"
+    },
+    {
+     "data": "{\"state\": \"completed\"}",
+     "kind": "turn.state",
+     "seq": 21,
+     "turnId": "execution_8df79e90706340bdaa534315cf614c58"
+    },
+    {
+     "data": "{\"profile_revision\": 1, \"state\": \"accepted\"}",
+     "kind": "turn.accepted",
+     "seq": 23,
+     "turnId": "execution_f9ccc54499ca485195c92d7792c12c74"
+    },
+    {
+     "data": "{\"state\": \"running\"}",
+     "kind": "turn.state",
+     "seq": 24,
+     "turnId": "execution_f9ccc54499ca485195c92d7792c12c74"
+    },
+    {
+     "data": "{\"cancel_requested\": true, \"state\": \"running\"}",
+     "kind": "turn.state",
+     "seq": 25,
+     "turnId": "execution_f9ccc54499ca485195c92d7792c12c74"
+    },
+    {
+     "data": "{\"error_code\": \"TURN_CANCELLED\", \"state\": \"cancelled\"}",
+     "kind": "turn.state",
+     "seq": 29,
+     "turnId": "execution_f9ccc54499ca485195c92d7792c12c74"
+    },
+    {
+     "data": "{\"profile_revision\": 1, \"state\": \"accepted\"}",
+     "kind": "turn.accepted",
+     "seq": 31,
+     "turnId": "execution_0e4d6aa538bc41a0bfae51dc7adaa1ef"
+    },
+    {
+     "data": "{\"text\": \"STATEFUL-NONCE-7A21\"}",
+     "kind": "message.delta",
+     "seq": 32,
+     "turnId": "execution_0e4d6aa538bc41a0bfae51dc7adaa1ef"
+    },
+    {
+     "data": "{\"state\": \"running\"}",
+     "kind": "turn.state",
+     "seq": 33,
+     "turnId": "execution_0e4d6aa538bc41a0bfae51dc7adaa1ef"
+    },
+    {
+     "data": "{\"text\": \"STATEFUL-NONCE-7A21\"}",
+     "kind": "message.final",
+     "seq": 34,
+     "turnId": "execution_0e4d6aa538bc41a0bfae51dc7adaa1ef"
+    },
+    {
+     "data": "{\"checkpoint_native_id\": \"stateful-13\", \"checkpoint_object_digest\": \"sha256:d9031d2aea5a573196169b6fba94a1506f8795a783d81cc317817354d501eb40\", \"result_object_di",
+     "kind": "turn.capture",
+     "seq": 35,
+     "turnId": "execution_0e4d6aa538bc41a0bfae51dc7adaa1ef"
+    },
+    {
+     "data": "{\"state\": \"completed\"}",
+     "kind": "turn.state",
+     "seq": 36,
+     "turnId": "execution_0e4d6aa538bc41a0bfae51dc7adaa1ef"
+    }
+   ],
+   "turns": [
+    {
+     "errorCode": null,
+     "id": "execution_5ef791e2115847e0a61991f864e4b6e6",
+     "index": 0,
+     "nonceDeltaSeqs": [
+      3
+     ],
+     "state": "completed",
+     "stopRequested": false
+    },
+    {
+     "errorCode": null,
+     "id": "execution_12bdfde8cc5741439db8e7c59e639864",
+     "index": 1,
+     "nonceDeltaSeqs": [
+      10
+     ],
+     "state": "completed",
+     "stopRequested": false
+    },
+    {
+     "errorCode": null,
+     "id": "execution_8df79e90706340bdaa534315cf614c58",
+     "index": 2,
+     "nonceDeltaSeqs": [
+      17
+     ],
+     "state": "completed",
+     "stopRequested": false
+    },
+    {
+     "errorCode": "TURN_CANCELLED",
+     "id": "execution_f9ccc54499ca485195c92d7792c12c74",
+     "index": 3,
+     "nonceDeltaSeqs": [],
+     "state": "cancelled",
+     "stopRequested": true
+    },
+    {
+     "errorCode": null,
+     "id": "execution_0e4d6aa538bc41a0bfae51dc7adaa1ef",
+     "index": 4,
+     "nonceDeltaSeqs": [
+      32
+     ],
+     "state": "completed",
+     "stopRequested": false
+    }
+   ]
+  },
+  "result": "NATIVE_HOME_GATE_OK",
+  "round": 1,
+  "seconds": 14.3,
+  "sessionUnderTest": "session_2beb7a2612be494296f4a007aa4c53d6",
+  "sidecarClosedInStderr": true,
+  "stderrTail": "n/sidecar_backend.py\", line 731, in _audited_home\n    audit, resumable = run.port.capture_execution(run.turn_id)\n                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/maoqh/projects/agent-box-env-provider/src/agent_box/server/execution/sidecar.py\", line 1355, in capture_execution\n    envelope.request({\"op\": \"close\"}, timeout=10)\n  File \"/home/maoqh/projects/agent-box-env-provider/src/agent_box/server/execution/sidecar.py\", line 1050, in request\n    raise self._closed_error()\nagent_box.server.execution.sidecar.SidecarError: SIDECAR_CLOSED: sidecar exited before answering\n",
+  "temporaryRoot": "/tmp/agentbox-native-home-gate-omuibzsp",
+  "temporaryRootRemoved": true
+ },
+ {
+  "code": null,
+  "error": "",
+  "exitCode": 0,
+  "gateG8": {
+   "cancelOutcome": "stop_requested",
+   "cancelledTurnState": "completed",
+   "nativeIdStable": true,
+   "recallDeltas": [
+    "STATEFUL-NONCE-7A21"
+   ]
+  },
+  "gateSawNonce": true,
+  "home": {
+   "journalHasWaitForCancel": true,
+   "nativeState": "STATEFUL-NONCE-7A21",
+   "reopenMethods": [
+    "session/new",
+    "session/load",
+    "session/load",
+    "session/load",
+    "session/load"
+   ],
+   "role": "native-home-gate-3591e95e"
+  },
+  "readWindow": {
+   "newestSeq": 36,
+   "nonceDeltaRows": [
+    {
+     "seq": 3,
+     "turnId": "execution_f19612a3ee3845b2a6b33d536d92726a"
+    },
+    {
+     "seq": 10,
+     "turnId": "execution_654c42d0058341eb8ddce3f1c3a1638a"
+    },
+    {
+     "seq": 18,
+     "turnId": "execution_c289b347cc08471d8267ef622882be8a"
+    },
+    {
+     "seq": 32,
+     "turnId": "execution_2c92a37e9e8f4e5d8906791ffea6b842"
+    }
+   ],
+   "nonceDeltasInsideEarliest200": 10,
+   "sessionEvents": 36,
+   "tailEvents": [
+    {
+     "data": "{\"profile_revision\": 1, \"state\": \"accepted\"}",
+     "kind": "turn.accepted",
+     "seq": 16,
+     "turnId": "execution_c289b347cc08471d8267ef622882be8a"
+    },
+    {
+     "data": "{\"state\": \"running\"}",
+     "kind": "turn.state",
+     "seq": 17,
+     "turnId": "execution_c289b347cc08471d8267ef622882be8a"
+    },
+    {
+     "data": "{\"text\": \"STATEFUL-NONCE-7A21\"}",
+     "kind": "message.delta",
+     "seq": 18,
+     "turnId": "execution_c289b347cc08471d8267ef622882be8a"
+    },
+    {
+     "data": "{\"text\": \"STATEFUL-NONCE-7A21\"}",
+     "kind": "message.final",
+     "seq": 19,
+     "turnId": "execution_c289b347cc08471d8267ef622882be8a"
+    },
+    {
+     "data": "{\"checkpoint_native_id\": \"stateful-13\", \"checkpoint_object_digest\": \"sha256:23fcbdc71fa1d60e7c4495bc0d92d6743da0321e7cd8fd6cc6e8e8f554328f6b\", \"result_object_di",
+     "kind": "turn.capture",
+     "seq": 20,
+     "turnId": "execution_c289b347cc08471d8267ef622882be8a"
+    },
+    {
+     "data": "{\"state\": \"completed\"}",
+     "kind": "turn.state",
+     "seq": 21,
+     "turnId": "execution_c289b347cc08471d8267ef622882be8a"
+    },
+    {
+     "data": "{\"profile_revision\": 1, \"state\": \"accepted\"}",
+     "kind": "turn.accepted",
+     "seq": 23,
+     "turnId": "execution_05e42cd6a409467e83a17be495a55522"
+    },
+    {
+     "data": "{\"state\": \"running\"}",
+     "kind": "turn.state",
+     "seq": 24,
+     "turnId": "execution_05e42cd6a409467e83a17be495a55522"
+    },
+    {
+     "data": "{\"cancel_requested\": true, \"state\": \"running\"}",
+     "kind": "turn.state",
+     "seq": 25,
+     "turnId": "execution_05e42cd6a409467e83a17be495a55522"
+    },
+    {
+     "data": "{\"error_code\": \"TURN_CANCELLED\", \"state\": \"cancelled\"}",
+     "kind": "turn.state",
+     "seq": 29,
+     "turnId": "execution_05e42cd6a409467e83a17be495a55522"
+    },
+    {
+     "data": "{\"profile_revision\": 1, \"state\": \"accepted\"}",
+     "kind": "turn.accepted",
+     "seq": 31,
+     "turnId": "execution_2c92a37e9e8f4e5d8906791ffea6b842"
+    },
+    {
+     "data": "{\"text\": \"STATEFUL-NONCE-7A21\"}",
+     "kind": "message.delta",
+     "seq": 32,
+     "turnId": "execution_2c92a37e9e8f4e5d8906791ffea6b842"
+    },
+    {
+     "data": "{\"state\": \"running\"}",
+     "kind": "turn.state",
+     "seq": 33,
+     "turnId": "execution_2c92a37e9e8f4e5d8906791ffea6b842"
+    },
+    {
+     "data": "{\"text\": \"STATEFUL-NONCE-7A21\"}",
+     "kind": "message.final",
+     "seq": 34,
+     "turnId": "execution_2c92a37e9e8f4e5d8906791ffea6b842"
+    },
+    {
+     "data": "{\"checkpoint_native_id\": \"stateful-13\", \"checkpoint_object_digest\": \"sha256:17900b3d6a744b75cacc21cfba2382931b28a4b9519f3caed08960d213ea406a\", \"result_object_di",
+     "kind": "turn.capture",
+     "seq": 35,
+     "turnId": "execution_2c92a37e9e8f4e5d8906791ffea6b842"
+    },
+    {
+     "data": "{\"state\": \"completed\"}",
+     "kind": "turn.state",
+     "seq": 36,
+     "turnId": "execution_2c92a37e9e8f4e5d8906791ffea6b842"
+    }
+   ],
+   "turns": [
+    {
+     "errorCode": null,
+     "id": "execution_f19612a3ee3845b2a6b33d536d92726a",
+     "index": 0,
+     "nonceDeltaSeqs": [
+      3
+     ],
+     "state": "completed",
+     "stopRequested": false
+    },
+    {
+     "errorCode": null,
+     "id": "execution_654c42d0058341eb8ddce3f1c3a1638a",
+     "index": 1,
+     "nonceDeltaSeqs": [
+      10
+     ],
+     "state": "completed",
+     "stopRequested": false
+    },
+    {
+     "errorCode": null,
+     "id": "execution_c289b347cc08471d8267ef622882be8a",
+     "index": 2,
+     "nonceDeltaSeqs": [
+      18
+     ],
+     "state": "completed",
+     "stopRequested": false
+    },
+    {
+     "errorCode": "TURN_CANCELLED",
+     "id": "execution_05e42cd6a409467e83a17be495a55522",
+     "index": 3,
+     "nonceDeltaSeqs": [],
+     "state": "cancelled",
+     "stopRequested": true
+    },
+    {
+     "errorCode": null,
+     "id": "execution_2c92a37e9e8f4e5d8906791ffea6b842",
+     "index": 4,
+     "nonceDeltaSeqs": [
+      32
+     ],
+     "state": "completed",
+     "stopRequested": false
+    }
+   ]
+  },
+  "result": "NATIVE_HOME_GATE_OK",
+  "round": 2,
+  "seconds": 18.8,
+  "sessionUnderTest": "session_20468b993e7047ad84d93cadf0757784",
+  "sidecarClosedInStderr": false,
+  "stderrTail": "^^^^\n  File \"/home/maoqh/projects/agent-box-env-provider/src/agent_box/server/execution/sidecar.py\", line 1355, in capture_execution\n    envelope.request({\"op\": \"close\"}, timeout=10)\n  File \"/home/maoqh/projects/agent-box-env-provider/src/agent_box/server/execution/sidecar.py\", line 1039, in request\n    self._channels.write_line(json.dumps(body, ensure_ascii=False, separators=(\",\", \":\")))\n  File \"/home/maoqh/projects/agent-box-env-provider/src/agent_box/server/execution/local_channel.py\", line 584, in write_line\n    raise RuntimeError(\"LOCAL_CHANNEL_CLOSED\")\nRuntimeError: LOCAL_CHANNEL_CLOSED\n",
+  "temporaryRoot": "/tmp/agentbox-native-home-gate-aizr2n4c",
+  "temporaryRootRemoved": true
+ }
+]
