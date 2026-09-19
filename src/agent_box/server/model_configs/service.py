@@ -5,6 +5,9 @@ import json
 from typing import Any, Mapping
 
 from agent_box.server.errors import ServerError, unavailable
+from agent_box.server.model_configs.provider_protocols import (
+    normalize_model_facts, normalize_protocols, validate_endpoints,
+)
 from agent_box.server.records import canonical, digest, reject_sensitive_keys
 
 
@@ -52,13 +55,10 @@ class ProviderModelService:
         return [self.project(row) for row in self.records.list(include_archived=include_archived)]
 
     def create(self, key: str, body: dict[str, Any]) -> dict[str, Any]:
-        self._validate(body, creating=True)
-        config = self.objects.publish(canonical({
-            "schema_version": 1, "configuration": {
-                item["controlId"]: item["value"] for item in body["configuration"]
-            },
-        }))
-        models = self.objects.publish(canonical({"schema_version": 1, "models": body["models"]}))
+        norm = self._validate(body, creating=True)
+        config = self.objects.publish(canonical(_config_payload(body, norm)))
+        models = self.objects.publish(
+            canonical({"schema_version": 1, "models": norm["models"]}))
         _status, result = self.records.create(
             key=key, request_digest=digest(body), display_name=body["displayName"],
             harness_type=body["harness"], provider_type=body["provider"],
@@ -74,13 +74,18 @@ class ProviderModelService:
         merged = {
             **body, "harness": current["harness_type"], "provider": current["provider_type"],
         }
-        self._validate(merged, creating=False)
-        config = self.objects.publish(canonical({
-            "schema_version": 1, "configuration": {
-                item["controlId"]: item["value"] for item in body["configuration"]
-            },
-        }))
-        models = self.objects.publish(canonical({"schema_version": 1, "models": body["models"]}))
+        norm = self._validate(merged, creating=False)
+        # Editing an unrelated field must not silently drop a previously declared
+        # protocol set or endpoint: absent in the update body means "keep", not
+        # "clear" (clearing is an explicit empty list, which _validate preserves).
+        prior = json.loads(self.objects.read(current["config_object_digest"]))
+        if "protocols" not in body and prior.get("protocols") is not None:
+            norm["protocols"] = list(prior["protocols"])
+        if "endpoints" not in body and prior.get("endpoints"):
+            norm["endpoints"] = dict(prior["endpoints"])
+        config = self.objects.publish(canonical(_config_payload(body, norm)))
+        models = self.objects.publish(
+            canonical({"schema_version": 1, "models": norm["models"]}))
         _status, result = self.records.update(
             record_id=record_id, expected_version=expected_version, key=key,
             request_digest=digest(body), display_name=body["displayName"],
@@ -192,6 +197,8 @@ class ProviderModelService:
 
     def project(self, row: Mapping[str, Any]) -> dict[str, Any]:
         config = json.loads(self.objects.read(row["config_object_digest"]))
+        declared = config.get("protocols")
+        endpoints = config.get("endpoints") or {}
         return {
             "id": row["id"], "version": int(row["version"]),
             "displayName": row["display_name"], "harness": row["harness_type"],
@@ -201,6 +208,13 @@ class ProviderModelService:
                 for key, value in sorted(dict(config.get("configuration") or {}).items())
             ],
             "models": self._models(row), "archivedAt": row["archived_at"],
+            # Order 092 stage 3: the record's canonical protocol set and its
+            # per-protocol endpoints. ``protocolsDeclared`` is the honest flag the
+            # front end reads to know whether the (empty) set means "none" or "not
+            # stated" - an undeclared record is unknown, never incompatible.
+            "protocols": list(declared) if declared is not None else None,
+            "endpoints": dict(endpoints) if endpoints else None,
+            "protocolsDeclared": declared is not None,
             # Order 55: the endpoint facts and where they came from; absent
             # means unknown, never a guessed default.
             "provenance": ({"baseUrl": row["base_url"],
@@ -214,7 +228,7 @@ class ProviderModelService:
     def _models(self, row: Mapping[str, Any]) -> list[dict[str, Any]]:
         return list(json.loads(self.objects.read(row["models_object_digest"])).get("models") or [])
 
-    def _validate(self, body: Mapping[str, Any], *, creating: bool) -> None:
+    def _validate(self, body: Mapping[str, Any], *, creating: bool) -> dict[str, Any]:
         harness = body["harness"]
         # Order 092 stage 2: a shared (harness-neutral) upstream record carries no
         # harness. It may be referenced by any declaration-compatible harness; its
@@ -245,6 +259,33 @@ class ProviderModelService:
                 raise ServerError(
                     "PROFILE_CONFIGURATION_INVALID", "Unavailable models require a reason", status=422,
                 )
+        # Order 092 stage 3: canonical protocol vocabulary + model facts. Dialects
+        # collapse to the four canonical values and an unknown one is a typed
+        # refusal; endpoints must be keyed by a declared protocol and follow the
+        # probe's URL discipline; capabilities are strict (documented keys only).
+        declared = None
+        if body.get("protocols") is not None:
+            declared = normalize_protocols(body["protocols"])
+        endpoints = validate_endpoints(body.get("endpoints"), declared or [])
+        normalized_models = [normalize_model_facts(item) for item in models]
+        return {"protocols": declared, "endpoints": endpoints, "models": normalized_models}
+
+
+def _config_payload(body: Mapping[str, Any], norm: Mapping[str, Any]) -> dict[str, Any]:
+    """The canonical configuration object for a record: control values plus the
+    optional protocol facts (092). Absent protocol set / empty endpoints are not
+    written, so an undeclared record reads back with those keys absent, not empty.
+    """
+    payload: dict[str, Any] = {
+        "schema_version": 1, "configuration": {
+            item["controlId"]: item["value"] for item in body["configuration"]
+        },
+    }
+    if norm["protocols"] is not None:
+        payload["protocols"] = norm["protocols"]
+    if norm["endpoints"]:
+        payload["endpoints"] = norm["endpoints"]
+    return payload
 
 
 def _model_references(value: Any):
