@@ -1,0 +1,13 @@
+{
+  "single_executor": true,
+  "shared_paths": [
+    "docs/implementation/status.md",
+    "tests/**",
+    "docs/server-round1/**",
+    "src/agent_box/**",
+    "plugins/**",
+    "scripts/server-round1/**",
+    "protocols/**",
+    "workers/**"
+  ]
+}
