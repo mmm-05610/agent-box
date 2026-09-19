@@ -248,6 +248,21 @@ def _artifact_error(exc: ArtifactStoreError) -> WireError:
     )
 
 
+#: What a user can actually do about each send blocker, in wire terms that exist
+#: today. A recovery state has no entry because no method in the 64 clears it —
+#: inventing one is a product decision (approval queue), not a projection detail,
+#: and "there is nothing you can do from here" is the honest answer (order 117).
+_BINDING_ACTIONS: Mapping[str, tuple[str, ...]] = {
+    "CREDENTIAL_NOT_FOUND": ("provision_the_credential_on_this_host",
+                             "point_the_model_at_an_available_credential"),
+    "PROVIDER_MODEL_NOT_FOUND": ("choose_an_available_model",),
+    "PROVIDER_MODEL_UNUSABLE": ("choose_an_available_model",),
+    "PROVIDER_MODEL_REFERENCE_MISSING": ("choose_an_available_model",),
+    "MODEL_UNAVAILABLE": ("choose_an_available_model",),
+    "PROFILE_CONFIGURATION_INVALID": ("choose_a_model",),
+}
+
+
 class WireService:
     """Dispatches wire/1 methods onto neutral use cases."""
 
@@ -552,7 +567,169 @@ class WireService:
             for key, value in (descriptor.capability_claims if descriptor else {}).items()
             if isinstance(value, bool)
         }
+        item["sendability"] = self._sendability(row, item)
         return item
+
+    # -- sendability (order 117, QA-009) -----------------------------------
+
+    def _profile_bindings(self, row: Mapping[str, Any]) -> tuple[list[dict[str, Any]], bool]:
+        """Re-walk the model resolution a turn would do, and say what it would hit.
+
+        `freeze_execution_configuration` (`model_configs/service.py:134-180`) is
+        the code that decides whether a Profile can actually run: it reads the
+        model control out of the Profile's configuration object, resolves the
+        provider record, then the model, then the credential. A client could only
+        learn the outcome by sending a message, so this walks the same chain and
+        reports the first thing it would trip on — the *rules* are copied here,
+        not imported, because `model_configs/**` is the runtime line's surface
+        (charter §3); `test_a_blocker_the_freeze_path_would_hit_is_named` is what
+        keeps the two from drifting.
+        """
+        empty: tuple[list[dict[str, Any]], bool] = ([], False)
+        descriptor = (
+            self.harnesses.get(row["harness_type"])
+            if row["harness_type"] in self.harnesses else None
+        )
+        if descriptor is None:
+            # An unregistered harness is a different visible fact (capabilities);
+            # nothing here can say whether a model would resolve.
+            return [], True
+        control_id = getattr(descriptor, "model_control_id", None)
+        if control_id is None:
+            return empty  # this harness takes no provider/model reference at all
+        if self.model_configs is None:
+            return [], True
+        digest = row.get("config_object_digest")
+        if not digest:
+            return [{
+                "providerModelId": None, "modelId": None,
+                "state": "blocked", "reason": "PROFILE_CONFIGURATION_INVALID",
+                "detail": f"control {control_id} selects no Provider/Model configuration",
+            }], False
+        try:
+            document = json.loads(self.objects.read(digest))
+        except Exception:  # noqa: BLE001 - unreadable configuration is unknown, not fine
+            return [], True
+        reference = (document.get("configuration") or {}).get(control_id)
+        if (not isinstance(reference, Mapping) or not isinstance(reference.get("providerId"), str)
+                or not isinstance(reference.get("modelId"), str) or not reference["modelId"]):
+            return [{
+                "providerModelId": None, "modelId": None,
+                "state": "blocked", "reason": "PROFILE_CONFIGURATION_INVALID",
+                "detail": f"control {control_id} must select a Provider/Model configuration",
+            }], False
+        binding: dict[str, Any] = {
+            "providerModelId": reference["providerId"], "modelId": reference["modelId"],
+            "controlId": control_id, "state": "ready", "reason": None, "detail": None,
+        }
+        try:
+            provider = self.model_configs.records.get(binding["providerModelId"])
+        except ServerError as error:
+            binding["state"] = "blocked"
+            binding["reason"] = ("PROVIDER_MODEL_NOT_FOUND" if error.code == "PROVIDER_MODEL_NOT_FOUND"
+                                 else "PROFILE_CONFIGURATION_INVALID")
+            binding["detail"] = str(error.message)[:200]
+            return [binding], False
+        except Exception:  # noqa: BLE001
+            return [], True
+        if provider["archived_at"] is not None or provider["harness_type"] != row["harness_type"]:
+            binding["state"] = "blocked"
+            binding["reason"] = "PROVIDER_MODEL_UNUSABLE"
+            binding["detail"] = ("archived" if provider["archived_at"] is not None
+                                 else "the provider record belongs to a different harness")
+            return [binding], False
+        try:
+            models = list(json.loads(
+                self.objects.read(provider["models_object_digest"])).get("models") or [])
+        except Exception:  # noqa: BLE001
+            return [binding], True
+        model = next((item for item in models if item.get("modelId") == binding["modelId"]), None)
+        if model is None:
+            binding["state"] = "blocked"
+            binding["reason"] = "PROVIDER_MODEL_REFERENCE_MISSING"
+            binding["detail"] = "the referenced model is not on that provider record"
+            return [binding], False
+        if model.get("availability") == "unavailable":
+            binding["state"] = "blocked"
+            binding["reason"] = "MODEL_UNAVAILABLE"
+            binding["detail"] = str(model.get("unavailableReason") or "")[:200]
+            return [binding], False
+        credential_id = provider.get("credential_id")
+        binding["credentialId"] = credential_id
+        kind = getattr(descriptor, "credential_kind", None)
+        if kind is not None and credential_id is not None:
+            # The same kind-scoped lookup the freeze path performs: a credential
+            # that exists but is not of the kind this harness takes is just as
+            # unsendable as one that is absent, and `exists()` alone would call
+            # it ready. `test_a_binding..._is_the_wrong_kind...` holds that open.
+            try:
+                self.model_configs.credentials.get(credential_id, kind=kind)
+            except ServerError as error:
+                binding["state"] = "blocked"
+                binding["reason"] = error.code
+                binding["detail"] = (
+                    f"this host has no credential {credential_id} of kind {kind}")[:200]
+                return [binding], False
+            except Exception:  # noqa: BLE001
+                return [binding], True
+        return [binding], False
+
+    def _sendability(self, row: Mapping[str, Any], projected: Mapping[str, Any]) -> dict[str, Any]:
+        """Can this Profile take a message here, answered **before** one is sent.
+
+        QA-009's complaint is that both blockers existed only as a failure after
+        the user had typed: 409 `PROFILE_RECOVERY_REQUIRED` at accept, and a
+        credential that was never provisioned on this host arriving as
+        `EXECUTION_FAILED` inside the turn. The accept-time behaviour is
+        unchanged — this only says it out loud earlier — and every fact that
+        could not be read is reported as `unknown`, never as "sendable".
+        """
+        checks: list[dict[str, Any]] = []
+        recovery = projected.get("recoveryPending")
+        if recovery is True:
+            checks.append({
+                "key": "recovery", "state": "blocked",
+                "reason": "PROFILE_RECOVERY_REQUIRED",
+                "message": "this Profile is waiting on a recovery the Server has not completed",
+                # No wire method clears this state today: saying so is the honest
+                # part of "what can the user do" (the clearing face is a product
+                # decision in the approval queue, not something to invent here).
+                "actions": [],
+            })
+        elif recovery is False:
+            checks.append({"key": "recovery", "state": "ready", "reason": None,
+                           "message": None, "actions": []})
+        else:
+            checks.append({"key": "recovery", "state": "unknown",
+                           "reason": "RECOVERY_STATE_UNREADABLE",
+                           "message": "this Server could not read the recovery state",
+                           "actions": []})
+        bindings, unreadable = self._profile_bindings(row)
+        for binding in bindings:
+            checks.append({
+                "key": "model:" + (binding.get("providerModelId")
+                                   or binding.get("controlId") or "unset"),
+                "state": binding["state"],
+                "reason": binding.get("reason"),
+                "message": binding.get("detail"),
+                "actions": _BINDING_ACTIONS.get(binding.get("reason") or "", []),
+                "credentialId": binding.get("credentialId"),
+            })
+        if unreadable:
+            checks.append({"key": "model", "state": "unknown", "reason": "CONFIGURATION_UNREADABLE",
+                           "message": "this Server could not read the Profile's configuration",
+                           "actions": []})
+        for state in ("blocked", "unknown"):
+            hit = next((item for item in checks if item["state"] == state), None)
+            if hit is not None:
+                return {
+                    "state": state,
+                    "reason": hit["reason"],
+                    "message": hit["message"],
+                    "actions": sorted({action for item in checks for action in item["actions"]}),
+                    "checks": checks,
+                }
+        return {"state": "ready", "reason": None, "message": None, "actions": [], "checks": checks}
 
     # -- managed hooks (Order 59) ------------------------------------------
 

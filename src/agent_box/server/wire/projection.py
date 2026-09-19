@@ -107,6 +107,18 @@ def accessibility_for(row: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def _tri_state(row: Mapping[str, Any], column: str) -> bool | None:
+    """The column as a fact the client can branch on: true, false, or unknown.
+
+    `None` means the row did not carry the column at all. Collapsing that into
+    `False` would tell a client "nothing is blocking this Profile" when the
+    Server actually does not know (order 117, `C-43`'s `Unknown`).
+    """
+    if column not in row:
+        return None
+    return bool(row[column])
+
+
 def profile_record(row: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "id": row["id"],
@@ -124,6 +136,11 @@ def profile_record(row: Mapping[str, Any]) -> dict[str, Any]:
         ),
         "originProfileId": row.get("origin_profile_id"),
         "archivedAt": row.get("archived_at"),
+        # Order 117 (QA-009): the send blocker the accept path already obeys
+        # (`sessions/repository.py` answers 409 PROFILE_RECOVERY_REQUIRED on it),
+        # visible here so a client can grey the Profile out before the user has
+        # typed anything. `null` is "unknown", which is not "not blocked".
+        "recoveryPending": _tri_state(row, "recovery_pending"),
         "createdAt": row["created_at"],
         "updatedAt": row["updated_at"],
     }
