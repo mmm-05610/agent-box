@@ -71,8 +71,14 @@ def _deployment(tmp_path: Path) -> Path:
     return document
 
 
-def _channel_for(tmp_path, monkeypatch, env_kind: str, *, ssh_connector: bool = False) -> str:
-    """Which channel the product's own port factory builds for one placement."""
+def _channel_for(tmp_path, monkeypatch, env_kind: str, *, ssh_connector: bool = False,
+                 host_os: str | None = None) -> str:
+    """Which channel the product's own port factory builds for one placement.
+
+    ``host_os`` fakes the Server's own platform (`"nt"` = Windows control plane)
+    so a guest placement's routing can be checked on a Linux test host - the exact
+    condition order 090 broke under.
+    """
     import agent_box.server.bootstrap.runtime as runtime_module
     import agent_box.server.execution.local_channel as local_module
     import agent_box.server.execution.sidecar as sidecar_module
@@ -106,8 +112,9 @@ def _channel_for(tmp_path, monkeypatch, env_kind: str, *, ssh_connector: bool = 
     runtime = build_runtime_from_sidecar_deployment(
         tmp_path / "server", _deployment(tmp_path), plugin_root=PLUGIN,
     )
-    try:
-        frozen = runtime.objects.publish(json.dumps({"execution": {}}).encode())
+    frozen = runtime.objects.publish(json.dumps({"execution": {}}).encode())
+
+    def call_port_factory():
         runtime.execution.port_factory({
             "harness_type": "pi", "distribution": "Ubuntu", "remote_user": "tester",
             "connection_id": "connection", "remote_path": "/workspace",
@@ -115,6 +122,16 @@ def _channel_for(tmp_path, monkeypatch, env_kind: str, *, ssh_connector: bool = 
             "profile_id": "profile_test", "profile_name": "Pi Test",
             "config_object_digest": frozen.digest,
         }, lambda *_args: None)
+
+    try:
+        if host_os is not None:
+            # Scope the fake host platform to just the resolution, so runtime.stop()
+            # still runs under the real one (its lock release is os-specific).
+            with monkeypatch.context() as scoped:
+                scoped.setattr(runtime_module.os, "name", host_os)
+                call_port_factory()
+        else:
+            call_port_factory()
     finally:
         runtime.stop()
     return chosen["channel"]
@@ -164,3 +181,30 @@ def test_the_local_channel_is_the_one_that_runs_a_command_it_is_handed():
     text = (Path(__file__).resolve().parents[2] / "src" / source).read_text()
     assert "compile_remote_sidecar_bwrap_argv" not in text
     assert "bwrap" not in text.replace("agent_box_sandbox_bwrap", "")
+
+
+def test_the_sandbox_default_follows_the_placement_not_the_host(monkeypatch):
+    """G1 (order 090): the room is composed for the guest the turn runs in, not
+    the machine hosting the Server. A WSL/SSH placement is Linux even under a
+    Windows control plane; only a native local placement may use the Windows
+    sandbox, and an explicit deployment provider still wins."""
+    from agent_box.server.bootstrap import runtime as runtime_module
+    monkeypatch.delenv("AGENT_BOX_SANDBOX_PROVIDER", raising=False)
+    choose = runtime_module._sandbox_provider_name
+    monkeypatch.setattr(runtime_module.os, "name", "nt")   # Windows control plane
+    assert choose({}, "wsl") == "sandbox-bwrap"
+    assert choose({}, "ssh") == "sandbox-bwrap"
+    assert choose({}, "local") == "sandbox-windows"
+    assert choose({"sandboxProvider": "sandbox-special"}, "wsl") == "sandbox-special"
+    monkeypatch.setattr(runtime_module.os, "name", "posix")
+    assert choose({}, "wsl") == "sandbox-bwrap"
+    assert choose({}, "local") == "sandbox-bwrap"
+
+
+def test_a_wsl_turn_still_routes_to_the_worker_from_a_windows_host(tmp_path, monkeypatch):
+    """G1 end-to-end (the trial's exact host condition): a WSL-workspace turn on a
+    Server reporting `nt` must reach the WSL worker channel, not fall back to the
+    host `sandbox-windows` (which unresolved made it an ambiguous dispatch). Without
+    the placement-aware default the port factory raises and this errors, so the
+    gate only passes with the fix."""
+    assert _channel_for(tmp_path, monkeypatch, "wsl", host_os="nt") == "worker"

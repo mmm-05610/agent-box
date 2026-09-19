@@ -1138,6 +1138,73 @@ def test_public_dispatch_records_capability_refusal_as_a_failed_start(tmp_path):
         assert session["turns"][0]["error_code"] == "CAPABILITY_REQUIREMENT_UNSATISFIED", session
 
 
+def test_an_unresolvable_placement_is_a_typed_refusal_not_an_ambiguous_dispatch(tmp_path):
+    """Order 090 G2: a turn whose placement/sandbox cannot resolve is refused with
+    its own typed code (Work Core records a *failed* start), never as a
+    `DispatchAmbiguous`. Removing the provider.start conversion to ExecutionStartRejected
+    would flip the ledger to ambiguous and the code to EXECUTION_FAILED, so this
+    test is the counter-example that keeps the gate honest.
+    """
+    from agent_box.extensions.runtime_composition.sandbox_port import SandboxPortUnavailable
+
+    registry = HarnessRegistry()
+    registry.register(HarnessDescriptor("pi", capability_claims={"stream": True}))
+
+    class Connector:
+        def distributions(self): return [{"name": "Ubuntu"}]
+        def probe(self, distribution, user):
+            return {"probe_id": "probe", "distribution": distribution, "user": user}
+        def browse(self, probe_id, path):
+            return {"path": path, "directories": [], "files": []}
+        def open_workspace(self, probe_id, path):
+            return {"connection_id": "connection", "distribution": "Ubuntu",
+                    "user": os.environ["USER"], "path": str(tmp_path)}
+
+    def execution_factory(records, objects, approvals, notifier, _connector, _credentials, _secrets):
+        def port_factory(context, on_event):
+            # No sandbox resolves for this placement - deterministic, before any
+            # native side effect (open_execution is never reached).
+            raise SandboxPortUnavailable(
+                "SANDBOX_PROVIDER_UNRESOLVED", "no sandbox provider serves this placement")
+        return SidecarExecutionBackend(
+            records, objects, approvals, port_factory=port_factory, on_event=notifier.notify)
+
+    runtime = build_runtime(
+        tmp_path / "server", harnesses=registry,
+        execution_factory=execution_factory, connector=Connector(),
+    )
+    with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
+        opened = _wire_post(client, runtime.token, "workspaces.open", {
+            "requestId": "place-open", "path": str(tmp_path),
+            "environment": {"kind": "wsl", "host": "Ubuntu", "user": None},
+        })["workspace"]
+        profile = client.post("/api/v1/profiles", headers={
+            "Authorization": f"Bearer {runtime.token}", "Idempotency-Key": "place-profile",
+        }, json={"name": "place", "harness_type": "pi",
+                 "configuration": {"model": "initial"}, "credential_id": None}).json()
+        accepted = _wire_post(client, runtime.token, "sessions.createAndSend", {
+            "requestId": "place-first", "workspaceId": opened["id"],
+            "profileId": profile["profile_id"], "overrides": [],
+            "message": {"text": "place", "attachments": []},
+        })
+        session_id = accepted["session"]["id"]
+        deadline = time.monotonic() + 8
+        session = runtime.repository.get_session(session_id)
+        while time.monotonic() < deadline and session["turns"][0]["state"] == "running":
+            time.sleep(0.02)
+            session = runtime.repository.get_session(session_id)
+        assert session["turns"][0]["state"] == "failed", session
+        assert session["turns"][0]["error_code"] == "SANDBOX_PROVIDER_UNRESOLVED", session
+        with runtime.database.read() as conn:
+            kinds = [row["type"] for row in conn.execute(
+                "SELECT type FROM core_events WHERE type IN (?,?)",
+                (EventType.EXECUTION_DISPATCH_AMBIGUOUS.value,
+                 EventType.EXECUTION_DISPATCH_FAILED.value),
+            )]
+        assert "ExecutionDispatchFailed" in kinds, kinds
+        assert "ExecutionDispatchAmbiguous" not in kinds, kinds
+
+
 def test_success_dispatches_queued_turn_with_frozen_effective_configuration(tmp_path):
     runtime = _local_sidecar_runtime(tmp_path)
     with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
