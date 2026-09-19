@@ -5,6 +5,25 @@
 > 的账在 `agent-box-env-provider`。本树切片与批次见 `worktree-charter.md`（`c1 = 106 → 088 → 090 → 091`）。
 > （调度者建树时写的种子；此后由本树执行者维护。）
 
+## CHECKPOINT c1 — 后端 runtime 线第一批（106 / 088 / 090 / 091）[DONE，含 091 PARTIAL] · 2026-09-19
+
+**1 现在能试什么**
+- **106**：忙时入队一条 → 上一轮结束后该条**跑完**（不再 1 秒 `SIDECAR_CLOSED`）。`tests/server/test_harness_sidecar.py -k "queue or drain"`：正例两轮 completed、退回旧实现必红复现 `SIDECAR_CLOSED`、sidecar 每次退 ⇒ 有界重建后 `SIDECAR_REBUILD_FAILED`。
+- **088**：`_decode_windows_output` 现全函数——任何 `wsl.exe` 缓冲（0xd2 code-page、奇数长像 UTF-16LE、截断 BOM）不再崩读者线程；真 UTF-16 `--list` 仍正确解析。`plugins/agent-box-runtime-wsl/tests/test_windows_wsl_decode.py`。
+- **090**：WSL/SSH 工作区的沙箱默认**随放置**（Linux guest=bwrap，与控制面宿主无关），Windows 宿主驱动的 WSL 轮不再回退 `sandbox-windows`；不可解析的放置＝**派发前类型化拒绝**（`SANDBOX_PROVIDER_UNRESOLVED`/`*_CONNECTOR_UNAVAILABLE`/`PLACEMENT_UNKNOWN`），**不再** `DispatchAmbiguous`。`tests/server/test_placement.py` + `test_control_plane_sync`/`test_an_unresolvable_placement...`。
+- **091**：传输无关的同步引擎（首部署清单/逐项摘要、按 `(kind,id,version,digest)` 幂等增量、执行侧本地改 → `CONTROL_PLANE_AUTHORITY`、凭据内容结构上不可入集合）。`tests/server/test_control_plane_sync_091.py`。
+
+**2 要你拍的（交回调度者的架构裁决）**
+- **091 执行侧持久记录传输**：现对执行侧唯一的**持久**可写通道是 `home.put`（落原生 home＝本单明确不同步），`view.put/secret.put` 是 attempt 级用完即清；要在执行侧持久留存同步记录只能 ①走 home.put（与"不同步 home"冲突）或 ②**新增一个 Worker 控制协议 op（如 `records.put`）**。工单禁"改 wire 方法数/形状⇒停下交回"——**新增 Worker op 是否算所禁的"新 wire"？** 请裁定（选项 A/B/C 见 `docs/server-round1/fullstack/091-control-plane-sync.md §5`）。建议 B：把"首部署"定为逐执行幂等重建的有界投影（无跨机持久库），与"执行侧非权威"一致，我可据此把引擎接进 `port_factory`。
+
+**3 花了什么**：真实模型调用 0；`wsl.exe`/真 Worker/真机门 0（全 monkeypatch/内存假端点）。§Spend 全部为源码取证 + 定向/全量 pytest。清理：三个 runtime `finally: stop()`，tmp_path 自动回收，无残留。
+
+**4 恢复点**：本批四单已提交（106/088/090/091 各按阶段提交）。**基线**＝tag `checkpoint/c1`。工作树 clean。**下一位**＝调度者已新投 **107（=R-0020 的 096a，思考打开）/108（输出上限参数化）**，两者按公告串行（108 涉 model_configs/runtime 描述符＝与 A 的 104/105 串行；107 涉 plugins/agent-box-harnesses 模板）。c2 的 092 仍待 A 的 105 收口。无未提交在制品。
+
+**5 不含糊（回归计数）**：根套件 `tests/` = **951 passed / 18 failed / 21 skipped**（255s）。**18 全为本环境既有失败，非本批引入**（逐一核验）：`test_chain_gate_without_worker_fails_typed` 断言磁盘上存在 `.acceptance-bundle-*`（全新工作树无）；`test_pi/opencode_gate_cleanup`（16 条）跑真链需预置 runtime 产物/node/bwrap ⇒ `FileNotFoundError`；`test_the_production_default_lease_is_five_seconds` 读 manifest 文件缺失 `FileNotFoundError`；`test_first_run_lock::test_without_the_gate...` 为时序 flake（**隔离跑 5 passed**）。本批四单定向全绿（106:90 / 088:21 / 091:19 / 090:15 passed）+ 新增门全过 ⇒ **本批引入回归 = 0**。091 终态 **PARTIAL**（引擎+G1–G4 绿；精确剩余＝跨机持久传输待 §5 裁决、无版本 kind（binding/hook/grant/account）增量含删除需 schema 18→19、Windows↔WSL 真机部署本环境不可用）。
+
+---
+
 ## 计数口径（工单 49 G3；2026-09-17）
 
 **最近一次有记录的全量计数（068 轮刷新；源头=e39959f 提交信息，068 按单内约束未复跑）**：
