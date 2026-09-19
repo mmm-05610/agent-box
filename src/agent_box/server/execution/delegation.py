@@ -271,15 +271,25 @@ class DelegationService:
                 {"workspace_id": workspace_id, "profile_id": chosen["profileId"]},
             )[1]
             return session["session_id"], None, False
-        # Continuation: the handle is a native session id of the *same family*.
+        # Continuation: the handle is a native session id of a *specific, authorized*
+        # child session - not "any session of the same family".
         with self.records.database.read() as conn:
-            row = conn.execute(
+            rows = conn.execute(
                 "SELECT id,profile_id FROM server_sessions "
                 "WHERE checkpoint_native_id=?", (task_id,),
-            ).fetchone()
-        if row is None:
+            ).fetchall()
+        if not rows:
             raise DelegationError(
                 "SUBAGENT_TASK_UNKNOWN", "no subagent session carries that task_id")
+        if len(rows) > 1:
+            # Order 139 (AUD-B-021): `checkpoint_native_id` has no unique index, so the
+            # same handle can resolve to several sessions and `fetchone()` would land on
+            # whichever row the ledger happens to return first. That is an
+            # unreproducible landing point; fail deterministically instead of choosing.
+            raise DelegationError(
+                "SUBAGENT_NOT_AUTHORIZED",
+                "this task_id resolves to more than one session; the continuation is ambiguous")
+        row = rows[0]
         session = self.records.get_session(str(row["id"]))
         owner = self.profiles.get(str(session["profile_id"]))
         if str(owner["harness_type"]) != str(child_profile["harness_type"]):
@@ -289,6 +299,16 @@ class DelegationService:
             raise DelegationError(
                 "SUBAGENT_TASK_FAMILY_MISMATCH",
                 "a subagent session can only be continued within its own family",
+            )
+        if str(session["profile_id"]) != str(chosen["profileId"]):
+            # Order 139: a parent only authorized to call child C must not resume the
+            # native handle of a different profile D just because D is the same family.
+            # The session must belong to the child this run actually selected (the same
+            # roster the grant was read from), so authorization and continuation are one
+            # fact. Reuses SUBAGENT_NOT_AUTHORIZED - no new code, no contract change.
+            raise DelegationError(
+                "SUBAGENT_NOT_AUTHORIZED",
+                "that task_id is not a session of the authorized subagent for this call",
             )
         return str(row["id"]), task_id, True
 

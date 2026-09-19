@@ -1412,3 +1412,15 @@ pi-production-chain-gate.py  runtime=dfdae54be337c45de58e44161b18880f  A(b1f6e07
 | 141 | 全 | 到期先 `self._usage_of(turn_id)` → `self.sessions.cancel_turn(turn_id, "subagent-timeout:..")`（与两 stop 门同一停法：记录+execution.cancel+级联孙）→ 读子 native 句柄 → raise `DelegationError("SUBAGENT_TIMEOUT", msg含 turnId/task_id/usage)`。端点回 `getattr(refusal,"message")` ⇒ 句柄达调用方，**未碰 wire/端点**。G1 超时后子轮离 active；G2 仍类型化 `SUBAGENT_TIMEOUT`（不降泛码）；G3 拒绝体含 `turnId=`+`usage so far`；G4 全走真 `run`（子不结束）；G5 成功体逐字不变。反例**两处已树内实测**：删 `cancel_turn`⇒G1"离 active"门红（子仍 running）；从 message 拿掉 `turnId=`⇒G3"可定位"门红 | `test_subagent_timeout_stops_141.py` **3 passed**（含 success-unchanged）；rule_liveness_086 **两条真停门测试改直建 running 子轮**（141 后超时自身即停子、不能再用作"取活子"setup；主体两停门级联覆盖不变）＋delegation+138+136+subagents 广扫 **35 passed**（无回退）；**Worker 工件不在** | 0 | 本提交 |
 
 **归批（132 新亚型）**：**『资源边界的声明』与『真的停不停』必须同一份事实**——超时曾只截断等待不截断执行；同族 `136`（约束记两处）、`139`（授权名单 vs 续接归属）。137/139/140 仍待（137 stage1 已落）。
+
+## 工单 139 — `task_id` 续接必须校验会话**归属**（`AUD-B-021` high·ops 复用码裁决；2026-09-19，执行者·runtime 线）
+
+> 终态 **`SUBAGENT_TASK_OWNERSHIP_DONE`**。续接原**全库按 `checkpoint_native_id` 查会话**、**只拒一次跨家族** ⇒ 只被授权调 C 的父可用**同家族**未授权 D 的句柄把子轮续到 D 会话（还可能在别工作区）＝门禁做成"同一家随便接"；且 `checkpoint_native_id` 无唯一约束 ⇒ `fetchone()` 多行命中取行序第一条＝落点不可复现。§Spend：0 真调用。证据 `docs/server-round1/task-continuation-ownership-139.md`。
+
+**ops 裁决（不自行再定）**：**复用既有 `SUBAGENT_NOT_AUTHORIZED`**（审阅者亦倾向）＝**零合同变更**，**不新造** `SUBAGENT_TASK_NOT_CALLABLE`（新码属合同增补须走重锁对表，留用户）；`checkpoint_native_id` **唯一索引＝schema 变更＝不在本单**（本单只做**代码层确定性**，歧义⇒类型化拒）。
+
+| 单 | 阶段 | 门 | 回归 | 真实模型 | 提交 |
+| --- | --- | --- | --- | --- | --- |
+| 139 | 全 | `_resolve_child_session` 续接分支：`fetchall` 取代 `fetchone`；0 行⇒`SUBAGENT_TASK_UNKNOWN`（不变）、**>1 行⇒确定性 `SUBAGENT_NOT_AUTHORIZED`**（歧义、绝不挑行）；**跨家族检查在前**（G5 保持 `SUBAGENT_TASK_FAMILY_MISMATCH`）；**新归属判据** `session.profile_id==chosen.profileId`（即本次名册选中的子）否则 `SUBAGENT_NOT_AUTHORIZED`（授权名单与续接判定同一份事实）。G1+G2：同家族未授权 D 句柄⇒拒（原静默续 D）；G3 歧义⇒确定性拒；正例（续 C 自己句柄）仍成 | `test_task_continuation_ownership_139.py` **4 passed**；delegation+subagents+rule_liveness_086+138+141+136+harness_round_086 广扫 **43 passed**（既有 family/unknown 续接用例全绿）；**Worker 工件不在**。反例**已树内实测**：中和歧义+归属两判据⇒恰"未授权/歧义"门红、跨家族/正例仍绿 | 0 | 本提交 |
+
+**同片串行**：139 单独提交（未与 138/140/141 混提）。`132` 亚型：授权名单（名册）与续接归属判定**曾是两份事实**，现归一。剩 137（stage1 已落）／140（usage 汇总到父轮）。
