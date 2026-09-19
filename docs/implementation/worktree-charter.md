@@ -19,6 +19,12 @@
   **`scripts/server-round1/**`（门脚本与生产链门的唯一 owner＝A 树，`QA-004`）**——本树**只读引用**；
   确实需要改某个门脚本 ⇒ **交回**，由调度者在那张单里开**一次性例外**（先例：`108` 的 `234fa08` 把该路径写进它的 `write_paths`）。
   依据是实测：两棵后端树各带一份 15 门脚本、**md5 逐个 15/15 逐字相同**（`docs/qa/dedup-ledger.md` D-001）⇒ 两份真相、改判据即静默分叉。
+- **已开的一次性例外（ops，2026-09-19 第 110 轮）**：单 **`116`**（`wire-500-fork-parity`）允许写
+  `src/agent_box/server/wire/handlers.py` 里**两个 `WireError(` 调用点**（`:1196` artifact store、`:1244` usage aggregator）＋ 把守卫测试
+  `tests/server/test_wire_error_family_101.py` 带进本树。**理由（实测）**：本树这两处把内部码当 family 传 ⇒ 裸 HTTP 500（live 2/2），
+  而正确的形态只存在于 A 树（`bca77821` `:1238`/`:1297`）、守卫测试也只在 A 树 ⇒ 本树套件**永远不会红**（`D-002`/`D-005`）；
+  且 `R-0035` 合并冻结 ⇒ "等合并带过来"不是可判定谓词。**例外只覆盖上述三处**：`wire/errors.py` 与 `wire/**` 其它内容**仍在禁写面**（闭合由 A 树的 `115` 负责）；
+  这不是边界迁移，`115` 收口后 A 树仍是 `wire/**` 的唯一 owner。
 - **共享文件必须串行**：`src/agent_box/server/model_configs/**` 与 `server/bootstrap/runtime.py` 的描述符部分（**这条面仍有效**：同写才要串行）。
   ~~A 的 104/105 与 B 的 092/096 不得同时进行；按公告点名串行（先 A 的 104/105，再 B 的 092）~~
   ⇒ **该串行理由已过期（`R-0051 ①`，2026-09-19）**：`104` 已 `PROBE_SSRF_HARDENING_DONE`、`105` 已 `HELLO_HARNESSES_DONE` 且重锁完成
