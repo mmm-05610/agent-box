@@ -8,7 +8,7 @@ import threading
 from typing import Iterator
 
 
-PRODUCT_SCHEMA_VERSION = 19
+PRODUCT_SCHEMA_VERSION = 20
 
 
 class FutureSchemaError(RuntimeError):
@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS server_provider_models (
     id TEXT PRIMARY KEY,
     version INTEGER NOT NULL DEFAULT 1,
     display_name TEXT NOT NULL,
-    harness_type TEXT NOT NULL,
+    harness_type TEXT,
     provider_type TEXT NOT NULL,
     credential_id TEXT REFERENCES server_credentials(id),
     config_object_digest TEXT NOT NULL,
@@ -329,6 +329,62 @@ def _migrate_18_to_19(conn: sqlite3.Connection) -> None:
     which is the honest absence, not a fabricated one.
     """
     _add_columns(conn, "server_queue_items", {"pause_reason": "TEXT"})
+
+
+def _migrate_19_to_20(conn: sqlite3.Connection) -> None:
+    """Order 092 stage 2: a provider record may be harness-neutral (shared).
+
+    `harness_type` goes from NOT NULL to nullable so one upstream can be
+    referenced by any declaration-compatible harness (NULL = shared). SQLite
+    cannot drop a column constraint in place, so the table is rebuilt. The copy
+    names every column explicitly (not `SELECT *`) so it never depends on the old
+    column order. Forward-only: a row that has become shared (NULL) cannot be
+    re-promoted to the old NOT NULL invariant without inventing a harness for it,
+    so "rollback" means "stay at 19, where no NULL row may exist" - documented,
+    not executed, and safe because no NULL row exists until a shared record is
+    first created. An existing tree whose column is already nullable is skipped
+    (idempotent across a re-initialize).
+    """
+    if not _has_table(conn, "server_provider_models"):
+        return
+    column = next((row for row in conn.execute(
+        "PRAGMA table_info(server_provider_models)").fetchall()
+        if row[1] == "harness_type"), None)
+    if column is None or column[3] == 0:  # already nullable - nothing to rebuild
+        return
+    conn.executescript(
+        """
+        PRAGMA foreign_keys = off;
+        CREATE TABLE server_provider_models_v20 (
+            id TEXT PRIMARY KEY,
+            version INTEGER NOT NULL DEFAULT 1,
+            display_name TEXT NOT NULL,
+            harness_type TEXT,
+            provider_type TEXT NOT NULL,
+            credential_id TEXT REFERENCES server_credentials(id),
+            config_object_digest TEXT NOT NULL,
+            models_object_digest TEXT NOT NULL,
+            base_url TEXT,
+            auth_style TEXT,
+            wire_api TEXT,
+            fields_source TEXT,
+            archived_at TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        INSERT INTO server_provider_models_v20 (
+            id, version, display_name, harness_type, provider_type, credential_id,
+            config_object_digest, models_object_digest, base_url, auth_style,
+            wire_api, fields_source, archived_at, created_at, updated_at)
+        SELECT id, version, display_name, harness_type, provider_type, credential_id,
+            config_object_digest, models_object_digest, base_url, auth_style,
+            wire_api, fields_source, archived_at, created_at, updated_at
+        FROM server_provider_models;
+        DROP TABLE server_provider_models;
+        ALTER TABLE server_provider_models_v20 RENAME TO server_provider_models;
+        PRAGMA foreign_keys = on;
+        """
+    )
 
 
 def _migrate_16_to_17(conn: sqlite3.Connection) -> None:
@@ -676,6 +732,8 @@ class Database:
                 _migrate_17_to_18(conn)
             if current in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18):
                 _migrate_18_to_19(conn)
+            if current in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19):
+                _migrate_19_to_20(conn)
             conn.executescript(_SCHEMA)
             conn.execute(
                 "INSERT OR IGNORE INTO agentbox_product_schema(singleton, version, applied_at) "

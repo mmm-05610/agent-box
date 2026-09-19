@@ -109,7 +109,10 @@ class ProviderModelService:
         for assignment in values:
             for reference in _model_references(assignment.get("value")):
                 row = self.records.get(reference["providerId"])
-                if row["archived_at"] is not None or row["harness_type"] != harness:
+                # A shared record (harness_type NULL) may be referenced by any
+                # harness (092); a bound record still refuses the wrong harness.
+                if row["archived_at"] is not None or (
+                        row["harness_type"] is not None and row["harness_type"] != harness):
                     raise ServerError(
                         "PROFILE_CONFIGURATION_INVALID",
                         "Provider/Model reference is archived or for a different Harness", status=422,
@@ -141,7 +144,8 @@ class ProviderModelService:
                 "PROFILE_CONFIGURATION_INVALID", "Provider/Model reference is invalid", status=422,
             )
         row = self.records.get(provider_id)
-        if row["archived_at"] is not None or row["harness_type"] != harness:
+        if row["archived_at"] is not None or (
+                row["harness_type"] is not None and row["harness_type"] != harness):
             raise ServerError(
                 "PROFILE_CONFIGURATION_INVALID",
                 "Provider/Model reference is archived or for a different Harness", status=422,
@@ -212,12 +216,19 @@ class ProviderModelService:
 
     def _validate(self, body: Mapping[str, Any], *, creating: bool) -> None:
         harness = body["harness"]
-        if harness not in self.harnesses:
-            raise unavailable("HARNESS_UNAVAILABLE", "Requested Harness is not configured")
+        # Order 092 stage 2: a shared (harness-neutral) upstream record carries no
+        # harness. It may be referenced by any declaration-compatible harness; its
+        # credential kind is validated against the *consuming* harness at freeze,
+        # not here (there is no single descriptor to check against). A bound record
+        # (harness set) still must name a configured harness, exactly as before.
+        descriptor = None
+        if harness is not None:
+            if harness not in self.harnesses:
+                raise unavailable("HARNESS_UNAVAILABLE", "Requested Harness is not configured")
+            descriptor = self.harnesses.get(harness)
         reject_sensitive_keys(body["configuration"])
-        descriptor = self.harnesses.get(harness)
         credential_id = body.get("credentialId")
-        if credential_id is not None:
+        if credential_id is not None and descriptor is not None:
             if descriptor.credential_kind is None:
                 raise ServerError(
                     "PROFILE_CONFIGURATION_INVALID", "Harness does not accept credentials", status=422,

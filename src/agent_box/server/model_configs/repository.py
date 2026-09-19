@@ -33,7 +33,7 @@ class ProviderModelRecords:
 
     def create(
         self, *, key: str, request_digest: str, display_name: str,
-        harness_type: str, provider_type: str, credential_id: str | None,
+        harness_type: str | None, provider_type: str, credential_id: str | None,
         config_digest: str, models_digest: str,
         base_url: str | None = None, auth_style: str | None = None,
         wire_api: str | None = None, fields_source: str | None = None,
