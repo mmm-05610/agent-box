@@ -750,6 +750,7 @@ class SessionRecords:
         native_platform: str | None = None, home_locator: str | None = None,
         usage: dict[str, Any] | None = None, usage_source: str | None = None,
         change_set_object_digest: str | None = None,
+        terminal_reason: str | None = None,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         with self.database.transaction() as conn:
             row = conn.execute("SELECT * FROM server_turns WHERE id=?", (turn_id,)).fetchone()
@@ -774,6 +775,16 @@ class SessionRecords:
             if change_set_object_digest:
                 change_set_column = ",change_set_object_digest=?"
                 change_set_values = [change_set_object_digest]
+            # Order 134 (122 consumer side): a harness completion may carry a
+            # machine-readable stop reason (e.g. max_tokens). When present and
+            # not a clean end_turn we persist it in terminal_reason so the wire
+            # projection's `reason` surfaces truncation. Absent -> we do not add
+            # the column at all, so the UPDATE is byte-identical to before.
+            terminal_column = ""
+            terminal_values: list[Any] = []
+            if terminal_reason is not None:
+                terminal_column = ",terminal_reason=?"
+                terminal_values = [terminal_reason]
             if usage:
                 usage_columns = (",usage_input_tokens=?,usage_output_tokens=?,"
                                  "usage_total_tokens=?,usage_source=?")
@@ -783,8 +794,9 @@ class SessionRecords:
                 ]
             conn.execute(
                 "UPDATE server_turns SET state='completed',capture_state='captured',cleanup_state='pending',result_object_digest=?,updated_at=?"
-                + usage_columns + change_set_column + " WHERE id=?",
-                [result_object_digest, timestamp, *usage_values, *change_set_values, turn_id],
+                + usage_columns + change_set_column + terminal_column + " WHERE id=?",
+                [result_object_digest, timestamp, *usage_values, *change_set_values,
+                 *terminal_values, turn_id],
             )
             latest_usage = None
             if usage:

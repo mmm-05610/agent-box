@@ -576,6 +576,7 @@ class SidecarExecutionBackend:
                 native_platform=audit["nativePlatform"], home_locator=audit["homeLocator"],
                 usage=usage, usage_source=usage_source,
                 change_set_object_digest=change_set_digest,
+                terminal_reason=_terminal_reason_from_result(run.result),
             )
             next_execution_id = completed.get("next_execution_id")
             self.work_service.complete_work(run.work_id, "Turn completed through Harness sidecar")
@@ -970,3 +971,22 @@ def _safe_code(exc: BaseException) -> str:
     logging.getLogger(__name__).error(
         "execution failed without a typed code", exc_info=exc)
     return "EXECUTION_FAILED"
+
+
+#: ACP's machine-readable stop reasons (an existing vocabulary, not invented).
+_CLEAN_STOP_REASONS = frozenset({"end_turn", "stop", "complete", ""})
+
+
+def _terminal_reason_from_result(result) -> str | None:
+    """Order 134 (122 consumer side): a harness completion may report *why* it
+    stopped. Return a persisted terminal_reason only when the result actually
+    says the turn stopped for a non-clean reason (e.g. ``max_tokens``); a
+    missing field or a clean end returns ``None`` so behavior is byte-identical
+    to before. We never invent a reason the Worker did not send.
+    """
+    if not isinstance(result, dict):
+        return None
+    stop = result.get("stopReason") or result.get("stop_reason")
+    if not isinstance(stop, str) or stop.strip().lower() in _CLEAN_STOP_REASONS:
+        return None
+    return stop

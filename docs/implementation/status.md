@@ -1334,3 +1334,14 @@ runtime 侧（存储/service/描述符/派生/冻结/逐家声明）已 DONE 且
 > ③ **保留号 005（注释 no-op）仍入 ledger**（钉死 AUD-B-009 警告的"复用编号⇒runner 静默跳过新 schema"这个真坑）；
 > ④ 结构比较器对 NOT NULL 漂移敏感（反例见证，门非恒真）。
 > 产品侧（合成种子如实改定性 + 真实结构门）+ Work Core 等价门**两半齐** ⇒ 终态 **`MIGRATION_TEST_IS_NOT_DECORATIVE_DONE`**。§Spend：0 真调用。
+
+## 工单 134 — 截断可见·消费侧（122 交回剩余；2026-09-19，执行者·runtime 线）
+
+> 终态 **`TERMINAL_REASON_CONSUMER_DONE`**。消费侧在本树写面（execution/sessions）做全；**生产侧 `stopReason` 字段属 Worker 合同变更（审批队列），非本单**（134 §明确不做）。
+> 一旦生产侧落地，`122` 的"可见"**即刻成立**（下游 `wire/projection.py:173 reason=terminal_reason or error_code` 本就通了）。§Spend：0 真调用。
+
+| 单 | 阶段 | 门 | 回归 | 真实模型 | 提交 |
+| --- | --- | --- | --- | --- | --- |
+| 134 | 全（消费侧） | G1 合成 `stopReason:"max_tokens"`⇒`complete_turn` 写 `server_turns.terminal_reason`（列已存在）；G2 **缺席/`end_turn`/畸形⇒`None`⇒UPDATE 逐字不含该列**（与今天一致，不凭空造信息 R-0032⑤）；helper `_terminal_reason_from_result` 只认非干净停因（`max_tokens/refusal/max_turn_requests`），既有 ACP 词表不新造；Outcome 不改枚举（截断经 terminal_reason 可区分，wire projection 已透出） | `test_terminal_reason_consumer_134.py` **4 passed**（含 absent-safety 与 max_tokens 两反例）；sessions/turn 广扫 **187 passed**（complete_turn 热路无回退，仅既有 env 红 production_lease）；**Worker 工件不在** | 0 | 本提交 |
+
+**与 122 的关系**：122 判定"执行段手里无此事实"属实（生产侧未出字段）；134 把**消费侧**备妥（读到就用、没有就不写）。生产侧＝`protocols/worker/v1.schema.json`+`workers/**` 出 `stopReason`＝审批合同单（交 I）。二者正交，122 维持其 PARTIAL、由生产侧单收口。
