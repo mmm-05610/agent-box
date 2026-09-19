@@ -281,6 +281,12 @@ def main(argv: list[str] | None = None, *, face_factory=None) -> int:
     parser.add_argument("--teardown", action="store_true")
     options = parser.parse_args(argv)
 
+    # The report can legitimately carry a non-ASCII path (a key file under a user profile with
+    # a non-Latin name). Windows consoles pick a legacy code page, and a UnicodeEncodeError in
+    # the final print would throw away a run that actually succeeded.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="backslashreplace")
+
     options.force_mode_guard = {"auto": None, "enforce": True,
                                 "skip": False}[options.mode_guard]
     if options.explain_modes is not None:
