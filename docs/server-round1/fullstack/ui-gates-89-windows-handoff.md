@@ -99,6 +99,16 @@ QA 一手跑到 §3 时撞上：`R-0056` 要求独立数据根 ⇒ 全新根里 
 
 ```powershell
 # Run on the Windows side (the control plane, R-0014). Key file: 0600, outside the data root.
+# STEP 0 - read-only preflight: 4 calls, writes nothing, and answers "can this leg run here?"
+& "$env:LOCALAPPDATA\AgentBox\r4c9-env\Scripts\python.exe" `
+  "\\wsl.localhost\Ubuntu\home\maoqh\projects\agent-box-env-provider\scripts\server-round1\ui_gates_89_seed_profile.py" `
+  --base-url http://127.0.0.1:18820 `
+  --token-file "$env:LOCALAPPDATA\AgentBox\89-gate-qa-data\secrets\http-token" `
+  --key-file  C:\secrets\deepseek-key.txt --preflight
+# verdict CLEAR + wouldSeed.needed=true  ==> the root is empty (QA's items=0) and seeding is the next step.
+# BLOCKED prints the blocker names: SERVER_UNREACHABLE / TOKEN_REJECTED / KEY_FILE_MISSING /
+# PROFILES_READ_REFUSED:<code>. Exit 3 on any blocker, so it is safe to gate on.
+# STEP 1 - seed:
 & "$env:LOCALAPPDATA\AgentBox\r4c9-env\Scripts\python.exe" `
   "\\wsl.localhost\Ubuntu\home\maoqh\projects\agent-box-env-provider\scripts\server-round1\ui_gates_89_seed_profile.py" `
   --base-url http://127.0.0.1:18820 `

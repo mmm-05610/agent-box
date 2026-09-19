@@ -2171,3 +2171,23 @@ CPython 会把 `OSError(13, …)` 自动提升成 `PermissionError`，**错的�
 把一次**其实成功**的 seed 判成失败。⇒ `main()` 起手把 stdout 定成 `utf-8 ＋ backslashreplace`
 （`--self-test` 19/19、shape check 10/10 复跑均不回归）。三处共同形状：**门在我们的机器上绿，不等于在跑的那台机器上能跑**——
 凡是"交给别人跑的腿"，平台语义（文件系统位、代理、代码页）都要一手量过，别按本机的默认想象。
+
+## 把三处平台坑收成一个 `--preflight`（§8b 的"能做的"；2026-09-20 05:0x）
+
+上一轮三处缺陷（模式位／代理／代码页）有一个共同点：**都是"跑一次才知道"**。而 QA 那一腿最贵的不是失败，是
+**先把 Windows 侧服务起起来、再发现独立根里 `items=0`**。⇒ 把"这条腿在这台机器上到底能不能跑"变成**开跑前四次读**：
+
+- `ui_gates_89_seed_profile.py --preflight`：`GET /live` ＋ `GET /api/v1/credentials`（**只有 id 与 kind**，那条面自己就不给 locator）
+  ＋ `profiles.list` ＋ `providerModels.list` ⇒ 一个 JSON（`preflight` 事实 ＋ `blockers` ＋ `verdict`），
+  任何 blocker ⇒ **退出码 3**，所以它可以被门用而不只是被人读。blocker 名：`SERVER_UNREACHABLE` /
+  `TOKEN_REJECTED` / `KEY_FILE_MISSING` / `PROFILES_READ_REFUSED:<码>` / `NOTHING_READY_AND_NO_KEY_FILE`。
+  事实里含 **`wouldSeed.needed`**：根里已有 `ready` ⇒ 明说"不必 seed"（这正是 QA 该在 0 秒拿到的那条事实）。
+- 它**不写任何东西**，并且这一点是被断言的、不是被声称的：门数出**调用序列恰好是那四次读**（`preflight_wrote_nothing_it_was_not_asked_to_write`）。
+- `--self-test` **19 → 24**（新增 5 条：只读序列／空根说"要 seed"／服务没在听 ⇒ BLOCKED／token 被拒 ⇒ 点名 BLOCKED／
+  根里已有 ready ⇒ 说"不用 seed"）；`ui_gates_89_seed_shape_check.py` **10 → 12**（真处理栈上先 preflight 再 seed：
+  **空根读出 `total:0` ＋ `needed:true`**，seed 之后 `ready:1`）——QA 的 `items=0` 从此是一条**可复算的门观测**，不是一次旅行。
+- 跑本 §3b 加了 STEP 0（先跑 `--preflight`，再决定要不要 seed），并保持"抄进 `.ps1` 的行纯 ASCII"。
+
+**一处自己踩的坑如实记**：shape check 里我先用**固定偏移** `calls[4:]` 去切 seed 的调用序列，preflight 一变就多切了两条，
+`every_face_the_seed_uses_is_a_public_one` 当场红成"只看到一次 profiles.list"。红得对——那条断言当时在考**算术**而不是考协议；
+改成"从日志里第一处写调用起切"（`first_write`），并在注释里写明为什么不许用偏移量。**`--self-test` 24/24、shape check 12/12。**

@@ -48,6 +48,14 @@ class TestClientFace:
     def _headers(self):
         return {"Authorization": f"Bearer {self.token}"}
 
+    def get(self, path: str):
+        self.calls.append((("get", path),))
+        response = self.client.get(path, headers=self._headers)
+        try:
+            return response.status_code, response.json()
+        except Exception:  # noqa: BLE001
+            return response.status_code, {"unparsable": response.text[:200]}
+
     def rest(self, path: str, body: dict, idempotency_key: str):
         self.calls.append((("rest", path), body, idempotency_key))
         response = self.client.post(path, json=body,
@@ -152,9 +160,37 @@ def main() -> int:
             argv = ["--base-url", "http://127.0.0.1:18820", "--token-file", str(token_file),
                     "--key-file", str(key_file), "--label", "seed89-shape",
                     "--harness", "alpha", "--state-file", str(state_file)]
+
+            # -- preflight on the fresh root: this is QA's `items=0`, caught before a run
+            #    instead of after standing up a Server on the far side of the planet.
+            code_before, pre_text = _call(argv[:4] + ["--preflight", "--harness", "alpha",
+                                                      "--key-file", str(key_file)], factory)
+            pre = json.loads(pre_text) if pre_text.strip().startswith("{") else {}
+            facts_before = pre.get("preflight", {})
+            check("preflight_sees_an_empty_root_before_anything_is_sent",
+                  code_before == 0 and facts_before.get("profiles", {}).get("total") == 0
+                  and facts_before.get("wouldSeed") == {"needed": True, "harnesses": ["alpha"]}
+                  and pre.get("verdict") == "CLEAR",
+                  {"exit": code_before, "verdict": pre.get("verdict"),
+                   "profiles": facts_before.get("profiles"),
+                   "wouldSeed": facts_before.get("wouldSeed")})
+            check("preflight_wrote_nothing_it_was_not_asked_to_write",
+                  [entry[0] for entry in holder["face"].calls]
+                  == [("get", "/live"), ("get", "/api/v1/credentials"),
+                      ("wire", "profiles.list"), ("wire", "providerModels.list")],
+                  {"calls": [entry[0] for entry in holder["face"].calls]})
+
             code, seed_text = _call(argv, factory)
             calls = holder["face"].calls
-            methods = [key for key, *_ in calls]
+            # The log also holds the four preflight reads above; the sequence assertion is
+            # about what the *seed* did, so it looks at the tail from here on.
+            # Slice from the seed's first write rather than counting reads: the preflight
+            # above legitimately grows its own read list, and a fixed offset would make this
+            # assertion about arithmetic instead of about the protocol.
+            first_write = next(index for index, entry in enumerate(calls)
+                               if entry[0] == ("rest", "/api/v1/credentials"))
+            seed_calls = calls[first_write:]
+            methods = [key for key, *_ in seed_calls]
             check("seed_exit_zero_on_the_real_handlers", code == 0, {"exit": code})
             check("every_face_the_seed_uses_is_a_public_one",
                   methods == [("rest", "/api/v1/credentials"),

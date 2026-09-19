@@ -72,6 +72,18 @@ class Face:
     def rest(self, path: str, body: dict, idempotency_key: str):
         return self._send(f"{self.base_url}{path}", body, idempotency_key)
 
+    def get(self, path: str):
+        request = urllib.request.Request(f"{self.base_url}{path}",
+                                         headers={"Authorization": f"Bearer {self.token}"},
+                                         method="GET")
+        try:
+            with self._opener.open(request, timeout=30) as response:
+                return response.status, json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            return exc.code, {"unparsable": exc.read().decode("utf-8", "replace")[:200]}
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            return 0, {"unreachable": type(exc).__name__}
+
     def wire(self, method: str, params: dict):
         # The envelope `id` is not a parameter: `profiles.list`'s accepted shape is exactly
         # `{"includeArchived"}` (handlers.py:47), so read faces send no requestId at all.
@@ -279,6 +291,9 @@ def main(argv: list[str] | None = None, *, face_factory=None) -> int:
                         help="print how the mode guard classifies PATH and exit")
     parser.add_argument("--require-ready", action="store_true")
     parser.add_argument("--teardown", action="store_true")
+    parser.add_argument("--preflight", action="store_true",
+                        help="read-only: report what would block this leg on this machine, "
+                             "without creating anything")
     options = parser.parse_args(argv)
 
     # The report can legitimately carry a non-ASCII path (a key file under a user profile with
@@ -308,7 +323,11 @@ def main(argv: list[str] | None = None, *, face_factory=None) -> int:
 
     token = Path(options.token_file).read_text(encoding="utf-8").strip()
     face = make_face(options.base_url, token)
-    if options.teardown:
+    blockers: list[str] = []
+    if options.preflight:
+        options.harness = options.harness or ["pi", "codex"]
+        report, blockers = preflight(face, options)
+    elif options.teardown:
         if options.state_file is None or not options.state_file.is_file():
             print(json.dumps({"refused": "TEARDOWN_NEEDS_STATE_FILE"}))
             return 3
@@ -331,11 +350,77 @@ def main(argv: list[str] | None = None, *, face_factory=None) -> int:
             return 3
     print(lines)
 
+    if blockers:
+        return 3
     states = {harness: (value or {}).get("state")
               for harness, value in (report.get("sendability") or {}).items()}
     if options.require_ready and any(state != "ready" for state in states.values()):
         return 3
     return 0
+
+
+def preflight(face: Face, options) -> tuple[dict, list[str]]:
+    """Answer "can this machine run this leg?" without writing a single row.
+
+    QA's run found `items=0` only after standing up a Windows Server; the three platform
+    surprises this script now handles (mode bits, proxies, code page) all cost a *failed run*
+    to learn. Everything here is a GET or a read-face call, and the self-test asserts exactly
+    that - a "preflight" that creates a credential would be the thing it is meant to detect.
+    """
+    facts: dict = {}
+    blockers: list[str] = []
+
+    status, body = face.get("/live")
+    facts["live"] = {"status": status, "body": body if isinstance(body, dict) else None}
+    if status != 200:
+        blockers.append("SERVER_UNREACHABLE")
+
+    status, body = face.get("/api/v1/credentials")
+    if status == 200 and isinstance(body, dict):
+        rows = body.get("items") or []
+        facts["credentials"] = {"count": len(rows), "kinds": sorted({str(r.get("kind"))
+                                                                     for r in rows})}
+    else:
+        facts["credentials"] = {"status": status}
+        blockers.append("TOKEN_REJECTED" if status in (401, 403) else "CREDENTIAL_LIST_UNREADABLE")
+
+    status, body = face.wire("profiles.list", {"includeArchived": False})
+    if status >= 400 or "result" not in body:
+        code = ((body or {}).get("error") or {}).get("code", f"HTTP{status}")
+        blockers.append(f"PROFILES_READ_REFUSED:{_clean(face.token, code)}")
+        items = []
+    else:
+        items = (body.get("result") or {}).get("items") or []
+    ready = sorted(str(item.get("harness")) for item in items
+                   if (item.get("sendability") or {}).get("state") == "ready")
+    facts["profiles"] = {"total": len(items), "ready": len(ready), "readyHarnesses": ready}
+
+    status, body = face.wire("providerModels.list", {"includeArchived": False})
+    providers = ((body or {}).get("result") or {}).get("providerModels") \
+        or ((body or {}).get("result") or {}).get("items") or []
+    facts["providerModels"] = {"count": len(providers) if status < 400 else None,
+                               "status": status}
+
+    facts["platform"] = {"osName": os.name,
+                         "credentialStoreHint": ("auto-composed on nt" if os.name == "nt"
+                                                 else "absent unless injected - a POSIX "
+                                                      "`python -m agent_box.server` answers "
+                                                      "CREDENTIAL_STORE_UNAVAILABLE")}
+    if options.key_file:
+        key = Path(options.key_file)
+        trusted, reason = _unix_modes_trusted(key)
+        facts["keyFile"] = {"exists": key.is_file(), "modeGuard": f"{'enforced' if trusted else 'skipped'}:{reason}"}
+        if not key.is_file():
+            blockers.append("KEY_FILE_MISSING")
+    elif not ready:
+        blockers.append("NOTHING_READY_AND_NO_KEY_FILE")
+    if not ready and not blockers:
+        facts["wouldSeed"] = {"needed": True, "harnesses": options.harness or ["pi", "codex"]}
+    else:
+        facts["wouldSeed"] = {"needed": False}
+    return {"preflight": facts, "blockers": sorted(set(blockers)),
+            "verdict": "BLOCKED" if blockers else "CLEAR",
+            "wroteAnything": False}, sorted(set(blockers))
 
 
 def seed_report(facts: dict) -> dict:
@@ -380,6 +465,17 @@ class _StubFace:
     def _answer(self, key, status, body):
         self.calls.append((key, status, body))
         return status, body
+
+    def get(self, path: str):
+        override = self.answers.get(("get", path))
+        self.calls.append((("get", path),))
+        if override is not None:
+            return override
+        if path == "/live":
+            return 200, {"status": "alive"}
+        if path == "/api/v1/credentials":
+            return 200, {"items": [{"credentialId": "credential_stub0001", "kind": "api-key"}]}
+        return 200, {"items": []}
 
     def rest(self, path: str, body: dict, idempotency_key: str):
         override = self.answers.get(("rest", path))
@@ -723,6 +819,58 @@ def self_test() -> int:
         check("the_face_never_hands_a_request_to_an_environment_proxy",
               ours == {} and theirs.get("http") == "http://127.0.0.1:9",
               {"ours": ours, "defaultOpenerWouldUse": theirs.get("http")})
+
+        # -- preflight: it must answer the leg's questions without writing a single row --
+        clear = record(_StubFace)
+        code, text, _ = run(base + ["--preflight"], clear)
+        payload = _payload(text)
+        touched = [entry[0] for entry in clear.calls]
+        check("preflight_reads_only_and_names_the_reads",
+              code == 0 and payload.get("verdict") == "CLEAR"
+              and touched == [("get", "/live"), ("get", "/api/v1/credentials"),
+                              ("wire", "profiles.list"), ("wire", "providerModels.list")],
+              {"exit": code, "touched": touched, "verdict": payload.get("verdict")})
+        check("preflight_says_a_seed_is_still_needed",
+              payload.get("preflight", {}).get("wouldSeed") == {"needed": True,
+                                                               "harnesses": ["pi", "codex"]},
+              {"wouldSeed": payload.get("preflight", {}).get("wouldSeed")})
+
+        # Counter-example: a dead Server must be BLOCKED, not "CLEAR with empty facts".
+        down = record(_StubFace, answers={("get", "/live"): (0, {"unreachable": "URLError"})})
+        code, text, _ = run(base + ["--preflight"], down)
+        payload = _payload(text)
+        check("a_server_that_is_not_listening_blocks_the_leg",
+              code == 3 and payload.get("verdict") == "BLOCKED"
+              and "SERVER_UNREACHABLE" in payload.get("blockers", []),
+              {"exit": code, "blockers": payload.get("blockers")})
+
+        # Counter-example: a rejected bearer token is its own blocker (QA's leg died on
+        # "read the token from this root", so the answer must name it before any write).
+        denied = record(_StubFace, answers={("get", "/api/v1/credentials"): (401, {})})
+        code, text, _ = run(base + ["--preflight"], denied)
+        payload = _payload(text)
+        check("a_rejected_token_blocks_the_leg_by_name",
+              code == 3 and "TOKEN_REJECTED" in payload.get("blockers", []),
+              {"exit": code, "blockers": payload.get("blockers")})
+
+        # A root that already has a ready profile must say the seed is not needed - the
+        # exact fact whose absence cost QA a round trip.
+        class _Stocked(_StubFace):
+            def __init__(self, base_url, token, **kwargs):
+                super().__init__(base_url, token, **kwargs)
+                self.created = [{"id": "profile_existing", "version": 3,
+                                 "displayName": "existing", "harness": "pi"}]
+
+        stocked = record(_Stocked)
+        code, text, _ = run(base + ["--preflight"], stocked)
+        payload = _payload(text)
+        profile_facts = payload.get("preflight", {}).get("profiles", {})
+        check("an_already_ready_profile_says_no_seed_is_needed",
+              code == 0 and profile_facts.get("ready") == 1
+              and profile_facts.get("readyHarnesses") == ["pi"]
+              and payload.get("preflight", {}).get("wouldSeed") == {"needed": False},
+              {"exit": code, "profiles": profile_facts,
+               "wouldSeed": payload.get("preflight", {}).get("wouldSeed")})
 
     passed = [name for name, ok, _ in cases if ok]
     failed = [(name, detail) for name, ok, detail in cases if not ok]
