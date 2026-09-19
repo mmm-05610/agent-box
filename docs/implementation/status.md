@@ -1946,3 +1946,52 @@ HEAD 即检查点；`git status --short` 只剩本树自己的证据目录（`08
   `test_unavailable_capabilities_carry_a_reason`（`workspaces.open` 的 supported 随宿主能否起沙箱室而变）⇒
   **环境未齐不是回归**，带齐即绿。这是本夜第 **4** 条"计数必须声明环境"的一手（128 的 undo、118 的工件、119 的负载、本条的 PYTHONPATH），
   自报行由 118 的挂钩打印。真实模型调用 **0 / ¥0**。
+
+## 工单 147 — 资产面五处兜底 `except` 不再说谎＋漏路径，`profiles.list` 不再逐行重走模型解析（`AUD-B-037` ＋ 并入 `AUD-B-040`，2026-09-19 **19:0x–19:2x UTC**，执行者）
+
+**终态 `ASSET_SURFACE_EXCEPT_TYPED_DONE`**。证据 [asset-surface-refusals-147.md](../server-round1/asset-surface-refusals-147.md)，
+门 `tests/server/test_asset_surface_refusals_147.py`（**11 条**，全走真 wire）。
+
+- 前提一手复核**成立**（五处 = `grep -n "getattr(refusal"` 命中 10 行；⑤ 实测 `PermissionError` 的原文里带绝对路径），
+  并核到一处**工单措辞与合同不符**：Scope 写"其余异常一律 `UNAVAILABLE`／`INTERNAL`"，
+  而**锁定家族集里没有 `INTERNAL`**（`len(FAMILIES)==12`，101 的门钉着）⇒ 服务端故障取 `UNAVAILABLE`、**不新增家族**，
+  这条差异写进门里（同一条门同时断言 12 与 `"INTERNAL" not in FAMILIES`），要 `INTERNAL` 就是**合同变更＋重锁**，归调度者。
+- 五处合成一条路 `_asset_refusal(exc)`：**有域内码** ⇒ `family_for(code)` ＋ **文案逐字不变** ＋ 新增 `details.internalCode`
+  （为此在 `errors.py::_BY_CODE` 登记四个 `CATALOG_*` → `INVALID_REQUEST`，①–④ 的家族本来就没变，只是不再靠硬写）；
+  **其余异常** ⇒ `UNAVAILABLE` ＋ `internalCode=异常类型名`，**原文只进服务端日志**（与 `_safe_code` 同手法）。
+- 并入的 `AUD-B-040` 做完了：`_CallReader` **一次调用内**按 digest memo ＋ 模型查找从线性 `next` 换成按 provider 建一次索引；
+  **同一夹具两跑实测**：40 行 ⇒ `objects.read` **41 次 / 197,761 字节**；把三层 memo 打掉 ⇒ **80 次 / 7,678,390 字节**。
+  判据只判次数与字节，**计时不进任何门**。另有一条钉"memo 不跨调用"（第二个 reader 自己读一次 ⇒ 计数 2）与一条钉"memo 的字节 == 冷读字节"。
+- 反例是**真退回**：把改前那两行 f-string 装回 ⇒ 同一请求必须变回 `INVALID_REQUEST`、必须**含绝对路径**、必须**没有** `internalCode`
+  ——三条断言一起红才说明这条门量的是真东西；外加一条结构门（`getattr(refusal` 命中数必须 0、`raise _asset_refusal(...)` 必须 5）。
+- 与 123 并读（审阅者点名）：123 收**传输边界**、147 收 **wire 方法边界**，合起来才是"每个出站错误都带 JSON-RPC 体且不说谎"；
+  归批形制留给 132：**同一类故障在多处各拼一份 message＝五份真相**。
+- 计数：定向 **11 passed / 2.16s**；周边 `asset_hubs + 147 + 117 + 125 + 103` = **63 passed / 28.57s**
+  （那批资产面自己的消息断言**一字未改**仍绿＝G4 的旁证）；批末见下一行。
+- 批末：`tests/server -q` = **879 passed / 1 skipped / 0 failed in 321.31s**（`879 = 868 ＋ 147 的 11`）；
+  `tests/ -q` = **1179 passed / 1 skipped / 0 failed in 340.24s**
+  （对账：1179 − 1142（118 批末的根套件）＝ **37**；本批新增可归因的是 145 +7、125 +16、147 +11、119 净 +1 ＝ **+35**，
+  **余 2 条我没归因**——不改任何判定（两腿都 0 失败、`103` 的门逐行核对通过），但按本树口径把差额留在这里而不是编一个刚好凑数的解释）。
+  103 的生成账按 147 的证据重算：**367** 条证据行、单源观察名单 41 → **40**（`assets.syncCatalog` 等不再是单源）。**Worker 工件：在**（本单未用：门只走本地对象库与目录权限）。真实模型调用 **0 / ¥0**。
+
+## CHECKPOINT b2-5（118 ＋ 119 ＋ 145 ＋ 125 ＋ 147；2026-09-20 03:2x，执行者）
+
+- 本批收口**五张用户可见单**，每张一个 tag：
+  `checkpoint/b2-118`（`4282eb0`）· `b2-119`（`3be3d1a`）· `b2-145`（`7fea0c1`）· `b2-125`（`18eb41c`）· `b2-147`（本提交）。
+- **目录对账更新**（`R-0068` ①）：b2/b3 现 **30 张**；本批期间新投进来的是 `147`（一手：见其 dispatch 提交与时刻，写在上一行）；
+  仍未收口的只有三张，且**每一张的判据都一手核过**：
+  `124`（判据＝本树存在 `execution/protocols.py`，实测**不存在**）·
+  `132`（判据＝runtime 树 `status.md` 有 `130`/`131` 终态码，grep 实测**没有**）·
+  `089`（判据＝QA/人按 handoff 跑完 Windows 真机腿）。⇒ **队列不空但本树无"可立即开工"的单**；
+  下一轮按纪律先重读 `work-orders/**`，有新单/判据成立即开工。
+- §Spend 增量（本批五张）：**真实模型调用 0 / ¥0**；子代理 **0**；
+  机时：`tests/server` 全量 4 次（448.54 / 305.67 / 251.97 / 本轮）＋ `tests/` 全量 2 次（441.94 / 本轮）＋ 定向 20 余次；
+  拦截一次策略风险：想按 `QA-011` 原样在宿主起 8 个 CPU 燃烧进程复现假红，**被 Auto 分类器拦下**
+  ⇒ 换成不依赖负载的确定性演示（见 119 报告 §3），并把原命令作为可复算注释留在门里。
+- 本批**新登记的交回/候选**（全在 §待开单）：`storage/**` 的 wire_seq 历史回填 · `accounts/**` 的资产写与回执同事务 ·
+  `write_asset` 的 locator 命名时机（裁决） · `model_configs/**` 的 `_model_references` 把 `None` 拼成 `"None"` ·
+  证据后缀 `.log` 被 gitignore（归 `49` 那条线） · runtime 树要 118 的同一机制。
+- **时刻口径**：本批各行时间一律 **UTC**（`date -u`），而本树更早各行是本机 +8 ⇒ 跨条比对请以提交号为准，不要拿时间做因果。
+- 一条反复出现、值得 ops 记进形制的东西：本批**四次**"红/绿由环境决定"的现场——
+  128 的 `monkeypatch.undo()` 撤掉了 fixture 的替身 · 118 的工件缺席（exit 0）· 119 的墙钟判据 · 125 的缺插件 `PYTHONPATH`。
+  治法也已经同批落地：118 让**套件自己**打印环境事实（`WORKER_ARTIFACT=` / `VERDICT=`）。

@@ -91,6 +91,16 @@ _BY_CODE: Mapping[str, str] = {
     "SESSION_BUSY": "CONFLICT_REQUEST",
     "EVENT_CURSOR_AHEAD": "INVALID_REQUEST",
     "EVENT_CURSOR_EXPIRED": "INVALID_REQUEST",
+    # Order 147 (`AUD-B-037`): the asset surface's own domain codes. They were
+    # never registered, so the five `except Exception as refusal` copies hardcoded
+    # `INVALID_REQUEST` and folded the code into prose. Registering them lets the
+    # one shared path assign the family, while `details.internalCode` carries the
+    # precise code - the shape order 115 fixed. Client-side catalog problems stay
+    # `INVALID_REQUEST` (the reviewer's ①-④, whose wording must not drift).
+    "CATALOG_INVALID": "INVALID_REQUEST",
+    "CATALOG_SOURCE_MISSING": "INVALID_REQUEST",
+    "CATALOG_ORIGIN_MISSING": "INVALID_REQUEST",
+    "CATALOG_ENTRY_UNKNOWN": "INVALID_REQUEST",
 }
 
 

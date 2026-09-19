@@ -24,8 +24,8 @@ python3 scripts/server-round1/wire_drive_coverage.py --check     # 有缺口即�
 | 有真实 wire 驱动证据 | **64** |
 | 豁免 | **0** |
 | 无证据（差集） | **0** |
-| 证据行数合计 | 356（含 117/123/128/129 的新门；分布仍很偏）|
-| 只被**一个文件**驱动的方法 | **41** 个，列在下面当观察名单 |
+| 证据行数合计 | 367（含 117/123/128/129/145/125/147 的新门；分布仍很偏）|
+| 只被**一个文件**驱动的方法 | **40** 个，列在下面当观察名单 |
 
 ## 观察名单（单源证据：删掉那一个文件，该方法即成缺口）
 
@@ -44,7 +44,6 @@ python3 scripts/server-round1/wire_drive_coverage.py --check     # 有缺口即�
 * `assets.publishMcp` → `tests/server/test_asset_hubs.py`
 * `assets.publishPlugin` → `tests/server/test_asset_hubs.py`
 * `assets.publishSkill` → `tests/server/test_asset_hubs.py`
-* `assets.syncCatalog` → `tests/server/test_asset_hubs.py`
 * `assets.unbind` → `tests/server/test_asset_hubs.py`
 * `config.describe` → `tests/server/test_wire_v1.py`
 * `config.resolve` → `tests/server/test_wire_v1.py`
@@ -93,7 +92,7 @@ python3 scripts/server-round1/wire_drive_coverage.py --check     # 有缺口即�
 | `assets.publishMcp` | `tests/server/test_asset_hubs.py:479` — `mcp = call("assets.publishMcp", {` | 2 |
 | `assets.publishPlugin` | `tests/server/test_asset_hubs.py:793` — `response = client.post("/wire/v1/assets.publishPlugin", headers={` | 2 |
 | `assets.publishSkill` | `tests/server/test_asset_hubs.py:472` — `skill = call("assets.publishSkill", {` | 1 |
-| `assets.syncCatalog` | `tests/server/test_asset_hubs.py:532` — `catalog = call("assets.syncCatalog", {` | 2 |
+| `assets.syncCatalog` | `tests/server/test_asset_hubs.py:532` — `catalog = call("assets.syncCatalog", {` | 8 |
 | `assets.unbind` | `tests/server/test_asset_hubs.py:511` — `unbound = call("assets.unbind", {` | 1 |
 | `config.describe` | `tests/server/test_wire_v1.py:448` — `descriptor = api.ok("config.describe", {` | 5 |
 | `config.resolve` | `tests/server/test_wire_v1.py:587` — `resolved = api.ok("config.resolve", {` | 3 |
@@ -107,20 +106,20 @@ python3 scripts/server-round1/wire_drive_coverage.py --check     # 有缺口即�
 | `hooks.update` | `tests/server/test_hook_models.py:250` — `illegal = call("hooks.update", {` | 1 |
 | `profiles.archive` | `tests/server/test_wire_v1.py:561` — `archived_profile = api.ok("profiles.archive", {` | 1 |
 | `profiles.clone` | `tests/server/test_profile_permissions.py:345` — `cloned = client.post("/wire/v1/profiles.clone", headers={` | 6 |
-| `profiles.create` | `tests/server/test_harness_sidecar.py:1183` — `profile = _wire_post(client, runtime.token, "profiles.create", {` | 8 |
+| `profiles.create` | `tests/server/test_asset_surface_refusals_147.py:203` — `profile = api.ok("profiles.create", {` | 9 |
 | `profiles.grantSubagent` | `tests/server/test_delegation.py:402` — `granted = call("profiles.grantSubagent", {` | 3 |
-| `profiles.list` | `tests/server/test_profiles_list_sendability_117.py:73` — `items = wire(client, headers, "profiles.list", {"includeArchived": Tru` | 10 |
+| `profiles.list` | `tests/server/test_asset_surface_refusals_147.py:220` — `listed = api.ok("profiles.list", {"includeArchived": False})` | 12 |
 | `profiles.memory` | `tests/server/test_profile_memory.py:93` — `before = call("profiles.memory", {` | 3 |
 | `profiles.revokeSubagent` | `tests/server/test_delegation.py:419` — `revoked = call("profiles.revokeSubagent", {` | 1 |
 | `profiles.setPermissions` | `tests/server/test_profile_permissions.py:430` — `written = client.post("/wire/v1/profiles.setPermissions", headers={` | 4 |
 | `profiles.subagentGrants` | `tests/server/test_delegation.py:399` — `empty = call("profiles.subagentGrants", {"profileId": parent["profile_` | 4 |
 | `profiles.update` | `tests/server/test_wire_v1.py:521` — `renamed = api.ok("profiles.update", {` | 2 |
-| `profiles.updateConfig` | `tests/server/test_harness_sidecar.py:1187` — `configured = _wire_post(client, runtime.token, "profiles.updateConfig"` | 5 |
+| `profiles.updateConfig` | `tests/server/test_asset_surface_refusals_147.py:206` — `api.ok("profiles.updateConfig", {` | 6 |
 | `providerArtifacts.install` | `tests/server/test_wire_error_family_101.py:146` — `response = post(client, headers, "providerArtifacts.install",` | 4 |
 | `providerArtifacts.list` | `tests/server/test_wire_error_family_101.py:78` — `artifacts = post(client, headers, "providerArtifacts.list",` | 11 |
 | `providerArtifacts.rollback` | `tests/server/test_wire_error_family_101.py:132` — `response = post(client, headers, "providerArtifacts.rollback",` | 2 |
 | `providerModels.archive` | `tests/server/test_wire_v1.py:554` — `referenced = api.err("providerModels.archive", {` | 2 |
-| `providerModels.create` | `tests/server/test_harness_sidecar.py:1175` — `provider = _wire_post(client, runtime.token, "providerModels.create", ` | 8 |
+| `providerModels.create` | `tests/server/test_asset_surface_refusals_147.py:196` — `created = api.ok("providerModels.create", {` | 9 |
 | `providerModels.list` | `tests/server/test_provenance_wire_098.py:87` — `listed = api.ok("providerModels.list", {"includeArchived": False})` | 2 |
 | `providerModels.probeConnection` | `tests/server/test_usage_parsing.py:700` — `checked = wire("providerModels.probeConnection", {` | 3 |
 | `providerModels.probeModels` | `tests/server/test_provenance_wire_098.py:144` — `status, body = api.call("providerModels.probeModels", {` | 2 |
