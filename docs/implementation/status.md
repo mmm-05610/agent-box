@@ -1174,3 +1174,24 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 | 单 | 阶段 | 门 | 回归 | 真实模型 | 提交 |
 | --- | --- | --- | --- | --- | --- |
 | 104 | 1 观测 | 两条绕过都在**公开入口**上实测（不只私有 helper）：① 字面私网被拒（`https://169.254.169.254`、`https://10.255.255.254` ⇒ `PROBE_ENDPOINT_BLOCKED`），**同一地址换成域名就通过**；把 `socket.getaddrinfo` 换 tripwire 数出来：`_validate_endpoint` 期间 **0 次解析**，`pull_models` 全程只有 **1 次且发生在连接层**，返回值没人看 ⇒ 拒绝与否取决于 URL 写法而不是目标是否内网；② 本机起两个回环假端点，A 回 302→B：`出站请求总数 = 2`、**二跳带 `Authorization: Bearer <同一假值>`**（合同说一次）。**工单没写的第三条（撞出来的）**：`getproxies()` 在本机非空 ⇒ 探针走默认 opener 就交给系统代理——`https` 腿代理只见 `CONNECT host:443`（看不到头），`http` 腿代理收到**绝对 URI ＋ 明文凭据**并且 `pull_models` 回 `ok/1 model ids`（Server 以为在探声明端点，实际整次对话由中转方完成）；按本机真实代理环境跑"302→`http://169.254.169.254`"：跳 1 直连被记录、**跳 2 离开本进程由代理代跑**（回 502——是那个外部进程不放行，不是我们的代码拒绝） | 无新增测试。既有面核对：唯一的 SSRF 门 `test_usage_parsing.py:392-404` **只喂字面 IP**（3 个都不是域名），全仓 tests/ 里 **302/redirect 零命中** ⇒ 与 098/099/101 同一形状：实现有门、门只走一条腿。出站清扫表：Python 侧带凭据出站**只有 `probe.py:94`** 一处；`workers/**` 零命中；JS 三处不是同一威胁模型（表在证据 §4） | **0 次 / ¥0**（凭据只用字面假值；目标只有 127.0.0.1 与一个从未被解析的 `.invalid`/`.example` 名字；tripwire 让"解析"这一步也不出本机） | 本提交（阶段 1） |
+
+## 工单 092 — Provider 记录中立化 + 协议词汇 + 兼容派生（R-0013 第 1 层；2026-09-19，执行者·runtime 线）
+
+> **runtime 半落地、wire 半路由 A/settings 重锁** ⇒ 终态 **`PROVIDER_REGISTRY_PARTIAL`**（与 097/098
+> 把 wire/schema 项交 102 同型）。§3「今晚队列」判据满足：**092 收口行可在此查到 ⇒ 093 / 094 / 096 开工谓词成立**
+> （093 接线输入——记录 `protocols`/`endpoints`、描述符 `wire_protocols`、冻结透传——已在本树内部面具备）。
+> 证据：[stages2-5 落地账](../server-round1/092-provider-registry-stages2-5.md) · [wire-review 092 节](../server-round1/wire-review.md)
+
+| 单 | 阶段 | 门 | 回归 | 真实模型 | 提交 |
+| --- | --- | --- | --- | --- | --- |
+| 092 | 2 中立化迁移 | schema 19→20：`_migrate_19_to_20` 表重建（显式列名、前向 only、幂等）；service 引用/冻结：NULL＝任意声明兼容家可引用、绑定家跨界仍 422；repository `harness_type:str\|None` | `test_provider_neutralization_092.py` **5 passed**（迁移保真/幂等/全新=20/共享引用+反例/仓储插入 NULL 行）| 0 真调用 | `b192a5f` |
+| 092 | 3 词汇+事实 | `provider_protocols.py`：四值 canonical + 方言归一（`chat/chat_completions/openai-completions→openai-chat`；`anthropic/messages/claude→anthropic-messages`；`generateContent/gemini→gemini-generate`）；未知⇒`PROTOCOL_UNKNOWN` 且记录不建；`endpoints` 键⊆protocols + 复用 `probe._validate_endpoint` 私网拒；`capabilities` 严格、缺席保持缺席、错形⇒`PROVIDER_MODEL_INVALID`；service create/update 落 config 对象、update 未带 protocols⇒保留；project 读回 + `protocolsDeclared` | `test_provider_protocols_092.py` **12 passed**；回归 `098+wire_v1+stage_a+092` **80 passed**（wire_api 存储语义未动，守 098 收口） | 0 真调用 | `826d079` |
+| 092 | 4 派生+冻结 | 描述符 `wire_protocols`（装配校验：键∈canonical、值非空、≤4）；`execution/protocols.py` canonical 单一真相；runtime 座位解析 `wireProtocols`⇒违规 `SIDECAR_DEPLOYMENT_INVALID`；list 读时派生 `compatibility[{harness,protocol}]`（两侧都声明才成对、稳定序、不落库、改声明即变）；冻结两侧声明且不相交⇒`PROTOCOL_INCOMPATIBLE`、任一侧未声明⇒不拦 | `test_provider_compatibility_092.py` **6 passed**（G4 派生+反例、未声明≠不可用、G5 拒+补协议后同引用通过、描述符非法拒）；回归 `harness_sidecar 92/wire_v1/subagent_086/stage_a` | 0 真调用 | `8e6fa44` |
+| 092 | 4b 逐家声明 | 六家可钉 `wireProtocols`（codex `{chat,responses}`、claude `{anthropic}`、pi `{openai-completions}`、hermes `{chat_completions}`、opencode/kilo `{@ai-sdk/openai-compatible}`）——方言值全取自 093 一手观测；dsh/qwen 省略＝未声明（钉死不猜） | 六模板 **79 passed** + harness_sidecar **92** + 092 compat/protocols **18**；装配无 `SIDECAR_DEPLOYMENT_INVALID` | 0 真调用 | `56af017` |
+| 092 | 5 门+账 | 全量 `tests/`+`plugins/harnesses/tests`＝**1211 passed / 20 failed / 24 skipped**（修复前）。**本单引入 1 红**（`wire_protocols` 注释品牌字面 `codex` 被 capability-path 中立门咬）⇒ 修（去品牌字面，`harness_capability_integration+server_capability_contract` **70 passed**，`1cc4e8c`）；余 **19 红全环境性/继承**：**Worker 工件不在**（chain_gate/opencode×11/pi×5/production_lease）+ `test_skill_projection`（claude native-home `.claude`，继承非本单）。**修复后本单引入回归 = 0**。`待 QA 复算` | 见左（**待 QA 复算**） | 0 真调用 | 本提交 |
+
+**终态 `PROVIDER_REGISTRY_PARTIAL`**。精确剩余（**都在本执行者「不碰 `server/wire/**`」边界外，路由 A/settings**）：
+① `handlers.py` `providerModels.create/update` 参数白名单（harness 可选 + `protocols[]`/`endpoints{}`/`models[].{protocols,capabilities}`）+ `wireApi` 枚举扩 canonical 四值 + 旧两值归一（连带 098 `wireApi="chat_completions"` 回声断言需同步）；
+② 生成 wire-v1 schema/工件 + P28 重生成 + 两仓重锁（G7 材料已备：见 wire-review 092 节）；
+③ **v2 多槽**（R-0013 追加，G8/G9/G10）：`config.describe` 逐槽 `model_slot` 投影 + profile 槽表引用形状（均在 `handlers.py::config_describe/_controls`＝A 线）＋描述符 `model_controls` 声明（本树可随后半补，不依赖 wire）。
+runtime 侧（存储/service/描述符/派生/冻结/逐家声明）已 DONE 且带反例。**§Spend：0 真调用 / ¥0**（全合成输入与本机回环，凭据 locator 未访问，临时根核清）。
