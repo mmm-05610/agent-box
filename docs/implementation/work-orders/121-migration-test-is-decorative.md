@@ -13,6 +13,7 @@ parallelism: "none"
 parallelism_reason: "单线程：一个测试文件的定性/改名 + 一处死分支处置，产物不可拆（拆了要两次提交同一文件）。"
 parallel_units: []
 serialize_with: ["092", "120"]
+revisions: [{"at": "f594b08", "what": "修订 v2：把 Work Core 的 SQL \u6587\u4ef6\u8fc1\u79fb\uff08migrations/001..009\uff09\u7684\u300c\u5347\u7ea7\u21d4\u5168\u65b0\u5b89\u88c5\u300d\u7b49\u4ef7\u95e8\u4e5f\u7eb3\u5165\uff08\u540c\u4e00\u683c\uff1b\u7a2e\u5b50\uff1dAUD-B-009 \u7684 W1\u2013W4 \u624b\u5de5\u5b9e\u9a8c\uff0c\u5ba1\u9605\u8005\u81ea\u8ff0\u5c5e\u5efa\u8bae\u3001\u672a\u7acb\u6848\uff09\u3002", "after_stage": 0, "ruling": "R-0054"}]
 ---
 
 # Work Order 121 — 唯一覆盖"升级"的那条测试是装饰（`AUD-B-006` confirmed/low）
@@ -38,6 +39,20 @@ serialize_with: ["092", "120"]
 | 该测试只断言 `version==18` 与两个索引名 | `tests/server/test_stage_a_server.py:279`（本树与 A 树都带这份文件） |
 | `v2..v17 → 18` **15/15 结构等价**（逐表列名/类型/NOT NULL/默认值/主键、外键集、索引名与 SQL，并与 greenfield 18 对表） | `AUD-B-007`（**`rejected`**，留档防重复报） |
 | `092` 正在被要求做"迁移测试"那一格 ⇒ 本单与它**同片**（`serialize_with: ["092"]`） | 092 单正文 + 审阅者建议 |
+
+
+## 修订 v2（2026-09-19 20:5x，ops；`at` = `f594b08`，**after_stage 0**）
+
+**新依据**：后端审阅者 `AUD-B-009` 从"未测外推"**升格为实测证伪**（它用**仓内真 SQL ＋ 真 `_run_migrations`** 跑了 W1–W4：全新安装 ledger＝`[1..9]`/16 表/9 索引；「004 形状 ＋ 真数据」升到 9 ⇒ 结构 DRIFT＝clean，
+`core_dispatches` 重建的状态映射与 SQL 文档逐字一致（`started→accepted`、`dispatching→legacy-unverifiable`、`inputs_digest` 保持 NULL 不拿旧摘要冒充）、旧行留在 `_pre_v006_archive`；按 006 注释重建的旧 005 形状升到 9 只多 4 个归档列；三种根重跑**全幂等**）。
+它在报告里明确：**"Work Core 侧也没有常设「升级⇔全新安装」门（本轮是手工跑）⇒ 与 `121` 同一格可合做"**。
+
+**修订内容（只加一格，不改原有 ①②③④）**：
+- 新增 Stage：把 Work Core SQL 文件迁移（`migrations/001..009`）的**等价门**做成**常设、可跑**的检查（种子＝审阅者 W1–W4 的可复算步骤：全新安装 vs 升级到 9 的**结构与 ledger 等价**、幂等性、归档表语义、`inputs_digest` 不许被旧摘要冒充）。
+- Gate 增加一行 **G5**：该等价门在**人为改坏一处升级后的列/迁移**时**必须红**。
+- **注意**：`005_resource_contract_inputs.sql` 只含注释，写明他们**自己踩过「复用编号 ⇒ runner 静默跳过新 schema」**并用预留编号堵死 ⇒ 该坑在产品侧仍无门（正是本单 ① 的对象）；Work Core 侧那条注释**不要删**，它是**一次真事故换来的**记录。
+
+**修订回执**：纳入后在下一个阶段提交信息或本树 status 记一行「已纳入 work order 121 修订 @<sha>」。
 
 ## Scope
 
