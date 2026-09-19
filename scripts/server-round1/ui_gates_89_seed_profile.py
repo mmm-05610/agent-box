@@ -107,6 +107,48 @@ def _result(face: Face, status: int, body: dict, step: str) -> dict:
     return body.get("result") or {}
 
 
+#: Filesystems that cannot express Unix mode bits, so `0o777` there says nothing about
+#: who can read the file (measured first-hand: a file under `/mnt/c/...` reports `0o777`).
+NO_UNIX_MODE_FSTYPES = ("drvfs", "9p", "cifs", "smb2", "ntfs", "exfat", "fat", "vfat", "fuse")
+
+
+def _unix_modes_trusted(path: Path, mounts: list[str] | None = None) -> tuple[bool, str]:
+    """Can this file's mode bits be trusted as an access-control fact at all?
+
+    The owner-only guard below exists to stop *this script* from creating or accepting a
+    world-readable key file on a normal Unix filesystem. On NTFS (and on WSL's `/mnt/c`,
+    which reports `0o777` for everything) every file looks loose, so enforcing the check
+    would refuse the only platform this leg can run on. Answer that honestly and say so in
+    the report - never skip silently.
+    """
+    if os.name != "posix":
+        return False, f"platform:{os.name}"
+    target = Path(path).resolve()
+    best_mount, best_type = "", "unknown"
+    if mounts is None:
+        try:
+            lines = Path("/proc/mounts").read_text("utf-8", "replace").splitlines()
+        except OSError:
+            return True, "no-proc-mounts"
+    else:
+        lines = mounts
+    for line in lines:
+        parts = line.split()
+        if len(parts) < 3:
+            continue
+        # `/proc/mounts` escapes spaces and tabs in the paths (`\040`, `\011`), so a mount
+        # point containing one must be unescaped before it can be compared with the target.
+        mount = (parts[1].replace("\\040", " ").replace("\\011", "\t")
+                 .replace("\\012", "\n").replace("\\134", "\\"))
+        kind = parts[2]
+        if (str(target) == mount or str(target).startswith(mount.rstrip("/") + "/")) \
+                and len(mount) > len(best_mount):
+            best_mount, best_type = mount, kind
+    if best_type in NO_UNIX_MODE_FSTYPES or best_type.startswith("fuse."):
+        return False, f"fstype:{best_type}@{best_mount}"
+    return True, f"fstype:{best_type}@{best_mount}"
+
+
 def seed(face: Face, options) -> dict:
     key_file = Path(options.key_file)
     facts = {"keyFile": {"path": str(key_file), "exists": key_file.is_file()}}
@@ -114,9 +156,12 @@ def seed(face: Face, options) -> dict:
         mode = key_file.stat().st_mode
         facts["keyFile"]["mode"] = stat.filemode(mode)
         facts["keyFile"]["size"] = key_file.stat().st_size
+        trusted, reason = _unix_modes_trusted(key_file)
+        enforce = options.force_mode_guard if options.force_mode_guard is not None else trusted
+        facts["keyFile"]["modeGuard"] = ("enforced" if enforce else "skipped") + f":{reason}"
         # Owner-only, because the Server's store refuses anything looser, and because
         # a world-readable key file is the one thing this leg must never create.
-        if mode & 0o077:
+        if enforce and mode & 0o077:
             raise SystemExit(f"{key_file} is readable beyond its owner ({stat.filemode(mode)}); "
                              "chmod 600 it first - this script never reads the value itself")
     else:
@@ -221,9 +266,29 @@ def main(argv: list[str] | None = None, *, face_factory=None) -> int:
     parser.add_argument("--forbid-port", action="append", default=["18790", "18810"],
                         help="R-0056 guard: the acceptance line's instances are not ours to seed")
     parser.add_argument("--state-file", type=Path)
+    parser.add_argument("--mode-guard", choices=("auto", "enforce", "skip"), default="auto",
+                        help="owner-only check on the key file: auto = enforce where the "
+                             "filesystem can express it, skip (loudly, in the report) where it "
+                             "cannot - NTFS and WSL's /mnt/c report 0o777 for every file")
+    parser.add_argument("--force-mode-guard", default=None, help=argparse.SUPPRESS)
+    parser.add_argument("--explain-modes", type=Path, metavar="PATH",
+                        help="print how the mode guard classifies PATH and exit")
     parser.add_argument("--require-ready", action="store_true")
     parser.add_argument("--teardown", action="store_true")
     options = parser.parse_args(argv)
+
+    options.force_mode_guard = {"auto": None, "enforce": True,
+                                "skip": False}[options.mode_guard]
+    if options.explain_modes is not None:
+        trusted, reason = _unix_modes_trusted(options.explain_modes)
+        mode = options.explain_modes.stat().st_mode if options.explain_modes.is_file() else None
+        print(json.dumps({"path": str(options.explain_modes),
+                          "mode": stat.filemode(mode) if mode is not None else None,
+                          "unixModesTrusted": trusted, "why": reason,
+                          "guardWouldApply": bool(trusted and mode is not None
+                                                 and stat.S_IMODE(mode) & 0o077)},
+                         ensure_ascii=False))
+        return 0
 
     port = (options.base_url.rsplit(":", 1)[-1] or "").split("/")[0]
     if port in {str(item).strip() for item in options.forbid_port}:
@@ -441,6 +506,40 @@ def self_test() -> int:
         check("world_readable_key_file_refused_before_any_call",
               code == 1 and "chmod 600" in text and not loose.calls,
               {"exit": code, "calls": len(loose.calls), "text": text[-160:]})
+
+        # -- the guard must know when mode bits mean nothing (measured here, not assumed):
+        # a file under WSL's /mnt/c reports 0o777, and NTFS reports 0o666 to native Python,
+        # so an unconditional check would refuse the only platform this leg can run on.
+        trusted, reason = _unix_modes_trusted(key_file)
+        synthetic_untrusted, synthetic_reason = _unix_modes_trusted(
+            Path("/mnt/c/Users/someone/key.txt"),
+            ["C:\\wsl.localhost\\share /mnt/c drvfs rw,relatime 0 0"])
+        # A mount point with an escaped space (`\040`) must still be found, or the guard
+        # would fall back to the shorter "/" and call an NTFS file trustworthy.
+        spaced_untrusted, spaced_reason = _unix_modes_trusted(
+            Path("/mnt/my dir/key.txt"),
+            ["C:\\share /mnt/my\\040dir drvfs rw 0 0", "/dev/sda / ext4 rw 0 0"])
+        check("mode_guard_knows_which_filesystems_cannot_express_it",
+              trusted and reason.startswith("fstype:") and len(reason) > len("fstype:")
+              and not synthetic_untrusted and synthetic_reason.startswith("fstype:drvfs")
+              and not spaced_untrusted and "fstype:drvfs@/mnt/my dir" == spaced_reason,
+              {"thisMachine": reason, "synthetic": synthetic_reason, "spaced": spaced_reason})
+
+        windows_like = record(_StubFace)
+        _, key_file_windows = _files(root / "winmount", key_mode=0o777)
+        code, text, _ = run(base + ["--key-file", str(key_file_windows), "--mode-guard", "skip"],
+                            windows_like)
+        skipped = json.loads(text).get("seeded", {}).get("keyFile", {}) if code == 0 else {}
+        check("skipped_guard_still_accepts_and_says_so_in_the_report",
+              code == 0 and str(skipped.get("modeGuard", "")).startswith("skipped:fstype:"),
+              {"exit": code, "keyFile": skipped})
+
+        forced = record(_StubFace)
+        code, text, _ = run(base + ["--key-file", str(key_file_loose), "--mode-guard", "enforce"],
+                            forced)
+        check("enforce_still_bites_when_auto_would_have_skipped",
+              code == 1 and "chmod 600" in text and not forced.calls,
+              {"exit": code, "calls": len(forced.calls), "text": text[-140:]})
 
         # -- happy path: the exact call sequence, and the binding really carried --
         good = record(_StubFace)

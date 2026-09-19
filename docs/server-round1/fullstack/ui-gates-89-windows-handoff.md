@@ -114,6 +114,12 @@ QA 一手跑到 §3 时撞上：`R-0056` 要求独立数据根 ⇒ 全新根里 
 #       --state-file "$env:LOCALAPPDATA\AgentBox\89-gate-qa\seed-state.json"
 ```
 
+> **key 文件的权限位**：脚本在**能表达 Unix 模式的文件系统**上要求 `0600`（否则在任何调用之前拒掉），
+> 在**表达不了的**地方（NTFS、WSL 的 `/mnt/c`：一个普通文件就报 `0o666`/`0o777`）**自动跳过并写进报告**
+> （`seeded.keyFile.modeGuard: "skipped:fstype:9p@/mnt/c"`）。这不是放宽——那一侧真正的边界是 **NTFS ACL**，
+> 位检查在那里既不可能也无意义。想知道脚本怎么判你那个路径：
+> `python3 … ui_gates_89_seed_profile.py --base-url http://x --token-file /dev/null --explain-modes <key 路径>`。
+
 三条一手事实（本树今天量出来的，别当传闻）：
 
 1. **凭据只能按路径导入，而且只有 Windows 侧的 Server 有可写的凭据面**：

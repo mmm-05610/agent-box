@@ -2123,3 +2123,30 @@ CPython 会把 `OSError(13, …)` 自动提升成 `PermissionError`，**错的�
 - **何时醒**：≤5 分钟一轮，醒来先重读 `work-orders/**` ＋ 复算上面三行判据；任一成立即按该单 §Stages 开火。
 - **一条不属于我这一腿的账**：主树 `handoffs.md` 的 `H-013` 行**未提交**（按 `R-0067 ②` 列分离与既有惯例，
   提出者落行、ops 提交并写裁决列，如 `H-011`/`H-012` 那样）。
+
+## seed 腿的一处自我更正（真跑之前抓到会让 QA 白跑一次的缺陷；2026-09-20 04:4x）
+
+写完 seed 脚本回看，抓到一条**会让 QA 那一腿必然失败**的缺陷：0600 守卫用的是 **POSIX 模式位**，
+而 Windows 那一侧**根本不存在**这种位——一手量过（本树今日内两次）：
+
+| 现场 | `st_mode` 的 mode 位 | 旧守卫会怎样 |
+| --- | --- | --- |
+| `/mnt/c/Users/maoqh/AppData/Local/Temp/<新文件>`（drvfs/9p） | `0o777`（`-rwxrwxrwx`） | **拒**（`0o777 & 0o077 ≠ 0`） |
+| ext4 `/tmp` 下 `chmod 644` 的文件 | `0o644` | 拒（这是守卫**本该**咬的形状） |
+| 原生 Windows Python 看 NTFS 文件（QA §1 那条 venv 路径） | 惯例 `0o666` | 同样会拒 |
+
+⇒ 守卫在**唯一能跑这条腿的平台**上把每一份合法 key 文件都判成违规。改法不是"删掉检查"，而是**先问这块文件系统能不能表达模式位**：
+`_unix_modes_trusted()` 读 `/proc/mounts`（含 ` ` 转义，不转义就会退化去匹配更短的 `/` 而误判"可信"）、认 `drvfs/9p/cifs/…/fuse.*` 为**不可信**，
+非 posix 平台直接不可信；不可信时**跳过并把理由写进报告**（`keyFile.modeGuard: "skipped:fstype:9p@/mnt/c"`），绝不静默；
+另给跑的人一条自查命令 `--explain-modes <路径>`，与 `--mode-guard enforce|auto|skip` 三态。
+
+**两道门各自补了什么，以及一条门自己被抓到的假绿**：
+- `--self-test` **15 → 18**（新增：文件系统分类**实测本机 ext4 判可信**＋合成表判 `drvfs` 不可信＋带 ` ` 的挂载点必须仍被找到；
+  `skip` 正例要求报告里**看得见** `skipped:fstype:`；`enforce` 在"auto 会跳过"的场合**照旧咬**——防"能跳过"变成"全局关掉"）。
+- 补的第一版分类用例**当场红了一次**：我加了 `mounts=` 形参却忘了在函数体里用它（真表照读）⇒ 用例把本机真表当成了合成表来判，
+  `fstype:9p@/mnt/c` 混过了 `drvfs` 断言。**红得对**：那正是"门在测自己写错的地方"。修实现＋把用例改成三条独立断言后 **18/18**。
+- 真挂载一手复算：`--explain-modes /mnt/c/…/seed89-explain.txt` ⇒ `{"mode":"-rwxrwxrwx","unixModesTrusted":false,"why":"fstype:9p@/mnt/c","guardWouldApply":false}`，
+  探针文件建完即删并核实（`removed: YES`）。`ui_gates_89_seed_shape_check.py` 复跑 **10/10** 不回归。
+- 跑本 §3b 加了一格"key 文件的权限位"：说清哪一侧靠位、哪一侧靠 **NTFS ACL**，并给出自查命令；顺带修好我在编辑中误删的那道代码围栏（已核 ` ``` ` 成对）。
+
+**真实模型调用 0 / ¥0；凭据内容 0 次读取**（本轮只读自己造的探针文件的 `stat`，值从未进任何进程）。
