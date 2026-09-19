@@ -1890,3 +1890,34 @@ HEAD 即检查点；`git status --short` 只剩本树自己的证据目录（`08
   自报行 `VERDICT=GREEN_DESIGN_SKIPS_ONLY`，**Worker 工件：在**）。真实模型调用 **0 / ¥0**。
 - 交回：`086` 真父轮门与 `080` 正例的 `wait_turn`/120 s 上限**同族仍吃墙钟**（§待开单已登记），
   119 的方法（"让它发生，读事件序"）可照搬，但那是别的门的写面。
+
+## 工单 145 — `workspace.connection` 定档 **2(b)**：保留 id、写明"预留、服务端暂不出"、门咬住"它不出"（`AUD-B-011` needs_validation，2026-09-19 17:5x，执行者）
+
+**终态 `WORKSPACE_CONNECTION_NO_PRODUCER_DONE`**。证据 [workspace-connection-reserved-145.md](../server-round1/workspace-connection-reserved-145.md)，
+门 `tests/server/test_workspace_connection_reserved_145.py`（7 条）。**`sessions/repository.py` 的那一行一次性例外未使用**（一个字没动）。
+
+- **三源对账（＋一处审阅者没点名的第四处）**：声明（`projection.py:19` 线名集合、`:38` 恒等映射）／编号（`sessions/repository.py:38`，128 的 14 项）／
+  产生（**零**：全树 `append_turn_event(` 调用点无一吃它；唯一按变量 kind 转发的桥 `_native_event` 的分支表也不含）／
+  投递（**管道活着**：`projection.py:342` 会投影，手写一行 ⇒ 真 `history.snapshot` 里确实出帧）。
+  第四处＝`storage/database.py:582` 历史回填的 `IN` 清单里也有它（不在本单写面，登记）。
+- **定档 2(b) 的依据不是"我选的"，是结构**：`server_session_events.session_id NOT NULL` ＋ `EventFrame.sessionId` 必填 ⇒
+  没有 Session 的阶段**没有任何流能承载这一帧**；"补生产者"要改 `execution/**`/`workspaces/**`（runtime 线），
+  "删名字"等于替合同层回答"这味儿走哪儿"——主树账上早已写"需前端在合同层裁决，后端不猜语义"，本单**引用**那条而不是新造一条。
+- 落地＝**只加事实**：`projection.py` 线名集合旁写清 reserved／no producer／为什么不能删／门在哪；
+  顺手改对同文件 docstring 里一句**已经错了的声明**（"the eight wire event kinds" 而集合早已更大 ⇒ 改为"这套由本模块拥有，这里不写数字"）——
+  097 那一族（手写计数与集合分叉）在**本单写面内**、零行为变化。
+- **反例不是"注释掉断言"**：手写一行证明"不出"不是因为投影器滤掉，而是因为**没人产生**
+  ⇒ 将来谁接上生产者，`test_a_real_session_never_shows_the_reserved_kind` 自己变红；另有两条源码级扫描
+  （调用点/桥的分支表里出现这个 kind 即红）。
+- **与 097/129/132 的关系点名给 132**：097＝漏报（64 法只写 27）· 145＝多报（表上有、永不出）· 129＝半报（必填却没人读）
+  ⇒ 同一形制三个面；132 要通用化的话，直接取本单的四条可跑断言做形制（**同一事实只允许一处记账，其余是引用＋比对**）。
+- 计数：定向 **7 passed / 1.37s**；周边回归 `145 + 128 + 105 + 103 + 098 + 117` = **58 passed / 18.80s**
+  ——第一次跑红的那条是 `103` 的生成账又被本单新门改过期（`history.snapshot` 26→28、`workspaces.open` 41→43、合计 352→356），重算后绿。
+  **Worker 工件：在**（本单未用）。真实模型调用 **0 / ¥0**。
+
+## 队列地图补两行（`R-0069` ③ 的四列形制）
+
+| 单 | 现态 | 卡在哪（精确） | 解卡入口 |
+| --- | --- | --- | --- |
+| `124` | **不开工**（17:4x 一手核完判据） | 本单 §Scope 要求 canonical 四值**引用** `execution/protocols.py`，而**该文件不在本树**：`ls src/agent_box/server/execution/` 无此文件；全树 grep `openai-responses / anthropic-messages / openai-completions / provider_protocols` **0 命中**（runtime 树有：`CANONICAL_PROTOCOLS = openai-chat / openai-responses / anthropic-messages / gemini-generate`）。⇒ 复制字面被 G3 禁止；把 092 的文件搬进本树不是执行者权限（不 merge 主干）。白名单那一半也吃这条腿：`protocols[]` 的值若不能对 canonical 校验，**接受＝静默吞掉信息**（违 `R-0032 ⑤`） | `依赖 092 合入本树`——可判定：`test -f src/agent_box/server/execution/protocols.py`。成立即开工（写面已够：`wire/handlers.py`＋`tests/**`＋`docs/**`） |
+| `125` | 判据待核（下一步） | 同族疑点：它的"取值来源"也写"引用单一真相（同 124）" | `自行`：先一手核 `config.describe` 的槽词汇是否已在本树（描述符 `model_controls` 缺席时按 145 的口径处理：能落地就落地、不能就按判据不开工并记此处） |

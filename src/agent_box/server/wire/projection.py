@@ -3,7 +3,13 @@
 Internal storage keeps the 37-era names (`turn`, `connection_state`, internal
 event kinds) so retained evidence stays meaningful. This module is the single
 place that translates them into the contract's vocabulary: `executionId`,
-`version`, `environment`, `connection`, and the eight wire event kinds.
+`version`, `environment`, `connection`, and the wire event kinds - a set this
+module owns, so no sentence here counts it. (This docstring used to claim "the
+eight wire event kinds" while the set below was already larger: a hand-written
+count of
+a set drifts, which is exactly what order 097 learned about `server.hello`.
+`tests/server/test_workspace_connection_reserved_145.py` keeps the set honest in
+both directions.)
 
 No Harness brand is interpreted here; `harness` travels as an opaque data field.
 """
@@ -30,6 +36,17 @@ WIRE_EVENT_KINDS = frozenset({
     "queue.updated",
     "workspace.connection",
 })
+
+#: `workspace.connection` is **reserved, with no producer** (order 145, `AUD-B-011`):
+#: nothing in `src/agent_box` appends the kind, so the Server never emits it today.
+#: It is not deleted because the blocker is structural, not accidental -
+#: `server_session_events.session_id` is NOT NULL and `EventFrame.sessionId` is
+#: required, so a session-less browsing phase has no stream that could carry the
+#: frame; whether it should be a synchronous result or a second session-free
+#: channel is a contract decision (ops: `agent-box-server-round1` status, 需前端在合同层裁决).
+#: The gate is `tests/server/test_workspace_connection_reserved_145.py`: it reads a
+#: real session's frames and fails if this kind ever appears, and its
+#: counter-example writes a row by hand to prove the pipe is live.
 
 # Internal kind -> wire kind. Kinds absent here are internal bookkeeping and are
 # not projected onto the event stream at all (for example turn.capture).

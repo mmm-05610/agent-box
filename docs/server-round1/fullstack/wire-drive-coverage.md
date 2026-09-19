@@ -24,7 +24,7 @@ python3 scripts/server-round1/wire_drive_coverage.py --check     # 有缺口即�
 | 有真实 wire 驱动证据 | **64** |
 | 豁免 | **0** |
 | 无证据（差集） | **0** |
-| 证据行数合计 | 352（含 117/123/128/129 的新门；分布仍很偏）|
+| 证据行数合计 | 356（含 117/123/128/129/145 的新门；分布仍很偏）|
 | 只被**一个文件**驱动的方法 | **41** 个，列在下面当观察名单 |
 
 ## 观察名单（单源证据：删掉那一个文件，该方法即成缺口）
@@ -98,7 +98,7 @@ python3 scripts/server-round1/wire_drive_coverage.py --check     # 有缺口即�
 | `config.describe` | `tests/server/test_wire_v1.py:448` — `descriptor = api.ok("config.describe", {` | 5 |
 | `config.resolve` | `tests/server/test_wire_v1.py:587` — `resolved = api.ok("config.resolve", {` | 3 |
 | `executions.list` | `tests/server/test_execution_inventory.py:128` — `result = client.post("/wire/v1/executions.list", headers={` | 6 |
-| `history.snapshot` | `tests/server/test_harness_sidecar.py:2209` — `frames = _wire_post(client, runtime.token, "history.snapshot", {` | 26 |
+| `history.snapshot` | `tests/server/test_harness_sidecar.py:2209` — `frames = _wire_post(client, runtime.token, "history.snapshot", {` | 28 |
 | `hooks.create` | `tests/server/test_hook_models.py:235` — `created = call("hooks.create", {` | 2 |
 | `hooks.delete` | `tests/server/test_hook_models.py:273` — `removed = call("hooks.delete", {` | 1 |
 | `hooks.list` | `tests/server/test_hook_models.py:261` — `listed = call("hooks.list", {"requestId": "hook-list-1"})["result"]["h` | 1 |
@@ -142,7 +142,7 @@ python3 scripts/server-round1/wire_drive_coverage.py --check     # 有缺口即�
 | `workspaces.browse` | `tests/server/test_wire_v1.py:291` — `invalid = api.client.post("/wire/v1/workspaces.browse", headers=api.he` | 4 |
 | `workspaces.gitStatus` | `tests/server/test_git_status.py:143` — `result = client.post("/wire/v1/workspaces.gitStatus", headers={` | 6 |
 | `workspaces.list` | `tests/server/test_wire_v1.py:278` — `"jsonrpc": "2.0", "id": "1", "method": "workspaces.list", "params": {}` | 3 |
-| `workspaces.open` | `tests/server/test_accounts.py:248` — `opened = client.post("/wire/v1/workspaces.open", headers={` | 41 |
+| `workspaces.open` | `tests/server/test_accounts.py:248` — `opened = client.post("/wire/v1/workspaces.open", headers={` | 43 |
 
 ## 这张表**没有**说明什么
 
