@@ -57,3 +57,24 @@
 - 不与 qwen 混同（独立 id、独立 root）。不改 092/093 通用机制（本单消费）。不在 `--thinking` 上发明档位（属 096/107）。
 - wire 不新增方法（第九家＝目录多一条记录）。凭据纪律：`.auth` 内容、machine_id 零入日志/证据。
 - **本阶段只做观测+计划（114 阶段 1）**；打包/物化/登录/放置/门（阶段 2–5）在后续提交逐件落地，未拍/未查实处如实标注，不半拉子。
+
+## 6 阶段 2 打包可行性（一手，2026-09-19 续）——可离线 pin
+
+**qodercli 的安装形状与既有 node/python 家族都不同，且可离线 pin**（`~/.qoder/bin/qodercli/` 一手 `ls`）：
+- 每个版本一个**自包含 ELF 单文件**：`qodercli-1.1.55` / `-1.1.56` / `-1.1.57`（各 ~185 MB）；`version.txt`＝`1.1.57`；
+  `.qodercli-install-resource`＝`curl-bash`（安装方式，非 npm）。
+- 辅助件 `~/.qoder/.bin/runtime-info-linux-x64-<hash>`（652 KB，mode 0500）——是否被无头 `-p` 运行读取**待阶段 2 实跑核**。
+- `~/.local/bin/qodercli` 是指向 `qodercli-1.1.57` 的符号链接。
+⇒ 打包＝把 pin 版本的单 ELF（＋按需的 `.bin/runtime-info-*`）拷进运行时工件树、算树摘要、只读投影进
+`/runtime/artifacts/qoder-runtime/...`；adapter command＝该 ELF，args＝`--print …`。**不需** node_modules / python venv，
+与 build-*-runtime-artifact.mjs 同构但更简。⇒ 阶段 2 的"能否离线 pin"**已解除**（可）。
+
+## 7 阶段 1 追加：item #6 未知键登记**已落为代码+测试**
+
+`plugins/agent-box-harnesses/src/agent_box_harnesses/qoder/native_config.py`（`QODER_NATIVE_KEYS` 登记表 +
+`unregistered_keys` "不静默丢弃"门）+ `tests/test_qoder_native_config_114.py`（6 passed）：逐条给出处（G5）、
+unknown 键 `meaning=None`（不发明）、注册一条新键即从"未登记"转"已登记"（反例门，证门读的是登记表不是硬编码）、
+`.auth` 登录态**不**作为配置键被物化器触碰（凭据纪律）。
+> **本 increment 只落 #6（+ #2 的打包可行性观测）**；`qoder/` 包此刻**不注册进 harnesses.toml**（无 production.py、无注册记录），
+> 故任何"目录=家族"的枚举/能力真相表/hello 计数都看不到它 ⇒ 不会把"能登记"误当"能跑"（防 G1 假绿）。
+> 家族**注册**留到 #1 打包模板 + #3 登录（依赖 094/095）就绪后一并落，届时 G1/G2/G3 门齐。
