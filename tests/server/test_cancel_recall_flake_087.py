@@ -262,9 +262,43 @@ def _measure(rounds: int) -> tuple[list[dict], dict]:
     return observed, summary
 
 
+def test_cancel_recall_flake_087_one_round_keeps_its_durable_facts():
+    """The cheap leg, always in the suite: one real round, asserted on the log.
+
+    Deliberately not asserting the gate's verdict — that is the thing 087 found
+    broken (the gate reads a turn it never waited for). What must hold is the
+    product's F4 promise, measured where it is durable: the cancelled turn's
+    input reached the home journal, the recall answer exists as a `message.delta`
+    row, and the native session was reopened rather than silently replaced.
+    """
+    observed = _one_round(0)
+    assert observed.get("result") in {"NATIVE_HOME_GATE_OK", "NATIVE_HOME_GATE_FAILED"}, observed
+    window = observed["readWindow"]
+    cancelled = [item for item in window["turns"] if item["state"] == "cancelled" and item["stopRequested"]]
+    assert cancelled, "no stop-requested cancelled turn: the round never cancelled"
+    recalled = [item for item in window["turns"]
+                if item["state"] == "completed" and item["nonceDeltaSeqs"]]
+    assert recalled, json.dumps(window["turns"])[:800]
+    assert observed["home"].get("journalHasWaitForCancel") is True, observed["home"]
+    assert observed["home"].get("nativeState") == NONCE, observed["home"]
+    assert observed["home"].get("reopenMethods", [])[:1] == ["session/new"], observed["home"]
+    assert set(observed["home"].get("reopenMethods", [])[1:]) == {"session/load"}, observed["home"]
+
+
 def test_cancel_recall_flake_087_cancel_recall_rounds_are_counted():
-    """G1: N>=20 real cancel→recall rounds, each with its raw fragment."""
-    rounds = int(os.environ.get("AGENTBOX_087_ROUNDS", "20"))
+    """G1: N>=20 real cancel→recall rounds, each with its raw fragment.
+
+    Opt-in because a round is a full 45 gate run (~13 s each, and it rewrites
+    the evidence file): the counting leg is driven on purpose, not as a
+    side effect of someone running the suite. `AGENTBOX_087_ROUNDS=20`.
+    """
+    requested = os.environ.get("AGENTBOX_087_ROUNDS")
+    if requested is None:
+        pytest.skip("counted leg is opt-in: AGENTBOX_087_ROUNDS=20 python3 -m pytest "
+                    "tests/server/test_cancel_recall_flake_087.py -q "
+                    "(or tests/server/test_cancel_recall_flake_087.py 20); "
+                    "the durable-facts leg above always runs")
+    rounds = int(requested)
     assert rounds >= 20, "work order 087 requires at least twenty rounds"
     RUNS.mkdir(parents=True, exist_ok=True)
     observed, summary = _measure(rounds)

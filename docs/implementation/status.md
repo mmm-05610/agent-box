@@ -780,6 +780,12 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 | **两个探测方法对 `provenance` 不对称** ⇒ `probeConnection` 里那句 `_provenance(params)` 可证是死代码 | 112 顺带第一手量到：`probeModels` 接受并校验 `provenance`（全 null/混合 null 都通过，未知键类型化拒绝），而 `probeConnection` 对**任何**形态的 `provenance` 都回 `INVALID_REQUEST: params shape is invalid: unexpected provenance` ⇒ 形状门在 handler 之前就拒了，`handlers.py:1323` 那行永远看到 `None`。这把 098 终态行未做项 ③ 从"看起来是死的"变成"可复跑地是死的" | 删它＝改语义（要么让 `probeConnection` 接受 provenance，要么明确它不接受并写下理由），两个方向都是裁决而不是清理；且它牵动合同面（`probeConnection#params` 该不该有这一键） | [112 证据 §6](../server-round1/fullstack/provider-update-keeps-omitted-112.md) |
 
 
+| **修 45 门的 turn 位置下标**（087 的精确剩余；本单改不到它） | 087 两轮 N=20 定位：40/40 轮取消轮在 index 3、召回轮在 4，而 `native-home-gate.py:505/:526/:542` 等的是 2/3/4，增量又按 `recall["executionId"]` 筛 ⇒ 断言的是没等的轮；连带 `:510/:550` 的 `cancelledTurnState` 读 G6 漂移轮 ⇒ "取消没落地"那条从未真能咬。修法：按 executionId 定位 turn | `scripts/server-round1/**` 不在 087 的 `write_paths`（QA-004 定本树为其 owner，但要调度者在单里开写面）；本树一字节未改 | [087 证据 §2/§6](../server-round1/fullstack/cancel-recall-flake-087.md) ＋ `docs/server-round1/fullstack/087-runs/rounds.json` |
+| **取消之后下一条 turn 停在 `accepted` 不被采纳**（1/40 实测，形态像产品缺陷） | 样本 1 round 4：取消轮 cancelled 后，召回轮整轮停在 `accepted`、无增量、`wait_turn` 90 s 超时（该轮 102.6 s vs 其余 ~13 s）。可疑落点是取消路径上的 `queue_records.pause_pending`（`sessions/repository.py` 失败分支）与"下一条谁来采纳"的接缝——公告 107 轮 `110` 的"stop 后 paused 不自动采纳"是同一片语义 | 属 `sessions/**`、`execution/**`（章程 §3 归 runtime 线），且 087 只被授权复现与归因 | 同上一行的 `rounds.json` 里 `round == 4`（提交 `9b7b754` 那份）；本轮 `[087 证据 §5](../server-round1/fullstack/cancel-recall-flake-087.md)` |
+| **`transport/http` 边界的最后一道墙**（115 的射程外剩余） | `app.py` 的 wire 路由只对 `WireError` 作答，`dispatch` 之外（认证、`decode_request` 非 WireError 分支、`encode_result`）抛出的任何东西仍是裸 500；115 把闭合做在 `wire/**` 两道墙里，但"每个出站错误都带 JSON-RPC 体"这条不变量要真正成立，边界自己得有一道 | `src/agent_box/server/transport/**` 不在 115 的 `write_paths`（`wire/**`、`tests/**`、`docs/**`、`status`） | [115 证据 §7](../server-round1/wire-error-family-closure-115.md) |
+| **把"这个 Profile 在本机跑不跑得起来"下沉成 profiles 行上的派生列** | 117 的投影每行要做 2 次对象读 + 1–2 次 DB 读，而 `profiles.list` 是每次连接都读的面；今天几十条无感，但这是**每次连接的线性代价**，正确解法是在写入侧派生一列（或索引）而不是每次重算 | 落点在 `src/agent_box/server/profiles/**`（runtime 线写面），117 的 `write_paths` 只有 `wire/**` | [117 证据 §6](../server-round1/profiles-list-sendability-117.md) |
+| **`get_session` 的事件窗取"最早 200"且不报告截断** | 一手量到：整场门会话只有 38 事件所以本轮与 087 的间歇**无关**（那条猜测已被否掉并留数据）；但 `sessions/repository.py:1012,1024` 的窗口确实是 `ORDER BY seq LIMIT 200` + `SELECT *`，REST `GET /api/v1/sessions/{id}` 直接把它当完整历史回给客户端 ⇒ 会话长到 200 事件之后，这个读法会静默丢掉最新一段，而不是说"我截断了" | 属 `sessions/**` ＋ 合同/REST 面（要加 `truncated`/total 键），不在 087/115/117 任何一张的写面 | [087 证据 §3 第一条](../server-round1/fullstack/cancel-recall-flake-087.md)（含否证数据）＋ `src/agent_box/server/transport/http/app.py:289-291` |
+
 > 编号说明：上一节 `## CHECKPOINT b2`（080/081 那次）的 §2 写了"新增 B5"，但当时表里没落 B5
 > （其内容并入了 B4 的四项交回）。本表 **B5 由 085 新增**，是该编号的实际持有者；批末重写那节时一并更正引用。
 
@@ -1498,3 +1504,57 @@ L 的改判：**字节对表那一腿不由我重跑**（后端审阅者已从�
   它复现的那台是 `/tmp/audit-fe-2/server` 的 `90a11cb`（101 阶段 1）快照 ⇒ **是重部署问题，不是家族问题**。
 - ❌ 仍**没有**在**用户那台**试用实例上验过：那需要重启/换构建，属人的一腿（`089` 的部署腿与 `091` 一起）。
 - 顺带把 103 账上一个可复跑事实钉牢：这五个方法在**真 wire**（socket 级）上被驱动过，不只是 ASGI 进程内。
+
+## 工单 087 — G8 取消/召回间歇：定位到门自己身上（2026-09-19 19:5x–20:4x，执行者）
+
+**终态 `CANCEL_RECALL_FLAKE_PARTIAL`**。证据 [cancel-recall-flake-087.md](../server-round1/fullstack/cancel-recall-flake-087.md)，
+驱动器 `tests/server/test_cancel_recall_flake_087.py`，逐轮原始数据 `docs/server-round1/fullstack/087-runs/`。
+
+- **两轮独立 N=20（共 40 轮真跑，未改动的 45 门整体）**：16 绿 / 4 红，然后 20 绿 / 0 红 ⇒ 4/40 ≈ 10%，与 067 的"run1 败 run2 过"同量级。
+- **根因**：门的 turn 位置下标整体差一位（40/40 轮里取消轮在 **3**、召回轮在 **4**，门 `:505/:526/:542` 等的是 2/3/4），
+  而增量按 `recall["executionId"]` 筛 ⇒ **它在断言一个它从没等过的轮**：答案落库晚于那次返回就 `recallDeltas: []`。
+  连带 `:510/:550` 的 `cancelledTurnState` 读的是 G6 漂移轮 ⇒ "取消没落地就失败"那条断言从未真的能咬。
+- **否掉两条旧解释**（都留了数据）：读窗 `ORDER BY seq LIMIT 200` 截断——整场才 38 事件、每轮窗口内都有 nonce ⇒ 否；
+  `SIDECAR_CLOSED`=那条竞态——40 轮里 13 轮有它其中 10 轮绿、2 轮红根本没它 ⇒ 否。
+- **产品侧 F4 语义每一轮都对**（取消输入进 home journal、`native_id` 稳定、取消后全走 `session/load`、召回增量在库里）
+  ⇒ **45-G8 的账不是部分覆盖**，是门读答案的姿势错了。
+- 真实模型调用 **0**；`sessions/**`、`execution/**`、`scripts/server-round1/**` 一字节未写（章程 §3 / 本单 write_paths）。
+
+**§2 末尾留了一条没结掉的判据**（门为什么有时不发重试：25 轮发、15 轮不发）：不改变上面的结论，已写清验法交回。
+
+## 工单 115 — 错误族位这一族闭合（QA-008 A 面；2026-09-19 12:0x–12:2x，执行者）
+
+**终态 `WIRE_FAMILY_CLOSURE_DONE`**。证据 [wire-error-family-closure-115.md](../server-round1/wire-error-family-closure-115.md)，
+门 `tests/server/test_wire_error_family_closure_115.py`。前提自核通过（OF-02）：两道墙手拆后真 socket 实测
+`500 / text/plain / 21 字节 'Internal Server Error'`；并量到 `ServerError` 早已在 dispatch 收敛 ⇒ 开着的是"构造期 + 意外异常"。
+
+- **两道墙**（都在 `wire/**`）：`errors.converge_family`（族位收进真实族、原码进 `details.internalCode`、不再抛 `ValueError`）＋
+  `WireService.dispatch` 的兜底（任何意外异常也出合规错误对象，只放异常**类型**、不放文本）。故意冗余：任一道在，裸 500 出不来；
+  反例门两条——只退收敛 ⇒ `internalCode` 退化成 `ValueError`（G1 红）、两道全退 ⇒ 500 纯文本回来。
+- **本单自己抓到自己写的回归**：墙第一版把 `WireError` 也吞了（它是 `Exception`）⇒ typed 全塌成 `UNAVAILABLE`+`internalCode:'WireError'`；
+  反例 `test_a_typed_refusal_is_never_re_projected_by_the_wall` 就是这个 bug 变的。
+- **两张历史单的反例门被改判**（`tests/**` 在写面内）：101 的两条、098 的一条原本断言"退回缺陷 ⇒ 500"，
+  这个形状现在本机已不可能出站 ⇒ 改成量同一缺陷今天的产物（类型化 + 诊断退化可见），并在测试里写明是哪张单 supersede 的。
+  **这是契约后果，不是清理**：交回 L 在 098/101 的账上各注一行。
+- 兄弟树只读核验（116 的活）：`56af017` 的 `wire/handlers.py:1192-1197/1242-1245` 族位仍收内部码、
+  `errors.py:112-114` 仍 raise、`dispatch:370-372` 无墙、`tests/server/` 63 个文件里 **0** 个 family 守卫；
+  在场面清单写进证据 §6，并点名"单侧合并不会有任何门喊"这条风险。
+- 定向计数：`115+101+117+wire_v1+能力合同` **144 passed / 0 failed**（含 117 的 11 条）；
+  **Worker 工件：不在**（`workers/agent-box-worker/target/{debug,release}` 未构建）——这几条腿不读它。
+
+## 工单 117 — `profiles.list` 发之前就说清阻塞与原因（QA-009 后端面，含修订 v2；2026-09-19 12:4x–13:3x，执行者）
+
+**终态 `PROFILE_ADMITTABLE_PROJECTION_DONE`**；已纳入 work order 117 修订 @`bca7782`（`after_stage: 0`）。
+证据 [profiles-list-sendability-117.md](../server-round1/profiles-list-sendability-117.md)，门 `tests/server/test_profiles_list_sendability_117.py`（11 条）。
+
+- 投影只**增两键**：`recoveryPending: true|false|null`（`null` ＝ 读不到，**不等于**没阻塞）＋
+  `sendability: {state, reason, message, actions, checks[]}`；既有 12 键逐字不变（G3 用键集合快照钉住）。
+- `sendability` 走的是 turn 真会走的那条链（`freeze_execution_configuration` 的次序与条件，规则**复制**而非 import——`model_configs/**` 是 runtime 线写面），
+  并用一条门把两边对表：同一份数据直接叫产品的 freeze，拿它抛的码与投影给的码比 ⇒ 漂移就红。
+- **三处实测把本单的假设改掉**（比原计划更对，都留在报告 §3）：① 没选模型的 Profile 是 **blocked**
+  （`PROFILE_CONFIGURATION_INVALID`，freeze 自己抛）而不是 ready；② 凭据要看 **kind**（`exists()` 会把"有一行但 kind 不对"叫绿，
+  freeze 抛 `CREDENTIAL_NOT_FOUND`）⇒ 投影改成 kind-scoped `get`；③ overall state 里 blocked 压过 unknown，但 unknown 永不冒成 ready。
+- **不发明解除面**：`recovery_pending` 那条 check 的 `actions` 是空，并写明"从 wire 上什么都做不了"是诚实答案（清理属审批队列）。
+- 代价如实：每行多 2 次对象读 + 1–2 次 DB 读，未做批量化（要下沉成 profiles 行上的派生列 ⇒ `server/profiles/**`，越界）⇒ 记进下面的候选。
+- 顺带把 103 的生成账重跑了一遍（`wire-drive-coverage.md`：64 行、证据 325 条、单源 44 条），
+  并在账里写清一件事：115 的门虽发那五个方法，但名字在 `FIVE_METHODS` 常量里 ⇒ 按工具规则**不算第二处证据**——这条不是疏漏，正是规则存在的原因。

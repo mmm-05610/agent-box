@@ -24,13 +24,15 @@ python3 scripts/server-round1/wire_drive_coverage.py --check     # 有缺口即�
 | 有真实 wire 驱动证据 | **64** |
 | 豁免 | **0** |
 | 无证据（差集） | **0** |
-| 证据行数合计 | 310（分布很偏：`test_wire_v1.py` 一个文件占 124 行） |
-| 只被**一个文件**驱动的方法 | **45** 个，列在下面当观察名单 |
+| 证据行数合计 | 325（分布仍很偏；117 的新门给 `profiles.list` 与 `providerModels.*` 各添了几行）|
+| 只被**一个文件**驱动的方法 | **44** 个，列在下面当观察名单 |
 
 ## 观察名单（单源证据：删掉那一个文件，该方法即成缺口）
 
-这些不是缺口，是**脆**。101 之后 `usage.*` 与 `providerArtifacts.*` 五条只有
-`tests/server/test_wire_error_family_101.py` 一处驱动——它此前是零（101 的第一手）。
+这些不是缺口，是**脆**。101 那五条（`usage.*`、`providerArtifacts.*`）此前是零驱动、今天仍是
+**只有一处驱动**：115 的门也发这五个方法，但它把方法名放在 `FIVE_METHODS` 常量里再传变量，
+按本页那条规则（"数据字面量里出现名字不算驱动"）**不给它们添第二处证据**——这条不是疏漏，
+正是这条规则存在的原因：换名字的改动不该悄悄把覆盖变绿。
 
 * `accounts.bind` → `tests/server/test_accounts.py`
 * `accounts.create` → `tests/server/test_accounts.py`
@@ -63,7 +65,6 @@ python3 scripts/server-round1/wire_drive_coverage.py --check     # 有缺口即�
 * `profiles.subagentGrants` → `tests/server/test_delegation.py`
 * `profiles.update` → `tests/server/test_wire_v1.py`
 * `providerArtifacts.install` → `tests/server/test_wire_error_family_101.py`
-* `providerArtifacts.list` → `tests/server/test_wire_error_family_101.py`
 * `providerArtifacts.rollback` → `tests/server/test_wire_error_family_101.py`
 * `providerModels.archive` → `tests/server/test_wire_v1.py`
 * `providerModels.probeConnection` → `tests/server/test_usage_parsing.py`
@@ -112,18 +113,18 @@ python3 scripts/server-round1/wire_drive_coverage.py --check     # 有缺口即�
 | `profiles.clone` | `tests/server/test_profile_permissions.py:345` — `cloned = client.post("/wire/v1/profiles.clone", headers={` | 6 |
 | `profiles.create` | `tests/server/test_harness_sidecar.py:1183` — `profile = _wire_post(client, runtime.token, "profiles.create", {` | 8 |
 | `profiles.grantSubagent` | `tests/server/test_delegation.py:402` — `granted = call("profiles.grantSubagent", {` | 3 |
-| `profiles.list` | `tests/server/test_subagent_harness_real_round_086.py:578` — `items = _wire(base_url, token, "profiles.list", {"includeArchived": Tr` | 2 |
+| `profiles.list` | `tests/server/test_profiles_list_sendability_117.py:73` — `items = wire(client, headers, "profiles.list", {"includeArchived": Tru` | 7 |
 | `profiles.memory` | `tests/server/test_profile_memory.py:93` — `before = call("profiles.memory", {` | 3 |
 | `profiles.revokeSubagent` | `tests/server/test_delegation.py:419` — `revoked = call("profiles.revokeSubagent", {` | 1 |
 | `profiles.setPermissions` | `tests/server/test_profile_permissions.py:430` — `written = client.post("/wire/v1/profiles.setPermissions", headers={` | 4 |
 | `profiles.subagentGrants` | `tests/server/test_delegation.py:399` — `empty = call("profiles.subagentGrants", {"profileId": parent["profile_` | 4 |
 | `profiles.update` | `tests/server/test_wire_v1.py:521` — `renamed = api.ok("profiles.update", {` | 2 |
-| `profiles.updateConfig` | `tests/server/test_harness_sidecar.py:1187` — `configured = _wire_post(client, runtime.token, "profiles.updateConfig"` | 4 |
+| `profiles.updateConfig` | `tests/server/test_harness_sidecar.py:1187` — `configured = _wire_post(client, runtime.token, "profiles.updateConfig"` | 5 |
 | `providerArtifacts.install` | `tests/server/test_wire_error_family_101.py:146` — `response = post(client, headers, "providerArtifacts.install",` | 4 |
-| `providerArtifacts.list` | `tests/server/test_wire_error_family_101.py:78` — `artifacts = post(client, headers, "providerArtifacts.list",` | 4 |
+| `providerArtifacts.list` | `tests/server/test_wire_error_family_101.py:78` — `artifacts = post(client, headers, "providerArtifacts.list",` | 12 |
 | `providerArtifacts.rollback` | `tests/server/test_wire_error_family_101.py:132` — `response = post(client, headers, "providerArtifacts.rollback",` | 2 |
 | `providerModels.archive` | `tests/server/test_wire_v1.py:554` — `referenced = api.err("providerModels.archive", {` | 2 |
-| `providerModels.create` | `tests/server/test_harness_sidecar.py:1175` — `provider = _wire_post(client, runtime.token, "providerModels.create", ` | 7 |
+| `providerModels.create` | `tests/server/test_harness_sidecar.py:1175` — `provider = _wire_post(client, runtime.token, "providerModels.create", ` | 8 |
 | `providerModels.list` | `tests/server/test_provenance_wire_098.py:85` — `listed = api.ok("providerModels.list", {"includeArchived": False})` | 2 |
 | `providerModels.probeConnection` | `tests/server/test_usage_parsing.py:700` — `checked = wire("providerModels.probeConnection", {` | 3 |
 | `providerModels.probeModels` | `tests/server/test_provenance_wire_098.py:142` — `status, body = api.call("providerModels.probeModels", {` | 2 |

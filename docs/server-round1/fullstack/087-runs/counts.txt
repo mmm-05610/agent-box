@@ -1,0 +1,5 @@
+DRIVER_EXIT=0
+SUITE_EXIT=1
+FAILED tests/server/test_provenance_wire_098.py::test_counter_example_the_scope_bug_returns_the_500
+FAILED tests/server/test_wire_drive_coverage_103.py::test_the_generated_ledger_lists_each_method_with_the_evidence_the_tool_found
+4 failed, 783 passed in 799.02s (0:13:19)
