@@ -1302,3 +1302,17 @@ runtime 侧（存储/service/描述符/派生/冻结/逐家声明）已 DONE 且
 > qwen/dsh 枚举未一手钉⇒不声明（钉死不猜）。测试 `test_reasoning_knobs_096.py` **6 passed**；中立门未受影响（model_configs 不在扫描集，6 passed）。
 > **096 整体仍 PARTIAL**：`config.describe` 生效域投影＝A 线 wire（本模块只决定"何值合法"，投影界面交 A）；
 > 逐家 controlOptions 声明进 production.py + v2 模板翻转＝与 108 模板字节钉死测试同文件⇒须同批改（未做，串行）；G6 真 `thought.delta` 缺真链。
+
+## 工单 126 — 并集语义组合（QA-014 高；合并窗口第一硬前置；2026-09-19，执行者·runtime 线）
+
+> **阶段 1 完成**（一手核两侧 `update` 逐字 + 组合判定=可能 + 可执行蓝图）。终态记 **`UNION_SEMANTICS_RECONCILED_PARTIAL`**
+> （阶段 2–4 实际改写未做——理由见下，非回避）。证据：[126 阶段 1](../server-round1/fullstack/union-semantics-reconciliation-126-stage1.md)。§Spend：0 真调用。
+
+- **冲突一手**：A `112`（`89c72b5`）`update`＝`{**project(current),**body}` 打底 + `repository.update` 四列 `KEEP` 哨兵（省略保留 / 显式 null 清空）；
+  runtime `092` `update`＝`_validate`→`normalize_protocols/validate_endpoints` + `_config_payload` 落 protocols/endpoints。两段各重写 `update`＋`repository.update` 签名 ⇒ 单边合并按 QA-014 U-A `73 failed`/U-R `48 failed`（EXIT=1），赢侧丢对面守卫。
+- **组合蓝图（两边守卫同绿）**：`merged={**project(current),**body,…}` → 过 `self._validate(merged)`（092 归一）→ `config=_config_payload(merged,norm)`、`models=norm["models"]`（092）；四 provenance 列走 A 的 `KEEP` 哨兵（112）。
+  需把 `repository.py` 的 `class _Keep`/`KEEP`+按需 SET 移植进本树（本树停在 092 态无 KEEP），并带 A 的 `112` 守卫测试进本树（逐字不改弱，同 `116` 先例）。
+- **为何本次不仓促做完阶段 2–4**：动的是两树共享的 `repository.update` 签名（092 也改过它）+ 组合正确性必须**跑全套件**核对（两侧反例同绿、任一侧单退必红、092/120/121 不回退）；在回合预算末尾半拉子改共享段有误弄红当前 **1231/19 干净树**之险 ⇒ 留给专注回合一次做完并全套件核对。**非"组合不可能"**（蓝图已给），故不走裁决交回那条。
+- **合同工件那处 docs 冲突**（rename/rename 的 `wire-v1.schema.registered-*.json`，机械收口 ⇒ 8 条 `FileNotFoundError`，测试承重）＝ 归 `113` 重锁，本单只记录不动手。
+
+> **优先级覆盖（ops 第 122 轮 `d3802aa`）**：120/122 主路径须先于队列任何一项——本树 status **120 有 DONE 收口行、122 有 PARTIAL 收口行** ⇒ 前置满足；126 高优先阶段 1 已落，阶段 2–4 待专注回合。
