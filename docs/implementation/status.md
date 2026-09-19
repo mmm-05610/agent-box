@@ -1382,3 +1382,11 @@ pi-production-chain-gate.py  runtime=dfdae54be337c45de58e44161b18880f  A(b1f6e07
 | 127 | 全 | G1 指纹可复算（md5+命令+结论）；G2 差异**有据登记**（pi justified-divergence／dsh runtime-only），第三种形态由常设漂移检测门咬；G3 判定语义未削（脚本零改）；G4 只动 status/证据/测试，未碰脚本与 A 树。`test_gate_script_parity_127.py` 断言"文件实算 md5＝记录 md5"（改脚本不改记录⇒红）＋结论须在 {normalized,justified-divergence,runtime-only} | 反例**已树内实测**：给 pi 追加一行（第三种形态、不改记录）⇒ 恰 1 条 md5 匹配门红、3 条仍绿；恢复后 4 passed。**未跑全量**（本单纯 docs/md5/门，无 src 改动） | 0 | 本提交 |
 
 **交回 ops（内容质量 vs ownership 是两件事，未自合并）**：请裁 A owner 是否采纳 runtime 的 pi 改进／接 dsh；在此之前分叉**已登记且有据、非静默**。
+
+## 工单 137 — Worker 契约 `stopReason`（生产侧·R-0064 获批·主路径最后一格；阶段 1 观测已提交，进行中；2026-09-19，执行者·runtime 线）
+
+> **状态：开工（stage 1 观测已落，未收口）**。与 `135` 同档：`134` 消费侧 + 本单生产侧 ⇒ `122` 才能收口。`depends_on 134` 已满足（消费语义在位）。§Spend：0 真调用。观测文档 `docs/server-round1/worker-stop-reason-137-stage1.md`。
+
+**一手结论（stage 1）**：完成结果＝Worker `ProcessRecord`（`main.rs:98/423/509/1160/1264`，`run_process` 产），即 `sidecar_backend._complete` 读的 `run.result`——134 已把它经 `_terminal_reason_from_result` 路由进 `complete_turn(terminal_reason)` ⇒ **下游无需新字段**。今天 Worker 侧 `stopReason/stop_reason/end_turn/max_tokens/PromptResponse` 在 `workers/**/*.rs` **0 命中**（坐实 122"无此事实"）。**两道守卫对"增补·出站·不改版本"的 stopReason 均安全**：两源命名守卫（`test_state_capture_error_boundary.py:252`）只比 `PROTOCOL_VERSION` 常量（不查结果字段），`deny_unknown_fields` 只管**入站** request/bootstrap（`v1.schema.json` 是请求侧，无结果侧 `additionalProperties:false`）⇒ **无守卫级交回**。
+
+**剩余 stage 2–5（未动源码）**：② `ProcessRecord` 增可选 `stop_reason`，**只在 ACP 真观测到时**填（拿不到⇒交回、不填默认值，Notes⑬）——须在真实 ACP 转录上核实可观测性；③ `sidecar`/`_complete` 读的键与 Worker 出的键对齐；④ **真链门** worker→sidecar→`_complete`（`max_tokens`/`end_turn` 双向）+ 反例（去字段必红）——**需已构建 Worker**（本树有 `cargo/rustc` 源与工具链，缺 `target/{release,debug}` 预置工件＝既有 env 红族），真链腿若无法跑则如实报 env-blocked、不静默跳；⑤ **三元门 `102` 随字段复算并入账** + 两守卫逐条绿。硬约束 **G5 只增不改**（不 bump `PROTOCOL_VERSION`、不改名/删字段）。
