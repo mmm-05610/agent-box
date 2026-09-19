@@ -10,6 +10,7 @@ ruling: R-0012
 terminal: ["CONTROL_PLANE_SYNC_DONE", "CONTROL_PLANE_SYNC_PARTIAL"]
 waive: []
 parallel_units: ["first-deploy","incremental-sync","credential-projection"]
+revisions: [{"at": "1855f35", "what": "\u4fee\u8ba2 v2\uff08R-0055 / AQ-0010 \u7528\u6237\u5df2\u62cd\uff09\uff1a\u6267\u884c\u4fa7\u540c\u6b65\u8bb0\u5f55\uff1d\u6709\u754c\u6295\u5f71\u3001\u6bcf\u6267\u884c\u91cd\u5efa \u21d2 \u2460 \u5173\u95ed\uff1bG1 \u4ee5\u8fdb\u7a0b\u5185\u4e24\u5e93\u6295\u5f71\u9a8c\uff1b\u7981\u6b62\u65b0\u589e Worker op / \u6539 PROTOCOL_VERSION=5 / \u6539 worker JSON schema\u3002\u5269\u4f59\uff1d\u2461 \u65e0\u7248\u672c kind \u7684\u5220\u9664\u8bed\u4e49\uff08schema 18\u219219 \u5893\u7891\uff09\u4e0e \u2462 \u771f\u673a\u90e8\u7f72\uff08\u73b0\u573a\uff1d089\uff09\u3002", "after_stage": 0, "ruling": "R-0055"}]
 ---
 
 # Work Order 091 — 控制面同步：首次部署 + 增量 + 凭据只在 Windows（每执行投影）
@@ -25,6 +26,25 @@ parallel_units: ["first-deploy","incremental-sync","credential-projection"]
 - R-0012 取代 45 §6 中"控制面记录也不同步"的部分；45 §6 其余（home/会话按平台）保持
 - 现状：执行侧的记录要么为空（新根）、要么靠手工脚本灌（`desktop-setup.py` 那套）；**没有**"首次连接自动部署 + 变更增量"的机制
 - 凭据现状：Windows 根有 2 条（DPAPI 侧），执行侧按执行由部署文档的 `credentialEnvironment` 注入（一次性投影已在 45 §13/56 的规则里）
+
+
+## 修订 v2（2026-09-19 20:2x，ops；`at` = `1855f35`，**after_stage 0** ⇒ 你尚未收口，直接按修订版做）
+
+**卡口已由用户裁决（`R-0055`，答复 `AQ-0010`，commit `1855f35`）**：执行侧同步记录＝**有界投影、每执行重建**。逐条落到本单：
+
+| 裁决原文（`R-0055`） | 本单怎么做 |
+| --- | --- |
+| 首部署＝逐执行**幂等重导**清单；**不建跨机持久库** | Stage 2 的"首次部署"按**逐执行重导**实现；**执行侧不留跨机持久同步库** |
+| **不新增 Worker op**、**不动 `PROTOCOL_VERSION=5`**、**不动 `protocols/worker/v1.schema.json`** | 不许用新增 op 换实现；`test_the_control_protocol_is_named_in_both_sources` 与 `Bootstrap(deny_unknown_fields)` 两条守卫**必须原样通过**（这是本单"不改协议"的硬约束） |
+| 幂等键仍 `(kind,id,version,digest)`：**同一执行期内可增量，跨执行重新有界投影** | Stage 3 的增量语义按此实现；跨执行**不假设**上一执行的痕迹 |
+| G1 以**进程内两库投影**验 | G1 的判据按此写（不依赖任何跨机持久物） |
+| 本裁决**不动**四条不变式 | 控制面＝Windows、执行侧非权威、原生 home/会话按平台、凭据只在 Windows 按执行一次性投影 —— **一字不改** |
+
+**本单由此关闭 ①**。**剩余（收口时必须如实写进交回）**：
+- **② 无版本 kind 的删除语义**（`binding/hook/grant/account` 的增量含删除）⇒ 需要 schema 版本列/墓碑 ＋ `PRODUCT_SCHEMA_VERSION` 抬版 ⇒ **这属新面，先交回 ops/I**，不要在本单里顺手抬版；
+- **③ 真机部署**（Windows→`wsl.exe`→WSL worker 的现场）⇒ **现场是 `089`**（A 线），本单只做进程内 G1–G4。
+
+**修订回执（`README §3.5b`）**：纳入本修订后，在下一个阶段提交信息或本树 status 里记一行「已纳入 work order 091 修订 @<sha>」。
 
 ## Scope
 
@@ -61,6 +81,18 @@ parallel_units: ["first-deploy","incremental-sync","credential-projection"]
 
 **WHEN** 在执行侧全盘扫描注入值
 **THEN** **零命中**（凭据只在执行进程的运行时投影里，不落持久存储）
+
+### Requirement: 执行侧不留跨机持久同步库（**修订 v2**）
+
+#### Scenario: 逐执行重建
+
+**WHEN** 同一执行侧被连接两次（两次执行期）
+**THEN** 第二次**重新**做一次有界投影（幂等重导），**不依赖**上一次留在执行侧的持久记录
+
+#### Scenario: 反例（门要能咬）
+
+**WHEN** 把实现改成"执行侧持久库 + 新增 Worker op/抬协议版本"
+**THEN** 本单的门与两条协议守卫（`test_the_control_protocol_is_named_in_both_sources`、`Bootstrap(deny_unknown_fields)`）**必须红**
 
 ## Stages
 
