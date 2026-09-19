@@ -1510,6 +1510,40 @@ def test_rebuild_is_bounded_and_typed_when_sidecar_stays_closed(tmp_path):
         runtime.stop()
 
 
+def test_paused_queue_item_surfaces_its_reason_on_the_wire(tmp_path):
+    """Order 110 v2: order 67's stop/fail -> paused is kept, but the pause must be
+    explainable - the `paused` state AND its typed reason reach the wire (queue
+    view + the `queue.updated` event), so the UI can show why and offer
+    withdraw-and-resend. Dropping the reason (the pre-fix `del reason`) reds this."""
+    runtime = _local_sidecar_runtime(tmp_path)
+    with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
+        _profile, first, _second = _queue_setup(client, runtime, tmp_path, "wait-for-cancel")
+        result = _wire_post(client, runtime.token, "runs.stop", {
+            "requestId": "pause-stop", "sessionId": first["session"]["id"],
+            "executionId": first["executionId"],
+        })
+        assert result["outcome"] == "stop_requested"
+        deadline = time.monotonic() + 8
+        queued = runtime.queue.list(first["session"]["id"])
+        while time.monotonic() < deadline and not (queued and queued[0]["state"] == "paused"):
+            time.sleep(0.02)
+            queued = runtime.queue.list(first["session"]["id"])
+        assert queued and queued[0]["state"] == "paused", queued
+        # the reason is now part of the queue view the wire returns
+        assert queued[0]["pauseReason"] == "cancelled", queued[0]
+        # and it rode the queue.updated event into the session stream (既有形状)
+        session = runtime.repository.get_session(first["session"]["id"])
+        updated = [event for event in session["events"] if event["kind"] == "queue.updated"]
+        assert updated, session["events"]
+        assert any(
+            (event["data"].get("item") or {}).get("state") == "paused"
+            and (event["data"]["item"]).get("pauseReason") == "cancelled"
+            for event in updated
+        ), updated
+        # not auto-adopted (order 67 semantic preserved): the successor never ran
+        assert len(session["turns"]) == 1
+
+
 def test_sidecar_permission_round_trip_uses_server_approval_store(tmp_path):
     registry = HarnessRegistry()
     registry.register(HarnessDescriptor("pi", capability_claims={
