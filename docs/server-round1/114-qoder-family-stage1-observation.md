@@ -78,3 +78,21 @@ unknown 键 `meaning=None`（不发明）、注册一条新键即从"未登记"�
 > **本 increment 只落 #6（+ #2 的打包可行性观测）**；`qoder/` 包此刻**不注册进 harnesses.toml**（无 production.py、无注册记录），
 > 故任何"目录=家族"的枚举/能力真相表/hello 计数都看不到它 ⇒ 不会把"能登记"误当"能跑"（防 G1 假绿）。
 > 家族**注册**留到 #1 打包模板 + #3 登录（依赖 094/095）就绪后一并落，届时 G1/G2/G3 门齐。
+
+## 8 阶段 2 复核：登录态文件"不可假填"的第一手判据（更正先前"094/095 缺席"的不精确说法）
+
+一手核对既有账号家族（**codex 已用 `subscriptionCredential`**，`codex/production.py:325-329`）得两条硬判据：
+- codex 模板原文：**"the other families are declared [login file] only once a real login run pins their file"**
+  ⇒ 登录态文件**必须由一次真实登录跑钉出**，不得凭目录观测臆填。
+- manifest `#894`（Order 56 裁决）：Stage A 要逐家一手确立"登录态在哪、是否单文件、是否机器绑定、harness 是否会改写"；
+  **任一项不满足 ⇒ 该家对订阅判为不支持，而不是 faked**。
+
+对照 Qoder 一手：`.auth/` 是**多文件**（`user`/`machine_id`/`dynamic-*.json`）且 `machine_id`/`installation_id` 是**机器绑定**、
+`dynamic-*.json` 是**非确定文件名**（不能进 `subscriptionCredential.files` 的固定清单，且 files 上限 8、非目录walk）。
+⇒ **114 #3 的登录声明此刻不可诚实落地**：既无 094/095 登录引擎把账号资产喂进来，也没有一次真 Qoder 登录把 `.auth` 的确切文件钉出。
+硬写＝假填，正是判据禁止的。**据此更正**先前账里"094/095 infra 未并入本树"的措辞：**账号资产底座（`server/accounts/` +
+`subscriptionCredential` 投影）在本树已在**（Order 56），真正缺的是 **094/095 登录引擎 + 一次真登录钉文件**（后者还受本环境无 Qoder 账号限制）。
+
+⇒ 114 #1 家族**注册**（harnesses.toml + 安装集 + capability lockstep）与 #3/#4/#5 一并**阻塞于**：094/095（其自身阻塞于 092←A-105 点名）
+＋ 真 Qoder 登录观测。本 increment 只保留已诚实落地的 #6 未知键登记（已落代码+测试）＋ #2 打包"可离线 pin"可行性结论（单 ELF）。
+build-qoder 脚本可在有真工件后镜像 codex 单文件闭包补，但**先决条件是 #3 的登录文件钉出**，否则注册即假绿。
