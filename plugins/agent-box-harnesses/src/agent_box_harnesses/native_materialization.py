@@ -160,3 +160,71 @@ def render_claude_env(*, base_url: str, protocol: str) -> dict:
     """
     field, _dialect = translate_protocol("claude-code", protocol)
     return {"ANTHROPIC_BASE_URL": base_url}
+
+
+def _limit_block(*, context: int | None, output: int | None) -> dict:
+    """G8: a limit is written only where a fact exists - absent stays absent.
+
+    The order-093 v2 rule: never backfill a default. If neither a user override
+    nor an upstream fact is present for a limit, the key is simply not emitted.
+    """
+    block = {}
+    if context is not None:
+        block["context"] = context
+    if output is not None:
+        block["output"] = output
+    return block
+
+
+def render_opencode_provider(*, provider: str, base_url: str, protocol: str, model: str,
+                             family: str = "opencode",
+                             api_key_env: str = "DEEPSEEK_API_KEY",
+                             context_limit: int | None = None,
+                             output_limit: int | None = None) -> dict:
+    """opencode/kilo's `provider.<id>` object (shared fork shape).
+
+    G1 hierarchy: the endpoint is `options.baseURL`, the dialect is the
+    provider-level `npm`, and limits sit at `models.<id>.limit` - none of them at
+    the wrong level. `apiKey` is a `{env:...}` reference, never a value.
+    """
+    field, dialect = translate_protocol(family, protocol)
+    model_entry: dict = {"name": f"{model}"}
+    limits = _limit_block(context=context_limit, output=output_limit)
+    if limits:
+        model_entry["limit"] = limits
+    return {
+        field: dialect,
+        "name": provider,
+        "options": {"baseURL": base_url, "apiKey": "{env:%s}" % api_key_env},
+        "models": {model: model_entry},
+    }
+
+
+def render_hermes_config(*, base_url: str, protocol: str, model: str,
+                         provider: str = "custom",
+                         api_key_env: str = "DEEPSEEK_API_KEY",
+                         max_tokens: int | None = None) -> dict:
+    """hermes' config.yaml document for one upstream.
+
+    hermes records the endpoint twice (preferring `model.base_url`, with the
+    provider block's own `api`) - both are written so nothing else can be
+    contacted; the dialect is `providers.<id>.transport`. `max_tokens` is a limit
+    and follows G8 (absent fact -> not written).
+    """
+    field, dialect = translate_protocol("hermes", protocol)
+    model_block: dict = {"provider": provider, "default": model, "base_url": base_url}
+    if max_tokens is not None:
+        model_block["max_tokens"] = max_tokens
+    return {
+        "model": model_block,
+        "providers": {
+            provider: {
+                "name": provider,
+                "api": base_url,
+                "key_env": api_key_env,
+                field: dialect,
+                "default_model": model,
+                "models": {model: {}},
+            },
+        },
+    }

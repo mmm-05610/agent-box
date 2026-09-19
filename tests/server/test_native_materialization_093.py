@@ -101,3 +101,63 @@ def test_unpinnable_family_cannot_be_rendered_at_all():
             with pytest.raises(nm.NativeMaterializationError) as refused:
                 nm.translate_protocol(harness, protocol)
             assert refused.value.code == "PROTOCOL_UNSUPPORTED_BY_HARNESS"
+
+
+# -- G1/G8: opencode/kilo nesting and "no fact -> no key" --------------------
+
+def test_opencode_endpoint_and_dialect_are_nested_and_limit_is_model_scoped():
+    obj = nm.render_opencode_provider(
+        provider="custom-loopback", base_url="http://127.0.0.1:8123/v1",
+        protocol="openai-chat", model="glm-4",
+        context_limit=200000, output_limit=8192)
+    assert obj["npm"] == "@ai-sdk/openai-compatible"          # dialect at provider level
+    assert obj["options"]["baseURL"] == "http://127.0.0.1:8123/v1"   # endpoint under options
+    assert obj["options"]["apiKey"] == "{env:DEEPSEEK_API_KEY}"      # G4: a reference
+    assert obj["models"]["glm-4"]["limit"] == {"context": 200000, "output": 8192}  # limit under the model
+    assert "baseURL" not in obj and "limit" not in obj        # never at the wrong level
+
+
+def test_opencode_omits_the_limit_key_entirely_when_no_fact():
+    obj = nm.render_opencode_provider(
+        provider="p", base_url="https://up.test", protocol="openai-chat", model="m")
+    assert "limit" not in obj["models"]["m"]                  # G8: absent stays absent
+
+
+def test_kilo_renders_with_its_own_env_reference():
+    obj = nm.render_opencode_provider(
+        provider="deepseek", base_url="https://api.deepseek.com", protocol="openai-chat",
+        model="deepseek-flash", family="kilo", api_key_env="OPENAI_API_KEY")
+    assert obj["npm"] == "@ai-sdk/openai-compatible"
+    assert obj["options"]["apiKey"] == "{env:OPENAI_API_KEY}"
+
+
+def test_opencode_refuses_a_protocol_it_has_not_pinned():
+    with pytest.raises(nm.NativeMaterializationError) as refused:
+        nm.render_opencode_provider(
+            provider="p", base_url="https://up.test", protocol="anthropic-messages", model="m")
+    assert refused.value.code == "PROTOCOL_UNSUPPORTED_BY_HARNESS"
+
+
+def test_hermes_writes_both_endpoint_fields_and_the_transport_dialect():
+    doc = nm.render_hermes_config(
+        base_url="https://up.test/v1", protocol="openai-chat", model="glm-4",
+        max_tokens=8192)
+    assert doc["model"]["base_url"] == "https://up.test/v1"        # the preferred field
+    assert doc["providers"]["custom"]["api"] == "https://up.test/v1"  # and the block's own
+    assert doc["providers"]["custom"]["transport"] == "chat_completions"
+    assert doc["model"]["default"] == "glm-4"
+    assert doc["model"]["max_tokens"] == 8192
+    assert doc["providers"]["custom"]["key_env"] == "DEEPSEEK_API_KEY"  # reference
+
+
+def test_hermes_omits_max_tokens_when_no_fact():
+    doc = nm.render_hermes_config(
+        base_url="https://up.test/v1", protocol="openai-chat", model="m")
+    assert "max_tokens" not in doc["model"]                    # G8
+
+
+def test_hermes_render_is_idempotent_and_credential_free():
+    args = dict(base_url="https://up.test/v1", protocol="openai-chat", model="m")
+    assert nm.render_hermes_config(**args) == nm.render_hermes_config(**args)
+    import json
+    assert "sk-" not in json.dumps(nm.render_hermes_config(**args))

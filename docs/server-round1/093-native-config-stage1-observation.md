@@ -68,6 +68,11 @@ R-0022 串行点（A 105 → B 092）的下游**——092 一旦点名开工并�
 - **G2 反例门**：给 claude 配 `openai-chat`、给 pi 配 `openai-responses`、dsh/qwen 全协议 ⇒ 拒。
 - **G5 幂等**：codex 渲染两次逐字节相同；**G4**：输出只含 env/locator 引用（`env_key`/`$DEEPSEEK_API_KEY`），无凭据值。
 
+**已补全（六家渲染器齐，`test_native_materialization_093.py` → 25 passed）**：
+- `render_opencode_provider`（opencode/kilo 同形，`family`/`api_key_env` 参数化）：G1——`npm`（方言）在 provider 层、`options.baseURL`（端点）在 `options` 下、`limit` 在 `models.<id>.limit`；**G8**——无 limit 事实 ⇒ 不写 `limit` 键（不回填）；apiKey 恒 `{env:…}` 引用；非 chat 协议拒。
+- `render_hermes_config`：G1——`model.base_url` + `providers.<id>.api` 双端点、`transport` 方言、`model.default`；**G8**——无 `max_tokens` 事实 ⇒ 不写；key_env 引用；幂等无凭据。
+- 覆盖矩阵：**可钉六家**（codex/pi/hermes/opencode/kilo/claude）各有渲染器 + 断言；**钉不死两家**（dsh/qwen）全协议拒 ⇒ 阶段 2 的"写入器骨架 + 翻译表 + 类型化拒绝（含反例）"对全部八家已完备。
+
 **真正剩在 092 的**（阶段 3/4，非阶段 2）：`freeze_execution_configuration`（`model_configs/service.py:162-169`）目前只出
 `{provider,model,credentialId,configuration}`，**未把已存的 `base_url`/`wire_api` 透进冻结执行**给 harness；把它连同 092 的
 `protocols[]`/`endpoints{}`/描述符 `wireProtocols` 一并落到冻结投影，是**阶段 3 逐家接线**与**阶段 4 端到端第二上游真轮**的输入。
