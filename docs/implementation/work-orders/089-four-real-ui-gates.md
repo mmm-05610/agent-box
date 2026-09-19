@@ -3,7 +3,7 @@ id: 089
 slug: four-real-ui-gates
 batch: b3
 baseline: "b2 checkpoint"
-depends_on: [{"order": "090", "condition": "agent-box-runtime-round1 tree：090-placement-routing DONE（该树 status 记）"}]
+depends_on: [{"order": "082", "condition": "agent-box-env-provider tree：082-ledger-45-closeout DONE（同树，收口行见该树 status）"}, {"order": "090", "condition": "agent-box-runtime-round1 tree：090-placement-routing DONE（该树 status 记）"}, {"order": "091", "condition": "agent-box-runtime-round1 tree：`R-0056` 的判据成立——该树 status.md 的 `CP1 c1` 记账写着 091 的传输无关引擎＋进程内 G1–G4 已绿"}]
 write_paths: ["docs/server-round1/fullstack/**", "docs/implementation/status.md", "scripts/server-round1/**"]
 forbidden: ["src/agent_box/**", "plugins/**", "tests/**", "/home/maoqh/projects/agent-box-desktop-next-wsl-round1/**"]
 ruling: R-0011
