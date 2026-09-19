@@ -24,7 +24,7 @@ python3 scripts/server-round1/wire_drive_coverage.py --check     # 有缺口即�
 | 有真实 wire 驱动证据 | **64** |
 | 豁免 | **0** |
 | 无证据（差集） | **0** |
-| 证据行数合计 | 328（含 117 与 123 的新门；分布仍很偏）|
+| 证据行数合计 | 334（含 117/123/128 的新门；分布仍很偏）|
 | 只被**一个文件**驱动的方法 | **44** 个，列在下面当观察名单 |
 
 ## 观察名单（单源证据：删掉那一个文件，该方法即成缺口）
@@ -78,7 +78,6 @@ python3 scripts/server-round1/wire_drive_coverage.py --check     # 有缺口即�
 * `workspaces.archive` → `tests/server/test_wire_v1.py`
 * `workspaces.browse` → `tests/server/test_wire_v1.py`
 * `workspaces.list` → `tests/server/test_wire_v1.py`
-
 ## 逐方法（按名字排序）
 
 | 方法 | 驱动证据（第一条） | 证据行数 |
@@ -102,7 +101,7 @@ python3 scripts/server-round1/wire_drive_coverage.py --check     # 有缺口即�
 | `config.describe` | `tests/server/test_wire_v1.py:448` — `descriptor = api.ok("config.describe", {` | 5 |
 | `config.resolve` | `tests/server/test_wire_v1.py:587` — `resolved = api.ok("config.resolve", {` | 3 |
 | `executions.list` | `tests/server/test_execution_inventory.py:128` — `result = client.post("/wire/v1/executions.list", headers={` | 6 |
-| `history.snapshot` | `tests/server/test_harness_sidecar.py:2209` — `frames = _wire_post(client, runtime.token, "history.snapshot", {` | 24 |
+| `history.snapshot` | `tests/server/test_harness_sidecar.py:2209` — `frames = _wire_post(client, runtime.token, "history.snapshot", {` | 26 |
 | `hooks.create` | `tests/server/test_hook_models.py:235` — `created = call("hooks.create", {` | 2 |
 | `hooks.delete` | `tests/server/test_hook_models.py:273` — `removed = call("hooks.delete", {` | 1 |
 | `hooks.list` | `tests/server/test_hook_models.py:261` — `listed = call("hooks.list", {"requestId": "hook-list-1"})["result"]["h` | 1 |
@@ -133,7 +132,7 @@ python3 scripts/server-round1/wire_drive_coverage.py --check     # 有缺口即�
 | `queue.withdraw` | `tests/server/test_wire_v1.py:752` — `stale = api.err("queue.withdraw", {` | 2 |
 | `runs.stop` | `tests/server/test_harness_sidecar.py:676` — `stopped = client.post("/wire/v1/runs.stop", headers=headers, json={` | 5 |
 | `sendOutcome.query` | `tests/server/test_wire_v1.py:799` — `assert api.ok("sendOutcome.query", {"requestId": "never-sent"}) == {"o` | 2 |
-| `server.hello` | `tests/server/test_hello_harnesses_105.py:65` — `response = self.client.post("/wire/v1/server.hello", headers=self.head` | 12 |
+| `server.hello` | `tests/server/test_hello_harnesses_105.py:65` — `response = self.client.post("/wire/v1/server.hello", headers=self.head` | 14 |
 | `sessions.archive` | `tests/server/test_wire_v1.py:953` — `archived = api.ok("sessions.archive", {` | 1 |
 | `sessions.createAndSend` | `tests/server/test_accounts.py:254` — `sent = client.post("/wire/v1/sessions.createAndSend", headers={` | 50 |
 | `sessions.list` | `tests/server/test_profile_permissions.py:187` — `listed = client.post("/wire/v1/sessions.list", headers={` | 9 |
@@ -146,7 +145,7 @@ python3 scripts/server-round1/wire_drive_coverage.py --check     # 有缺口即�
 | `workspaces.browse` | `tests/server/test_wire_v1.py:291` — `invalid = api.client.post("/wire/v1/workspaces.browse", headers=api.he` | 4 |
 | `workspaces.gitStatus` | `tests/server/test_git_status.py:143` — `result = client.post("/wire/v1/workspaces.gitStatus", headers={` | 6 |
 | `workspaces.list` | `tests/server/test_wire_v1.py:278` — `"jsonrpc": "2.0", "id": "1", "method": "workspaces.list", "params": {}` | 3 |
-| `workspaces.open` | `tests/server/test_accounts.py:248` — `opened = client.post("/wire/v1/workspaces.open", headers={` | 39 |
+| `workspaces.open` | `tests/server/test_accounts.py:248` — `opened = client.post("/wire/v1/workspaces.open", headers={` | 41 |
 
 ## 这张表**没有**说明什么
 

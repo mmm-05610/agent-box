@@ -1720,3 +1720,23 @@ HEAD 即检查点；`git status --short` 只剩本树自己的证据目录（`08
   定向复算 8 次（平均 ~40 s）· 1 次 20 轮计数腿被全量套件顺带重跑（已把那条腿改成 opt-in，教训见 1ea024f 的提交信息）。
 - **踩坑两条入形**：① 全量套件会**重写已提交的证据文件**（`rounds.json` 被改成两轮）⇒ 重跑型门必须 opt-in + 写明命令；
   ② 跨 shell 传 Windows 路径**别用嵌套引号**（`"$env:…"` 被 bash 吞掉 ⇒ 我量到假的 `False/False`，差点写成"前置未就绪"）。
+
+## 工单 128 — `history.snapshot` 的 `seq` 只有一个编号空间（AUD-B-010，2026-09-19 15:2x–15:4x，执行者）
+
+**终态 `WIRE_SEQ_SPACES_DONE`**。证据 [wire-seq-numbering-spaces-128.md](../server-round1/wire-seq-numbering-spaces-128.md)，
+门 `tests/server/test_wire_seq_numbering_spaces_128.py`（**7 条**，全部从真 HTTP 的 `history.snapshot` 读帧，不直调 `event_frame`）。
+
+- 一手复核成立：`thought.delta / plan.updated / mode.updated / usage.updated` 四类**会产帧**（`wire/projection.py:_EVENT_KIND_MAP`）
+  却不在编号名单 `sessions/repository.py:WIRE_VISIBLE_EVENT_KINDS`（10 项）里 ⇒ 缺号时投影回落到**存储 `seq`**，
+  一条流上两套编号并存；客户端按 `seq` 排序＋去重会**丢正文与工具卡**（门里那条反例实测到 reuse>0）。
+- 修法是**一条成员改动**（10 → 14），不改任何产帧点、不加事件类型、不改 `server.hello` 的 64 法（G4 逐字钉住）。
+- **本单自己撞出一条"环境决定的绿"（如实）**：那条换回旧名单的反例用了 `monkeypatch.undo()`，而 `monkeypatch` 是函数级的、
+  与 `server` fixture 同一个对象 ⇒ `undo()` 顺手撤掉 fixture 里那条 `sandbox_available` 替身，同一测试**后半段**的
+  `workspaces.open` 被按真实主机条件拒掉，报出来是 `KeyError: 'result'`。带 `AGENT_BOX_SANDBOX_MODULE` 跑就全绿、不带就红。
+  改成就地 `try/finally` 只还原那一个常量，**两种环境各复跑一遍**才记绿。与 123 那条"改全局状态的门要说清撤回了什么"同族。
+- **边界如实（不装作闭合）**：`storage/database.py:_migrate_4_to_5` 当年按**十项**名单回填过历史行，那文件不在 128 写面
+  ⇒ 新写入已归一，**已存在的老 Session 里那四类旧行仍是 `wire_seq IS NULL`**、仍可能混两套。登记成一条能写 `storage/**` 的单（见下表 §待开单）。
+- 计数：定向 **7 passed**（两种环境各一次）；批末 `tests/server -q` = **1 failed / 812 passed / 1 skipped in 483.33s**
+  ——红的是 `103` 那张生成账（本单新门多了 6 条证据行：`history.snapshot` 24→26、`server.hello` 12→14、`workspaces.open` 39→41），
+  重新生成后 `103 + 128` 定向 = **15 passed / 6.86s**。**Worker 工件：在**（本轮未用：门只走本地 SQLite ＋ 桩执行后端）。
+  真实模型调用 **0 / ¥0**；临时根由 pytest 管理，无源码外产物。
