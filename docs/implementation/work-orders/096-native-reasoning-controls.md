@@ -1,7 +1,7 @@
 ---
 id: 096
 slug: native-reasoning-controls
-batch: b4
+batch: c2
 baseline: "f6cbc113791347e20acc85ec34c2e697d2345dd0"
 depends_on: [{"order": "092", "condition": "模型事实（capabilities.reasoningOptions）与描述符的多控件声明可用"}, {"order": "093", "condition": "逐家原生配置写入器可用（本单要往它上面加旋钮的键）"}]
 write_paths: ["src/agent_box/**", "plugins/**", "tests/**", "scripts/server-round1/**", "docs/server-round1/**", "docs/implementation/status.md"]
@@ -9,7 +9,7 @@ forbidden: ["/home/maoqh/projects/agent-box-server-round1/**", "/home/maoqh/proj
 ruling: R-0013
 terminal: ["NATIVE_REASONING_CONTROLS_DONE", "NATIVE_REASONING_CONTROLS_PARTIAL"]
 waive: []
-parallel_units: []
+parallel_units: ["pi","dsh"]
 ---
 
 # Work Order 096 — 思考/推理旋钮：逐家声明 + 取值域动态 + 落盘

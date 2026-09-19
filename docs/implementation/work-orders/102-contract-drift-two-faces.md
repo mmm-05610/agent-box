@@ -1,7 +1,7 @@
 ---
 id: "102"
 slug: contract-drift-two-faces
-batch: b2
+batch: c3
 baseline: "fc961945b15074a710267b0ed055280b4e5495a4"
 depends_on: []
 write_paths: ["protocols/**", "workers/agent-box-worker/**", "src/agent_box/**", "tests/**", "docs/server-round1/**", "docs/implementation/status.md"]
@@ -9,7 +9,7 @@ forbidden: ["/home/maoqh/projects/agent-box-server-round1/**", "/home/maoqh/proj
 ruling: R-0011
 terminal: ["CONTRACT_DRIFT_TWO_FACES_DONE", "CONTRACT_DRIFT_TWO_FACES_PARTIAL"]
 waive: []
-parallel_units: []
+parallel_units: ["schema-enum","dispatch-arm","golden"]
 ---
 
 # Work Order 102 — 两个合同面的漂移（Worker op 枚举落后 / 前端工件证据副本陈旧且诱导假绿）

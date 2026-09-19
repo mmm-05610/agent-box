@@ -1,7 +1,7 @@
 ---
 id: 093
 slug: native-config-materialization
-batch: b4
+batch: c2
 baseline: "f6cbc113791347e20acc85ec34c2e697d2345dd0"
 depends_on: [{"order": "092", "condition": "provider 记录带 protocols/endpoints 与描述符 wireProtocols；否则本单只能做观测阶段"}]
 write_paths: ["src/agent_box/**", "plugins/**", "tests/**", "scripts/server-round1/**", "docs/server-round1/**", "docs/implementation/status.md"]
@@ -9,7 +9,7 @@ forbidden: ["/home/maoqh/projects/agent-box-server-round1/**", "/home/maoqh/proj
 ruling: R-0013
 terminal: ["NATIVE_CONFIG_MATERIALIZATION_DONE", "NATIVE_CONFIG_MATERIALIZATION_PARTIAL"]
 waive: []
-parallel_units: []
+parallel_units: ["claude-code","codex","opencode","hermes","dsh","qwen","kilo","pi"]
 ---
 
 # Work Order 093 — 冻结的 provider/model 落进各家原生配置（R-0013 第 1 层的执行侧）

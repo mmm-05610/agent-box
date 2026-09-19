@@ -1,5 +1,5 @@
 ---
-id: 106
+id: "106"
 slug: sidecar-rebuild-on-drain
 batch: b2
 baseline: "75db678"

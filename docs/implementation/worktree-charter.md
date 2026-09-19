@@ -32,10 +32,14 @@
 | 6 | `093` | 原生配置落盘（**8 家＝8 个可并行单元**） | 092 |
 | 7 | `094` | 订阅登录引擎（device-code） | 092 |
 | 8 | `095` | provider 型登录 + 账号生命周期 | 094 |
-| 9 | `096a` | **thinking 打开**（pi/dsh 模板，配置层）+ 门"真一轮出现 `thought.delta`" | 092（或独立先做） |
-| 10 | `096b` | 思考旋钮/取值域/落盘（原 096 主体） | 092+093 |
-| 11 | `100` | 其余家真实 UI 门（**逐家＝可并行单元**；假端点优先） | 089（A 树） |
-| 12 | `102` | Worker 协议漂移（op 枚举/正例/三元门） | 无 |
+| 9 | `107`（**R-0020 的 `096a`**） | **thinking 打开**（pi/dsh 模板，配置层）+ 门"真一轮出现 `thought.delta`"；`parallel_units: ["pi","dsh"]` | 无（可先做；**A 线 P35 等它**） |
+| 10 | `096`（**R-0020 的 `096b`**） | 思考旋钮/取值域/落盘（原 096 主体）；`parallel_units: ["pi","dsh"]` | 092+093 |
+| 11 | `100` | 其余家真实 UI 门（**逐家＝可并行单元**；假端点优先）；`parallel_units: ["per-family"]` | 089（A 树） |
+| 12 | `102` | Worker 协议漂移（op 枚举/正例/三元门）；`parallel_units: ["schema-enum","dispatch-arm","golden"]` | 无 |
+
+> **编号映射（R-0020/R-0023）**：`096a` ⇒ 文件名 `107-thinking-on-in-templates.md`（校验器要求三位数编号）；`096b` ⇒ **原文件** `096-native-reasoning-controls.md`（不新造文件）。
+> **与 A 树的共享文件串行**：`server/model_configs/**` 与 `bootstrap/runtime.py` 描述符部分——**A 的 `104/105` 先做，本树的 `092` 后做**（公告点名）。
+> **本树不做**：`server/wire/**`、`model_configs/probe.py` 及其探针语义（属 A 树）。
 
 > 契约文件在 `docs/implementation/work-orders/`（**与 A 树同一份历史**）；**新单由调度者投递**（父树白名单）。
 

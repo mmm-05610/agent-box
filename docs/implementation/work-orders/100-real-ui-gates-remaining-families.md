@@ -1,7 +1,7 @@
 ---
 id: "100"
 slug: real-ui-gates-remaining-families
-batch: b3
+batch: c3
 baseline: "b2 checkpoint"
 depends_on: [{"order": "089", "condition": "pi 与 codex 两家在 Windows 控制面上真实 UI 门已绿（R-0015）"}]
 write_paths: ["docs/server-round1/fullstack/**", "docs/implementation/status.md", "scripts/server-round1/**"]
@@ -9,7 +9,7 @@ forbidden: ["src/agent_box/**", "plugins/**", "tests/**", "/home/maoqh/projects/
 ruling: R-0015
 terminal: ["REMAINING_REAL_UI_GATES_DONE", "REMAINING_REAL_UI_GATES_PARTIAL"]
 waive: []
-parallel_units: []
+parallel_units: ["per-family"]
 ---
 
 # Work Order 100 — 其余家的真实 UI 门（089 之后逐个补）
