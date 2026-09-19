@@ -641,7 +641,7 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production,
         endpoint.start()
     bundle = sidecar_bundle_files(PLUGIN)
     catalog = (production.models_document() if live
-               else production.loopback_models_document(endpoint.base_url))
+               else production.gate_models_document(endpoint.base_url))
     bundle[f"agentbox-sidecar/deployment/pi/{production.MODELS_SOURCE.rsplit('/', 1)[-1]}"] = json.dumps(
         catalog).encode()
     bundle["agentbox-sidecar/deployment/pi/settings.json"] = production.SETTINGS_TEMPLATE.read_bytes()
@@ -791,11 +791,13 @@ def run_chain(temporary, workspace, worker, artifact, digest, endpoint, producti
     deployment = temporary / "deployment.json"
     deployment.write_text(json.dumps(document), encoding="utf-8")
 
-    # Live mode projects the official catalogue byte-for-byte; the no-model mode
-    # rewrites only baseUrl, so the two differ in exactly that one field.
+    # Live mode projects the official catalogue byte-for-byte (permissive default
+    # ceiling); the no-model gate projects the endpoint override *plus* its own
+    # explicit ceiling pin (gate_models_document -> 64), so its request budget is
+    # bounded and never silently inherits the template default (Order 108).
     catalog_bytes = (
         json.dumps(production.models_document(), sort_keys=True, separators=(",", ":")).encode()
-        if live else json.dumps(production.loopback_models_document(endpoint.base_url),
+        if live else json.dumps(production.gate_models_document(endpoint.base_url),
                                 sort_keys=True, separators=(",", ":")).encode()
     )
 

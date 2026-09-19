@@ -636,7 +636,7 @@ def observe_reopen(temporary, workspace, worker, artifact, digest, production,
         endpoint.start()
     bundle = sidecar_bundle_files(PLUGIN)
     settings_document = (production.settings_document() if live
-                         else production.loopback_settings_document(endpoint.base_url))
+                         else production.gate_settings_document(endpoint.base_url))
     bundle[f"agentbox-sidecar/deployment/dsh/{production.SETTINGS_SOURCE.rsplit('/', 1)[-1]}"] = (
         production.render_settings_document(settings_document))
     events: list[dict] = []
@@ -798,13 +798,15 @@ def run_chain(temporary, workspace, worker, artifact, digest, endpoint, producti
     deployment = temporary / "deployment.json"
     deployment.write_text(json.dumps(document), encoding="utf-8")
 
-    # Live mode projects the official settings document byte-for-byte; the
-    # no-model mode rewrites only baseURL, so the two differ in exactly that
-    # one field. The bytes are the template renderer's deterministic output.
+    # Live mode projects the official settings document byte-for-byte (permissive
+    # default ceiling); the no-model gate projects the endpoint override *plus* its
+    # own explicit ceiling pin (gate_settings_document -> 64), so a no-model run's
+    # request budget stays bounded and never silently inherits the template default
+    # (Order 108). The bytes are the template renderer's deterministic output.
     settings_bytes = (
         production.render_settings_document(production.settings_document())
         if live else production.render_settings_document(
-            production.loopback_settings_document(endpoint.base_url))
+            production.gate_settings_document(endpoint.base_url))
     )
 
     import agent_box.server.bootstrap.runtime as runtime_module
