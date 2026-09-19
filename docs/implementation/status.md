@@ -1306,3 +1306,19 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 | 单 | 阶段 | 门 | 回归 | 真实模型 | 提交 |
 | --- | --- | --- | --- | --- | --- |
 | 112 | 5 修订 v2 的第二半（逐字段登记可空性） | 调度者按阶段 1 实测改了这张单，裁定"省略即保留只是一半，**显式清空不许被吞**；可空性以合同/工件为准，逐字段登记"。补做四条门：① **合同可空列（`credentialId`，`anyOf [string,null]`）真的解绑**——绑定态→null ⇒ 读回 null、版本 +1，而服务层省略该键 ⇒ 绑定保持（两种意图第一次在同一列上可分辨并各自生效）；② 三个非空列（`displayName`/`configuration`/`models`）给 null 一律**点名**类型化拒绝；③ **可空性表与工件逐字段核对**（重锁改了可空性 ⇒ 这条先红，而不是让行为断言悄悄过期；并钉住"`update` 接受的字段集就是这七个"）；④ 一处**如实登记的偏差**：`models: []` 合同合规（无 `minItems`）而 Server 拒（`Models must be non-empty and unique`）——它**说话**不是静默，故不改只钉，合同哪天加了 `minItems` 这条门会红并要求重看。`provenance` 四列因**合同里没有这一键**（113 点名的漂移）而以 Server 侧登记，并在表里标明这一格是合同缺口 | 门 24 ⇒ **28 passed in 9.89s**；定向 `pytest tests/server -k "provider or update or provenance or artifact or coverage"` ⇒ **120 passed / 650 deselected，0 失败** | 0 次 / ¥0（`/locator/never-read` 是字面 locator，未读取任何凭据内容） | 本提交（在 `checkpoint/b2-2` **之后**；tag 不移动——README §3.2 禁止覆盖，本次以更正行入账） |
+
+### 公告第 102 轮那条提醒的入账（113 的工件何时该重生成，2026-09-19）
+
+公告写："**`113` 的工件要在 `110` 落地后的现状上生成（含 `pauseReason`），否则又差一个字段**"。第一手核对本树现状：
+
+| 检查 | 实测 |
+| --- | --- |
+| `wire_artifact.py --check <清单>` | `inventory is current (eaae9330…)`，退出码 **0** ⇒ 清单与**本树源码**一致 |
+| `grep -rn pauseReason src/agent_box` | **零命中** |
+| `storage/database.py:11` | `PRODUCT_SCHEMA_VERSION = **18**`（`110` 把它抬到 19 那一改在 **runtime 线**，`49083af`） |
+
+⇒ 本树工件**现在不含 `pauseReason` 是事实而不是遗漏**：这条线里没有那个字段。等两线合并（或 `110` 的成果到达本树）之后，
+**不需要有人记得**：`--check` 会红（清单落后于源码）、`--compare` 会点名差异（合同与清单不再同)——这正是 113 把门写成
+"内容必须等于现算"与"副本名字必须等于自己的哈希"的原因。另记一条跨线口径：**清单的 result 轴一律不声明**，
+所以 `pauseReason` 这类**视图/事件字段**天然只会在重锁后的合同那侧显形；两仓对表的三条轴（方法集/required/可选名）
+不会因它假绿，也不会因它假红。
