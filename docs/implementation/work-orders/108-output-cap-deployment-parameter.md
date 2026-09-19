@@ -4,12 +4,13 @@ slug: output-cap-deployment-parameter
 batch: c2
 baseline: "a7b5dbe"
 depends_on: []
-write_paths: ["plugins/agent-box-harnesses/**", "src/agent_box/**", "tests/**", "docs/server-round1/**", "docs/implementation/status.md"]
+write_paths: ["plugins/agent-box-harnesses/**", "src/agent_box/**", "scripts/server-round1/**", "tests/**", "docs/server-round1/**", "docs/implementation/status.md"]
 forbidden: ["/home/maoqh/projects/agent-box-server-round1/**", "/home/maoqh/projects/agent-box-desktop-next-wsl-round1/**", "/home/maoqh/projects/agent-box-env-provider/**", "release/**"]
 ruling: R-0021
 terminal: ["OUTPUT_CAP_PARAMETERIZED_DONE", "OUTPUT_CAP_PARAMETERIZED_PARTIAL"]
 waive: []
 parallel_units: ["pi", "dsh", "hermes"]
+revisions: [{"at": "49083af", "what": "write_paths 增补 scripts/server-round1/**：生产链门在 opencode-production-chain-gate.py 里断言 template==OUTPUT_TOKEN_LIMIT，不改它本单无法落地（执行者交回）", "after_stage": 1, "ruling": "R-0032"}]
 ---
 
 # Work Order 108 — 输出上限参数化：`maxTokens: 64` 从生产模板里拿掉（AQ-0004，用户已批准）
