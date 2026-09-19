@@ -22,6 +22,25 @@ class SecretStore(Protocol):
     def delete(self, locator: str) -> None: ...
 
 
+class SecretLocatorUnavailable(RuntimeError):
+    """A recorded credential's locator is not resolvable in the store.
+
+    Typed (``code = CREDENTIAL_NOT_AVAILABLE``) so ``_safe_code`` surfaces it as
+    the execution reason instead of a reasonless ``EXECUTION_FAILED``. The
+    message carries only the non-sensitive locator id and why it cannot be read;
+    no secret bytes are ever included.
+    """
+
+    code = "CREDENTIAL_NOT_AVAILABLE"
+
+    def __init__(self, locator: str) -> None:
+        self.locator = locator
+        super().__init__(
+            f"credential locator {locator!r} is not available on this machine "
+            "(the credential was never imported here, or was removed); "
+            "select a profile whose credential is present")
+
+
 class _Blob(ctypes.Structure):
     _fields_ = [("cbData", wintypes.DWORD), ("pbData", ctypes.POINTER(ctypes.c_byte))]
 
@@ -146,7 +165,6 @@ class WindowsDpapiSecretStore:
 @dataclass
 class MemorySecretStore:
     """Explicitly injected deterministic store for tests; never default composition."""
-
     values: dict[str, bytes]
 
     def import_file(self, source: Path, kind: str) -> tuple[str, str]:
@@ -156,7 +174,15 @@ class MemorySecretStore:
         return credential_id, credential_id
 
     def read(self, locator: str) -> bytes:
-        return self.values[locator]
+        # Order 120: a locator that is not in the store is a decidable
+        # configuration fact, not a Python bookkeeping accident. Raising the raw
+        # ``KeyError`` let it collapse into a reasonless ``EXECUTION_FAILED`` far
+        # from where the cause is known; name the (non-sensitive) locator so the
+        # failure stays typed and actionable. The value is never in the message.
+        try:
+            return self.values[locator]
+        except KeyError:
+            raise SecretLocatorUnavailable(locator) from None
 
     def delete(self, locator: str) -> None:
         self.values.pop(locator, None)

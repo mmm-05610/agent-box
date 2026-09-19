@@ -1195,3 +1195,14 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 ② 生成 wire-v1 schema/工件 + P28 重生成 + 两仓重锁（G7 材料已备：见 wire-review 092 节）；
 ③ **v2 多槽**（R-0013 追加，G8/G9/G10）：`config.describe` 逐槽 `model_slot` 投影 + profile 槽表引用形状（均在 `handlers.py::config_describe/_controls`＝A 线）＋描述符 `model_controls` 声明（本树可随后半补，不依赖 wire）。
 runtime 侧（存储/service/描述符/派生/冻结/逐家声明）已 DONE 且带反例。**§Spend：0 真调用 / ¥0**（全合成输入与本机回环，凭据 locator 未访问，临时根核清）。
+
+## 工单 120 — 缺凭据不许崩成 KeyError／不许只剩 EXECUTION_FAILED（主路径；2026-09-19，执行者·runtime 线）
+
+> 调度者插入「今晚焦点之前」（R-0054 ⑥ + AQ-0009 主路径无已知未修；A 的 T6 一手硬前置）。做完即回 092→093（已完成）。
+> 证据：[credential-missing-typed-failure-120.md](../server-round1/fullstack/credential-missing-typed-failure-120.md)
+
+| 单 | 阶段 | 门 | 回归 | 真实模型 | 提交 |
+| --- | --- | --- | --- | --- | --- |
+| 120 | 1-4（一处提交收口） | G1 store 缺 locator⇒`SecretLocatorUnavailable`（`code=CREDENTIAL_NOT_AVAILABLE`、点名不敏感 id、**零 key 内容**）非 KeyError；G2/G3 port_factory 在 capability_gate/spawn **之前**把读失败转成 `CREDENTIAL_NOT_AVAILABLE` 并落日志⇒`_safe_code` 出**具名码**非 `EXECUTION_FAILED`；G2 反例见证 `_safe_code(KeyError(..))==EXECUTION_FAILED`（退回即门红） | 定向 `test_credential_missing_typed_120`+`test_deployment_credentials` **15 passed**；`harness_sidecar` **92 passed/6 skipped**；`runtime` import OK；**Worker 工件不在**（QA-007，环境红与本单无关）| 0 真调用 | 本提交 |
+
+**终态 `CREDENTIAL_MISSING_TYPED_FAILURE_DONE`**（runtime 射程）。边界如实：转录 reason 字段＝大写 code（wire `execution.state` 既有形状）⇒ 本单把 `EXECUTION_FAILED` 升到具名 `CREDENTIAL_NOT_AVAILABLE`；更长的自由文本"换哪个 profile"属 wire/schema 消息位（A 树），可行动细节现落服务器日志（只 id、零凭据内容，守 R-0032⑤）。`wire/**` 未动。§Spend：0 真调用 / ¥0。

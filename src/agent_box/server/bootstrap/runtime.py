@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 import csv
 from datetime import datetime, timezone
 import io
+import logging
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -839,7 +840,19 @@ def build_runtime_from_sidecar_deployment(
                 record = credentials.get(credential_id, kind=descriptor.credential_kind)
                 if secret_store is None:
                     raise RuntimeError("CREDENTIAL_STORE_UNAVAILABLE")
-                credential = secret_store.read(record["secret_locator"])
+                try:
+                    credential = secret_store.read(record["secret_locator"])
+                except Exception as exc:  # Order 120: resolve at this layer
+                    # The credential cannot be read on this machine. Fail here,
+                    # before the capability gate and any spawn, so the transcript
+                    # gets a typed, actionable reason (``CREDENTIAL_NOT_AVAILABLE``)
+                    # rather than a KeyError collapsing into EXECUTION_FAILED. The
+                    # id is non-sensitive; the secret value is never logged.
+                    _log = logging.getLogger(__name__)
+                    _log.warning(
+                        "credential %s is unavailable for execution (harness %s): %s",
+                        credential_id, context.get("harness_type"), exc)
+                    raise RuntimeError("CREDENTIAL_NOT_AVAILABLE") from exc
             # The native home: no restore, no upload. The Harness reopens its
             # own durable directory on the machine that runs this turn; the
             # record's locator (kept once a turn has run) survives renames,
