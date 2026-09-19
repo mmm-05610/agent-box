@@ -314,3 +314,33 @@ for entry in resolved:            # 每一个答案，不是第一个
   `plugins/agent-box-harnesses/third_party/.../agent-model-catalog.js` 的目录拉取若要同样约束，是另一张单。
 * **给 103**：`providerModels.probeConnection` 里那个 `_provenance` 死调用点（098 §10 已记）
   与本单无关，但 103 的覆盖面会把"每个登记方法至少被真 wire 驱动一次"这件事一并照出来。
+
+## 11 计数、账与清理
+
+| 项 | 结果 |
+| --- | --- |
+| 门文件 | `15 passed in 6.66s`（最终源码）；旧码对照 `9 failed / 6 passed`（§9.2） |
+| `python3 -m pytest tests/server -q` | **687 passed in 332.20s**（**687 = 672 ＋ 本单 15**，一条未掉） |
+| `python3 -m pytest tests/ -q`（第一轮） | **1 failed / 986 passed in 489.39s** |
+| `python3 -m pytest tests/ -q`（复跑） | **987 passed in 298.45s**（**987 = 972 ＋ 本单 15**） |
+| `validate_order.py --strict` | 30 OK / 31 FAIL（FAIL 恰为 37…67 的 v1 历史单）；068–105 全 OK |
+| `git diff --check` | 干净 |
+
+**那一条红不是本单的回归，且按事实记成三行**：红的是
+`tests/server/test_first_run_lock.py::test_without_the_gate_the_same_first_runs_overlap`
+（080 的反例门，断言"没有锁则两次冷跑的时间窗**必相交**"——相交与否是线程时序问题）。
+一手证据：① **同一份源码**在 `tests/server` 那一腿里 **687 全绿**（该文件包含在内），
+② 单跑该文件 **3 次 × 5 passed**，加 `tests/integration` 一起 **74 passed**，
+③ 出问题那一轮 `tests/` 用时 489.39s，而同机前后两轮是 358.34s / 374.66s、复跑（无并发全量）只用 298.45s
+——用时与结果一起指向"负载下时序被拉长"，与 R-0023 点名的 11 GB 瓶颈一致。
+本树**没有**为让门绿改那条断言（章程 §8）；已登记进 `status.md` 的 §待开单，
+连同"该反例门需要一个不看墙钟时间的写法"一起交回调度者。
+
+**费用**：真实模型调用 **0 次 / ¥0**，且这是**机制**不是承诺——门文件里 `getaddrinfo` 对表外名字一律 `gaierror`、
+需要它的用例把 `create_connection` 换成"记录并抛"，真发一次就是红的（§9.1 最后一条 G4 断言）。
+凭据 locator **未访问**；全程出现的凭据只有一个字面假值
+`DUMMY-NOT-A-REAL-SECRET-0123456789`，它没进过任何日志或证据（除本行引用它本身）。
+
+**清理**：`/tmp/104-oldcode`（咬旧码用的副本）跑完 `rm -rf` 并核实缺席；
+三次假端点都是进程内随机端口、随用例 `shutdown()`；临时数据根 `obs105-`/`obs105b-`/`real*` 全部核实删除；
+工作树在阶段 2/3 的两次"咬旧码"前后一字未动（§9.2 的跑法）。

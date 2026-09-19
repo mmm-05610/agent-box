@@ -768,6 +768,9 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 | --- | --- | --- | --- |
 | 授权层拒**任意环**（不只一条反向边） | `profiles/repository.py:140`（自授）与 `:157`（直接反向边）之外，A→B、B→C、C→A **三条边全建得出来**；运行期靠 `check_cycle` 拦第 3 跳，但授权表里的图**不是 DAG** | 属 65 的 C 段（授权 CRUD），而 086 的 `write_paths` 不含该面的语义扩展；R-0016 也只允许"接已有规则"，不允许本单顺手加限制 | [086 证据 §10](../server-round1/fullstack/subagent-harness-round-086.md)、用例 `tests/server/test_subagent_rule_liveness_086.py::test_a_three_edge_ring_closes_on_its_third_hop_and_is_refused` |
 | Worker 侧 `session/request_permission` **无应答路径** | `grep -rn request_permission workers/agent-box-worker/src/` 只命中 `fs::set_permissions` 两处无关项；`src/agent_box` 亦无 ⇒ ACP 适配器把工具权限交给 `canUseTool` 后无处可答，真父轮只能靠 SDK 侧预批准 | `workers/**` 不在 086/085 的 `write_paths`（099 只被授权修 `home.put` 的分发臂） | [086 证据 §7](../server-round1/fullstack/subagent-harness-round-086.md) |
+| 探针把连接**钉到已校验的地址**（闭掉 DNS 重绑定窗口） | 104 修好了"完全不看解析结果"，没修"看了之后不再变"：校验解析一次、`http.client` 再解析一次，TTL=0 的名字可先答公网过关再答 `169.254.169.254`。要做对得自己管 `server_hostname`/SNI 与证书校验，而**本树没有 TLS 桩**（环回例外只放 `http`）⇒ 没有反例的门不算门 | 是新的语义与新的测试面，不在 104 的射程（104 §Scope 只列"不跟随／复检／尽量钉"，且明确"做不到就写清残余风险"） | [104 证据 §10 残余风险](../server-round1/fullstack/probe-ssrf-hardening-104.md) |
+| **CGNAT `100.64.0.0/10` 是否进拒绝集**（语义裁决） | 实测本机 `ipaddress`（Python 3.12）对 `100.64.0.1` 的 `is_private/is_reserved/is_multicast/is_link_local` **四个旗标全 False** ⇒ 104 的复检放过它；而 WSL2／Tailscale／VPN 的内部面常落在这段（IMDS 形状的服务常挂在那儿） | 104 §Scope 写的是"私网/保留/多播"三类，自扩拒绝集＝改变可探范围（可能拒掉用户真想探的内部网关），需要裁决而不是顺手做 | [104 证据 §8.1](../server-round1/fullstack/probe-ssrf-hardening-104.md) |
+| 080 的反例门**在负载下假红**（与 087 同族，但是另一条门） | 同一份源码：`tests/server` 整腿 **687 passed** ⇒ 紧接着 `tests/` 整腿里 `test_first_run_lock.py::test_without_the_gate_the_same_first_runs_overlap` **1 failed / 986 passed**；单跑该文件 **3 次全 5 passed**、加 `tests/integration` 一起 **74 passed**。该断言是"没有锁则两次冷跑的时间窗必相交"——**相交与否取决于线程时序**；那一轮 `tests/` 用时 489.39s，同机此前两轮是 358.34s / 374.66s（慢约 30%，与 R-0023 点名的 11 GB 瓶颈一致） | 属 080 的门，而 080 已收口；本树不得为让门绿而改断言（章程 §8），且 104 没碰 `execution/**` | 本轮终态行与 [104 证据 §11](../server-round1/fullstack/probe-ssrf-hardening-104.md) |
 
 
 > 编号说明：上一节 `## CHECKPOINT b2`（080/081 那次）的 §2 写了"新增 B5"，但当时表里没落 B5
@@ -1089,7 +1092,7 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 
 ## 工单 104 — 探测出站的 SSRF 两条绕过 ＋ 凭据随行（安全；2026-09-19，执行者）
 
-> **进行中**：本记阶段 1（观测）。终态行在阶段 5 提交时补。
+> **已收口**：终态行在本节末尾。阶段 1 与 4 与 5 各一次提交，阶段 2＋3 合一（理由见本节末注）。
 > 证据：[probe-ssrf-hardening-104.md](../server-round1/fullstack/probe-ssrf-hardening-104.md)
 
 | 单 | 阶段 | 门 | 回归 | 真实模型 | 提交 |
@@ -1102,3 +1105,5 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 > （`_validate_endpoint` 与 `_open_request`/`_typed_http_error`），拆开必须靠"改—回退—再改"来造两个提交，
 > 而章程禁止对工作树做那种编辑再恢复；两道的门本来也各自独立（G1 走 opener、G2 走解析）。
 > 证据里 §7 与 §8 是分开记的，各自带实测。
+| 104 | 5 账与清理 | 计数：门 `15 passed in 6.66s`；`tests/server -q` **687 passed in 332.20s**（687 = 672 ＋ 本单 15）；`tests/ -q` 第一轮 **1 failed / 986 passed in 489.39s**、复跑 **987 passed in 298.45s**（987 = 972 ＋ 15）；`validate_order.py --strict` 30 OK / 31 FAIL（FAIL 恰为 37…67）；`git diff --check` 干净。**那一条红不是本单的回归，按事实记三行**：红的是 080 的反例门 `test_without_the_gate_the_same_first_runs_overlap`（断言"没有锁则两次冷跑时间窗必相交"，相交与否是线程时序）——同一份源码在 `tests/server` 那一腿 687 全绿（该文件含在内）、单跑该文件 3×5 passed、加 `tests/integration` 一起 74 passed、出问题那轮用时 489.39s 而同机前后是 358.34/374.66s 且无并发复跑只用 298.45s ⇒ 指向负载拉长时序（与 R-0023 点名的 11 GB 瓶颈一致）。**本树没有为让门绿改那条断言**，已连同"它需要一个不看墙钟时间的写法"登记进 §待开单 | 见上行 | **0 次 / ¥0，且是机制不是承诺**（表外名字一律 `gaierror`、需要它的用例把 `create_connection` 换成"记录并抛"，真发一次就红）；凭据 locator 未访问，全程只有一个字面假值；`/tmp/104-oldcode` 与三个临时根逐一核实删除 | 本提交（阶段 5） |
+| 104 | **终态 `PROBE_SSRF_HARDENING_DONE`** | 门：G1 不跟随（3xx ⇒ 类型化 `PROBE_ENDPOINT_BLOCKED` **且源站计数恰 1、目标站 0**）；G2 解析复检（域名→IMDS／公网+内网混合／`fe80::1` 三类全拒，且**没有一次 connect 发生**）；G3 回归（字面私网、`ftp://`、`gaierror→UNREACHABLE`、两条公开入口端到端 `ok`/`reachable` 逐条钉住）；G4 零真机成本由机制保证。反例真跑：整份门咬 `d2b2036` 的旧 `probe.py` ⇒ **9 failed / 6 passed**（绿的六条各自说明理由，其中代理那条按事实写明"在旧码跑里为什么是绿的"、它的反例在阶段 1 §2.2/§2.3）。摘要：**探针的"一次、且只到声明的端点"从模块自述变成可证的事实**——不跟 3xx、不用系统代理、看解析结果而非名字写法；顺带修掉一个会骗人的地方（`_typed_http_error` 曾是零调用者，错误映射有两份）。费用 0 次 / ¥0。清理无源码外产物。**未做项（逐条）**：① **DNS 重绑定窗口不消除**（校验解析一次、连接再解析一次）⇒ 需要把已校验地址带进连接层＋TLS 测试桩，已登记 §待开单并交回；② **CGNAT `100.64.0.0/10` 仍可通过**（`ipaddress` 四旗标全 False，实测 §8.1）⇒ 语义裁决，不自扩拒绝集；③ 工单 §Scope 写的正例是"合法 **https** 端点（本地假服务）成功"，本机没有 TLS 桩（环回例外只放 `http`）⇒ 正例用的是**环回 http 例外**这条合法路径，https 侧只到"通过校验"（`test_a_public_name_still_passes_the_endpoint_check`）；④ 代理腿的反例是阶段 1 的两处一手测量而非进程内门（原因写明在 §9.2） | 同上行 | **0 次 / ¥0** | 本提交 |
