@@ -745,18 +745,30 @@ def build_runtime_from_sidecar_deployment(
             capability_claims = {} if raw_claims is None else validate_claims(raw_claims)
         except CapabilityDeclarationError as exc:
             raise RuntimeError(f"SIDECAR_DEPLOYMENT_INVALID: {exc.code}") from exc
-        registry.register(HarnessDescriptor(
-            harness_id,
-            credential_kind=credential_kind,
-            model_control_id=model_control_id,
-            credential_environment=credential_environment,
-            capability_claims=capability_claims,
-            control_options={
-                str(key): tuple(options)
-                for key, options in dict(item.get("controlOptions") or {}).items()
-            },
-            security_locked_controls=tuple(item.get("securityLockedControls") or ()),
-        ))
+        # Order 092: the seat may declare the canonical protocols it speaks and
+        # the family-native dialect value for each. Absent = undeclared (unknown,
+        # never incompatible); an illegal declaration is a typed refusal.
+        raw_wire_protocols = item.get("wireProtocols") or {}
+        if not isinstance(raw_wire_protocols, dict):
+            raise RuntimeError("SIDECAR_DEPLOYMENT_INVALID")
+        from agent_box.server.execution import HarnessDescriptorError
+        try:
+            descriptor = HarnessDescriptor(
+                harness_id,
+                credential_kind=credential_kind,
+                model_control_id=model_control_id,
+                credential_environment=credential_environment,
+                capability_claims=capability_claims,
+                control_options={
+                    str(key): tuple(options)
+                    for key, options in dict(item.get("controlOptions") or {}).items()
+                },
+                security_locked_controls=tuple(item.get("securityLockedControls") or ()),
+                wire_protocols=raw_wire_protocols,
+            )
+        except HarnessDescriptorError as exc:
+            raise RuntimeError(f"SIDECAR_DEPLOYMENT_INVALID: {exc}") from exc
+        registry.register(descriptor)
     unused = sorted(set(bindings) - used_bindings)
     if unused:
         # A binding nobody asked for is a typo or a stale document, and silently

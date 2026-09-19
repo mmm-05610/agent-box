@@ -14,6 +14,37 @@ from agent_box.resource_contracts.harness_capabilities import (
     merge_capabilities,
     validate_claims,
 )
+from agent_box.server.execution.protocols import (
+    CANONICAL_PROTOCOLS, CANONICAL_PROTOCOL_SET, MAX_WIRE_PROTOCOLS,
+)
+
+
+class HarnessDescriptorError(ValueError):
+    """A deployment seat declared a field the assembly refuses (typed)."""
+
+
+def _validate_wire_protocols(value: Mapping[str, str]) -> dict[str, str]:
+    """Freeze a seat's protocol map to canonical keys in canonical order.
+
+    Every key must be one of the four canonical protocols, every value a
+    non-empty native-dialect string, and the map may not exceed the vocabulary.
+    A violation is a typed ``HarnessDescriptorError`` the bootstrap turns into
+    ``SIDECAR_DEPLOYMENT_INVALID`` - so a production template cannot smuggle a
+    second, unchecked protocol dictionary the compatibility derivation would
+    silently trust.
+    """
+    if not isinstance(value, Mapping):
+        raise HarnessDescriptorError("wire_protocols must be an object")
+    if len(value) > MAX_WIRE_PROTOCOLS:
+        raise HarnessDescriptorError("too many wire_protocols declared")
+    normalized: dict[str, str] = {}
+    for key, dialect in value.items():
+        if key not in CANONICAL_PROTOCOL_SET:
+            raise HarnessDescriptorError(f"wire_protocols key {key!r} is not canonical")
+        if not isinstance(dialect, str) or not dialect:
+            raise HarnessDescriptorError(f"wire_protocols value for {key!r} must be non-empty")
+        normalized[key] = dialect
+    return {name: normalized[name] for name in CANONICAL_PROTOCOLS if name in normalized}
 
 
 class TurnExecutionPort(Protocol):
@@ -51,6 +82,11 @@ class HarnessDescriptor:
     # Controls a security rule pins; they are reported as locked and cannot be
     # overridden by a Profile default or a temporary override.
     security_locked_controls: tuple[str, ...] = ()
+    # Work Order 092: the canonical protocols this Harness can speak, mapped to
+    # that family's own native dialect value (e.g. codex -> {"openai-chat":
+    # "chat"}). Declared only for families whose dialect is pinned in this repo;
+    # a family that declares none is *undeclared*, not incompatible.
+    wire_protocols: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         # 声明只能是 canonical id + 真 bool；装配期就失败，而不是等到某次执行
@@ -58,6 +94,7 @@ class HarnessDescriptor:
         object.__setattr__(
             self, "capability_claims", validate_claims(self.capability_claims),
         )
+        object.__setattr__(self, "wire_protocols", _validate_wire_protocols(self.wire_protocols))
 
 
 class HarnessRegistry:
@@ -79,6 +116,15 @@ class HarnessRegistry:
 
     def registered(self) -> tuple[str, ...]:
         return tuple(sorted(self._descriptors))
+
+    def wire_protocols(self, harness_type: str) -> dict[str, str]:
+        """The canonical→native protocol map one Harness seat declared (092).
+
+        Empty means the seat declares none: an *undeclared* family is not
+        incompatible, it is unknown, and the Server never blocks on unknown.
+        """
+        descriptor = self._descriptors.get(harness_type)
+        return dict(descriptor.wire_protocols) if descriptor else {}
 
     def claims_for(self, harness_type: str) -> dict[str, bool]:
         """External-compatible shape: {canonical id: declared}; unknown → {}."""

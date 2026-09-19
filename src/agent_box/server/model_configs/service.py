@@ -168,6 +168,19 @@ class ProviderModelService:
         if descriptor.credential_kind is not None and credential_id is not None:
             self.credentials.get(credential_id, kind=descriptor.credential_kind)
         stored = json.loads(self.objects.read(row["config_object_digest"]))
+        # Order 092 stage 4: only a *declared* mismatch blocks. Both the record
+        # and this Harness must state protocols; if they do and share none, the
+        # combination is genuinely impossible and is a typed refusal. Either side
+        # undeclared -> do not block (unknown is never treated as unavailable).
+        provider_protocols = set(stored.get("protocols") or [])
+        harness_protocols = self._registry_wire_protocols(harness)
+        if provider_protocols and harness_protocols and not (provider_protocols & harness_protocols):
+            raise ServerError(
+                "PROTOCOL_INCOMPATIBLE",
+                f"Provider declares {sorted(provider_protocols)} but Harness "
+                f"{harness!r} declares {sorted(harness_protocols)}; no protocol in common",
+                status=422,
+            )
         return {
             "providerModelId": row["id"],
             "providerModelVersion": int(row["version"]),
@@ -215,6 +228,10 @@ class ProviderModelService:
             "protocols": list(declared) if declared is not None else None,
             "endpoints": dict(endpoints) if endpoints else None,
             "protocolsDeclared": declared is not None,
+            # Order 092 stage 4: which Harness could use this record and via which
+            # protocol - derived on read from both sides' declarations, never
+            # stored, so it can never go stale against a changed deployment.
+            "compatibility": self._derive_compatibility(declared),
             # Order 55: the endpoint facts and where they came from; absent
             # means unknown, never a guessed default.
             "provenance": ({"baseUrl": row["base_url"],
@@ -227,6 +244,38 @@ class ProviderModelService:
 
     def _models(self, row: Mapping[str, Any]) -> list[dict[str, Any]]:
         return list(json.loads(self.objects.read(row["models_object_digest"])).get("models") or [])
+
+    def _registry_wire_protocols(self, harness: str) -> set[str]:
+        """The canonical protocols one registered Harness seat declares it speaks.
+
+        Tolerates a plain-mapping harness table (as unit tests supply) so the
+        derivation degrades to "unknown" instead of crashing on a test double.
+        """
+        getter = getattr(self.harnesses, "wire_protocols", None)
+        if getter is None:
+            return set()
+        return set(getter(harness) or {})
+
+    def _derive_compatibility(self, declared: Any) -> list[dict[str, str]]:
+        """Which Harnesses could use this record, and via which protocol.
+
+        Both sides must declare for a pair to appear: an undeclared record
+        (``declared is None``) yields no rows and reads as ``protocolsDeclared:
+        false``, and a family that declares no protocols contributes nothing -
+        that is *unknown*, not "incompatible" (the two are different states).
+        """
+        if not declared:
+            return []
+        registered = getattr(self.harnesses, "registered", None)
+        if registered is None:
+            return []
+        declared_set = set(declared)
+        pairs: list[dict[str, str]] = []
+        for harness in sorted(registered()):
+            supported = self._registry_wire_protocols(harness) & declared_set
+            for protocol in sorted(supported):
+                pairs.append({"harness": harness, "protocol": protocol})
+        return pairs
 
     def _validate(self, body: Mapping[str, Any], *, creating: bool) -> dict[str, Any]:
         harness = body["harness"]

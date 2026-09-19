@@ -19,15 +19,10 @@ from __future__ import annotations
 from typing import Any, Iterable, Mapping
 
 from agent_box.server.errors import ServerError
+from agent_box.server.execution.protocols import CANONICAL_PROTOCOLS
 
-
-#: The only four protocol strings the Server speaks, in canonical display order.
-CANONICAL_PROTOCOLS: tuple[str, ...] = (
-    "openai-chat",
-    "openai-responses",
-    "anthropic-messages",
-    "gemini-generate",
-)
+#: The canonical display order comes from the single shared vocabulary in the
+#: neutral execution layer; this module never redefines it.
 _CANONICAL_ORDER = {name: index for index, name in enumerate(CANONICAL_PROTOCOLS)}
 _CANONICAL_SET = frozenset(CANONICAL_PROTOCOLS)
 
