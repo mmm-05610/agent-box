@@ -636,3 +636,29 @@ Order 57/58/59/65 的方法在代码与前端工件里都在，但本文件**没
    （5 项既有失败），且会让任何"按本树副本对表"的核对得出过时结论；
 3. **明确生成与比较口径**（哪条工具链生成、按语义还是按字节）——否则摘要永远不可复现；
 4. **补 wire-review 缺失小节**：Order 57/58/59/65 的方法面（当前 0 命中）。
+
+## Work Order 092 — provider 记录第 1 层字段（runtime 已落；wire 白名单待 A + 两仓重锁）
+
+runtime 侧（`server/model_configs/**`、`storage/database.py`、`server/execution/**`、
+`plugins/**/production.py`）已实现并带反例：记录 `harness` 可空（schema 19→20）、canonical
+协议四值 + 方言归一表、记录/模型 `protocols[]`、`endpoints{}`（复用 probe URL 纪律）、
+模型 `capabilities{}` 严格模式（文档化键、缺席保持缺席）、描述符 `wire_protocols`、
+list 读时派生 `compatibility[]` + `protocolsDeclared`（不落库）、冻结 `PROTOCOL_INCOMPATIBLE`。
+
+**方法/字段与摘要（供 A/settings 重生成用；本树不擅改 wire）**：
+- `providerModels.create` / `.update` 入参新增可选：`harness`（→可选）、`protocols: string[]`、
+  `endpoints: {protocol→url}`、`models[].protocols: string[]`、`models[].capabilities: object`。
+- `providerModels.list`/`.create` 结果新增：`protocols`、`endpoints`、`protocolsDeclared: bool`、
+  `compatibility: [{harness, protocol}]`；`models[]` 项透回 `protocols`/`capabilities`（缺席即无键）。
+- `provenance.wireApi` 枚举：`{chat_completions, responses}` → canonical 四值
+  `{openai-chat, openai-responses, anthropic-messages, gemini-generate}`，**并接受旧两值归一**
+  （`chat_completions→openai-chat`、`responses→openai-responses`）。⚠ 归一改变 create 回声：
+  `test_provenance_wire_098.py` 目前断言 `wireApi="chat_completions"` 原样读回——**wire 侧一旦
+  接受+归一，该回声测试须同步更新**（本树为守 098 已收口成果，未在 service 改写 `wire_api` 存储，
+  仅把归一表用于 compatibility 派生；wire 枚举扩 + 存储归一随本项一起做）。
+- **v2 多槽（R-0013 追加）**：`config.describe` 的 `model_slot` 逐槽投影 + profile 槽表引用形状
+  （`handlers.py::config_describe/_controls`，A 线）＋描述符 `model_controls` 声明＋冻结逐槽带
+  `controlId`（`PROTOCOL_INCOMPATIBLE`）。
+
+**前端工件落后＝如实记，不改工件、不跳测试**（G7）：以上到得了 wire 要靠 `wire-v1.ts`/生成工件
+重生成 + 两仓重锁。092 整单在 A/settings 补齐前记 `PROVIDER_REGISTRY_PARTIAL`（wire 半路由）。
