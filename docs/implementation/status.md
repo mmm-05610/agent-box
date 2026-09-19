@@ -1424,3 +1424,15 @@ pi-production-chain-gate.py  runtime=dfdae54be337c45de58e44161b18880f  A(b1f6e07
 | 139 | 全 | `_resolve_child_session` 续接分支：`fetchall` 取代 `fetchone`；0 行⇒`SUBAGENT_TASK_UNKNOWN`（不变）、**>1 行⇒确定性 `SUBAGENT_NOT_AUTHORIZED`**（歧义、绝不挑行）；**跨家族检查在前**（G5 保持 `SUBAGENT_TASK_FAMILY_MISMATCH`）；**新归属判据** `session.profile_id==chosen.profileId`（即本次名册选中的子）否则 `SUBAGENT_NOT_AUTHORIZED`（授权名单与续接判定同一份事实）。G1+G2：同家族未授权 D 句柄⇒拒（原静默续 D）；G3 歧义⇒确定性拒；正例（续 C 自己句柄）仍成 | `test_task_continuation_ownership_139.py` **4 passed**；delegation+subagents+rule_liveness_086+138+141+136+harness_round_086 广扫 **43 passed**（既有 family/unknown 续接用例全绿）；**Worker 工件不在**。反例**已树内实测**：中和歧义+归属两判据⇒恰"未授权/歧义"门红、跨家族/正例仍绿 | 0 | 本提交 |
 
 **同片串行**：139 单独提交（未与 138/140/141 混提）。`132` 亚型：授权名单（名册）与续接归属判定**曾是两份事实**，现归一。剩 137（stage1 已落）／140（usage 汇总到父轮）。
+
+## 工单 140 — 委派的用量**并入父轮账**（读侧·`AUD-B-022` medium·ops 取读侧口径；2026-09-19，执行者·runtime 线）
+
+> 终态 **`DELEGATION_USAGE_PARENT_ROLLUP_DONE`**。`aggregate_by_session` 原只按 `session_id=? AND state='completed'` 收——委派子轮跑在**另一条会话**里 ⇒ 父侧账漏掉子（实测父 110 vs 子 9500）。`parent_turn_id` 链接能找子（`live_child_turn_ids`，`086` 为取消建）但**只有 `cancel_descendants` 用**＝归属这一维没人接（OF-14 同族）。§Spend：0 真调用。证据 `docs/server-round1/delegation-usage-rollup-140.md`。
+
+**ops 裁决（不自行再定）**：取**读侧并账**（`65:78`"记到发起它的那一轮"＝记账根问题的字面实现、且是收紧）；**不取**"子轮终态时把用量累加登记到父轮"那案（写侧改写已落库事实、同一事实两处存＝`132` 要治的形状 ⇒ `R-0070 ②` 留用户）。**聚合根＝父轮**（docstring 显式声明）。展示用的 `_usage_of` 返回体（回给模型的工具结果）**不动**（Notes：另一件事）。
+
+| 单 | 阶段 | 门 | 回归 | 真实模型 | 提交 |
+| --- | --- | --- | --- | --- | --- |
+| 140 | 全 | `aggregate_by_session(S)`：取 S 的**根轮**（`parent_turn_id IS NULL`）→ 沿 `parent_turn_id` 递归收其**委派子树**的 completed 轮用量（`_subtree_usage`）并入 S。无委派⇒每轮皆自根⇒与旧 session-scoped 查询逐字同（G4）；每轮只有一个根⇒跨会话并查不重复计（G3）。门用真 `server_turns`/`server_sessions` 行（父→子→孙，各在别会话）经 `UsageAggregator` 真算：G1+G2 父＝110+9500+100=**9710**、`turnsReported`=3；G3 并查[父,子,孙]⇒父 9710 且三者和**仍 9710**（子/孙对自己被父拥有的轮报 0；双计实装会 >9710）；G4 不委派会话＝50。反例**已树内实测**：关掉后代合并⇒恰两条 rollup 门红（父回落 110）、不委派门仍绿 | `test_delegation_usage_rollup_140.py` **3 passed**；既有 `test_usage_aggregate.py`（无委派）**仍绿**（归因改动对非委派逐字不变）；usage+delegation+subagent 广扫 **64 passed / 1 skipped（env）**；**Worker 工件不在** | 0 | 本提交 |
+
+**OF-14/132 归批**：机制（`parent_turn_id` 链）在场、**归属这一维的接线路径**缺席——与 136/141 同族。**137 剩 stage 2–5**（真 worker emit 需已构建 Worker；本树无预置工件），**主路径 122 的真收口仍待 137**（134 消费侧 + 137 生产侧）。138/139/140/141 四单**逐单串行、逐单提交**已完成。
