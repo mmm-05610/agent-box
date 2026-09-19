@@ -96,7 +96,8 @@ class DelegationService:
             return {"tools": [], "roster": []}
         profiles = self.profiles.list(include_archived=False)
         roster = resolve_roster(
-            parent_id=parent_profile_id, edges=edges, profiles=profiles)
+            parent_id=parent_profile_id, edges=edges, profiles=profiles,
+            workspace_of=self._workspace_map(profiles))
         return {
             "tools": tool_definitions(roster=roster),
             "roster": roster[:MAX_ROSTER_ENTRIES],
@@ -113,7 +114,17 @@ class DelegationService:
             raise DelegationError(
                 "SUBAGENT_NOT_AUTHORIZED", "this role has no authorized subagents")
         profiles = self.profiles.list(include_archived=False)
-        roster = resolve_roster(parent_id=parent_profile_id, edges=edges, profiles=profiles)
+        # Order 138 (`65:83`, ops `R-0070 ①`): the delegation act is scoped to the
+        # *parent turn's* workspace. A fresh child lands there - never wherever the
+        # child profile last happened to run - and only children that operate in the
+        # same workspace are candidates for this turn (a cross-workspace child is not
+        # offered, so requesting it is an explicit `SUBAGENT_NOT_AUTHORIZED`, not a
+        # silent landing in another project).
+        parent_workspace_id = self.records.get_turn_context(parent_turn_id)["workspace_id"]
+        roster = resolve_roster(parent_id=parent_profile_id, edges=edges, profiles=profiles,
+                                workspace_of=self._workspace_map(profiles))
+        roster = [entry for entry in roster
+                  if entry.get("workspace") == parent_workspace_id]
         # Order 136: `child_limits` must be sourced from the *child's own* rules
         # at the production call site. It used to be omitted entirely, which made
         # `validate_run_arguments`' narrowing checks structurally dead (an
@@ -150,7 +161,8 @@ class DelegationService:
         child_may_delegate = has_delegation(edges, chosen["profileId"])
 
         session_id, native_id, resumed = self._resolve_child_session(
-            child_profile=child_profile, chosen=chosen, validated=validated)
+            child_profile=child_profile, chosen=chosen, validated=validated,
+            parent_workspace_id=parent_workspace_id)
 
         # Create the child turn as a normal turn, linked to the parent.
         merged_posture = self._merged_posture(
@@ -241,14 +253,18 @@ class DelegationService:
 
     def _resolve_child_session(
         self, *, child_profile: Mapping[str, Any], chosen: Mapping[str, Any],
-        validated: Mapping[str, Any],
+        validated: Mapping[str, Any], parent_workspace_id: str,
     ) -> tuple[str, str | None, bool]:
         task_id = validated.get("task_id")
         if task_id is None:
-            workspace_id = self._shared_workspace_id(child_profile)
+            # Order 138: a fresh child runs in the *parent turn's* workspace, not the
+            # child profile's last-touched one (which let a conversation about project A
+            # write into project B and drift the landing point).
+            workspace_id = parent_workspace_id
             # A unique key per call: two concurrent subagent calls in the same
             # millisecond must not collide on the idempotency record.
             import uuid as _uuid
+
 
             session = self.sessions.create_session(
                 f"subagent-{_uuid.uuid4().hex}",
@@ -276,15 +292,25 @@ class DelegationService:
             )
         return str(row["id"]), task_id, True
 
-    def _shared_workspace_id(self, child_profile: Mapping[str, Any]) -> str:
+    def _child_workspace(self, profile_id: str) -> str | None:
+        """The workspace a Profile currently operates in: its last-touched session."""
         with self.records.database.read() as conn:
             row = conn.execute(
                 "SELECT s.workspace_id FROM server_sessions s "
                 "WHERE s.profile_id=? ORDER BY s.updated_at DESC LIMIT 1",
-                (child_profile["id"],),
+                (profile_id,),
             ).fetchone()
-        if row is not None:
-            return str(row["workspace_id"])
+        return str(row["workspace_id"]) if row is not None else None
+
+    def _workspace_map(self, profiles: Sequence[Mapping[str, Any]]) -> dict[str, str | None]:
+        """profile id -> current workspace, for the roster's `workspace` field."""
+        return {str(profile["id"]): self._child_workspace(str(profile["id"]))
+                for profile in profiles}
+
+    def _shared_workspace_id(self, child_profile: Mapping[str, Any]) -> str:
+        workspace_id = self._child_workspace(str(child_profile["id"]))
+        if workspace_id is not None:
+            return workspace_id
         raise DelegationError(
             "SUBAGENT_WORKSPACE_UNKNOWN",
             "the subagent Profile has no workspace to run in yet",

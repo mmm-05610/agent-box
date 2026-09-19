@@ -63,6 +63,7 @@ def grant_edges(rows: Iterable[Mapping[str, Any]]) -> dict[str, set[str]]:
 def resolve_roster(
     *, parent_id: str, edges: Mapping[str, set[str]],
     profiles: Sequence[Mapping[str, Any]], availability: Mapping[str, str] | None = None,
+    workspace_of: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """The authorized roster, each entry with its availability state.
 
@@ -70,6 +71,12 @@ def resolve_roster(
     unavailability reason; a child that is not available is still *listed*
     (the parent is authorized to know it exists) but marked, so the tool can
     say why a call would fail instead of failing blind.
+
+    Order 138 (`65:83`, ops `R-0070 ①`): `workspace_of` maps a child id to the
+    workspace it currently operates in; the entry carries that as the contract's
+    `workspace` field so the roster is the *visible* face of the same-workspace
+    authorization, and the delegation act can filter candidates by the parent's
+    workspace. Absent (a caller without session access) ⇒ the field is ``None``.
     """
     granted = edges.get(str(parent_id), set())
     roster: list[dict[str, Any]] = []
@@ -84,6 +91,7 @@ def resolve_roster(
             "description": (profile.get("description") or "")[:MAX_SUBAGENT_DESCRIPTION_CHARS],
             "available": (availability or {}).get(profile_id) is None,
             "reason": (availability or {}).get(profile_id),
+            "workspace": (workspace_of or {}).get(profile_id),
         })
         if len(roster) >= MAX_ROSTER_ENTRIES:
             break

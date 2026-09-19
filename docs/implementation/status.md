@@ -1390,3 +1390,15 @@ pi-production-chain-gate.py  runtime=dfdae54be337c45de58e44161b18880f  A(b1f6e07
 **一手结论（stage 1）**：完成结果＝Worker `ProcessRecord`（`main.rs:98/423/509/1160/1264`，`run_process` 产），即 `sidecar_backend._complete` 读的 `run.result`——134 已把它经 `_terminal_reason_from_result` 路由进 `complete_turn(terminal_reason)` ⇒ **下游无需新字段**。今天 Worker 侧 `stopReason/stop_reason/end_turn/max_tokens/PromptResponse` 在 `workers/**/*.rs` **0 命中**（坐实 122"无此事实"）。**两道守卫对"增补·出站·不改版本"的 stopReason 均安全**：两源命名守卫（`test_state_capture_error_boundary.py:252`）只比 `PROTOCOL_VERSION` 常量（不查结果字段），`deny_unknown_fields` 只管**入站** request/bootstrap（`v1.schema.json` 是请求侧，无结果侧 `additionalProperties:false`）⇒ **无守卫级交回**。
 
 **剩余 stage 2–5（未动源码）**：② `ProcessRecord` 增可选 `stop_reason`，**只在 ACP 真观测到时**填（拿不到⇒交回、不填默认值，Notes⑬）——须在真实 ACP 转录上核实可观测性；③ `sidecar`/`_complete` 读的键与 Worker 出的键对齐；④ **真链门** worker→sidecar→`_complete`（`max_tokens`/`end_turn` 双向）+ 反例（去字段必红）——**需已构建 Worker**（本树有 `cargo/rustc` 源与工具链，缺 `target/{release,debug}` 预置工件＝既有 env 红族），真链腿若无法跑则如实报 env-blocked、不静默跳；⑤ **三元门 `102` 随字段复算并入账** + 两守卫逐条绿。硬约束 **G5 只增不改**（不 bump `PROTOCOL_VERSION`、不改名/删字段）。
+
+## 工单 138 — 委派补上"工作区"这一维（`AUD-B-020` high·ops `R-0070 ①` 字面实现；2026-09-19，执行者·runtime 线）
+
+> 终态 **`DELEGATION_WORKSPACE_DIMENSION_DONE`**。插队（high，边界缺陷）：与 135/137 同档、先于 126。缺陷＝fresh 子轮落到"`_shared_workspace_id(child)`＝子 profile 最近动过的会话"的工作区（**可以是另一个项目**），名册不发 `workspace` 字段、授权/选候选都不含工作区维 ⇒ 项目 A 的对话可写进项目 B、落点漂移。§Spend：0 真调用。证据 `docs/server-round1/delegation-workspace-dimension-138.md`。
+
+**ops `R-0070 ①` 定案（不自行再裁产品语义）**：取 `65:83` **字面实现**——落点＝父轮工作区、名册发 `workspace` 字段、按父工作区筛候选；**不取**"跨区类型化拒绝 `SUBAGENT_WORKSPACE_MISMATCH`"那案（把"默认"读成可覆盖＝产品语义 ⇒ `R-0070 ②` 留用户）。本单**不加新拒止码**。
+
+| 单 | 阶段 | 门 | 回归 | 真实模型 | 提交 |
+| --- | --- | --- | --- | --- | --- |
+| 138 | 全 | 三处同源：`resolve_roster` 经注入 `workspace_of` 发 `workspace` 字段；`run` 取 `get_turn_context(parent_turn_id)["workspace_id"]`→候选 `[e for e in roster if e["workspace"]==parent_ws]`；fresh 放置＝`parent_workspace_id`（不再 `_shared_workspace_id(child)`）。跨区子不作候选⇒请求它走既有 `SUBAGENT_NOT_AUTHORIZED`（显式、非静默落 B）。G1 子 home==父 ws⇒子 session 落父 ws；G2 跨区⇒拒、不在 B 建子会话；G3 名册含 `workspace`；G4 全走真 `run`。反例**已树内实测**：删过滤 + 还原 child-home 放置⇒恰 2 跨区门红、同区/字段门仍绿。同工作区行为逐字不变 | `test_delegation_workspace_dimension_138.py` **4 passed**；delegation(含 `65` e2e，父轮改真实)+subagents+rule_liveness_086+harness_round_086+profile_permissions+shared_session_store+136+127 广扫 **59 passed**（`resolve_roster`/放置改动无回退）；**Worker 工件不在** | 0 | 本提交 |
+
+**同片串行（138/139/140/141 同段 `delegation.run`／`_resolve_child_session`）**：本单单独提交、按 `serialize_with` 逐单串行，未与其它三张混提。`65` e2e 原以 phantom `parent-turn-e2e`（无 `server_turns` 行）掩盖了"放置从不读父轮"——本单改为建真实父 session+turn（生产即如此），非迁就测试的 hack。

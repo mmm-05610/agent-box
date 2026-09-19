@@ -592,6 +592,18 @@ def test_the_real_bridge_process_runs_a_child_turn_end_to_end(tmp_path, monkeypa
             "workspace_id": workspace["workspace_id"], "profile_id": child["profile_id"]})
         runtime.repository.profiles.grant_subagent(
             parent_id=parent["profile_id"], child_id=child["profile_id"])
+        # Order 138: the bridge is invoked from a *live parent turn*, and placement is
+        # scoped to that turn's workspace. The fabricated token id must therefore name a
+        # real turn in the shared workspace (as production guarantees), not a phantom.
+        parent_session = sessions.create_session("parent-e2e", {
+            "workspace_id": workspace["workspace_id"], "profile_id": parent["profile_id"]})[1]
+        with runtime.database.transaction() as conn:
+            conn.execute(
+                "INSERT INTO server_turns(id,session_id,profile_id,profile_revision,"
+                "native_generation,state,capture_state,cleanup_state,input_object_digest,"
+                "created_at,updated_at) VALUES ('parent-turn-e2e',?,?,1,0,'running','pending',"
+                "'pending','x','t','t')",
+                (parent_session["session_id"], parent["profile_id"]))
         runtime.delegation_tokens["e2e-token"] = {
             "turnId": "parent-turn-e2e", "profileId": parent["profile_id"],
         }
