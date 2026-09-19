@@ -213,3 +213,48 @@ harnesses: [{"id":"alpha","credentialKind":"api_key","modelControlId":"model"},
    那一次红就是"把键集补进 hello"的入口，别顺手删测试。
 3. **给 103**：`harnesses` 是 hello 的第二个面，元门如果要按方法粒度算，
    应把"发现面的字段级覆盖"记在 `server.hello` 上（本单的 10 条已经是字段级）。
+
+## 12 更正与升级：重锁到达（`ed6592b7`），G4 变绿 ⇒ 终态改判 **DONE**
+
+§9/§10 写下之后，桌面 settings 线把合同那一半做了（`ed6592b7`，2026-09-19 11:44：
+`wire-v1.ts` ＋14 行、测试 ＋35 行、生成工件 ＋21 行、`contracts/wire-v1/README.md` 同步）。
+本节是**就地更正**，不删旧文：PARTIAL 的判定在当时是唯一诚实的答案（那一刻工件里确实没有 `harnesses`，
+本树也确实没有生成器），世界变了就把判定改掉并留下痕迹。
+
+**一手核对**（不是采信公告文字）：从**对方提交的那个 commit** 里取出工件（`git show ed6592b7:…/wire-v1.schema.json`）——
+
+| 项 | 实测 |
+| --- | --- |
+| `hello#result.properties` | `['auth','capabilities','harnesses','protocolVersion','serverId']` ⇒ **有 `harnesses`** |
+| `items` | `{id, credentialKind?, modelControlId?}`、`required: ["id"]`、`additionalProperties: false` ⇒ 与本单发射的形状**逐键相同** |
+| 工件摘要 | `c4255b31dba1ab2c92b57ae668f00eee8c11d17f1a6f0f37a22fba766d2c8c4d` |
+| TS 权威摘要（同一 commit） | `58d61ebb359381b652a4e687d6e652a8322e726714ea28a9592912b87f8b091b` |
+
+**两处分歧，都按对方为准**：
+① 我 §8 建议把 `harnesses` 写进 `required`，锁下来的版本**没有**（只在 properties 里）⇒ 服务端无论如何都发这个键，
+所以行为一致，但**合同不强制**它——这件事记在这里，将来若有人删掉该键，锁不会拦住，只有本单的门会（`test_the_four_old_fields_are_exactly_unchanged` 钉着顶层键集合）。
+② `credentialKind` 在锁里是**裸 `{"type": "string"}`**，没收枚举 ⇒ 与 §8 的"故意不收枚举"一致。
+
+**本树做了什么**：把那份重锁后的工件**原样**放进本树的证据副本路径
+`docs/server-round1/fullstack/generated/wire-v1.schema.json`（覆盖此前 33 方法的陈旧副本），
+门里再**按摘要钉住**它（`hashlib.sha256(ARTIFACT) == ARTIFACT_SHA256`），
+于是"两棵树说的是同一份工件"是断言而不是口头承诺。
+被覆盖的旧副本（`a1bd52a4fb68…`）的摘要与它比锁当时缺什么，都留在 §4 的表里可查。
+
+**门随之翻转**（这正是 §10 预告的那一步）：
+`test_the_locked_wire_artifact_still_refuses_the_new_key`（要求工件**拒绝**新键）
+→ 拆成两条：
+`test_the_relocked_artifact_accepts_what_the_server_emits`（正向：摘要对得上 **且** 真响应过 schema）
+＋ `test_the_locked_shape_still_refuses_what_must_not_be_sent`（三条篡改反例：
+多一个 `credentialEnvironment` 键、把 `credentialKind` 写成 `null`、去掉 `id` ⇒ 都必须被 schema 拒）。
+**没有把反例删掉**，只是把它从"合同还没宽"换成"合同宽了但仍是笼子"。
+
+**复跑**（`AGENT_BOX_WIRE_SCHEMA=` 指向这份重锁工件）：
+
+| 跑法 | 结果 |
+| --- | --- |
+| 本单门文件 | `13 passed`（默认模式同一数字） |
+| `tests/server/test_wire_v1.py` | **37 passed** ⇒ 既有 wire 全套对**新锁**仍然一致（081/21 那套"后端按新工件复跑"的登记动作，本单补上了） |
+
+**终态改判：`HELLO_HARNESSES_DONE`**。§10 列的三条交回里，第 1 条（重锁）已完成；
+第 2 条（092 落地后补 `wireProtocols`）与第 3 条（103 的字段级覆盖）仍然有效。

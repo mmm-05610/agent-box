@@ -4,9 +4,10 @@ The list has to come from the registry and nowhere else. Records are user data:
 a fresh deployment has none, and deriving a directory from them is what left a
 client with "custom harness" as the only option. So the gates here are set
 equality against the registry (including *shrinking* it), the absence of
-anything the family did not declare, and one machine-readable pin that the
-locked wire artifact still refuses the new key - because that refusal is the
-relock this order cannot perform from this tree.
+anything the family did not declare, and the locked wire artifact - checked by
+digest, then used to validate a live response. The artifact had to be widened
+for this key to be legal at all (`ed6592b7`); a later drift in either tree
+shows up here as a red gate rather than a quiet "clients will cope".
 """
 from __future__ import annotations
 
@@ -183,27 +184,53 @@ def test_wire_protocols_is_not_published_because_the_descriptor_has_no_such_fiel
     assert all("wireProtocols" not in entry for entry in result["harnesses"])
 
 
-# -- the relock, pinned so it cannot be quietly skipped --------------------
+# -- the relock: registered, and still falsifiable -------------------------
 
-def test_the_locked_wire_artifact_still_refuses_the_new_key(hello):
-    """G4, stated as what is *not* done yet.
+ARTIFACT = (pathlib.Path(__file__).resolve().parents[2]
+            / "docs/server-round1/fullstack/generated/wire-v1.schema.json")
 
-    `server.hello#result` in the locked artifact carries
-    `additionalProperties: false` over exactly the four old keys, so a client
-    that validates against the published contract rejects this response. This
-    tree has no generator for that artifact and cannot write the TS authority
-    (the frontend's), so the relock is handed over rather than faked - and when
-    it lands, the passing form of this test is the gate that says so.
-    """
+#: The pair this tree registers. The relock landed in the settings line at
+#: `ed6592b7`, encoding the shape this Server actually emits; the digest below
+#: is that artifact, copied into this tree so the gate is reproducible here.
+ARTIFACT_SHA256 = "c4255b31dba1ab2c92b57ae668f00eee8c11d17f1a6f0f37a22fba766d2c8c4d"
+
+
+def _hello_schema():
+    return json.loads(ARTIFACT.read_text(encoding="utf-8"))["server.hello#result"]
+
+
+def test_the_relocked_artifact_accepts_what_the_server_emits(hello):
+    """G4. Before `ed6592b7` this assertion was the *refusal* of the new key;
+    flipping it to acceptance is what "the relock is done" means in code, and
+    the digest check keeps the two trees honest about which artifact that is."""
+    import hashlib
+
     import jsonschema
 
-    schema_path = (pathlib.Path(__file__).resolve().parents[2]
-                   / "docs/server-round1/fullstack/generated/wire-v1.schema.json")
-    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    assert hashlib.sha256(ARTIFACT.read_bytes()).hexdigest() == ARTIFACT_SHA256
     _runtime, _api, result = hello
-    with pytest.raises(jsonschema.ValidationError) as caught:
-        jsonschema.validate(result, schema["server.hello#result"])
-    assert "harnesses" in str(caught.value), str(caught.value)
+    jsonschema.validate(result, _hello_schema())
+
+
+@pytest.mark.parametrize("tamper", [
+    pytest.param(lambda entry: entry.update({"credentialEnvironment": "/home/x/.agentbox"}),
+                 id="undeclared-key"),
+    pytest.param(lambda entry: entry.update({"credentialKind": None}),
+                 id="null-instead-of-absent"),
+    pytest.param(lambda entry: entry.pop("id"), id="id-less-entry"),
+])
+def test_the_locked_shape_still_refuses_what_must_not_be_sent(hello, tamper):
+    """The falsification for the gate above: `additionalProperties: false`,
+    `required: [id]` and "string, not null" are precisely the three ways a later
+    change could leak an implementation detail or invent a declaration."""
+    import jsonschema
+
+    _runtime, _api, result = hello
+    assert result["harnesses"], "the tamper cases need a populated directory"
+    entry = dict(result["harnesses"][0])
+    tamper(entry)
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate({**result, "harnesses": [entry]}, _hello_schema())
 
 
 def test_the_four_old_fields_are_exactly_unchanged(hello):
