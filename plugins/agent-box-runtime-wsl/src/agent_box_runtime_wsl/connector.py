@@ -228,12 +228,29 @@ class WslConnector:
 
 
 def _decode_windows_output(value: bytes) -> str:
+    """Decode `wsl.exe` output without ever raising on the reader path.
+
+    `wsl.exe` answers in whatever the console is set to - UTF-16 with or without
+    a BOM, or an ANSI/OEM code page - and a partial line can look UTF-16 without
+    being a whole code unit. The earlier heuristic decoded the UTF-16 guesses
+    directly, so a truncated or mis-classified buffer raised
+    ``UnicodeDecodeError`` out of the subprocess reader thread (order 088's
+    ``0xd2`` trial). Every guess is now attempted inside a guard and falls
+    through to a lossy code-page read, so the worst a hostile buffer can do is
+    yield replacement characters, never crash the Server.
+    """
     if not value:
         return ""
     if value.startswith((b"\xff\xfe", b"\xfe\xff")):
-        return value.decode("utf-16")
+        try:
+            return value.decode("utf-16")
+        except UnicodeDecodeError:
+            pass  # a bad BOM payload is not fatal: fall through to the guesses
     if len(value) >= 4 and value[1::2].count(0) >= max(1, len(value[1::2]) // 2):
-        return value.decode("utf-16-le")
+        try:
+            return value.decode("utf-16-le")
+        except UnicodeDecodeError:
+            pass  # looks UTF-16LE but is not a whole buffer: keep going
     try:
         return value.decode("utf-8-sig")
     except UnicodeDecodeError:
