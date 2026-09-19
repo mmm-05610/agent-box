@@ -9,7 +9,7 @@ forbidden: ["/home/maoqh/projects/agent-box-server-round1/**", "/home/maoqh/proj
 ruling: R-0011
 terminal: ["WIRE_DRIVE_COVERAGE_DONE", "WIRE_DRIVE_COVERAGE_PARTIAL"]
 waive: []
-parallel_units: []
+parallel_units: ["serve-all-64","account-the-36","exemptions","counterexample"]
 ---
 
 # Work Order 103 — 元门：每个已登记方法至少被**真实 wire** 驱动过一次
