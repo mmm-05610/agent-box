@@ -3,13 +3,14 @@ id: 089
 slug: four-real-ui-gates
 batch: b3
 baseline: "b2 checkpoint"
-depends_on: [{"order": "082", "condition": "merged into main as <sha>"}, {"order": "090", "condition": "Windows 控制面下 WSL 工作区的放置路由可用（R-0014）"}, {"order": "091", "condition": "控制面同步与每执行凭据投影可用"}]
+depends_on: [{"order": "090", "condition": "agent-box-runtime-round1 tree：090-placement-routing DONE（该树 status 记）"}]
 write_paths: ["docs/server-round1/fullstack/**", "docs/implementation/status.md", "scripts/server-round1/**"]
 forbidden: ["src/agent_box/**", "plugins/**", "tests/**", "/home/maoqh/projects/agent-box-desktop-next-wsl-round1/**"]
 ruling: R-0011
 terminal: ["FOUR_REAL_UI_GATES_DONE", "FOUR_REAL_UI_GATES_PARTIAL"]
 waive: []
 parallel_units: ["pi","codex"]
+revisions: [{"at": "cc764a1", "what": "转录正文已有的修订（本记录由 ops 第 119 轮机械转录，内容取自该单正文的「## 修订 v2」段）：按用户裁定 R-0014（控制面=Windows）/ R-0015（广度授权给调度者）/ R-0017（假端点优先）改写四个真 UI 门的前提与成本口径。", "after_stage": 0, "ruling": "R-0014"}]
 ---
 
 # Work Order 089 — 四家真实 UI 门（最终验收路径）
