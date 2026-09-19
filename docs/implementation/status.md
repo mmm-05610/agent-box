@@ -1475,3 +1475,26 @@ L 的改判：**字节对表那一腿不由我重跑**（后端审阅者已从�
 `python3 scripts/server-round1/ui_gates_89_leak_check.py docs/server-round1/fullstack/ui-gates-89`；
 换了之后 G3 才有反例可言（旧写法连"key 不以 `sk-` 开头"都检不出）。
 **本单没跑**：G1/G2 仍等 `091` 收口；这一步只是把"跑的时候手里要有真门"这件事先做掉。
+
+## 真实 HTTP bind 复跑 101 的那五个方法（2026-09-19 09:0x；补的是"TestClient 看不见 500/200 边界"这一层）
+
+**为什么要跑**：101 的门全部走 `TestClient(..., raise_server_exceptions=False)`——它能区分 500 与类型化错误，
+但那是**同一进程内**的 ASGI 调用。QA-008 报的正是"HTTP 500 纯文本"，那种形状只有在**真 socket** 上才有说服力；
+而且 098/101 的未做项里都挂着"对试用 Server 那一腿未跑"。所以自己起一个一次性实例量清楚（**不是**用户那台）。
+
+| 方法（参数按合同给全） | 真实 bind 的读数 |
+| --- | --- |
+| `usage.aggregate` / `usage.export` | **HTTP 200** ＋ `code=UNAVAILABLE` ＋ `details.internalCode=USAGE_AGGREGATOR_UNAVAILABLE` |
+| `providerArtifacts.list` | HTTP 200 ＋ `UNAVAILABLE` ＋ `internalCode=ARTIFACT_STORE_UNAVAILABLE` |
+| `providerArtifacts.install` / `rollback` | HTTP 200 ＋ `INVALID_REQUEST`——**因为我的探测漏了 `requestId`**，参数形状门先拒（这条顺序本身就是事实：门在组合检查之前） |
+| 不存在的 `nonexistent.method` | HTTP 200 ＋ `INVALID_REQUEST`（没有 404、也没有 500） |
+
+环境：`uvicorn` 本机随机端口（39863）、`build_runtime` 一个全新临时数据根、`registry()` 的 `alpha`；
+**没有**任何真实上游、**没有**读凭据 locator（`runtime.token` 是内存里的随机串）。跑完 `should_exit` 停自己起的线程、
+临时根删除并核实（`临时根存在 = False`、`服务线程存活 = False`）。
+
+**结论的边界（别多读一步）**：
+- ✅ 在**本树代码**上，五个方法在真 socket 下不产 500——这正面回答了 QA-008 的形态："500 纯文本"在这台实例上不复现；
+  它复现的那台是 `/tmp/audit-fe-2/server` 的 `90a11cb`（101 阶段 1）快照 ⇒ **是重部署问题，不是家族问题**。
+- ❌ 仍**没有**在**用户那台**试用实例上验过：那需要重启/换构建，属人的一腿（`089` 的部署腿与 `091` 一起）。
+- 顺带把 103 账上一个可复跑事实钉牢：这五个方法在**真 wire**（socket 级）上被驱动过，不只是 ASGI 进程内。
