@@ -396,11 +396,28 @@ class WireService:
                 entry["reason"] = reason
             capabilities.append(entry)
         auth = {"required": True, "schemes": ["session_token"]} if self.token_required else {"required": False}
+        harnesses = []
+        # The family directory is a deployment fact - which harnesses this Server
+        # can run - so it comes from the registry, never from the records: a
+        # fresh deployment has no records, and deriving the list from them was
+        # what left a client with nothing to choose. `registered()` is already
+        # sorted by id, so this is the registry's own order rather than a second
+        # sort that could later disagree with it. Only what a family *declares*
+        # is published, and a declaration that is absent stays absent.
+        for harness_id in self.harnesses.registered():
+            descriptor = self.harnesses.get(harness_id)
+            entry: dict[str, Any] = {"id": harness_id}
+            if descriptor.credential_kind is not None:
+                entry["credentialKind"] = descriptor.credential_kind
+            if descriptor.model_control_id is not None:
+                entry["modelControlId"] = descriptor.model_control_id
+            harnesses.append(entry)
         return {
             "serverId": self._server_id_provider(),
             "protocolVersion": WIRE_VERSION,
             "capabilities": capabilities,
             "auth": auth,
+            "harnesses": harnesses,
         }
 
     def _capability(self, capability_id: str) -> tuple[bool, str | None]:

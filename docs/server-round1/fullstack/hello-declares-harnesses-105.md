@@ -79,3 +79,102 @@ build_runtime(临时根).harnesses.registered() -> ()
 4. `wireProtocols` 键**不给**（§2：字段不存在）；092 落地后补，登记成交回而不是现在发明。
 5. 不泄漏：只出这三个键 ⇒ 无凭据内容、无路径、无 digest；但**要有一条真断言**（G2），
    因为"只出声明"最容易在下一次加字段时被顺手破掉。
+
+## 6 阶段 2 实施：字段来自注册表，排序沿用注册表
+
+`hello()` 的返回值多出 `harnesses`（`handlers.py`，紧跟在 `auth` 之后）：
+
+```
+for harness_id in self.harnesses.registered():
+    descriptor = self.harnesses.get(harness_id)
+    entry = {"id": harness_id}
+    if descriptor.credential_kind is not None:   entry["credentialKind"] = …
+    if descriptor.model_control_id is not None:  entry["modelControlId"] = …
+```
+
+三条决定与理由：
+
+1. **不在 handler 里再排一次**：`registered()` 已经是 `tuple(sorted(...))`（§1 实测），
+   两处排序迟早分叉；顺序的真相只有一个持有者。
+2. **`None` 就不给键**：`credentialKind`/`modelControlId` 是"这一家声明了什么"，
+   给 `null` 会让客户端把"没声明"和"声明为无"混成一件事（工单 §必须保持不变的"缺席即未知"语义）。
+3. **只出三个键**：`credential_environment`（凭据环境）、`control_options`、`capability_claims`、
+   `security_locked_controls` 一概不出——它们是实现细节，不是目录；G2 有一条专断言扫这件事。
+
+`WireService` 本来就持有注册表（`self.harnesses`，`handlers.py:282`）⇒ **没有新注入、没有新参数**。
+
+**真机复跑**（uvicorn 真 bind `127.0.0.1:33471`，`urllib` 真发两次）：
+
+```
+harnesses: [{"id":"alpha","credentialKind":"api_key","modelControlId":"model"},
+            {"id":"mido","credentialKind":"oauth"},
+            {"id":"zeta"}]
+两次逐字节相同: True
+顶层键: ['auth','capabilities','harnesses','protocolVersion','serverId'] | capabilities: 64
+```
+
+⇒ 注册顺序 zeta→alpha→mido 出去是 alpha→mido→zeta；只声明了 `credentialKind` 的 `mido` 不带 `modelControlId`；
+什么都没声明的 `zeta` 只有 `id`。临时根跑完 `TEMP_ABSENT True`。
+
+## 7 阶段 3/4：门（`tests/server/test_hello_harnesses_105.py`，10 条）
+
+| 用例 | 钉哪道门 | 断言的形状 |
+| --- | --- | --- |
+| `test_hello_lists_exactly_the_registered_families` | G1 | 条目集合**等于** `runtime.harnesses.registered()`（不是等于一份写死的名单） |
+| `test_the_order_is_the_registries_own_and_reproducible` | G1 顺序 | 两次调用的 `json.dumps` 逐字节相同；且**不是**注册顺序（乱序注册是这一条能成立的前提） |
+| `test_removing_a_family_from_the_registry_removes_it_from_hello` | **G1 反例**（工单点名的"摘掉一个家族"） | 先建一条引用 `alpha` 的 Profile 记录，再把 `mido` 从注册表摘掉 ⇒ 名单跟着变 ⇒ **同时证明它不是从记录派生的**（派生版会留下 `alpha`、丢不掉 `mido`） |
+| `test_a_family_declaring_nothing_shares_only_its_id` | §必须保持不变 | `zeta` 的条目就是 `{"id": "zeta"}`；全表**没有值为 `None` 的键** |
+| `test_a_deployment_with_no_families_answers_an_empty_list_not_an_error` | **G3** | `harnesses == []`、200、`capabilities` 仍 64 条（§3 的默认形状） |
+| `test_the_family_list_publishes_declarations_and_nothing_else` | **G2** | 键集 ⊆ `{id, credentialKind, modelControlId}`；整段 JSON 小写后扫 `credentialenvironment`/`adapter`/`controloptions`/`capabilityclaims`/`securitylockedcontrols`/`sha256`/`digest`/`c:\`/`/home/`/`/mnt/`/`.agentbox`/`token`/`secret` **一个都不许出现** |
+| `test_harness_ids_do_not_leak_into_the_capability_table` | §明确不做 ① | 家族 id 集合 ∩ `capabilities` 的 id 集合 `== ∅` |
+| `test_wire_protocols_is_not_published_because_the_descriptor_has_no_such_field` | 阶段 1 §2 的**钉子** | `dataclasses.fields(HarnessDescriptor)` 里没有 `wire_protocols` **且**响应里没有 `wireProtocols` ⇒ 092 落地加字段时这条会红，逼一次**有意的**修改而不是顺手 |
+| `test_the_locked_wire_artifact_still_refuses_the_new_key` | **G4 的现状**（见 §8） | 拿本树那份已锁工件校验真响应 ⇒ `jsonschema` 必须抛错且消息里有 `harnesses` |
+| `test_the_four_old_fields_are_exactly_unchanged` | 回归 | 顶层键集合恰为旧四件＋`harnesses`；`protocolVersion`/`auth` 逐字不变；`capabilities` 每行仍是 `{id, supported}`（不支持才多 `reason`），条数==派发表长度（097 的不变量） |
+
+**反例是真跑的**：门文件拿去咬 `f9bc012` 的 `handlers.py`（`/tmp` 副本，`PYTHONPATH` 排前，工作树未动，
+跑完 `rm -rf` 并核实缺席）⇒ **10 failed / 0 passed**。连"工件仍拒绝新键"那条也红：
+旧码没有 `harnesses` ⇒ 响应**恰好通过**旧工件的校验，`pytest.raises` 落空。
+这条恰好说明 G4 的两半是一件事：**字段存在**与**工件放行**必须一起成立，任一半单独绿都不算绿。
+
+定向回归（`test_hello_capability_sync_097 ＋ test_provenance_wire_098 ＋ test_wire_v1 ＋ 本文件`）
+⇒ **65 passed**（7＋11＋37＋10），hello 的既有消费者一个没掉。
+
+## 8 阶段 3（合同）：这一半本树做不了，交出去的是可校验的东西
+
+**为什么做不了**（一手，§4 已给出处）：`server.hello#result` 的权威是**前端树的 TS**，
+生成的 JSON 工件由它导出；本树既没有生成器（全树 grep 命中为零），也不能写前端树（工单 `forbidden` 与本树章程）。
+按 `wire-review.md` 的四段先例，流程本来就是"前端提交新权威 → 后端用新工件跑 `AGENT_BOX_WIRE_SCHEMA` 校验 → 两树登记同一对摘要"。
+
+**当前这一对的摘要**（本单一手 `sha256sum`，不是引用）：
+
+| 工件 | sha256 |
+| --- | --- |
+| 前端 TS 权威 `apps/desktop/src/types/wire/wire-v1.ts` | `1019b38b069899137440f22f0e8cebedefb7b13b8e95784651b96189ad977556` |
+| 前端生成工件 `docs/desktop-product-delivery/contracts/wire-v1/generated/wire-v1.schema.json`（64 方法 / 134 条目） | `1a3604ee9dd543eedacc4be33af8e87b44f8ed3aaa7d395484c28973b6d8e5be` |
+| 本树证据副本 `docs/server-round1/fullstack/generated/wire-v1.schema.json`（33 方法，未动） | `a1bd52a4fb68436079ae2d2e439953e8ac7f345ab5934a936a9434952bee0729` |
+
+**给前端的按键**（`server.hello#result.properties` 增加，其余一字不改；`required` 里加 `harnesses`，
+因为空态是 `[]` 而不是省略——这一条由 §7 的 G3 用例钉住）：
+
+```json
+"harnesses": {
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "id": {"type": "string", "minLength": 1},
+      "credentialKind": {"type": "string", "minLength": 1},
+      "modelControlId": {"type": "string", "minLength": 1}
+    },
+    "required": ["id"],
+    "additionalProperties": false
+  }
+}
+```
+
+`credentialKind` **故意不收枚举**：枚举词汇属各家声明（092 的射程），今天收进来就等于
+本单替 092 决定词汇——那是 §5 第 4 条要避免的那类"顺手"。
+
+**顺带照亮 102 的一条**：权威工件（`1a3604ee…`）的 `providerModels.update#params`
+**同样没有** `provenance`（本单一手读键集）⇒ 098 §9.2 发现的漂移**不是本树副本独有的陈旧**，
+两边一致地缺这一条。
