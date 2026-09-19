@@ -1325,3 +1325,12 @@ runtime 侧（存储/service/描述符/派生/冻结/逐家声明）已 DONE 且
 - 新门 `test_union_semantics_126.py` 5 条（省略保 protocols+provenance、显式 null 清空 provenance 且保 protocols、update 换 protocols 仍归一、update 未知协议⇒`PROTOCOL_UNKNOWN` 且不改记录、repository 层 KEEP 省略保留直证）。
 - **回归**：`126 + 092×3 + 098(真 wire update)` **41 passed**；广扫 `-k "model|profile|freeze|provider|provenance|credential|neutral|union"` **163 passed** ⇒ **092 守卫 + 098 真线 + 112 语义在 model_configs 半区同时绿，无回退**。**Worker 工件不在**（无关）。
 - **剩余（终态仍 `UNION_SEMANTICS_RECONCILED_PARTIAL`）＝wire 半区**：A `112` 非本分支祖先 ⇒ 本树 `wire/handlers.py::_provenance` 尚无"显式 null 经 wire 透传清空"的 112 修复，而 `wire/**` 是 A 树写面（126 write_paths 外）。合并时 **A 带 handlers `_provenance`(112) 进来即与本作合取拼全**；A 的 `112` 真-wire 守卫测试（`test_provider_update_keeps_omitted_112.py`）届时可跑。**本树已保证 model_configs 半区合并不再二选一丢守卫**（QA-014 的 ≥10 条 092 守卫在此半区与 112 共存）。合同工件 docs 冲突仍归 `113`。
+
+### 工单 121 — 阶段 升级：Work Core SQL 文件迁移等价门落地 ⇒ 终态 **DONE**（2026-09-19，fresh 预算）
+
+> 补完 v2 追加格（前记 PARTIAL 的精确剩余）。`test_work_core_migration_equivalence_121.py` **4 passed**（常设、进程内、`_run_migrations`）：
+> ① 全新安装 ledger=[1..9] 且幂等重跑结构不变；② **"004 形状 + legacy 数据"升级到 head ⇒ ledger=[1..9]、live 结构与全新安装逐字等价、
+> 006 把 `started→accepted`、无关终态保留、原行入 `core_dispatches_pre_v006_archive`、**`inputs_digest` 保持 NULL（不拿旧摘要冒充）**；
+> ③ **保留号 005（注释 no-op）仍入 ledger**（钉死 AUD-B-009 警告的"复用编号⇒runner 静默跳过新 schema"这个真坑）；
+> ④ 结构比较器对 NOT NULL 漂移敏感（反例见证，门非恒真）。
+> 产品侧（合成种子如实改定性 + 真实结构门）+ Work Core 等价门**两半齐** ⇒ 终态 **`MIGRATION_TEST_IS_NOT_DECORATIVE_DONE`**。§Spend：0 真调用。
