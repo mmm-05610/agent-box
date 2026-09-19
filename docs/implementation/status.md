@@ -7,14 +7,21 @@
 
 ## 待拍 / 阻塞（runtime 线执行者 → 调度者）· 2026-09-19
 
-- **工单 110 的语义冲突（交回，不自行拍）**：110 要"任何终态（completed/failed/**cancelled**）都触发队列**采纳/排空**"。
-  但现状是 order 67 的**既定语义**：`finish_cancelled`/`fail_turn` 对停止/失败轮 **`pause_pending`**（排队项转 `paused`，
-  不自动续跑），并有**在册通过测试** `tests/server/test_harness_sidecar.py::test_stop_or_failure_pauses_queued_turn`
-  （断言 stop→`paused`、fail→`paused`）钉着。"停止后应排空"与"停止后暂停"直接对立，且 `claim_next` 只取 `pending`
-  （paused 项取不到）。⇒ 这是**产品队列语义**改动、会动到 order 67 的既有验收：
-  **请裁定**——① 110 是否**取代** 67 的"stop/fail→pause"改为"stop/fail→采纳下一项"（若是，我据裁定改行为**并如实更新那条 67 测试**，
-  不偷偷放宽）；还是 ② 只修"终态未触发采纳检查"这一处、**保留 pause**（那 110 的症状其实是别处：需你确认期望的停后队列态是 running-adopted 还是 paused-visible）；
-  还是 ③ 采纳/不采纳都给**类型化事实**而非改状态。110 依赖此裁，未拍前我不动 67 面。
+- **工单 108 需要 `scripts/**`（不在其 write_paths）才能做对——交回（一手证据，未盲改）**：108 要"生产模板不再写死 64"且"门里仍是 64"。
+  但 64 的门侧行为**住在 `scripts/server-round1/*-production-chain-gate.py`**（108 write_paths 未含 scripts/**）：
+  ① `opencode-production-chain-gate.py:802` **断言** `structure["maxTokens"] == production.OUTPUT_TOKEN_LIMIT`——模板一改非 64 即门红；
+  ② 各门把 `outputTokenLimit: production.OUTPUT_TOKEN_LIMIT` **记进报告**（dsh :464/479 等），且 loopback 副本"只换 baseUrl" ⇒
+     模板 maxTokens 变非 64 时门仍**报 64** 而真发 fixture 是新值 ⇒ 报告与事实背离（成本失控）；③ 门脚本本环境跑不动（缺 node/bwrap）。
+  **请裁**：把 `scripts/server-round1/**` 纳入 108 write_paths（我给每门一个显式 GATE 上限、模板解耦为部署可声明/宽松缺省、同步钉死测试），
+  或定"模板留 64 供门 / 生产期由部署文档字段注入宽松值"的口径（与 G1"模板不再写死 64"字面冲突，需你定）。未拍前不动模板、不越界改 scripts。
+
+- **工单 110 — 已裁定并收口**（R-0032 ⑤ / `d67781d`）：67 的 stop/fail⇒pause 保留；本单改"暂停可见+类型化原因+可继续"，已交付
+  （`pause_reason` 落库 18→19、`queue.updated` 事件仅在有原因时带 `pauseReason`，非暂停事件逐字段不变）。
+  **遗留待裁（非我可自决）**：`queue.withdraw` 只接受 `pending`，对 `paused` 返 `too_late` ⇒ 裁定设想的"withdraw+重发"清不掉 paused 项；
+  "改 paused 可撤"是队列语义改动（G2 禁改），"一键恢复"是新 wire 方法（§41 要求交回）。
+
+- （历史，已由上条裁定处置）**工单 110 的原始语义冲突**：110 曾写"任何终态都触发队列采纳"，与 order 67 的
+  `finish_cancelled`/`fail_turn ⇒ pause_pending`（在册测试 `test_stop_or_failure_pauses_queued_turn` 钉着）对立——已交回并由调度者裁定保留 67。
 
 ## CHECKPOINT c1 — 后端 runtime 线第一批（106 / 088 / 090 / 091）[DONE，含 091 PARTIAL] · 2026-09-19
 
