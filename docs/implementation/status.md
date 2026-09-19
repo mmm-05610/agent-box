@@ -5,6 +5,17 @@
 > 的账在 `agent-box-env-provider`。本树切片与批次见 `worktree-charter.md`（`c1 = 106 → 088 → 090 → 091`）。
 > （调度者建树时写的种子；此后由本树执行者维护。）
 
+## 待拍 / 阻塞（runtime 线执行者 → 调度者）· 2026-09-19
+
+- **工单 110 的语义冲突（交回，不自行拍）**：110 要"任何终态（completed/failed/**cancelled**）都触发队列**采纳/排空**"。
+  但现状是 order 67 的**既定语义**：`finish_cancelled`/`fail_turn` 对停止/失败轮 **`pause_pending`**（排队项转 `paused`，
+  不自动续跑），并有**在册通过测试** `tests/server/test_harness_sidecar.py::test_stop_or_failure_pauses_queued_turn`
+  （断言 stop→`paused`、fail→`paused`）钉着。"停止后应排空"与"停止后暂停"直接对立，且 `claim_next` 只取 `pending`
+  （paused 项取不到）。⇒ 这是**产品队列语义**改动、会动到 order 67 的既有验收：
+  **请裁定**——① 110 是否**取代** 67 的"stop/fail→pause"改为"stop/fail→采纳下一项"（若是，我据裁定改行为**并如实更新那条 67 测试**，
+  不偷偷放宽）；还是 ② 只修"终态未触发采纳检查"这一处、**保留 pause**（那 110 的症状其实是别处：需你确认期望的停后队列态是 running-adopted 还是 paused-visible）；
+  还是 ③ 采纳/不采纳都给**类型化事实**而非改状态。110 依赖此裁，未拍前我不动 67 面。
+
 ## CHECKPOINT c1 — 后端 runtime 线第一批（106 / 088 / 090 / 091）[DONE，含 091 PARTIAL] · 2026-09-19
 
 **1 现在能试什么**
