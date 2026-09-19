@@ -20,6 +20,8 @@ from __future__ import annotations
 
 import copy
 import inspect
+import json
+import pathlib
 
 from fastapi.testclient import TestClient
 import pytest
@@ -43,6 +45,12 @@ OTHER = {"modelId": "model-b", "displayName": "Model B",
          "availability": "unknown", "unavailableReason": None}
 BODY = {"displayName": "Official API", "harness": "alpha", "provider": "opaque-provider",
         "credentialId": None, "configuration": [], "models": [MODEL]}
+
+#: The registered contract copy (order 113 moved it out of `generated/` and named
+#: it for its own digest). Read for one thing only: which columns are nullable.
+ARTIFACT = (pathlib.Path(__file__).resolve().parents[2]
+            / "docs/server-round1/fullstack/contract"
+            / "wire-v1.schema.registered-c4255b31.json")
 
 
 @pytest.fixture
@@ -240,7 +248,123 @@ def test_create_is_neutral_to_the_null_change(api):
         "wireApi": None, "fieldsSource": None}
 
 
-# -- G4 不越界 ------------------------------------------------------------
+# -- 修订 v2 的逐字段登记：可空性由合同决定，不是由实现决定 ----------------
+
+#: Read from the locked contract (`providerModels.update#params.properties`),
+#: and asserted against it below - so the table cannot quietly disagree with the
+#: artifact it claims to describe.
+NULLABLE_PER_CONTRACT = {
+    "credentialId": True,     # anyOf [string, null]
+    "displayName": False,     # string
+    "configuration": False,   # array
+    "models": False,          # array
+}
+
+#: A divergence, named rather than smoothed over: the contract puts no length
+#: bound on `models`, while the Server refuses an empty list. It is still honest
+#: (a typed refusal, never a silent keep), which is the test R-0032 ⑤ sets.
+CONTRACT_ALLOWS_EMPTY_BUT_SERVER_REFUSES = ("models",)
+
+
+def _credential_capable_registry():
+    """`registry()`'s alpha declares no `credential_kind`, so the service refuses
+    any binding on it - which is why the unbind leg below needs its own harness."""
+    from agent_box.server.execution import HarnessDescriptor, HarnessRegistry
+
+    reg = HarnessRegistry()
+    reg.register(HarnessDescriptor(
+        "alpha", credential_kind="api-key", capability_claims={"stream": True},
+        configuration_validator=lambda value: None if isinstance(value, dict) else ValueError(),
+    ))
+    return reg
+
+
+def test_the_contract_nullable_column_really_unbinds(tmp_path):
+    """The revision's other half: `credentialId` is `anyOf [string, null]` in the
+    contract, so a null means *detach this* - and it must actually detach, and an
+    omitted `credentialId` at the service layer must leave it attached."""
+    from agent_box.server.credentials import CredentialRecords
+
+    runtime = build_runtime(tmp_path / "cred", harnesses=_credential_capable_registry())
+    with TestClient(create_app(runtime), base_url="http://127.0.0.1",
+                    raise_server_exceptions=False) as client:
+        # the database file exists only after the app's lifespan opens it
+        CredentialRecords(runtime.database).register("cred-o112", "api-key", "/locator/never-read")
+        api = Wire(client, {"Authorization": f"Bearer {runtime.token}"})
+        params = dict(copy.deepcopy(BODY), requestId="o112-cred-create",
+                      credentialId="cred-o112", provenance=PROVENANCE)
+        bound = api.ok("providerModels.create", params)["providerModel"]
+        assert bound["credentialId"] == "cred-o112"
+
+        detached = api.ok("providerModels.update", update(
+            api, bound, request_id="o112-cred-null", credentialId=None))["providerModel"]
+        assert detached["credentialId"] is None
+
+        kept = runtime.model_configs.update(
+            detached["id"], detached["version"], "o112-cred-keep",
+            {"displayName": "只改名字，凭据保持"},
+        )
+        assert kept["displayName"] == "只改名字，凭据保持"
+    # re-attach and omit the column on the wire: the required set refuses by name
+    with TestClient(create_app(runtime), base_url="http://127.0.0.1",
+                    raise_server_exceptions=False) as client:
+        api = Wire(client, {"Authorization": f"Bearer {runtime.token}"})
+        again = api.ok("providerModels.update", update(
+            api, kept, request_id="o112-cred-reattach", credentialId="cred-o112"))["providerModel"]
+        params = update(api, again, request_id="o112-cred-omit")
+        params.pop("credentialId")
+        error = api.err("providerModels.update", params)
+        assert error["code"] == "INVALID_REQUEST" and "credentialId" in error["message"]
+        assert again["credentialId"] == "cred-o112"
+
+
+def test_the_three_non_nullable_columns_refuse_null_by_name(api):
+    """`displayName`/`configuration`/`models` are not nullable in the contract,
+    so a null has to be answered with the field's own name - not a silent keep."""
+    record = create(api)
+    for field in ("displayName", "configuration", "models"):
+        error = api.err("providerModels.update",
+                        update(api, record, request_id="o112-null-" + field, **{field: None}))
+        assert error["code"] == "INVALID_REQUEST", (field, error)
+        assert field in error["message"], (field, error)
+
+
+def _contract_update_properties():
+    schema = json.loads(ARTIFACT.read_text(encoding="utf-8"))
+    return schema["providerModels.update#params"]["properties"]
+
+
+def test_the_nullability_table_is_read_from_the_contract_and_not_typed_in():
+    """The table above claims which columns are nullable; this checks the claim
+    against the artifact, so a relock that changes nullability turns this red
+    instead of letting a behavior claim quietly age into an assumption."""
+    properties = _contract_update_properties()
+    derived = {
+        field: any(item.get("type") == "null" for item in schema.get("anyOf", []))
+        for field, schema in properties.items()
+    }
+    assert derived.keys() == set(properties), "every column must be accounted for"
+    assert NULLABLE_PER_CONTRACT == {
+        field: nullable for field, nullable in derived.items()
+        if field in NULLABLE_PER_CONTRACT
+    }, (NULLABLE_PER_CONTRACT, derived)
+    # and the columns this file reasons about are exactly the ones update accepts
+    assert set(properties) == {
+        "requestId", "providerModelId", "expectedVersion", "displayName",
+        "credentialId", "configuration", "models"}
+
+
+@pytest.mark.parametrize("field", CONTRACT_ALLOWS_EMPTY_BUT_SERVER_REFUSES)
+def test_an_empty_list_the_contract_allows_is_still_a_typed_refusal(api, field):
+    """Registered as a divergence, not fixed here: refusing an empty model list
+    is stricter than the contract, but it speaks - which is what AQ-0007 is about."""
+    schema = _contract_update_properties()[field]
+    assert "minItems" not in schema, "the contract grew a bound; re-read this gate"
+    record = create(api)
+    error = api.err("providerModels.update",
+                    update(api, record, request_id="o112-empty-" + field, **{field: []}))
+    assert error["code"] == "INVALID_REQUEST"
+
 
 def test_the_locked_param_shape_for_update_is_untouched():
     required, optional = handlers_module._PARAM_SHAPES["providerModels.update"]

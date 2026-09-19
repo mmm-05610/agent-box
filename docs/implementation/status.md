@@ -1297,3 +1297,12 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 | **合计** | **0 次** | **¥0** | — | **全程未访问** | DeepSeek 额度未消耗；R-0011 的授权本批未被使用（真实调用留给 089 那一类门） |
 
 子代理：**0 个**（本批全部单线程执行，含 113 声明的 3 个 `parallel_units` 未使用）⇒ 无额外请求与费用。
+
+## 工单 112 — 更正与补做：**已纳入 work order 112 修订 v2 @`6c09534`**（2026-09-19，执行者）
+
+> 回执按主树 README §3.5b 记这一行；修订原文见 [112 契约 §修订 v2](work-orders/112-provider-update-keeps-omitted-112.md)，
+> 登记正文见 [112 证据 §7](../server-round1/fullstack/provider-update-keeps-omitted-112.md)。
+
+| 单 | 阶段 | 门 | 回归 | 真实模型 | 提交 |
+| --- | --- | --- | --- | --- | --- |
+| 112 | 5 修订 v2 的第二半（逐字段登记可空性） | 调度者按阶段 1 实测改了这张单，裁定"省略即保留只是一半，**显式清空不许被吞**；可空性以合同/工件为准，逐字段登记"。补做四条门：① **合同可空列（`credentialId`，`anyOf [string,null]`）真的解绑**——绑定态→null ⇒ 读回 null、版本 +1，而服务层省略该键 ⇒ 绑定保持（两种意图第一次在同一列上可分辨并各自生效）；② 三个非空列（`displayName`/`configuration`/`models`）给 null 一律**点名**类型化拒绝；③ **可空性表与工件逐字段核对**（重锁改了可空性 ⇒ 这条先红，而不是让行为断言悄悄过期；并钉住"`update` 接受的字段集就是这七个"）；④ 一处**如实登记的偏差**：`models: []` 合同合规（无 `minItems`）而 Server 拒（`Models must be non-empty and unique`）——它**说话**不是静默，故不改只钉，合同哪天加了 `minItems` 这条门会红并要求重看。`provenance` 四列因**合同里没有这一键**（113 点名的漂移）而以 Server 侧登记，并在表里标明这一格是合同缺口 | 门 24 ⇒ **28 passed in 9.89s**；定向 `pytest tests/server -k "provider or update or provenance or artifact or coverage"` ⇒ **120 passed / 650 deselected，0 失败** | 0 次 / ¥0（`/locator/never-read` 是字面 locator，未读取任何凭据内容） | 本提交（在 `checkpoint/b2-2` **之后**；tag 不移动——README §3.2 禁止覆盖，本次以更正行入账） |

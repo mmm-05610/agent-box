@@ -105,3 +105,26 @@ CAS/`expectedVersion`/幂等 `requestId`/错误族全不变。
 形状门在 handler 之前就把带 `provenance` 的请求拒了。这正是 098 终态行未做项 ③ 记下的那个"死调用点"，
 现在有了可复跑的实测。**本单不删它**：删＝改语义（要么让 `probeConnection` 接受 provenance，要么明确它不接受），
 两个方向都该由调度者拍。登记见本树 `status.md` §待开单同族条目（098 §9.2 / 113 的 `--compare` 也各指到同一处合同漂移）。
+
+## 7 修订 v2（`6c09534`）要的第二半：逐字段登记"可空性 ⇒ 处置"
+
+调度者按阶段 1 的实测改了这张单（原文前提是反的），并裁定："省略即保留"只是一半，
+另一半是**显式清空不许被吞**；逐字段的可空性以**合同/工件**为准。登记如下——
+"合同"那一列全部是 `wire-v1.schema.registered-c4255b31.json` 里 `providerModels.update#params.properties` 的现物，
+由门 `test_the_nullability_table_is_read_from_the_contract_and_not_typed_in` 每次核对（重锁改可空性 ⇒ 门红，而不是散文过期）。
+
+| 字段 | 合同可空？ | 显式给 `null` 的实测处置 | 省略该字段的实测处置 | 钉它的门 |
+| --- | --- | --- | --- | --- |
+| `credentialId` | **是**（`anyOf [string, null]`） | **真的解绑**：绑定态 → null ⇒ 读回 `credentialId: null`、版本 +1；服务层省略该键 ⇒ 绑定**保持** | 线面：`INVALID_REQUEST: … missing credentialId`（必填集含它） | `test_the_contract_nullable_column_really_unbinds` |
+| `displayName` | 否（`string`） | 类型化拒绝：`displayName must be a bounded string` | 点名拒绝 | `test_the_three_non_nullable_columns_refuse_null_by_name`、`test_display_name_still_refuses_null_rather_than_keeping_quietly` |
+| `configuration` | 否（`array`；`[]` 合法） | 类型化拒绝：`configuration must be a list of control assignments`；而 `[]` 是**合法清空**（读回空列表，provenance 不受牵连） | 点名拒绝 | 同上 ＋ `test_configuration_may_be_emptied_on_purpose` |
+| `models` | 否（`array`，**合同无 `minItems`** ⇒ 空数组合规） | 类型化拒绝：`models must be a list` | 点名拒绝 | 上表那条 ＋ `test_an_empty_list_the_contract_allows_is_still_a_typed_refusal` |
+| `provenance` 四列 | **合同里根本没有 `provenance` 这一键**（113 的 `--compare` 点名的两条漂移：`update` 与 `probeModels`） | 以 Server 侧为准：省略 ⇒ 保留；显式 `null` ⇒ **真的清空**（单列/全列都分辨得出） | 四列整体省略 ⇒ 全保留；只给一列 ⇒ 未给的三列保留 | G1×4 ＋ G2×5 |
+
+**一处如实登记的偏差（不是缺陷，也不是"已对齐"）**：`models: []` 合同允许、Server 拒绝。
+按 R-0032 ⑤"选不让信息被吞的那侧"，Server 的做法是**说话**（类型化 `Models must be non-empty and unique`）而不是静默——
+所以本单不动它，只把它钉成一条会随合同变化的门（合同哪天加了 `minItems`，那条门会红并要求重看）。
+
+**门数变化**：24 ⇒ **28**（新增 4 条：可空列真的解绑、三个非空列点名拒绝、可空性表与工件核对、`models:[]` 偏差）。
+`28 passed in 9.89s`。这是 `checkpoint/b2-2` **之后**的补做：tag 不移动（README §3.2 禁止覆盖），
+本节的账以"更正行"形式附在 112 终态行之后。
