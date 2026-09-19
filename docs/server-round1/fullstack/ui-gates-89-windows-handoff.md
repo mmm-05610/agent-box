@@ -22,6 +22,10 @@
 
 ## 1 起 Windows 侧 Server（修订 v2 要的正是这条路径）
 
+> **抄进 `.ps1` 的行一律纯 ASCII ＋ CRLF**（QA 第 2 条环境事实）：中文注释存成 UTF-8 无 BOM 时，
+> PowerShell 5.1 按 ANSI 解码会把变量读成 `$null`（现场：`$SourceRoot` 空 ⇒ `Join-Path : 参数是空值`）。
+> 本包里以 `#` 开头且带中文的行是**给人读的注释**，落到脚本前请换成 ASCII（§3b 那段已经全是 ASCII）。
+
 > **⚠️ 先读 `R-0056` 的资源护栏，别照抄 `trial-serve.ps1` 的默认值**（本轮补读裁决时发现的问题，见 §6）：
 > `089` 的 Windows 侧 Server **必须用独立端口段 + 独立数据根**，**不得**与验收线 A 的 WSL 试用环境
 > （`18790` / `~/.agentbox-trial-chat`）抢同一份资源。而 `trial-serve.ps1` 写的是
@@ -29,15 +33,15 @@
 > 拿它当验收根跑，等于在用户的真 Profile 上试错。**要改这两行再跑**：
 >
 > ```powershell
-> $DataRoot = Join-Path $env:LOCALAPPDATA "AgentBox\89-gate"   # 独立根（跑完归档/删除并留证据）
-> $Port     = 18820                                            # 独立端口段（18790/18810 已有主）
+> $DataRoot = Join-Path $env:LOCALAPPDATA "AgentBox\89-gate"   # own root; archive+delete after
+> $Port     = 18820                                            # 18790/18810 already taken
 > ```
 >
 > 端口先自己验一次空闲：`powershell.exe -NoProfile -Command "Get-NetTCPConnection -LocalPort 18820 -ErrorAction SilentlyContinue"`
 > 无输出 ＝ 可用。`trial-app.ps1` 那两条环境变量要跟着改（`-ServerRoot` / `-ServerPort` 都收参数）。
 
 ```powershell
-# 终端 A（Windows）—— 先按上面改好 $DataRoot / $Port，再起
+# Terminal A (Windows): apply the $DataRoot / $Port edits above, then run
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\agentbox-w48-trial\trial-serve.ps1
 ```
 
@@ -53,9 +57,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\agentbox-w48-trial\tr
 ## 2 起真 Electron（这一步就是 089 的 G1"真"）
 
 ```powershell
-# 终端 B（Windows）
+# Terminal B (Windows)
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\agentbox-w48-trial\trial-app.ps1
-# 等价于：$env:ORDESSA_SERVER_ROOT="$env:LOCALAPPDATA\AgentBox\desktop"; $env:ORDESSA_SERVER_PORT="18770";
+# Equivalent to: $env:ORDESSA_SERVER_ROOT="$env:LOCALAPPDATA\AgentBox\desktop"; $env:ORDESSA_SERVER_PORT="18770";
 #         cd C:\Users\maoqh\agentbox-wsl-round1\apps\desktop; npm run dev:renderer ; npm run dev:electron -- --remote-debugging-port=9222
 ```
 
@@ -89,8 +93,12 @@ curl -sS -X POST http://127.0.0.1:18770/wire/v1/profiles.list \
 QA 一手跑到 §3 时撞上：`R-0056` 要求独立数据根 ⇒ 全新根里 `profiles.list` 回 **`items=0`** ⇒ G1/G2 无从下手。
 **根因不在产品**（本树源码一手核过，见下面两条），在**这份跑本没写怎么造 profile**——补上：
 
+> **这段里的 `#` 注释一律纯 ASCII**：QA 第 2 条环境事实—–从 WSL 写给 PowerShell 的脚本
+> 若带中文注释且存成 UTF-8 无 BOM，PowerShell 5.1 按 ANSI 解码会把变量读成 `$null`
+> （实测现场：`$SourceRoot` 变空 ⇒ `Join-Path : 参数是空值`）。**要么纯 ASCII＋CRLF，要么写 BOM。**
+
 ```powershell
-# 在 Windows 侧跑（控制面＝Windows，`R-0014`）。一份 0600 的 key 文件放在**根外**的私有路径。
+# Run on the Windows side (the control plane, R-0014). Key file: 0600, outside the data root.
 & "$env:LOCALAPPDATA\AgentBox\r4c9-env\Scripts\python.exe" `
   "\\wsl.localhost\Ubuntu\home\maoqh\projects\agent-box-env-provider\scripts\server-round1\ui_gates_89_seed_profile.py" `
   --base-url http://127.0.0.1:18820 `
@@ -99,10 +107,10 @@ QA 一手跑到 §3 时撞上：`R-0056` 要求独立数据根 ⇒ 全新根里 
   --endpoint  https://api.deepseek.com --model-id deepseek-chat `
   --harness pi --harness codex --require-ready `
   --state-file "$env:LOCALAPPDATA\AgentBox\89-gate-qa\seed-state.json"
-# 退出码：0＝两条都 ready；3＝有 blocked/unknown（报告里的 checks 会点名是哪一条事实）；
-#         4＝命中 R-0056 的端口护栏（默认禁 18790/18810），一次请求都没发。
-# 跑完（无论成败）归档自己造的东西：
-#   … ui_gates_89_seed_profile.py --base-url … --token-file … --teardown `
+# Exit codes: 0 = both ready; 3 = blocked/unknown (the report's checks name which fact);
+#             4 = the R-0056 port guard fired (default forbids 18790/18810) with zero requests sent.
+# After the run, whatever happened, archive what you seeded:
+#   ... ui_gates_89_seed_profile.py --base-url ... --token-file ... --teardown `
 #       --state-file "$env:LOCALAPPDATA\AgentBox\89-gate-qa\seed-state.json"
 ```
 
