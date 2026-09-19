@@ -693,3 +693,21 @@ AGENT_BOX_WIRE_SCHEMA=docs/server-round1/fullstack/contract/wire-v1.schema.regis
 
 **重锁之后要做的一件事**：把清单重生成一次并跑 `--compare`，若那两条漂移消失则该节与 `--compare`
 的退出码自动变干净——**不需要有人记得改散文**。
+
+### 5 漂移被修好时的那条门会红——预期动作写在这里
+
+`tests/server/test_wire_artifact_113.py::test_the_two_bodies_differ_only_in_the_registered_drift`
+把当前那 2 条 `provenance` 漂移钉成常量 `KNOWN_DRIFT`。**下一次重锁把 `provenance` 编进
+`providerModels.update#params` / `probeModels#params` 之后，这条门会红**——那是设计，不是故障。
+预期动作（按顺序）：
+
+1. 跑 `python3 scripts/server-round1/wire_artifact.py --compare docs/server-round1/fullstack/contract/<新登记的那份>`
+   ⇒ 期望 `optionalNotInContract` 变 `[]`、退出码 0；
+2. 把本文件"工件口径（113）"§4 表里"已知漂移"那一行改成"无（<日期>，<哪次重锁>）"，
+   并把 §1 表里副本文件名换成新摘要（副本**名字必须等于内容哈希**，这条由门钉着）；
+3. 同步 `tests/server/test_wire_artifact_113.py` 的 `KNOWN_DRIFT = []` 与
+   `tests/server/test_hello_harnesses_105.py:ARTIFACT_SHA256`＋那条 105 的门所指的**形状**
+   （105 的门钉的是 `harnesses` 那一面；若这次重锁同时动了 hello 的形状，那条门会自己说）。
+
+**为什么不是"自动通过"**：漂移消失是一件需要有人看一眼的事实（它意味着两份本体真的对齐了），
+所以这里故意让门先红一次，而不是让常量自己跟着动。
