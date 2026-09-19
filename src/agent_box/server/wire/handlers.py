@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from pathlib import Path
+import re
 import shutil
 import mimetypes
 from pathlib import PurePosixPath
@@ -18,7 +20,7 @@ from agent_box.server.errors import ServerError
 from agent_box.server.execution.artifact_store import ArtifactStoreError
 from agent_box.server.records import canonical, digest, reject_sensitive_keys
 from agent_box.server.wire.envelope import CursorCodec
-from agent_box.server.wire.errors import WireError
+from agent_box.server.wire.errors import WireError, family_for
 from agent_box.server.accounts.records import account_view
 from agent_box.server.assets.records import asset_view
 from agent_box.server.hooks.records import hook_view
@@ -241,6 +243,39 @@ _ARTIFACT_FAMILIES = {
 }
 
 
+#: The asset/catalog surface answers typed refusals with `CatalogError(code, message)`
+#: and everything else with whatever Python raised. Order 147 (`AUD-B-037`) is the
+#: record of what the five copies of `except Exception as refusal` did with that:
+#: they wrote `INVALID_REQUEST: <ClassName>: <str(exc)>`, so a permission or disk
+#: failure on the Server told the client its request was illegal, and the raw text
+#: carried absolute paths (including the data root) out over the wire.
+_LOG = logging.getLogger(__name__)
+_CODE_SHAPE = re.compile(r"[A-Z][A-Z0-9_]{2,127}")
+
+
+def _asset_refusal(exc: BaseException) -> WireError:
+    """One path for the asset surface's refusals - five copies were five truths.
+
+    A code that is shaped like a registered domain code keeps its own words: the
+    family `errors.family_for` assigns it, the same `code: message` text the
+    surface has always sent, and `details.internalCode` so the precise code is
+    structured rather than embedded prose (the shape order 115 fixed).
+
+    Anything else is a Server-side fault, not the caller's mistake: it answers
+    `UNAVAILABLE` with a machine-readable `internalCode` of the exception *type*
+    only. The raw text goes to the Server log, never to the client - which is
+    what `_safe_code` does in `execution/sidecar_backend.py`.
+    """
+    code = getattr(exc, "code", None)
+    if isinstance(code, str) and _CODE_SHAPE.fullmatch(code):
+        message = str(getattr(exc, "message", "the asset surface refused the request"))
+        return WireError(family_for(code), f"{code}: {message}",
+                         {"internalCode": code, "retryable": family_for(code) == "UNAVAILABLE"})
+    _LOG.warning("asset surface raised %s: %s", type(exc).__name__, exc)
+    return WireError("UNAVAILABLE", "the asset surface could not complete the request",
+                     {"internalCode": type(exc).__name__, "retryable": True})
+
+
 def _artifact_error(exc: ArtifactStoreError) -> WireError:
     return WireError(
         _ARTIFACT_FAMILIES.get(exc.code, "INVALID_REQUEST"),
@@ -262,6 +297,81 @@ _BINDING_ACTIONS: Mapping[str, tuple[str, ...]] = {
     "MODEL_UNAVAILABLE": ("choose_an_available_model",),
     "PROFILE_CONFIGURATION_INVALID": ("choose_a_model",),
 }
+
+
+#: Which directory a model-slot reference points at. One string, and the gate
+#: in `tests/server/test_config_describe_slots_125.py` is the thing that keeps
+#: `model_configs` a single table rather than a guess.
+SLOT_TABLE = "providerModels"
+
+
+def _model_reference_list(value: Any) -> list[dict[str, str]]:
+    """Every Provider/Model reference inside a control value, in document order.
+
+    A control may hold one reference (the shape order 60 shipped) or a list of
+    them (R-0013's v2 multi-slot). This mirrors
+    `model_configs.service._model_references`, and a gate compares the two on
+    fixed samples so the copy cannot drift silently.
+    """
+    found: list[dict[str, str]] = []
+    if isinstance(value, Mapping):
+        if isinstance(value.get("providerId"), str) and isinstance(value.get("modelId"), str):
+            found.append({"providerId": str(value["providerId"]),
+                          "modelId": str(value["modelId"])})
+        for nested in value.values():
+            found += _model_reference_list(nested)
+    elif isinstance(value, list):
+        for nested in value:
+            found += _model_reference_list(nested)
+    return found
+
+
+class _CallReader:
+    """One wire call's worth of object reads, de-duplicated by digest (order 147).
+
+    `AUD-B-040` measured `profiles.list` walking the model resolution once *per
+    row*: with 40 profiles over a single provider whose model list is 285 KB,
+    one call issued 80 `objects.read`s and re-hashed 11 MB, because `read()`
+    verifies the digest by re-hashing the whole object and nothing memoised it.
+    Memoising on the digest does not weaken that check - the digest *is* the
+    immutability argument - and it is scoped to one call, so no projection can
+    outlive the composition that produced it.
+    """
+
+    def __init__(self, objects: Any) -> None:
+        self._objects = objects
+        self._bytes: dict[str, bytes] = {}
+        self._parsed: dict[str, Any] = {}
+        self._indexes: dict[str, dict[str, Any]] = {}
+        self._records: dict[str, Any] = {}
+
+    def read(self, digest: str) -> bytes:
+        cached = self._bytes.get(digest)
+        if cached is None:
+            cached = self._objects.read(digest)
+            self._bytes[digest] = cached
+        return cached
+
+    def parsed(self, digest: str) -> Any:
+        cached = self._parsed.get(digest)
+        if cached is None:
+            cached = json.loads(self.read(digest))
+            self._parsed[digest] = cached
+        return cached
+
+    def index(self, digest: str, *, section: str, field: str) -> dict[str, Any]:
+        """`modelId -> model`, built once per object instead of a linear scan per row."""
+        cached = self._indexes.get(digest)
+        if cached is None:
+            items = self.parsed(digest).get(section) or []
+            cached = {str(item[field]): item for item in items if field in item}
+            self._indexes[digest] = cached
+        return cached
+
+    def record(self, provider_id: str, fetch: Callable[[], Any]) -> Any:
+        if provider_id not in self._records:
+            self._records[provider_id] = fetch()
+        return self._records[provider_id]
 
 
 class WireService:
@@ -553,11 +663,14 @@ class WireService:
         if not isinstance(include, bool):
             raise WireError("INVALID_REQUEST", "includeArchived must be a boolean")
         items = []
+        # One reader per call: `profiles.list` used to re-resolve the same provider
+        # and the same model list for every row (order 147, `AUD-B-040`).
+        read = _CallReader(self.objects)
         for row in self.profiles.records.list(include_archived=include):
-            items.append(self._profile(row))
+            items.append(self._profile(row, read))
         return {"items": items, "nextCursor": None}
 
-    def _profile(self, row: Mapping[str, Any]) -> dict[str, Any]:
+    def _profile(self, row: Mapping[str, Any], read: _CallReader | None = None) -> dict[str, Any]:
         item = profile_record(row)
         descriptor = (
             self.harnesses.get(row["harness_type"])
@@ -568,12 +681,14 @@ class WireService:
             for key, value in (descriptor.capability_claims if descriptor else {}).items()
             if isinstance(value, bool)
         }
-        item["sendability"] = self._sendability(row, item)
+        item["sendability"] = self._sendability(row, item, read)
         return item
 
     # -- sendability (order 117, QA-009) -----------------------------------
 
-    def _profile_bindings(self, row: Mapping[str, Any]) -> tuple[list[dict[str, Any]], bool]:
+    def _profile_bindings(self, row: Mapping[str, Any],
+                          read: _CallReader | None = None,
+                          ) -> tuple[list[dict[str, Any]], bool]:
         """Re-walk the model resolution a turn would do, and say what it would hit.
 
         `freeze_execution_configuration` (`model_configs/service.py:134-180`) is
@@ -587,6 +702,7 @@ class WireService:
         keeps the two from drifting.
         """
         empty: tuple[list[dict[str, Any]], bool] = ([], False)
+        read = read or _CallReader(self.objects)
         descriptor = (
             self.harnesses.get(row["harness_type"])
             if row["harness_type"] in self.harnesses else None
@@ -608,7 +724,7 @@ class WireService:
                 "detail": f"control {control_id} selects no Provider/Model configuration",
             }], False
         try:
-            document = json.loads(self.objects.read(digest))
+            document = read.parsed(digest)
         except Exception:  # noqa: BLE001 - unreadable configuration is unknown, not fine
             return [], True
         reference = (document.get("configuration") or {}).get(control_id)
@@ -624,7 +740,10 @@ class WireService:
             "controlId": control_id, "state": "ready", "reason": None, "detail": None,
         }
         try:
-            provider = self.model_configs.records.get(binding["providerModelId"])
+            provider = read.record(
+                binding["providerModelId"],
+                lambda: self.model_configs.records.get(binding["providerModelId"]),
+            )
         except ServerError as error:
             binding["state"] = "blocked"
             binding["reason"] = ("PROVIDER_MODEL_NOT_FOUND" if error.code == "PROVIDER_MODEL_NOT_FOUND"
@@ -640,11 +759,11 @@ class WireService:
                                  else "the provider record belongs to a different harness")
             return [binding], False
         try:
-            models = list(json.loads(
-                self.objects.read(provider["models_object_digest"])).get("models") or [])
+            models = read.index(provider["models_object_digest"],
+                                section="models", field="modelId")
         except Exception:  # noqa: BLE001
             return [binding], True
-        model = next((item for item in models if item.get("modelId") == binding["modelId"]), None)
+        model = models.get(binding["modelId"])
         if model is None:
             binding["state"] = "blocked"
             binding["reason"] = "PROVIDER_MODEL_REFERENCE_MISSING"
@@ -675,7 +794,8 @@ class WireService:
                 return [binding], True
         return [binding], False
 
-    def _sendability(self, row: Mapping[str, Any], projected: Mapping[str, Any]) -> dict[str, Any]:
+    def _sendability(self, row: Mapping[str, Any], projected: Mapping[str, Any],
+                     read: _CallReader | None = None) -> dict[str, Any]:
         """Can this Profile take a message here, answered **before** one is sent.
 
         QA-009's complaint is that both blockers existed only as a failure after
@@ -705,7 +825,7 @@ class WireService:
                            "reason": "RECOVERY_STATE_UNREADABLE",
                            "message": "this Server could not read the recovery state",
                            "actions": []})
-        bindings, unreadable = self._profile_bindings(row)
+        bindings, unreadable = self._profile_bindings(row, read)
         for binding in bindings:
             checks.append({
                 "key": "model:" + (binding.get("providerModelId")
@@ -828,9 +948,7 @@ class WireService:
                 source_path=_Path(_bounded(params["sourcePath"], "sourcePath", 4096)),
             )
         except Exception as refusal:  # noqa: BLE001 - typed by the store
-            raise WireError("INVALID_REQUEST",
-                            f"{getattr(refusal, 'code', type(refusal).__name__)}: "
-                            f"{getattr(refusal, 'message', refusal)}")
+            raise _asset_refusal(refusal) from refusal
         return {"catalog": self._catalog_view(snapshot)}
 
     def assets_catalog(self, params: Mapping[str, Any]) -> dict[str, Any]:
@@ -867,9 +985,7 @@ class WireService:
                 records=records, skills=skills, mcp=mcp,
             )
         except Exception as refusal:  # noqa: BLE001 - typed by the store
-            raise WireError("INVALID_REQUEST",
-                            f"{getattr(refusal, 'code', type(refusal).__name__)}: "
-                            f"{getattr(refusal, 'message', refusal)}")
+            raise _asset_refusal(refusal) from refusal
         return {"installed": installed}
 
     def assets_probe(self, params: Mapping[str, Any]) -> dict[str, Any]:
@@ -912,9 +1028,7 @@ class WireService:
         try:
             facts = skills.install(source, asset_id=asset_id, revision=revision)
         except Exception as refusal:  # noqa: BLE001 - typed by the store
-            raise WireError("INVALID_REQUEST",
-                            f"{getattr(refusal, 'code', type(refusal).__name__)}: "
-                            f"{getattr(refusal, 'message', refusal)}")
+            raise _asset_refusal(refusal) from refusal
         published = records.publish(
             key=_request_id(params["requestId"]),
             request_digest=digest({"assetId": asset_id, "revision": revision,
@@ -937,9 +1051,7 @@ class WireService:
         try:
             canonical = mcp.install(definition, asset_id=asset_id, revision=revision)
         except Exception as refusal:  # noqa: BLE001 - typed by the store
-            raise WireError("INVALID_REQUEST",
-                            f"{getattr(refusal, 'code', type(refusal).__name__)}: "
-                            f"{getattr(refusal, 'message', refusal)}")
+            raise _asset_refusal(refusal) from refusal
         published = records.publish(
             key=_request_id(params["requestId"]),
             request_digest=digest({"assetId": asset_id, "revision": revision,
@@ -970,9 +1082,7 @@ class WireService:
             facts = self.plugin_assets.install(
                 source, asset_id=asset_id, revision=revision)
         except Exception as refusal:  # noqa: BLE001 - typed by the store
-            raise WireError("INVALID_REQUEST",
-                            f"{getattr(refusal, 'code', type(refusal).__name__)}: "
-                            f"{getattr(refusal, 'message', refusal)}")
+            raise _asset_refusal(refusal) from refusal
         published = records.publish(
             key=_request_id(params["requestId"]),
             request_digest=digest({"assetId": asset_id, "revision": revision,
@@ -1689,11 +1799,8 @@ class WireService:
             descriptor = self.harnesses.get(harness)
             for control_id, values in sorted((descriptor.control_options or {}).items()):
                 current = configured.get(control_id)
-                holds_reference = (
-                    isinstance(current, Mapping) and self.model_configs is not None
-                    and isinstance(current.get("providerId"), str)
-                    and isinstance(current.get("modelId"), str)
-                )
+                references = _model_reference_list(current)
+                holds_reference = bool(references) and self.model_configs is not None
                 # The control the deployment names as its model control takes a
                 # Provider/Model reference and declares no static values for it
                 # (the reference comes from the directory, and
@@ -1705,18 +1812,15 @@ class WireService:
                 # this really is an enumeration and stays one.
                 if (descriptor.model_control_id == control_id and not values
                         and self.model_configs is not None):
-                    model = (self.model_configs.reference(current["providerId"], current["modelId"])
-                             if holds_reference else None)
                     controls.append({
                         "kind": "model_slot", "controlId": control_id, "editable": True,
-                        "slots": [{"name": control_id, "model": model}],
+                        "slots": self._slot_entries(control_id, references, current),
                     })
                     continue
                 if holds_reference:
-                    model = self.model_configs.reference(current["providerId"], current["modelId"])
                     controls.append({
                         "kind": "model_slot", "controlId": control_id, "editable": True,
-                        "slots": [{"name": control_id, "model": model}],
+                        "slots": self._slot_entries(control_id, references, current),
                     })
                     continue
                 controls.append({
@@ -1736,6 +1840,37 @@ class WireService:
                 control["multiline"] = False
             controls.append(control)
         return controls
+
+    def _slot_entries(self, control_id: str, references: list[dict[str, str]],
+                      current: Any) -> list[dict[str, Any]]:
+        """One entry per Provider/Model reference a model control holds (order 125).
+
+        Before this, a control holding a *list* of references projected exactly
+        one slot built from `control_id` alone, so a client could not see past
+        the first seat - 092's G8 named that shape ("只投影第一个槽必须门红").
+
+        The legacy single-reference shape is emitted **verbatim**
+        (`{"name": control_id, "model": ...}`) because order 60's wire test pins
+        that dict key for key; only a value that is actually a list gains the
+        table-reference keys. A reference that no longer resolves is not papered
+        over: `model_configs.reference` raises typed, same as before.
+        """
+        if self.model_configs is None:
+            return [{"name": control_id, "model": None}]
+        if not isinstance(current, list):
+            one = references[0] if references else None
+            return [{"name": control_id,
+                     "model": (self.model_configs.reference(one["providerId"], one["modelId"])
+                               if one else None)}]
+        entries = []
+        for index, reference in enumerate(references):
+            model = self.model_configs.reference(reference["providerId"], reference["modelId"])
+            entries.append({
+                "name": f"{control_id}[{index}]", "slotIndex": index,
+                "table": SLOT_TABLE, "providerId": reference["providerId"],
+                "modelId": reference["modelId"], "model": model,
+            })
+        return entries
 
     def _locked_controls(self, profile: Mapping[str, Any]) -> list[str]:
         """Controls a security rule pins; they can never be overridden."""

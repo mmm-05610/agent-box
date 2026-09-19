@@ -788,6 +788,7 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 | **按新的 14 项名单回填历史行的 `wire_seq`**（128 的射程外剩余；老 Session 仍可能显示错序） | 128 一手：`wire/projection.py:206` 在 `wire_seq` 缺席时回落到存储 `seq`，而 `storage/database.py:_migrate_4_to_5` 那段 `UPDATE … SET wire_seq=(SELECT COUNT(*) …)` 是按**当年十项**名单算的 ⇒ **新写入已归一，已存在的库里那四类旧行仍是 NULL**，同一个老 Session 两套编号混着；客户端按 `seq` 排序＋去重会丢正文。回填要注意 `server_session_wire_order` 的 UNIQUE 与既有号不能撞 | `src/agent_box/storage/**` 不在 128 的 `write_paths`（`wire/**`、`sessions/**`、`tests/**`、`docs/**`、`status`）；本单宁可留一条已登记的缺口，也不越界改迁移 | [128 证据 §4](../server-round1/wire-seq-numbering-spaces-128.md)（含「游标编码的是 raw seq，回填不改游标语义」那一句） |
 | **把 `accounts.importAsset` 的资产写与幂等回执做成一个事务**（129 的射程外剩余） | 129 一手：`write_asset` 先落 `SecretStore` 才有回执可存 ⇒ 只能 `get`（读事务）→ 写 → `save`（另一事务），中间那段窗口里两个同 key 的首次请求**至多一份回执胜出**（`save` 在事务内再 check 一次），但**可能留下第二份没人指向的资产字节**。闭合要在 `accounts/assets.py` / `records.py` 内做，或改成内容寻址 locator 让第二次天然等价 | `src/agent_box/server/accounts/**` 不在 129 的 `write_paths`（`wire/**`、`tests/**`、`docs/**`、`status`）；本单按工单 §Scope 那句「做不到就交回并附一手证据」处理，**没有**顺手改资产层 | [129 证据 §5.1](../server-round1/import-asset-request-id-129.md) |
 | **`write_asset` 的 locator 命名时机要不要改成内容寻址**（一条裁决，不是清理） | 129 一手：`assets.py:176-191` 每次调用都新铸 locator（内容与 key 都不参与命名）⇒ **不同 requestId 的同一份字节 = 两个 locator**、两个都真实存在；129 只把「同一逻辑请求铸两个」变成不可达（回放根本不执行）。要不要走到「同内容 ⇒ 同 locator」是产品语义决定，它会牵动 reclaim 的摘要比对与账号资产的历史引用 | 属资产层语义 ＋ 牵动 56 的 reclaim 规则；129 §Scope 只授权修「同一请求重试」与「locator 铸造时机」两点，后者做不到 ⇒ 交回 | [129 证据 §5.4](../server-round1/import-asset-request-id-129.md) ＋ 门 `tests/server/test_import_asset_request_id_129.py::test_a_different_key_for_the_same_bytes_is_a_new_request_not_a_replay`（把现状钉成事实而不是传闻） |
+| **`_model_references` 把 `modelId: None` 拼成字符串 `"None"` 的引用**（写入侧比读侧宽，会让一次解析注定 404） | 125 一手：`model_configs/service.py:250-258` 判"是不是引用"用的是**键在不在**（`set(value) >= {"providerId","modelId"}`）然后 `str(...)` 强转 ⇒ `{"providerId": "p", "modelId": None}` 被当成"引用了名叫 `None` 的模型"；而 wire 侧要求两者都是非空字符串（`wire/handlers.py::_model_reference_list`）⇒ 两侧在这一形上**有意不同**，125 的门把这一分歧单独钉住而不是假装相等。后果在服务层：这样的配置能通过校验、然后在 `reference()`/freeze 处必然 404 | `src/agent_box/server/model_configs/**` 不在 125 的 `write_paths`（只有 `wire/handlers.py`）；收紧键判据＝改写入侧语义（可能拒掉今天写得进去的配置），属裁决不是清理 | [125 证据 §4](../server-round1/config-describe-slots-125.md) ＋ 门 `tests/server/test_config_describe_slots_125.py::test_the_two_walks_differ_on_one_shape_and_the_wire_is_the_stricter_one` |
 
 > 编号说明：上一节 `## CHECKPOINT b2`（080/081 那次）的 §2 写了"新增 B5"，但当时表里没落 B5
 > （其内容并入了 B4 的四项交回）。本表 **B5 由 085 新增**，是该编号的实际持有者；批末重写那节时一并更正引用。
@@ -1783,9 +1784,9 @@ HEAD 即检查点；`git status --short` 只剩本树自己的证据目录（`08
 | `118-artifact-absence-is-not-green`（`QA-010`） | **已收口 `ARTIFACT_ABSENCE_IS_NOT_GREEN_DONE`**（本节下方；投于 **19:48**，`c175762`，在本树账上空转约 4.5 h） | 本树一直按章程 §3 那张"今晚队列"表走（087→115→117→089→123→128→129），**没在阶段边界重读目录** ⇒ 这张单从未出现在账上。**这条就是 `R-0068` 点名的形状，我犯了** | 立即开工（无前置；写面 `scripts/server-round1/**`＋`tests/**`＋`docs/**` 全在本树） |
 | `119-load-independent-counter-example`（`QA-011`） | **已收口 `LOAD_INDEPENDENT_COUNTER_EXAMPLE_DONE`**（投于 19:48，`c175762`） | —— | 开工（`serialize_with` 点名 `115/117/118` 都已收口 ⇒ 现在可动）；它正是本树 §待开单里"080 反例门负载假红"那条的**正式落地单** |
 | `124-provider-model-write-whitelist` | **不开工：判据不成立**（投于 **20:35**，`906d741`；17:4x 一手核） | 本单 §Scope 要求 canonical 四值**引用**单一真相 `execution/protocols.py`，而**该文件不在本树**（一手：`ls src/agent_box/server/execution/` 无 `protocols.py`；全树 grep `openai-responses|anthropic-messages|openai-completions|provider_protocols` **0 命中**）⇒ 要么复制字面（G3 明令禁止），要么把它合进本树（不是执行者的权限：不 merge 主干）。而白名单那一半也吃这条腿：`protocols[]` 的值若不能对 canonical 校验，接受＝静默吞掉信息（违 `R-0032 ⑤`） | `依赖 092（runtime 线）的 execution/protocols.py 出现在本树`（可判定：`test -f src/agent_box/server/execution/protocols.py`）；在此之前本单不落地，**不做强行一半的 PARTIAL**
-| `125-config-describe-slot-projection` | **未开工**（同上 `906d741`，20:35） | 同上（`092` 交回的 ③ 的 wire 半边） | 开工（写面同 124） |
-| `145-workspace-connection-has-no-producer`（`AUD-B-011`） | **在飞**（17:5x 开工；投于 **23:21**，`4187d83`；三源对账已做完） | ops 刚投递，且 `serialize_with` 把它排在 `128/129/132` 之后 | 待 `128/129` 收口（本批即收口）后开工；**它和 128 直接咬合**：`workspace.connection` 就在 128 归一的名单里 |
-| `132-declaration-vs-execution-reconciliation-gate` | **未开工**（投于 **21:30**，`b195206`） | 依赖 `128`（本批刚收口）＋ runtime 线 `130/131` 的收口行——**判据不在我手里** | 每轮核 runtime 树 `status.md`；谓词不成立就先做 `118/119/124/125/145`，不长睡 |
+| `125-config-describe-slot-projection` | **已收口 `CONFIG_DESCRIBE_SLOT_PROJECTION_DONE`**（投于 20:35，`906d741`） | —— |
+| `145-workspace-connection-has-no-producer`（`AUD-B-011`） | **已收口 `WORKSPACE_CONNECTION_NO_PRODUCER_DONE`**（定档 2(b)；投于 23:21，`4187d83`） | —— |
+| `132-declaration-vs-execution-reconciliation-gate` | **判据未成立**（投于 21:30，`b195206`；18:5x 一手核） | 它点名依赖 runtime 线 `130`/`131` 的收口行；一手：在那棵树的 `status.md` 里 grep `130|131` **没有任何含 DONE/PARTIAL/终态/收口 的行**（只有一条 098 的旧行偶然含 "098"）⇒ 判据不成立 | `依赖 130/131`（可判定判据＝那棵树 status.md 出现两单的终态码）；等待期做 `147`（已投递的新单） |
 
 > 一条如实更正：**上一次我写 `QUEUE_EMPTY_AT` 被判过早并在原地作废**（同一格里登记的 6 张未开工单就是当时的反证）。
 > 本轮起把"重读目录"做成阶段边界的固定动作，本表就是那一格的产物；今后每张新单要么开工、要么在本表占一行并写判据。
@@ -1921,3 +1922,27 @@ HEAD 即检查点；`git status --short` 只剩本树自己的证据目录（`08
 | --- | --- | --- | --- |
 | `124` | **不开工**（17:4x 一手核完判据） | 本单 §Scope 要求 canonical 四值**引用** `execution/protocols.py`，而**该文件不在本树**：`ls src/agent_box/server/execution/` 无此文件；全树 grep `openai-responses / anthropic-messages / openai-completions / provider_protocols` **0 命中**（runtime 树有：`CANONICAL_PROTOCOLS = openai-chat / openai-responses / anthropic-messages / gemini-generate`）。⇒ 复制字面被 G3 禁止；把 092 的文件搬进本树不是执行者权限（不 merge 主干）。白名单那一半也吃这条腿：`protocols[]` 的值若不能对 canonical 校验，**接受＝静默吞掉信息**（违 `R-0032 ⑤`） | `依赖 092 合入本树`——可判定：`test -f src/agent_box/server/execution/protocols.py`。成立即开工（写面已够：`wire/handlers.py`＋`tests/**`＋`docs/**`） |
 | `125` | 判据待核（下一步） | 同族疑点：它的"取值来源"也写"引用单一真相（同 124）" | `自行`：先一手核 `config.describe` 的槽词汇是否已在本树（描述符 `model_controls` 缺席时按 145 的口径处理：能落地就落地、不能就按判据不开工并记此处） |
+
+## 工单 125 — `config.describe` 逐槽投影：一个控件的多张槽表要**一张张看得见**（`092` 交回 ③ 的 wire 半边，2026-09-19 18:2x–18:4x，执行者）
+
+**终态 `CONFIG_DESCRIBE_SLOT_PROJECTION_DONE`**。证据 [config-describe-slots-125.md](../server-round1/config-describe-slots-125.md)，
+门 `tests/server/test_config_describe_slots_125.py`（**16 条**，全走真 wire）。
+
+- 一手复核：`_controls` 的两条 `model_slot` 分支**永远只造一条槽**（`slots: [{"name": control_id, …}]`，name 还是从 controlId 编的）；
+  而**存储/校验侧早已能吃列表**（`model_configs/service.py:121` 递归遍历 `_model_references`）⇒ 这是**纯 wire 半边**的缺陷。
+  边界同时量到：`freeze_execution_configuration` 对非 `Mapping` 直接类型化拒绝 ⇒ "逐槽冻结"（092 G8 的另一半）在本树还不存在，
+  属 runtime 线的 `model_controls` 声明半（工单原话：随后补、**不阻塞本单**）。
+- 落地三条规则：值不是列表 ⇒ **老形状逐字不变**（G9；`test_wire_v1.py:454` 本来就逐键钉着）；
+  值是列表 ⇒ **一引用一槽**并带稳定表引用（`name/slotIndex/table/providerId/modelId/model`）；
+  空列表 ⇒ `slots == []`，**不给缺席的槽编默认值**（G10）。`table` 只有一处字面，门比对它等于服务层表名。
+- **反例是真退回**：把 `_slot_entries` 换成"只看第一条" ⇒ 同一份两槽配置立刻只剩 1 槽（125 之前的世界当场重放），`undo()` 后核实恢复。
+- **顺带量到一条别的线的缺陷（交回，不自行修）**：`_model_references` 判"是不是引用"用**键在不在**再 `str()` 强转 ⇒
+  `{"providerId":"p","modelId":None}` 变成"名叫 `None` 的模型"，注定在后面 404。125 的门没有把这件事抹平：
+  7 个正常样本要求与两侧**逐字相等**，这一形单独钉成"服务层更宽、wire 更严"（写进 §待开单，修在 `model_configs/**`）。
+- 另有一条"不越界"的门：`_slot_entries` 只允许出现在 `wire/handlers.py`。
+- 计数：定向（齐环境）`125 ＋ test_wire_v1` = **53 passed / 91.44s**；
+  批末 `tests/server -q` = **868 passed / 1 skipped / 0 failed in 251.97s**（`868 = 852 ＋ 16`）；
+  邻域第一遍**缺**插件 `PYTHONPATH` 时 102 passed / 1 failed，红的是
+  `test_unavailable_capabilities_carry_a_reason`（`workspaces.open` 的 supported 随宿主能否起沙箱室而变）⇒
+  **环境未齐不是回归**，带齐即绿。这是本夜第 **4** 条"计数必须声明环境"的一手（128 的 undo、118 的工件、119 的负载、本条的 PYTHONPATH），
+  自报行由 118 的挂钩打印。真实模型调用 **0 / ¥0**。
