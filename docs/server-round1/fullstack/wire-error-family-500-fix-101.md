@@ -102,3 +102,78 @@ usage_aggregate  -> tests/server/test_usage_aggregate.py（一处）
 4. 门**驱动真实 wire**覆盖五个方法：无服务 ⇒ 类型化 `UNAVAILABLE`；有服务 ⇒ 真结果；
    两类用户错误 ⇒ 类型化；反例 = 退回旧实现必须红。
 5. 装配（`bootstrap`）与"这台服务该不该提供这两个面"是**产品/组合裁决** ⇒ 交回，不在本单射程。
+
+## 7 阶段 2 实施：家族位、形状、映射，一次改在同一处
+
+| 改点 | 内容 |
+| --- | --- |
+| `_artifact_store()` | 第一参 `ARTIFACT_STORE_UNAVAILABLE` → **`UNAVAILABLE`**，原内部码进 `details.internalCode`（与 `from_server_error` 的收敛语义逐字一致，`errors.py:121`） |
+| `usage_aggregate` 的守卫 | 同形：`USAGE_AGGREGATOR_UNAVAILABLE` → `UNAVAILABLE` ＋ `internalCode` |
+| `_PARAM_SHAPES["providerArtifacts.install"]` | 必填集补 **`digest`**（对齐权威工件，§3）；值本身仍经 `_bounded(..., 128)` 过一遍，不是裸取 |
+| 三个 `provider_artifacts_*` | 各自 `try/except ArtifactStoreError` → `_artifact_error(exc)` |
+| 新增 `_ARTIFACT_FAMILIES` ＋ `_artifact_error()` | 模块级：`*_VERSION_MISSING`/`*_SOURCE_MISSING` → `NOT_FOUND`；`*_VERSION_EXISTS` → `CONFLICT_REQUEST`（依 `errors.py` 里 `ENTERPRISE_STATE_CONFLICT → CONFLICT_REQUEST` 的先例）；其余（`DIGEST_MISMATCH`/`SOURCE_INVALID`/`FAMILY_INVALID`/`VERSION_INVALID`）→ `INVALID_REQUEST`；**一律带 `internalCode`** |
+
+**没有新增家族**（`FAMILIES` 仍 12 项，有一条门专门钉这个数字），
+**没有改 wire 形状**（`UNAVAILABLE` 与 `details` 都是既有信封里的东西；`install` 多收一个键是**合同本来就要的**）。
+
+## 8 阶段 3：组合面核对的结论已经写在 §5，这里补"修完之后 wire 说什么真话"
+
+装配点 `bootstrap/runtime.py` 属 runtime 线（§5），本单不动它。
+于是修完之后，任何组合上这五个方法说的话是：
+
+> `UNAVAILABLE` ＋ `details.internalCode = USAGE_AGGREGATOR_UNAVAILABLE | ARTIFACT_STORE_UNAVAILABLE`
+
+——"这台服务没有这个面"，而不是"内部错误"。**这正是 097 交回的那件事的另一半**：
+hello 说"方法存在"（真），wire 说"这个面没装配"（也真），两句话不再合成一个 500。
+
+## 9 阶段 4：门（`tests/server/test_wire_error_family_101.py`，17 条）
+
+| 用例（含参数化的五条） | 钉哪道门 |
+| --- | --- |
+| `test_a_composition_without_the_service_refuses_by_type[五个方法]` | **G1**：五个各一次，必须 `http=200` ＋ `code=UNAVAILABLE` ＋ `internalCode` 是那两个之一 |
+| `test_the_internal_code_says_which_of_the_two_faces_is_absent` | 收敛不许把两条不同的真话合成一句模糊的话 |
+| `test_no_wire_error_is_constructed_with_a_non_family_first_argument` | **G2**：文本级扫 `handlers.py` 全部字面 `WireError(` 第一参 ⇒ 非法集合为空；再把每个名字**真的构造**一遍 |
+| `test_the_families_are_the_twelve_locked_ones` | 本单不扩词汇（扩词汇＝合同变更，属重锁） |
+| `test_usage_aggregate_answers_with_real_numbers_once_injected`／`test_provider_artifacts_list_answers_once_the_store_is_injected` | **G1 的另一半**：注入真实现 ⇒ 真结果（不是"永不报错"式的假绿） |
+| `test_rolling_back_to_an_uninstalled_version_is_not_found`／`test_a_digest_that_does_not_match_the_staged_tree_is_an_invalid_request` | §4 的两类用户错 ⇒ `NOT_FOUND`／`INVALID_REQUEST` ＋ 内部码 |
+| `test_install_declares_the_digest_its_locked_contract_requires`／`test_a_request_without_the_digest_is_refused_by_type` | §3 的第二堵墙：形状含 `digest`，且缺它时是**类型化**拒绝而不是 `KeyError` |
+| `test_an_already_installed_version_is_reported_as_a_state_conflict` | 映射表的第三族（在映射上断言，理由写在该用例 docstring：真装一版需要两侧算出同一个摘要，那属 57 的测试面） |
+| `test_counter_example_the_internal_code_in_the_family_slot_is_back_to_a_500` | **反例 A**：进程内把守卫换回旧写法 ⇒ 同一请求回到 `http=500`，跑完 `monkeypatch.undo()` 并核实还原 |
+| `test_counter_example_the_shape_without_digest_lets_the_keyerror_through` | **反例 B**：只换回旧形状 ⇒ `KeyError` 又变成 500（钉住"半修家族位不够"这件事） |
+
+**整份门拿去咬 `90a11cb` 的 `handlers.py`**（`/tmp` 副本、`PYTHONPATH` 排前、工作树未动、跑完核实缺席）
+⇒ **13 failed / 4 passed**。四条绿的各自都有理由，不是漏网：
+`FAMILIES==12`（本单没改词汇，旧码也满足）；两条"注入后能用"（旧码注入后**确实**能用——
+它们测的正是"家族位不是唯一的一堵墙"里的可修部分）；反例 A 本身（它断言"换回旧写法就 500"，与源码版本无关）。
+
+**真监听复跑**（uvicorn 真 bind `127.0.0.1:34253` ＋ `urllib` 真发，DoD 的"真实环境五方法各一次"）：
+
+| 方法 | 无服务（生产今天的形状） | 注入两个真实现 |
+| --- | --- | --- |
+| `usage.aggregate` | 200 `UNAVAILABLE`＋`USAGE_AGGREGATOR_UNAVAILABLE` | **200 `result {"sessions": []}`** |
+| `usage.export` | 200 同上 | **200 `result {"sessions": []}`** |
+| `providerArtifacts.list` | 200 `UNAVAILABLE`＋`ARTIFACT_STORE_UNAVAILABLE` | **200 `result {harness, versions: [], current: null}`** |
+| `providerArtifacts.install` | 200 `UNAVAILABLE`＋… | 200 `INVALID_REQUEST`＋`ARTIFACT_DIGEST_MISMATCH` |
+| `providerArtifacts.rollback` | 200 `UNAVAILABLE`＋… | 200 `NOT_FOUND`＋`ARTIFACT_VERSION_MISSING` |
+
+⇒ **没有任何一条是 500**；三种结局（类型化不可用、真结果、类型化用户错）都在真 HTTP 上各走了一遍。
+顺带核实 097/098/105 没被碰坏：`server.hello` 仍 200、`capabilities` 64、`harnesses: []`。
+
+## 10 账与清理
+
+真实模型调用 **0 次 / ¥0**：全程本地 SQLite ＋ 本地临时目录里的假 artifact store，
+`digest` 是字面假摘要，凭据 locator **未访问**。
+清理：三次临时根（`obs101-`/`obs101b-`/`obs101c-`）、`real101-`、`/tmp/101-oldcode` 逐一核实缺席；
+两条反例都是进程内 monkeypatch，跑完核实还原，工作树无残留。
+计数见终态行。
+
+## 11 交回
+
+* **给装配线（runtime 线）**：`bootstrap/runtime.py` 从不 import `UsageAggregator`/`ArtifactStore`（§5），
+  所以本单修完之后这五个方法在**任何**组合上都是类型化 `UNAVAILABLE`。
+  要不要给真实部署装上面是**产品裁决**（53/57 交付的是"面"还是"这台机器上的这个面"）。
+  本树的写权不含 `bootstrap/**`（R-0023），故交回而不是顺手接。
+* **给 103（元门）**：`providerArtifacts.install` 在 098/本轮之前**不存在任何可成功的请求**
+  （两条路各自 500），却在合同与 hello 里都算一个方法——这类"登记齐全但从没通过一次"的面正是 103 要一网打尽的形状。
+* **给 102**：本单**没有**触碰任何工件；`digest` 那个键是**服务端形状落后于既有权威**（§3），
+  102 做工件同步时应能看到服务端与权威在这一条上已一致。

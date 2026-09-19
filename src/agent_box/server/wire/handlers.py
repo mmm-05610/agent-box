@@ -14,6 +14,7 @@ from pathlib import PurePosixPath
 from typing import Any, Callable, Mapping
 
 from agent_box.server.errors import ServerError
+from agent_box.server.execution.artifact_store import ArtifactStoreError
 from agent_box.server.records import canonical, digest, reject_sensitive_keys
 from agent_box.server.wire.envelope import CursorCodec
 from agent_box.server.wire.errors import WireError
@@ -97,7 +98,7 @@ _PARAM_SHAPES = {
         {"harness"}, set(),
     ),
     "providerArtifacts.install": (
-        {"requestId", "harness", "version", "sourceToken"}, set(),
+        {"requestId", "harness", "version", "sourceToken", "digest"}, set(),
     ),
     "providerArtifacts.rollback": (
         {"requestId", "harness", "version"}, set(),
@@ -223,6 +224,28 @@ def _models(value: Any) -> list[dict[str, Any]]:
             "availability": availability, "unavailableReason": reason,
         })
     return result
+
+
+#: The artifact store speaks its own codes; the wire speaks twelve families.
+#: These are the store's facts that a client can act on, so they must not
+#: arrive as a 500 - and the internal code stays in `details` because the
+#: projection is a narrowing, not a replacement of what went wrong.
+#: `CONFLICT_REQUEST` for an already-installed version follows the precedent
+#: `ENTERPRISE_STATE_CONFLICT` sets in errors.py: the world is not the shape
+#: the request assumed.
+_ARTIFACT_FAMILIES = {
+    "ARTIFACT_VERSION_MISSING": "NOT_FOUND",
+    "ARTIFACT_SOURCE_MISSING": "NOT_FOUND",
+    "ARTIFACT_VERSION_EXISTS": "CONFLICT_REQUEST",
+}
+
+
+def _artifact_error(exc: ArtifactStoreError) -> WireError:
+    return WireError(
+        _ARTIFACT_FAMILIES.get(exc.code, "INVALID_REQUEST"),
+        str(exc),
+        {"internalCode": exc.code},
+    )
 
 
 class WireService:
@@ -1210,23 +1233,27 @@ class WireService:
     def _artifact_store(self):
         if self.artifact_store is None:
             raise WireError(
-                "ARTIFACT_STORE_UNAVAILABLE",
+                "UNAVAILABLE",
                 "this composition has no artifact management face",
+                {"internalCode": "ARTIFACT_STORE_UNAVAILABLE"},
             )
         return self.artifact_store
 
     def provider_artifacts_list(self, params: Mapping[str, Any]) -> dict[str, Any]:
         harness = _bounded(params["harness"], "harness", 64)
         store = self._artifact_store()
-        versions = store.installed(harness)
-        return {
-            "harness": harness,
-            "versions": [
-                {"version": version, **store.summary(harness, version)}
-                for version in versions
-            ],
-            "current": store.current_reference(harness),
-        }
+        try:
+            versions = store.installed(harness)
+            return {
+                "harness": harness,
+                "versions": [
+                    {"version": version, **store.summary(harness, version)}
+                    for version in versions
+                ],
+                "current": store.current_reference(harness),
+            }
+        except ArtifactStoreError as exc:
+            raise _artifact_error(exc) from exc
 
     def provider_artifacts_install(self, params: Mapping[str, Any]) -> dict[str, Any]:
         """Install a version the execution side has staged under the store's
@@ -1235,9 +1262,13 @@ class WireService:
         harness = _bounded(params["harness"], "harness", 64)
         version = _bounded(params["version"], "version", 64)
         token = _bounded(params["sourceToken"], "sourceToken")
+        digest = _bounded(params["digest"], "digest", 128)
         store = self._artifact_store()
-        source = store.incoming_dir(token)
-        receipt = store.install(harness, version, source, params["digest"])
+        try:
+            source = store.incoming_dir(token)
+            receipt = store.install(harness, version, source, digest)
+        except ArtifactStoreError as exc:
+            raise _artifact_error(exc) from exc
         shutil.rmtree(source, ignore_errors=True)
         return {"harness": harness, "version": version,
                 "digest": receipt["digest"], "entries": receipt["entries"]}
@@ -1246,8 +1277,11 @@ class WireService:
         harness = _bounded(params["harness"], "harness", 64)
         version = _bounded(params["version"], "version", 64)
         store = self._artifact_store()
-        store.rollback(harness, version)
-        return {"harness": harness, "current": store.current_reference(harness)}
+        try:
+            store.rollback(harness, version)
+            return {"harness": harness, "current": store.current_reference(harness)}
+        except ArtifactStoreError as exc:
+            raise _artifact_error(exc) from exc
 
     def usage_aggregate(self, params: Mapping[str, Any]) -> dict[str, Any]:
         """Order 53: per-session usage aggregation over the ledger.
@@ -1258,8 +1292,9 @@ class WireService:
         """
         if self.usage_aggregator is None:
             raise WireError(
-                "USAGE_AGGREGATOR_UNAVAILABLE",
+                "UNAVAILABLE",
                 "this composition exposes no usage-aggregation face",
+                {"internalCode": "USAGE_AGGREGATOR_UNAVAILABLE"},
             )
         session_ids = params.get("sessions") or []
         if not isinstance(session_ids, list) or not all(
