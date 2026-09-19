@@ -84,3 +84,38 @@ def test_dsh_and_qwen_are_not_materializable_here():
         protocols=["openai-chat"], endpoints={"openai-chat": URL})) is None
     assert materialize_family("qwen", _frozen(
         protocols=["openai-chat"], endpoints={"openai-chat": URL})) is None
+
+
+def test_freeze_to_native_bytes_end_to_end_via_the_real_service(tmp_path):
+    # The unblocked seam of 093: record -> freeze_execution_configuration (092's
+    # passthrough) -> materialize_family, using the REAL service and repository,
+    # not a hand-made frozen dict. Proves the record's URL+dialect actually reach
+    # the native bytes without a live sidecar (the guest write itself is env-gated).
+    from agent_box.server.idempotency import IdempotentRecords
+    from agent_box.server.model_configs.repository import ProviderModelRecords
+    from agent_box.server.model_configs.service import ProviderModelService
+    from agent_box.server.execution import HarnessDescriptor, HarnessRegistry
+    from agent_box.storage import Database, ObjectStore
+
+    root = tmp_path / "data"
+    root.mkdir()
+    database = Database(root / "db.sqlite3")
+    database.initialize()
+    registry = HarnessRegistry()
+    registry.register(HarnessDescriptor(
+        "codex", model_control_id="model",
+        wire_protocols={"openai-chat": "chat", "openai-responses": "responses"}))
+    svc = ProviderModelService(
+        ProviderModelRecords(database, IdempotentRecords(database)), ObjectStore(root),
+        harnesses=registry, credentials=None, profiles=None)
+    created = svc.create("k1", {
+        "displayName": "Loopback", "harness": None, "provider": "acme-loopback",
+        "credentialId": None, "configuration": [],
+        "protocols": ["openai-chat"], "endpoints": {"openai-chat": URL},
+        "models": [{"modelId": "m1", "displayName": "m1", "availability": "available",
+                    "unavailableReason": None}]})
+    frozen = svc.freeze_execution_configuration("codex", {"model": {
+        "providerId": created["id"], "modelId": "m1"}})
+    out = materialize_family("codex", frozen)
+    assert f'base_url = "{URL}"' in out["content"]      # record url, not the constant
+    assert 'wire_api = "chat"' in out["content"]        # codex dialect for openai-chat
