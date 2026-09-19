@@ -24,8 +24,8 @@ python3 scripts/server-round1/wire_drive_coverage.py --check     # 有缺口即�
 | 有真实 wire 驱动证据 | **64** |
 | 豁免 | **0** |
 | 无证据（差集） | **0** |
-| 证据行数合计 | 334（含 117/123/128 的新门；分布仍很偏）|
-| 只被**一个文件**驱动的方法 | **44** 个，列在下面当观察名单 |
+| 证据行数合计 | 352（含 117/123/128/129 的新门；分布仍很偏）|
+| 只被**一个文件**驱动的方法 | **41** 个，列在下面当观察名单 |
 
 ## 观察名单（单源证据：删掉那一个文件，该方法即成缺口）
 
@@ -35,9 +35,6 @@ python3 scripts/server-round1/wire_drive_coverage.py --check     # 有缺口即�
 正是这条规则存在的原因：换名字的改动不该悄悄把覆盖变绿。
 
 * `accounts.bind` → `tests/server/test_accounts.py`
-* `accounts.create` → `tests/server/test_accounts.py`
-* `accounts.importAsset` → `tests/server/test_accounts.py`
-* `accounts.list` → `tests/server/test_accounts.py`
 * `assets.bind` → `tests/server/test_asset_hubs.py`
 * `assets.bindings` → `tests/server/test_asset_hubs.py`
 * `assets.catalog` → `tests/server/test_asset_hubs.py`
@@ -83,9 +80,9 @@ python3 scripts/server-round1/wire_drive_coverage.py --check     # 有缺口即�
 | 方法 | 驱动证据（第一条） | 证据行数 |
 | --- | --- | --- |
 | `accounts.bind` | `tests/server/test_accounts.py:372` — `bound = call("accounts.bind", {` | 1 |
-| `accounts.create` | `tests/server/test_accounts.py:351` — `created = call("accounts.create", {` | 2 |
-| `accounts.importAsset` | `tests/server/test_accounts.py:358` — `imported = call("accounts.importAsset", {` | 2 |
-| `accounts.list` | `tests/server/test_accounts.py:378` — `listed = call("accounts.list", {})["result"]["accounts"]` | 1 |
+| `accounts.create` | `tests/server/test_accounts.py:351` — `created = call("accounts.create", {` | 7 |
+| `accounts.importAsset` | `tests/server/test_accounts.py:358` — `imported = call("accounts.importAsset", {` | 14 |
+| `accounts.list` | `tests/server/test_accounts.py:378` — `listed = call("accounts.list", {})["result"]["accounts"]` | 2 |
 | `approvals.decide` | `tests/server/test_harness_sidecar.py:1319` — `decided = client.post("/wire/v1/approvals.decide", headers=headers, js` | 8 |
 | `assets.bind` | `tests/server/test_asset_hubs.py:489` — `bound = call("assets.bind", {` | 2 |
 | `assets.bindings` | `tests/server/test_asset_hubs.py:494` — `bindings = call("assets.bindings", {` | 2 |

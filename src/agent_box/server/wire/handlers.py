@@ -6,6 +6,7 @@ behavior lives here: this module is the contract's edge.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 import shutil
@@ -1097,6 +1098,25 @@ class WireService:
                 "importing one file into a multi-file login state is not supported",
             )
         payload = source.read_bytes()
+        # Order 129 (`AUD-B-012`): the locked contract requires `requestId`, and the
+        # two sibling methods (`accounts.create`, `accounts.bind`) run theirs through
+        # the idempotency layer. This handler never read the key, so a retry of one
+        # import executed a second time instead of replaying - and a second execution
+        # mints a second locator, because `write_asset` names a fresh one per call.
+        key = _request_id(params["requestId"])
+        request_digest = digest({
+            "accountId": account_id, "sourcePath": str(source), "size": size,
+            "sha256": hashlib.sha256(payload).hexdigest(),
+        })
+        scope = "accounts.importAsset"
+        # Not a fresh `IdempotentRecords`: this is the instance `accounts.create`
+        # already uses, so the family really does share one path and one table.
+        idempotency = accounts.idempotency
+        prior = idempotency.get(scope, key, request_digest)
+        if prior is not None:
+            # The receipt is the answer, so a replay is byte-identical to the
+            # first response rather than a second observation of the record.
+            return prior[1]
         locator, digest_value = assets.write_asset(
             account_id=account_id, files={name: payload}, kind="subscription",
         )
@@ -1104,7 +1124,14 @@ class WireService:
             account_id, locator=locator, digest=digest_value,
             state=str(account["state"]),
         )
-        return {"account": account_view(accounts.get(account_id))}
+        body = {"account": account_view(accounts.get(account_id))}
+        # `save` re-checks inside its own transaction and returns the winner's
+        # receipt, so two racing first attempts cannot both claim the key. The
+        # window that remains is the side effect between the check here and the
+        # insert there: closing it needs the asset write inside the same
+        # transaction, which lives in `assets/**` and not in this order's surface.
+        idempotency.save(scope, key, request_digest, 200, body)
+        return body
 
     def _subscription_files_for(self, harness: str) -> tuple[str, ...]:
         """The family's declared subscription files, from the deployment."""

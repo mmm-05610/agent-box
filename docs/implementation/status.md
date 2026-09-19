@@ -785,6 +785,9 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 | **`transport/http` 边界的最后一道墙**（115 的射程外剩余） | `app.py` 的 wire 路由只对 `WireError` 作答，`dispatch` 之外（认证、`decode_request` 非 WireError 分支、`encode_result`）抛出的任何东西仍是裸 500；115 把闭合做在 `wire/**` 两道墙里，但"每个出站错误都带 JSON-RPC 体"这条不变量要真正成立，边界自己得有一道 | `src/agent_box/server/transport/**` 不在 115 的 `write_paths`（`wire/**`、`tests/**`、`docs/**`、`status`） | [115 证据 §7](../server-round1/wire-error-family-closure-115.md) |
 | **把"这个 Profile 在本机跑不跑得起来"下沉成 profiles 行上的派生列** | 117 的投影每行要做 2 次对象读 + 1–2 次 DB 读，而 `profiles.list` 是每次连接都读的面；今天几十条无感，但这是**每次连接的线性代价**，正确解法是在写入侧派生一列（或索引）而不是每次重算 | 落点在 `src/agent_box/server/profiles/**`（runtime 线写面），117 的 `write_paths` 只有 `wire/**` | [117 证据 §6](../server-round1/profiles-list-sendability-117.md) |
 | **`get_session` 的事件窗取"最早 200"且不报告截断** | 一手量到：整场门会话只有 38 事件所以本轮与 087 的间歇**无关**（那条猜测已被否掉并留数据）；但 `sessions/repository.py:1012,1024` 的窗口确实是 `ORDER BY seq LIMIT 200` + `SELECT *`，REST `GET /api/v1/sessions/{id}` 直接把它当完整历史回给客户端 ⇒ 会话长到 200 事件之后，这个读法会静默丢掉最新一段，而不是说"我截断了" | 属 `sessions/**` ＋ 合同/REST 面（要加 `truncated`/total 键），不在 087/115/117 任何一张的写面 | [087 证据 §3 第一条](../server-round1/fullstack/cancel-recall-flake-087.md)（含否证数据）＋ `src/agent_box/server/transport/http/app.py:289-291` |
+| **按新的 14 项名单回填历史行的 `wire_seq`**（128 的射程外剩余；老 Session 仍可能显示错序） | 128 一手：`wire/projection.py:206` 在 `wire_seq` 缺席时回落到存储 `seq`，而 `storage/database.py:_migrate_4_to_5` 那段 `UPDATE … SET wire_seq=(SELECT COUNT(*) …)` 是按**当年十项**名单算的 ⇒ **新写入已归一，已存在的库里那四类旧行仍是 NULL**，同一个老 Session 两套编号混着；客户端按 `seq` 排序＋去重会丢正文。回填要注意 `server_session_wire_order` 的 UNIQUE 与既有号不能撞 | `src/agent_box/storage/**` 不在 128 的 `write_paths`（`wire/**`、`sessions/**`、`tests/**`、`docs/**`、`status`）；本单宁可留一条已登记的缺口，也不越界改迁移 | [128 证据 §4](../server-round1/wire-seq-numbering-spaces-128.md)（含「游标编码的是 raw seq，回填不改游标语义」那一句） |
+| **把 `accounts.importAsset` 的资产写与幂等回执做成一个事务**（129 的射程外剩余） | 129 一手：`write_asset` 先落 `SecretStore` 才有回执可存 ⇒ 只能 `get`（读事务）→ 写 → `save`（另一事务），中间那段窗口里两个同 key 的首次请求**至多一份回执胜出**（`save` 在事务内再 check 一次），但**可能留下第二份没人指向的资产字节**。闭合要在 `accounts/assets.py` / `records.py` 内做，或改成内容寻址 locator 让第二次天然等价 | `src/agent_box/server/accounts/**` 不在 129 的 `write_paths`（`wire/**`、`tests/**`、`docs/**`、`status`）；本单按工单 §Scope 那句「做不到就交回并附一手证据」处理，**没有**顺手改资产层 | [129 证据 §5.1](../server-round1/import-asset-request-id-129.md) |
+| **`write_asset` 的 locator 命名时机要不要改成内容寻址**（一条裁决，不是清理） | 129 一手：`assets.py:176-191` 每次调用都新铸 locator（内容与 key 都不参与命名）⇒ **不同 requestId 的同一份字节 = 两个 locator**、两个都真实存在；129 只把「同一逻辑请求铸两个」变成不可达（回放根本不执行）。要不要走到「同内容 ⇒ 同 locator」是产品语义决定，它会牵动 reclaim 的摘要比对与账号资产的历史引用 | 属资产层语义 ＋ 牵动 56 的 reclaim 规则；129 §Scope 只授权修「同一请求重试」与「locator 铸造时机」两点，后者做不到 ⇒ 交回 | [129 证据 §5.4](../server-round1/import-asset-request-id-129.md) ＋ 门 `tests/server/test_import_asset_request_id_129.py::test_a_different_key_for_the_same_bytes_is_a_new_request_not_a_replay`（把现状钉成事实而不是传闻） |
 
 > 编号说明：上一节 `## CHECKPOINT b2`（080/081 那次）的 §2 写了"新增 B5"，但当时表里没落 B5
 > （其内容并入了 B4 的四项交回）。本表 **B5 由 085 新增**，是该编号的实际持有者；批末重写那节时一并更正引用。
@@ -1736,7 +1739,94 @@ HEAD 即检查点；`git status --short` 只剩本树自己的证据目录（`08
   改成就地 `try/finally` 只还原那一个常量，**两种环境各复跑一遍**才记绿。与 123 那条"改全局状态的门要说清撤回了什么"同族。
 - **边界如实（不装作闭合）**：`storage/database.py:_migrate_4_to_5` 当年按**十项**名单回填过历史行，那文件不在 128 写面
   ⇒ 新写入已归一，**已存在的老 Session 里那四类旧行仍是 `wire_seq IS NULL`**、仍可能混两套。登记成一条能写 `storage/**` 的单（见下表 §待开单）。
+- **【就地更正，随 129 批】** 上一版这里写的是「重新生成后 103＋128 定向 = 15 passed」——那一趟其实是 **15 passed / 1 failed**，
+  红的那条正是本节记的 `monkeypatch.undo()` 耦合（103 自己那 9 条全绿）。把"多数绿"写成"全绿"就是假绿，按 128 自己的口径改正：
+  `103` 单独 **9 passed / 12.62s**；`128` 修好后单独 **7 passed**（不带 `AGENT_BOX_SANDBOX_MODULE` 与带各一次）。
 - 计数：定向 **7 passed**（两种环境各一次）；批末 `tests/server -q` = **1 failed / 812 passed / 1 skipped in 483.33s**
   ——红的是 `103` 那张生成账（本单新门多了 6 条证据行：`history.snapshot` 24→26、`server.hello` 12→14、`workspaces.open` 39→41），
-  重新生成后 `103 + 128` 定向 = **15 passed / 6.86s**。**Worker 工件：在**（本轮未用：门只走本地 SQLite ＋ 桩执行后端）。
+  重新生成后 `103` 定向 = **9 passed / 12.62s**。**Worker 工件：在**（本轮未用：门只走本地 SQLite ＋ 桩执行后端）。
   真实模型调用 **0 / ¥0**；临时根由 pytest 管理，无源码外产物。
+
+## 工单 129 — `accounts.importAsset` 的 `requestId` 从"声明有"变成"真的读"（`AUD-B-012`，2026-09-19 15:5x–16:1x，执行者）
+
+**终态 `IMPORT_ASSET_REQUEST_ID_DONE`**。证据 [import-asset-request-id-129.md](../server-round1/import-asset-request-id-129.md)，
+门 `tests/server/test_import_asset_request_id_129.py`（**10 条**，全走真 wire `raise_server_exceptions=False`）。
+
+- **先证明缺陷在场**（退回旧函数、装回**派发表**再发两次同一请求）：实测 `write_asset` **2 次**、
+  同一账号拿到**两个 locator**（`…7a0738b2…` / `…29d97ddb…`）、两次都是 `result` ⇒ **回执层面完全看不出重做**。
+  所以这条门**只能数副作用**，不能只看响应——这是本单门的核心设计，也是它和 103 那张账的共同教训。
+- 修法不新造机制：`key = _request_id(params["requestId"])` ＋ **`accounts.idempotency`**（`accounts.create` 用的**同一个实例**、同一张 `server_idempotency` 表）；
+  摘要覆盖 `accountId + sourcePath + size + sha256(字节)`。为此把本单一度加在文件头的 `IdempotentRecords` import **撤掉**——派发面不该认识这个类。
+- **摘要为什么含字节**：同族的摘要覆盖"请求体"，而这里的请求体是一个**路径**；路径不变而文件内容变了＝**不是同一个请求**
+  ⇒ 落 `CONFLICT_REQUEST`（`internalCode=IDEMPOTENCY_CONFLICT`）而不是悄悄覆盖（`R-0032 ⑤`）。
+  副作用是"重试时源文件被删 ⇒ 先到的是 `INVALID_REQUEST` 而不是回放"，这条已写进报告 §5.2 供前端文案引用。
+- **三法对照表在报告 §3**，且"同族一致"那一格是**测出来的**：`accounts.create` 的同 key 换体给出同一族同一内部码
+  （门 `test_the_conflict_family_matches_the_sibling_that_uses_the_same_layer`）。差异只有一处并有依据：
+  `create`/`bind` 的 check+insert 与副作用同事务，`importAsset` 做不到（字节要先落 `SecretStore` 才有回执可存）⇒ **如实登记成交回**。
+- 交回三条（已进 §待开单，本单一字节未越界）：① 资产写与回执写做成一个事务（`accounts/**`）；
+  ② `write_asset` 的 locator 要不要改成内容寻址（**裁决**，牵动 56 的 reclaim 摘要比对）；③ 本单只把"同一请求铸两个 locator"变成不可达。
+- 计数：定向 **10 passed / 4.58s**（报告落盘后复跑）；批末 `tests/server -q` = **823 passed / 1 skipped / 0 failed in 549.39s**
+  （**Worker 工件：在**，本轮未用——门只走本地 SQLite ＋ `MemorySecretStore`）。算术：`823 = 812 + 129 的 10 + 1`
+  算术：上一轮（128 批末）**收集 814** ＝ 812 passed ＋ 1 failed ＋ 1 skipped → 本轮**收集 824** ＝ ＋129 的 10 条，
+  通过数 812 → **823**（上一轮那 1 红就是 `103` 的生成账，本轮 0 红）。生成账按 129 的证据重算：**352** 条证据行、
+  单源观察名单 44 → **41**（`accounts.create` / `importAsset` / `list` 不再只有一处驱动）。
+  另记两次假红的**成因都是"账被自己的新门改过期"**（103 的生成账）与"报告门跑在报告落盘之前"，**不是回归**，两次都当场重算/补文件后复绿。
+  真实模型调用 **0 / ¥0**；locator 只以**前 8 位**出现在报告里。
+
+## 本批目录对账（章程必读 ①「**目录就是队列**」，`R-0068`；2026-09-19 16:1x 一手核）
+
+判据：逐份读 `work-orders/**` 的 `id` / `batch` / `terminal`，与本树 `status.md` 的收口节与终态码对表（脚本 `python3 /tmp/dir_recon.py` 那类的一次性用法，不是产物）。
+**b2/b3 共 29 张**：**22 张**有收口节且账上有终态码；**6 张从未在本树 `status.md` 出现**，逐条给判据（099/105/113 等历史单不在此列）。
+
+| 单 | 现态 | 为什么此前没做 | 下一步（本树） |
+| --- | --- | --- | --- |
+| `118-artifact-absence-is-not-green`（`QA-010`） | **未开工**（投于 **19:48**，`c175762`；在场约 4.5 h） | 本树一直按章程 §3 那张"今晚队列"表走（087→115→117→089→123→128→129），**没在阶段边界重读目录** ⇒ 这张单从未出现在账上。**这条就是 `R-0068` 点名的形状，我犯了** | 立即开工（无前置；写面 `scripts/server-round1/**`＋`tests/**`＋`docs/**` 全在本树） |
+| `119-load-independent-counter-example`（`QA-011`） | **未开工**（同上 `c175762`，19:48） | 同上 | 开工（`serialize_with` 点名 `115/117/118` 都已收口 ⇒ 现在可动）；它正是本树 §待开单里"080 反例门负载假红"那条的**正式落地单** |
+| `124-provider-model-write-whitelist` | **未开工**（投于 **20:35**，`906d741`） | 同上（`092` 交回的 ①） | 开工（写面只有 `wire/handlers.py`＋`tests/**`＋`docs/**`＋status ⇒ 射程内） |
+| `125-config-describe-slot-projection` | **未开工**（同上 `906d741`，20:35） | 同上（`092` 交回的 ③ 的 wire 半边） | 开工（写面同 124） |
+| `145-workspace-connection-has-no-producer`（`AUD-B-011`） | **未开工**（投于 **23:21**，`4187d83`） | ops 刚投递，且 `serialize_with` 把它排在 `128/129/132` 之后 | 待 `128/129` 收口（本批即收口）后开工；**它和 128 直接咬合**：`workspace.connection` 就在 128 归一的名单里 |
+| `132-declaration-vs-execution-reconciliation-gate` | **未开工**（投于 **21:30**，`b195206`） | 依赖 `128`（本批刚收口）＋ runtime 线 `130/131` 的收口行——**判据不在我手里** | 每轮核 runtime 树 `status.md`；谓词不成立就先做 `118/119/124/125/145`，不长睡 |
+
+> 一条如实更正：**上一次我写 `QUEUE_EMPTY_AT` 被判过早并在原地作废**（同一格里登记的 6 张未开工单就是当时的反证）。
+> 本轮起把"重读目录"做成阶段边界的固定动作，本表就是那一格的产物；今后每张新单要么开工、要么在本表占一行并写判据。
+
+## 队列地图（`R-0069` ③ 的四列通行格式；把散文式"卡住"改成可判定的解卡入口）
+
+| 单 | 现态 | 卡在哪（精确） | 解卡入口 |
+| --- | --- | --- | --- |
+| `089` | 预检/预演做完，两家的**真机腿未跑**（不声明终态码） | 只剩一条：用户那台 Windows 实例上按 [ui-gates-89-windows-handoff.md](../server-round1/fullstack/ui-gates-89-windows-handoff.md) 跑一轮（`R-0056` 护栏：独立端口段＋独立数据根）。**用户已把这一腿交调度者派 QA/人执行** | `依赖 QA/人`（判据＝该 handoff 的回执落回本树 `docs/server-round1/fullstack/ui-gates-89/**`，含逐笔 usage 账） |
+| `132` | 未开工 | runtime 线 `130/131` 的收口行未在本树可读位置出现（`128` 已收口） | `依赖 130/131`（判据＝runtime 树 `status.md` 有那两单的终态码）；等待期做 118/119/124/125/145 |
+| `145` | 未开工 | 无卡点，只排在 `128/129` 之后（`serialize_with`） | `自行`（下一张即开工） |
+| `116`（兄弟树修复清单） | 交回件 | 修复在 runtime 树，本树只提供了逐字清单 | `依赖 116`（判据＝runtime 树 status 记 `116` 终态） |
+
+## 先例对照（`R-0062 ①`：**只写进执行账**，落单归 ops——`work-orders/**` 是调度侧文件，`R-0058`）
+
+- **本树内部形制**：`128`/`129` 与 `097`（`server.hello` 声明 27 / 实派 64，差 37）是**同一族的三面**——
+  097 是"实现有、声明漏"（漏报），`145` 是"声明有、产生零"（多报），`129` 是"声明有、**读了但没用**"（半报）。
+  抄的是 `097` 那条**机制**而不是结论：**把"声明"与"实际"绑在同一处可复跑的比较上**（097 用 `server.hello` 的门、
+  103 用生成账＋扫描器、129 用"形状必填 ∧ 副作用只发生一次"两条同跑的断言）。
+- **另一条抄的是 101 的形状门**：`test_install_declares_the_digest_its_locked_contract_requires` 那种
+  "必填集里有没有这一键"的直接断言，在 129 里对应 `test_a_request_without_the_key_is_refused_by_the_shape_before_any_write`
+  ——但 129 多要了**一件**：同一请求里还要断言"零副作用"，因为 101 那次的教训正是**形状对、函数体错**。
+- **反例写法抄 115/123**：装回去的东西必须装在**代码真正会读的那一处**（派发表 / startup 之前的 handler 表），
+  否则反例什么都没证——`123` 已经栽过一次，`129` 是同一个坑的第二次，这次当场抓到。
+- **外部查表如实**：`docs/research/reuse-catalog.md`（在 ops 树，本树只读）现有 `C-01…C-4x` 逐条扫下来
+  全是 **UI/harness 形态**的参照（表单、思考块、diff 渲染、条件形状如 `C-43` K8s `Condition`），
+  **没有一条**是"服务端幂等键/receipt"或"事件编号空间"的先例 ⇒ 若 ops 要给 129/128 找外部锚点，目录里现在**没有**，需要新查而不是引用。
+
+## handoff 通道冲突一条（如实，不自行拍）
+
+章程必读 ②（`R-0067`）说"要别人做事 ⇒ 写 `docs/implementation/handoffs.md`（主树）"，
+但本批在飞的 `124/125/129/132/145` 的 `forbidden` **逐张包含** `/home/maoqh/projects/agent-box-server-round1/**`。
+⇒ 本轮**没有**往主树写任何东西，跨角色请求仍以本树 §待开单 为准（129 那三条、`128` 的回填、`089` 的派工）。
+两者取一即可解：要么 ops 在下一张单里开一次性例外（先例＝`116` 在 `wire/handlers.py` 开的调用点例外、`145` 给 `sessions/repository.py` 开的那一行），
+要么确认"§待开单 仍是合法通道"。这是**口径**问题，不是本树能自己定的。
+
+## CHECKPOINT b2-4（128 ＋ 129，2026-09-20 00:1x，执行者）
+
+- 收口两张：`128` → **`WIRE_SEQ_SPACES_DONE`**（tag `checkpoint/b2-128` @ `baca619`）·
+  `129` → **`IMPORT_ASSET_REQUEST_ID_DONE`**（tag `checkpoint/b2-129` @ 本提交）。
+- 队列**非空**：`118 → 119 → 124 → 125 → 145`（`132` 等 runtime 的 `130/131`）⇒ **不写 `QUEUE_EMPTY_AT`**，继续施工。
+- §Spend 增量（本批 128/129）：**真实模型调用 0 / ¥0**（本地 SQLite ＋ `MemorySecretStore` ＋ 假登录态文件；
+  凭据只作 locator，报告里只出现前 8 位）· 子代理 **0** · 机时：`tests/server` 全量 **3 次**
+  （483.33s / 336.76s / 本轮）＋ 定向 6 次（平均 ~4s）· 无源码外产物（pytest 临时根自动回收，`/tmp` 只放脚手架脚本）。
