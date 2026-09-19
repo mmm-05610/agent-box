@@ -15,7 +15,8 @@ see the generic `runtimeArtifactMounts` / `projectionFiles` / `stateProjection`
 
 The native configuration itself (`settings.yaml`) is checked in next to this
 module under `deploy/dsh/`: one provider, the user-confirmed product model
-`deepseek-flash`, the official DeepSeek root, a 64-token output ceiling, and
+`deepseek-flash`, the official DeepSeek root, a permissive default output ceiling
+(order 108; a no-model gate pins its own bounded ceiling), and
 thinking disabled. A test asserts the checked-in bytes against this module's
 constants, so the template cannot drift into a second implementation. The
 loopback endpoint a no-model gate uses is produced by replacing
@@ -62,6 +63,12 @@ NATIVE_MODEL_VALUE = '["deepseek-official","deepseek-flash"]'
 OFFICIAL_BASE_URL = "https://api.deepseek.com"
 CREDENTIAL_KIND = "api-key"
 CREDENTIAL_ENVIRONMENT = "DEEPSEEK_API_KEY"
+#: Order 108 (AQ-0004): the ceiling a *real* deployment sends. The 64 was a
+#: gate-era cost control that truncated ordinary answers; a managed run now gets
+#: a permissive default (a deployment-declared override would win over it).
+DEFAULT_OUTPUT_TOKEN_LIMIT = 8192
+#: Order 108: the *gate's* explicit ceiling, not the template's, so a no-model
+#: gate's request budget stays bounded regardless of the production default.
 OUTPUT_TOKEN_LIMIT = 64
 
 #: Stable artifact name and the confined guest path it is projected to. The
@@ -140,6 +147,19 @@ def loopback_settings_document(base_url: str) -> dict[str, Any]:
         raise DshProductionTemplateError("DSH_LOOPBACK_BASE_URL_INVALID")
     document = settings_document()
     document[SETTINGS_NAMESPACE]["baseURL"] = base_url
+    return document
+
+
+def gate_settings_document(base_url: str) -> dict[str, Any]:
+    """The loopback settings a chain gate projects, pinned to the gate ceiling.
+
+    Order 108: the endpoint swap stays :func:`loopback_settings_document` (only
+    `baseURL`); the gate's budget is an explicit, separate pin to
+    :data:`OUTPUT_TOKEN_LIMIT`, so a no-model gate does not inherit the permissive
+    production default (removing the pin is the G2 counter-example).
+    """
+    document = loopback_settings_document(base_url)
+    document[SETTINGS_NAMESPACE]["maxTokens"] = OUTPUT_TOKEN_LIMIT
     return document
 
 

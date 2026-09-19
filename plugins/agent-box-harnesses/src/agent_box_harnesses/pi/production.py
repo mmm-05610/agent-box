@@ -14,7 +14,9 @@ The native configuration itself (`models.json`, `settings.json`) is checked in
 next to this module under `deploy/pi/` and is byte-identical to the
 configuration Work Order 42-D prepared in `bc7d95b`: one provider, the
 user-confirmed product model `deepseek-flash`, the official DeepSeek root, a
-64-token output ceiling, thinking disabled, and both agent and provider retries
+permissive default output ceiling (order 108: no longer the 64 that truncated
+ordinary answers; a no-model gate instead pins its own bounded ceiling),
+thinking disabled, and both agent and provider retries
 off. A test asserts that equality, so the template cannot drift into a second
 implementation. The loopback endpoint a no-model gate uses is produced by
 copying `models.json` and replacing `baseUrl` alone.
@@ -54,6 +56,14 @@ NATIVE_MODEL_VALUE = f"{PI_PROVIDER}/{PRODUCT_MODEL_ID}"
 OFFICIAL_BASE_URL = "https://api.deepseek.com"
 CREDENTIAL_KIND = "api-key"
 CREDENTIAL_ENVIRONMENT = "DEEPSEEK_API_KEY"
+#: Order 108 (AQ-0004): the ceiling a *real* deployment sends. The 64 below was a
+#: gate-era cost control that truncated ordinary answers; a managed run now gets
+#: a permissive default. A deployment-declared override (the registered remaining
+#: field for 108) would take precedence over this default.
+DEFAULT_OUTPUT_TOKEN_LIMIT = 8192
+#: Order 108: the *gate's* explicit ceiling, no longer the template's. A no-model
+#: chain gate projects its fixture pinned to this value so its request budget
+#: stays bounded and stable regardless of the permissive production default.
 OUTPUT_TOKEN_LIMIT = 64
 
 #: Stable artifact name and the confined guest path it is projected to. The
@@ -143,6 +153,21 @@ def loopback_models_document(base_url: str) -> dict[str, Any]:
         raise PiProductionTemplateError("PI_LOOPBACK_BASE_URL_INVALID")
     document = models_document()
     document["providers"][PI_PROVIDER]["baseUrl"] = base_url
+    return document
+
+
+def gate_models_document(base_url: str) -> dict[str, Any]:
+    """The loopback catalogue a chain gate projects, pinned to the gate ceiling.
+
+    Order 108: the endpoint swap stays :func:`loopback_models_document` (only
+    `baseUrl`); the gate's request budget is an explicit, separate pin to
+    :data:`OUTPUT_TOKEN_LIMIT` so a no-model gate never inherits the permissive
+    production default. Removing the pin (the G2 counter-example) would let the
+    gate project 8192 and no longer bound its own cost.
+    """
+    document = loopback_models_document(base_url)
+    for model in document["providers"][PI_PROVIDER]["models"]:
+        model["maxTokens"] = OUTPUT_TOKEN_LIMIT
     return document
 
 

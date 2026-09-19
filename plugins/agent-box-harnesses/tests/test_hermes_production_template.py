@@ -110,7 +110,9 @@ def test_production_template_pins_the_confirmed_model_and_official_root():
     assert production.MODEL_PROVIDER_DECLARATION == production.NATIVE_PROVIDER_IDENTITY
     assert production.NATIVE_MODEL_SELECTION == "custom:deepseek-flash"
     assert document["model"]["default"] == production.PRODUCT_MODEL_ID
-    assert document["model"]["max_tokens"] == production.OUTPUT_TOKEN_LIMIT == 64
+    # Order 108 (AQ-0004): the checked-in template carries the permissive
+    # production default, not the gate-era 64 that truncated answers.
+    assert document["model"]["max_tokens"] == production.DEFAULT_OUTPUT_TOKEN_LIMIT == 8192
     assert provider["key_env"] == production.CREDENTIAL_ENVIRONMENT == "DEEPSEEK_API_KEY"
     assert provider["extra_body"]["thinking"] == {"type": "disabled"}
     assert provider["transport"] == "chat_completions"
@@ -138,7 +140,10 @@ def test_loopback_override_changes_only_the_two_endpoint_fields():
     for before, after in differences.values():
         assert before == "https://api.deepseek.com"
         assert after == "http://127.0.0.1:8080"
-    assert override["model"]["max_tokens"] == 64
+    # The endpoint override inherits the permissive production default (order
+    # 108): only the two endpoint fields differ, and everything else - ceiling
+    # included - matches the template.
+    assert override["model"]["max_tokens"] == production.DEFAULT_OUTPUT_TOKEN_LIMIT == 8192
     assert override["agent"] == production.config_document()["agent"]
     assert override["providers"][production.PROVIDER_BLOCK_KEY]["models"] == (
         production.config_document()["providers"][production.PROVIDER_BLOCK_KEY]["models"])
@@ -148,6 +153,24 @@ def test_loopback_override_changes_only_the_two_endpoint_fields():
     rendered = production.loopback_config_yaml("http://127.0.0.1:8080")
     assert "base_url: http://127.0.0.1:8080" in rendered
     assert "api: http://127.0.0.1:8080" in rendered
+
+
+def test_gate_projection_pins_the_gate_ceiling_while_the_template_stays_permissive():
+    """Order 108 G2: the fixture a chain gate projects carries 64, not 8192.
+
+    `loopback_config_document` is the endpoint-only override (it inherits the
+    permissive default); `gate_projected_config_document` and the serialized
+    `loopback_config_yaml` the gate mounts pin `model.max_tokens` to the gate's
+    own OUTPUT_TOKEN_LIMIT. If the pin were removed the gate would project 8192
+    and its request budget would no longer be bounded - the counter-example.
+    """
+    assert production.loopback_config_document(
+        "http://127.0.0.1:8080")["model"]["max_tokens"] == production.DEFAULT_OUTPUT_TOKEN_LIMIT
+    assert production.gate_projected_config_document(
+        "http://127.0.0.1:8080")["model"]["max_tokens"] == production.OUTPUT_TOKEN_LIMIT == 64
+    rendered = production.loopback_config_yaml("http://127.0.0.1:8080")
+    assert "max_tokens: 64" in rendered
+    assert "max_tokens: 8192" not in rendered
 
 
 def test_loopback_override_refuses_anything_but_a_loopback_url():
@@ -218,7 +241,7 @@ def test_deployment_document_declares_the_managed_chain():
     # its `TOKEN` pattern. It is declared in the projected configuration
     # (`model.max_tokens`) and asserted on the wire by the chain gate.
     assert "HERMES_MAX_TOKENS" not in environment
-    assert production.config_document()["model"]["max_tokens"] == production.OUTPUT_TOKEN_LIMIT
+    assert production.config_document()["model"]["max_tokens"] == production.DEFAULT_OUTPUT_TOKEN_LIMIT
     assert not any("TOKEN" in key for key in environment)
     # Nothing test-only may leak into the production default: no preloaded
     # guard, no audit paths, no credential material anywhere.

@@ -65,7 +65,9 @@ def test_production_template_pins_the_confirmed_model_and_official_root():
     assert provider["apiKey"] == "$DEEPSEEK_API_KEY"
     model = provider["models"][0]
     assert model["id"] == production.PRODUCT_MODEL_ID
-    assert model["maxTokens"] == production.OUTPUT_TOKEN_LIMIT == 64
+    # Order 108 (AQ-0004): the template carries the permissive production
+    # default, no longer the gate-era 64 that truncated ordinary answers.
+    assert model["maxTokens"] == production.DEFAULT_OUTPUT_TOKEN_LIMIT == 8192
     assert model["reasoning"] is False
     assert model["samplingParams"]["thinking"] == {"type": "disabled"}
     settings = production.settings_document()
@@ -85,6 +87,26 @@ def test_loopback_override_changes_only_the_base_url():
     # The production template on disk is never rewritten by producing an override.
     assert production.models_document()["providers"][production.PI_PROVIDER]["baseUrl"] == (
         production.OFFICIAL_BASE_URL)
+
+
+def test_gate_fixture_pins_the_gate_ceiling_while_the_template_stays_permissive():
+    """Order 108 G2: the gate's own budget is explicit, not inherited from 8192.
+
+    The endpoint override keeps "only baseUrl" (so the catalogue still carries the
+    permissive default); the gate projection is a *separate*, explicit pin to
+    OUTPUT_TOKEN_LIMIT. If the pin were removed the gate would project the
+    template's 8192 and no longer bound its request budget - the counter-example,
+    asserted by the two values actually differing.
+    """
+    override = production.loopback_models_document("http://127.0.0.1:8080")
+    gate_fixture = production.gate_models_document("http://127.0.0.1:8080")
+    assert override["providers"][production.PI_PROVIDER]["models"][0]["maxTokens"] == (
+        production.DEFAULT_OUTPUT_TOKEN_LIMIT)
+    assert production.DEFAULT_OUTPUT_TOKEN_LIMIT == 8192
+    assert gate_fixture["providers"][production.PI_PROVIDER]["models"][0]["maxTokens"] == (
+        production.OUTPUT_TOKEN_LIMIT)
+    assert production.OUTPUT_TOKEN_LIMIT == 64
+    assert gate_fixture["providers"][production.PI_PROVIDER]["baseUrl"] == "http://127.0.0.1:8080"
 
 
 def test_loopback_override_refuses_anything_but_a_loopback_url():

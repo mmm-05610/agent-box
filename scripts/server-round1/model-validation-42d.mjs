@@ -82,7 +82,7 @@ export function piModelConfig() {
       api: "openai-completions",
       apiKey: "$DEEPSEEK_API_KEY",
       models: [{ id: "deepseek-flash", name: "DeepSeek Flash (bounded acceptance)", reasoning: false,
-        input: ["text"], contextWindow: 1_000_000, maxTokens: 64,
+        input: ["text"], contextWindow: 1_000_000, maxTokens: 8192,
         samplingParams: { thinking: { type: "disabled" } },
         // Conservative current official peak Flash tariff (USD / 1M tokens).
         cost: { input: 0.44, output: 1.32, cacheRead: 0.014, cacheWrite: 0 } }],
@@ -118,7 +118,7 @@ export function hermesModelConfig() {
   // `custom:deepseek-flash` / `custom`, and model-metadata lookup falls back to the heuristic 128K
   // context window instead of the built-in DeepSeek table's 1,000,000.
   return {
-    model: { provider: "custom", default: "deepseek-flash", max_tokens: 64,
+    model: { provider: "custom", default: "deepseek-flash", max_tokens: 8192,
       base_url: "https://api.deepseek.com" },
     providers: { custom: {
       name: "DeepSeek official", api: "https://api.deepseek.com",
@@ -135,7 +135,7 @@ export function hermesConfigYaml() {
     "model:",
     "  provider: custom",
     "  default: deepseek-flash",
-    "  max_tokens: 64",
+    "  max_tokens: 8192",
     "  base_url: https://api.deepseek.com",
     "providers:",
     "  custom:",

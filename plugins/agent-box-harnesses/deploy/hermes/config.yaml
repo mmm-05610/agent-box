@@ -1,7 +1,7 @@
 model:
   provider: custom
   default: deepseek-flash
-  max_tokens: 64
+  max_tokens: 8192
   base_url: https://api.deepseek.com
 providers:
   custom:

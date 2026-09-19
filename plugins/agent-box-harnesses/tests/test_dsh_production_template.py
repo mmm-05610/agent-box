@@ -29,11 +29,26 @@ def test_checked_in_settings_match_the_module_constants():
     document = yaml.safe_load(production.SETTINGS_TEMPLATE.read_text(encoding="utf-8"))
     section = document[production.SETTINGS_NAMESPACE]
     assert section["baseURL"] == production.OFFICIAL_BASE_URL == "https://api.deepseek.com"
-    assert section["maxTokens"] == production.OUTPUT_TOKEN_LIMIT == 64
+    # Order 108 (AQ-0004): the checked-in template carries the permissive
+    # production default, not the gate-era 64 that truncated answers.
+    assert section["maxTokens"] == production.DEFAULT_OUTPUT_TOKEN_LIMIT == 8192
     assert section["thinking"] == "disabled"
     assert section["reasoningEffort"] == "off"
     # A credential reference, never credential material.
     assert "DEEPSEEK_API_KEY" not in json.dumps(document)
+
+
+def test_gate_fixture_pins_the_gate_ceiling_while_the_template_stays_permissive():
+    """Order 108 G2: the gate's budget is explicit, not inherited from 8192."""
+    override = production.loopback_settings_document("http://127.0.0.1:8080")
+    gate_fixture = production.gate_settings_document("http://127.0.0.1:8080")
+    assert override[production.SETTINGS_NAMESPACE]["maxTokens"] == (
+        production.DEFAULT_OUTPUT_TOKEN_LIMIT)
+    assert production.DEFAULT_OUTPUT_TOKEN_LIMIT == 8192
+    assert gate_fixture[production.SETTINGS_NAMESPACE]["maxTokens"] == (
+        production.OUTPUT_TOKEN_LIMIT)
+    assert production.OUTPUT_TOKEN_LIMIT == 64
+    assert gate_fixture[production.SETTINGS_NAMESPACE]["baseURL"] == "http://127.0.0.1:8080"
 
 
 def test_production_template_pins_the_confirmed_model_and_official_root():

@@ -14,7 +14,8 @@ The native configuration (`deploy/hermes/config.yaml`) is byte-equal in content
 to the configuration Work Order 42-D prepared (`hermesModelConfig()` in
 `scripts/server-round1/model-validation-42d.mjs`): one provider block, the
 user-confirmed product model `deepseek-flash`, the official DeepSeek root, a
-64-token output ceiling, thinking disabled, and the lowest retry count the
+permissive default output ceiling (order 108; a no-model gate pins its own
+bounded ceiling), thinking disabled, and the lowest retry count the
 harness supports (`agent.api_max_retries: 1`, i.e. at most two provider attempts
 per prompt). A test asserts that equality, so the template cannot drift into a
 second implementation.
@@ -123,6 +124,18 @@ NATIVE_MODEL_VALUE = PRODUCT_MODEL_ID
 OFFICIAL_BASE_URL = "https://api.deepseek.com"
 CREDENTIAL_KIND = "api-key"
 CREDENTIAL_ENVIRONMENT = "DEEPSEEK_API_KEY"
+#: Order 108 (AQ-0004): the ceiling a *real* deployment sends. 64 was a gate-era
+#: cost control that truncated ordinary answers ("本来就不该砍掉长度"); a managed
+#: run now gets a permissive default. A deployment that declares its own value
+#: overrides this - the deployment-doc field is the registered remaining work
+#: (see the 108 evidence doc), so today the permissive default is what lands.
+DEFAULT_OUTPUT_TOKEN_LIMIT = 8192
+#: Order 108: this is now the *gate's* ceiling, not the production template's.
+#: Each no-model chain gate projects its fixture with this explicit value (cost
+#: bounded, stable, never inherited silently from the template); the gate records
+#: it as `outputTokenLimit`. Deleting the pin would let the gate project the
+#: permissive default and its request budget would no longer be bounded - that is
+#: the G2 counter-example the fixture-builder test guards.
 OUTPUT_TOKEN_LIMIT = 64
 #: `agent.api_max_retries: 1` in the prepared configuration: one retry, so at
 #: most two provider attempts for one prompt. This is the lowest retry count
@@ -198,9 +211,10 @@ MODEL_CONTROL_ID: str | None = None
 #:   Server's deployment validation refuses a credential-shaped environment key
 #:   (`TOKEN|SECRET|KEY|...`), and `HERMES_MAX_TOKENS` trips it on `TOKENS`
 #:   (measured - `build_runtime_from_sidecar_deployment` raises
-#:   `SIDECAR_DEPLOYMENT_INVALID`). The 64-token ceiling is therefore declared
-#:   where Hermes reads it, in the projected `model.max_tokens`, and the gate
-#:   asserts the value that actually reached the provider.
+#:   `SIDECAR_DEPLOYMENT_INVALID`). The output ceiling is therefore declared
+#:   where Hermes reads it, in the projected `model.max_tokens` (a permissive
+#:   default in production; a no-model gate pins its own bounded ceiling - order
+#:   108), and the gate asserts the value that actually reached the provider.
 #: * `HERMES_MODEL` / `HERMES_INFERENCE_MODEL` / `HERMES_TUI_PROVIDER` /
 #:   `HERMES_INFERENCE_PROVIDER` - the model and provider declarations 42-D
 #:   prepared. Measured: the ACP entry point takes both from `config.yaml`
@@ -274,8 +288,12 @@ def loopback_config_document(base_url: str) -> dict[str, Any]:
     """A copy of the configuration with only the endpoint replaced.
 
     A no-model gate needs Hermes to talk to a local fake endpoint. Everything
-    else - provider, model id, output ceiling, retry bound, thinking mode -
-    stays the template's, and the production template itself is never rewritten.
+    else - provider, model id, the permissive output ceiling, retry bound,
+    thinking mode - stays the template's, and the production template itself is
+    never rewritten. The *cost* ceiling a gate projects is pinned separately, by
+    :func:`gate_projected_config_document` / :func:`loopback_config_yaml`, so the
+    endpoint override stays minimal ("only baseUrl") while the gate's bounded
+    budget is an explicit, audited value rather than an inherited default.
     """
     if not isinstance(base_url, str) or not base_url.startswith("http://127.0.0.1:"):
         raise HermesProductionTemplateError("HERMES_LOOPBACK_BASE_URL_INVALID")
@@ -285,6 +303,20 @@ def loopback_config_document(base_url: str) -> dict[str, Any]:
     if PROVIDER_BLOCK_KEY not in providers:
         raise HermesProductionTemplateError("HERMES_CONFIG_TEMPLATE_INVALID")
     providers[PROVIDER_BLOCK_KEY]["api"] = base_url
+    return document
+
+
+def gate_projected_config_document(base_url: str) -> dict[str, Any]:
+    """The loopback fixture a chain gate projects, with the gate's own ceiling.
+
+    Order 108: the gate does not inherit the template's permissive ceiling -
+    it pins `model.max_tokens` to the explicit :data:`OUTPUT_TOKEN_LIMIT` so a
+    no-model gate's request budget stays bounded and stable no matter what the
+    production default is. The endpoint swap remains :func:`loopback_config_document`
+    (only baseUrl); the ceiling pin is this separate, named step.
+    """
+    document = loopback_config_document(base_url)
+    document["model"]["max_tokens"] = OUTPUT_TOKEN_LIMIT
     return document
 
 
@@ -318,8 +350,14 @@ def documented_differences(base_url: str) -> dict[str, tuple[Any, Any]]:
 
 
 def loopback_config_yaml(base_url: str) -> str:
-    """Serialize the loopback override for the projection the gate mounts."""
-    loopback = loopback_config_document(base_url)
+    """Serialize the gate's projected fixture (endpoint swapped, ceiling pinned).
+
+    The projection target is one flat file; a small, deterministic serializer
+    keeps the emitted YAML identical to the checked-in document's shape. The
+    ceiling comes from :func:`gate_projected_config_document`, so what a chain
+    gate projects is the gate's own bounded budget, not the template default.
+    """
+    loopback = gate_projected_config_document(base_url)
     # The projection target is one flat file; a small, deterministic serializer
     # keeps the emitted YAML identical to the checked-in document's shape.
     lines: list[str] = []
