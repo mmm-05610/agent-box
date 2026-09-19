@@ -52,6 +52,23 @@
 
 > 契约文件在 `docs/implementation/work-orders/`（**与 A 树同一份历史**）；**新单由调度者投递**（父树白名单）。
 
+### 今晚队列（2026-09-19 19:2x 组织调整 v2；`R-0054` ⑥——**本树＝今晚焦点：后端第二波**）
+
+| 序 | 单 | 开工条件（**可判定谓词**；每轮自己核，成立即开工，**不等任何人放行**） |
+| --- | --- | --- |
+| 1 | `091` 收口 | 无条件（`090` 已收口） |
+| 2 | `092` **阶段 2** | 无条件。**工作区已有未提交改动＝上一任的活，属你自己**：`src/agent_box/server/model_configs/repository.py`、`service.py`、`src/agent_box/storage/database.py`、`tests/server/test_stage_a_server.py`（改）＋ `tests/server/test_provider_neutralization_092.py`（新）⇒ 先 `git status`/`git diff` 看清，纳入并提交，**别丢**。§3 里"092 与 A 线 105 串行"的理由**已过期**（`104` `PROBE_SSRF_HARDENING_DONE`、`105` `HELLO_HARNESSES_DONE` 且重锁完成） |
+| 3 | `093`（**8 家＝8 个可并行单元**） | `092` 的收口行能在本树 `status.md` 查到（或 `git log --grep` 命中） |
+| 4 | `094` | `092` 收口（同上判据） |
+| 5 | `095` | `094` 收口 |
+| 6 | `096`（`096b` 主体） | `092` 与 `093` 均收口 |
+| 7 | `107`（`096a` thinking） | 无条件可做；**与 `108` 同改一批模板 ⇒ 串行**（`108` 先） |
+| 8 | `100`（逐家＝可并行单元） | **等 A 线 `089`**：判据＝A 树 `status.md` 里能查到 `089` 的收口行 |
+| 9 | `102` | 无条件 |
+
+> **禁止**：把"等公告点名 / 等调度者放行"当开工条件（`R-0054` ④）。本树实测受害过——等一个**早已过期**的放行，白等一段。
+> **谓词不成立时**：先做 §8 fallback 清单里第一条能做的；确实全被阻塞才在本树 `status.md` 写"等什么 / 为什么别的都不能做 / 预计何时醒"，且**单次等待 ≤5 分钟**。
+
 ## 3b 并行预算（执行者侧）——**本树是"拆出来提速"的，务必用足**
 
 - 允许开子代理并行：**是**；**同时在跑 ≤6**（机器 20 核但**仅 11 GB 内存**，测试重 ⇒ 内存是瓶颈）；**深度 ≤1**
@@ -95,20 +112,35 @@ cat /home/maoqh/projects/agent-box-server-round1/docs/implementation/prefs.md
   校验：`python3 ~/.agents/skills/incremental-work-order/scripts/validate_order.py <本单> --strict`
 - 证据落 `docs/server-round1/**`；本树账 `docs/implementation/status.md`；**凭据只作 locator**、真实调用按 R-0017（假端点优先、逐笔记账）
 
+## 6b 阻塞时的 fallback 活单清单（`R-0041 ⑦` ＋ `OF-01` 的回退条款）
+
+> **为什么有这一节**：同类项目上实测过"进程在、只有 `sleep`、零产出"两段（83 分钟、92 分钟）。**规则：等依赖单次 ≤5 分钟，醒来先做下面第一条能做的**，做完在本树 `status.md` 记一行（带计数/证据）再回到等待。
+
+1. **复算本批已收口单的门计数**：按命令原文重跑，**必须附一行「Worker 工件在/不在」**（`QA-007`：本树正是缺 git-ignore 的构建产物才天然 18 红），并标 `待 QA 复算`（`R-0040 ⑥`）。
+2. **`093` 的 8 家键位先在假端点预演**：逐家钉"设置键位置与形状"，钉不死就写清**类型化拒绝**的判据（正向 + 反例）。
+3. **`107`/`096` 的反例门先写好**：思考开关的"出现 `thought.delta`"门与"关掉后不再出现"的反例，可以先把门写进测试再改生产路径。
+4. **给证据建索引**：`docs/server-round1/evidence/**` 按单号列一张"哪张单哪阶段、什么门、几次请求"的表（只读整理）。
+5. **核自己的依赖谓词**：读 A 树 `status.md` 与主树 `bulletin.md` 的新条目，确认 `089`/`091` 的谓词是否已成立。
+6. 以上全被阻塞 ⇒ 在本树 `status.md` 写"等什么 / 为什么别的都不能做 / 预计何时醒"（**这才允许长一点睡**）。
+
+**不做的事**：不替调度者改契约、不碰他树、不因为等待就宣告"无事可做"。
+
 ## 7 启动提示词（用户开新会话时粘贴；≤15 行）
 
 ```text
 /goal 你是本项目的【后端执行者·runtime 线】（子树 agent-box-runtime-round1），按队列连续施工。
 
 先完整读这些并遵守：
-- docs/implementation/worktree-charter.md（本树章程：归属边界、队列切片 c1/c2/c3、并行预算）
-- docs/implementation/work-orders/**（契约权威；你的切片从 106 → 088 → 090 → 091 起）
-- /home/maoqh/projects/agent-box-server-round1/docs/implementation/bulletin.md（公告；串行点名与优先级在这里）
-- 主树 README.md §3/§4 与 manifest.json / status.md / rulings.md / prefs.md
+- docs/implementation/worktree-charter.md（本树章程：归属边界、**§3「今晚队列」＝开工顺序与可判定谓词**、§6b fallback、并行预算）
+- docs/implementation/work-orders/**（契约权威）
+- /home/maoqh/projects/agent-box-server-round1/docs/implementation/ 下的 bulletin.md（公告；最新一条＝「组织调整 v2 / R-0054」）、README.md §3/§4、manifest.json、status.md、rulings.md、prefs.md
 
-边界：不碰 server/wire/** 与探针语义（属 A 树）；model_configs/** 与 runtime 描述符部分按公告串行（A 的 104/105 先）。
-纪律：单内不停；批末 `git tag -a checkpoint/c1 …` + 报告写进本树 status 后继续；只写工单声明的 write_paths；
-用足并行：每张单的 parallel_units 就是授权范围（093 八家、100 逐家），子代理 ≤6 且不做 git 写；
-全量套件只在批末跑（若公告说别树在跑全量，先跑定向）；pathspec 提交；不 merge 主干、不 push、不 reset/stash/clean。
-队列做完才可停，并写 `QUEUE_EMPTY_AT <日期>`。
+今晚焦点＝后端第二波：`091` 收口 → `092` 阶段 2 → `093`（8 家＝8 单元）→ `094` → `095` → `096`；`107` 与 `108` 串行（`108` 先）；`100` 等 A 线 `089`；`102` 随时可做。
+【接手】重启前工作区有未提交改动（`model_configs/repository.py`、`service.py`、`storage/database.py`、`tests/server/test_stage_a_server.py` ＋ 新文件 `test_provider_neutralization_092.py`）
+——**那是你自己的 092 阶段 2 在写的活**：先 `git status`/`git diff` 看清，纳入并提交，别丢。
+边界：不碰 `server/wire/**` 与探针语义（属 A 树）；`model_configs/**` 与 `runtime.py` 描述符部分只在**同改**时串行。
+纪律：单内不停；批末 `git tag -a checkpoint/<批> …` + 报告写进本树 status 后继续；**每张用户可见单收口就打检查点（`R-0053`）**；
+用足并行（`093` 八家、`100` 逐家；子代理 ≤6、不做 git 写）；全量套件只在批末跑、且**同一时刻最多两棵树在跑**；
+`git add -- <显式路径>` + pathspec 提交；不 merge 主干、不 push、不 reset/stash/clean；队列做完才可停并写 `QUEUE_EMPTY_AT <日期>`。
+【不许只剩 sleep】等依赖时单次 ≤5 分钟，醒来先做 §6b 第一条能做的。
 ```
