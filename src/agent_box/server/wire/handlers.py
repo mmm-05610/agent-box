@@ -1312,38 +1312,39 @@ class WireService:
     #: the three honest answers (a preset catalogue, a pulled model list, or
     #: the user's own hand entry); the endpoint fields themselves are optional
     #: and stay absent when their source does not supply them.
+    #:
+    #: These are wire field names, and they stay wire field names all the way
+    #: into the service body: `service.create/update` reads `body["authStyle"]`
+    #: and hands the SQL column name to the repository, which is the only place
+    #: allowed to know one. A handler that translated to columns here would
+    #: write nothing at all and still answer 200.
     _PROVENANCE_ENUMS = {
         "authStyle": {"api_key", "oauth", "none"},
         "wireApi": {"chat_completions", "responses"},
         "fieldsSource": {"preset", "pulled", "manual"},
     }
-    _PROVENANCE_COLUMNS = {
-        "authStyle": "auth_style",
-        "wireApi": "wire_api",
-        "fieldsSource": "fields_source",
-        "baseUrl": "base_url",
-    }
+    _PROVENANCE_FIELDS = ("baseUrl", "authStyle", "wireApi", "fieldsSource")
 
-    @staticmethod
-    def _provenance(params: Mapping[str, Any]) -> dict[str, str] | None:
+    @classmethod
+    def _provenance(cls, params: Mapping[str, Any]) -> dict[str, str] | None:
         raw = params.get("provenance")
         if raw is None:
             return None
         if (not isinstance(raw, Mapping)
-                or not set(raw) <= set(_PROVENANCE_COLUMNS)):
-            raise WireError("INVALID_PARAMS", "provenance carries unknown fields")
+                or not set(raw) <= set(cls._PROVENANCE_FIELDS)):
+            raise WireError("INVALID_REQUEST", "provenance carries unknown fields")
         provenance: dict[str, str] = {}
-        for field, column in _PROVENANCE_COLUMNS.items():
+        for field in cls._PROVENANCE_FIELDS:
             value = raw.get(field)
             if value is None:
                 continue
             value = _bounded(str(value), f"provenance.{field}", 512)
-            allowed = _PROVENANCE_ENUMS.get(field)
+            allowed = cls._PROVENANCE_ENUMS.get(field)
             if allowed is not None and value not in allowed:
                 raise WireError(
-                    "INVALID_PARAMS", f"provenance.{field} is not a known value",
+                    "INVALID_REQUEST", f"provenance.{field} is not a known value",
                 )
-            provenance[column] = value
+            provenance[field] = value
         return provenance or None
 
     def _provider_model_body(

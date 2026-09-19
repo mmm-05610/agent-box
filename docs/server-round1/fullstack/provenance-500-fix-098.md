@@ -92,3 +92,48 @@
 - 临时数据根用 `tempfile.mkdtemp(prefix="obs098…")`，跑完 `shutil.rmtree` 并回读存在性 ⇒
   两次探测均打印 `CLEAN True`。
 - 本阶段**未改任何源码或测试**（只有本证据文件与 `status.md` 的账行为新增）。
+
+## 7 阶段 2 实施：两处一起改，外加一处错误族
+
+### 7.1 作用域（工单点名的那一处）
+
+`@staticmethod` → **`@classmethod`**，两处裸名改 `cls._PROVENANCE_*`。
+
+选"类限定"而不是"提到模块级"的理由：这两个常量是 `WireService` 的**私有合同细节**
+（枚举值就是 wire 词汇），提到模块级会让它们变成 `handlers` 模块的公开姓名，
+而本文件里没有任何模块级常量是这个待遇；`@classmethod` 是四处调用点
+（`self._provenance(params)`）**一字不改**就能走通的最小形状。
+
+### 7.2 返回键（阶段 1 §3 抓到的第二缺陷）
+
+`_PROVENANCE_COLUMNS = {field: column}` → **`_PROVENANCE_FIELDS = ("baseUrl", "authStyle", "wireApi", "fieldsSource")`**，
+`_provenance()` 返回 **wire 字段名**键；列名的归属留在 `repository.py`（唯一真正拼 SQL 的地方）。
+
+不改名会留下一个说谎的常量：它的值（列名）在改完之后没有任何读者，
+而它的名字仍然承诺"这里做列映射"。`grep -rn "_PROVENANCE_COLUMNS"` 在改动前只命中
+`handlers.py` 自身与该工单文本（`build/lib/**` 是构建产物副本）⇒ 重命名不牵动别处。
+`_PROVENANCE_ENUMS` 的三个枚举值**逐字未动**（工单 §明确不做）。
+
+### 7.3 错误族：`INVALID_PARAMS` 不是合法家族（实测）
+
+改完作用域后复跑，两条**拒绝路径仍 500**：`WireError("INVALID_PARAMS", …)` 的第一参
+不在 `FAMILIES` 12 项闭集里（`errors.py:13-26`）⇒ `__post_init__` 抛 `ValueError` ⇒ 500。
+这正是 **101 的缺陷族**，而 101 的 §Scope 明写"098 射程的 `INVALID_PARAMS` 两处可并入或留给 098，
+但要在报告里写明归属"⇒ **归属：本单已修**，两处改成 `INVALID_REQUEST`（与同文件其余
+71 处校验拒绝同一族），消息文本逐字未动（`provenance carries unknown fields` /
+`provenance.{field} is not a known value`）。
+
+**全仓家族扫描**（`src/agent_box` ＋ `plugins`，正则同时吃单行与换行后的第一参，90 个字面构造点）：
+
+| 第一参 | 计数 | 是否合法家族 | 归属 |
+| --- | --- | --- | --- |
+| `INVALID_REQUEST` | 71 | 合法 | — |
+| `UNAVAILABLE` | 7 | 合法 | — |
+| `NOT_FOUND` | 3 | 合法 | — |
+| `OUTCOME_UNKNOWN` | 1 | 合法 | — |
+| `INVALID_PARAMS` | 2 | **非法** | **本单已修（§7.3）** |
+| `ARTIFACT_STORE_UNAVAILABLE` | 1 | **非法** | **101**（`handlers.py:1195`，经 `_artifact_store()` 一处顶住 `providerArtifacts.list/install/rollback` 三个方法） |
+| `USAGE_AGGREGATOR_UNAVAILABLE` | 1 | **非法** | **101**（`handlers.py:1243`，顶住 `usage.aggregate`/`usage.export`） |
+
+⇒ **本单射程内的非法家族清零**；剩下 2 个字面点＝101 点名的 5 个方法，一处不剩地带进 101。
+（扫描器口径：只认字面字符串第一参，`WireError.from_server_error(...)` 不在此列——那条路本来就收敛到合法家族。）
