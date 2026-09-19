@@ -1613,3 +1613,47 @@ HEAD 即检查点；`git status --short` 只剩本树自己的证据目录（`08
   **凭据映射策略**（10 条 provider 记录只有 1 条指向内存里种的凭据）。红线照旧不碰：**不把真 key 种到 `credential_e08793…`**（8 条 `maomaokingdom` 用户自有网关引用它 ⇒ 种下去＝把用户的 key 发往第三方）。
 - **我能自证的都自证了**：`ui_gates_89_leak_check.py --self-test` ⇒ 5 红 + 8 绿 + 全仓 `docs/` 461 文件零误报 ⇒ G3 那条门是真门。
 - 全程对 18790 **只读**（`server.hello`/`profiles.list`/`providerModels.list` 三次线上读 + `/proc/cmdline`）；那台实例归验收线（A）守，本树不起停/不重启/不动数据根。
+
+## 089 的 Windows 真机腿：按用户裁定**交回调度者派 QA/人执行**，本树交的是可照抄包（2026-09-19 14:1x）
+
+用户指示（原文）："提交请求给调度者让他安排 QA 或相关人员直接用 powershell.exe 跑 windows 侧校验"。
+⇒ 本树不起 Windows 交互会话，改为交出一包**已一手核过前置**的照抄件：
+[ui-gates-89-windows-handoff.md](../server-round1/fullstack/ui-gates-89-windows-handoff.md)。
+
+- 前置实测（`powershell.exe -NoProfile -Command "Test-Path '…'"`，全部 `True`）：Windows venv `python.exe`、
+  数据根 `%LOCALAPPDATA%\AgentBox\desktop` 与其 `secrets\http-token`、桌面源码 `C:\Users\maoqh\agentbox-wsl-round1\apps\desktop`、
+  46 门部署 `C:\agentbox-uigate46\deployment.json`；**Worker 工件在**（`workers/agent-box-worker/.acceptance-bundle-c9…c12` ＋ `target/{debug,release}/agent-box-worker`）。
+- **关键一条**：`trial-serve.ps1` 的 `$SourceRoot` 指向 `\\wsl.localhost\...\agent-box-env-provider` ＝ **本工作树**
+  ⇒ Windows 侧一起来跑的就是含 `115`+`117` 的源码 ⇒ 挑 profile 不必再"发一条看它崩不崩"，读一次 `profiles.list` 看 `sendability.state` 即可（包 §3 给了命令）。
+- 留了一条**自己差点写错**的案：第一次用嵌套引号量 Windows 前置得到 `False/False`，改字面路径后全是 `True`；
+  跨 shell 传路径别信嵌套引号（与 62/64 那批 Windows 解码坑同族形状）。
+- 跑之前对 HEAD（写作时 `4230b2a`）；跑的人发现缺陷**不要就地改**（089"只跑不改"），带 sha 交回。
+
+## 批末回归计数（`R-0040 ⑥`：不宣告"全量通过"，标 `待 QA 复算`）
+
+| 命令（原文） | 结果 |
+| --- | --- |
+| `AGENT_BOX_SANDBOX_MODULE=agent_box_sandbox_bwrap PYTHONPATH=src:<六个插件 src> python3 -m pytest tests/server -q` | **1 failed / 797 passed** in 325.79 s（那一条红是 087 驱动文件缺 `import pytest`，已在 `c3bd518` 修） |
+| 同环境 `python3 -m pytest tests/ -q`（修完之后重跑） | **1 failed / 1096 passed / 1 skipped** in 495.93 s |
+| `python3 -m pytest tests/server/test_first_run_lock.py tests/server/test_wire_error_family_closure_115.py tests/server/test_profiles_list_sendability_117.py tests/server/test_provenance_wire_098.py tests/server/test_wire_error_family_101.py -q` | **2 failed / 57 passed** in 61.90 s |
+
+- **本批（087/115/117）的门与既有错误面门：57 条里除 `test_first_run_lock` 的两条全绿**；那两条红的都是 080 的负载敏感门
+  （`test_two_profiles_first_runs_do_not_overlap_through_the_server`、`test_without_the_gate_the_same_first_runs_overlap`），
+  在本树账上是**已登记的两条同族**（§全局维护债 773 行与待开单里"负载敏感三条"）——本次又给同族添了一条实证：
+  **同一条 `test_first_run_lock.py` 在与其他文件并跑时红了 2 条**（不是 1 条），仍然支持"因＝墙钟/线程时序"这一侧，
+  但按那条账同一口径：**本树不为让门绿改它的断言**（章程 §8），归因与修法要那张卫生单。
+- **Worker 工件：在**（c9–c12 ＋ debug/release 二进制；`QA-007` 要求报数必附这一行——本树与 runtime 树不同，别把这条计数搬过去用）。
+- 真实模型调用：**0**（整批）。§Spend 的机时账写在检查点报告里。
+- 待 **QA 复算**（`R-0040 ⑥`）。
+
+## QUEUE_EMPTY_AT 2026-09-19
+
+今晚队列（`087 → QA-008/QA-009(=`115`/`117`) → `103` → `099` → `089``）逐条落定：
+`087` 收口 `CANCEL_RECALL_FLAKE_PARTIAL`（剩余＝改门的写面单，提案已交）· `115` `WIRE_FAMILY_CLOSURE_DONE` ·
+`117` `PROFILE_ADMITTABLE_PROJECTION_DONE` · `103` 早已 `WIRE_DRIVE_COVERAGE_DONE`（本批只重跑了它的生成账）·
+`099` 早已收口（`8eb8ac2`）· `089` 按用户裁定**交回调度者派 QA/人执行 Windows 真机腿**，本树部分（预检 + 照抄包）已交。
+
+⇒ 队列内没有"本树现在还能自己往下做"的项了。§8b 清单里剩下的可做事：
+①`089` 两条门脚本的假端点预演（要 089 的 `scripts/**` 写面，属本单射程，等 QA 那腿有结果再做更省事——先不重复劳动）；
+②给 45-G8 下标那条改法配反例（同样要 `scripts/**` 写面的单）；
+③把 `100`（其余六家）与 `108/120/122` 的依赖边在账上对齐——那是调度者的排序，不越权。
