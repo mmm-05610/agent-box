@@ -368,7 +368,7 @@ ProviderModelConfigRecord = {
   `990cf905586791c0b8a78ed5fd04431b4119f9229faeb00863e7d39cc9c902b7`；
   生成工件 `wire-v1.schema.json` sha256
   `9e7f28381fdb5db91873d85e26acbd0ca3237737d4d5b4c4b8524d04a4b8b0f4`
-  （后端侧证据副本：`docs/server-round1/fullstack/generated/wire-v1.schema.json`）。
+  （后端侧证据副本：`docs/server-round1/fullstack/generated/wire-v1.schema.snapshot-33methods-stale.json`）。
 - **严格校验**：`AGENT_BOX_WIRE_SCHEMA=<工件>` 下 `tests/server/test_wire_v1.py`
   **37 passed**——含 FRAME_COVERAGE 注入的 `usage.updated` 帧（positive）与会话投影的
   `latestUsage`；pi 全链门（c10）在工件在位时 exit 0，真实 usage.updated 帧通过前端
@@ -392,7 +392,7 @@ ProviderModelConfigRecord = {
 - **两仓摘要（前端 HEAD b1f44a23，分支 feature/agentbox-desktop-product）**：
   TS 合同 sha256 `8ff6d183732b20979d9226c5abe84ea47eaa952c2feef701e2f87fdeed968f83`；
   生成工件 sha256 `0cdc459cd8b8a5bc34d86fe61595bcbd7aea7648be9ef974020f6b5616c348a7`
-  （证据副本：`docs/server-round1/fullstack/generated/wire-v1.schema.json`，13 个事件 kind）。
+  （证据副本：`docs/server-round1/fullstack/generated/wire-v1.schema.snapshot-33methods-stale.json`，13 个事件 kind）。
 - **严格校验**：`AGENT_BOX_WIRE_SCHEMA=<工件>` 下 test_wire_v1 **37 passed**——
   FRAME_COVERAGE 新增三条 produced 条目（thought/plan/mode），声明-观测对照平衡。
 - **不动的**：28 方法、wire/1、既有事件 kind 与载荷——纯新增面（52 D 与 51 D 本计划共享
@@ -411,7 +411,7 @@ ProviderModelConfigRecord = {
 - **两仓摘要（前端合同提交 73ea5d59）**：TS
   `182e7adb0be6d8ec07426433f2ad38e58230089b516e575a9927daa2f57d253b`；
   生成工件 `ec37b9623e8a9dba335f75ffb9cc245f581daa85db123885a5ea4990b6e888ba`
-  （后端证据副本：`docs/server-round1/fullstack/generated/wire-v1.schema.json`）。
+  （后端证据副本：`docs/server-round1/fullstack/generated/wire-v1.schema.snapshot-33methods-stale.json`）。
 - **严格校验**：`AGENT_BOX_WIRE_SCHEMA=<工件>` 下 test_wire_v1 **47 passed**
   （含 usage/进程事实与 provenance 的全部严格帧）。
 - **探测（models.list / connection.test）**：G2–G3 的有界探测与 SSRF 防护为
@@ -434,7 +434,7 @@ ProviderModelConfigRecord = {
 - **两仓摘要（前端提交 b284f70c）**：TS
   `64dc99610b15360d4d114cb377b9034efeab127d5d15a34da5b7db8f42d8e08f`；
   工件 `42a164a47697f7481f4e5a224e7e2f5241719c1fa3fa476fa54f824c2096433d`
-  （后端证据副本：`docs/server-round1/fullstack/generated/wire-v1.schema.json`）。
+  （后端证据副本：`docs/server-round1/fullstack/generated/wire-v1.schema.snapshot-33methods-stale.json`）。
 - **定向测试**：13 项（探测器反例：SSRF 三形态拒绝、loopback 假端点的
   认证失败/成功/可达、超大响应上限、格式不符）——`tests/server/test_usage_parsing.py`。
 
@@ -581,7 +581,7 @@ sha256sum /home/maoqh/projects/agent-box-desktop-next-wsl-round1/docs/desktop-pr
 #   f5d27269184aa387ce1227dbf8497e25b51e0d7ba5d3360f412e9b8cda33a583
 sha256sum /home/maoqh/projects/agent-box-desktop-next-wsl-round1/apps/desktop/src/types/wire/wire-v1.ts
 #   6e8ae84a1abeb32c89b6761068ec3f380991bbf8497645626b700ed70cd5dedb
-sha256sum docs/server-round1/fullstack/generated/wire-v1.schema.json
+sha256sum docs/server-round1/fullstack/generated/wire-v1.schema.snapshot-33methods-stale.json
 #   a1bd52a4fb68436079ae2d2e439953e8ac7f345ab5934a936a9434952bee0729
 ```
 
@@ -589,7 +589,13 @@ sha256sum docs/server-round1/fullstack/generated/wire-v1.schema.json
 | --- | --- | --- |
 | **前端交回对（阶段 2，2026-09-18）** | TS `6e8ae84a1abeb32c89b6761068ec3f380991bbf8497645626b700ed70cd5dedb`；工件 `f5d27269184aa387ce1227dbf8497e25b51e0d7ba5d3360f412e9b8cda33a583`（**59 方法**） | 前端 `contracts/wire-v1/README.md` §摘要登记 + 现物本体（本单就地计算，与前端记录值**逐字一致**，前端内部自洽） |
 | 后端**最后一条**登记（55-G2，2026-09-17） | TS `64dc99610b15360d4d114cb377b9034efeab127d5d15a34da5b7db8f42d8e08f`；工件 `42a164a47697f7481f4e5a224e7e2f5241719c1fa3fa476fa54f824c2096433d` | 本文件 Order 55 G2 节（434–437 行） |
-| 后端工件副本（本树） | `a1bd52a4fb68436079ae2d2e439953e8ac7f345ab5934a936a9434952bee0729`（**33 方法**，含 `providerArtifacts.*`） | `docs/server-round1/fullstack/generated/wire-v1.schema.json`（与前端 status 记录的同一个值，互相印证） |
+| 后端工件**陈旧快照**（本树，**非当前工件**） | `a1bd52a4fb68436079ae2d2e439953e8ac7f345ab5934a936a9434952bee0729`（**33 方法**，缺 081/105 起的 31 个方法） | `docs/server-round1/fullstack/generated/wire-v1.schema.snapshot-33methods-stale.json`（order 102 已从 `wire-v1.schema.json` 改名，消除"当前工件"暗示） |
+
+> **Order 102（AUD-B-003）防假绿提示**：本树那份只有 33 个方法，是历史快照，**不是**当前 wire 工件。
+> 权威工件（现 64 方法）在**前端树** `contracts/wire-v1/generated/`（081 登记的重锁规则管辖其配对）。
+> **任何严格校验的门必须显式 `AGENT_BOX_WIRE_SCHEMA=<前端权威工件>`**，**不得**默认取本树这份快照——
+> 否则会在只覆盖 33/64 的情况下"全绿"（这就是改名要根除的假绿）。改名后 `generated/` 下不再有
+> 同名 `wire-v1.schema.json` 可被误当当前工件；此快照仅留作历史数值互证的记录。
 
 **方法集比对（本单从两份工件与代码方法表各取一次）**：
 
@@ -617,7 +623,7 @@ Order 57/58/59/65 的方法在代码与前端工件里都在，但本文件**没
 3. **前端方法集 ⊂ 后端代码方法集**（59 ⊂ 64）；差的 5 个前端明示"刻意不编入"（Order 65 在飞、Order 53 未收口）。
 4. **反例演练（工单 G1）**：若把旧值 `b284f70c` / `42a164a4…` 当作"已一致"登记，会与现物就地计算值
    `f5d27269…` 直接矛盾——本单的登记因此只认**現物计算值**（两端各引一次：前端 `contracts/wire-v1/README.md`
-   与现物本体；后端 `docs/server-round1/fullstack/generated/wire-v1.schema.json`）。
+   与现物本体；后端 `docs/server-round1/fullstack/generated/wire-v1.schema.snapshot-33methods-stale.json`）。
 
 **据此登记（后端侧接受的事实）**：
 - 前端交回的**对**为 §1 表第一行（TS `6e8ae84a…` / 工件 `f5d27269…`，59 方法，2026-09-18）；
