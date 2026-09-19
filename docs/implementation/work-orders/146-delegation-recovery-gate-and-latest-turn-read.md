@@ -9,11 +9,11 @@ forbidden: ["/home/maoqh/projects/agent-box-server-round1/**", "/home/maoqh/proj
 ruling: R-0046
 terminal: ["DELEGATION_RECOVERY_GATE_AND_LATEST_READ_DONE", "DELEGATION_RECOVERY_GATE_AND_LATEST_READ_PARTIAL"]
 waive: []
-parallel_units: ["recovery-gate", "roster-availability", "latest-turn-read", "gate"]
+parallel_units: ["existing-chain-gates", "roster-availability", "latest-turn-read", "gate"]
 serialize_with: ["092", "120", "121", "122", "126", "127", "130", "131", "133", "134", "135", "136", "137", "138", "140", "141", "142", "144"]
 ---
 
-# Work Order 146 — 委派链**绕过 `PROFILE_RECOVERY_REQUIRED` 门** ＋ roster 的「不可用」是装饰 ＋ 取回窗口**截最旧 200 行**（`AUD-B-031`/`AUD-B-032`/`AUD-B-029`）
+# Work Order 146 — **委建子轮必须过既有链的门**（recovery ＋ exclusive-home 并发）＋ roster 的「不可用」是装饰 ＋ 取回窗口**截最旧 200 行**（`AUD-B-031`/`AUD-B-034`/`AUD-B-032`/`AUD-B-029`）
 
 ## Objective
 
@@ -25,7 +25,7 @@ serialize_with: ["092", "120", "121", "122", "126", "127", "130", "131", "133", 
 **⚠️ 一条留史说明**：`029` 原本被并入 **已收口的 `139`**（我的错——单已 `0528f1e` 收口，我 `f44b3af` 才加阶段）⇒ 我已把 `139` 复原（阶段 6/7 与门 G6/G7/G8 **移除**）并**改投本单**。
 ⇒ **教训**：**"同族别分开做"不等于"塞进已收口的单"**；收口后新发现一律新开单。
 
-## Current state（一手，三条 finding）
+## Current state（一手，四条 finding）
 
 | 事实 | 出处 |
 | --- | --- |
@@ -40,7 +40,7 @@ serialize_with: ["092", "120", "121", "122", "126", "127", "130", "131", "133", 
 
 | From | To / action | Reason |
 | --- | --- | --- |
-| 委派建轮前的门 | 在 `delegation.run()` 的 `archived` 检查旁**加 `recovery_pending` 拒绝**（类型化 `SUBAGENT_UNAVAILABLE`，理由 inline），**或**在 `_create_child_turn` 的 `INSERT` 前复查 | `65:102`「子执行走**既有执行链**」⇒ 同一条门必须同一条链生效 |
+| 委派建轮前的门（**两条不变式一起**） | 在 `_create_child_turn` 的 `INSERT` 前**复用既有链的两道门**：① `recovery_pending` 拒绝（类型化 `SUBAGENT_UNAVAILABLE`，理由 inline）② `_refuse_exclusive_home_concurrency(conn, child_profile)`（`AUD-B-034`） | `65:102`「子执行走**既有执行链**」⇒ **同一条门必须同一条链生效**；`AUD-B-034` 与 `031` **同一处代码、同一形状**（两条路径对同一条不变式给出相反答案）⇒ 审阅者明写"合成一张单" |
 | roster 的可用性 | 二选一：**① 真的喂**（把子 profile 的可判定事实注进 `availability`——至少 `archived`／`recovery_pending`／harness 未装配三类）；**② 删掉**这个恒真的形参与随之不可达的分支 | 别给后续验收留一个**恒真门**（与 `AUD-B-011`「声明有、发射点为零」同类） |
 | 取回链 | 改按「**本轮、最新**」读：复用 `list_events_page` 的 `DESC`+反转，或新增 `turn_events(turn_id, after)`；**不再读会话快照的列表** | 合同声明的上界是 `MAX_SUMMARY_CHARS`=**4096**（有界＝**摘要**），实测上界却是「会话事件表前 200 行」这个**未声明的内部窗口** |
 | `get_session` 窗口语义 | **定死**：要么明确返回「最近 N 条」并**两处查询一起改 `DESC`**，要么**去掉列表**、在文档里写死「只可用作标量读取」 | 别让下一个消费者再踩 |
@@ -60,6 +60,11 @@ serialize_with: ["092", "120", "121", "122", "126", "127", "130", "131", "133", 
 
 **WHEN** 用 `seal_interrupted_turns` 封一条子轮（⇒ 该 profile `recovery_pending=1`）后再委派
 **THEN** **类型化拒绝**（`SUBAGENT_UNAVAILABLE` 或同义），且 **`server_turns` 行数不增**
+
+#### Scenario: 独占家目录并发被拒（正例，`AUD-B-034`）
+
+**WHEN** 家族声明为 exclusive home，先由既有链在会话 s-C1 占住该 profile，再由**委派**在另一条会话 s-C2 建子轮
+**THEN** **类型化拒绝**（与既有链同为 `TURN_CONCURRENCY_CONFLICT`/409 或同义），且该 profile 的 **active 轮数仍为 1**
 
 #### Scenario: roster 说得清（正例，`AUD-B-032`）
 
@@ -84,7 +89,7 @@ serialize_with: ["092", "120", "121", "122", "126", "127", "130", "131", "133", 
 ## Stages
 
 - [ ] 1. 观测：三条一手复现（含 `seal_interrupted_turns` 真入口触发 ＋ roster 实测 ＋ 213 条事件取回 `''`）（提交）
-- [ ] 2. `AUD-B-031`：委派过 recovery 门（类型化拒绝）（提交）
+- [ ] 2. **委建子轮过既有链的门**：`AUD-B-031` recovery ＋ **`AUD-B-034` exclusive-home 并发**（两条一起，同一处代码）（提交）
 - [ ] 3. `AUD-B-032`：availability 真供给 **或** 删形参（二选一，写清）（提交）
 - [ ] 4. `AUD-B-029`：取回按「本轮、最新」读 ＋ `get_session` 窗口语义定死（提交）
 - [ ] 5. 门与反例（三处"注释掉必须红"）（提交）
@@ -96,6 +101,7 @@ serialize_with: ["092", "120", "121", "122", "126", "127", "130", "131", "133", 
 | --- | --- | --- | --- |
 | G1 委派过 recovery 门 | 封印后委派 ⇒ 类型化拒绝且 `server_turns` 不增 | 注释掉拒绝 ⇒ 门红 | fail (typed) |
 | G2 与既有链同源 | 同 profile、同库下，**两条路径给出同一答案**（既有链 409 / 委派拒绝） | 两者不一致 ⇒ 门红 | fail (typed) |
+| G2b **独占家目录并发**（`AUD-B-034`） | 既有链占住 profile 后，委派在**另一条会话**建轮 ⇒ 类型化拒绝且 active 轮数仍为 1 | 注释掉 `_refuse_exclusive_home_concurrency` ⇒ 门红 | fail (typed) |
 | G3 availability 有据 | `available=false` ＋ 类型码 reason（或形参已删） | 仍恒 True 且未删 ⇒ 门红 | fail (typed) |
 | G4 取回按本轮读 | delta 数 > 窗口 ⇒ 完整或带截断标记（不静默） | 改回读快照前 200 行 ⇒ 门红 | fail (typed) |
 | G5 续接非空 | 第二次续接 summary 非空 | 仍空 ⇒ 门红 | fail (typed) |
@@ -113,7 +119,7 @@ git diff --check && git status --short
 
 ## DoD
 
-1. 一手复现三条 · 2. `031` 门生效 · 3. `032` 二选一落地 · 4. `029` 最新读法 ＋ 窗口语义 · 5. 门与反例 · 6. 账与证据。缺一项 ⇒ PARTIAL。
+1. 一手复现四条 · 2. **委建子轮过既有链的门**（`031` recovery ＋ **`034` exclusive-home**）· 3. `032` 二选一落地 · 4. `029` 最新读法 ＋ 窗口语义 · 5. 门与反例 · 6. 账与证据。缺一项 ⇒ PARTIAL。
 
 ## Acceptance
 
@@ -123,5 +129,5 @@ git diff --check && git status --short
 ## Notes for the executor
 
 - **排序**：`031` 是 **medium 但属"授权/边界"**（同一 profile 对用户不可用、对父模型可用）⇒ 与 `138`/`139`/`140`/`141` 同档；本单**整张**做完再动 `126`。
-- **`132` 的两个新亚型（请收口时点名）**：① **「门在多条路径上必须同源」**（既有链拒、委派不拒 ＝ `031`）；② **「同一行里关于『哪份配置/哪个窗口』的多个字段必须同源」**（`029` 的窗口方向 ＋ `138` 并入的 `028` 账本两栏）。
+- **`132` 的两个新亚型（请收口时点名）**：① **「门在多条路径上必须同源」**（既有链拒、委派不拒 ＝ `031` **＋ `034`**；审阅者建议在 `132` 里加一条形状检查：**既有链的每个 `raise ServerError` 型门，委派路径必须有对应断言或显式豁免说明**）；② **「同一行里关于『哪份配置/哪个窗口』的多个字段必须同源」**（`029` 的窗口方向 ＋ `138` 并入的 `028` 账本两栏）。
 - **前提待验**（`OF-02`）：三条均引自审阅者一手（含行号与实测输出）；第一步自己复核。
