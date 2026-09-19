@@ -24,7 +24,7 @@ python3 scripts/server-round1/wire_drive_coverage.py --check     # 有缺口即�
 | 有真实 wire 驱动证据 | **64** |
 | 豁免 | **0** |
 | 无证据（差集） | **0** |
-| 证据行数合计 | 367（含 117/123/128/129/145/125/147 的新门；分布仍很偏）|
+| 证据行数合计 | 368（含 117/123/128/129 的新门；分布仍很偏）|
 | 只被**一个文件**驱动的方法 | **40** 个，列在下面当观察名单 |
 
 ## 观察名单（单源证据：删掉那一个文件，该方法即成缺口）
@@ -92,7 +92,7 @@ python3 scripts/server-round1/wire_drive_coverage.py --check     # 有缺口即�
 | `assets.publishMcp` | `tests/server/test_asset_hubs.py:479` — `mcp = call("assets.publishMcp", {` | 2 |
 | `assets.publishPlugin` | `tests/server/test_asset_hubs.py:793` — `response = client.post("/wire/v1/assets.publishPlugin", headers={` | 2 |
 | `assets.publishSkill` | `tests/server/test_asset_hubs.py:472` — `skill = call("assets.publishSkill", {` | 1 |
-| `assets.syncCatalog` | `tests/server/test_asset_hubs.py:532` — `catalog = call("assets.syncCatalog", {` | 8 |
+| `assets.syncCatalog` | `tests/server/test_asset_hubs.py:532` — `catalog = call("assets.syncCatalog", {` | 9 |
 | `assets.unbind` | `tests/server/test_asset_hubs.py:511` — `unbound = call("assets.unbind", {` | 1 |
 | `config.describe` | `tests/server/test_wire_v1.py:448` — `descriptor = api.ok("config.describe", {` | 5 |
 | `config.resolve` | `tests/server/test_wire_v1.py:587` — `resolved = api.ok("config.resolve", {` | 3 |

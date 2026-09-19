@@ -2022,3 +2022,17 @@ python3 -m pytest tests/server/test_artifact_absence_is_not_green_118.py \
 | --- | --- | --- |
 | `089` 的两家真实 UI 门 | 预检/预演/泄漏门/Windows 可照抄包都齐（`ui-gates-89-*`），**真机腿在人**（用户裁定交调度者派 QA）；R-0056 的两条开工判据**都成立**（`rulings.md` 有 `R-0055`；runtime 树 `091` 记着"引擎＋G1–G4 绿、终态 PARTIAL"） | 按 `docs/server-round1/fullstack/ui-gates-89-windows-handoff.md` 在 Windows 侧跑（**R-0056 护栏**：独立端口段＋独立数据根，不碰 18790/`~/.agentbox-trial-chat`）；回来把逐笔 usage 与转录落 `docs/server-round1/fullstack/ui-gates-89/**`，本树据此才能声明终态码 |
 | `124` 的写面白名单＋canonical 四值 | **不开工**：`src/agent_box/server/execution/protocols.py` 在本树不存在（`ls` 实测），全树 grep 四个 canonical 值 0 命中；值本身在 runtime 树（`openai-chat / openai-responses / anthropic-messages / gemini-generate`） | 判据一行：`test -f src/agent_box/server/execution/protocols.py`。成立即按工单三条落地（harness 可选 ＋ 三个新形状 ＋ 四值＋旧两值归一），且 G3 要求**引用**不许复制字面 |
+
+## 147 的补做（一条更硬的门；2026-09-19 19:39 UTC，执行者）
+
+收口后回看，`AUD-B-037` 的原文是"**五处同款**"，而我第一版只对 `assets.syncCatalog` 一处做了真故障断言，
+另四处只由一条 grep 计数门（`raise _asset_refusal(...)` 命中 5）兜着——**计数门证明形状，不证明行为**。
+补一条参数化门把**五个站点逐一真跑**：对每处包装的那个存储调用注入同一个 `OSError(13, "Permission denied", <假的宿主路径>)`，
+逐点断言 `UNAVAILABLE` ＋ `internalCode` ＋ `message` **不含该路径** ＋ `retryable: true`；
+并且**先断言四个存储对象都已装配**，否则直接红——一条会因为"什么都没测到"而绿的门，比没门更糟。
+定向 **16 passed / 6.55s**（原 11 ＋ 5 个参数样本）。
+
+**一条自我更正留在账上**：这条门第一版把 `internalCode` 断成 `OSError`，五样本一起红——
+CPython 会把 `OSError(13, …)` 自动提升成 `PermissionError`，**错的是我的期望，不是产品**；改判后全绿。
+这类红是门在量真东西的证据（同一条门也确实测到了"路径没漏"，因为注入的就是带路径的异常）。
+批末第一遍 `tests/server -q` = **883 passed / 1 failed / 1 skipped in 317.68s**——红的是 `103` 的**生成账**（本条新门给 `assets.*` 添了驱动证据，账没先重算 ⇒ 门如实红，**不是产品回归**）；重算（367 → **368** 条证据行，单源观察名单仍 40）后 **103 ＋ 147 定向 = 25 passed / 10.04s**，并把重算记进同一提交。

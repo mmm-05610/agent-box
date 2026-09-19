@@ -280,3 +280,57 @@ def test_a_second_call_starts_empty(server):
     second = handlers_module._CallReader(counter)
     assert first.read(digest) == second.read(digest)
     assert counter.reads == 2, counter.reads
+
+
+#: Every site `AUD-B-037` counted, with the store method each one wraps. The
+#: five were *identical* text, so a gate that exercises one of them proves
+#: nothing about the other four - this covers all five behaviourally.
+FIVE_SITES = (
+    ("assets.syncCatalog", "catalogs", "sync"),
+    ("assets.installFromCatalog", "catalogs", "install_entry"),
+    ("assets.publishSkill", "skill_assets", "install"),
+    ("assets.publishMcp", "mcp_assets", "install"),
+    ("assets.publishPlugin", "plugin_assets", "install"),
+)
+
+#: What a real `OSError` carries: `str(PermissionError(13, ..., filename))` is
+#: "...: '/the/absolute/path'", which is the leak this order exists to stop.
+HOST_PATH = "/home/operator/.agentbox/data-root/assets/index.json"
+
+
+def _params_for(method, tmp_path, runtime):
+    if method == "assets.syncCatalog":
+        return {"requestId": "p147-five-sync", "sourceId": "community",
+                "sourcePath": str(source_dir(tmp_path))}
+    if method == "assets.installFromCatalog":
+        return {"requestId": "p147-five-install", "sourceId": "community",
+                "entryName": "my-skill", "revision": 1}
+    if method == "assets.publishMcp":
+        return {"requestId": "p147-five-mcp", "assetId": "calendar", "revision": 1,
+                "definition": {"name": "calendar",
+                               "transport": {"stdio": {"command": "/bin/calendar"}}}}
+    return {"requestId": f"p147-five-{method.split('.')[-1]}", "assetId": "my-skill",
+            "revision": 1, "sourcePath": str(tmp_path / "whatever")}
+
+
+@pytest.mark.parametrize("method, attribute, function", FIVE_SITES)
+def test_all_five_sites_answer_a_server_fault_the_same_way(
+        server, tmp_path, monkeypatch, method, attribute, function):
+    runtime, api = server
+    owner = getattr(runtime.wire, attribute)
+    assert owner is not None, (
+        f"{attribute} is not composed in this tree; the gate would be vacuous")
+    if method == "assets.installFromCatalog":
+        api.ok("assets.syncCatalog", _params_for("assets.syncCatalog", tmp_path, runtime))
+
+    def failing(*_args, **_kwargs):
+        raise OSError(13, "Permission denied", HOST_PATH)
+
+    monkeypatch.setattr(type(owner), function, failing)
+    error = api.call(method, _params_for(method, tmp_path, runtime))["error"]
+    assert error["code"] == "UNAVAILABLE", (method, error)
+    # `OSError(13, ...)` is auto-promoted by CPython; the type name is the fact.
+    assert error["details"]["internalCode"] == "PermissionError", (method, error)
+    assert HOST_PATH not in error["message"], (method, error)
+    assert not ABSOLUTE_PATH.search(error["message"]), (method, error)
+    assert error["details"]["retryable"] is True, (method, error)

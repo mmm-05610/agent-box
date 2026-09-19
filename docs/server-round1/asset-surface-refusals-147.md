@@ -44,7 +44,7 @@ memo 打掉   ：objects.read = 80 次 / 7,678,390 字节    ← 正是 132/147 
 ```
 （审阅者量到的是 285 KB 的 models 对象 ⇒ 11,410 KB；形状一致、字节随对象大小变，**判据是次数**，计时不进任何门。）
 
-## 3 门（`tests/server/test_asset_surface_refusals_147.py`，**11 条**，全部真 wire `raise_server_exceptions=False`）
+## 3 门（`tests/server/test_asset_surface_refusals_147.py`，**16 条**，全部真 wire `raise_server_exceptions=False`）
 
 | Gate | 覆盖 | 反例 |
 | --- | --- | --- |
@@ -53,6 +53,7 @@ memo 打掉   ：objects.read = 80 次 / 7,678,390 字节    ← 正是 132/147 
 | G3 无路径外泄 | 两条的 `message` 用正则 `(?:^\|[\s:'"])(/[A-Za-z0-9._/-]{2,})` 断言**不含绝对路径片段** | 同一反例断言"旧文案**含**路径"——如果哪天它不含了，这条反例就红，说明漏路径的判据在骗人 |
 | G4 域内码不变 | `CATALOG_SOURCE_MISSING` 的文案**逐字**比对（`==`，不是 startswith）；`CATALOG_INVALID` 前缀比对；两处都**新增** `internalCode` | 文案漂移即红 |
 | 结构 | `getattr(refusal` 命中数 **0**、`raise _asset_refusal(...)` 命中数 **5** | 有人再抄一份 ⇒ 计数变红 |
+| **五处逐一真跑**（补做，19:39 UTC） | `test_all_five_sites_answer_a_server_fault_the_same_way`：对**五个**站点各自的存储调用注入同一个 `OSError(13, …, filename)`，逐点断言 `UNAVAILABLE` ＋ `internalCode` ＋ `message` 不含该绝对路径 ＋ `retryable: true`；先断言四个存储对象**都已装配**，否则门直接红（**空跑的门比没门更糟**） | 任一处仍是旧形状 ⇒ 该参数样本红 |
 | G5b 读次数 | 40 行 ⇒ `objects.read ≤ 41` 且 `≥ 40`；且 40 行的 `sendability.state` 全是 `ready`（去重没把事实去掉） | `test_counter_example_bypassing_the_memo_...`：把 `read/parsed/index` 三层 memo 全打掉 ⇒ **≥ 80**，红得有理 |
 | 完整性 | memo 的字节 == 冷读字节；`parsed/index` 内容与直接 `json.loads` 相同；**memo 不跨调用**（第二个 `_CallReader` 自己读一次 ⇒ 计数 2） | 任何一项不成立即红 |
 
@@ -65,7 +66,8 @@ memo 打掉   ：objects.read = 80 次 / 7,678,390 字节    ← 正是 132/147 
 
 ## 5 账
 
-计数：定向 **11 passed / 2.16s**；周边（117/125/098/103/asset_hubs/147）见 status.md 本单终态行。
+计数：定向 **16 passed / 6.55s**；
+  **一条自我更正留在账上**：这条五站点门第一版把 `internalCode` 断成 `OSError`，五个样本一起红——原因是 CPython 会把 `OSError(13, …)` 自动提升成 `PermissionError`，**是我的期望错、不是产品错**；改成 `PermissionError` 后 16/16 绿。这类红恰恰证明门在量真东西（G3 的"路径不外泄"也是靠注入的真异常文案咬住的）。周边（117/125/098/103/asset_hubs/147）见 status.md 本单终态行。
 `103` 的生成账按本单证据重算（`assets.syncCatalog` 等从 1 处驱动变多源）。真实模型调用 **0 / ¥0**。
 
 DoD 六项：1 一手复现 ⑤/⑥ ＋ 核 ①–④（§1/§3）· 2 五处统一（§2a）· 3 message 卫生 ＋ 域内码保持（§2a/§3）·
