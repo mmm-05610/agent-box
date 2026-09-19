@@ -3,13 +3,14 @@ id: 099
 slug: worker-home-put-dispatch
 batch: b2
 baseline: "ace4ecd2e531d545aac5489cfc905092434d325e"
-depends_on: [086]
+depends_on: ["086"]
 write_paths: ["workers/agent-box-worker/**", "tests/**", "docs/server-round1/**", "docs/implementation/status.md"]
 forbidden: ["/home/maoqh/projects/agent-box-server-round1/**", "/home/maoqh/projects/agent-box-desktop-next-wsl-round1/**", "release/**"]
 ruling: R-0003
 terminal: ["WORKER_HOME_PUT_DISPATCH_DONE", "WORKER_HOME_PUT_DISPATCH_PARTIAL"]
 waive: []
-parallel_units: []
+parallelism: "none"
+parallelism_reason: "已收口的单线程修复（Worker home.put 接线），当时未拆分单元；再次触碰时按当时实际补声明。"
 ---
 
 # Work Order 099 — Worker 的 `home.put` 从未接上分发线（086 阶段 2 第一手抓到）

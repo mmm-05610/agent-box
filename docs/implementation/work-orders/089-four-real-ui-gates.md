@@ -9,7 +9,7 @@ forbidden: ["src/agent_box/**", "plugins/**", "tests/**", "/home/maoqh/projects/
 ruling: R-0011
 terminal: ["FOUR_REAL_UI_GATES_DONE", "FOUR_REAL_UI_GATES_PARTIAL"]
 waive: []
-parallel_units: []
+parallel_units: ["pi","codex"]
 ---
 
 # Work Order 089 — 四家真实 UI 门（最终验收路径）
