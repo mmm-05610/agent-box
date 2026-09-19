@@ -8,6 +8,7 @@ from agent_box.server.errors import ServerError, unavailable
 from agent_box.server.model_configs.provider_protocols import (
     normalize_model_facts, normalize_protocols, validate_endpoints,
 )
+from agent_box.server.model_configs.repository import KEEP
 from agent_box.server.records import canonical, digest, reject_sensitive_keys
 
 
@@ -71,28 +72,32 @@ class ProviderModelService:
 
     def update(self, record_id: str, expected_version: int, key: str, body: dict[str, Any]):
         current = self.records.get(record_id)
+        # Work Order 126 union of 092 x Order 112 (both guards kept):
+        #   * 112 - the stored record is the base, so any field the caller does
+        #     not name keeps its value; the four provenance columns name KEEP to
+        #     mean "not named" and pass an explicit null to mean "clear".
+        #   * 092 - the merged body then runs through _validate, which normalizes
+        #     and strictly validates the recognized protocol facts (protocols /
+        #     endpoints / model capabilities); because 112 seeded the merge from
+        #     project(current), a protocol set is carried forward when omitted,
+        #     so the old hand-written "preserve prior" is no longer needed.
         merged = {
-            **body, "harness": current["harness_type"], "provider": current["provider_type"],
+            **self.project(current), **body,
+            "harness": current["harness_type"], "provider": current["provider_type"],
         }
         norm = self._validate(merged, creating=False)
-        # Editing an unrelated field must not silently drop a previously declared
-        # protocol set or endpoint: absent in the update body means "keep", not
-        # "clear" (clearing is an explicit empty list, which _validate preserves).
-        prior = json.loads(self.objects.read(current["config_object_digest"]))
-        if "protocols" not in body and prior.get("protocols") is not None:
-            norm["protocols"] = list(prior["protocols"])
-        if "endpoints" not in body and prior.get("endpoints"):
-            norm["endpoints"] = dict(prior["endpoints"])
-        config = self.objects.publish(canonical(_config_payload(body, norm)))
+        config = self.objects.publish(canonical(_config_payload(merged, norm)))
         models = self.objects.publish(
             canonical({"schema_version": 1, "models": norm["models"]}))
         _status, result = self.records.update(
             record_id=record_id, expected_version=expected_version, key=key,
-            request_digest=digest(body), display_name=body["displayName"],
-            credential_id=body.get("credentialId"), config_digest=config.digest,
+            request_digest=digest(body), display_name=merged["displayName"],
+            credential_id=merged.get("credentialId"), config_digest=config.digest,
             models_digest=models.digest,
-            base_url=body.get("baseUrl"), auth_style=body.get("authStyle"),
-            wire_api=body.get("wireApi"), fields_source=body.get("fieldsSource"),
+            base_url=body["baseUrl"] if "baseUrl" in body else KEEP,
+            auth_style=body["authStyle"] if "authStyle" in body else KEEP,
+            wire_api=body["wireApi"] if "wireApi" in body else KEEP,
+            fields_source=body["fieldsSource"] if "fieldsSource" in body else KEEP,
         )
         return self.project(self.records.get(result["providerModelId"]))
 

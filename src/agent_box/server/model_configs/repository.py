@@ -9,6 +9,20 @@ from agent_box.server.ids import now, opaque_id
 from agent_box.storage import Database
 
 
+class _Keep:
+    """Order 112 (union with 092, via 126): "this column was not named" is its
+    own value. `None` used to mean both *not named* and *cleared*, and COALESCE
+    resolved that by keeping the old row - so a caller's explicit request to
+    forget an endpoint fact answered 200 and changed nothing."""
+
+    def __repr__(self) -> str:
+        return "<KEEP>"
+
+
+KEEP = _Keep()
+PROVENANCE_COLUMNS = ("base_url", "auth_style", "wire_api", "fields_source")
+
+
 class ProviderModelRecords:
     def __init__(self, database: Database, idempotency: IdempotentRecords) -> None:
         self.database = database
@@ -65,8 +79,8 @@ class ProviderModelRecords:
     def update(
         self, *, record_id: str, expected_version: int, key: str, request_digest: str,
         display_name: str, credential_id: str | None, config_digest: str, models_digest: str,
-        base_url: str | None = None, auth_style: str | None = None,
-        wire_api: str | None = None, fields_source: str | None = None,
+        base_url: Any = KEEP, auth_style: Any = KEEP,
+        wire_api: Any = KEEP, fields_source: Any = KEEP,
     ) -> tuple[int, dict[str, Any]]:
         scope = f"providerModels.update:{record_id}"
         with self.database.transaction() as conn:
@@ -79,15 +93,27 @@ class ProviderModelRecords:
                 "SELECT 1 FROM server_credentials WHERE id=?", (credential_id,),
             ).fetchone() is None:
                 raise ServerError("CREDENTIAL_NOT_FOUND", "Credential was not found", status=404)
+            # Order 112 (composed with 092 by 126): a provenance column named
+            # KEEP is left out of the SET (so "not named" keeps its value),
+            # while an explicitly-named null clears it - COALESCE could not tell
+            # those apart. Recognized protocol facts live in the config object
+            # (092), so they ride config_digest, not these columns.
+            assignments = ["display_name=?", "credential_id=?",
+                           "config_object_digest=?", "models_object_digest=?"]
+            values: list[Any] = [display_name, credential_id, config_digest, models_digest]
+            for column, value in zip(
+                PROVENANCE_COLUMNS, (base_url, auth_style, wire_api, fields_source),
+            ):
+                if isinstance(value, _Keep):
+                    continue
+                assignments.append(f"{column}=?")
+                values.append(value)
+            assignments += ["version=version+1", "updated_at=?"]
+            values += [now(), record_id]
             conn.execute(
-                "UPDATE server_provider_models SET display_name=?,credential_id=?,"
-                "config_object_digest=?,models_object_digest=?,"
-                "base_url=COALESCE(?,base_url),auth_style=COALESCE(?,auth_style),"
-                "wire_api=COALESCE(?,wire_api),fields_source=COALESCE(?,fields_source),"
-                "version=version+1,updated_at=? "
-                "WHERE id=?",
-                (display_name, credential_id, config_digest, models_digest,
-                 base_url, auth_style, wire_api, fields_source, now(), record_id),
+                "UPDATE server_provider_models SET "
+                + ",".join(assignments) + " WHERE id=?",
+                tuple(values),
             )
             body = {"providerModelId": record_id}
             self.idempotency.insert(conn, scope, key, request_digest, 200, body)

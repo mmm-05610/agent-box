@@ -1316,3 +1316,12 @@ runtime 侧（存储/service/描述符/派生/冻结/逐家声明）已 DONE 且
 - **合同工件那处 docs 冲突**（rename/rename 的 `wire-v1.schema.registered-*.json`，机械收口 ⇒ 8 条 `FileNotFoundError`，测试承重）＝ 归 `113` 重锁，本单只记录不动手。
 
 > **优先级覆盖（ops 第 122 轮 `d3802aa`）**：120/122 主路径须先于队列任何一项——本树 status **120 有 DONE 收口行、122 有 PARTIAL 收口行** ⇒ 前置满足；126 高优先阶段 1 已落，阶段 2–4 待专注回合。
+
+### 工单 126 — 阶段 2/3：model_configs 半区组合完成（2026-09-19，fresh 预算）
+
+> 依 §1 蓝图**在本树做完 model_configs 半区的 092×112 合取**（这半正归本树写面），把合并窗口的 model_configs 冲突预解掉。
+- `repository.py`：移植 A `112` 的 `_Keep`/`KEEP` 哨兵 + `PROVENANCE_COLUMNS`，`update` 去 `COALESCE`、按"点名才 SET"生成（**省略＝保留、显式 null＝清空**）。
+- `service.py::update`：`merged = {**project(current), **body, harness, provider}`（112 打底）→ 过 `self._validate(merged)`（092 归一/严校）→ `_config_payload(merged,norm)` + `norm["models"]`；四 provenance 列走 `body[...] if ... in body else KEEP`（112）。092 原先手写"缺 protocols 保 prior"已由 project 打底统一，删之（单一真相）。
+- 新门 `test_union_semantics_126.py` 5 条（省略保 protocols+provenance、显式 null 清空 provenance 且保 protocols、update 换 protocols 仍归一、update 未知协议⇒`PROTOCOL_UNKNOWN` 且不改记录、repository 层 KEEP 省略保留直证）。
+- **回归**：`126 + 092×3 + 098(真 wire update)` **41 passed**；广扫 `-k "model|profile|freeze|provider|provenance|credential|neutral|union"` **163 passed** ⇒ **092 守卫 + 098 真线 + 112 语义在 model_configs 半区同时绿，无回退**。**Worker 工件不在**（无关）。
+- **剩余（终态仍 `UNION_SEMANTICS_RECONCILED_PARTIAL`）＝wire 半区**：A `112` 非本分支祖先 ⇒ 本树 `wire/handlers.py::_provenance` 尚无"显式 null 经 wire 透传清空"的 112 修复，而 `wire/**` 是 A 树写面（126 write_paths 外）。合并时 **A 带 handlers `_provenance`(112) 进来即与本作合取拼全**；A 的 `112` 真-wire 守卫测试（`test_provider_update_keeps_omitted_112.py`）届时可跑。**本树已保证 model_configs 半区合并不再二选一丢守卫**（QA-014 的 ≥10 条 092 守卫在此半区与 112 共存）。合同工件 docs 冲突仍归 `113`。
