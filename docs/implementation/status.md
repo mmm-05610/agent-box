@@ -1345,3 +1345,13 @@ runtime 侧（存储/service/描述符/派生/冻结/逐家声明）已 DONE 且
 | 134 | 全（消费侧） | G1 合成 `stopReason:"max_tokens"`⇒`complete_turn` 写 `server_turns.terminal_reason`（列已存在）；G2 **缺席/`end_turn`/畸形⇒`None`⇒UPDATE 逐字不含该列**（与今天一致，不凭空造信息 R-0032⑤）；helper `_terminal_reason_from_result` 只认非干净停因（`max_tokens/refusal/max_turn_requests`），既有 ACP 词表不新造；Outcome 不改枚举（截断经 terminal_reason 可区分，wire projection 已透出） | `test_terminal_reason_consumer_134.py` **4 passed**（含 absent-safety 与 max_tokens 两反例）；sessions/turn 广扫 **187 passed**（complete_turn 热路无回退，仅既有 env 红 production_lease）；**Worker 工件不在** | 0 | 本提交 |
 
 **与 122 的关系**：122 判定"执行段手里无此事实"属实（生产侧未出字段）；134 把**消费侧**备妥（读到就用、没有就不写）。生产侧＝`protocols/worker/v1.schema.json`+`workers/**` 出 `stopReason`＝审批合同单（交 I）。二者正交，122 维持其 PARTIAL、由生产侧单收口。
+
+## 工单 135 — 类型化码必须走到真出去的那条腿（120 真机复算仍红·第 4 次同形；2026-09-19，执行者·runtime 线）
+
+> 终态 **`TYPED_CODE_ON_LIVE_LEG_DONE`**。层次接线单：低层（`secrets.py`/`runtime.py`）本就带码，**缺的是腿**——`work_core/services.py` 的 dispatch 包装把上游异常**字符串化**成 `DispatchAmbiguous`，`_safe_code` 只在 `ExecutionStartRejected` 上认 `.code` ⇒ 泛码 `EXECUTION_FAILED` 吞掉 `CREDENTIAL_NOT_AVAILABLE`。§Spend：0 真调用。层次图见 `docs/server-round1/typed-code-live-leg-135.md`。
+
+| 单 | 阶段 | 门 | 回归 | 真实模型 | 提交 |
+| --- | --- | --- | --- | --- | --- |
+| 135 | 全 | 结构保留：三处包装（输入解析 `DispatchFailed`／`ExecutionStartRejected` `DispatchFailed`／`Exception` `DispatchAmbiguous`）在 raise 前用 `_dispatch_error_code(exc)` 沿链取 `.code` 或"整条消息即纯大写码"，命中才 `error.code=code`（构造签名/调用方不变）。G1+G2 真腿：`test_missing_credential_code_reaches_execution_state` 用**真 `dispatch_execution`** 抛出的异常喂 `sidecar_backend:287` 同款 `_safe_code` → 同款 wire `_event_body` → `reason==CREDENTIAL_NOT_AVAILABLE`（120 只把裸类型错误直调 `_safe_code`＝"门只走一条腿"，本单纯在补这条腿）；`RuntimeError("CREDENTIAL_NOT_AVAILABLE")`（A 日志原形）同绿。G3 泛码仍在：`RuntimeError("worker vanished at 03:14 …")` 句子消息 ⇒ 不附码 ⇒ `EXECUTION_FAILED`。G4 零凭据内容：id 在场、无 secret 字节。反例**已在树内实测**：删三处 `error.code=code` 附码 ⇒ 恰 3 条真腿红、2 条泛码/反例仍绿 | `test_typed_code_live_leg_135.py` **5 passed**；work_core/dispatch/credential/boundary/inventory 广扫 **153 passed / 4 skipped**（仅既有 env 红·**Worker 工件不在**）；`test_work_core_input_dispatch.py` 全绿（含 `RuntimeError("lost receipt")` 句子→仍泛码，无新附码） | 0 | 本提交 |
+
+**关系**：与 `120` 同一处语义、不同腿——120 修两 seam 的门、135 补穿过第 3 层（dispatch 包装）到 `execution.state` 的真腿门。**未碰** `wire/**`/`protocols/**`/`bootstrap/**`/Worker 合同；修复全在 `work_core/services.py`（本单写面）＋测试。**第 5 次同形预防**：层次图落进证据文档，"低层绿/高层红"的判据＝门必须穿过第 3 层（直调 `_safe_code` 不算）。

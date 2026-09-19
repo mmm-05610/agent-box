@@ -5,6 +5,7 @@ from dataclasses import replace
 from datetime import datetime, timezone
 import hashlib
 import json
+import re
 from uuid import uuid4
 from typing import Mapping, Sequence
 
@@ -45,6 +46,39 @@ def _ref_identity(ref: Ref) -> tuple:
         ref.uri,
         tuple(sorted(ref.metadata.items())),
     )
+
+
+#: An upper-snake token is the shared shape of a typed code across layers (the
+#: ``code`` attribute the secrets store sets, and the reason-code vocabulary the
+#: transcript maps). Only a *whole* token counts, so a sentence never becomes a
+#: code by accident.
+_TYPED_CODE = re.compile(r"[A-Z][A-Z0-9_]{2,127}")
+
+
+def _dispatch_error_code(exc: BaseException) -> str | None:
+    """Order 135: pull the typed code out of the exception a Dispatch will wrap.
+
+    The low layer (secrets/runtime) raises the credential failure with a real
+    ``code`` attribute, but ``_safe_code`` on the transcript leg only reads a
+    ``code`` off an ``ExecutionStartRejected`` in the chain - so a plain
+    ``RuntimeError("CREDENTIAL_NOT_AVAILABLE")`` reaching this wrap loses its
+    identity the moment we stringify it into a Dispatch. We re-attach it here so
+    the code travels structurally to the user-visible leg instead of surviving
+    as message text. Truly unknown failures (no attribute, sentence message)
+    still return ``None`` and stay the generic reason.
+    """
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        explicit = getattr(current, "code", None)
+        if isinstance(explicit, str) and _TYPED_CODE.fullmatch(explicit):
+            return explicit
+        current = current.__cause__ or current.__context__
+    message = str(exc).strip()
+    if _TYPED_CODE.fullmatch(message):
+        return message
+    return None
 
 
 def _now() -> datetime:
@@ -195,9 +229,13 @@ class ExecutionService:
         except Exception as exc:
             message = f"{type(exc).__name__}: {exc}"[:256]
             self.repository.record_dispatch_failed(dispatch_id, message)
-            raise DispatchFailed(
+            error = DispatchFailed(
                 f"Execution Dispatch failed for {execution_id}: {message}"
-            ) from exc
+            )
+            code = _dispatch_error_code(exc)
+            if code is not None:
+                error.code = code
+            raise error from exc
 
         try:
             receipt = provider.start(request)
@@ -205,15 +243,23 @@ class ExecutionService:
         except ExecutionStartRejected as exc:
             message = f"{type(exc).__name__}: {exc}"[:256]
             self.repository.record_dispatch_failed(dispatch_id, message)
-            raise DispatchFailed(
+            error = DispatchFailed(
                 f"Execution Dispatch failed for {execution_id}: {message}"
-            ) from exc
+            )
+            code = _dispatch_error_code(exc)
+            if code is not None:
+                error.code = code
+            raise error from exc
         except Exception as exc:
             message = f"{type(exc).__name__}: {exc}"[:256]
             self.repository.record_dispatch_ambiguous(dispatch_id, message)
-            raise DispatchAmbiguous(
+            error = DispatchAmbiguous(
                 f"Execution Dispatch is ambiguous for {execution_id}: {message}"
-            ) from exc
+            )
+            code = _dispatch_error_code(exc)
+            if code is not None:
+                error.code = code
+            raise error from exc
 
         self.repository.record_dispatch_accepted(dispatch_id, receipt)
         return self.repository.get_dispatch_receipt(dispatch_id)
