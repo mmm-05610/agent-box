@@ -186,11 +186,15 @@ def test_an_already_installed_version_is_reported_as_a_state_conflict():
 
 # -- counter-examples: the old shapes must go red -------------------------
 
-def test_counter_example_the_internal_code_in_the_family_slot_is_back_to_a_500(server, monkeypatch):
+def test_counter_example_the_internal_code_in_the_family_slot_is_no_longer_a_500(server, monkeypatch):
     """Restore exactly the defect: an internal code in the family position.
 
-    The same request that now answers `UNAVAILABLE` has to fall back to 500, and
-    the restoration is checked, not assumed.
+    Order 115 supersedes the assertion this gate used to carry ("back to a 500").
+    The family slot now converges onto a real family and keeps the original code,
+    so the *consequence* the client saw is gone even with the call-site defect
+    put back; 101's own fix is what keeps the family honest rather than merely
+    well-formed. `test_wire_error_family_closure_115.py` is where the bare-500
+    shape is now falsified, and it needs both walls down to bring it back.
     """
     def old_shape(_self):
         raise WireError("ARTIFACT_STORE_UNAVAILABLE",
@@ -199,15 +203,24 @@ def test_counter_example_the_internal_code_in_the_family_slot_is_back_to_a_500(s
     monkeypatch.setattr(handlers_module.WireService, "_artifact_store", old_shape)
     _runtime, client, headers = server
     response = post(client, headers, "providerArtifacts.list", {"harness": "alpha"})
-    assert response.status_code == 500, (
-        f"the family-position defect did not reproduce: http={response.status_code}")
+    assert response.status_code == 200, (
+        f"the family slot is still able to 500: http={response.status_code}")
+    error = response.json()["error"]
+    assert error["code"] == "UNAVAILABLE", error
+    assert error["details"]["internalCode"] == "ARTIFACT_STORE_UNAVAILABLE", error
     monkeypatch.undo()
     assert handlers_module.WireService._artifact_store is not old_shape
 
 
-def test_counter_example_the_shape_without_digest_lets_the_keyerror_through(server, monkeypatch):
+def test_counter_example_the_shape_without_digest_reports_a_crash_not_a_500(server, monkeypatch):
     """And the half-fix that only touches the family slot: with `digest` still
-    missing from the shape, a client that omits it walks into `KeyError`."""
+    missing from the shape, a client that omits it walks into `KeyError`.
+
+    Same supersession note as the gate above: 115's dispatch wall means the
+    client now gets a JSON-RPC error object naming the exception type — which is
+    why 101's shape fix still has to stand, since `UNAVAILABLE/KeyError` is a far
+    worse answer than `INVALID_REQUEST` naming the missing field.
+    """
     shapes = dict(handlers_module._PARAM_SHAPES)  # noqa: SLF001
     shapes["providerArtifacts.install"] = (
         {"requestId", "harness", "version", "sourceToken"}, set())
@@ -215,8 +228,9 @@ def test_counter_example_the_shape_without_digest_lets_the_keyerror_through(serv
     _runtime, client, headers = server
     params = {k: v for k, v in PARAMS["providerArtifacts.install"].items() if k != "digest"}
     response = post(client, headers, "providerArtifacts.install", params)
-    assert response.status_code == 500, (
-        f"the missing-digest defect did not reproduce: {response.status_code}")
+    assert response.status_code == 200, response.text[:200]
+    error = response.json()["error"]
+    assert (error["code"], error["details"]["internalCode"]) == ("UNAVAILABLE", "KeyError"), error
     monkeypatch.undo()
     restored_required, _ = handlers_module._PARAM_SHAPES["providerArtifacts.install"]  # noqa: SLF001
     assert "digest" in restored_required

@@ -391,8 +391,21 @@ class WireService:
             _request_id(params["requestId"])
         try:
             return handler(params)
+        except WireError:
+            # A typed refusal is the contract answering, not a crash: the wall
+            # below must never re-project it onto `UNAVAILABLE`.
+            raise
         except ServerError as exc:
             raise WireError.from_server_error(exc) from exc
+        except Exception as exc:  # noqa: BLE001 - the wire contract, not the caller's convenience
+            # The last wall of the error family (order 115): anything else that
+            # escapes a handler still leaves this Server as a JSON-RPC error
+            # object. The exception's *text* never goes out — it can name a host
+            # path or a credential locator — only its type, as `internalCode`.
+            raise WireError(
+                "UNAVAILABLE", "this Server could not answer the request",
+                {"internalCode": type(exc).__name__, "retryable": True},
+            ) from exc
 
     # -- discovery ---------------------------------------------------------
 
