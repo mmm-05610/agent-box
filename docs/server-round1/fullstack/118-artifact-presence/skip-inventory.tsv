@@ -1,0 +1,48 @@
+TOOL	tests/integration/native/harnesses/test_claude_real_bwrap.py:43	bwrap unavailable
+TOOL	tests/integration/native/harnesses/test_skill_real_bwrap.py:47	real tmux binary unavailable
+TOOL	tests/integration/native/test_bwrap_formal_dispatch_vertical.py:64	real bwrap unavailable: binary missing or namespace capability denied
+TOOL	tests/integration/native/test_execution_runtime_composition_native_bwrap.py:21	real bwrap probe unavailable
+TOOL	tests/integration/native/test_execution_runtime_composition_native_tmux.py:23	real bwrap probe unavailable
+TOOL	tests/integration/native/test_execution_runtime_composition_native_tmux.py:25	real tmux binary unavailable
+TOOL	tests/server/test_accounts.py:165	bwrap is required
+TOOL	tests/server/test_accounts.py:295	bwrap is required
+TOOL	tests/server/test_asset_hubs.py:257	bwrap is required
+TOOL	tests/server/test_asset_hubs.py:409	bwrap is required
+TOOL	tests/server/test_asset_hubs.py:757	bwrap is required
+DESIGN	tests/server/test_cancel_recall_flake_087.py:304	counted leg is opt-in: AGENTBOX_087_ROUNDS=20 python3 -m pytest 
+TOOL	tests/server/test_delegation.py:534	bwrap and node are required
+DESIGN	tests/server/test_environment_providers.py:75	root reads every path, so the refusal cannot be provoked
+TOOL	tests/server/test_first_run_lock.py:170	bwrap is required
+TOOL	tests/server/test_first_run_lock.py:179	bwrap is required
+TOOL	tests/server/test_first_run_lock.py:302	the real opencode binary and bwrap are required
+TOOL	tests/server/test_harness_capability_projection.py:92	node is unavailable
+TOOL	tests/server/test_harness_mcp_config_source_086.py:177	claude CLI and node required
+TOOL	tests/server/test_harness_mcp_config_source_086.py:216	claude CLI and node required
+ARTIFACT	tests/server/test_harness_sidecar.py:65	sidecar entry not built
+ARTIFACT	tests/server/test_harness_sidecar.py:82	sidecar entry not built
+ARTIFACT	tests/server/test_harness_sidecar.py:125	sidecar entry not built
+ARTIFACT	tests/server/test_harness_sidecar.py:158	sidecar entry not built
+ARTIFACT	tests/server/test_harness_sidecar.py:177	sidecar entry not built
+TOOL	tests/server/test_harness_sidecar.py:487	current Worker and bwrap are required
+TOOL	tests/server/test_harness_sidecar.py:539	current Worker and bwrap are required
+TOOL	tests/server/test_harness_sidecar.py:736	current Worker and bwrap are required
+TOOL	tests/server/test_harness_sidecar.py:1989	the release Worker and bwrap are required
+TOOL	tests/server/test_harness_sidecar.py:2049	the release Worker and bwrap are required
+TOOL	tests/server/test_home_projection.py:299	bubblewrap is not installed on this host
+ARTIFACT	tests/server/test_server_capability_contract.py:216	harness plugin runtime is unavailable
+ARTIFACT	tests/server/test_server_capability_contract.py:230	harness plugin runtime is unavailable
+ARTIFACT	tests/server/test_server_capability_contract.py:240	harness plugin runtime is unavailable
+TOOL	tests/server/test_server_capability_contract.py:759	node is unavailable
+TOOL	tests/server/test_shared_session_store.py:103	bwrap is required
+TOOL	tests/server/test_shared_session_store.py:405	bwrap is required
+TOOL	tests/server/test_shared_session_store.py:481	bwrap is required
+TOOL	tests/server/test_shared_session_store.py:597	bwrap is required
+TOOL	tests/server/test_shared_session_store.py:685	bwrap is required
+TOOL	tests/server/test_sidecar_home_projection.py:51	current Worker and bwrap are required
+TOOL	tests/server/test_sidecar_lease_keepalive.py:44	current Worker and bwrap are required
+TOOL	tests/server/test_sidecar_native_driver.py:96	node is unavailable
+DESIGN	tests/server/test_stage_a_server.py:218	POSIX mode bits are not Windows ACL evidence
+ARTIFACT/TOOL	tests/server/test_subagent_harness_real_round_086.py:79	the real-harness round needs the release Worker binary and bubblewrap
+DESIGN	tests/server/test_wire_v1.py:1234	AGENT_BOX_WIRE_SCHEMA is not set for this run
+TOOL	tests/server/test_wsl_legs_083.py:28	no wsl.exe channel on this host
+# totals {'TOOL': 35, 'DESIGN': 4, 'ARTIFACT': 9}

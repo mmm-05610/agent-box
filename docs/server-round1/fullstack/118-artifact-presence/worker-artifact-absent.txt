@@ -1,0 +1,19 @@
+s                                                                        [100%]
+ARTIFACT_worker-debug=present workers/agent-box-worker/target/debug/agent-box-worker
+ARTIFACT_worker-release=present workers/agent-box-worker/target/release/agent-box-worker
+ARTIFACT_worker-musl-dir=present workers/agent-box-worker/target/x86_64-unknown-linux-musl
+ARTIFACT_sidecar-entry=present plugins/agent-box-harnesses/runtime/worker-entry.mjs
+ARTIFACT_acp-npm-closure=present plugins/agent-box-harnesses/runtime-claude/node_modules/@agentclientprotocol/claude-agent-acp
+TOOL_bwrap=present
+TOOL_node=present
+TOOL_npm=present
+TOOL_claude=present
+TOOL_wsl.exe=present
+SKIPPED_CLASSIFIED_artifact=1
+SKIPPED_CLASSIFIED_tool=1
+SKIPPED_TOTAL=1
+WORKER_ARTIFACT=present
+VERDICT=DEGRADED_ARTIFACT_ABSENT
+=========================== short test summary info ============================
+SKIPPED [1] tests/server/test_subagent_harness_real_round_086.py:322: the real-harness round needs the release Worker binary and bubblewrap
+1 skipped in 0.07s

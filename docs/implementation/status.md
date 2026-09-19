@@ -1780,8 +1780,8 @@ HEAD 即检查点；`git status --short` 只剩本树自己的证据目录（`08
 
 | 单 | 现态 | 为什么此前没做 | 下一步（本树） |
 | --- | --- | --- | --- |
-| `118-artifact-absence-is-not-green`（`QA-010`） | **未开工**（投于 **19:48**，`c175762`；在场约 4.5 h） | 本树一直按章程 §3 那张"今晚队列"表走（087→115→117→089→123→128→129），**没在阶段边界重读目录** ⇒ 这张单从未出现在账上。**这条就是 `R-0068` 点名的形状，我犯了** | 立即开工（无前置；写面 `scripts/server-round1/**`＋`tests/**`＋`docs/**` 全在本树） |
-| `119-load-independent-counter-example`（`QA-011`） | **未开工**（同上 `c175762`，19:48） | 同上 | 开工（`serialize_with` 点名 `115/117/118` 都已收口 ⇒ 现在可动）；它正是本树 §待开单里"080 反例门负载假红"那条的**正式落地单** |
+| `118-artifact-absence-is-not-green`（`QA-010`） | **已收口 `ARTIFACT_ABSENCE_IS_NOT_GREEN_DONE`**（本节下方；投于 **19:48**，`c175762`，在本树账上空转约 4.5 h） | 本树一直按章程 §3 那张"今晚队列"表走（087→115→117→089→123→128→129），**没在阶段边界重读目录** ⇒ 这张单从未出现在账上。**这条就是 `R-0068` 点名的形状，我犯了** | 立即开工（无前置；写面 `scripts/server-round1/**`＋`tests/**`＋`docs/**` 全在本树） |
+| `119-load-independent-counter-example`（`QA-011`） | **在飞**（118 收口后紧接开工；同上 `c175762`，19:48） | 同上（118 之后立刻做） | 开工（`serialize_with` 点名 `115/117/118` 都已收口 ⇒ 现在可动）；它正是本树 §待开单里"080 反例门负载假红"那条的**正式落地单** |
 | `124-provider-model-write-whitelist` | **未开工**（投于 **20:35**，`906d741`） | 同上（`092` 交回的 ①） | 开工（写面只有 `wire/handlers.py`＋`tests/**`＋`docs/**`＋status ⇒ 射程内） |
 | `125-config-describe-slot-projection` | **未开工**（同上 `906d741`，20:35） | 同上（`092` 交回的 ③ 的 wire 半边） | 开工（写面同 124） |
 | `145-workspace-connection-has-no-producer`（`AUD-B-011`） | **未开工**（投于 **23:21**，`4187d83`） | ops 刚投递，且 `serialize_with` 把它排在 `128/129/132` 之后 | 待 `128/129` 收口（本批即收口）后开工；**它和 128 直接咬合**：`workspace.connection` 就在 128 归一的名单里 |
@@ -1830,3 +1830,40 @@ HEAD 即检查点；`git status --short` 只剩本树自己的证据目录（`08
 - §Spend 增量（本批 128/129）：**真实模型调用 0 / ¥0**（本地 SQLite ＋ `MemorySecretStore` ＋ 假登录态文件；
   凭据只作 locator，报告里只出现前 8 位）· 子代理 **0** · 机时：`tests/server` 全量 **3 次**
   （483.33s / 336.76s / 本轮）＋ 定向 6 次（平均 ~4s）· 无源码外产物（pytest 临时根自动回收，`/tmp` 只放脚手架脚本）。
+
+## 工单 118 — 工件缺席不再算绿：套件自己把「工件在/不在」说出口（`QA-010`，2026-09-19 16:2x–17:1x，执行者）
+
+**终态 `ARTIFACT_ABSENCE_IS_NOT_GREEN_DONE`**。证据 [artifact-absence-is-not-green-118.md](../server-round1/artifact-absence-is-not-green-118.md)，
+门 `tests/server/test_artifact_absence_is_not_green_118.py`（**19 条，全部 subprocess 真跑**）。
+
+- **前提逐条一手核**：本树五个工件路径 **5/5 present**；runtime 树 `workers/agent-box-worker/target` **整个目录不存在**（跨树只读）。
+  ⇒ "21 条 skip" 这一具体数字**在本树复现不出**（工件在场，那些门压根不会跳）——复现的是它的**形状**，两条腿都真跑：
+  `AGENTBOX_W43_WORKER=/no/such/worker` ⇒ **exit 0** ＋ 1 skip（原因点名 release Worker binary）；
+  `PATH=/nonexistent-bin` ⇒ **exit 0** ＋ 2 skip（"bwrap is required"）。两份日志入 `118-artifact-presence/`。
+- **对照一条防做过界**：把 `PYTHONPATH` 少给插件路径时得到的是 **12 个 collection error（响的）**而不是 skip
+  ⇒ 本单只治 **skip 这条静默通道**，"报错就是报错"那一类一个字没动。
+- 机制（`scripts/server-round1/artifact_presence.py`，与 103 扫描器同一形制＝**账是生成的**）：三类 `ARTIFACT/TOOL/DESIGN` ＋
+  **`UNKNOWN` 兜底且永不绿**；`tests/conftest.py` 的 `pytest_terminal_summary` 逐条打印
+  `ARTIFACT_*=present|ABSENT` / `TOOL_*` / `SKIPPED_CLASSIFIED_*` / `WORKER_ARTIFACT=` / `VERDICT=`；
+  `AGENTBOX_STRICT_PRESENCE=1` 时非绿判定把退出码 0 → 1（**同一命令两腿实测**）。
+  **二选一的依据写在报告 §2**：默认"降级不计绿"而不是默认红，因为 runtime 树按事实没有工件，默认红会把"没跑"又搅成"跑挂了"。
+- 门里两处反例是**重放 118 之前的世界**：① 同样的 skip 放到本树 conftest 之外 ⇒ exit 0 且没有 `VERDICT=` 行；
+  ② 把 `RULES` 清空 ⇒ 落 `UNKNOWN` ⇒ 仍 `DEGRADED`（**"删规则"回不到旧绿**）。另有一条 `_presence` 取不到时写
+  `DEGRADED_PRESENCE_REPORT_UNAVAILABLE`——**报告器自己哑了也算不绿**。
+- 名单（DoD 的"21 条清单"在本树口径）：`--inventory` 扫声明 ⇒ 48 条 reason＝**ARTIFACT 9 / TOOL 35 / DESIGN 4 / UNKNOWN 0**，
+  并有一条门盯着"新加的 skip 没人分类"（故意留的摩擦，同 103）。
+  顺手量到一条**别照着名单估工**的坑：`test_harness_sidecar.py` 那 5 处原因写 "sidecar entry **not built**"，
+  而那个 entry 是 `git ls-files` 认得的**入库文件** ⇒ 这 5 条在本树永远不跳（措辞是旧话）。分类器仍按原因文本显形，报告 §5.1 写明这条不计入"补工件能多跑几条"。
+- **一条与 128 相互印证的顺带发现**：`tests/conftest.py:13` 一直 `setdefault("AGENT_BOX_SANDBOX_MODULE", …)`——
+  那正是 128 那条"环境决定的绿"能骗过手跑的原因（批量跑有、手跑没有）。**本单不动它**（改了会改既有门的判据），只在报告 §3 点名。
+- 计数：定向 **19 passed / 4.86s** · 自检 `--self-test` **GREEN / exit 0** ·
+  加挂钩之后 `tests/server -q` = **842 passed / 1 skipped / 0 failed in 448.54s**、`tests/ -q` = **1142 passed / 1 skipped / 0 failed in 441.94s**
+  （`1142 = 1123 ＋ 19`；两腿都自带 `WORKER_ARTIFACT=present` ＋ `VERDICT=GREEN_DESIGN_SKIPS_ONLY`，
+  那 1 skip 是 087 的 opt-in 计数腿 ⇒ 归 DESIGN ⇒ **这就是"不误伤"的实证**）。
+  103 的生成账**未动**（本单的门不往 `/wire/v1/` 发方法：重跑扫描器仍 352 行 / 41 单源，diff 为空）。
+  **Worker 工件：在**（本树 5/5；缺席两腿是用 env 造出来的受控场景）。真实模型调用 **0 / ¥0**。
+- 顺手量到一条**证据卫生**的坑（报告 §5.5）：`.gitignore` 里的 `*.log` 让**叫 `*.log` 的证据永远不入库**——
+  我第一次 `git add` 时三份实验日志静默没进去，只进了 `.tsv` ⇒ 本单把它们改名成 `.txt` 入库，
+  批量计数日志仍按旧口径（不入库、数字抄进散文）。要不要定「能入库的后缀」规矩归 `49` 那条线，不自行改。
+- 交回（§5.2，不属本单写面）：runtime 树要同一机制 ⇒ 需要它自己的 `conftest.py`/`scripts/**`；
+  按 `QA-004`（本树是 `scripts/server-round1/**` 唯一 owner）**不要复制两份**，要么定为只读引用、要么另开一单。
