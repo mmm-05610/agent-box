@@ -1365,3 +1365,20 @@ runtime 侧（存储/service/描述符/派生/冻结/逐家声明）已 DONE 且
 | 136 | 全 | 生产调用点 `run` 先按请求的子 profile 派生 `child_limits`：`permissions` 取子 row 的 `permission_preset`（narrow-only：`plan` 子⇒`["plan"]`，余⇒`["default","plan"]`）；`models` 取子冻结配置里 `model_control_id` 槽的 `modelId` 集（无槽/无钉⇒**省略该维＝不检、绝不误拒无模型声明的子**；整段 `try/except→None` 不致命）。名字只在**已授权 roster** 里查以取限（未知/越权⇒None，由 validate 以越权拒、非误判加宽）。G1+G2：`test_child_limits_production_path_136.py` 全走真 `DelegationService.run`——子 `plan` 请求 `default`⇒`SUBAGENT_PERMISSION_WIDENED`；钉 `gpt-5` 请求 `gpt-2`⇒`SUBAGENT_MODEL_WIDENED`。G3 收紧仍收：`default` 子请求 `plan` 完成、请求自身钉的 `gpt-5` 完成、无钉子请求任意 model 不误拒。反例**已树内实测**：把生产调用改回不传 child_limits ⇒ 恰 2 条生产加宽门红（退回 `ACCEPTED`）、3 条收紧/不误拒/低seam见证仍绿。G4 零削弱：`validate_run_arguments`+两码未动。同族自查：`validate_run_arguments` 生产唯一调用点，已接 | `test_child_limits_production_path_136.py` **5 passed**；delegation+subagents+rule_liveness_086+harness_round_086+profile_permissions 广扫 **42 passed**（`run` 热路无回退，`set_permissions`/收紧用例全绿）；**Worker 工件不在** | 0 | 本提交 |
 
 **OF-14 第 5 例收口**：`test_subagents.py` 用手工 `child_limits` 证判定（低 seam 绿）恰是"门只走一条腿"的成因，本单新增 `test_counterexample_the_dead_low_seam_this_order_resurrects` 记录之；真腿门走 `DelegationService.run`。与 135 同批（135=120 真腿、136=子代理约束真腿），均排在 126 之前。
+
+## 工单 127 — 门脚本"两份真相"（`QA-015` 中；`scripts/server-round1/**` owner＝A 树；2026-09-19，执行者·runtime 线）
+
+> 终态 **`GATE_SCRIPT_PARITY_DONE`**（走 **有据分叉交回** 分支 Scope②）。一手复核（OF-02）与 QA-015 计数有出入：对 A **当前** HEAD `b1f6e07`（经共享 git 对象读，跨树 FS 读被拦）——`dsh-production-chain-gate.py` 在 A 侧**根本不存在**（runtime-only，非"共同 15 里分叉"）；`pi-production-chain-gate.py` 两侧都在但**分叉**（runtime 1178L／A 1137L）。**不归一**：runtime 侧的改动是已落地的 43/47/108 + HOME_MARKER 债修（注入 sandbox 端口、按 run 隔离 `--home-root`、`GATE_WORKER_REQUIRED` 发现、`gate_models_document`），归一会丢弃它们＝语义降级（Notes 第 115 行"owner 版本反而更差⇒交回"）。判定**未削、脚本一字未改**。§Spend：0 真调用。证据 `docs/server-round1/gate-script-parity-127.md`。
+
+**可复算指纹行（G1）**：
+```
+dsh-production-chain-gate.py runtime=bf0efde9ef1f982f9f2870f7c324a894  A(b1f6e07)=ABSENT           conclusion=runtime-only
+pi-production-chain-gate.py  runtime=dfdae54be337c45de58e44161b18880f  A(b1f6e07)=2768daa7a61e26f262b5cbbfff3ba087  conclusion=justified-divergence
+```
+比较命令原文见 127 文档「Reproducible comparison」段（`md5sum …` + `git show b1f6e07:… | md5sum` + `git cat-file -e …`），QA 每轮可复算。
+
+| 单 | 阶段 | 门 | 回归 | 真实模型 | 提交 |
+| --- | --- | --- | --- | --- | --- |
+| 127 | 全 | G1 指纹可复算（md5+命令+结论）；G2 差异**有据登记**（pi justified-divergence／dsh runtime-only），第三种形态由常设漂移检测门咬；G3 判定语义未削（脚本零改）；G4 只动 status/证据/测试，未碰脚本与 A 树。`test_gate_script_parity_127.py` 断言"文件实算 md5＝记录 md5"（改脚本不改记录⇒红）＋结论须在 {normalized,justified-divergence,runtime-only} | 反例**已树内实测**：给 pi 追加一行（第三种形态、不改记录）⇒ 恰 1 条 md5 匹配门红、3 条仍绿；恢复后 4 passed。**未跑全量**（本单纯 docs/md5/门，无 src 改动） | 0 | 本提交 |
+
+**交回 ops（内容质量 vs ownership 是两件事，未自合并）**：请裁 A owner 是否采纳 runtime 的 pi 改进／接 dsh；在此之前分叉**已登记且有据、非静默**。
