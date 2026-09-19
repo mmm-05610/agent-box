@@ -56,7 +56,7 @@
 | 2 | `QA-008` 新单（`usage.aggregate/export` 真 HTTP 500，主路径） | 由 ops **当轮投递**（`R-0054 ⑧a`）；投递进本树 `work-orders/` 即可开工 |
 | 3 | `QA-009` 新单（`profiles.list` 不投影 `recovery_pending`，主路径） | 同上 |
 | 4 | `103-wire-drive-coverage-meta-gate` | `101` 已收口（谓词已成立） |
-| 5 | `089-four-real-ui-gates` | **等 runtime 树 `091` 收口**：判据＝runtime 树 `status.md` 里能查到 `091` 的收口行 |
+| 5 | `089-four-real-ui-gates` | **`R-0056`：可按合同原文字面开工**——判据＝① `rulings.md` 有 `R-0055`（选 B）② runtime 树 `status.md` 的 `CP1 c1` 记账里写着 `091` 的**传输无关引擎 + 进程内 G1–G4 已绿**（`PARTIAL` 剩余只剩 ②③）⇒ 「控制面同步与每执行凭据投影**可用**」成立。**`091` 的 ③ 真机部署由你自己这个 Stage 现场验并记账**（不再作为前置）。**资源护栏**：Windows 侧 Server 用**独立端口段 + 独立数据根**，不与验收线 A 的 WSL 试用环境（18790 / `~/.agentbox-trial-chat`）抢同一份资源；要复用先与 A 协调并在两树 status 各记一行 |
 | 6 | `099-worker-home-put-dispatch` | 无条件（已投递） |
 
 > **禁止**：把"等公告点名"当开工条件（`R-0054` ④）。谓词不成立 ⇒ 先做 §8 fallback 清单第一条能做的，别长睡（单次 ≤5 分钟）。
@@ -133,8 +133,8 @@
 > 它是 086 阶段 2 的硬前置——086 的 `write_paths` 不含 `workers/**`，故另立单）。
 > **已投递（b2 追加，R-0012 相关）**：`090-placement-routing`（WSL 工作区的执行必须路由到 WSL worker；无环境 ⇒ **派发前**类型化拒绝）→
 > `091-control-plane-sync`（控制面以 Windows 为准：首次连接部署 + 变更增量 + 凭据只留 Windows 按执行一次性投影；原生 home/会话仍按平台）。
-> **已投递（b3，b2 收口后）**：`089-four-real-ui-gates`（四家真实 UI 门＝最终验收路径；**Server 须跑在 WSL 侧**，
-> 见主树 `docs/server-round1/try-checkpoints.md` 的教训）。
+> **已投递（b3，b2 收口后）**：`089-four-real-ui-gates`（四家真实 UI 门＝最终验收路径）。
+> ~~**Server 须跑在 WSL 侧**，见主树 `docs/server-round1/try-checkpoints.md` 的教训~~ ⇒ **该口径已被 `R-0014` 取代**（控制面＝Windows，WSL 只是执行侧）：`089` 改在**Windows 侧 Server** 上验收，以单文件「修订 v2」为准；上面这句只作溯源。
 > **已投递（b4，b3 收口后按序）**：`092-provider-registry-and-protocols`（R-0013 第 1 层：provider 记录中立化 ——
 > `harness` 可空、canonical 四协议词汇、模型事实、描述符 `wireProtocols`、读时派生 `compatibility`、冻结时
 > `PROTOCOL_INCOMPATIBLE`）→ `093-native-config-materialization`（R-0013 第 1 层的执行侧：冻结配置落进各家原生文件，
@@ -213,7 +213,7 @@ cat /home/maoqh/projects/agent-box-server-round1/docs/implementation/bulletin.md
 - /home/maoqh/projects/agent-box-server-round1/docs/implementation/ 下的 bulletin.md（最新公告＝「组织调整 v2 / R-0054」）、README.md §3/§4、manifest.json、status.md、rulings.md、prefs.md
   （**`rulings.md` 与 `approval-queue.md` 现在只有对话窗口写——你只读**）
 
-今晚队列：`087` → `QA-008`/`QA-009` 两张新单（由 ops 当轮投递，投进来就做）→ `103` → `099` → `089`（**谓词：runtime 树 `091` 已收口**，判据＝那棵树的 `status.md` 能查到 `091` 的收口行）。
+今晚队列：`087` → `QA-008`/`QA-009` 两张新单（由 ops 当轮投递，投进来就做）→ `103` → `099` → `089`（**`R-0056`：按合同原文字面开工**，判据＝`rulings.md` 有 `R-0055` ＋ runtime 树 `status.md` 里 `091` 的引擎/进程内 G1–G4 已绿；**③ 真机部署由你现场验并记账**；Windows Server 用独立端口段与数据根，别抢 A 的 18790 试用环境）。
 纪律：单内不停；批末 `git tag -a checkpoint/<批> …` + 把检查点报告写进本树 status 后**继续**；**每张用户可见单收口就打检查点（`R-0053`）**；
 升级标阻塞继续做别的；只写工单声明的 write_paths；`git add -- <显式路径>` + pathspec 提交；不 merge 主干、不 push、不 reset/stash/clean；
 凭据只作 locator；真实调用按 `R-0017`（假端点优先、逐笔记账）。队列做完才可停并写 `QUEUE_EMPTY_AT <日期>`。
