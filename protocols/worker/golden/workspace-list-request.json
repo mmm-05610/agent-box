@@ -1,0 +1,7 @@
+{
+  "requestId": "request-13",
+  "connectionId": "connection-1",
+  "serverInstanceId": "server-1",
+  "op": "workspace.list",
+  "arguments": {}
+}

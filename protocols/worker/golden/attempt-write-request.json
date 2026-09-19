@@ -1,0 +1,11 @@
+{
+  "requestId": "request-14",
+  "connectionId": "connection-1",
+  "serverInstanceId": "server-1",
+  "op": "attempt.write",
+  "attemptId": "attempt-1",
+  "generation": 1,
+  "arguments": {
+    "data": "ZGF0YS1jaHVuaw=="
+  }
+}

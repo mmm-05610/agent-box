@@ -1,0 +1,9 @@
+{
+  "requestId": "request-15",
+  "connectionId": "connection-1",
+  "serverInstanceId": "server-1",
+  "op": "stdin.close",
+  "attemptId": "attempt-1",
+  "generation": 1,
+  "arguments": {}
+}

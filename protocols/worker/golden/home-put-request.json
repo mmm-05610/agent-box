@@ -1,0 +1,11 @@
+{
+  "requestId": "request-11",
+  "connectionId": "connection-1",
+  "serverInstanceId": "server-1",
+  "op": "home.put",
+  "arguments": {
+    "locator": "pi-test/.pi",
+    "path": "agent/sessions/imported.jsonl",
+    "data": "aG9tZS1wdXQtZ29sZGVu"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "requestId": "request-12",
+  "connectionId": "connection-1",
+  "serverInstanceId": "server-1",
+  "op": "workspace.get",
+  "arguments": {
+    "path": "notes.txt",
+    "offset": 0,
+    "maxLength": 1024
+  }
+}
