@@ -1597,3 +1597,19 @@ L 的改判：**字节对表那一腿不由我重跑**（后端审阅者已从�
 HEAD 即检查点；`git status --short` 只剩本树自己的证据目录（`087-runs/`）。
 下一张（按今晚队列）＝**089 两家真实 UI 门**，谓词已核：runtime 树 `status.md` 的 CHECKPOINT c1 段落里有 **091 的终态行（`PARTIAL`，引擎+G1–G4 绿）** ⇒ 按章程 §3 的字面判据成立，可以开火；
 但 089 的第一腿需要**用户那一侧**把 Windows 应用重开（试用环境随重启已停），先按 `try-checkpoints.md` 起 WSL 侧 Server。
+
+## 工单 089 — 两家真实 UI 门：预检做完，卡在**三条人的腿**上（不声明终态码）（2026-09-19 13:5x，执行者）
+
+预检报告 [ui-gates-89-preflight.md](../server-round1/fullstack/ui-gates-89-preflight.md)。**真实模型调用 0**（今晚连"该花"的条件都没到；不用假端点结果冒充，§Requirements 反例条）。
+
+- **依赖谓词逐条自核成立**：`082` 收口 ✅；runtime 树 `090` 在 CHECKPOINT c1 的 DONE 里 ✅；
+  `091` 的终态行在（`PARTIAL`，"引擎+G1–G4 绿"，正是 `R-0056` 那句判据的原文）✅ ⇒ 按章程 §3 可以开火。
+- **但修订 v2 的前提与现场不一致**（本单自己不能替谁抹平）：修订写"改在 **Windows 侧** Server 上验收"，
+  现场跑的是 **WSL 侧** `trial-serve-linux.py`（pid 4355、18790、pi+codex 工件已挂、一条 `deepseek-official` 内存凭据）。
+  两条路都要人拍：**按现场跑并记偏离**，或**先把 Windows 侧部署出来**（那是 091 自己的剩余腿＋48 门槛 B 从未通过）。
+- **线上实测把 `T6-1` 的形状钉住了**：18790 的 `profiles.list` 21 行**仍是 12 键**（无 `recoveryPending`、无 `sendability`、无模型绑定）
+  ⇒ 从这条线上任何一次读都判不出"哪家发得出去"。117 在本树已经把它做成 14 键 ⇒ 缺的是**让那台实例跑到含 117 的构建**（重启/换构建＝人的腿，与 115"用户那台未验"同批）。
+- 另外两条腿只能用户做：**真 Electron**（`/mnt/c/agentbox-w48-trial/trial-app.ps1` 在盘上、`powershell.exe` 可用，但那是用户的交互会话，G1 的"真"不能由我从 WSL 代打）；
+  **凭据映射策略**（10 条 provider 记录只有 1 条指向内存里种的凭据）。红线照旧不碰：**不把真 key 种到 `credential_e08793…`**（8 条 `maomaokingdom` 用户自有网关引用它 ⇒ 种下去＝把用户的 key 发往第三方）。
+- **我能自证的都自证了**：`ui_gates_89_leak_check.py --self-test` ⇒ 5 红 + 8 绿 + 全仓 `docs/` 461 文件零误报 ⇒ G3 那条门是真门。
+- 全程对 18790 **只读**（`server.hello`/`profiles.list`/`providerModels.list` 三次线上读 + `/proc/cmdline`）；那台实例归验收线（A）守，本树不起停/不重启/不动数据根。
