@@ -328,7 +328,7 @@ class SidecarExecutionBackend:
 
         def prompt_worker() -> None:
             try:
-                run.result = port.prompt(turn_id, prompt_content, attachments)
+                run.result = self._prompt_with_rebuild(port, turn_id, prompt_content, attachments)
             except BaseException as exc:  # surfaced by the completion owner
                 run.error = exc
             finally:
@@ -336,6 +336,55 @@ class SidecarExecutionBackend:
 
         threading.Thread(target=prompt_worker, daemon=True).start()
         return run
+
+    #: How many times a freshly-opened sidecar may be rebuilt when a prompt
+    #: finds it already closed (the drain the same second a prior sidecar exits,
+    #: ACC-R2-1). Bounded on purpose: recovery is not an infinite retry.
+    PROMPT_REBUILD_LIMIT = 2
+    #: Upper bound on the total backoff spent waiting out an in-flight teardown
+    #: across those rebuilds; the wait is bounded, never open-ended.
+    PROMPT_REBUILD_BACKOFF_SECONDS = 0.2
+
+    def _prompt_with_rebuild(self, port, turn_id, prompt_content, attachments):
+        """Prompt the execution's sidecar, rebuilding it if it is already closed.
+
+        Order 106: the queue drain starts in the same second the previous turn
+        reaches *completed*, and that previous sidecar is mid-teardown. The
+        successor turn gets its own fresh sidecar, but the overlap still surfaces
+        as ``SIDECAR_CLOSED`` at the prompt boundary - a queued message the user
+        sees die in a second. Here the drained (and any) turn ensures a live
+        sidecar before it gives up: on ``SIDECAR_CLOSED`` it drops the dead
+        envelope, reopens a fresh sidecar on the SAME execution, and re-prompts -
+        bounded by ``PROMPT_REBUILD_LIMIT`` and a bounded backoff. If every
+        rebuild still finds a closed sidecar, the failure is typed
+        (``SIDECAR_REBUILD_FAILED``) rather than left as an ambiguous close.
+
+        It reuses the new-turn open path (``open_execution``) rather than a second
+        dispatch path, so it never re-dispatches the turn and touches no queue,
+        idempotency or wire semantics.
+        """
+        deadline = time.monotonic() + self.PROMPT_REBUILD_BACKOFF_SECONDS
+        last: SidecarError | None = None
+        for attempt in range(self.PROMPT_REBUILD_LIMIT + 1):
+            try:
+                return port.prompt(turn_id, prompt_content, attachments)
+            except SidecarError as exc:
+                if exc.code != "SIDECAR_CLOSED":
+                    raise
+                last = exc
+                if attempt == self.PROMPT_REBUILD_LIMIT:
+                    break
+                remaining = deadline - time.monotonic()
+                if remaining > 0:
+                    time.sleep(min(self.PROMPT_REBUILD_BACKOFF_SECONDS / (attempt + 1), remaining))
+                # Rebuild this execution on a fresh sidecar, then retry.
+                port.close_execution(turn_id)
+                port.open_execution(turn_id)
+        raise SidecarError(
+            "SIDECAR_REBUILD_FAILED",
+            "sidecar stayed closed after "
+            f"{self.PROMPT_REBUILD_LIMIT} rebuild attempt(s); last: {last}",
+        )
 
     def _native_event(self, turn_id: str, kind: str, data: Mapping[str, Any], port) -> None:
         if kind == "message.delta":
