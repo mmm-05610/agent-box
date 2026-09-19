@@ -30,6 +30,20 @@
 - （历史，已由上条裁定处置）**工单 110 的原始语义冲突**：110 曾写"任何终态都触发队列采纳"，与 order 67 的
   `finish_cancelled`/`fail_turn ⇒ pause_pending`（在册测试 `test_stop_or_failure_pauses_queued_turn` 钉着）对立——已交回并由调度者裁定保留 67。
 
+## runtime 线 c2/c3 分账（进行中）· 2026-09-19
+
+| 单 | 终态 | 门/证据 | 精确剩余 / §Spend |
+| --- | --- | --- | --- |
+| [109](work-orders/109-second-delay-failure-hangs-http.md) | **HTTP_HANG_AFTER_SECOND_FAILURE_DONE** | `_complete` finally 保证释放（新增 `_retire_run`，逐步各自守护）；门=确定性触发"清理记录二次抛"⇒ run 仍退役、退回旧 finally 必红；错误码逐字不变。回归 harness+本单 94 passed。[证据](../server-round1/109-http-hang-after-second-failure.md) | 端到端"真 uvicorn 单循环被打死"受多线程真传输限制（本环境不可控复现），在**源头不变量**门住。§Spend：0 真调用 |
+| [110](work-orders/110-queue-not-adopted-after-stop.md) | **QUEUE_ADOPTION_AFTER_STOP_DONE（v2 口径）** | 67 pause 保留；`pause_reason` 落库(schema 18→19)、`queue.updated` 事件**仅在有原因时**带 `pauseReason`、queue 视图带之；门=stop 后 paused+reason==cancelled+不自动采纳，退回 `del reason` 必红。wire_v1+pause+本单门 40 passed、boundaries 21。[证据](../server-round1/110-queue-pause-visibility.md) | **合同变更（新字段，非新方法）→ 重锁链**：settings 线把 `pauseReason` 编进 `wire-v1.ts`+重生成工件+登记新摘要对；A 线 `113` 以 110 现状发布含 `pauseReason` 的工件。遗留待裁：`withdraw` 仅 pending，paused 项撤不掉（改它=队列语义，交回）。§Spend：0 真调用 |
+| [102](work-orders/102-contract-drift-two-faces.md) | **CONTRACT_DRIFT_TWO_FACES_DONE** | AUD-B-002：`v1.schema.json` op.enum 补齐 5 落后 op + golden 5 正例 + 三元门（受审常量==schema、每项在 main.rs、新 op 有 golden、golden⊆枚举，两向内建反例）。AUD-B-003：陈旧 33 方法快照改名（防假绿）+ wire-review 7 引用同步 + "门必须显式 AGENT_BOX_WIRE_SCHEMA"提示。相邻协议测试 10 passed。[证据](../server-round1/102-contract-drift-two-faces.md) | 工单"24"数字与 22+5=27 不自洽，已按分发实际为权威记账。§Spend：0 |
+
+**待裁阻塞（见上「待拍/阻塞」节，一手证据已交回，未越界改 write_paths 外文件）**：`108`（64 门耦合在 `scripts/server-round1/*-production-chain-gate.py`，不在其 write_paths；opencode 门 :802 断言 template==OUTPUT_TOKEN_LIMIT）；`111`（claude `ask` 映射在 `src/agent_box/server/profiles/posture_translation.py:53-81`，不在其 write_paths；一处修法已备好待路径修正即刻落地）。`107`（需 pi/dsh 原生"thinking-on"一手 schema + `thought.delta` 真机门）。`092–096`/`100` 串行等于 A 线 105/089（尚未并入本树）。
+
+**下一位（R-0036/R-0038 序）**：`114`（Qoder CLI 成一家，六部，write_paths 宽含 src/scripts，本树可施工）——待 108/111 的 write_paths 裁定回来后即收那两张，否则转入 `114` 阶段 1 观测。
+
+---
+
 ## CHECKPOINT c1 — 后端 runtime 线第一批（106 / 088 / 090 / 091）[DONE，含 091 PARTIAL] · 2026-09-19
 
 **1 现在能试什么**
