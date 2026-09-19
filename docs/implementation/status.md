@@ -1292,3 +1292,13 @@ runtime 侧（存储/service/描述符/派生/冻结/逐家声明）已 DONE 且
 | `107` | 阶段 1 交回（prior） | pi 思考"开"的合法值本环境无一手出处（pi 未装、全局 dsh 非 pin 版）⇒ 不猜值 | 提供 pin 版 pi/dsh 的 `thinking` 合法值一手 |
 | `121` | 产品侧 DONE（v1 装饰测试已如实改 + 真实结构门） | Work Core `src/agent_box/migrations/001..009`（`_run_migrations(conn)`+`schema_versions`）的升级⇔全新等价常设门；**注意 legacy-data 升级会多出 4 归档列**（AUD-B-009），非平凡等值 | 独立单元：按 W1–W4 四子实验 codify，含归档列语义反例 |
 | `122` | 阶段 1+5 交回 | 需 Worker 协议 `stopReason` 字段（ACP 枚举，字段尚不存在）+ `sessions/repository.py::complete_turn` 写 `terminal_reason`（该文件在 122 write_paths 外） | ops 另开 Worker 协议字段单（A/45）；本单届时补解析+写列+反例 |
+
+### 工单 096 — 阶段 2/3（取值域 + 校验，本树可落切片；2026-09-19）
+
+> 纯函数 `model_configs/reasoning_knobs.py`：旋钮=harness 级、值域=模型级。
+> `effective_domain` = 该家钉死 effort 枚举（codex low/med/high、opencode/kilo +xhigh，一手取 cc-switch presets）
+> ∪ 当前模型 `reasoning_options`（方言翻译、去重、稳定序）；两边都无⇒`None`＝未声明（**不发明档位**）。
+> `default_effort`＝中间档非最高（AQ-0001/G7）；`validate_reasoning_value` 域外或未声明⇒`CONTROL_VALUE_UNSUPPORTED`（指名控件+值）。
+> qwen/dsh 枚举未一手钉⇒不声明（钉死不猜）。测试 `test_reasoning_knobs_096.py` **6 passed**；中立门未受影响（model_configs 不在扫描集，6 passed）。
+> **096 整体仍 PARTIAL**：`config.describe` 生效域投影＝A 线 wire（本模块只决定"何值合法"，投影界面交 A）；
+> 逐家 controlOptions 声明进 production.py + v2 模板翻转＝与 108 模板字节钉死测试同文件⇒须同批改（未做，串行）；G6 真 `thought.delta` 缺真链。
