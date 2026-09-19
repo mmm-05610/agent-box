@@ -771,7 +771,12 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 | 探针把连接**钉到已校验的地址**（闭掉 DNS 重绑定窗口） | 104 修好了"完全不看解析结果"，没修"看了之后不再变"：校验解析一次、`http.client` 再解析一次，TTL=0 的名字可先答公网过关再答 `169.254.169.254`。要做对得自己管 `server_hostname`/SNI 与证书校验，而**本树没有 TLS 桩**（环回例外只放 `http`）⇒ 没有反例的门不算门 | 是新的语义与新的测试面，不在 104 的射程（104 §Scope 只列"不跟随／复检／尽量钉"，且明确"做不到就写清残余风险"） | [104 证据 §10 残余风险](../server-round1/fullstack/probe-ssrf-hardening-104.md) |
 | **CGNAT `100.64.0.0/10` 是否进拒绝集**（语义裁决） | 实测本机 `ipaddress`（Python 3.12）对 `100.64.0.1` 的 `is_private/is_reserved/is_multicast/is_link_local` **四个旗标全 False** ⇒ 104 的复检放过它；而 WSL2／Tailscale／VPN 的内部面常落在这段（IMDS 形状的服务常挂在那儿） | 104 §Scope 写的是"私网/保留/多播"三类，自扩拒绝集＝改变可探范围（可能拒掉用户真想探的内部网关），需要裁决而不是顺手做 | [104 证据 §8.1](../server-round1/fullstack/probe-ssrf-hardening-104.md) |
 | 080 的反例门**在负载下假红**（与 087 同族，但是另一条门） | 同一份源码：`tests/server` 整腿 **687 passed** ⇒ 紧接着 `tests/` 整腿里 `test_first_run_lock.py::test_without_the_gate_the_same_first_runs_overlap` **1 failed / 986 passed**；单跑该文件 **3 次全 5 passed**、加 `tests/integration` 一起 **74 passed**。该断言是"没有锁则两次冷跑的时间窗必相交"——**相交与否取决于线程时序**；那一轮 `tests/` 用时 489.39s，同机此前两轮是 358.34s / 374.66s（慢约 30%，与 R-0023 点名的 11 GB 瓶颈一致） | 属 080 的门，而 080 已收口；本树不得为让门绿而改断言（章程 §8），且 104 没碰 `execution/**` | 本轮终态行与 [104 证据 §11](../server-round1/fullstack/probe-ssrf-hardening-104.md) |
+| **086 的真实轮门也在负载下假红**（同族第三条，写法要一起治） | 113 收口那一轮 `tests/server -q`：**1 failed / 765 passed in 445.20s**（红的是 `test_subagent_harness_real_round_086.py::test_a_real_claude_parent_round_calls_run_subagent_itself`）；**同一树状态单跑该条 ⇒ `1 passed in 30.33s`**（真 claude 二进制 ＋ bwrap ＋ **环回假上游** ⇒ 真实模型仍 0 次）。该用例自己就写明"父轮必须塞进 sidecar 的 120 s 进程上限"，而整树并发时那一轮的墙钟被拉长（与 080 那条同一成因）；本轮之前一轮的同一腿 **750 passed** 里这条是绿的，而它不读 113 改过的任何一个文件（脚本/文档/新门）。**但要说清证据的档次**："因＝负载"是**推断**，支持它的是三点（同一树状态单跑绿、上一轮全量绿、红的那条与本批改动无读取关系）；该轮的**断言正文没留下来**（后台作业只截了 summary 三行），所以"端口与另一棵树相撞"这条备选原因没有被排除 | 属 086 的门，086 已收口；本树不为让门绿改断言（章程 §8）。三条同族（080 的时间窗相交、087 的取消/召回间歇、本条的 120 s 轮次）需要的是**同一个修法**：把"依赖墙钟/线程时序"的断言换成结构判据，并让失败自带可留档的正文（长门不要用 `tail -3` 收口） | 本轮终态行 ＋ [086 证据 §2](../server-round1/fullstack/subagent-harness-round-086.md)（120 s 上限那一段就写在它的门 docstring 里） |
 | ~~`validate_order.py --strict` 的新并行度规则还没有落地面（61 个契约文件 ⇒ 61 FAIL）~~ **已由调度者落地**（公告 82 轮，本单登记后数分钟）：`--legacy-ok` 下本树 **51 份契约、FAIL 0**；37 张历史单与 099 都补了 `parallelism: none` ＋ 理由，`089` 补 `parallel_units: ["pi","codex"]`，A 树还在带的 10 张 runtime 线单（088/090–096/100/102）已删（权威副本移入 runtime 树）。本行留作轨迹，不再是要办的事 | 校验器 `~/.agents/skills/incremental-work-order/scripts/validate_order.py` mtime **2026-09-19 12:40**（在 097/098/104 三次记账之后被改）新增一条：必须**显式声明并行度**——非空 `parallel_units`，或 `parallelism: "none"` ＋ `parallelism_reason`。此前 31 FAIL（37…67 的 v1 历史单），现在 **61 FAIL**：多出的 30 条正是 068–105 里所有写 `parallel_units: []` 的 v2 单（含已收口的 097/098/104/105 与在做的 101/103） | 填"哪一单能并行、并行几路"是**调度裁决**（公告 63 轮已给 runtime 的 090/091/092/094/095/107/108 与 A 线 103=4，其余留 `[]`），执行者自己补那行＝替调度者裁决；且这是**契约元数据**，章程 §5 规定由调度者改并投递新版本 | [101 证据 §13](../server-round1/fullstack/wire-error-family-500-fix-101.md) |
+| **`providerModels.update` 在合同上无法表达"部分更新"**（要放宽必填集 ⇒ 改合同＋重锁） | 112 一手：`_PARAM_SHAPES["providerModels.update"]` 的必填集含 `displayName/credentialId/configuration/models`，实测省略任一条 ⇒ 类型化 `INVALID_REQUEST: params shape is invalid: missing <字段>`。工单 §Requirements 那条"只给 displayName 不给 models"的场景因此**在线上发不出来**；112 把"省略即保留"落在两个可达层面（服务层 body 省略键、线面 provenance 的四列），并把这条事实钉成门而不是悄悄放宽形状 | 放宽必填集＝改 wire 形状＋重锁对，属合同面（桌面 settings 线写权、且要过 `--compare`）；112 自己的 G4 明写"wire 形状零改动" | [112 证据 §2](../server-round1/fullstack/provider-update-keeps-omitted-112.md)、门 `tests/server/test_provider_update_keeps_omitted_112.py::test_omitting_a_required_field_is_still_a_typed_shape_refusal` |
+| **两处 Server 接受而合同未声明的 `provenance`**（`providerModels.update` / `probeModels`）——现在有了可复跑的探测器 | 113 的 `wire_artifact.py --compare` 实测输出：`optionalNotInContract` 恰这 2 条，`requiredSetDrift`/方法集两轴为空。修法在**合同侧**（把 `provenance` 编进那两份 `#params`）；补好后 `--compare` 退出码自己变干净，不需要有人记得改散文 | 改对方树的合同不在本树写权（113 §Scope 明写）；账上 098 §9.2 早已写"交 102 重锁"，而 102 现在属 runtime 线 ⇒ 需要调度者把它挂回**能改合同的那条线** | [113 证据 §4](../server-round1/fullstack/wire-artifact-published-113.md)、`docs/server-round1/wire-review.md` 的"工件口径（Order 113）"§4 |
+| **后端清单不含 result 形状**（要后端也出可机读的 result 合同，需要一个新的形状来源） | 113 的工件每行 `result = {"declared": false, "authority": "contract"}` 是**如实**而非偷懒：后端 handler 返回的是临时构造的 dict，没有可机读声明；本单宁可显式写"我不知道"，也不让"清单里没写"被读成"两边一致" | 从 handler 生成 result schema 是新工具面（要么加返回类型注解、要么从门里采样），不是 113 的四件事之一 | [113 证据 §2/§6](../server-round1/fullstack/wire-artifact-published-113.md) |
+| **两个探测方法对 `provenance` 不对称** ⇒ `probeConnection` 里那句 `_provenance(params)` 可证是死代码 | 112 顺带第一手量到：`probeModels` 接受并校验 `provenance`（全 null/混合 null 都通过，未知键类型化拒绝），而 `probeConnection` 对**任何**形态的 `provenance` 都回 `INVALID_REQUEST: params shape is invalid: unexpected provenance` ⇒ 形状门在 handler 之前就拒了，`handlers.py:1323` 那行永远看到 `None`。这把 098 终态行未做项 ③ 从"看起来是死的"变成"可复跑地是死的" | 删它＝改语义（要么让 `probeConnection` 接受 provenance，要么明确它不接受并写下理由），两个方向都是裁决而不是清理；且它牵动合同面（`probeConnection#params` 该不该有这一键） | [112 证据 §6](../server-round1/fullstack/provider-update-keeps-omitted-112.md) |
 
 
 > 编号说明：上一节 `## CHECKPOINT b2`（080/081 那次）的 §2 写了"新增 B5"，但当时表里没落 B5
@@ -1176,3 +1181,119 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 | 113 | 2 后端工件生成 | `scripts/server-round1/wire_artifact.py` 从**源码 AST** 出 64 行清单（方法 → handler → 必填/可选名集），`result` 一律 `{"declared": false, "authority": "contract"}`——**宁可显式写"我不知道"**，因为缺键会让"清单没写 result"看起来像"两边一致"。生成器**复用 103 的解析器**（给它加 `dispatch_pairs()`/`param_shapes()`，`dispatch_methods()` 改由同一棵 AST 派生）：一个仓里两份解析器互相点头不算证据。确定性实测：`--print-digest` 两次同值 `eaae9330…`，`methodCount 64` | 103 的 9 条门在解析层重构后仍全绿（与 113/105 同跑 ⇒ 38 passed in 13.48s） | 0 次 / ¥0 | 与本提交合一 |
 | 113 | 3 旧副本处置 | 旧位置留 `generated/README.md`：写明**权威在桌面 settings 线**、两份东西各在哪、以及"门必须显式写路径"；副本**按摘要命名**⇒ 过期从"看不出来"变成"名字对不上内容" | 门 G2 三条（旧路径不存在／内容哈希==登记 `c4255b31…`／名字里的 8 位==内容哈希）＋一条反例（把副本内容换成别的字节而名字仍声称 c4255b31 ⇒ 红，实测假文件哈希 `ea6caae5…`） | 0 次 / ¥0 | 与本提交合一 |
 | 113 | 4 口径 + 两仓对表 | `wire-review.md` 新增"工件口径（Order 113）"节：**生成／比较／门入口**三件事在同一节里，四条命令可复跑，`--write/--check/--compare` 对**仓外路径直接退出**。对表实测（`--compare`，退出码 1）：**方法集 64 vs 64 一致、required 名集 0 漂移、`provenance` 两条具名漂移**（`providerModels.update`/`probeModels`：Server 接受、合同未声明——正是 098 §9.2 交回、账上写"交 102 重锁"的同一条）。⇒ 本单**不改对方合同**，把差异点名交回；"两仓一致"在**摘要轴**成立（本树副本 == 公告第 58 轮登记值），在**内容轴**如实报 2 条 | 门共 **16 条**（G1×4＋G1b×1＋G2×3＋G3×2＋G4×3＋越界×2＋G5×1）；反例进程内真跑 **4 红 / 2 复位绿**（旧位置放无名副本→红、内容改名不改→红、口径删一条命令→红、提交清单落后→红）；全套件见终态行 | 0 次 / ¥0 | 与本提交合一 |
+
+## 工单 089 — 两家真实 UI 门（pi + codex）：登记为阻塞，不声明终态码（2026-09-19，执行者）
+
+> 契约：[089](work-orders/089-four-real-ui-gates.md)（R-0011 / 修订 v2 依 R-0014·R-0015·R-0017）
+
+**为什么不跑而不跑**：三条都是第一手或明文，不是一条含糊的"等依赖"。
+
+1. **依赖未满足（契约自己的 depends_on）**：`090` 与 `091`。`090` 按公告第 73 轮报 DONE；
+   **`091` 报 `PARTIAL`**（同一公告，且调度者对 091 的架构问题当场给了裁决、活未收口）。
+   工单的依赖条件是"**控制面同步与每执行凭据投影可用**"——PARTIAL 不等于可用，本单因此没有意义（工单 §修订 v2 第 1 点原文：前置不落地本单无意义）。
+2. **门要的宿主不在这棵树**：G1 要求"真 Electron + 真 Worker + 真模型答复"，R-0014 把控制面定在 **Windows**。
+   本树跑在 WSL，没有可点击的桌面应用；而 089 的 `forbidden` 里点名桌面树 ⇒ 我不能替桌面侧起 UI，
+   也不能"退而求其次"用 WSL 侧 Server 跑（那条权宜之计正是被 R-0014 取代的那一段）。
+3. **窗口口径未定**：R-0033 ① 把第 3 轮验收前置写成 `P42` ＋ `109`/`110` 先落地，④ 写"不得以'带已知缺陷开窗'的方式交接"；
+   公告第 101 轮显示窗口**已被开窗交接**、且其"已知缺口"清单里含 **`112`（本树刚落地）** 与 `110`/`108`。
+   这个不一致由调度者与验收会话处理（我不改 `docs/acceptance/**`），但在我这一侧的后果是：**现在点 089 会跑在一个口径未定的窗口上**。
+
+**要人拍/要人跑的部分（精确到腿）**：① 从本树 `df115c7` 在 Windows 侧起一份 Server（真实数据根＋真实凭据 locator）；
+② 桌面应用按 `ORDESSA_SERVER_ROOT`/`ORDESSA_SERVER_PORT` 连上；③ pi 与 codex 各发一条最小提示并记账
+（请求数/tokens/估算费用逐家逐轮）；④ 至少一条失败路径（关凭据或指坏端点）给类型化原因；⑤ 证据落
+`docs/server-round1/fullstack/ui-gates-89/`（G3 的零凭据命中检查就是对着这个目录跑的）。
+
+**因此**：本单**不声明终态码**（没有执行就没有码——`FOUR_REAL_UI_GATES_DONE`/`_PARTIAL` 都不写），
+记为**阻塞：等 `091` 收口 ＋ 需要人在 Windows 控制面上点**。真实模型 **0 次 / ¥0**（未发起任何调用）。
+
+---
+
+## A 线队列状态（2026-09-19，执行者）
+
+`104 → 105 → 101 → 103 → 112 → 113` 六张已收口（`089` 如上阻塞）。本树 `work-orders/` 里
+**没有下一张可执行的单** ⇒ **QUEUE_EMPTY_AT 2026-09-19**（章程"队列不空规则"：合法停止，如实报出）。
+
+**恢复点**：`df115c7`（113）＋ 收口提交；`checkpoint/b2` 仍在 `4c32992`（080/081 那次批末报告），
+**未新建 tag**——追加批次（097/098/104/105/101/103/112/113）的名字与批次归属是调度裁决，
+执行者不自己造 tag 名（tag 亦不得覆盖）。
+
+**本树还能做、但需要新单的事**（全部已在 §待开单点名，编号归调度者）：
+必填集放宽（⇒ 部分更新可在线上表达）与那两条 `provenance` 漂移的合同侧声明，都属**重锁家族**；
+探针的 DNS 钉定与 CGNAT 语义仍开着。
+
+| 单 | 终态码 | 门 | 回归 | 真实模型 | 提交 |
+| --- | --- | --- | --- | --- | --- |
+| 112 | **`PROVIDER_UPDATE_KEEPS_OMITTED_DONE`** | 门：**G1** 省略即保留（不带 `provenance` 四列逐字不动、只给一列时未给的三列不动、`{}` 不动、**服务层只给 `displayName` 时其余全部保留且 `version+1`**——工单那条场景在服务层被钉成断言）；**G2** 显式 `null` **真的清空**（全清 ⇒ 读回 `provenance: null`、单列清 ⇒ 只动那一列、**同一请求里清一列/改一列/留两列**三种意图并存，且都从 `providerModels.list` 另一次调用读回而不是回显）；**G2b** 不允许清空者仍点名拒绝（`displayName:null`、`models:[]`）而 `configuration:[]` 合法清空；**G3** 不退化（旧 `expectedVersion` ⇒ `CONFLICT_VERSION` 带 `current`、同 `requestId` 重放不双加版本、098 的枚举/超长仍类型化、**create 中性**逐字同投影）；**G4** 不越界（`_PARAM_SHAPES` 必填/可选集字面钉死；省略任一必填字段仍是点名该字段的类型化拒绝）。反例：把 `if value is None: continue` 装回 ⇒ 缺陷当场复现；仓储四形参默认必须 `is KEEP` 且源码无 `COALESCE`；`KEEP is not None`。摘要：`_provenance`/`service.update`/`repository.update` 三层各归位，"省略"与"显式清空"从不可区分变成两种意图两条路径；`COALESCE` 从这条写路径消失，"保留"改成 `KEEP` 显式表达而不是靠 SQL 吞。费用：**0 次 / ¥0**（全程本地 SQLite ＋ 环回；凭据 locator 未访问）。清理：`/tmp/o112` 退码副本已删并核实不存在。**未做项（逐条）**：① 工单场景"只给 displayName 不给 models"**在线面上不可表达**（必填集含四件），放宽必填集＝改合同＋重锁 ⇒ 登记 §待开单并交回；② 那条退码跑的 15 条绿里有一条红是我脚手架的假红（已在 112 证据 §4 标注，不当证据用）；③ `probeConnection` 那句死 `_provenance` 调用点仍未删（本轮把它从"看起来是死的"变成"可复跑地是死的"，见证据 §6）；④ 公告第 101 轮把 `112` 列进 ACC-R3 的已知缺口——落地后该由调度者从窗口清单里划除（我不改 `docs/acceptance/**`） | `tests/server -q` **765 passed / 1 failed in 445.20s**（失败的是 086 的真实轮门，负载敏感假红：同一树状态**单跑 30.33s 绿**、且在紧接着的根套件腿里**也是绿的**）；根 `tests/ -q` **1066 passed / 0 failed in 547.39s**；算术 `766 = 750 ＋ 113 的 16`、`1066 = 1026 ＋ 112 的 24 ＋ 113 的 16`；定向 `pytest tests/server -k "provider or update or provenance"` **68 passed / 682 deselected** | **0 次 / ¥0** | 本提交 |
+| 113 | **`WIRE_ARTIFACT_PUBLISHED_PARTIAL`** | 门：G1 本体（`--print-digest` 两次同值 `eaae9330…`、64 方法、清单方法集 == 活运行时 `_handlers` 键集、**提交件 == 现算件**）；G1b 每行 `result` 显式 `{"declared": false, "authority": "contract"}`（沉默不许被读成同意）；G2 旧副本（旧路径不存在＋指针点名权威与摘要＋**副本名字里的 8 位 == 内容哈希**）；G3 口径（生成/比较/门入口三件事在同一节，四条命令可复跑，"没有默认工件"这句话本身被断言）；G5 不越界（64、`server.hello`、`update` 必填七件字面未动，仓外路径一律 `SystemExit`）。反例真跑：4 红（旧位置放无名副本、内容改了名字不改、口径少一条命令、提交清单落后）＋2 复位绿。摘要：后端第一次有了**自己生成、自己解释得清边界**的工件；本树的合同副本改成"名字里带自己的 sha256"，从"看起来像当前工件"变成"过期就叫出自己新名字"；两仓**按名字比**当场点名 2 条 `provenance` 漂移（098 §9.2 那条）而不是假设一致。费用：**0 次 / ¥0**。清理：临时目录与副本逐一核实删除。**精确剩余（PARTIAL 的三个字值在哪）**：**跨树只读核验那一腿没跑**——对桌面 settings 树的读取被本环境拦下（实测：对该树的只读 `ls` 被策略拒绝），所以"两边本体一致"目前只有"本树副本 == 公告第 58 轮登记的 `c4255b31…`"这一条支撑，**不是字节对表**；补法＝调度者或 settings 线跑一次 `wire_artifact.py --compare <它送来的那份>`。**其余未做**：那两条漂移的合同侧声明（属 102/重锁家族）、081 交回第 4 条（`wire-review` 缺 57/58/59/65 小节）仍开着、清单不含 result 形状（要新的形状来源） | `tests/server -q` **765 passed / 1 failed**（红的是 086 的负载敏感真实轮门，与本单无关：本单没动 `src/**`；同一树状态单跑该条 `1 passed in 30.33s`、根套件腿里也绿）；根 `tests/ -q` **1066 passed / 0 failed in 547.39s**（HEAD `df115c7`）；本单门 **16 passed**，与 105/103 同跑 **38 passed in 13.48s**；`validate_order.py --legacy-ok` ⇒ **53 份契约 FAIL 0**，`--strict` ⇒ **52 FAIL**（原因只有两类：31 条 v1 历史单缺 frontmatter；其余是同线 `write_paths` 两两重叠＝公告 FB-9 等用户拍的那条结构性反馈，`112` 因与 `113` 共享 `status.md`/`tests/**` 被点名，**本单引入 0 条真实并发风险**，契约元数据归调度者，见章程 §5） | **0 次 / ¥0** | 本提交 |
+
+---
+
+## CHECKPOINT b2-2（A 线追加批次，2026-09-19）
+
+> 批次名沿用投递的契约 front matter（`097/098/104/105/101/103/112/113` 都写 `batch: b2`）。
+> `checkpoint/b2` 已指向 080/081 那次的批末报告，**同名不复用、更不覆盖**（README §3.2）⇒ 本次叫 **`b2-2`**。
+> **已纳入 work order 112 / 113 投递 @`6e6d72b`（父树 @`baeaf81`）**，回执按 §3.5b 记这一行。
+
+**1 现在能试什么**（每条都是本批落地的、可在本树复跑的入口）
+
+| 试什么 | 命令/动作 | 期望看到 |
+| --- | --- | --- |
+| `server.hello` 说得出家族（105） | `TestClient` 或真 Server 打一次 `server.hello` | `harnesses:[{id, credentialKind?, modelControlId?}]`；顺序＝注册表自身顺序、两次**逐字节相同**；没声明的家族**没有那个键**（不是 `null`） |
+| 探测"获取上游模型列表"是安全的（104） | 真 key 现在可用于 `providerModels.probeModels` | 3xx ⇒ `PROBE_ENDPOINT_BLOCKED`（且源站计数恰 1、目标站 0）；名字解析到内网/保留/多播 ⇒ 拒；**不走系统代理** |
+| 五个方法不再必 500（101） | 无 artifact/usage 组合上调 `usage.aggregate`、`providerArtifacts.list/install/rollback` | 类型化 `UNAVAILABLE` ＋ `details.internalCode`（不再是 HTTP 500），`FAMILIES` 仍 12 项 |
+| `provenance` 能写、能留、能清（098＋112） | create 带四列 → update 不带 → update 带显式 `null` | 第一步读回四列；第二步**逐字保留**；第三步**真的清空**（读回 `provenance: null`）；`displayName:null` 与 `models:[]` 仍是点名拒绝 |
+| 覆盖账与元门（103） | `python3 scripts/server-round1/wire_drive_coverage.py --check` | 退出码 0；账 64 行、每行有 file:line 证据；**藏掉某个文件就出现缺口** |
+| 工件本体与漂移（113） | `python3 scripts/server-round1/wire_artifact.py --compare docs/server-round1/fullstack/contract/wire-v1.schema.registered-c4255b31.json` | 方法集 64 vs 64 一致、required 0 漂移，**点名 2 条 `provenance`**，退出码 1（有差异就不是"静通过"） |
+
+**2 要人拍的**（问题 / 选项与代价 / 建议 / 不拍的后果）
+
+| # | 问题 | 选项与代价 | 我的建议 | 不拍的后果 |
+| --- | --- | --- | --- | --- |
+| P1 | **089 谁能点**：门要真 Electron＋真 Worker＋真模型，控制面在 Windows（R-0014），且 `091` 仍是 PARTIAL | ① 人在 Windows 上点一轮（要一份从本树构建的部署）；② 收紧本单范围只验"服务端已能声明＋线能跑通"（**这是放宽**，需明示） | ①，且等 `091` 收口 | Stage 1 的真实 UI 门一直空着，验收第 3 轮没有后端侧的点击证据 |
+| P2 | **`providerModels.update` 的部分更新**要不要能在线上表达（必填集放宽 ⇒ 改合同＋重锁） | ① 放宽并走重锁（要 settings 线配合，一对摘要再换一次）；② 维持现状（客户端必须整条发回） | ②不动语义、①按 R-0032 ⑤"透明传达"一侧走——但这是裁决不是清理 | 前端"只改一个字段"的意图永远只能靠重发整条，老客户端并发编辑会互相覆盖 |
+| P3 | **两条 `provenance` 漂移归谁修**（合同侧补声明；102 现属 runtime 线，改合同又在 settings 线） | ① 派一张合同面小单给 settings 线；② 并入 102 的重锁 | ①，因为它现在**有可复跑的探测器**（`--compare`），落地即自动干净 | 守合同的客户端至今发不出 `update`/`probeModels` 的 provenance 这条腿 |
+| P4 | **`probeConnection` 的死 `_provenance` 调用点** | ① 让它接受 provenance（与 `probeModels` 对称）；② 明确它不接受并删调用 | 先定语义再动代码；两条都改可观察行为 | 留着就是一处"看起来支持"的假面（本轮已把它量成可复跑的事实） |
+| P5 | **负载敏感的三条门**（080 时间窗相交、087 取消/召回、086 的 120 s 真实轮） | ① 逐条改成结构判据（要一张卫生单）；② 继续"全量偶发红→单跑绿"记账 | ①：本批已两次撞见，账越记越贵 | 每次全量都要人重跑一遍才知道是不是回归 |
+| P6 | **tag 命名**：`checkpoint/b2` 已被 080/081 那次占用 | ① 本次记 `b2-2`（§3.2 的重试用法）；② 给追加批次另起名字（如 `a1`） | ①（不改名最省，且不改历史） | 批末动作没有落点，恢复点只能靠 sha |
+| P7 | **FB-9**（同线单必然 `write_paths` 重叠 ⇒ `--strict` 52 FAIL）等用户/调度定口径 | 见公告第 82 轮 | 不在执行者射程 | `--strict` 永远红，批末"活单必须干净"没法判 |
+| P8 | 103 的 **45/64 单文件驱动**要不要补成"高价值面至少两处独立" | 要预算（45 份重复用例不值） | 只挑真会被误删的高价值面 | 删一个文件就掉回缺口，但门会立刻叫 |
+
+**3 花了什么**：**真实模型调用 0 次 / ¥0**——本批 6 张（104/105/101/103/112/113）**每一张都是 0 次**，
+全部门在本地 SQLite ＋ 环回假端点/假 artifact store 上跑；凭据 locator（`~/.agent-box-acceptance-secret.*/deepseek-api-key`）
+**未被访问**（未读取、未复制、未落盘、未入日志）；子代理：**未使用**（112 声明 `parallel_units: ["single"]`；
+113 声明 3 个单元但**本树实际单线程做**，如实记，不因"能并行"而制造并行）。
+清理证据：`/tmp/o112`（退码副本）、`/tmp/101-oldcode`、`/tmp/104-oldcode` 与各临时数据根逐一核实删除；
+本树工作区除本节外无未提交改动。
+
+**4 恢复点**：下一单＝**无**（`QUEUE_EMPTY_AT 2026-09-19`，见上节）；`089` 阻塞在 `091` 收口＋人在 Windows 侧点。
+基线：本批起点 `4ac8263`（调度者投递 112/113 的那次），终点＝本节所在提交；
+`checkpoint/b2` = `4c32992`（080/081 那次）**未动**，新 tag **`checkpoint/b2-2`** 指向本节提交。
+未提交改动：**无**（先提交，再在提交上打 tag）。
+
+**5 不含糊**：
+① **113 是 `PARTIAL` 不是 `DONE`**——跨树字节对表那一腿没跑（读取被拦），不拿"摘要相符"冒充"本体对表"；
+② **089 没有执行 ⇒ 不写任何终态码**（`_DONE`/`_PARTIAL` 都不写），只记阻塞与要人跑的腿；
+③ 全量里那条红（086 真实轮门）**不粉饰成"已修"**，也不为它改断言，按假红登记并留三点支持证据与一条未排除的备选原因；
+④ 两张单的**前提修正**都写在证据里而不是悄悄改契约（103："36 从未被驱动"只在一半上成立；113："33 方法旧副本"已被 105 消解，残留的是"无声"），112 更是把工单的因果整个反过来量（"省略会写空"→ 实际是"显式 null 被当省略"）；
+⑤ `--strict` 的 52 FAIL 如实报，**不**因为"不是我引入的"就不写进账。
+
+---
+
+## §Spend（本树账：请求数 / 真实模型调用 / 费用）
+
+> 章程 §7 点名要这一节，此前**没有**——费用一直记在各单终态行的"真实模型"列里。本节从 2026-09-19 起补上，
+> 并把 A 线追加批次的账汇成一处（历史单不回填，它们的账在各自终态行）。
+
+| 单 | 真实模型调用 | 估算费用 | 上游 | 凭据 locator | 备注 |
+| --- | --- | --- | --- | --- | --- |
+| 097 | 0 | ¥0 | 无（本地组合） | 未访问 | 全程 TestClient ＋ 临时数据根 |
+| 098 | 0 | ¥0 | 环回假上游（真监听一次） | 未访问 | 探测未发真请求 |
+| 104 | 0 | ¥0 | **只有环回假端点** | 未访问 | 出站由机制保证（表外名字一律 `gaierror`） |
+| 105 | 0 | ¥0 | 无 | 未访问 | 门为本地 hello |
+| 101 | 0 | ¥0 | 无（本地假 artifact store） | 未访问 | `digest` 为字面假值 |
+| 103 | 0 | ¥0 | 无 | 未访问 | 扫描器读文件不执行文件 |
+| 112 | 0 | ¥0 | 无 | 未访问 | 本地 SQLite |
+| 113 | 0 | ¥0 | 无 | 未访问 | 工件/门只在源码与 JSON 上算 |
+| **合计** | **0 次** | **¥0** | — | **全程未访问** | DeepSeek 额度未消耗；R-0011 的授权本批未被使用（真实调用留给 089 那一类门） |
+
+子代理：**0 个**（本批全部单线程执行，含 113 声明的 3 个 `parallel_units` 未使用）⇒ 无额外请求与费用。

@@ -90,3 +90,18 @@ CAS/`expectedVersion`/幂等 `requestId`/错误族全不变。
   **68 passed / 682 deselected**，0 失败。
 * 全套件计数见本单终态行（G5 无声明，按 DoD 第 3 项入账）。
 * 真实模型 **0 次 / ¥0**；清理：`/tmp/o112` 退码副本已删并核实不存在。
+
+## 6 顺带量到的一条（交回，不在本单射程）
+
+两个探测方法对 `provenance` 的处理**不对称**，本轮为跑"探针不受 null 改动影响"这条检查而第一手量到：
+
+| 方法 | 请求带 `provenance` | 结果 |
+| --- | --- | --- |
+| `providerModels.probeModels` | 全 null / 混合 null | **接受**（校验通过，照常探测；`http://127.0.0.1:1` ⇒ 类型化 `PROBE_UNREACHABLE`） |
+| 同上 | 未知键 `nope` | 类型化 `INVALID_REQUEST: provenance carries unknown fields`（本单改的分支之外，行为未变） |
+| `providerModels.probeConnection` | **任何**形态的 `provenance` | `INVALID_REQUEST: params shape is invalid: unexpected provenance` |
+
+⇒ `handlers.py:1323` 里 `probe_connection` 那句 `self._provenance(params)` **永远看到 `None`**——这不是推断：
+形状门在 handler 之前就把带 `provenance` 的请求拒了。这正是 098 终态行未做项 ③ 记下的那个"死调用点"，
+现在有了可复跑的实测。**本单不删它**：删＝改语义（要么让 `probeConnection` 接受 provenance，要么明确它不接受），
+两个方向都该由调度者拍。登记见本树 `status.md` §待开单同族条目（098 §9.2 / 113 的 `--compare` 也各指到同一处合同漂移）。
