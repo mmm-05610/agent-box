@@ -23,8 +23,9 @@ store); an unknown handle is refused; nothing here guesses.
 """
 from __future__ import annotations
 
+import json
 import time
-from typing import Any, Mapping
+from typing import Any, Iterable, Mapping, Sequence
 
 from agent_box.server.errors import ServerError
 from agent_box.server.profiles.subagents import (
@@ -44,6 +45,33 @@ from agent_box.server.profiles.subagents import (
 MAX_SUMMARY_CHARS = 4096
 #: Errors in the child turn become a typed tool result, never raw stdout.
 TERMINAL_OK = "completed"
+
+
+def _iter_model_ids(value: Any) -> Iterable[str]:
+    """Every ``modelId`` a child's model-control value names (provider/model
+    references may nest); a bare string is taken as a single id."""
+    if isinstance(value, Mapping):
+        model_id = value.get("modelId")
+        if isinstance(model_id, str):
+            yield model_id
+        for nested in value.values():
+            yield from _iter_model_ids(nested)
+    elif isinstance(value, list):
+        for nested in value:
+            yield from _iter_model_ids(nested)
+
+
+def _child_permission_ceiling(child_profile: Mapping[str, Any]) -> list[str]:
+    """The presets a caller may still *narrow* the child to (order 60's rule).
+
+    ``plan`` is the narrow preset and ``default`` is wider; a child already on
+    ``plan`` cannot be asked to run at ``default``, while a child on ``default``
+    (or any wider/unset preset) may be run at either. This is the source the
+    production path feeds into ``validate_run_arguments``' ``child_limits`` -
+    without it the ``SUBAGENT_PERMISSION_WIDENED`` branch is structurally dead.
+    """
+    preset = str(child_profile.get("permission_preset") or "default")
+    return ["plan"] if preset == "plan" else ["default", "plan"]
 
 
 class DelegationService:
@@ -86,8 +114,13 @@ class DelegationService:
                 "SUBAGENT_NOT_AUTHORIZED", "this role has no authorized subagents")
         profiles = self.profiles.list(include_archived=False)
         roster = resolve_roster(parent_id=parent_profile_id, edges=edges, profiles=profiles)
+        # Order 136: `child_limits` must be sourced from the *child's own* rules
+        # at the production call site. It used to be omitted entirely, which made
+        # `validate_run_arguments`' narrowing checks structurally dead (an
+        # over-wide preset or a different model slipped through as ACCEPTED).
+        child_limits = self._child_limits_for_request(arguments, roster=roster)
         try:
-            validated = validate_run_arguments(arguments, roster=roster)
+            validated = validate_run_arguments(arguments, roster=roster, child_limits=child_limits)
         except DelegationError:
             raise
         if calls_this_turn >= 4:
@@ -157,6 +190,54 @@ class DelegationService:
         }
 
     # -- internals ----------------------------------------------------------
+
+    def _child_limits_for_request(
+        self, arguments: Mapping[str, Any], *, roster: Sequence[Mapping[str, Any]],
+    ) -> dict[str, Any] | None:
+        """Source the narrowing ceiling for the *requested* child.
+
+        ``validate_run_arguments`` is still the authorization gate: an unknown or
+        unauthorized name resolves to no child here and is refused there for that
+        reason (never as a widening), so sourcing limits cannot leak a child the
+        caller may not call.
+        """
+        name = arguments.get("subagent")
+        entry = next((item for item in roster if item["name"] == name), None)
+        if entry is None:
+            return None
+        return self._child_limits(self.profiles.get(entry["profileId"]))
+
+    def _child_limits(self, child_profile: Mapping[str, Any]) -> dict[str, Any]:
+        limits: dict[str, Any] = {"permissions": _child_permission_ceiling(child_profile)}
+        models = self._child_model_ids(child_profile)
+        if models:
+            limits["models"] = models
+        return limits
+
+    def _child_model_ids(self, child_profile: Mapping[str, Any]) -> list[str] | None:
+        """The model ids the child pins in its own model slot, or ``None``.
+
+        Checked only when the family declares a model slot and the child actually
+        references models there; otherwise the dimension stays unchecked so a
+        child that declares no models is never rejected for it. This mirrors the
+        "optional arguments only narrow" rule without over-reaching into provider
+        model-set resolution.
+        """
+        registry = self.registry
+        if registry is None or self.objects is None:
+            return None
+        try:
+            descriptor = registry.get(str(child_profile.get("harness_type")))
+            control_id = getattr(descriptor, "model_control_id", None) if descriptor else None
+            digest = child_profile.get("config_object_digest")
+            if not control_id or not digest:
+                return None
+            config = json.loads(self.objects.read(str(digest)))
+            value = (config.get("configuration") or {}).get(control_id) if isinstance(config, Mapping) else None
+            ids = sorted({model_id for model_id in _iter_model_ids(value) if isinstance(model_id, str)})
+            return ids or None
+        except Exception:  # a limit that cannot be sourced stays unchecked, never fatal
+            return None
 
     def _resolve_child_session(
         self, *, child_profile: Mapping[str, Any], chosen: Mapping[str, Any],
