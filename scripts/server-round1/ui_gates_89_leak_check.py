@@ -87,9 +87,31 @@ def scan_text(text: str) -> list[tuple[int, str, str]]:
     return sorted(hits)
 
 
+def scanned_files(root: pathlib.Path) -> list[pathlib.Path]:
+    """The set this gate actually reads. A single file is a legitimate target."""
+    if root.is_file():
+        return [root] if root.suffix.lower() in TEXT_SUFFIXES else []
+    return sorted(p for p in root.rglob("*") if p.is_file()
+                  and p.suffix.lower() in TEXT_SUFFIXES)
+
+
+def verdict(root: pathlib.Path) -> tuple[dict[str, list[tuple[int, str, str]]], int, bool]:
+    """`(hits, files_scanned, clean)`. Zero scanned files is never `clean`.
+
+    That distinction is the whole point: the first version of this gate was run
+    on one evidence file and printed "零命中 ✓（0 个文件）" while having read
+    nothing at all — a green that was pure absence. A gate that can be satisfied
+    by reading nothing is worse than no gate, which is exactly what this tool
+    exists to replace.
+    """
+    paths = scanned_files(root)
+    found = scan_tree(root)
+    return found, len(paths), bool(paths) and not found
+
+
 def scan_tree(root: pathlib.Path) -> dict[str, list[tuple[int, str, str]]]:
     found: dict[str, list[tuple[int, str, str]]] = {}
-    for path in sorted(p for p in root.rglob("*") if p.is_file()):
+    for path in scanned_files(root):
         if path.suffix.lower() not in TEXT_SUFFIXES:
             continue
         hits = scan_text(path.read_text(encoding="utf-8", errors="replace"))
@@ -138,10 +160,25 @@ def _self_test() -> int:
         hits = scan_text(sample)
         assert not hits, (label, hits)
 
+    # A gate that reports clean on nothing is the failure mode, so it is a fixture:
+    # an empty directory must NOT come back clean. This is the only place the
+    # self-test touches the filesystem, and it creates a directory, no file.
+    import tempfile
+    with tempfile.TemporaryDirectory() as scratch:
+        _hits, scanned, clean = verdict(pathlib.Path(scratch))
+        assert scanned == 0 and not clean, (scanned, clean)
+    # A single named file must really be read — `.py` is deliberately not in the
+    # text set, so this uses an evidence file from this repository instead.
+    evidence = pathlib.Path(__file__).resolve().parents[2] / "docs/server-round1/fullstack/ui-gates-89-rehearsal.json"
+    if evidence.is_file():
+        _h, one_scanned, one_clean = verdict(evidence)
+        assert one_scanned == 1, f"单文件目标没被扫到：{evidence}"
+        assert one_clean, "既有证据文件应当真的读得出'干净'"
+
     root = pathlib.Path(__file__).resolve().parents[2]
     false_alarms = scan_tree(root / "docs")
     assert not false_alarms, f"本仓既有证据被误报：{list(false_alarms)[:3]}"
-    print(f"self-test: {len(must_hit)} 必须红 ＋ {len(must_pass)} 必须绿 ＋ "
+    print(f"self-test: {len(must_hit)} 必须红 ＋ {len(must_pass)} 必须绿 ＋ 0文件不算干净 ＋ "
           f"全仓 docs/ 零误报（{sum(1 for p in (root / 'docs').rglob('*') if p.is_file())} 个文件）—— 全过")
     return 0
 
@@ -161,12 +198,15 @@ def main() -> int:
         print(f"evidence directory does not exist yet: {root}")
         print("G3 的缺席按'未跑'处理，不按'零命中'处理——空目录不是干净")
         return 1
-    found = scan_tree(root)
-    if not found:
-        counted = sum(1 for entry in root.rglob("*") if entry.is_file())
+    found, counted, clean = verdict(root)
+    if clean:
         print(f"零命中 ✓（{counted} 个文件，"
               f"{len(RULES)} 条规则；占位符与 locator 路径按规则不计）")
         return 0
+    if not counted:
+        print(f"G3 红：扫到 0 个可读文本文件（{root}）⇒ 按'未跑'处理，不按'零命中'处理")
+        print("只有真读到内容才允许报干净；后缀不在文本集内也可能是路径给错了")
+        return 1
     for path, hits in found.items():
         for number, rule, preview in hits:
             print(f"{path}:{number}: {rule}: {preview}")

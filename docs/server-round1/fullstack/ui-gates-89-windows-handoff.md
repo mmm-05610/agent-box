@@ -90,6 +90,23 @@ PYTHONPATH=src python3 scripts/server-round1/ui_gates_89_leak_check.py docs/serv
 # 自检（改检查器本身时必跑）：--self-test ⇒ 5 必须红 + 8 必须绿 + 全仓 docs/ 461 文件零误报（本树 14:0x 实测全过）
 ```
 
+## 4b 门机械已经预演过（假端点，真实模型调用 0）
+
+```bash
+PYTHONPATH=src:<六个插件 src> AGENT_BOX_SANDBOX_MODULE=agent_box_sandbox_bwrap \
+  python3 scripts/server-round1/ui_gates_89_fake_rehearsal.py
+# → REHEARSAL_OK，7 条全绿；报告 docs/server-round1/fullstack/ui-gates-89-rehearsal.json
+#   它明写 notAcceptanceEvidence：这份**不是** 089 的真门证据（089 §Requirements 反例条不许拿假端点冒充）
+```
+
+预演钉住的四件事，跑真机时是同一批断言：
+① 两家座位（`pi`/`codex`）各发一句都走到 `completed` 且有 assistant 增量；
+② **没有座位的一家在建档时就被类型化拒**（`503 HARNESS_UNAVAILABLE`）且 **`server_turns` 一条没多**
+   ⇒ 缺环境不会先收下、再在执行段崩（`T6-1`/`T6-2` 的形状就是"先收下"）；
+③ 三种坏输入（未知方法、类型错的参数、缺参数）出站全是 JSON-RPC 错误对象，**没有一条裸 500**（`115` 的实效）；
+④ `profiles.list` 在真装配上确实带 `sendability`+`recoveryPending`（`117` 的实效）。
+预演自己也红过一次：断言把 REST 的 `{"error":{"code":…}}` 当字符串比 ⇒ 门咬到我；修完才是上面这四条。
+
 ## 5 交回的三条（跑的人一定会撞到，先写在这）
 
 1. **`native-home-gate.py` 的 turn 下标差一位**（089 若复用 45 门的读法会带同一个假红）——

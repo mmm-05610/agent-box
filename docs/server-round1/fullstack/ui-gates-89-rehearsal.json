@@ -1,0 +1,93 @@
+{
+ "checks": {
+  "no_bare_500:profiles.list": {
+   "detail": {
+    "jsonRpcEnvelope": true,
+    "status": 200
+   },
+   "pass": true
+  },
+  "no_bare_500:sessions.createAndSend": {
+   "detail": {
+    "jsonRpcEnvelope": true,
+    "status": 200
+   },
+   "pass": true
+  },
+  "no_bare_500:unknown.method": {
+   "detail": {
+    "jsonRpcEnvelope": true,
+    "status": 200
+   },
+   "pass": true
+  },
+  "profiles_list_carries_sendability": {
+   "detail": {
+    "profiles": 2,
+    "states": [
+     [
+      "ready",
+      null
+     ],
+     [
+      "ready",
+      null
+     ]
+    ]
+   },
+   "pass": true
+  },
+  "roundtrip:codex": {
+   "detail": {
+    "assistantChars": 17,
+    "assistantPrefix": "controlled stream",
+    "errorCode": null,
+    "realModelRequests": 0,
+    "turnState": "completed"
+   },
+   "pass": true
+  },
+  "roundtrip:pi": {
+   "detail": {
+    "assistantChars": 17,
+    "assistantPrefix": "controlled stream",
+    "errorCode": null,
+    "realModelRequests": 0,
+    "turnState": "completed"
+   },
+   "pass": true
+  },
+  "seatless_refused_typed_before_dispatch": {
+   "detail": {
+    "note": "\u4e24\u5904\u90fd\u8981\u6210\u7acb\uff1a\u88c5\u914d\u91cc\u6ca1\u6709\u8fd9\u4e2a\u5ea7\u4f4d \u21d2 \u5efa\u6863\u5373\u7c7b\u578b\u5316\u62d2\uff1b\u5e76\u4e14**\u4e00\u6761 turn \u90fd\u6ca1\u88ab\u521b\u5efa**\uff08\u7f3a\u73af\u5883\u4e0d\u80fd\u82b1\u6389\u7528\u6237\u4e00\u6b21\u8bf7\u6c42\uff09",
+    "profileCreateError": {
+     "code": "HARNESS_UNAVAILABLE",
+     "message": "Requested Harness is not configured",
+     "request_id": "req_b6669392c743446a8bc6287c3f4f1d49",
+     "retryable": true
+    },
+    "profileCreateStatus": 503,
+    "sendError": {
+     "code": "NOT_FOUND",
+     "details": {
+      "internalCode": "PROFILE_NOT_FOUND",
+      "retryable": false
+     },
+     "message": "Profile was not found"
+    },
+    "turnsAfter": 2,
+    "turnsBefore": 2
+   },
+   "pass": true
+  }
+ },
+ "cleanup": {
+  "temporaryRootRemoved": true
+ },
+ "failures": [],
+ "kind": "REHEARSAL_FAKE_ENDPOINT",
+ "notAcceptanceEvidence": "089 \u7684\u771f\u95e8\u8bc1\u636e\u53ea\u5728 ui-gates-89/ \u91cc\uff1b\u8fd9\u4efd\u662f\u95e8\u673a\u68b0\u7684\u9884\u6f14",
+ "order": "089",
+ "realModelRequests": 0,
+ "result": "REHEARSAL_OK"
+}
