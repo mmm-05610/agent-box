@@ -18,6 +18,12 @@
   42-D prepared 三家同步、字节钉死测试同步不放宽、三家各加反例门。**剩余**：三家链门真实端到端本环境不可跑（缺 Worker/sidecar/预置工件）；
   "部署文档字段可声明"这条取值来源未做（工单"取一，另一个如实登记"）。见下方 c2/c3 表 108 行与证据。
 
+- **工单 107 — 阶段 1 完成、阶段 2+ 一手阻塞（交回）**：把 pi/dsh 思考"打开"的**合法值**在本环境**无一手出处**
+  （pi 未安装；装的是全局 dsh、非 pin 的 `0.1.5-rc.1`，其启动器 `--help` 不暴露 `llm-deepseek.thinking`/`reasoningEffort` 值域；
+  `pi/config.py thinking="high"` 是另一条 `--thinking` CLI 路、非模板 `samplingParams.thinking.type` 形状）。
+  工单硬约束"**不发明**、合法值以实测/官方 schema 为准"⇒ **不猜值、不落模板**。请供其一：① pin 版 pi/dsh 的"开"合法 schema（含是否需 `reasoning:true` 才产 thought）；② 授权在预置 pin 工件上跑 `--help` 取值；③ 调度者按官方文档定值。
+  另注：107 文里"maxTokens 仍为 64"已被 108 取代（现为宽松缺省 8192，本单口径＝"107 不碰 maxTokens"）。真机 `thought.delta` 链门段本环境亦不可跑。详见 [阶段 1 观测](../server-round1/107-thinking-on-stage1-observation.md)。
+
 - **工单 110 — 已裁定并收口**（R-0032 ⑤ / `d67781d`）：67 的 stop/fail⇒pause 保留；本单改"暂停可见+类型化原因+可继续"，已交付
   （`pause_reason` 落库 18→19、`queue.updated` 事件仅在有原因时带 `pauseReason`，非暂停事件逐字段不变）。
   **遗留待裁（非我可自决）**：`queue.withdraw` 只接受 `pending`，对 `paused` 返 `too_late` ⇒ 裁定设想的"withdraw+重发"清不掉 paused 项；
@@ -38,7 +44,7 @@
 
 **待裁阻塞（见上「待拍/阻塞」节，一手证据已交回，未越界改 write_paths 外文件）**：`107`（需 pi/dsh 原生"thinking-on"一手 schema + `thought.delta` 真机门）。`092–096`/`100` 串行等于 A 线 105/089（尚未并入本树）。
 
-**下一位（R-0036/R-0038 序）**：`111`、`108` 均已落地（108 PARTIAL）。接下来：`114`（Qoder CLI 成一家，六部，write_paths 宽含 src/scripts，本树可施工，阶段 1 观测已提交）与 `107`（思考打开，与 108 同改 `deploy/{pi,dsh}` 模板⇒ 串行，现 108 已落可接）。`092` 仍待 A 线 105 收口并入本树。
+**下一位（R-0036/R-0038 序）**：`111`、`108` 均已落地（108 PARTIAL）；`107` 阶段 1 完成但**一手阻塞于 pin 版 pi/dsh 的"思考开"合法 schema**（见上「待拍/阻塞」），未拍前不落模板。本树现可推进的是 `114`（Qoder CLI 成一家，六部，write_paths 宽含 src/scripts，阶段 1 观测已提交，进入阶段 2 打包/物化）。`092` 仍待 A 线 105 收口并入本树。
 
 ---
 
