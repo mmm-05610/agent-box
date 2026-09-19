@@ -1392,3 +1392,29 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 | --- | --- | --- |
 | 105 | `HELLO_HARNESSES_DONE`（由 `PARTIAL` 改判，判定过程留在 §9/§10 与更正行） | **门**：更正行"门随之翻转…＋三条篡改反例"；**回归计数**：当时定向 `10 passed in 3.91s` ＋ 组合 `65 passed`；**含 105 全部改动的第一个全套件对**＝101 收口那轮 `tests/server 717 / 根 1017`（0 失败）——**105 自己没收口那一腿，此行为如实补记，不是复算**；**摘要**：字段只来自注册表、乱序注册仍逐字节稳定、缺席即无键；**费用**：**0 次 / ¥0**；**清理**：临时数据根逐一核实删除，无源码外产物；**未做项**：① `wireProtocols` 要等 runtime 线 `092` 加描述符字段后另开合同面单；② Windows 侧 hello 复跑属人的一腿；③ 两仓工件本体交换与"证据副本会不会冒充当前"→ **已交 113** |
 | 113 | `WIRE_ARTIFACT_PUBLISHED_PARTIAL` | **门**：终态行 G1/G1b/G2/G3/G4/G5 全列；**回归计数**：该行第 4 列（765/1、1066/0、本单 16 条、与 105/103 同跑 38 passed）；**摘要**：门列后半（"后端第一次有了自己生成、自己解释得清边界的清单"）；**费用**：**0 次 / ¥0**；**清理**：临时目录逐一核实删除；**未做项**＝原文里那句"**精确剩余**"：① 与桌面树现物字节对表（该腿按公告 106 轮移交主树会话，本树不改判）②`provenance` 两条漂移的合同侧声明 ③ 081 交回第 4 条（`wire-review` 缺 57/58/59/65 小节）④ 清单不含 result 形状 |
+
+## QA-008 的归属核对（2026-09-19 07:55，一手；写在 L 转单之前）
+
+R-0052 ①(a) 把 `QA-008`（`usage.aggregate` ⇒ **HTTP 500 纯文本**）判为"与 101/098 同族、违反 R-0032 ⑤"，
+并给了三条依据：`USAGE_AGGREGATOR_UNAVAILABLE` 不在家族表里、全 `src/` 只出现 1 次、**测试 0 覆盖**。
+本树现物核完，**前两条成立、第三条不成立，且这条 500 在本树代码上已经不复存在**：
+
+| 检查 | 本树（`fc6d4da`）现物 | 被 QA 打到的那个 Server |
+| --- | --- | --- |
+| `usage_aggregate` 怎么抛 | `WireError("UNAVAILABLE", msg, {"internalCode": "USAGE_AGGREGATOR_UNAVAILABLE"})`（101 阶段 2–4 的修法） | `WireError("USAGE_AGGREGATOR_UNAVAILABLE", msg)` ⇒ 内部码当家族位 ⇒ `__post_init__` 抛 `ValueError` ⇒ **正是 500 纯文本** |
+| `family_for("USAGE_AGGREGATOR_UNAVAILABLE")` | 实测返回 **`'UNAVAILABLE'`**（在家族表里） | — |
+| 源码版本 | tip `fc6d4da` | **`/tmp/audit-fe-2/server` 的 `.git` 指向 `90a11cb`＝"101 阶段 1"**——即 101 修复**之前**的那个快照；进程活着（18791 端口，与 18790 上更早的实例并存） |
+| 测试覆盖 | `tests/server/test_wire_error_family_101.py` 里**两条**直接断言这条：`:71` 家族与 `internalCode` 成对、`:80` `usage.aggregate` 的 `details.internalCode == "USAGE_AGGREGATOR_UNAVAILABLE"`；103 的覆盖账还把 101 这个文件列为 `usage.aggregate` 的**唯一**驱动证据 | — |
+
+⇒ **要给 L 的一句话**：这条不是"再修一次家族"，而是**那台在跑的 Server 是 101 之前的快照**——
+与 098 终态行未做项① 记的是同一件事（"在跑的实例是本单修复之前构建的，对它复现只会再量一次 500"）。
+所以那张新单的判据应当是**"从含 101 的构建重新起实例，再打 `usage.aggregate`，期望类型化 `UNAVAILABLE`＋`internalCode`"**，
+而不是在本树再动 `wire/errors.py`；若重部署后仍能复现 500，那才是新缺陷，本树随时接。
+
+（另注：`QA-009`＝`profiles.list` 不投影 `recovery_pending` 那条**不在这三条里**，写面在 `server/profiles/**`＋`sessions/**`，
+按 R-0023 归 **runtime 线**；本树不接。）
+
+### 补打检查点（R-0053 ④）
+
+112 是"用户可见单"且它的**修订 v2 收口**（`d56535f`）落在 `checkpoint/b2-2` 之后 ⇒ 按 ① 的命名补一个：**`checkpoint/b2-112`**。
+`checkpoint/b2`（`4c32992`）与 `checkpoint/b2-2`（`beee590`）**都不移动**（§3.2 禁止覆盖）。
