@@ -1216,3 +1216,16 @@ runtime 侧（存储/service/描述符/派生/冻结/逐家声明）已 DONE 且
 > 定向 `materialization or native` **27 passed/2 skipped**（含 093 阶段 2 既有 25 条未退化）。
 > **剩（终态仍 `NATIVE_CONFIG_MATERIALIZATION_PARTIAL`）**：① 派生器接到**真实 guest 投影写点**（turn 期）＋ 端到端第二上游真轮＝本环境缺 Worker/sidecar
 > 工件不可跑（同 108/114 真机腿先例，只读+in-process 覆盖）；② v2 逐槽/限额落盘（`model_controls` 描述符侧 + 各家 limit 字段）尚未接（092 wire 多槽那半未落）。逐家 DONE/PARTIAL 待真轮环境补。
+
+### 工单 094 — 登录引擎（阶段 1+2，假端点；非终态；2026-09-19，执行者·runtime 线）
+
+> 092 收口后判据成立（provider authStyle 可用 + harness 侧声明）。**已落**：`server/accounts/login_engine.py`——
+> device-code 登录引擎（会话生命周期 begin/poll/cancel + 流程注册表 **只登记一手钉死的 codex**，端点/auth.json 形状抄自 cc-switch
+> `codex_oauth.rs`/`subscription.rs`）；**transport 注入**⇒假端点在进程内跑机械路径（R-0011，0 真调用）；令牌只交 `land_asset`
+> 回调（生产里进 secret store），**任何客户端视图零令牌**；取消/过期⇒**再无任何出站**（出站计数器为门证）。
+> 类型化拒绝：未钉死的家⇒`LOGIN_FLOW_UNSUPPORTED`（零出站，绝不猜端点）；有流程但未声明 `subscriptionCredential.files`⇒`LOGIN_STATE_FILES_UNDECLARED`。
+> 测试 `test_subscription_login_engine_094.py` **5 passed**（G1 cancel/expire 零出站、G2 视图无 token + 落 auth.json、G3 假端点全路径落资产、G4 两类拒）；
+> 回归 `tests/server -k "account or credential or subscription"` **60 passed**；engine import OK。**Worker 工件不在**（无关环境红）。
+> **剩（终态 `SUBSCRIPTION_LOGIN_PARTIAL`）**：① `accounts.beginLogin/loginStatus/cancelLogin` 三方法在 `wire/handlers.py`＝**A 树**（越界，交 A + relock）；
+> ② 生产 transport（真 device-code 出站，复用 probe 边界）与 56 `pack_asset`+`AccountRecords` 的真实组装（本增量证明回调契约，未接生产 compose）；
+> ③ **真机一轮登录**要用户在自己浏览器输设备码（本环境无人 + 无真链工件不可跑）＋一轮执行验登录态可用＝真机腿。逐家（codex 端到端 DONE）待真机环境补。§Spend：0 真调用 / ¥0。
