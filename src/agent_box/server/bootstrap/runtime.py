@@ -854,16 +854,12 @@ def build_runtime_from_sidecar_deployment(
             # comes from the deployment, the process environment, or the one
             # documented default provider id. An unresolvable name is a typed
             # refusal, not a silent run without isolation.
-            # The documented default provider id is platform-specific: a
-            # bwrap provider cannot exist on Windows, and the Windows provider
-            # (Job life cycle, no container - see the order-48 spike) cannot
-            # exist on Linux. The name is still resolved, never imported.
-            _default_provider = "sandbox-windows" if os.name == "nt" else "sandbox-bwrap"
+            # The default provider follows the placement (the machine that runs
+            # the turn), not the host: a WSL/SSH guest is Linux even when the
+            # Server itself sits on Windows (order 090). The name is still
+            # resolved, never imported.
             sandbox_port = resolve_sandbox_port(
-                deployment.get("sandboxProvider")
-                or os.environ.get("AGENT_BOX_SANDBOX_PROVIDER")
-                or _default_provider
-            )
+                _sandbox_provider_name(deployment, placement.kind))
             asset_files: dict[str, bytes] = {}
             profile_id_for_assets = context.get("profile_id")
             # A composition whose ledger has never been opened cannot hold a
@@ -1212,6 +1208,28 @@ def _capability_binding(context: Mapping[str, Any]) -> str:
     ))
 
 
+def _sandbox_provider_name(deployment: Mapping[str, Any], placement_kind: str | None) -> str:
+    """The sandbox provider that composes the room for THIS execution.
+
+    The room runs on the machine that executes the turn, not the machine hosting
+    the Server (R-0014: a Windows control plane drives Linux WSL/SSH workers).
+    A WSL/SSH placement always lands in a Linux guest, so its default is the
+    guest sandbox - even when the Server process itself sits on Windows. Only a
+    native `local` placement may default to the Windows sandbox. A deployment may
+    still name `sandboxProvider` explicitly, or the process may pin
+    `AGENT_BOX_SANDBOX_PROVIDER`; neither is overridden here. Keying the default
+    on the host alone is order 090's defect: it sent a WSL turn to
+    `sandbox-windows`, unresolved in the guest, and the refusal came back as an
+    ambiguous dispatch.
+    """
+    provider = deployment.get("sandboxProvider") or os.environ.get("AGENT_BOX_SANDBOX_PROVIDER")
+    if provider:
+        return str(provider)
+    if placement_kind in {"wsl", "ssh"}:
+        return "sandbox-bwrap"
+    return "sandbox-windows" if os.name == "nt" else "sandbox-bwrap"
+
+
 def _capability_material(
     context: Mapping[str, Any], deployment: Mapping[str, Any],
 ) -> tuple[tuple[Any, ...], tuple[Any, ...], tuple[str, ...], str]:
@@ -1246,12 +1264,9 @@ def _capability_material(
         # 一致，且两者都落在本模块的锁定批准映射内。"已安装/已加载"本身不构成
         # 授权——descriptor 只是待比对的身份，批准集才是授权来源。
         # 声明文档由**已解析的沙箱端口**构造（上层不认识具体沙箱）。
-        _default_provider = "sandbox-windows" if os.name == "nt" else "sandbox-bwrap"
+        # 默认随放置走（`_sandbox_provider_name`），与本执行 port_factory 同源。
         port = resolve_sandbox_port(
-            deployment.get("sandboxProvider")
-            or os.environ.get("AGENT_BOX_SANDBOX_PROVIDER")
-            or _default_provider
-        )
+            _sandbox_provider_name(deployment, context.get("env_kind")))
         descriptor_id = port.descriptor_id()
         document = port.declaration_document(
             readonly_targets=executable_targets + projection_targets + artifact_targets,

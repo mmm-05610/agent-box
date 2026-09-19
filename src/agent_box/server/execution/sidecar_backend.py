@@ -13,8 +13,10 @@ from pathlib import PurePosixPath
 from typing import Any, Callable, Mapping
 
 from agent_box.extensions import capability
+from agent_box.extensions.runtime_composition.sandbox_port import SandboxPortUnavailable
 from agent_box.resource_contracts import AgentBoxProfileV1, PromptFragmentV1, WorkspaceV1
 from agent_box.server.execution.first_run_lock import first_run_gate
+from agent_box.server.execution.placement import PlacementUnsupported
 from agent_box.server.execution.sidecar import SidecarError, SidecarHarnessPort
 from agent_box.work_core import (
     ExecutionFinalizationRequest, ExecutionProjection, ExecutionStartReceipt,
@@ -132,6 +134,16 @@ class _CoreSidecarProvider:
             # （而非 ambiguous），并把原因码挂在异常上供 Server 映射还原。
             # post-open 的任何 SidecarError（即使同名错误码）不经此转换，保持
             # 既有歧义语义。
+            rejection = ExecutionStartRejected(str(refusal))
+            rejection.code = refusal.code
+            raise rejection from refusal
+        except (PlacementUnsupported, SandboxPortUnavailable) as refusal:
+            # Order 090: placement/sandbox resolution happens inside port_factory,
+            # strictly before any native side effect (open_execution/spawn). A turn
+            # that cannot resolve its placement is therefore a deterministic
+            # "start never happened" refusal - it must be recorded as a typed
+            # failure with its own code, never as an ambiguous dispatch. This is
+            # the same ExecutionStartRejected seam the capability gate uses.
             rejection = ExecutionStartRejected(str(refusal))
             rejection.code = refusal.code
             raise rejection from refusal
