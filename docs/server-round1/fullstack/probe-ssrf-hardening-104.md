@@ -239,3 +239,78 @@ for entry in resolved:            # 每一个答案，不是第一个
 两条都补了一行 `socket.getaddrinfo` 桩（返回一个公网地址），**断言一字未动**。
 ⇒ 这是"语义变严了，旧夹具里藏着的'名字不用存在'这个假设浮出来"，不是回归；
 改前先跑（`2 failed / 69 passed`）、改后复跑（`71 passed`）都记在案。
+
+## 9 阶段 4：门（`tests/server/test_probe_egress_104.py`，15 条）
+
+门一律**数请求**，不读源码：每个用例连的都是本机回环的 `ThreadingHTTPServer` 假端点，
+断言的是"谁收到了几条、请求行长什么样、带没带 `Authorization`"。
+
+### 9.1 用例 ↔ 门
+
+| 用例 | 钉哪道门 | 断言的形状 |
+| --- | --- | --- |
+| `test_a_redirect_is_refused_as_a_typed_endpoint_block` | G1 | 302 ⇒ `PROBE_ENDPOINT_BLOCKED` |
+| `test_exactly_one_request_leaves_when_the_endpoint_redirects` | **G1 的正身** | 源站 `count == 1` **且**目标站 `count == 0`（"跟完再抱怨"过不了这条） |
+| `test_the_credential_reaches_the_declared_endpoint_and_no_one_else` | G1（凭据腿） | 源站确实收到了 `Bearer …`（证明"本来有机会泄"），目标站 `requests == []` |
+| `test_probe_connection_refuses_the_redirect_too` | G1（第二个公开入口） | `status=unreachable` ＋ `detail=PROBE_ENDPOINT_BLOCKED`，目标站 0 条 |
+| `test_a_configured_proxy_is_not_used_even_for_a_plain_http_probe` | §2 那条旁路 | 假代理 `count == 0`，且声明端点记到的请求行**不是**绝对 URI（`not path.startswith("http")`） |
+| `test_the_module_does_not_go_through_the_shared_default_opener` | 同上，独立一条 | 把 `urllib.request._opener` 换成"一用就抛"的假 opener，正例仍成功 ⇒ 它有自己的 opener |
+| `test_a_name_resolving_to_imds_is_refused` | **G2** | 域名→`169.254.169.254` ⇒ 拒，**且 `create_connection` 记录为空**（"拒了但还是伸手了"过不了） |
+| `test_a_name_offering_public_and_private_together_is_refused` | G2 的"全部答案" | 公网＋内网两条答案 ⇒ 拒 |
+| `test_an_ipv6_link_local_answer_is_refused` | G2（v6） | `fe80::1` ⇒ 拒 |
+| `test_literal_private_addresses_are_still_refused` | 回归（既有那条腿） | `10.0.0.1`/`192.168.1.9`/`169.254.169.254` 字面量结论一字未变 |
+| `test_a_public_name_still_passes_the_endpoint_check` | G3 正例（判定侧） | `create_connection` 被打桩掉，所以"通过"只能是**校验放过**，不是"后来失败了" |
+| `test_an_unresolvable_name_is_still_unreachable_not_blocked` | G3 语义不变 | `gaierror` ⇒ `PROBE_UNREACHABLE`（没被顺手改成"我们拒绝了你"） |
+| `test_both_public_entries_still_succeed_against_a_loopback_fake` | G3 正例（端到端） | `pull_models → ok ('model-a',)`；`probe_connection → reachable` |
+| `test_the_scheme_rule_is_checked_before_any_resolution` | 边界顺序 | `ftp://` 在**`getaddrinfo` 一被调用就抛**的桩下仍被拒 ⇒ 顺序没被本单挪动 |
+| `test_nothing_was_resolved_outside_this_files_own_table` | **G4** | 全文件的 DNS 流量就是两张列表：问过的名字 ⊆ 本文件自己那张表；直接答的数字 ⊆ 本文件声明的那几个常量 |
+
+零出站不是靠"记得不发"：`getaddrinfo` 桩对**任何**不在表里且不是回环的名字回 `gaierror`，
+`create_connection` 在需要它的用例里被换成"记录并抛"。所以真发出去一次就是红的。
+
+### 9.2 反例：整份门拿去咬**修复前**的 `probe.py`
+
+跑法与 098 相同（复制 `src/agent_box` 到 `/tmp`、只替换副本里的 `probe.py` 为
+`git show d2b2036:…`，`PYTHONPATH` 排前，工作树一字未动，跑完 `rm -rf` 并核实缺席）。
+
+| 结果 | 内容 |
+| --- | --- |
+| **9 failed / 6 passed** | 红的正是：G1 四条（含"恰一次"与凭据两条）、判定侧三条（IMDS／混合／`fe80::1`）、默认 opener 那条、以及"解析不出仍 `UNREACHABLE`"那条 |
+| 绿的六条 | 三条本来就管字面量（`literal_private`、`public_name_passes`、`scheme_rule`）、两条正例（`both_public_entries`、G4 列表）、以及**代理那条（见下）** |
+| 一次白送的证据 | 旧码某条红得很难看：`AssertionError: a probe attempted to connect to ('127.0.0.1', 7897)`——那是**本机的代理端口**，旧代码在测试里就把请求交给了它 |
+
+**代理那条为什么在旧码跑里是绿的**（必须说清，不然像在挑好看的）：旧代码用
+`urlopen` 的**默认 opener**，而那个 opener 是**进程内首次使用时的快照**——
+同一进程里前面的用例已经把它建好了，本用例后面再 `setenv` 就不起作用。
+⇒ 这一条的反例**不在进程内**，而在阶段 1 的两处一手测量里（§2.2：假代理收到
+`GET http://localhost:…/models` **带明文凭据**并回 `ok`；§2.3：真实代理环境下第二跳离程），
+两者都是在**修复前**的代码上跑的。门这边留的是"修完之后不许复发"。
+
+### 9.3 计数
+
+* 门文件：`15 passed in 6.66s`（最终源码）
+* 咬旧码：`9 failed / 6 passed in 6.69s`
+* 定向回归：`tests/server -k "probe or usage or provider or model"` ⇒ 改前 `2 failed / 69 passed`
+ （两条既有夹具需要解析桩），补桩后 **`71 passed`**
+* 全套件与账在 §11
+
+## 10 残余风险与交回（工单 §Notes 点名的那一句）
+
+**残余风险（不消除，写清为什么）**：**DNS 重绑定窗口仍在**。校验解析一次、连接再解析一次，
+中间 TTL=0 的名字可以先答公网地址过关、再答 `169.254.169.254`。
+本单把"**完全不看解析结果**"修成了"看"，**没有**修成"看了之后不再变"。
+闭死它需要把已校验的地址带到连接层（https 侧要自己管 `server_hostname`/SNI 与证书校验），
+而本机没有 TLS 桩可用（环回例外只放 `http`）⇒ 没有反例的门不算门，所以本单**不做半套**，
+建议另开一单（带威胁模型与 TLS 测试面）。
+
+**交回**：
+
+* **CGNAT `100.64.0.0/10` 今天可通过校验**（`ipaddress` 在本机 Python 3.12 下
+  对 `100.64.0.1` 的 `private/reserved/multicast/link_local` 四个旗标全是 `False`，实测见 §8.1）。
+  WSL2／Tailscale／各类 VPN 的内部面常落在这段。要不要拒是**语义裁决**，本单不自扩拒绝集。
+* **`_typed_http_error` 曾是零调用者**（§7）：修前的错误映射有两份，改在"看起来是正主"的那份上不生效。
+  本单统一之后只剩一份。这类"两份映射"如果别处还有，属 102/103 的形。
+* **`workers/**` 与 JS 侧不是本单的射程**（§4 清扫表）：Python 侧带凭据出站在本单之后清零；
+  `plugins/agent-box-harnesses/third_party/.../agent-model-catalog.js` 的目录拉取若要同样约束，是另一张单。
+* **给 103**：`providerModels.probeConnection` 里那个 `_provenance` 死调用点（098 §10 已记）
+  与本单无关，但 103 的覆盖面会把"每个登记方法至少被真 wire 驱动一次"这件事一并照出来。
