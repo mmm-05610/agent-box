@@ -1255,3 +1255,14 @@ runtime 侧（存储/service/描述符/派生/冻结/逐家声明）已 DONE 且
 | 121 | 4 死分支有结论 | **选 ②**：保留 `if current==1`/`_migrate_1_to_2` 作为合成种子→全链的驱动（生产根从 v2 起），依据＝删它即自毁这条升级覆盖；种子测试仍跑 1→current、幂等、保行 | 同上 | 0 | 本提交 |
 
 **剩余（PARTIAL 精确项）**：Work Core `migrations/001..009` 的"全新安装⇔升级到 9"结构+ledger 等价常设门（G5：人为改坏一处升级列/迁移⇒红）。独立单元，本单产品侧不动它语义。
+
+## 工单 096 — 思考/推理旋钮（阶段 1 观测；2026-09-19，执行者·runtime 线）
+
+> 092（模型事实 `reasoningOptions`+描述符）+ 093（写入器）判据成立 ⇒ 开工观测。**阶段 1＝纯观测、零代码**。
+> 证据：[096 阶段 1](../server-round1/096-native-reasoning-stage1-observation.md)。§Spend：0 真调用。
+
+| 单 | 阶段 | 门/观测 | 冲突/边界 | 真实模型 | 提交 |
+| --- | --- | --- | --- | --- | --- |
+| 096 | 1 观测 | 逐家思考原生键一手实测（codex `model_reasoning_effort`@config.toml:26=high、pi `samplingParams.thinking`+`reasoning:false`@models.json:11/16、dsh `thinking:"disabled"`+`reasoningEffort:"off"`@settings.yaml:21/24、opencode/kilo per-model `options.reasoningEffort`@opencode.json:14/16、hermes `thinking`@config.yaml:16）；两层语义（旋钮=harness 级 / 值域=模型级、翻译后 ∪ 钉死枚举，两边无⇒不声明）；v2 默认翻转写死点一手定位 | **① §4 生效域投影在 `config.describe`＝A 树 wire**（与 092/122 同型：声明+校验+落盘本树做、describe 交 A）；**② §5 v2 改 `deploy/{pi,dsh,opencode}` 与 108 刚落的模板字节钉死测试同文件不同键⇒须同批改 108 期望**（R-0054 串行） | 0 | 本提交 |
+
+**剩**：阶段 2–5（描述符 controlOptions/`modelControls` 声明旋钮 + `CONTROL_VALUE_UNSUPPORTED` 校验 + 写入器键 + v2 模板翻转**与 108 钉死测试同批** + G6/G7 真 thought.delta 门）。**G6 真产生 thought.delta 需真链（本环境缺 Worker/sidecar 工件不可跑）⇒ 096 终态预期 PARTIAL**；qwen 无思考键/dsh·pi 逐模型映射不抄私表 ⇒ 类型化拒绝+逐家 status 登记。
