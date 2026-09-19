@@ -1059,3 +1059,13 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 - **本单不做**：不改 `home.put` 的边界语义（超限仍 `HOME_IO`、非普通文件仍拒、逃逸仍 `PATH_INVALID`；
   **空载荷实测到不了 `HOME_IO`**——`value_string` 先拒空串 ⇒ `REQUEST_INVALID`，该分支在真实客户端上不可达，见证据 §8 末）、
   不改 wire 形状、不动既有 bundle 目录（`c11` 留作反例样本，重建只写进新目录 `c12`）。
+
+
+## 工单 097 — `server.hello` 能力表与派发表对齐（2026-09-19，执行者）
+
+> **进行中**：本记本单**阶段 1**（真 hello 与派发表差集）。终态行在阶段 4 提交时补。
+> 证据：[hello-capability-sync-097.md](../server-round1/fullstack/hello-capability-sync-097.md)
+
+| 单 | 阶段 | 门 | 回归 | 真实模型 | 提交 |
+| --- | --- | --- | --- | --- | --- |
+| 097 | 1 观测：真 hello vs 派发表 | 观测形态 = **真 Server 真监听**（`build_runtime()` → `create_app` → uvicorn 真 bind `127.0.0.1`，`TestClient` 不算）＋ 真发一次 Validation 里那条 `POST /wire/v1/server.hello`。差集一手：声明 **27**（无重复）vs 派发表 **64**（无重复）⇒ **缺 37 条、逐条与工单 §Current state 同名同数**；**反方向 0**（表里没有派发不出来的方法）。工单没写、但决定后面两道门怎么落的两条一并实测：① 这 27 条里 **11 条是 `supported:false`**（四个 `workspaces.*` ⇒ `LOCAL_SANDBOX_UNAVAILABLE`；六个 `sessions.*` ＋ `sendOutcome.query` ⇒ `EXECUTION_CAPABILITY_UNAVAILABLE`）⇒ 这就是 G3 要比对的**同一部署基线**，且因为 `build_runtime` 的 `execution=None` 是生产默认（其 docstring 明写"好让能力回答诚实"），这 11 条是**真话**不是陈旧表的产物；② `tests/server/test_capability_namespace_boundary.py:72-76` 的能力命名空间隔离断言**读源码正则、不读这张表**，它已覆盖全部 64 条 ⇒ 补声明不会把第三套词汇混进前两套（但它是第二道防线，阶段 3 点名） | 本阶段无新增测试（观测 + 契约）；两个阶段 2 决定已在证据 §4 写明理由：`server.hello` **自身声明**（发现入口对自己隐身＝假话）、派生顺序取**派发表字面插入序**而非字母序（今天常量本就按族分组，字母序会把"表变全"伪装成顺序大改，而 §必须保持不变 点名的正是顺序稳定性） | **0 次 / ¥0**（只发一次本地发现方法，不碰任何 Provider；`auth.required` 用的是 `build_runtime` 自生成的会话令牌，凭据 locator 未访问） | 本提交（阶段 1） |
