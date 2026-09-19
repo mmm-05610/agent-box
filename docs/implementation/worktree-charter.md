@@ -15,9 +15,18 @@
 
 - **本树（B）主写**：`src/agent_box/server/bootstrap/**`、`server/execution/**`、`server/workspaces/**`、`server/sessions/**`、
   `plugins/**`、`workers/**`、`protocols/**`、`tests/**`（自己的用例）、`docs/server-round1/**`、`docs/implementation/status.md`（本树账）
-- **属 A 树**：`src/agent_box/server/wire/**`（参数表/handler）、`server/model_configs/probe.py` 及其探针语义
-- **共享文件必须串行**：`src/agent_box/server/model_configs/**` 与 `server/bootstrap/runtime.py` 的描述符部分——
-  A 的 104/105 与 B 的 092/096 **不得同时进行**；**按公告的点名串行**（先 A 的 104/105，再 B 的 092）。
+- **属 A 树**：`src/agent_box/server/wire/**`（参数表/handler）、`server/model_configs/probe.py` 及其探针语义、
+  **`scripts/server-round1/**`（门脚本与生产链门的唯一 owner＝A 树，`QA-004`）**——本树**只读引用**；
+  确实需要改某个门脚本 ⇒ **交回**，由调度者在那张单里开**一次性例外**（先例：`108` 的 `234fa08` 把该路径写进它的 `write_paths`）。
+  依据是实测：两棵后端树各带一份 15 门脚本、**md5 逐个 15/15 逐字相同**（`docs/qa/dedup-ledger.md` D-001）⇒ 两份真相、改判据即静默分叉。
+- **共享文件必须串行**：`src/agent_box/server/model_configs/**` 与 `server/bootstrap/runtime.py` 的描述符部分（**这条面仍有效**：同写才要串行）。
+  ~~A 的 104/105 与 B 的 092/096 不得同时进行；按公告点名串行（先 A 的 104/105，再 B 的 092）~~
+  ⇒ **该串行理由已过期（`R-0051 ①`，2026-09-19）**：`104` 已 `PROBE_SSRF_HARDENING_DONE`、`105` 已 `HELLO_HARNESSES_DONE` 且重锁完成
+  ⇒ **`092 → 093 → 094 → 095 → 096` 现在依次开工，不再等任何点名**（`093` 阶段 1 已见 `900d80d` 15:33）；`100` 仍按原口径等 `089`。
+- **计数口径（`QA-007`）**：报任何全量/门计数**必须附一行「Worker 工件在/不在」**——本树正是缺这些 git-ignore 的构建产物
+  （`workers/agent-box-worker/target/{debug,release}`、`.acceptance-bundle-c*`）才天然 **18 红**；QA 已在同一 pinned sha 用反证钉死
+  （不补工件 18 failed / EXIT=1 ⇄ 只补工件 18 passed / EXIT=0，`docs/qa/env-attribution.md` E-001）⇒ **不写这行，你的红数会被读成产品回归**。
+  批末按 `R-0040 ⑥`：不宣告"全量通过"，写 sha＋命令＋计数并标 **`待 QA 复算`**。
 - 只显式 `git add -- <paths>`；提交用 **pathspec 形式**；不 `reset`/`stash`/`clean`、不 `merge` 主干、**不 push**、不碰另两棵树
 
 ## 3 队列切片（按此顺序）
