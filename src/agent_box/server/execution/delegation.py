@@ -11,7 +11,9 @@ records the rest of the Server uses:
   **normal turn** for the child Profile, links it to the parent turn
   (`parent_turn_id`), dispatches it, waits within the ten-minute bound, and
   returns the child's **bounded final message** plus a `task_id` handle;
-* **cancellation propagates**: cancelling the parent cancels its children;
+* **cancellation propagates**: both stop entry points cascade the request to
+  the child turns the ledger links to the stopped turn (see
+  `SessionService.cancel_descendants`);
 * **usage attribution** is the link: the child's own usage columns stay on the
   child turn and the parent's roll-up is the join - nothing is copied between
   turns, and nothing is invented.
@@ -22,14 +24,14 @@ store); an unknown handle is refused; nothing here guesses.
 from __future__ import annotations
 
 import time
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping
 
 from agent_box.server.errors import ServerError
 from agent_box.server.profiles.subagents import (
     DEFAULT_TIMEOUT_SECONDS,
     DelegationError,
     MAX_ROSTER_ENTRIES,
-    check_depth,
+    check_cycle,
     grant_edges,
     has_delegation,
     inline_available,
@@ -75,8 +77,8 @@ class DelegationService:
     # -- run ----------------------------------------------------------------
 
     def run(
-        self, *, parent_turn_id: str, parent_profile_id: str, arguments: Mapping[str, Any],
-        chain: Sequence[str] = (), calls_this_turn: int = 0,
+        self, *, parent_turn_id: str, parent_profile_id: str,
+        arguments: Mapping[str, Any], calls_this_turn: int = 0,
     ) -> dict[str, Any]:
         edges = grant_edges(self.profiles.subagent_grants())
         if not has_delegation(edges, parent_profile_id):
@@ -103,14 +105,15 @@ class DelegationService:
         if bool(child_profile.get("archived_at")):
             raise ServerError("PROFILE_ARCHIVED", "Profile is archived", status=409)
 
-        # Depth: the chain is (root ... parent); appending the child must stay
-        # within the bound, and a cycle refuses by name.
-        next_chain = [*chain, str(parent_profile_id), chosen["profileId"]]
-        check_depth(next_chain)
+        # The ancestry is read out of the ledger, never handed over by the
+        # caller: the bridge knows only its own turn, and a self-reported chain
+        # is no chain (order 086 stage 3 - the rule below was written down and
+        # could not see the calls it was meant to refuse).
+        check_cycle([*self.records.turn_ancestry_profile_ids(parent_turn_id),
+                     chosen["profileId"]])
 
-        # The child's own edges decide whether *it* may delegate on; that is
-        # the default-refusal depth rule, and it is recorded on the result so
-        # the parent can relay it honestly.
+        # Whether the child itself holds grants is what decides if it may hand
+        # work on - recorded on the result so the parent can relay it honestly.
         child_may_delegate = has_delegation(edges, chosen["profileId"])
 
         session_id, native_id, resumed = self._resolve_child_session(
@@ -330,14 +333,3 @@ class DelegationService:
             "totalTokens": row["usage_total_tokens"],
             "usageSource": row["usage_source"],
         }
-
-
-def cancel_children(records, *, parent_turn_id: str) -> list[str]:
-    """Every child turn of one parent turn (order 65: cancellation propagates)."""
-    with records.database.read() as conn:
-        rows = conn.execute(
-            "SELECT id FROM server_turns WHERE parent_turn_id=? "
-            "AND state IN ('accepted','dispatching','running','capturing')",
-            (parent_turn_id,),
-        ).fetchall()
-    return [str(row["id"]) for row in rows]

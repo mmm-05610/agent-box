@@ -9,8 +9,10 @@ turn as the ledger really records it?
 
 That distinction already cost two orders here: 099 (a `home.put` implementation
 no dispatch arm ever routed) and 103 (the same shape across the 64 wire
-methods). The two checks below that come out red are that shape again, and each
-one states the entry point it was driven from so the claim can be re-checked.
+methods). Two of the checks below were exactly that - the cancellation cascade
+and the cycle refusal - and both are red at the commit that first wrote them
+(`3d19218`); each one names the entry point it was driven from, so the claim can
+be re-checked.
 
 Counterexamples are inside the assertions, not implied: the usage check completes
 the parent with its own numbers so a copy-onto-parent implementation would show
@@ -39,6 +41,28 @@ def _delegating_parent(tmp_path, *, grandchild: bool = False):
         profiles.grant_subagent(parent_id=child["profile_id"], child_id=other["profile_id"])
     return dict(database=database, profiles=profiles, records=records, sessions=sessions,
                 execution=execution, service=service, parent=parent, child=child, other=other)
+
+
+class _NeverFinishes(FakeExecution):
+    """A child turn that is still running when its parent is stopped.
+
+    `cancel` answers the way a real stop does: the process is gone, so the turn
+    reaches its terminal state.
+    """
+
+    def __init__(self, records) -> None:
+        super().__init__(records)
+        self.cancelled: list[str] = []
+
+    def accept(self, turn_id: str, *, overrides=None) -> None:
+        self.accepted.append(turn_id)
+        self.records.set_turn_dispatch(turn_id, work_id="w", execution_id="e",
+                                       dispatch_id="d", state="running")
+
+    def cancel(self, turn_id: str) -> bool:
+        self.cancelled.append(turn_id)
+        self.records.finish_cancelled(turn_id)
+        return True
 
 
 def test_the_child_s_usage_stays_on_its_own_turn_and_reaches_the_parent_as_a_fact(tmp_path):
@@ -121,19 +145,6 @@ def test_cancelling_the_parent_reaches_the_child_turn_that_is_still_running(tmp_
     service, records, sessions, parent = (
         env["service"], env["records"], env["sessions"], env["parent"])
 
-    class _NeverFinishes(FakeExecution):
-        cancelled: list[str] = []
-
-        def accept(self, turn_id: str, *, overrides=None) -> None:
-            self.accepted.append(turn_id)
-            records.set_turn_dispatch(turn_id, work_id="w", execution_id="e", dispatch_id="d",
-                                      state="running")
-
-        def cancel(self, turn_id: str) -> bool:
-            self.cancelled.append(turn_id)
-            records.finish_cancelled(turn_id)
-            return True
-
     stalled = _NeverFinishes(records)
     service.execution = stalled
     sessions.execution = stalled
@@ -155,16 +166,59 @@ def test_cancelling_the_parent_reaches_the_child_turn_that_is_still_running(tmp_
     assert states == {kids[0]: "cancelled"}, (
         f"cancelling the parent left the child running: {states} - the ledger says "
         "the parent is cancelled and nothing asks the child to stop")
+    assert kids[0] in stalled.cancelled, (
+        "the child must be stopped through the execution port, not only in the ledger")
 
 
-def test_a_three_hop_cycle_closes_and_is_refused_by_name(tmp_path):
+def test_the_wire_stop_applies_the_same_rule(tmp_path):
+    """两个入口: the desktop stops with `runs.stop`, not with the REST cancel.
+
+    `WireService.runs_stop` is bound to this env's own sessions and execution
+    (the same borrowing `test_delegation.py` uses for `_native_event`), so the
+    second door is the real one. A rule wired at one door only is how 103's
+    finding stays found.
+    """
+    from agent_box.server.wire.handlers import WireService
+
+    env = _delegating_parent(tmp_path / "wire")
+    service, records, sessions, parent = (
+        env["service"], env["records"], env["sessions"], env["parent"])
+    stalled = _NeverFinishes(records)
+    service.execution = stalled
+    sessions.execution = stalled
+    with pytest.raises(DelegationError) as timeout:
+        service.run(parent_turn_id="parent-turn", parent_profile_id=parent["profile_id"],
+                    arguments={"subagent": "beta", "description": "do some work",
+                               "prompt": "x", "timeout": 1})
+    assert timeout.value.code == "SUBAGENT_TIMEOUT"
+    with records.database.read() as conn:
+        kids = [str(row["id"]) for row in conn.execute(
+            "SELECT id FROM server_turns WHERE parent_turn_id='parent-turn'").fetchall()]
+    assert kids and records.get_turn_context(kids[0])["state"] == "running"
+
+    from types import SimpleNamespace
+
+    outcome = WireService.runs_stop(
+        SimpleNamespace(sessions=sessions, execution=stalled), {
+            "requestId": "stop-1",
+            "sessionId": records.get_turn_context("parent-turn")["session_id"],
+            "executionId": "parent-turn",
+        })
+    assert outcome["outcome"] == "stop_requested", outcome
+    assert kids[0] in stalled.cancelled, (
+        f"`runs.stop` stopped the parent only: {stalled.cancelled}")
+    assert records.get_turn_context(kids[0])["state"] == "cancelled"
+
+
+def test_a_three_edge_ring_closes_on_its_third_hop_and_is_refused(tmp_path):
     """环 (kept by R-0016): the ancestry is the ledger's, not the caller's to state.
 
     The grant layer only rejects the **direct** reverse edge, so A→B, B→C, C→A
     is representable and the delegation graph is not a DAG. That makes the
     runtime cycle rule the one that has to hold - and it can only hold if the
     chain is read back out of the ledger, because the bridge arrives with no
-    ancestry to declare.
+    ancestry to declare. The ring closes on the third hop: alpha is already
+    waiting in it, so gamma's call back to alpha is a role waiting on itself.
     """
     env = _delegating_parent(tmp_path)
     service, profiles, records = env["service"], env["profiles"], env["records"]
@@ -181,22 +235,17 @@ def test_a_three_hop_cycle_closes_and_is_refused_by_name(tmp_path):
                          parent_profile_id=env["child"]["profile_id"],
                          arguments={"subagent": "gamma", "description": "pass it on",
                                     "prompt": "x"})
-    third = service.run(parent_turn_id=second["turnId"],
-                        parent_profile_id=env["other"]["profile_id"],
-                        arguments={"subagent": "alpha", "description": "and back again",
-                                   "prompt": "x"})
-    # The fourth hop is the one that closes the loop: alpha delegating to beta
-    # again. Written exactly as the loopback endpoint writes it.
+    # Written exactly as the loopback endpoint writes it: no ancestry handed in.
     with pytest.raises(DelegationError) as cycle:
-        service.run(parent_turn_id=third["turnId"],
-                    parent_profile_id=env["parent"]["profile_id"],
-                    arguments={"subagent": "beta", "description": "start the second round",
+        service.run(parent_turn_id=second["turnId"],
+                    parent_profile_id=env["other"]["profile_id"],
+                    arguments={"subagent": "alpha", "description": "and back again",
                                "prompt": "x"})
     assert cycle.value.code == "SUBAGENT_CYCLE", cycle.value.code
     with records.database.read() as conn:
         closed = conn.execute(
             "SELECT count(*) FROM server_turns WHERE parent_turn_id=?",
-            (third["turnId"],)).fetchone()[0]
+            (second["turnId"],)).fetchone()[0]
     assert closed == 0, "the refused hop must not create a turn"
     # The grant layer's own refusal stays where it is: a two-edge cycle never
     # becomes representable in the first place.
@@ -209,11 +258,10 @@ def test_a_three_hop_cycle_closes_and_is_refused_by_name(tmp_path):
 def test_a_grandchild_delegation_is_allowed_now_that_depth_is_not_a_ceiling(tmp_path):
     """R-0016: the ceiling is revoked; only a repeated Profile is refused.
 
-    The counterexample is the revoked rule itself: the ceiling still bites every
-    in-process caller today (`test_delegation.py` / `test_subagents.py` pin
-    SUBAGENT_DEPTH_EXCEEDED), so once the chain is read from the ledger - which
-    is what makes the cycle rule above reachable - a re-added ceiling turns this
-    red. Four hops, all distinct, for exactly that reason.
+    The revoked rule is exactly what this test contradicts: under 65's ceiling a
+    chain this long was refused before anyone could repeat themselves, which is
+    why the ring test above was unreachable in the first place. Read the two as
+    a pair - one pins the rule R-0016 keeps, this one pins the rule it revokes.
     """
     env = _delegating_parent(tmp_path / "deep", grandchild=True)
     service, profiles, records = env["service"], env["profiles"], env["records"]

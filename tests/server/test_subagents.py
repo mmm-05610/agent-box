@@ -16,7 +16,7 @@ from agent_box.server.profiles.subagents import (
     DEFAULT_TURNS_LIMIT,
     MAX_TIMEOUT_SECONDS,
     DelegationError,
-    check_depth,
+    check_cycle,
     grant_edges,
     has_delegation,
     inline_available,
@@ -76,13 +76,17 @@ def test_only_granted_profiles_appear_and_cycles_never_become_representable(tmp_
     assert tool_definitions(roster=child_roster) == []
 
 
-def test_depth_and_cycles_are_refused_by_name(tmp_path):
-    check_depth(["alpha", "beta"])
-    with pytest.raises(DelegationError) as deep:
-        check_depth(["alpha", "beta", "gamma"])
-    assert deep.value.code == "SUBAGENT_DEPTH_EXCEEDED"
+def test_a_cycle_is_refused_by_name_and_depth_is_not_a_ceiling():
+    """Ruling R-0016 revoked 65's depth limit; the cycle rule is what remains.
+
+    The chain this checks is the shape the server now reads off the ledger, so a
+    long one must pass and a repeated role must not: a role inside its own call
+    is waiting on itself.
+    """
+    check_cycle(["alpha", "beta"])
+    check_cycle(["alpha", "beta", "gamma", "delta", "epsilon"])
     with pytest.raises(DelegationError) as cycle:
-        check_depth(["alpha", "beta", "alpha"])
+        check_cycle(["alpha", "beta", "alpha"])
     assert cycle.value.code == "SUBAGENT_CYCLE"
 
 
@@ -98,7 +102,9 @@ def test_the_tools_carry_the_roster_and_refuse_unauthorized_or_widened_calls():
     run = tools[1]
     assert "beta" in run["description"] and "gamma" in run["description"]
     assert run["inputSchema"]["required"] == ["subagent", "description", "prompt"]
-    # A child sees the list tool but never the run tool.
+    # The parameter exists for a caller that wants list-only tools. It is not a
+    # child restriction: ruling R-0016 revoked 65's "children get no run tool"
+    # default, and production always builds both from the child's own grants.
     child_tools = tool_definitions(roster=roster, include_run=False)
     assert [tool["name"] for tool in child_tools] == ["list_subagents"]
 

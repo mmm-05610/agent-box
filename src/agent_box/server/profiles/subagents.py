@@ -12,10 +12,11 @@ description so one call is enough. Four rules are this module's own:
   from an older context;
 * **optional arguments only narrow**: a caller may tighten a child's model
   slot, permission or limits, never widen them (order 60's rule, restated);
-* **depth is default-refusal, not a counter**: a child has no `run_subagent`
-  unless the child's own grants exist, so a grandchild delegation is
-  structurally impossible; the counters (depth ≤ 2, ≤ 4 calls per turn) are
-  the second layer, and a cycle (A→B→A) is refused by name;
+* **a cycle is refused by name, a deep chain is not**: one role may hand work
+  on for as long as the chain never returns to a role already waiting inside it
+  - that alone would deadlock, so it is the refusal that survives ruling R-0016,
+  which revoked 65's depth ceiling and its "a child gets no run tool" default;
+  the bound that remains is the ≤ 4 calls per turn;
 * **no grants, no tools**: a Profile with no edges gets neither tool
   materialised - a pair of always-failing tools is worse than none.
 """
@@ -27,7 +28,6 @@ from typing import Any, Iterable, Mapping, Sequence
 MAX_SUBAGENT_DESCRIPTION_CHARS = 160
 MAX_ROSTER_ENTRIES = 32
 MAX_INLINE_NAMES = 8
-DEFAULT_DEPTH_LIMIT = 2
 DEFAULT_TURNS_LIMIT = 4
 DEFAULT_TIMEOUT_SECONDS = 600          # the order's ten minutes
 MAX_TIMEOUT_SECONDS = 600
@@ -95,15 +95,18 @@ def has_delegation(edges: Mapping[str, set[str]], profile_id: str) -> bool:
     return bool(edges.get(str(profile_id)))
 
 
-def check_depth(chain: Sequence[str], *, limit: int = DEFAULT_DEPTH_LIMIT) -> None:
-    """Refuse by name when a chain exceeds the depth or closes a cycle."""
-    # A cycle is reported as a cycle even when it also overruns the depth: the
-    # more specific refusal is the more useful one.
+def check_cycle(chain: Sequence[str]) -> None:
+    """Refuse the one shape a delegation chain may never take: a repeated role.
+
+    `chain` is the ancestry the server read off the ledger plus the child about
+    to be started. Depth is not a ceiling here (ruling R-0016 revoked 65's);
+    a role that appears twice is the case that actually harms - it would be
+    waiting on a call that is waiting on it.
+    """
     if len(set(chain)) != len(chain):
-        raise DelegationError("SUBAGENT_CYCLE", "the delegation chain closes a cycle")
-    if len(chain) > limit:
         raise DelegationError(
-            "SUBAGENT_DEPTH_EXCEEDED", f"a delegation chain is at most {limit} deep",
+            "SUBAGENT_CYCLE",
+            "the delegation chain closes a cycle on a role already waiting in it",
         )
 
 
@@ -115,9 +118,9 @@ def tool_definitions(
     """The MCP tool pair, with the roster summary embedded in `run_subagent`.
 
     A Profile with no grants gets an empty list (the tools are not
-    materialised). `include_run=False` is what a *child* sees: the list tool
-    (if the child itself has grants) but never the run tool unless its own
-    edges allow it.
+    materialised). `include_run=False` asks for the list tool alone; it is not
+    what a child sees by default - whether a child may delegate is decided by
+    its own grants (ruling R-0016 revoked 65's "a child gets no run tool" rule).
     """
     if not roster:
         return []

@@ -651,7 +651,7 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 | --- | --- | --- |
 | 51 | USAGE_FACT_DONE：pi/codex/hermes/claude 门级观测轮全部产出事实（hermes (11,7)/(22,14)、claude (11,7)，source=声明格式）；WAL 侧车根因修复；六家解析器就绪 | kilo/opencode/dsh/qwen 模板未声明 usageProbe（解析器已备，未启用；kilo/opencode 启用时读共享库，走 66 只读规则） |
 | 52 | B/D+E 完成：三新 wire kind + 四类映射入账本 + 夹具端到端 | 真 harness 观测轮已跑（pi+假端点一圈**零过程事实**，否定结果记账）；需能发四类负载的真流 |
-| 65 | SUBAGENT_DELEGATION_PARTIAL：A/B＋C（授权边、两工具契约、委派服务、`parent_turn_id`、有界摘要、用量同源、续接/深度/环/扇出、取消传播、桥入 bundle、loopback 端点按次令牌、有授权才渲染、父 deny 继承、审批镜像、授权 CRUD wire、**真桥端到端（真进程→真通道子执行→摘要）**、并发扇出）；12 条测试 | P17/P20 前端；真 harness 父侧发起 tools/call 的一圈 | 75253fa + 701ae20 + 6854e4c + 本轮 |
+| 65 | SUBAGENT_DELEGATION_DONE（086 收口）：A/B＋C（授权边、两工具契约、委派服务、`parent_turn_id`、有界摘要、用量同源、续接/环/扇出、取消传播、桥入 bundle、loopback 端点按次令牌、有授权才渲染、父 deny 继承、审批镜像、授权 CRUD wire、**真桥端到端（真进程→真通道子执行→摘要）**、并发扇出）＋ **真 harness 父侧自发起 tools/call 一圈**（claude-code 真 CLI/真 `.claude.json`/真桥进程，`SUBAGENT_HARNESS_ROUND_DONE`）＋ **两条死规则接上真链路**（血统由账本 `parent_turn_id` 走出、调用方不可自报；取消级联接 REST `turns.cancel` 与 wire `runs_stop` 两入口）；**深度上限与"子轮默认不带 run 工具"按 R-0016 撤销**；12 条 + 086 的 18 条测试 | 只剩 P17/P20 前端（后端无剩余；授权层的**任意环**拒绝缺口另计，见 086 未做项） | 75253fa + 701ae20 + 6854e4c + 3d19218 + 本轮 |
 | 64 | EXECUTION_INVENTORY_DONE（账本同源、pid 本机可报/远端 null+reason、上限 200 类型化、零宿主路径；4 条测试） | WSL pid（需 Worker 单）；P20 同步与重锁 | 本轮 |
 | 63 | PROFILE_MEMORY_READ_DONE（本机侧完整；注册表 memory_paths、只读+有界+扫描、profiles.memory wire；4 条测试） | WSL 侧读；P17 同步与重锁 | 本轮 |
 | 62 | WORKSPACE_GIT_STATUS_DONE（本机侧完整 + WSL 接线；6 条测试含只读性证明） | WSL 真机轮；P20 同步与重锁 | 本轮 |
@@ -758,6 +758,17 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 | B3 | 54 的 `sidecar.py:631-632` 一行修（空快照折叠） | [069 报告 §3-4](../server-round1/fullstack/wsl-change-set-observation-069.md)（插桩 + 三态探针） | 并入 b2 的 066-G5 收尾单（同文件族）一起改 + 空快照测试 + 复跑观测轮 | WSL 通道变更集**恒 unknown**（首轮必现，且"正例只需审计文件"） |
 | B4 | **两仓仍未锁定**（081 已登记差异）：前端交回阶段 2 对 `6e8ae84a`/`f5d27269`（59 方法）≠ 后端登记 `64dc9961`/`42a164a4` ≠ 本树副本 `a1bd52a4`（33 方法）；摘要在两工具链间不可复现 ⇒ 需**换工件本体** | [wire-review Order 81 节](../server-round1/wire-review.md) | 拍四件：①后端发布 64 方法工件（或前端补 5 个后重生成）并**交换本体**；②替换本树旧副本（strict 5 项失败之因）；③定生成/比较口径；④补 Order 57/58/59/65 的 wire-review 小节（当前 0 命中） | 摘要永远对不上；前端按 59 方法实现、后端跑 64 方法，落后 5 个面的差异继续分叉 |
 | B5 | **同一个 `ask` 在两处翻译方向相反**（085 阶段 1 一手登记）：60 的 `posture_translation.py::translate_claude()` 把 `ask` 译进 **`allowedTools`**，而 CLI flag 语义与 settings 层 `permissions.allow` 同义 = **预先批准、免提示**；085 的写入器把 `ask` 落进 **`permissions.ask`** = 真的弹提示。前者相对中立姿态是**放宽**，与 60 自己的"只收紧"规则和 085 G2 相冲 | [085 证据 §4](../server-round1/fullstack/posture-config-keys-085.md)（钉死的落点表）+ §7.4 | 二选一：**改 60 的 claude 表**为 `ask→permissions.ask`（一处映射修正，不扩协议，但要重跑 60 的翻译测试），或**另开一单**收口（093 的写入器上线前必须有个答案）。085 不代改别人的契约，故只登记 | 一旦 093 把冻结配置落盘，同一份姿态会同时经两条路径翻译 ⇒ 60 那条把 ask 写成"免提示"，**用户看到的 ask 与实际生效的 ask 不一致**（放宽且不可见） |
+| B6 | **086 的 G2 字面与 65 的实现口径相反**（086 阶段 3 一手登记）：工单写"子轮用量**记在父轮**"，实现与 65 的 docstring 是"子轮用量**留在子轮行**、`parent_turn_id` 为链路、用量以事实形态回进父轮的工具结果"。两种都能满足"归属可追溯"，但账上只能有一种写法 | [086 证据 §9/§11](../server-round1/fullstack/subagent-harness-round-086.md) | 拍一句口径：**保持实现口径**⇒ 把 G2 改成"子轮用量归属可经 `parent_turn_id` 追溯、并在父轮工具结果内可见"；或**要"抄到父轮"**⇒ 那是一条汇总行为的新需求（要新单，且要先定"父轮重算/重复计数"怎么办） | 086 已按实现口径出具反例并登记差异；不改字面则下一张读 G2 的单会去实现"抄到父轮"，与 65 的行语义直接冲突并双计用量 |
+
+## 待开单（本树执行者登记，2026-09-19；编号由调度者从 100 起给）
+
+> 纪律：执行者不自行起草工单。以下是**本树跑出来的、超出当前单 `write_paths`/范围**的事实缺口，逐条给"证据已在手"的位置。
+
+| 候选 | 一手事实 | 为什么不并入现有单 | 证据 |
+| --- | --- | --- | --- |
+| 授权层拒**任意环**（不只一条反向边） | `profiles/repository.py:140`（自授）与 `:157`（直接反向边）之外，A→B、B→C、C→A **三条边全建得出来**；运行期靠 `check_cycle` 拦第 3 跳，但授权表里的图**不是 DAG** | 属 65 的 C 段（授权 CRUD），而 086 的 `write_paths` 不含该面的语义扩展；R-0016 也只允许"接已有规则"，不允许本单顺手加限制 | [086 证据 §10](../server-round1/fullstack/subagent-harness-round-086.md)、用例 `tests/server/test_subagent_rule_liveness_086.py::test_a_three_edge_ring_closes_on_its_third_hop_and_is_refused` |
+| Worker 侧 `session/request_permission` **无应答路径** | `grep -rn request_permission workers/agent-box-worker/src/` 只命中 `fs::set_permissions` 两处无关项；`src/agent_box` 亦无 ⇒ ACP 适配器把工具权限交给 `canUseTool` 后无处可答，真父轮只能靠 SDK 侧预批准 | `workers/**` 不在 086/085 的 `write_paths`（099 只被授权修 `home.put` 的分发臂） | [086 证据 §7](../server-round1/fullstack/subagent-harness-round-086.md) |
+
 
 > 编号说明：上一节 `## CHECKPOINT b2`（080/081 那次）的 §2 写了"新增 B5"，但当时表里没落 B5
 > （其内容并入了 B4 的四项交回）。本表 **B5 由 085 新增**，是该编号的实际持有者；批末重写那节时一并更正引用。
@@ -913,7 +924,7 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 
 ## 工单 086 — 65 最后一圈：真 harness 父侧自发起 tools/call（2026-09-18，执行者）
 
-> **进行中**：本记本单**阶段 1**（选家并核对工具播发）。终态行（含 G1/G2/G3 与 65 收口）在阶段 3 提交时补。
+> **已收口**：终态见本节末行（`SUBAGENT_HARNESS_ROUND_DONE`）。阶段 1/2/3 各有一行，G1/G2/G3 与 65 收口在阶段 3。
 > 证据：[subagent-harness-round-086.md](../server-round1/fullstack/subagent-harness-round-086.md)
 > ＋ 原始事实 [subagent-harness-round-086-pin.json](../server-round1/fullstack/subagent-harness-round-086-pin.json)
 > （sha256 `0d2aad5e30a936cf5bd6801c58c2f45fd9fa8d9b4dd85402a0feebb0033de95f`）。
@@ -944,6 +955,22 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   调用方无权自报血统。深度上限按 R-0016 **撤销**。
 - **顺带钉住的一条次序事实**：`run` 里参数校验**先于**血统检查，所以一次 `description` 只有两个词的委派会以
   `SUBAGENT_ARGUMENT_INVALID` 被打回、根本走不到环检查（第一版用例就是这么"红错了地方"的）。
+
+| 086 | 3b 两条死规则的修法 | 修法**不加新限制**（R-0016 明令），只把已有的规则接上真链路：**血统**——`delegation.run` 的签名里再没有 `chain`，祖先链由 `SessionsRepository.turn_ancestry_profile_ids()` 沿账本 `server_turns.parent_turn_id` 逐跳走出（每跳一跳一读、带 `visited` 自守卫），交给新的 `profiles.subagents.check_cycle()`；调用方**无权自报血统**。**深度**——`DEFAULT_DEPTH_LIMIT` 连同其拒绝分支一并**删除**，留下的界仍是"每父轮 ≤4 次调用"。**取消**——`SessionService.cancel_descendants()` 把取消沿账本子轮递归下发（`live_child_turn_ids()` 只取 `ACTIVE_TURN_STATES`），并接在**两个**入口上：REST `turns.cancel`（`cancel_turn` 里本轮 stop 未确认时也要下发）与 wire `runs_stop`（在 `if not accepted:` 早返回**之前**）。反例各自咬死：环用例第 1、2 跳**必须成功**、第 3 跳（gamma→alpha）才 `SUBAGENT_CYCLE`，且断言第二跳**没留下任何子轮**；取消用例的父轮一旦取消，端口必须收到对那个子轮的 `cancel`，否则红 | 本阶段净增 **1** 条（wire 入口那条同规则用例）⇒ `tests/server/test_subagent_rule_liveness_086.py` **8 passed / 3.97 s**（3a 的 3 红全部转绿）；三份委派用例面 `test_subagent_rule_liveness_086 + test_delegation + test_subagents` **22 passed**；**根套件 954 passed / 0 failed / 0 error（382.19 s）= 099 收口时的 946 ＋ 本单阶段 3 的 8 条**，逐项对上、**零退化**。**门的可证伪性是量出来的、不是声明的**：把 `check_cycle` 与 `cancel_descendants` 在**同一进程内**替成空操作（不改任何文件，经 `pytest.main` 跑）⇒ 恰 **3 failed / 5 passed**，失败的正是 REST 取消 / wire 停止 / 环三条 | **0 次 / ¥0**（全假执行端口；凭据 locator 全程未访问） | 本提交（阶段 3 修法半）|
+
+- **两条规则的死法不同，修法也就不该相同**：环检查**一直是对的**、只是看不见调用（`chain` 从不传递）；取消传播的
+  `cancel_children` 则是**从零到有的孤儿**（`src/agent_box` 里零调用方，且它放在 `delegation.py` 里、连层级都不对）。
+  故前者是"接线"（血统归账本读）、后者是"删除并换位"（cascade 归 `SessionService`，因为只有它同时握着账本与执行端口）。
+- **递归的终止性**（写下来是因为它必须可论证，而不是"跑起来没炸"）：`cancel_descendants` 只在
+  `live_child_turn_ids` 上递归，而运行期环检查保证任何父轮的子代里**没有重复角色** ⇒ 血统链不自交、递归自然有界；
+  账本里也不存在自指行（授权层拒自授予，`turn_ancestry_profile_ids` 另带 `visited` 兜底）。
+- **仍未做的环缺口（如实登记，不在本单偷修）**：授权层要拒的是**任意环**而不仅**一条反向边**——
+  A→B、B→C、C→A 三条边**现在仍然建得出来**，只是运行期第 3 跳会被 `check_cycle` 拦住。
+  把"图必须是 DAG"这件事做到授权层，属授权 CRUD 的面（65 的 C 段），要新工单。
+- **一条契约字面交回调度者（不改契约、不自行放宽验收）**：工单 **G2** 写"子轮用量**记在父轮**"，而实现与 65 的
+  docstring 是"子轮用量**留在子轮行**、`parent_turn_id` 是链路、子轮用量以事实形态回进父轮的**工具结果**里——
+  没有任何东西抄到父轮"。两种口径都能满足"归属可追溯"，但**账上只有一种写法**。本单按实现口径核对并出具反例
+  （断言内已把父轮自己 `complete` 成 3/2/5，任何"抄到父轮"的汇总会显示成 14/9/23），把**这句字面**交回。
 
 - **本阶段跑出来的不是"绿了一圈"，是一条真缺陷**：65 把桥渲染进 claude 的 `mcp_target =
   `/runtime/home/.claude/settings.json`，而**该家根本不从这个文件读 MCP 服务器** ⇒ 条落进没人读的文件；
@@ -985,6 +1012,23 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
   `authorized` 字段核对本注入令牌）；探针 CLI 运行全程 `HOME`/`CLAUDE_CONFIG_DIR` 指向临时目录，
   **未读也未写**用户真实 `~/.claude`；凭据 locator 全程未访问；临时件 `/tmp/086-pin.json` 已入库为证据副本、
   基线副本 `/tmp/086-baseline` 已删除并核实缺席。
+
+| 单 | 阶段 | 门 | 回归 | 真实模型 | 提交 |
+| --- | --- | --- | --- | --- | --- |
+| 086 | 终态 `SUBAGENT_HARNESS_ROUND_DONE` | **G1 真 harness ✅**（claude-code 一家：真 CLI 进程 + 真 `.claude.json` 读路径 + `tools/list` 带上桥工具 + 父**自己**发起 `tools/call run_subagent`；**反例是"夹具冒充即失败"这一条本身成立**——同一份用例里"没有任何一次请求播发桥工具"的缺席判定与 roster 名字来源都写死为断言，65 的原端到端用例正是父侧由测试进程自驱桥，才让这一圈显绿）。**G2 归属 ✅ 但契约字面交回**（见上；口径按实现：子轮用量留子轮行、`parent_turn_id` 为链、以事实形态回进父轮工具结果，反例把"抄到父轮"的汇总显示成 14/9/23 而钉死）。**G3 记账 ✅ 0 笔**（**本单真实模型请求 0 笔**，全阶段合计；R-0017 口径：门级真实调用一次未花，端点为 loopback 脚本假端点、凭据 locator 未访问。逐笔记账在本单是"零笔可记"，如实写成零而不是含糊过去）| 本单三个阶段新增用例 **9 + 1 + 8 = 18** 条；Validation `python3 -m pytest -q tests/server -k subagent` → **17 passed / 637 deselected**，且**这一跑里 0 个 skipped ⇒ 阶段 2 那条真实链路用例（真 CLI＋bwrap＋真桥）在本次复跑里又绿了一遍**，不是一次性观测；`tests/server/test_subagent_rule_liveness_086.py` **8 passed**、委派面三份 **22 passed**；根套件 **954 passed / 0 failed / 0 error**（阶段 3 复跑，= 099 收口 946 ＋ 本单阶段 3 的 8 条，**零退化**）。阶段 1 当时写的 941 口径已作废并由 954 替代 | **0 次 / ¥0** | `3d19218`（阶段 3 观测半，3 红为有意）＋ 本提交（阶段 3 修法半 + 账）|
+
+- **摘要（本单做完的一件事，和它顺带钉死的三件事）**：65 缺的那一圈——"父侧由**真 harness** 自己发起
+  `tools/call`"——已经在真 CLI、真沙箱、真桥进程上跑通并留下可复跑的用例；顺带一手钉死了 ① claude 的 MCP
+  **读路径**（`settings.json` 不读，故 `harnesses.toml` 的 `mcp_target` 改指 `.claude.json`，Server 零改动）、
+  ② 两条**写下来却从未被驱动**的规则（血统自报 ⇒ 取消传播孤儿）现已接到真入口上、且**门的失败是被量出来的**、
+  ③ 四家里 `pi/dsh/hermes/kilo/opencode` 未声明 MCP 文档 ⇒ 结构上不能承载桥，`qwen` 本宿主未装无法一手钉死，
+  `codex` 与自家只读投影相撞（只登记不越界修）。**一家可行即 DONE**，工单的 `PARTIAL` 分支条件是"三家都不可行"，不成立。
+- **未做项（不含糊）**：授权层的**任意环**拒绝（现只拒一条反向边，见上）；Worker 侧 `session/request_permission`
+  的**应答路径**（缺失，故真父轮依赖 SDK 预批准）；`timeoutMs` 120 s 与子轮等待 600 s 的**张力**；
+  真机上的**多子并发**扇出（并发 3/3 只有假端口面）；`hooks_target` 同形状的**读路径观测**（推导、未测）；
+  codex `mcp_target` 相撞的修法（`harnesses.toml` 在本单 `write_paths` 内，但修法要一家自己的读路径观测）。
+  另外宿主 CLI **2.1.274** 与部署钉死 **2.1.270** 的版本漂移，已由阶段 2 的**沙箱内真 CLI**（2.1.270）给出确认。
+- **65 收口**：见下一行与账本 65 行（`PARTIAL → DONE`）。
 
 
 ## 工单 099 — Worker 的 `home.put` 从未接上分发线（2026-09-18，调度者投递）

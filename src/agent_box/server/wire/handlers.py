@@ -1732,6 +1732,10 @@ class WireService:
             return {"outcome": "unconfirmed", "reason": "EXECUTION_CAPABILITY_UNAVAILABLE"}
         self.sessions.records.record_cancel_request(execution_id)
         accepted = bool(self.execution.cancel(execution_id))
+        # The same rule the REST cancel applies: an active turn that is asked to
+        # stop takes its delegated children with it, whether or not this
+        # process's own stop could be confirmed.
+        self.sessions.cancel_descendants(execution_id)
         if not accepted:
             # Stop was asked for but the process could not be confirmed stopped;
             # saying "stopped" here would be a lie.

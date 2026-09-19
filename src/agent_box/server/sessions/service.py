@@ -235,11 +235,30 @@ class SessionService:
         requested = self.records.get_turn_context(turn_id)
         stopped = requested["state"] in self.records.TERMINAL_TURN_STATES
         accepted = False if stopped else self.execution.cancel(turn_id)
+        if not stopped:
+            self.cancel_descendants(turn_id)
         self.on_event()
         return self.idempotency.save(
             scope, key, request_digest, 202,
             {"turn_id": turn_id, "cancel_requested": not stopped, "accepted": accepted},
         )
+
+    def cancel_descendants(self, turn_id: str) -> list[str]:
+        """Ask the turns one delegated turn left behind to stop as well.
+
+        Order 65's rule, wired by order 086: a child turn runs *inside* its
+        parent's tool call, so a parent that is stopped mid-call would otherwise
+        leave a live process and a ledger that says the work is over. The
+        recursion is bounded by the ledger - a turn's parent is always older -
+        and the children come from `parent_turn_id`, not from any caller's word.
+        """
+        stopped: list[str] = []
+        for child_id in self.records.live_child_turn_ids(turn_id):
+            self.records.record_cancel_request(child_id)
+            self.execution.cancel(child_id)
+            stopped.append(child_id)
+            stopped.extend(self.cancel_descendants(child_id))
+        return stopped
 
     def get_session(self, session_id: str):
         return self.records.get_session(session_id)

@@ -854,6 +854,46 @@ class SessionRecords:
                 (state, now(), turn_id),
             )
 
+    def turn_ancestry_profile_ids(self, turn_id: str) -> list[str]:
+        """The turn's own Profile and every ancestor's, oldest first.
+
+        Order 086: the delegation cycle rule reads the chain from the ledger
+        rather than from the caller, because a caller cannot vouch for its own
+        ancestry - a turn is only ever created with a parent that already
+        exists, so walking `parent_turn_id` upwards terminates.
+        """
+        profile_ids: list[str] = []
+        visited: set[str] = set()
+        with self.database.read() as conn:
+            current: str | None = turn_id
+            while current is not None and current not in visited:
+                visited.add(current)
+                row = conn.execute(
+                    "SELECT profile_id,parent_turn_id FROM server_turns WHERE id=?",
+                    (current,),
+                ).fetchone()
+                if row is None:
+                    break
+                profile_ids.append(str(row["profile_id"]))
+                current = row["parent_turn_id"]
+        return list(reversed(profile_ids))
+
+    def live_child_turn_ids(self, parent_turn_id: str) -> list[str]:
+        """Every still-active turn delegated *from* one parent turn.
+
+        Order 65's cancellation rule needs the ledger to be the one that knows
+        who is whose child; `parent_turn_id` is set when a child turn is
+        created, so this is the same link the usage attribution rides on.
+        """
+        placeholders = ",".join("?" * len(ACTIVE_TURN_STATES))
+        with self.database.read() as conn:
+            rows = conn.execute(
+                f"SELECT id FROM server_turns WHERE parent_turn_id=? "
+                f"AND state IN ({placeholders}) ORDER BY rowid",
+                (parent_turn_id, *ACTIVE_TURN_STATES),
+            ).fetchall()
+        return [str(row["id"]) for row in rows]
+
     def record_cancel_request(self, turn_id: str) -> dict[str, Any]:
         """Record that a stop was asked for, if there is anything to stop.
 

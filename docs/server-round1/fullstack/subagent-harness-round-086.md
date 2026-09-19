@@ -1,4 +1,8 @@
-# 086 阶段 1：选家并核对工具播发（真 harness 的读路径钉死）
+# 086 — 65 最后一圈：真 harness 父侧自发起 tools/call（证据）
+
+> §0–§8 = **阶段 1**（选家与工具播发）。阶段 2 的一轮在
+> `tests/server/test_subagent_harness_real_round_086.py`（含其 docstring 里的两处有意偏差）与本树账行。
+> §9–§11 = **阶段 3**（四项核对、由此实测出的两条死规则与其修法、账务）。
 
 基线 `4c32992`。本阶段做了三件事：**一手钉死 claude CLI 到底从哪个文件读 MCP 服务器**、
 **在生产形态下验证合成桥条目能否真的落到那个文件**、**按注册表把不能承载桥的家列出来**。
@@ -170,3 +174,85 @@ cd /tmp/086-baseline && <本树 PYTHONPATH> python3 -m pytest -q \
 
 本单**不顺手修**：它属于技能投影（52/58 那一族事实），改它会把无关修正混进阶段 1 的提交，
 且"钉死正确的逐家期望"需要一次技能读路径的一手观测——那是另一张单的形状。**登记为交回项**（见账行）。
+
+## 9 阶段 3：四项核对＝去跑，不是签字
+
+工单写的第 3 阶段是"归属/摘要/审批/取消四项核对"。65 的四个模块 docstring 把这四条**都说了**，
+`tests/server/` 里每条也**都有单元测试**——所以"核对"若只是读一遍代码签字，四条全过。
+本阶段把"核对"读成它唯一有意义的样子：**从产品真用的入口把这条规则跑一遍**。载体是
+`tests/server/test_subagent_rule_liveness_086.py`（8 条），每条在断言里自带反例。
+
+| 项 | 驱动它的入口 | 第一次跑（`3d19218`）| 现在 | 反例就写在断言里 |
+| --- | --- | --- | --- | --- |
+| 归属 | `DelegationService.run` → 真子轮 + 父轮自己 `complete_turn` | ✅ | ✅ | 父轮自己记成 3/2/5：任何"把子轮抄到父轮"的汇总会读成 14/9/23 |
+| 摘要 | 同上，两端都跑 | ✅ | ✅ | 超长侧 `4096 + "…"`，短侧逐字 `summary of <turnId>`——只测一侧都不算 |
+| 取消（REST）| `SessionService.cancel_turn` | ❌ 红 | ✅ | 子轮 `running`；断言要求它变 `cancelled` 且**经过 execution 端口**（`stalled.cancelled`）|
+| 取消（wire）| `WireService.runs_stop` | 未测 | ✅ | 桌面发的是这一条；只接一个门就是 103 说的形状 |
+| 审批镜像 | 真方法 `SidecarExecutionBackend._native_event` | ✅ | ✅ | 子轮的 `approval.requested` 必须落在**父轮**上并带 `from_subagent.turnId` |
+| 环 | 三边真链 A→B→C→A，逐跳真子轮 | ❌ `DID NOT RAISE` | ✅ | 第三跳放行 ⇒ 不抛；且断言被拒的那一跳**不建轮** |
+| 深度 | 四角色三跳全不同 | ✅（当时 `chain` 从不传，上限形同不存在）| ✅ | 反例＝被 R-0016 撤销的那道上限本身：加回去这轮就红 |
+| 端点形状 | 正则读 `app.py` 里 `service.run(...)` 实参 | ✅ | ✅ | 出现 `chain` 即红：血统由调用方自报的写法不算接上 |
+
+**四条里两条是死的**，两条死法不同：
+
+* **取消**——`cancel_children` 在 `src/agent_box` 里**零调用方**（`grep` 一手核），
+  两个取消入口都只按 `turn_id` 停自己；父轮 `cancelled` 之后子轮继续跑，账本与真进程各说一套。
+* **环**——授权层只拒**直接反向边**（`profiles/repository.py:140/:157`），
+  于是 A→B、B→C、C→A 三条边**都能建**（委派图不是 DAG）；而运行期那道 `check_depth`
+  依赖调用方传进来的 `chain`，**loopback 端点从不传**，所以它对真血统永远看不见。
+  阶段 3a 的第一版假设（"两跳环能建"）也被实测否掉：两跳在授权层就被拒了——**登记的修法因此不是"再加一层限制"**
+  （R-0016 明令不许新增限制），而是**把已有的环检查接到真链路上**。
+
+一条顺带实测到的次序事实（本单不改）：`validate_run_arguments` 跑在环检**之前**，
+所以一个既非法又闭环的调用会先吃到 `SUBAGENT_ARGUMENT_INVALID`（第一版就是被 "round two" 只有两字撞开的）。
+
+## 10 修法与其门
+
+| 改动 | 位置 |
+| --- | --- |
+| 祖先链由账本走：`turn_ancestry_profile_ids`（沿 `parent_turn_id` 上溯，oldest→newest）| `sessions/repository.py` |
+| 谁是谁的子：`live_child_turn_ids`（活跃态集合读 `ACTIVE_TURN_STATES`，同一处事实）| `sessions/repository.py` |
+| `check_depth` → `check_cycle`；删 `DEFAULT_DEPTH_LIMIT`（R-0016）| `profiles/subagents.py` |
+| `run` **不再有 `chain` 参数**；环检读上面那条链；删 `cancel_children` | `execution/delegation.py` |
+| `cancel_descendants`（递归、父先子后），接进 `cancel_turn` | `sessions/service.py` |
+| 同一个 `cancel_descendants`，接进 `runs_stop` | `wire/handlers.py` |
+
+递归的终止条件是账本给的结构事实：一个轮的父轮一定比它早存在，不会有回边。
+两个入口都在父轮**仍活跃**时下发级联（`runs_stop` 那侧即便本进程 stop 未被确认也照发），
+理由与 `record_cancel_request` 一致：**没确认停下不等于不该让它停**，而"未确认"绝不写成"已停"。
+
+门怎么证伪（两条都测过，不是推的）：
+
+1. **同文件在同一提交上的前后**——`3d19218`（修法之前）`3 failed, 4 passed`；
+   本阶段（修法之后）`8 passed`。
+2. **进程内抽掉两条规则**——`delegation.check_cycle = lambda: None` ＋
+   `SessionService.cancel_descendants = lambda …: []`，同一份 8 条测试重跑 ⇒
+   **恰这 3 条红**（REST 取消、wire 取消、环），其余 5 条照绿。
+   这条测量在**一次性进程内**做，未改任何产物文件（改文件被权限层挡下，也不该改）。
+
+`tests/server/test_delegation.py` 与 `test_subagents.py` 的两处旧断言按新机制改写：
+`cancel_children(records, …)` ⇒ `records.live_child_turn_ids(…)`（断的是同一件事实，换了拥有它的层），
+`SUBAGENT_DEPTH_EXCEEDED` 那条 ⇒ 换成"调用方不再自报血统"＋每轮 4 次上限仍在。
+
+## 11 账务、清理与本单没做的事
+
+* **回归计数（本阶段末，一手）**：`tests/server/test_subagent_rule_liveness_086.py` **8 passed / 3.97 s**；
+  委派面三份（liveness + `test_delegation` + `test_subagents`）**22 passed**；
+  **根套件 954 passed / 0 failed / 0 error（382.19 s）**。这个数**能逐项对上**：099 收口时 946
+  ＋ 本单阶段 3 新增的 8 条（3a 的 7 条 ＋ 3b 的 wire 入口 1 条）= 954 ⇒ **零退化**。
+  （阶段 1 当时报的 941 已作废：它没计入阶段 2 那条真实链路用例，口径见账本 086 计数注记。）
+  同一跑里 `tests/server -k subagent` 为 **17 passed / 637 deselected、0 skipped** ⇒
+  **G1 的那条真实链路用例（真 CLI 进程 + bwrap + 真桥往返）在本次复跑中再次通过**，是**可复跑**的门证据，不是一次性观测。
+  再按名单独跑一遍钉死它没被跳过：`pytest -q tests/server/test_subagent_harness_real_round_086.py -rsv` ⇒
+  **1 passed in 18.72 s**（无 skip 报告）。
+* **真实模型请求：本阶段 0 笔**（全为 loopback 夹具）。阶段 2 亦 **0 笔**——那一轮的端点是
+  脚本化的 loopback（其 docstring 逐条写明结构应答规则），真的是 **CLI 进程、bwrap 与 MCP 往返**。
+  与 R-0017（假端点优先、真实调用只用在门上）一致。
+* 凭据 locator **未触碰**；无外呼；无落盘凭据内容；无临时数据根残留（夹具全在 `tmp_path`）。
+* **G2 字面与实现不一致（交回，不自行改契约）**：工单 G2 写"子轮用量**记在父轮**"，
+  实现与 65 的 docstring 是"子轮用量留在子轮行，`parent_turn_id` 是那条链，父轮在**工具结果里**
+  拿到子轮的用量事实"——**没有任何东西抄到父轮**。本阶段按实测口径登记（归属 ✅）并把这句契约字面交回调度者。
+* **未做（本单不做）**：三边环在**授权层**的完整拒环（要改图可达性，属 65 的授权面，非本单）；
+  Worker 对 `session/request_permission` 的应答路径（阶段 2 因此必须预批两个桥工具）；
+  父轮 120 s 进程上限 vs 子轮 600 s 等待的张力；把 `cancel_descendants` 之外
+  的"一个父轮多子轮并发"真机化（夹具下已测一个子轮的级联）。

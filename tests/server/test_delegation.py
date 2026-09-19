@@ -11,7 +11,7 @@ from __future__ import annotations
 import pytest
 
 from agent_box.server.errors import ServerError
-from agent_box.server.execution.delegation import DelegationService, cancel_children
+from agent_box.server.execution.delegation import DelegationService
 from agent_box.server.idempotency import IdempotentRecords
 from agent_box.server.profiles import ProfileRecords
 from agent_box.server.profiles.subagents import DelegationError
@@ -135,11 +135,11 @@ def test_a_granted_run_completes_links_and_returns_the_bounded_summary(tmp_path)
         row = conn.execute("SELECT parent_turn_id FROM server_turns WHERE id=?",
                            (result["turnId"],)).fetchone()
     assert row["parent_turn_id"] == "parent-turn"
-    # Cancellation propagation finds it while it is still active.
-    assert cancel_children(records, parent_turn_id="parent-turn") == []
+    # The ledger is what knows who is whose child (order 086 wires the stop).
+    assert records.live_child_turn_ids("parent-turn") == []
     with database.transaction() as conn:
         conn.execute("UPDATE server_turns SET state='running' WHERE id=?", (result["turnId"],))
-    assert cancel_children(records, parent_turn_id="parent-turn") == [result["turnId"]]
+    assert records.live_child_turn_ids("parent-turn") == [result["turnId"]]
     assert execution.accepted == [result["turnId"]]
 
 
@@ -184,15 +184,16 @@ def test_continuation_depends_on_family_and_unknown_handles_refuse(tmp_path):
     assert second["task_id"] != first["task_id"]  # each turn reports its own native id
 
 
-def test_depth_cycle_and_fan_out_refuse(tmp_path):
+def test_fan_out_refuses_and_the_caller_no_longer_reports_its_own_ancestry(tmp_path):
+    """The per-turn bound stays; the chain parameter is gone (order 086).
+
+    What replaced it is the ledger: `test_subagent_rule_liveness_086.py` drives
+    the cycle rule through real child turns, because a chain a caller hands over
+    says nothing about who is actually waiting - which is how 65's rule ended up
+    written down and never live.
+    """
     _db, profiles, _records, _sessions, _execution, service, parent, child, _other = _setup(tmp_path)
     profiles.grant_subagent(parent_id=parent["profile_id"], child_id=child["profile_id"])
-
-    with pytest.raises(DelegationError) as deep:
-        service.run(parent_turn_id="parent-turn", parent_profile_id=parent["profile_id"],
-                    arguments={"subagent": "beta", "description": "do some work", "prompt": "x"},
-                    chain=[parent["profile_id"], parent["profile_id"]])
-    assert deep.value.code in {"SUBAGENT_DEPTH_EXCEEDED", "SUBAGENT_CYCLE"}
 
     with pytest.raises(DelegationError) as fan_out:
         service.run(parent_turn_id="parent-turn", parent_profile_id=parent["profile_id"],
