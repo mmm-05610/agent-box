@@ -186,8 +186,12 @@ def test_wire_protocols_is_not_published_because_the_descriptor_has_no_such_fiel
 
 # -- the relock: registered, and still falsifiable -------------------------
 
+#: Order 113 moved this copy out of `generated/` and into `contract/`, named for
+#: the digest it must hash to. The old path advertised "the artifact" while being
+#: a copy; a file whose name is its own hash cannot quietly stop being current.
 ARTIFACT = (pathlib.Path(__file__).resolve().parents[2]
-            / "docs/server-round1/fullstack/generated/wire-v1.schema.json")
+            / "docs/server-round1/fullstack/contract"
+            / "wire-v1.schema.registered-c4255b31.json")
 
 #: The pair this tree registers. The relock landed in the settings line at
 #: `ed6592b7`, encoding the shape this Server actually emits; the digest below

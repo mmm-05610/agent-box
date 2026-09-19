@@ -43,14 +43,12 @@ def _display(path: pathlib.Path) -> str:
     return str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else str(path)
 
 
-def dispatch_methods() -> list[str]:
-    """The dispatch table's keys, read out of the source with the AST.
+def dispatch_pairs() -> list[tuple[str, str]]:
+    """`(method, handler attribute)` for every row of the dispatch table.
 
-    Parsing rather than importing: `WireService.__init__` needs eleven wired
-    services to exist at all, and the table it builds is a literal dict. The AST
-    takes the keys wherever the line wraps - a regex on indentation silently
-    lost 10 of the 64 methods when this tool was first written, which is the
-    same failure mode this order exists to close.
+    Order 113's artifact generator needs the handler name too, and it must come
+    from the same parse as the coverage ledger: two parsers agreeing twice is
+    not evidence, one parser is.
     """
     tree = ast.parse(HANDLERS.read_text(encoding="utf-8"))
     for node in ast.walk(tree):
@@ -63,9 +61,40 @@ def dispatch_methods() -> list[str]:
             continue
         if not any(isinstance(t, ast.Attribute) and t.attr == "_handlers" for t in targets):
             continue
-        return [key.value for key in node.value.keys
-                if isinstance(key, ast.Constant) and isinstance(key.value, str)]
+        pairs = []
+        for key, value in zip(node.value.keys, node.value.values):
+            if not (isinstance(key, ast.Constant) and isinstance(key.value, str)):
+                continue
+            handler = (value.attr if isinstance(value, ast.Attribute)
+                       else ast.dump(value))
+            pairs.append((key.value, handler))
+        return pairs
     raise RuntimeError("no `self._handlers = {...}` literal found")
+
+
+def param_shapes() -> dict[str, tuple[set, set]]:
+    """The Server's own required/optional parameter sets, from the module
+    literal `_PARAM_SHAPES`. Same rule as above: parse, do not import."""
+    tree = ast.parse(HANDLERS.read_text(encoding="utf-8"))
+    for node in tree.body:
+        targets = node.targets if isinstance(node, ast.Assign) else (
+            [node.target] if isinstance(node, ast.AnnAssign) else [])
+        if any(isinstance(t, ast.Name) and t.id == "_PARAM_SHAPES" for t in targets):
+            return {method: (set(required), set(optional)) for method,
+                    (required, optional) in ast.literal_eval(node.value).items()}
+    raise RuntimeError("no module-level `_PARAM_SHAPES = {...}` literal found")
+
+
+def dispatch_methods() -> list[str]:
+    """The dispatch table's keys, read out of the source with the AST.
+
+    Parsing rather than importing: `WireService.__init__` needs eleven wired
+    services to exist at all, and the table it builds is a literal dict. The AST
+    takes the keys wherever the line wraps - a regex on indentation silently
+    lost 10 of the 64 methods when this tool was first written, which is the
+    same failure mode this order exists to close.
+    """
+    return [method for method, _handler in dispatch_pairs()]
 
 
 def evidence(method: str, paths=None) -> list[tuple[str, int, str]]:

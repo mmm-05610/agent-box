@@ -1,0 +1,992 @@
+{
+  "$protocolVersion": "wire/1",
+  "$schemaKind": "agent-box-server.wire-inventory",
+  "generatedBy": "scripts/server-round1/wire_artifact.py",
+  "methodCount": 64,
+  "methods": {
+    "accounts.bind": {
+      "handler": "accounts_bind",
+      "params": {
+        "optional": [],
+        "required": [
+          "accountId",
+          "expectedVersion",
+          "profileId",
+          "requestId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "accounts.create": {
+      "handler": "accounts_create",
+      "params": {
+        "optional": [],
+        "required": [
+          "accountIdentifier",
+          "harness",
+          "requestId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "accounts.importAsset": {
+      "handler": "accounts_import_asset",
+      "params": {
+        "optional": [],
+        "required": [
+          "accountId",
+          "requestId",
+          "sourcePath"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "accounts.list": {
+      "handler": "accounts_list",
+      "params": {
+        "optional": [],
+        "required": []
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "approvals.decide": {
+      "handler": "approvals_decide",
+      "params": {
+        "optional": [],
+        "required": [
+          "approvalId",
+          "decision",
+          "expectedVersion",
+          "requestId",
+          "scope"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "assets.bind": {
+      "handler": "assets_bind",
+      "params": {
+        "optional": [
+          "enabled",
+          "revision"
+        ],
+        "required": [
+          "assetId",
+          "profileId",
+          "requestId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "assets.bindings": {
+      "handler": "assets_bindings",
+      "params": {
+        "optional": [],
+        "required": [
+          "profileId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "assets.catalog": {
+      "handler": "assets_catalog",
+      "params": {
+        "optional": [],
+        "required": [
+          "sourceId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "assets.installFromCatalog": {
+      "handler": "assets_install_from_catalog",
+      "params": {
+        "optional": [],
+        "required": [
+          "entryName",
+          "requestId",
+          "revision",
+          "sourceId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "assets.list": {
+      "handler": "assets_list",
+      "params": {
+        "optional": [],
+        "required": []
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "assets.probe": {
+      "handler": "assets_probe",
+      "params": {
+        "optional": [],
+        "required": [
+          "definition"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "assets.publishMcp": {
+      "handler": "assets_publish_mcp",
+      "params": {
+        "optional": [],
+        "required": [
+          "assetId",
+          "definition",
+          "requestId",
+          "revision"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "assets.publishPlugin": {
+      "handler": "assets_publish_plugin",
+      "params": {
+        "optional": [],
+        "required": [
+          "assetId",
+          "requestId",
+          "revision",
+          "sourcePath"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "assets.publishSkill": {
+      "handler": "assets_publish_skill",
+      "params": {
+        "optional": [],
+        "required": [
+          "assetId",
+          "requestId",
+          "revision",
+          "sourcePath"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "assets.syncCatalog": {
+      "handler": "assets_sync_catalog",
+      "params": {
+        "optional": [],
+        "required": [
+          "requestId",
+          "sourceId",
+          "sourcePath"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "assets.unbind": {
+      "handler": "assets_unbind",
+      "params": {
+        "optional": [],
+        "required": [
+          "assetId",
+          "profileId",
+          "requestId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "config.describe": {
+      "handler": "config_describe",
+      "params": {
+        "optional": [],
+        "required": [
+          "profileId",
+          "workspaceId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "config.resolve": {
+      "handler": "config_resolve",
+      "params": {
+        "optional": [],
+        "required": [
+          "overrides",
+          "profileId",
+          "workspaceId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "executions.list": {
+      "handler": "executions_list",
+      "params": {
+        "optional": [
+          "limit"
+        ],
+        "required": [
+          "requestId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "history.snapshot": {
+      "handler": "history_snapshot",
+      "params": {
+        "optional": [
+          "cursor",
+          "page"
+        ],
+        "required": [
+          "sessionId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "hooks.create": {
+      "handler": "hooks_create",
+      "params": {
+        "optional": [
+          "source"
+        ],
+        "required": [
+          "family",
+          "model",
+          "name",
+          "requestId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "hooks.delete": {
+      "handler": "hooks_delete",
+      "params": {
+        "optional": [],
+        "required": [
+          "hookId",
+          "requestId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "hooks.list": {
+      "handler": "hooks_list",
+      "params": {
+        "optional": [
+          "family"
+        ],
+        "required": [
+          "requestId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "hooks.setEnabled": {
+      "handler": "hooks_set_enabled",
+      "params": {
+        "optional": [],
+        "required": [
+          "enabled",
+          "hookId",
+          "requestId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "hooks.triggers": {
+      "handler": "hooks_triggers",
+      "params": {
+        "optional": [
+          "hookId",
+          "limit"
+        ],
+        "required": [
+          "requestId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "hooks.update": {
+      "handler": "hooks_update",
+      "params": {
+        "optional": [],
+        "required": [
+          "hookId",
+          "model",
+          "requestId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "profiles.archive": {
+      "handler": "profiles_archive",
+      "params": {
+        "optional": [],
+        "required": [
+          "expectedVersion",
+          "profileId",
+          "requestId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "profiles.clone": {
+      "handler": "profiles_clone",
+      "params": {
+        "optional": [
+          "harness"
+        ],
+        "required": [
+          "displayName",
+          "profileId",
+          "requestId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "profiles.create": {
+      "handler": "profiles_create",
+      "params": {
+        "optional": [
+          "credentialId"
+        ],
+        "required": [
+          "displayName",
+          "harness",
+          "requestId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "profiles.grantSubagent": {
+      "handler": "profiles_grant_subagent",
+      "params": {
+        "optional": [],
+        "required": [
+          "childProfileId",
+          "profileId",
+          "requestId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "profiles.list": {
+      "handler": "profiles_list",
+      "params": {
+        "optional": [],
+        "required": [
+          "includeArchived"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "profiles.memory": {
+      "handler": "profiles_memory",
+      "params": {
+        "optional": [],
+        "required": [
+          "profileId",
+          "requestId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "profiles.revokeSubagent": {
+      "handler": "profiles_revoke_subagent",
+      "params": {
+        "optional": [],
+        "required": [
+          "childProfileId",
+          "profileId",
+          "requestId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "profiles.setPermissions": {
+      "handler": "profiles_set_permissions",
+      "params": {
+        "optional": [],
+        "required": [
+          "expectedVersion",
+          "preset",
+          "profileId",
+          "requestId",
+          "rules"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "profiles.subagentGrants": {
+      "handler": "profiles_subagent_grants",
+      "params": {
+        "optional": [],
+        "required": [
+          "profileId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "profiles.update": {
+      "handler": "profiles_update",
+      "params": {
+        "optional": [],
+        "required": [
+          "displayName",
+          "expectedVersion",
+          "profileId",
+          "requestId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "profiles.updateConfig": {
+      "handler": "profiles_update_config",
+      "params": {
+        "optional": [],
+        "required": [
+          "expectedVersion",
+          "profileId",
+          "requestId",
+          "values"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "providerArtifacts.install": {
+      "handler": "provider_artifacts_install",
+      "params": {
+        "optional": [],
+        "required": [
+          "digest",
+          "harness",
+          "requestId",
+          "sourceToken",
+          "version"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "providerArtifacts.list": {
+      "handler": "provider_artifacts_list",
+      "params": {
+        "optional": [],
+        "required": [
+          "harness"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "providerArtifacts.rollback": {
+      "handler": "provider_artifacts_rollback",
+      "params": {
+        "optional": [],
+        "required": [
+          "harness",
+          "requestId",
+          "version"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "providerModels.archive": {
+      "handler": "provider_models_archive",
+      "params": {
+        "optional": [],
+        "required": [
+          "expectedVersion",
+          "providerModelId",
+          "requestId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "providerModels.create": {
+      "handler": "provider_models_create",
+      "params": {
+        "optional": [
+          "provenance"
+        ],
+        "required": [
+          "configuration",
+          "credentialId",
+          "displayName",
+          "harness",
+          "models",
+          "provider",
+          "requestId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "providerModels.list": {
+      "handler": "provider_models_list",
+      "params": {
+        "optional": [],
+        "required": [
+          "includeArchived"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "providerModels.probeConnection": {
+      "handler": "provider_models_probe_connection",
+      "params": {
+        "optional": [
+          "credentialId"
+        ],
+        "required": [
+          "baseUrl",
+          "requestId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "providerModels.probeModels": {
+      "handler": "provider_models_probe_models",
+      "params": {
+        "optional": [
+          "credentialId",
+          "provenance"
+        ],
+        "required": [
+          "baseUrl",
+          "requestId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "providerModels.update": {
+      "handler": "provider_models_update",
+      "params": {
+        "optional": [
+          "provenance"
+        ],
+        "required": [
+          "configuration",
+          "credentialId",
+          "displayName",
+          "expectedVersion",
+          "models",
+          "providerModelId",
+          "requestId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "queue.get": {
+      "handler": "queue_get",
+      "params": {
+        "optional": [],
+        "required": [
+          "sessionId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "queue.withdraw": {
+      "handler": "queue_withdraw",
+      "params": {
+        "optional": [],
+        "required": [
+          "expectedVersion",
+          "itemId",
+          "requestId",
+          "sessionId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "runs.stop": {
+      "handler": "runs_stop",
+      "params": {
+        "optional": [],
+        "required": [
+          "executionId",
+          "requestId",
+          "sessionId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "sendOutcome.query": {
+      "handler": "send_outcome_query",
+      "params": {
+        "optional": [],
+        "required": [
+          "requestId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "server.hello": {
+      "handler": "hello",
+      "params": {
+        "optional": [],
+        "required": [
+          "clientPresentationSupports",
+          "clientVersions"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "sessions.archive": {
+      "handler": "sessions_archive",
+      "params": {
+        "optional": [],
+        "required": [
+          "expectedVersion",
+          "requestId",
+          "sessionId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "sessions.createAndSend": {
+      "handler": "sessions_create_and_send",
+      "params": {
+        "optional": [],
+        "required": [
+          "message",
+          "overrides",
+          "profileId",
+          "requestId",
+          "workspaceId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "sessions.list": {
+      "handler": "sessions_list",
+      "params": {
+        "optional": [
+          "page",
+          "workspaceId"
+        ],
+        "required": [
+          "includeArchived"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "sessions.send": {
+      "handler": "sessions_send",
+      "params": {
+        "optional": [],
+        "required": [
+          "message",
+          "overrides",
+          "requestId",
+          "sessionId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "sessions.switchProfile": {
+      "handler": "sessions_switch_profile",
+      "params": {
+        "optional": [],
+        "required": [
+          "expectedVersion",
+          "profileId",
+          "requestId",
+          "sessionId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "sessions.update": {
+      "handler": "sessions_update",
+      "params": {
+        "optional": [
+          "displayName",
+          "pinned",
+          "workspaceId"
+        ],
+        "required": [
+          "expectedVersion",
+          "requestId",
+          "sessionId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "usage.aggregate": {
+      "handler": "usage_aggregate",
+      "params": {
+        "optional": [
+          "since",
+          "until"
+        ],
+        "required": [
+          "sessions"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "usage.export": {
+      "handler": "usage_export",
+      "params": {
+        "optional": [
+          "format"
+        ],
+        "required": [
+          "sessions"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "workspaces.archive": {
+      "handler": "workspaces_archive",
+      "params": {
+        "optional": [],
+        "required": [
+          "expectedVersion",
+          "requestId",
+          "workspaceId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "workspaces.browse": {
+      "handler": "workspaces_browse",
+      "params": {
+        "optional": [],
+        "required": [
+          "environment",
+          "path",
+          "requestId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "workspaces.gitStatus": {
+      "handler": "workspaces_git_status",
+      "params": {
+        "optional": [],
+        "required": [
+          "requestId",
+          "workspaceId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "workspaces.list": {
+      "handler": "workspaces_list",
+      "params": {
+        "optional": [],
+        "required": [
+          "includeArchived"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "workspaces.open": {
+      "handler": "workspaces_open",
+      "params": {
+        "optional": [
+          "expectedVersion"
+        ],
+        "required": [
+          "environment",
+          "path",
+          "requestId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    }
+  },
+  "source": {
+    "dispatchTable": "src/agent_box/server/wire/handlers.py",
+    "repository": "agent-box-env-provider"
+  }
+}
