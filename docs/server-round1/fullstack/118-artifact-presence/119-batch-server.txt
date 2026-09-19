@@ -1,0 +1,29 @@
+............................................................s........... [  8%]
+........................................................................ [ 17%]
+........................................................................ [ 25%]
+........................................................................ [ 34%]
+........................................................................ [ 42%]
+........................................................................ [ 51%]
+........................................................................ [ 59%]
+........................................................................ [ 68%]
+........................................................................ [ 76%]
+........................................................................ [ 85%]
+........................................................................ [ 93%]
+.....................................................                    [100%]
+ARTIFACT_worker-debug=present workers/agent-box-worker/target/debug/agent-box-worker
+ARTIFACT_worker-release=present workers/agent-box-worker/target/release/agent-box-worker
+ARTIFACT_worker-musl-dir=present workers/agent-box-worker/target/x86_64-unknown-linux-musl
+ARTIFACT_sidecar-entry=present plugins/agent-box-harnesses/runtime/worker-entry.mjs
+ARTIFACT_acp-npm-closure=present plugins/agent-box-harnesses/runtime-claude/node_modules/@agentclientprotocol/claude-agent-acp
+TOOL_bwrap=present
+TOOL_node=present
+TOOL_npm=present
+TOOL_claude=present
+TOOL_tmux=present
+TOOL_wsl.exe=present
+SKIPPED_CLASSIFIED_design=1
+SKIPPED_TOTAL=1
+WORKER_ARTIFACT=present
+VERDICT=GREEN_DESIGN_SKIPS_ONLY
+844 passed, 1 skipped in 317.84s (0:05:17)
+SERVER_EXIT=0

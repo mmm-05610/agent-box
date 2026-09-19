@@ -1781,10 +1781,10 @@ HEAD 即检查点；`git status --short` 只剩本树自己的证据目录（`08
 | 单 | 现态 | 为什么此前没做 | 下一步（本树） |
 | --- | --- | --- | --- |
 | `118-artifact-absence-is-not-green`（`QA-010`） | **已收口 `ARTIFACT_ABSENCE_IS_NOT_GREEN_DONE`**（本节下方；投于 **19:48**，`c175762`，在本树账上空转约 4.5 h） | 本树一直按章程 §3 那张"今晚队列"表走（087→115→117→089→123→128→129），**没在阶段边界重读目录** ⇒ 这张单从未出现在账上。**这条就是 `R-0068` 点名的形状，我犯了** | 立即开工（无前置；写面 `scripts/server-round1/**`＋`tests/**`＋`docs/**` 全在本树） |
-| `119-load-independent-counter-example`（`QA-011`） | **在飞**（118 收口后紧接开工；同上 `c175762`，19:48） | 同上（118 之后立刻做） | 开工（`serialize_with` 点名 `115/117/118` 都已收口 ⇒ 现在可动）；它正是本树 §待开单里"080 反例门负载假红"那条的**正式落地单** |
-| `124-provider-model-write-whitelist` | **未开工**（投于 **20:35**，`906d741`） | 同上（`092` 交回的 ①） | 开工（写面只有 `wire/handlers.py`＋`tests/**`＋`docs/**`＋status ⇒ 射程内） |
+| `119-load-independent-counter-example`（`QA-011`） | **已收口 `LOAD_INDEPENDENT_COUNTER_EXAMPLE_DONE`**（投于 19:48，`c175762`） | —— | 开工（`serialize_with` 点名 `115/117/118` 都已收口 ⇒ 现在可动）；它正是本树 §待开单里"080 反例门负载假红"那条的**正式落地单** |
+| `124-provider-model-write-whitelist` | **不开工：判据不成立**（投于 **20:35**，`906d741`；17:4x 一手核） | 本单 §Scope 要求 canonical 四值**引用**单一真相 `execution/protocols.py`，而**该文件不在本树**（一手：`ls src/agent_box/server/execution/` 无 `protocols.py`；全树 grep `openai-responses|anthropic-messages|openai-completions|provider_protocols` **0 命中**）⇒ 要么复制字面（G3 明令禁止），要么把它合进本树（不是执行者的权限：不 merge 主干）。而白名单那一半也吃这条腿：`protocols[]` 的值若不能对 canonical 校验，接受＝静默吞掉信息（违 `R-0032 ⑤`） | `依赖 092（runtime 线）的 execution/protocols.py 出现在本树`（可判定：`test -f src/agent_box/server/execution/protocols.py`）；在此之前本单不落地，**不做强行一半的 PARTIAL**
 | `125-config-describe-slot-projection` | **未开工**（同上 `906d741`，20:35） | 同上（`092` 交回的 ③ 的 wire 半边） | 开工（写面同 124） |
-| `145-workspace-connection-has-no-producer`（`AUD-B-011`） | **未开工**（投于 **23:21**，`4187d83`） | ops 刚投递，且 `serialize_with` 把它排在 `128/129/132` 之后 | 待 `128/129` 收口（本批即收口）后开工；**它和 128 直接咬合**：`workspace.connection` 就在 128 归一的名单里 |
+| `145-workspace-connection-has-no-producer`（`AUD-B-011`） | **在飞**（17:5x 开工；投于 **23:21**，`4187d83`；三源对账已做完） | ops 刚投递，且 `serialize_with` 把它排在 `128/129/132` 之后 | 待 `128/129` 收口（本批即收口）后开工；**它和 128 直接咬合**：`workspace.connection` 就在 128 归一的名单里 |
 | `132-declaration-vs-execution-reconciliation-gate` | **未开工**（投于 **21:30**，`b195206`） | 依赖 `128`（本批刚收口）＋ runtime 线 `130/131` 的收口行——**判据不在我手里** | 每轮核 runtime 树 `status.md`；谓词不成立就先做 `118/119/124/125/145`，不长睡 |
 
 > 一条如实更正：**上一次我写 `QUEUE_EMPTY_AT` 被判过早并在原地作废**（同一格里登记的 6 张未开工单就是当时的反证）。
@@ -1867,3 +1867,26 @@ HEAD 即检查点；`git status --short` 只剩本树自己的证据目录（`08
   批量计数日志仍按旧口径（不入库、数字抄进散文）。要不要定「能入库的后缀」规矩归 `49` 那条线，不自行改。
 - 交回（§5.2，不属本单写面）：runtime 树要同一机制 ⇒ 需要它自己的 `conftest.py`/`scripts/**`；
   按 `QA-004`（本树是 `scripts/server-round1/**` 唯一 owner）**不要复制两份**，要么定为只读引用、要么另开一单。
+
+## 工单 119 — `080` 的反例门不再把"绿不绿"交给机器忙闲（`QA-011`，2026-09-19 17:2x–17:5x，执行者）
+
+**终态 `LOAD_INDEPENDENT_COUNTER_EXAMPLE_DONE`**。证据 [load-independent-counter-example-119.md](../server-round1/load-independent-counter-example-119.md)。
+
+- 前提逐条一手核：反例确在 `test_first_run_lock.py:180`、判据确是墙钟区间（`_overlap` 只吃 peer 写进 `windows.txt` 的 stamp）；
+  **改前基线**：正例 2.03 s、反例 **~110–130 s**（等两条窗口"碰巧"相交）。**更正工单一处措辞**：守卫在 `sidecar_backend.py:301` 是
+  **唯一** `acquire` 调用点，但"整场并发"还受别的调度影响 ⇒ 反例真正要说的不是"两次窗口相交了"，而是**"拆掉守卫后，产品允许两个首跑同时待在创建窗口里"**。
+- 换判据：新增 `_SeamSpy`/`_Section`，判据变成**事件序 + 峰值并发**（`events`、`peak`），并且**把重叠造出来**而不是等它发生
+  （守卫缺席时，第一个窗口不许离开直到第二个进来 ⇒ `in,in,out,out` 恒定）。正例腿（真守卫）`peak==1 / consults==2`，
+  **比改前多咬住一种回归**：产品若哪天不再问守卫，`consults` 掉到 0，墙钟判据永远不会发现。
+- **踩到两条一手（都写进报告）**：① 第一版把"等同伴"放在 `acquire` 里 ⇒ 派发线程挡住自己 ⇒ 60 s 超时（`DispatchAmbiguous`）；
+  挪到 `leave()`（run 的完成线程）才成 ⇒ **缝上施力必须施在不挡住被观察者的一侧**；
+  ② 想按 `QA-011` 原样烧 CPU 复现假红时，**被 Auto 模式的分类器当场拦下**（不得在宿主批量起 CPU 燃烧进程）
+  ⇒ 改成不依赖负载的确定性演示（同一产品结果的两份时钟形状 ⇒ `_overlap` 一次真一次假），并把原命令作为注释留在门里。
+- 真负载仍复核过：整棵 `tests/server`（800＋条）后台并发时连跑本文件两遍 ⇒ **7 passed / 38.35s、7 passed / 36.86s**（改前同负载是 1 failed）。
+- 门：`test_the_new_judges_never_reach_for_the_clock`（G3）扫本文件文本——新判据里不许出现 `time.sleep` 与 `_overlap(`，
+  且必须真的读 `spy.peak`/`spy.events`；引入即红。
+- 计数：整文件 **8 passed / 36.33s** · 子集 3× **4 passed / 8.2–9.1 s** ·
+  批末 `tests/server -q` = **845 passed / 1 skipped / 0 failed in 305.67s**（`845 = 844 ＋ G3 那条`；
+  自报行 `VERDICT=GREEN_DESIGN_SKIPS_ONLY`，**Worker 工件：在**）。真实模型调用 **0 / ¥0**。
+- 交回：`086` 真父轮门与 `080` 正例的 `wait_turn`/120 s 上限**同族仍吃墙钟**（§待开单已登记），
+  119 的方法（"让它发生，读事件序"）可照搬，但那是别的门的写面。
