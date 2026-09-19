@@ -80,6 +80,49 @@ curl -sS -X POST http://127.0.0.1:18770/wire/v1/profiles.list \
   红线照旧：**不把真 DeepSeek key 种到 `credential_e08793…`**（8 条 `maomaokingdom` 用户自有网关记录引用它）。
 - 需要临时造一条可发的：`profiles.create` + `profiles.updateConfig` 绑 `{providerId, modelId}`
   （验收线在 P-2 就是这么走通第一手的），跑完**归档**并留清理证据。
+  ⇒ **本节上面那条 `curl` 在 Windows 端口上不可用**（QA 第 3 条环境事实：WSL → `127.0.0.1:<win-port>` 的
+  `POST` 会被代理层变成 `http=400 "Invalid HTTP request received."`，`GET /live` 才正常）。
+  **读法改在 Windows 侧做**（`Invoke-RestMethod`），或者直接用下面 §3b 的脚本（它两边都能跑，且默认按 locator 处理凭据）。
+
+## 3b 独立根里"一条 profile 都没有"⇒ 先 seed（QA 第 144 轮交回的 `items=0`，A 侧的活）
+
+QA 一手跑到 §3 时撞上：`R-0056` 要求独立数据根 ⇒ 全新根里 `profiles.list` 回 **`items=0`** ⇒ G1/G2 无从下手。
+**根因不在产品**（本树源码一手核过，见下面两条），在**这份跑本没写怎么造 profile**——补上：
+
+```powershell
+# 在 Windows 侧跑（控制面＝Windows，`R-0014`）。一份 0600 的 key 文件放在**根外**的私有路径。
+& "$env:LOCALAPPDATA\AgentBox\r4c9-env\Scripts\python.exe" `
+  "\\wsl.localhost\Ubuntu\home\maoqh\projects\agent-box-env-provider\scripts\server-round1\ui_gates_89_seed_profile.py" `
+  --base-url http://127.0.0.1:18820 `
+  --token-file "$env:LOCALAPPDATA\AgentBox\89-gate-qa-data\secrets\http-token" `
+  --key-file  C:\secrets\deepseek-key.txt `
+  --endpoint  https://api.deepseek.com --model-id deepseek-chat `
+  --harness pi --harness codex --require-ready `
+  --state-file "$env:LOCALAPPDATA\AgentBox\89-gate-qa\seed-state.json"
+# 退出码：0＝两条都 ready；3＝有 blocked/unknown（报告里的 checks 会点名是哪一条事实）；
+#         4＝命中 R-0056 的端口护栏（默认禁 18790/18810），一次请求都没发。
+# 跑完（无论成败）归档自己造的东西：
+#   … ui_gates_89_seed_profile.py --base-url … --token-file … --teardown `
+#       --state-file "$env:LOCALAPPDATA\AgentBox\89-gate-qa\seed-state.json"
+```
+
+三条一手事实（本树今天量出来的，别当传闻）：
+
+1. **凭据只能按路径导入，而且只有 Windows 侧的 Server 有可写的凭据面**：
+   `POST /api/v1/credentials` 的 body 是 `{kind, source_path, confirm_source_path}`（`transport/http/app.py:249-273`，
+   **值不进请求体**），而它要求组合里有 secret store——`bootstrap/runtime.py:317-320` 只在 **`os.name == "nt"`** 时自动装
+   `WindowsDpapiSecretStore`。⇒ **在 WSL 侧 `python -m agent_box.server` 起的服务会回
+   `CREDENTIAL_STORE_UNAVAILABLE`（retryable）**，seed 必须在控制面那台做。这条就是 `T6-1`（"没有一条发得出去的 profile"）的机制根因。
+2. **`providerModels.create` 的 `harness` 是执行家族、不是厂商名**：填 `"deepseek"` ⇒ `CAPABILITY_UNSUPPORTED / HARNESS_UNAVAILABLE`。
+   ⇒ 一家一条 Provider 记录（脚本就是这么写的：每个 `--harness` 各建一条）。
+3. **读面不收 `requestId`**：`profiles.list` 的形状门只允许 `{includeArchived}`（`handlers.py:47`）⇒
+   带上 `requestId` 会被判 `INVALID_REQUEST: unexpected requestId`。写面（`profiles.create/updateConfig/archive`）反过来必须带。
+
+**已验到哪一步（诚实口径）**：`scripts/server-round1/ui_gates_89_seed_shape_check.py` 把上面这条流程**逐面**过了一遍真实的
+Server 处理栈（in-process `TestClient`，假 key、假端点，**真实模型调用 0**）⇒ **`SHAPE_CHECK OK 10/10`**，
+其中正例是"seed 走完 ⇒ `profiles.list` 读回 `sendability.state:"ready"`"，反例是"key 文件读不了 / 同 label 改参数重放"两种都必须非零退出。
+`ui_gates_89_seed_profile.py --self-test` **15/15**（端口护栏零请求、0600 之外的 key 文件直接拒、报告是白名单投影、
+凭据/令牌形状会被就地涂掉）。**没验的仍是真机那一腿**：Windows 侧 DPAPI store ＋ 真 key ＋ 真端点 ⇒ 那要跑的人按上面命令做一次。
 
 ## 4 每家的验收判据与记账格式（089 §Requirements + G1/G2/G3）
 

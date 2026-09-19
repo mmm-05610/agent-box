@@ -788,6 +788,7 @@ Codex 旧 chat 配置尝试在模型请求前失败；新 Responses 配置已通
 | **按新的 14 项名单回填历史行的 `wire_seq`**（128 的射程外剩余；老 Session 仍可能显示错序） | 128 一手：`wire/projection.py:206` 在 `wire_seq` 缺席时回落到存储 `seq`，而 `storage/database.py:_migrate_4_to_5` 那段 `UPDATE … SET wire_seq=(SELECT COUNT(*) …)` 是按**当年十项**名单算的 ⇒ **新写入已归一，已存在的库里那四类旧行仍是 NULL**，同一个老 Session 两套编号混着；客户端按 `seq` 排序＋去重会丢正文。回填要注意 `server_session_wire_order` 的 UNIQUE 与既有号不能撞 | `src/agent_box/storage/**` 不在 128 的 `write_paths`（`wire/**`、`sessions/**`、`tests/**`、`docs/**`、`status`）；本单宁可留一条已登记的缺口，也不越界改迁移 | [128 证据 §4](../server-round1/wire-seq-numbering-spaces-128.md)（含「游标编码的是 raw seq，回填不改游标语义」那一句） |
 | **把 `accounts.importAsset` 的资产写与幂等回执做成一个事务**（129 的射程外剩余） | 129 一手：`write_asset` 先落 `SecretStore` 才有回执可存 ⇒ 只能 `get`（读事务）→ 写 → `save`（另一事务），中间那段窗口里两个同 key 的首次请求**至多一份回执胜出**（`save` 在事务内再 check 一次），但**可能留下第二份没人指向的资产字节**。闭合要在 `accounts/assets.py` / `records.py` 内做，或改成内容寻址 locator 让第二次天然等价 | `src/agent_box/server/accounts/**` 不在 129 的 `write_paths`（`wire/**`、`tests/**`、`docs/**`、`status`）；本单按工单 §Scope 那句「做不到就交回并附一手证据」处理，**没有**顺手改资产层 | [129 证据 §5.1](../server-round1/import-asset-request-id-129.md) |
 | **`write_asset` 的 locator 命名时机要不要改成内容寻址**（一条裁决，不是清理） | 129 一手：`assets.py:176-191` 每次调用都新铸 locator（内容与 key 都不参与命名）⇒ **不同 requestId 的同一份字节 = 两个 locator**、两个都真实存在；129 只把「同一逻辑请求铸两个」变成不可达（回放根本不执行）。要不要走到「同内容 ⇒ 同 locator」是产品语义决定，它会牵动 reclaim 的摘要比对与账号资产的历史引用 | 属资产层语义 ＋ 牵动 56 的 reclaim 规则；129 §Scope 只授权修「同一请求重试」与「locator 铸造时机」两点，后者做不到 ⇒ 交回 | [129 证据 §5.4](../server-round1/import-asset-request-id-129.md) ＋ 门 `tests/server/test_import_asset_request_id_129.py::test_a_different_key_for_the_same_bytes_is_a_new_request_not_a_replay`（把现状钉成事实而不是传闻） |
+| **POSIX 侧的 Server 组合里没有 secret store ⇒「独立根永远长不出可发的 profile」是机制、不是疏忽**（要么给 Linux 一个 file-backed store，要么把"seed 只在控制面"写成产品口径） | `089` seed 腿一手：`bootstrap/runtime.py:317-320` 只在 `os.name == "nt"` 时自动装 `WindowsDpapiSecretStore`，而 `python -m agent_box.server`（`__main__.py:52-56`）**不注入**任何 store ⇒ Linux/WSL 侧起的实例对 `POST /api/v1/credentials` 一律回 **`CREDENTIAL_STORE_UNAVAILABLE`（retryable）**（`ui_gates_89_seed_shape_check.py` 把这条钉成了正例）。后果面不止 `089`：`storage` 里可选实现只有 `MemorySecretStore`（构造要预填 dict）与 Windows DPAPI 两家，所以**任何**"在 WSL 侧准备一份能发的试用环境"的路径今天都走不通——`T6-1` 的机制根因就在这 | 属数据模型/平台能力选择（新增一个受管文件存储 ＝ 加密边界的语义决定），`089` 是"只跑不改"的单；本树 `src/**` 不在其 `write_paths`，且这条也不属于 `124`/`132` 任何一张在队的单 | [跑本 §3b](../server-round1/fullstack/ui-gates-89-windows-handoff.md) ＋ 门 `scripts/server-round1/ui_gates_89_seed_shape_check.py::a_server_without_a_secret_store_refuses_the_import_typed`（`SHAPE_CHECK OK 10/10`） |
 | **`_model_references` 把 `modelId: None` 拼成字符串 `"None"` 的引用**（写入侧比读侧宽，会让一次解析注定 404） | 125 一手：`model_configs/service.py:250-258` 判"是不是引用"用的是**键在不在**（`set(value) >= {"providerId","modelId"}`）然后 `str(...)` 强转 ⇒ `{"providerId": "p", "modelId": None}` 被当成"引用了名叫 `None` 的模型"；而 wire 侧要求两者都是非空字符串（`wire/handlers.py::_model_reference_list`）⇒ 两侧在这一形上**有意不同**，125 的门把这一分歧单独钉住而不是假装相等。后果在服务层：这样的配置能通过校验、然后在 `reference()`/freeze 处必然 404 | `src/agent_box/server/model_configs/**` 不在 125 的 `write_paths`（只有 `wire/handlers.py`）；收紧键判据＝改写入侧语义（可能拒掉今天写得进去的配置），属裁决不是清理 | [125 证据 §4](../server-round1/config-describe-slots-125.md) ＋ 门 `tests/server/test_config_describe_slots_125.py::test_the_two_walks_differ_on_one_shape_and_the_wire_is_the_stricter_one` |
 
 > 编号说明：上一节 `## CHECKPOINT b2`（080/081 那次）的 §2 写了"新增 B5"，但当时表里没落 B5
@@ -2036,3 +2037,50 @@ python3 -m pytest tests/server/test_artifact_absence_is_not_green_118.py \
 CPython 会把 `OSError(13, …)` 自动提升成 `PermissionError`，**错的是我的期望，不是产品**；改判后全绿。
 这类红是门在量真东西的证据（同一条门也确实测到了"路径没漏"，因为注入的就是带路径的异常）。
 批末第一遍 `tests/server -q` = **883 passed / 1 failed / 1 skipped in 317.68s**——红的是 `103` 的**生成账**（本条新门给 `assets.*` 添了驱动证据，账没先重算 ⇒ 门如实红，**不是产品回归**）；重算（367 → **368** 条证据行，单源观察名单仍 40）后 **103 ＋ 147 定向 = 25 passed / 10.04s**，并把重算记进同一提交。
+
+## `089` 的 seed 腿：判据翻了，而且翻在我们这一侧（§8b 第 4 条 → 开工；2026-09-20 04:3x，执行者）
+
+**先记账本变化，再记活**：本轮按纪律重读目录与依赖——`work-orders/` 65 个单文件（id ≥ 100 的 **18** 张），**无新单**（最新仍是 `147`）；
+`124` 判据 `test -f src/agent_box/server/execution/protocols.py` ⇒ **仍不存在**；`132` 判据（runtime 树 `status.md` 里 `130`/`131` 的终态码）⇒ **grep 仍 0 命中**。
+**`089` 的判据翻了**：QA 线**已经跑过**Windows 真机腿并交回 [`docs/qa/ui-gates-89-windows-leg.md`](../../../agent-box-server-round1/docs/qa/ui-gates-89-windows-leg.md)
+（`R-0065 ①` 派的那一腿，QA 只写自己面 ✓），终态 **PARTIAL**：
+
+| QA 一手结果 | 对本单的意义 |
+| --- | --- |
+| Windows 侧 Server **部署成功**：UNC 读 WSL 源码 ＋ `-m agent_box.server` ＋ bundle 自检 ＝1 ＋ 18820 LISTEN ＝1 ＋ `/live` 200 | `R-0056` 划给 `089` 现场验的"**③ Windows↔WSL 真机部署**"**已成立**（挂在 sha `5abedc0`，不是我们写作时的 `4230b2a`） |
+| 独立根上 `profiles.list` ⇒ **`items=0`** ⇒ G1/G2 到不了；按跑本 §4c **交回 A，不自己补映射** | 阻塞**从"人的腿"变成"A 的活"**（`R-0069` 口径下解卡入口＝**自行**）——而且这份跑本是我写的，**§1 要求独立根、§3 又要求根里有 ready profile**，这个内生张力是跑本的缺陷 |
+| 三条环境事实：`DATA_ROOT_UNOWNED` 守卫真咬／`.ps1` 必须纯 ASCII＋CRLF／WSL `curl` 打 Windows 端口的 `POST` 被代理变成 400 | 第三条直接判了我 §3 那条 `curl` 读法的死刑 ⇒ 已在跑本里就地改正（不另开单，跑本属本单 `write_paths`） |
+| 清理证据齐（按 `OwningProcess` 定位停自己那份、临时根走可恢复删除并核实、A 的 `18790`/pid 4355 全程未动、真实模型调用 **0**） | 交接纪律成立，本单可放心引用 |
+
+**本轮交付（都在 `089` 的 `write_paths` 里，"只跑不改"未破：`src/**` 一字未动）**：
+
+1. `scripts/server-round1/ui_gates_89_seed_profile.py`——把"独立根里怎么长出一条发得出去的 profile"做成一条命令：
+   `POST /api/v1/credentials`（**按路径导入**，值不进请求体、也不进本进程）→ 每家一条 `providerModels.create`（带 `provenance`）→
+   `profiles.create` ＋ `profiles.updateConfig` 绑 `{providerId, modelId}` → `profiles.list` 读回 `sendability`；
+   `--teardown` 按 state 文件**只归档自己造的**；`--require-ready` 让"跑了但没 ready"不能算成绿。
+   **`--self-test` 15/15**（离线、无 socket）：端口护栏**零请求**就拒（`R-0056`：默认禁 18790/18810）· 0600 之外的 key 文件在**任何调用之前**被拒 ·
+   三个面的调用顺序与"模型控件真的绑上了"逐条断言 · 反例五道（`blocked` 判据不能算成成功／profile 读不回来必须报 `NOT_IN_LIST`／
+   响应里出现 `sk-` 形状要拒／服务端的自由文本不得进报告／类型化拒绝不得被咽下）· teardown 不许碰别人的 profile。
+2. `scripts/server-round1/ui_gates_89_seed_shape_check.py`——**同一份流程打进真处理栈**（in-process `TestClient`，假 key、假端点，
+   **真实模型调用 0 / ¥0**）：**`SHAPE_CHECK OK 10/10`**。正例是 seed 走完后 `profiles.list` 回
+   `sendability.state:"ready"`（`recovery` 与 `model:provider_…` 两条 checks 都 ready）；反例两条真咬：
+   key 文件 `chmod 000` ⇒ `CREDENTIAL_SOURCE_UNREADABLE` 且**不出**报告；同 `--label` 改参数重放 ⇒ `IDEMPOTENCY_CONFLICT`。
+3. 三条**一手产品事实**（写进跑本 §3b，别再让下一个人试）：
+   ① **seed 只能在控制面做**——`bootstrap/runtime.py:317-320` 只在 `os.name == "nt"` 时自动装 `WindowsDpapiSecretStore`，
+   所以 WSL 侧 `python -m agent_box.server` 起的服务对凭据导入一律回 `CREDENTIAL_STORE_UNAVAILABLE`（本树一手量到，形状门也钉住了它）；
+   **这就是 `T6-1` 的机制根因**，不是"没人去点一下"。
+   ② `providerModels.create` 的 `harness` 是**执行家族**、不是厂商名（填 `deepseek` ⇒ `CAPABILITY_UNSUPPORTED/HARNESS_UNAVAILABLE`）
+   ⇒ Provider 记录**一家一条**（我第一版就是照厂商名写的，被真处理栈当场拒掉）。
+   ③ **读面不收 `requestId`**（`handlers.py:47`：`profiles.list` 只允许 `{includeArchived}`），写面必须收——第一版带上去被判
+   `INVALID_REQUEST: unexpected requestId`。
+4. 跑本 `ui-gates-89-windows-handoff.md`：§3 就地修正 `curl` 那一条，新增 **§3b**（可照抄命令、退出码口径、三条事实、
+   **"验到哪一步"的诚实边界**：形状与逻辑已验，**真机那一腿仍未验**——要 Windows 的 DPAPI store ＋ 真 key ＋ 真端点）。
+5. 跨线请求正式落号：**主树 `handoffs.md` `H-013`**（`R-0067 ③` 欠了两轮的首条；按 `R-0067 ②`"有期限有回执"改过一次口径——
+   本行落表前 QA 已跑过，所以请求体改成"**等 A 侧 seed 到位后从 §3 续跑第二轮**"，并把 QA 第一轮已拿到的三件标为**不必重跑**）。
+
+**没做的（如实）**：`ui_gates_89_leak_check.py --self-test` 本轮**未跑**——Auto 分类器连续两次以"该脚本不存在"拦下（实测存在：
+`ls scripts/server-round1/` 命中），按纪律不重复同一调用；G3 泄漏门的自检留到 QA 续跑那一轮一并做。
+
+**`089` 现在的账**：预检 ✅ · 预演 ✅（假端点，`notAcceptanceEvidence`）· **③ 真机部署 ✅（QA 一手，sha `5abedc0`）** ·
+**seed 腿 ✅（形状＋逻辑，本树一手）** · G1/G2（两家真发真答）❌ 未到 · G3（零泄漏门）❌ 未跑（要 G1/G2 的证据目录）。
+⇒ **仍不声明终态码**；解卡入口＝**依赖 QA 线**（`H-013` 的 ②：seed 已交付，从跑本 §3b→§4 续跑第二轮）。
