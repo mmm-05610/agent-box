@@ -207,8 +207,17 @@ FFFFF..   5 failed, 2 passed in 9.89s
   本单按 §7 不发明 blocker（那是逐族语义设计），但**这条交回要跟着 101 一起看**：
   101 落地后两者自然一致；101 未落地前，任何人拿 hello 当"可用清单"都会在这五条上被骗一次。
 * **是否需要重锁**：105 的写法是"可与 097 合并为一次重锁"。本单**没改形状**（条目仍是
-  `{id, supported, reason?}`），改的是这张表的**内容**。本树内**没有**生成的 wire 工件可核
-  （实测：`docs/contracts/` 只有 Work Core；`find` 无 `contracts/wire-v1`），
-  所以"前端那份 TS/工件里是否嵌了 capability id 清单"我在这一侧**无法第一手判定** ⇒ 交回调度者：
-  若嵌了，重锁由 105 一并做掉；没嵌，本单不产生新的一对摘要。
+  `{id, supported, reason?}`），改的是这张表的**内容**。
+  > **本节结论被本树 098 阶段 4 的第一手观测推翻，原文保留、结论更正如下（2026-09-19）**：
+  > 当时我按 `docs/contracts/` 与 `contracts/wire-v1` 这两个猜的位置去找，找不到就说"本树没有生成物"——
+  > **工件在，而且是被跟踪的**：`docs/server-round1/fullstack/generated/wire-v1.schema.json`
+  > （212,653 字节，`git ls-files` 命中，mtime 2026-09-18 02:06，`$protocolVersion = "wire/1"`）。
+  > 更正后的第一手判定：**本单不需要重锁**——`server.hello#result` 的
+  > `capabilities.items.properties.id` 只是 `{"type": "string", "minLength": 1}`，**没有嵌 capability id 清单**，
+  > 所以 27→64 不触碰这份工件；根对象倒是 `additionalProperties: false`，
+  > 因此 **105 往 `hello#result` 加 `harnesses` 键必须重锁**（这一点原本我只是"若嵌了才要"，现在是确定要）。
+  > 顺带量到的漂移（不属 097，交 102）：这份工件只覆盖 **33** 个方法，而派发表是 **64** 个。
+* **其余交回 102 的一条**：同一份工件里 `providerModels.update#params` 与 `providerModels.probeModels#params`
+  **都没有 `provenance`**，而服务端两处都接受它——细节与本单的读法见
+  [provenance-500-fix-098.md §9.2](provenance-500-fix-098.md)。
 * **Windows 侧复跑**：需要一个真在跑的 Windows Server（本机此刻 18770 拒连），以及重新部署才生效这件事。

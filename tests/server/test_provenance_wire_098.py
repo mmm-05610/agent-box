@@ -10,6 +10,12 @@ of the database, and the counter-examples show each half failing on its own.
 The client is built with `raise_server_exceptions=False` on purpose: this order
 is about the difference between a 500 and a typed refusal, and a test client
 that re-raises server exceptions turns that difference into a Python traceback.
+
+Running this file with `AGENT_BOX_WIRE_SCHEMA` pointed at the generated artifact
+fails two cases - `update` and `probeModels` do not declare `provenance` in
+their locked `#params`, though the Server accepts it. That is contract drift
+(see evidence §9.2, handed to order 102), not a defect in the code under test,
+so these gates assert the Server behaviour rather than the stale artifact's.
 """
 from __future__ import annotations
 

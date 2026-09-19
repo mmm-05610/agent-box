@@ -172,3 +172,103 @@
 `handlers.py`（旧版用 `git show HEAD~1:` 取；半修版在副本上做 4 处定点替换并逐处 `assert count == 1`），
 `PYTHONPATH` 把副本排在最前；跑完 `rm -rf` 并核实两个目录都不存在（`CLEAN True`）。
 工作树在这两次跑的前后都是同一份（`git status --short` 只剩待提交的门文件）。
+
+## 9 阶段 4：真机复跑、与已锁工件对一遍、计数与账
+
+### 9.1 真监听复跑（不是 `TestClient`）
+
+形态：`build_runtime(临时根)` → `create_app` → `uvicorn.Server` 在守护线程里真 bind
+`127.0.0.1` 随机端口（先 `socket.bind(("127.0.0.1",0))` 取空port再释放）→ `urllib` 真发
+`POST /wire/v1/<method>`。`lifespan="on"`（数据根与迁移由 app 生命周期建立）。
+
+| 请求 | http | 读回 |
+| --- | --- | --- |
+| `providerModels.create` 带四个合法 provenance | **200** | `{'baseUrl': 'https://api.deepseek.com', 'authStyle': 'api_key', 'wireApi': 'chat_completions', 'fieldsSource': 'manual'}` |
+| 紧接着另开一次 `providerModels.list` | 200 | `[{同样四字段}]` ⇒ **落库确认**（不是同一响应的回声） |
+| `create` 带未知字段 | 200 | `INVALID_REQUEST` ＋ `provenance carries unknown fields` |
+| `create` 带枚举外值 `{"wireApi":"teleport"}` | 200 | `INVALID_REQUEST` ＋ `provenance.wireApi is not a known value` |
+| `update` 只带 `{"fieldsSource":"preset"}` | 200 | 四字段齐全，`fieldsSource` 变 `preset`、其余三个保持 |
+| `create` 不带 provenance | 200 | `provenance: None` |
+| `probeModels` 带 provenance（`baseUrl` 指本机 discard 端口） | 200 | `{'status': 'failed', 'code': 'PROBE_UNREACHABLE', 'models': []}` ⇒ 类型化，未出站 |
+| `server.hello`（顺带确认 097 的成果没被本单碰坏） | 200 | — |
+
+跑完 `server.should_exit` → 删临时根 → `TEMP_ROOT_ABSENT True`。
+**真实模型 0 次**：全程只有本机回环与 discard 端口，凭据 locator 未访问。
+
+工单 §Validation 那条"对**试用 Server** 发一条带 provenance 的 create"：此刻机器上有两个在跑的
+`python3` 服务（`127.0.0.1:18790`/`18791`，`ss -ltnp` 一手）与一个 `node`（`18796`）。
+**本单没有向它们发写请求**，两条理由：① 那是用户的数据根，往里加一条 Provider 记录是可感知的副作用，
+不在"执行者可自行决定"的范围（章程 §8／主树 README §4）；② 在跑的实例是本单修复**之前**构建的，
+对它复现只会再量一次 500，证明的是部署落后、不是代码缺陷。⇒ 登记为**要人拍**（见 §10），
+本单的"真机"腿用上面这份真监听顶。
+
+### 9.2 与已锁工件 `wire-v1.schema.json` 对了一遍（这一步把两处漂移量了出来）
+
+本树的 `Wire.call` 在 `AGENT_BOX_WIRE_SCHEMA` 存在时会用生成的工件校验 params 与 result
+（`tests/server/test_wire_v1.py:118-127`）。拿它跑本单的 11 条门 ⇒ **9 passed / 2 failed**，
+两条失败**都不是本单代码的错**，而是工件与服务端不一致：
+
+| 事实 | 工件（`docs/server-round1/fullstack/generated/wire-v1.schema.json`，git 跟踪，212,653 B，`$protocolVersion="wire/1"`） | 服务端 |
+| --- | --- | --- |
+| `providerModels.create#params` 允许 `provenance` | **是**（keys 含 `provenance`，`additionalProperties: false`） | 是 ⇒ 一致 |
+| `providerModels.update#params` 允许 `provenance` | **否**（`Additional properties are not allowed ('provenance' was unexpected)`） | **是**（`handlers.py:61-65`） ⇒ **漂移** |
+| `providerModels.probeModels#params` 允许 `provenance` | **否**（keys 只有 `baseUrl/credentialId/requestId`） | **是**（`handlers.py:90-92`） ⇒ **漂移** |
+| 覆盖广度 | **33** 个方法有 `#params`/`#result` | 派发表 **64** ⇒ 31 个方法无条目 |
+
+⇒ 一句话后果：**一个严格按已锁工件做校验的客户端，根本没法给 `update` 送"来源标注"**——
+前端 P28 要走的正是 `update` 这条腿。本单把服务端修好了，合同面还差一次重锁；
+这属 **102（合同面漂移）** 的射程，本单不改工件（`docs/**/generated/**` 的再锁是合同动作，且 102 点名它）。
+
+反向的收获有两条，都是独立第三证人：
+① `providerModels.create#result` 里 `provenance` 子对象的键就是 **`baseUrl/authStyle/wireApi/fieldsSource`**
+（驼峰）＋ 三个枚举逐字一致 ⇒ §7.2"handler 该说 wire 字段名"不是我的偏好，是已锁合同本来就这么写的；
+② `WireError.code` 的 `enum` 就是那 12 项家族 ⇒ §7.3 的 `INVALID_PARAMS` 从来不是合法码。
+
+## 10 交回与要人拍的
+
+* **给 101**：本单射程内的非法家族清零；全仓 90 个字面 `WireError(` 构造点扫完只剩两处，
+  都是 101 点名的：`handlers.py:1195` `ARTIFACT_STORE_UNAVAILABLE`（在 `_artifact_store()` 里一处，
+  顶住 `providerArtifacts.list/install/rollback` **三个**方法）与 `handlers.py:1243`
+  `USAGE_AGGREGATOR_UNAVAILABLE`（一处顶住 `usage.aggregate`/`usage.export` **两个**方法）
+  ⇒ **2 个字面点＝5 个方法**，101 的门按方法数比、别按点数比。
+  101 §Scope 划给 098 的那两处（`INVALID_PARAMS`）**已在本单 §7.3 修掉**，101 不用重复做。
+* **给 102**：§9.2 的三条工件漂移（`update#params` 与 `probeModels#params` 缺 `provenance`、
+  33/64 覆盖广度）。其中第一条会**让已修好的服务端在守合同的客户端面前仍然不可用**。
+* **给 105**：`server.hello#result` 根对象是 `additionalProperties: false` ⇒ 新增 `harnesses` 键
+  **必须**重锁这份工件（本树就有工件，路径见 §9.2）。同时 097 §9 那条"本树没有生成物"已在
+  097 的证据里就地更正。
+* **给 103**：`provider_models_probe_connection`（`handlers.py:1271`）调 `self._provenance(params)`
+  而它自己的参数形状不允许 `provenance` ⇒ 那是一个**永远拿到 `None` 的死调用点**。
+  删它是改语义（本单不做），103 的"每个登记方法至少被真 wire 驱动一次"门会自然把它照出来。
+* **要人拍（阻塞登记）**：工单 §Validation 的"对试用 Server 发一条带 provenance 的 create"这一腿
+  ——需要**先从本树重建部署在跑的实例**（否则量到的还是旧码的 500），并且会往用户的数据根里
+  留一条 Provider 记录。二者都不是执行者可自决的动作。本单的真机腿已用**同一份代码的真监听**顶上（§9.1），
+  部署后复跑这条只要一次 `create` 即可判。
+* **工单文本与实不符的四小处（不改契约，交回调度者记）**：
+  ① 类名是 `WireService`，不是 `WireHandlers`；② §Current state 的行号整体 **+13 漂移**（097 删了 27 项常量），
+  实际是 `:1315/:1320/:1328`；③ §Validation 的"期望 201"——本传输没有 201，成功是
+  `http=200` ＋ JSON-RPC `result`（404/500 才是裸 HTTP 码）；④ G3 写的"类型化 `INVALID_PARAMS`"
+  指的是一个**不存在的家族**（12 项闭集里没有它），字面执行会永远修不好——本单按**意图**（类型化拒绝、不是 500）
+  实现为 `INVALID_REQUEST`，这正是 101 的缺陷族。
+
+## 11 计数与账
+
+| 项 | 结果 |
+| --- | --- |
+| 门文件（最终源码） | `11 passed in 5.59s` |
+| `python3 -m pytest tests/server -q` | **672 passed in 444.11s**（0 失败 0 跳过） |
+| `python3 -m pytest tests/ -q` | **972 passed in 358.34s**（0 失败 0 跳过） |
+| 计数算术 | **672 = 661（097 收口）＋ 本单 11**；**972 = 961（097 收口）＋ 本单 11** ⇒ 两条都恰好只长了本单新增的份数，一条未掉 |
+| `validate_order.py --strict` | 30 OK / 31 FAIL，FAIL 恰为 37…67 的 v1 历史单（非本单引入）；068–105 全 OK 含本单 |
+| `git diff --check` | 干净 |
+
+两遍全套件是在 `fb31cf5` 上跑的（`== HEAD ==` 由脚本一并打回，见输出末行）；此后本单只剩
+**门文件的模块 docstring 加了一段散文**（记 §9.2 的工件漂移），跑 `test_provenance_wire_098 +
+test_hello_capability_sync_097 + test_wire_v1` ⇒ **55 passed**（11＋7＋37）覆盖这个差量。
+计数不重跑全套件来"归属"那一行散文，与 097 §8.5 的取舍一致：**差量是注释、且差量本身有定向跑**。
+
+费用：**真实模型调用 0 次 / ¥0**。本单四个阶段全部是本地 SQLite ＋ 本机回环，
+`baseUrl` 只用过 `127.0.0.1:9`（discard）与 `api.deepseek.com` 这个**从未被解析也从未被连接**的字符串
+（它只作为一次 `create` 的**字段值**落进本地数据根）。凭据 locator **未访问**，没有任何凭据内容进过日志或证据。
+清理：三次临时数据根（`obs098-`、`fix098-`、`real098-`）跑后逐一核实缺席；
+两次"咬旧码"用的 `/tmp/098-oldcode`、`/tmp/098-scopeonly` 跑完 `rm -rf` 并核实（`CLEAN True`）。
