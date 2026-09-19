@@ -145,3 +145,97 @@ JS/third_party 那三处不是同一个威胁模型（不带用户 key 出站到
 3. **`localhost` 与 `127.0.0.1` 的环回例外是**合同**要的（本地假端点跑测试），不是漏洞**——
    但它意味着"能改 `/etc/hosts` 或能占听回环端口"的本机攻击者仍能让探测打到自己；
    这是本机沦陷前提，超出本单威胁模型，记录为"已知边界"而非"待修"。
+
+## 7 阶段 2 实施：一个"只此一跳"的 opener
+
+`_open_request` 不再走 `urllib.request.urlopen` 的**默认 opener**，改用一个模块级、
+导入时一次性建好的 `_OPENER`：
+
+```
+_OPENER = urllib.request.build_opener(_OneShotRedirect(), urllib.request.ProxyHandler({}))
+```
+
+* `_OneShotRedirect.redirect_request` **抛 `HTTPError`** 而不是返回新请求 ⇒
+  第二跳**连发起的机会都没有**（不是"跟了再回头"），这正是 G1 要求断言"请求计数恰为 1"的原因；
+* `ProxyHandler({})` ⇒ 系统代理彻底不参与（§2 那条旁路的根因）。
+
+**实测（本机回环，A 回 302→B）**：
+
+```
+pull_models -> PROBE_ENDPOINT_BLOCKED | the endpoint answered with a redirect; a probe makes one request to the declared endpoint
+A 侧请求数 = 1     B 侧(重定向目标)请求数 = 0
+⇒ 出站总数 = 1（合同要 1）    凭据跟到二跳 = False
+```
+
+一条附带的自证：这轮我把 `http_proxy`/`https_proxy` **故意指到 A 自己的端口**，
+而 A 记录到的请求行是**原点形式** `/models`（不是代理形式 `http://127.0.0.1:PORT/models`）
+⇒ 代理确实没被使用，而不是"用了但恰好同一台"。正例同步复跑：
+`pull_models -> ok '1 model ids' ('model-a',)`、`probe_connection -> reachable endpoint answered`。
+
+**顺手修掉一个会骗人的地方**：`_typed_http_error()` 在 `probe.py:108` 定义了，
+但 `_fetch_models_response` 的 `except HTTPError` 里是**另一份内联的同款映射**——
+那个函数**没有任何调用者**（`grep -rn "_typed_http_error" src/` 只命中定义行）。
+也就是说"给探针加一条错误映射"这件事，改在那份看起来是正主的函数里**不会生效**。
+本单把内联那份删掉、统一走 `_typed_http_error`，3xx 分支才真的接得上。
+
+3xx 映射成 `PROBE_ENDPOINT_BLOCKED`（**复用既有码，不新增**）：工单允许"或新码"，
+但新增码要动 wire 词汇＝合同面，不是一张修 bug 的单该顺手做的。
+
+## 8 阶段 3 实施：校验看"解析到什么"，不看"名字长什么样"
+
+`_validate_endpoint` 里那段"`ipaddress.ip_address(host)`，`ValueError` 就 `address=None`"换成
+**解析 + 对全部答案复检**：
+
+```
+port = parsed.port or (443 if scheme == "https" else 80)
+resolved = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+for entry in resolved:            # 每一个答案，不是第一个
+    address = ipaddress.ip_address(entry[4][0].split("%")[0])
+    if address.is_loopback: continue
+    if private|reserved|multicast|link_local: -> PROBE_ENDPOINT_BLOCKED
+```
+
+三条设计决定，逐条给理由：
+
+1. **看全部答案**。一个名字同时给公网和内网两条 A 记录是真实攻击形状（"第一个能过"就够了）；
+   只取 `resolved[0]` 会留下同型缺口。
+2. **解析失败仍回 `PROBE_UNREACHABLE`**（不是新码、也不是 `*_BLOCKED`）：
+   这与"连不上"在调用方看来是同一件事，且 `probe_connection` 的
+   `unreachable` 语义（工单 §必须保持不变）不被本单改写。
+3. **加了 `is_link_local`**：工单 §Scope 列的是"私网/保留/多播"。
+   实测 `ipaddress` 里 `fe80::1` 与 `169.254.169.254` 的 `is_private` **本来就是 True**，
+   所以这一项是**保险不是扩权**（它没有拒掉任何工单没打算拒的东西）。
+
+**实测**（`getaddrinfo` 全部打桩，**零 DNS、零出站**）：
+
+| 名字（桩答案） | 校验结论 |
+| --- | --- |
+| `imds-behind-a-name.invalid` → `169.254.169.254` | **`PROBE_ENDPOINT_BLOCKED`**（阶段 1 同一输入是"通过"） |
+| `mixed-answer.invalid` → 公网 `93.184.216.34` ＋ 内网 `10.0.0.1` | **`PROBE_ENDPOINT_BLOCKED`**（全部答案复检生效） |
+| `v6-linklocal.invalid` → `fe80::1` | **`PROBE_ENDPOINT_BLOCKED`** |
+| `public-only.invalid` → 公网 v4＋v6 | 通过校验（正例不受影响） |
+| `no-such-name.invalid` → `gaierror` | `PROBE_UNREACHABLE`（与修前同一结论） |
+| 字面量 `https://192.168.1.9` | `PROBE_ENDPOINT_BLOCKED`（回归：字面腿一字未变） |
+| `ftp://example.com` | `PROBE_ENDPOINT_BLOCKED`（scheme 先拒，不做解析） |
+| `http://127.0.0.1:<假端点>` | 通过，且 `pull_models` 回 `ok ('m1','m2')`、`probe_connection` 回 `reachable` |
+
+### 8.1 一处**没修**的分类缺口（实测，交回）
+
+`ipaddress` 在本机 Python 3.12 下对 **CGNAT `100.64.0.0/10`** 四个旗标全 `False`：
+
+```
+100.64.0.1  private=False reserved=False multicast=False link_local=False   -> 通过校验
+```
+
+而 WSL2 / Tailscale / 各类 VPN 的内部面常常正落在这段。工单 §Scope 只列了
+"私网/保留/多播"三类，**把 CGNAT 拉进拒绝集是一次语义裁决**（它会顺带拒掉一些用户真想探的内部网关），
+所以本单不自行扩集，**登记为待拍**：要么调度者裁定加进来，要么维持现状并在文档里写明这段是可达的。
+
+### 8.2 本单改动让两条既有测试改了一处（如实报）
+
+`test_pull_models_rejects_oversized_and_shapeless_responses` 与
+`test_a_slow_drip_answer_hits_the_total_deadline` 都用 `https://…example…` 这种**不存在的名字**
+并且只打桩 `_open_request`。修前校验**从不解析** ⇒ 名字无所谓；修后解析会真去问 DNS。
+两条都补了一行 `socket.getaddrinfo` 桩（返回一个公网地址），**断言一字未动**。
+⇒ 这是"语义变严了，旧夹具里藏着的'名字不用存在'这个假设浮出来"，不是回归；
+改前先跑（`2 failed / 69 passed`）、改后复跑（`71 passed`）都记在案。

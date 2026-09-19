@@ -9,7 +9,11 @@ Hard boundaries (order 55 §1/§2):
 
 * **https only**, except an explicit loopback exception (``http`` to
   ``127.0.0.1``/``localhost``/``::1``) so tests can run against a local fake;
-  private-network addresses that are not loopback are refused (no SSRF);
+  private-network addresses that are not loopback are refused (no SSRF), and a
+  *name* is refused by the addresses it resolves to, not by the string;
+* that one request goes **to the declared endpoint and nowhere else**: a
+  redirect is not followed and a system proxy is not used, because either one
+  would put a different server - and the credential header - in its place;
 * connection and total deadlines, a response-size cap and an entry cap;
 * the credential lives only in the request header inside this call — never in
   argv, never in a log line, never in an error message (errors quote the
@@ -21,6 +25,7 @@ from __future__ import annotations
 
 import ipaddress
 import json
+import socket
 import time
 import urllib.error
 import urllib.request
@@ -58,7 +63,9 @@ def _validate_endpoint(base_url: str) -> tuple[str, str]:
 
     https is the rule; http is allowed only to an explicit loopback host.
     A non-loopback private address is refused: the probe is one outbound
-    request to the *declared* endpoint, not a port scanner.
+    request to the *declared* endpoint, not a port scanner. The check looks at
+    the addresses a host resolves to rather than the spelling of the host,
+    because a name and the number behind it are the same endpoint to a scanner.
     """
     parsed = urlsplit(base_url if "://" in base_url else f"https://{base_url}")
     scheme = parsed.scheme.lower()
@@ -68,21 +75,58 @@ def _validate_endpoint(base_url: str) -> tuple[str, str]:
     if scheme == "http" and host not in _LOOPBACK_HOSTS:
         raise ProbeError("PROBE_ENDPOINT_BLOCKED", "plain http is allowed only to a loopback host")
     try:
-        address = ipaddress.ip_address(host)
-    except ValueError:
-        address = None
-    if address is not None and not address.is_loopback and (
-        address.is_private or address.is_reserved or address.is_multicast
-    ):
-        raise ProbeError(
-            "PROBE_ENDPOINT_BLOCKED",
-            "private network addresses are not probeable endpoints",
-        )
+        port = parsed.port or (443 if scheme == "https" else 80)
+        resolved = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    except socket.gaierror as error:
+        # The name is simply not there. That is the outcome this function used
+        # to reach one layer later, through the connect attempt; keeping the
+        # code means an unresolvable host still answers PROBE_UNREACHABLE.
+        raise ProbeError("PROBE_UNREACHABLE", "the endpoint's name does not resolve") from error
+    #: Every answer, not the first one: a name that offers a public address and
+    #: a private one is exactly how a "resolved fine" check gets walked past.
+    for entry in resolved:
+        address = ipaddress.ip_address(entry[4][0].split("%")[0])
+        if address.is_loopback:
+            continue
+        if (address.is_private or address.is_reserved
+                or address.is_multicast or address.is_link_local):
+            raise ProbeError(
+                "PROBE_ENDPOINT_BLOCKED",
+                "private network addresses are not probeable endpoints",
+            )
     base = f"{parsed.scheme}://{parsed.netloc}{parsed.path.rstrip('/')}"
     return base, host
 
 
+class _OneShotRedirect(urllib.request.HTTPRedirectHandler):
+    """Refuse to follow: a redirect is a *second* endpoint, not the declared one.
+
+    Raising the ``HTTPError`` from here - instead of returning a new request -
+    means no second connection is ever attempted, so the caller's single
+    request stays single. ``_fetch_models_response`` then types it.
+    """
+
+    def redirect_request(self, request, fp, code, message, headers, newurl):
+        raise urllib.error.HTTPError(newurl, code, message, headers, fp)
+
+
+#: The opener is built once, at import, from these two facts:
+#: no redirects, and no system proxy. The second is not belt-and-braces -
+#: with the environment's ``http_proxy`` set, ``urlopen`` hands the request
+#: (absolute URI and ``Authorization`` header, in clear, for ``http``) to that
+#: intermediary and reports the exchange as a probe of the *declared* endpoint.
+#: A one-shot probe to a declared endpoint has to choose its own next hop.
+_OPENER = urllib.request.build_opener(
+    _OneShotRedirect(), urllib.request.ProxyHandler({}),
+)
+
+
 def _typed_http_error(error: urllib.error.HTTPError) -> ProbeError:
+    if error.code in {301, 302, 303, 307, 308}:
+        return ProbeError(
+            "PROBE_ENDPOINT_BLOCKED",
+            "the endpoint answered with a redirect; a probe makes one request to the declared endpoint",
+        )
     if error.code in {401, 403}:
         return ProbeError("PROBE_AUTH_FAILED", "the endpoint rejected the credential")
     return ProbeError("PROBE_HTTP_ERROR", f"the endpoint answered with HTTP {error.code}")
@@ -91,7 +135,7 @@ def _typed_http_error(error: urllib.error.HTTPError) -> ProbeError:
 def _open_request(request: urllib.request.Request, timeout: float):
     """The one network touch. A module-level function so tests (and only
     tests) can substitute the transport without patching the stdlib."""
-    return urllib.request.urlopen(request, timeout=timeout)
+    return _OPENER.open(request, timeout=timeout)
 
 
 def _fetch_models_response(base_url: str, api_key: str | None) -> bytes:
@@ -117,11 +161,7 @@ def _fetch_models_response(base_url: str, api_key: str | None) -> bytes:
                 read += len(chunk)
             return b"".join(chunks)
     except urllib.error.HTTPError as error:
-        if error.code in {401, 403}:
-            raise ProbeError("PROBE_AUTH_FAILED", "the endpoint rejected the credential") from error
-        raise ProbeError(
-            "PROBE_HTTP_ERROR", f"the endpoint answered with HTTP {error.code}",
-        ) from error
+        raise _typed_http_error(error) from error
     except urllib.error.URLError as error:
         reason = getattr(error, "reason", None)
         if isinstance(reason, TimeoutError) or "timed out" in str(reason):
