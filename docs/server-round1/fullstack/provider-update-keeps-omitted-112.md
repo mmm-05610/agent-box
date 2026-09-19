@@ -128,3 +128,25 @@ CAS/`expectedVersion`/幂等 `requestId`/错误族全不变。
 **门数变化**：24 ⇒ **28**（新增 4 条：可空列真的解绑、三个非空列点名拒绝、可空性表与工件核对、`models:[]` 偏差）。
 `28 passed in 9.89s`。这是 `checkpoint/b2-2` **之后**的补做：tag 不移动（README §3.2 禁止覆盖），
 本节的账以"更正行"形式附在 112 终态行之后。
+
+## 8 "保留＝再发布同一份文档"到底花什么（对自家修法的量，不是自述）
+
+§3 写的修法有一句需要代价上的证据：`configuration`/`models` 用 `project(current)` 打底再发布，
+会不会每次只改名字的 update 都往对象库里多塞两份文档？量一次（三次只改 `displayName` 的 update，
+中间带嵌套 dict/list 值与 `unavailable` 理由）：
+
+| 量 | 结果 |
+| --- | --- |
+| `config_object_digest` 三次前后 | **不变** |
+| `models_object_digest` 三次前后 | **不变** |
+| 数据根内文件数 | **8 → 8**（`ObjectStore.publish` 命中同名即返回，见 `storage/objects.py:32-36`） |
+| `models` 读回 | 逐字相同（含顺序与 `unavailableReason`） |
+| `provenance` 读回 | 保持（本次没点名它） |
+| 版本 | 1 → 4（三条都各 +1，幂等/CAS 未被这条路径影响） |
+
+⇒ "保留"的成本是**一次存在性检查 ＋ 对既有对象做一次哈希校验**，不是重复写入；没有孤立对象。
+
+顺带量到一条**与本次修改无关但会被误认成回归**的既有行为：`configuration` 读回按 `controlId` **升序**
+（提交 `zeta, alpha` ⇒ 读回 `alpha, zeta`）。这是 `service.project()` 从 keyed dict 重建列表时 `sorted(...)` 的既有语义
+（`service.py:195-198`），**create 路径一直如此**；digest 不变即证明这条路径没有被 112 改动。
+把它写在这里是因为：如果哪天有人说"112 之后我的配置项顺序变了"，答案应该是"顺序从来没有承诺过，且它没变"。
