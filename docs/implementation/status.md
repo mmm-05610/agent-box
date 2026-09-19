@@ -1558,3 +1558,42 @@ L 的改判：**字节对表那一腿不由我重跑**（后端审阅者已从�
 - 代价如实：每行多 2 次对象读 + 1–2 次 DB 读，未做批量化（要下沉成 profiles 行上的派生列 ⇒ `server/profiles/**`，越界）⇒ 记进下面的候选。
 - 顺带把 103 的生成账重跑了一遍（`wire-drive-coverage.md`：64 行、证据 325 条、单源 44 条），
   并在账里写清一件事：115 的门虽发那五个方法，但名字在 `FIVE_METHODS` 常量里 ⇒ 按工具规则**不算第二处证据**——这条不是疏漏，正是规则存在的原因。
+
+## CHECKPOINT b2-3（087 + 115 + 117；2026-09-19 13:4x，执行者）
+
+三个标签 `checkpoint/b2-087`、`checkpoint/b2-115`、`checkpoint/b2-117` 打在同一 commit 上
+（三单的代码/证据/账都在那之后齐了；分单打标签会让"验收窗口"缺一半账，所以宁可共用一个 commit、分开命名）。
+
+### 现在能试什么（入口 + 期望）
+
+| 入口 | 怎么试 | 期望看到 |
+| --- | --- | --- |
+| **`profiles.list` 说实话了** | 桌面的选择器/任何 `POST /wire/v1/profiles.list`（REST `GET /api/v1/profiles` 未动） | 每行多两键：`recoveryPending: true\|false\|null`、`sendability:{state,reason,message,actions,checks[]}`；`state != "ready"` 就是"发之前就该灰掉"，`reason` 是机器码、`message` 是人话、`actions` 为空表示"这台机器上你什么都做不了"（`PROFILE_RECOVERY_REQUIRED` 就是这种） |
+| **未登记的域码不再变裸 500** | 任何 wire 方法，即便 handler 里把内部码写进族位、或 handler 直接崩（`KeyError` 等） | 出站恒是 JSON-RPC 错误对象：`code` ∈ 那 12 个族，`details.internalCode` 带原码或异常**类型**（绝不带异常原文 ⇒ 不外泄宿主路径/locator） |
+| **45-G8 的间歇有了判据** | `PYTHONPATH=src python3 tests/server/test_cancel_recall_flake_087.py 20`（约 4.5 min，每轮 = 一次整场 45 门）；单轮"持久事实"腿已在 `tests/server -k "cancel or recall"` 里默认跑 | 两轮样本合计 4/40 红；红的每一轮库里都有召回答案 ⇒ 不是"取消吃掉了输入"，是门在断言它没等的那一轮 |
+
+### 明确不在内（别按这些验收）
+
+- **门的修复本身**：`native-home-gate.py` 一字未改（不在 087 写面）⇒ 089 与任何复跑 45 门的人**仍会撞到同一条假红**；提案与验法在 [087 证据 §6](../server-round1/fullstack/cancel-recall-flake-087.md)。
+- **`transport/http` 边界的最后一道墙**：`dispatch` 之外抛出的东西（认证、`encode_result` 等）仍是裸 500 ⇒ 已登记候选单。
+- **recovery 的"解除面"**：没有新造方法；64 个方法里仍没有任何一条能清 `recovery_pending`（那是产品决定，走审批队列）。
+- **投影的批量化**：`profiles.list` 每行现在多 2 次对象读 + 1–2 次 DB 读，未做（落点在 runtime 线的 `server/profiles/**`）。
+- **用户那台试用实例**仍未验过 115 的形态（要重启/换构建，属人的一腿，与 089 的部署腿同批）。
+- 取消后下一条 turn 偶发停在 `accepted`（1/40 实测）——**没修**，登记成候选单交 runtime 线。
+
+### 已知缺陷 / 风险（如实）
+
+- **单侧合并会静默回退**：runtime 树（`56af017`）那两处族位仍是坏的、`errors.py` 仍 raise、dispatch 无墙、`tests/server/` 里 0 个 family 守卫。
+  本树这两道墙若被那一侧的 `wire/handlers.py` 覆盖掉，**没有门会喊**（因为行为退化但形状仍在别处）⇒ 合并评审要按 [115 证据 §6](../server-round1/wire-error-family-closure-115.md) 的在场面清单逐条核。
+- 三张历史单的反例门（101 两条、098 一条）被 115 **supersede** 并改了断言；这是契约后果，交回 L 在 098/101 的账上各注一行。
+- `sendability` 的判定规则是从 `freeze_execution_configuration` **复制**的（跨线写面所限），对表门只覆盖了凭据/缺模型两条路径 ⇒ 别的分支（如 provider 归档）没有独立对表。
+
+### 花了什么
+
+真实模型调用 **0**（全程假端点/fixture；`R-0017`）。成本是机时：40 轮 45 门（约 9 min）＋ `tests/server` 全量 325.79 s ＋ 定向 144 条 162 s。
+
+### 恢复点
+
+HEAD 即检查点；`git status --short` 只剩本树自己的证据目录（`087-runs/`）。
+下一张（按今晚队列）＝**089 两家真实 UI 门**，谓词已核：runtime 树 `status.md` 的 CHECKPOINT c1 段落里有 **091 的终态行（`PARTIAL`，引擎+G1–G4 绿）** ⇒ 按章程 §3 的字面判据成立，可以开火；
+但 089 的第一腿需要**用户那一侧**把 Windows 应用重开（试用环境随重启已停），先按 `try-checkpoints.md` 起 WSL 侧 Server。
