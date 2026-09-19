@@ -173,8 +173,11 @@ def _home_facts(root: Path) -> dict:
     return facts or {"note": "no role directory with a sessions window"}
 
 
-def _one_round(index: int) -> dict:
-    report = RUNS / f"round-{index:02d}.json"
+def _one_round(index: int, scratch: Path | None = None) -> dict:
+    # The always-in-suite leg (index 0) writes its raw gate report to scratch:
+    # it runs on every suite pass, and letting it rewrite committed evidence made
+    # `rounds.json` drift under whoever was reading it.
+    report = (scratch or RUNS) / f"round-{index:02d}.json"
     started = time.monotonic()
     completed = subprocess.run(
         [sys.executable, str(GATE), "--keep", "--report", str(report)],
@@ -273,7 +276,9 @@ def test_cancel_recall_flake_087_one_round_keeps_its_durable_facts():
     input reached the home journal, the recall answer exists as a `message.delta`
     row, and the native session was reopened rather than silently replaced.
     """
-    observed = _one_round(0)
+    import tempfile
+    with tempfile.TemporaryDirectory(prefix="agentbox-087-leg-") as scratch:
+        observed = _one_round(0, Path(scratch))
     assert observed.get("result") in {"NATIVE_HOME_GATE_OK", "NATIVE_HOME_GATE_FAILED"}, observed
     window = observed["readWindow"]
     cancelled = [item for item in window["turns"] if item["state"] == "cancelled" and item["stopRequested"]]
