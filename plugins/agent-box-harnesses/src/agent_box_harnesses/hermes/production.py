@@ -459,6 +459,8 @@ def harness_deployment(
         "capabilityClaims": capability_claims(),
         "credentialKind": CREDENTIAL_KIND,
         "credentialEnvironment": CREDENTIAL_ENVIRONMENT,
+        # Order 092: canonical protocols this family can speak -> native dialect value.
+        "wireProtocols": {"openai-chat": "chat_completions"},
         "runtimeArtifactMounts": [dict(item) for item in mounts],
         "projectionFiles": [dict(item) for item in (
             projection_files_override

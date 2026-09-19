@@ -301,6 +301,8 @@ def harness_deployment(
         "credentialEnvironment": CREDENTIAL_ENVIRONMENT,
         "modelControlId": MODEL_CONTROL_ID,
         "controlOptions": {MODEL_CONTROL_ID: []},
+        # Order 092: canonical protocols this family can speak -> native dialect value.
+        "wireProtocols": {"openai-chat": "chat", "openai-responses": "responses"},
         # 生产默认选定的 ACP 认证方法：`chat-gpt` 需要磁盘登录态，本隔离里没有。
         "preferredAuthMethod": preferred_auth_method,
         "runtimeArtifactMounts": [dict(item) for item in mounts],
