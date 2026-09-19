@@ -4,12 +4,13 @@ slug: claude-ask-mapping-fix
 batch: c2
 baseline: "53583d7"
 depends_on: []
-write_paths: ["plugins/agent-box-harnesses/**", "tests/**", "docs/server-round1/**", "docs/implementation/status.md"]
+write_paths: ["plugins/agent-box-harnesses/**", "src/agent_box/server/profiles/**", "tests/**", "docs/server-round1/**", "docs/implementation/status.md"]
 forbidden: ["/home/maoqh/projects/agent-box-server-round1/**", "/home/maoqh/projects/agent-box-desktop-next-wsl-round1/**", "/home/maoqh/projects/agent-box-env-provider/**", "release/**"]
 ruling: R-0032
 terminal: ["CLAUDE_ASK_MAPPING_DONE", "CLAUDE_ASK_MAPPING_PARTIAL"]
 waive: []
 parallel_units: ["single"]
+revisions: [{"at": "015c91c", "what": "write_paths 增补 src/agent_box/server/profiles/**：真正的修复点在 posture_translation.py 的 translate_claude（ask 被塞进 allowedTools＝自动放行），不在 plugins 家；并裁定 profiles/** 归 runtime 线", "after_stage": 1, "ruling": "R-0032"}]
 ---
 
 # Work Order 111 — claude 的权限映射：`ask` 必须映射成**会提问**（AQ-0005，用户已拍）
@@ -24,7 +25,7 @@ parallel_units: ["single"]
 
 | 事实 | 出处 |
 | --- | --- |
-| 60 的 claude 姿态映射在 `plugins/agent-box-harnesses/**`（claude 家），`ask` 一档没有落到 claude 的提问语义 | 60 单与 claude 家实现；AQ-0005 的争点（"哪种写法会让信息在系统中间被吃掉"） |
+| **实际修复点（执行者一手定位 `015c91c`）**：`src/agent_box/server/profiles/posture_translation.py:53-81` 的 `translate_claude`——`ask` 被塞进 **`allowedTools`**（:72-77）⇒ 工具**自动放行**＝"不问"；claude 家插件里**没有** ask 映射（grep 空） | 执行者一手 + AQ-0005 的争点 |
 | 60 的翻译测试（姿态逐家翻译）在 `tests/**` | 60 单的 Validation 段 |
 | `093` 尚未落盘（runtime 线 `c2`） | runtime 树章程的 c2 表 |
 
