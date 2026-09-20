@@ -2242,3 +2242,32 @@ in-process uvicorn 线程、假 key、假端点，跑完停自己的线程、删
 
 **真实模型调用 0 / ¥0；未接触任何共享环境**（随机高位端口、自己的临时根、跑完删除并核实）。
 复算：`--self-test` 24/24 不回归。
+
+## 对 `AUD-B95` 的答复（审阅者第 95 轮那条 `profiles.list` 逐行代价）＋ 把"矿脉是否还有第二格"量了一遍（2026-09-20 07:0x）
+
+主树 `c68190d`（`AUD-B95`：`profiles.list` 每行重读 provider/models 对象并全量重算 SHA-256，
+实测 40 行 = 80 次读 / 11,410 KB；并给机检判据"40 行上限 = 40 ＋ provider 数"）——
+**这条在本树已收口**：它就是 `147` 修订里并入的 `AUD-B-040`（同一判据、同一条门 `G5b`），
+终态 `ASSET_SURFACE_EXCEPT_TYPED_DONE`（`cbf126f`／`checkpoint/b2-147b`，补做 `3a41c70` 一族在 `147` 之后）。
+**别让这条变成第二张 147**（这正是主树 `a7292a1` 记过的"差点催生一张空单"的形状）。
+
+为了不把"已修"只当成账上的话，我用**门之外的尺子**复量了一遍（一次性 `build_runtime` ＋ 包住
+`ObjectStore.read` 计数，跑完即删临时根；两档行数看**斜率**，不看绝对值）：
+
+| 面 | 1 行 | 12 行 | 判读 |
+| --- | --- | --- | --- |
+| `profiles.list` | 2 次读 / 0 额外 | **2 次读**（items=12） | **平的** ⇒ 逐行重读确实没了（147 的 `_CallReader` memo 生效）；`AUD-B95` 的 80 次/11,410 KB 这一形状在本树不再出现 |
+| `providerModels.list` | 2 次读 | 2 次读 | 平的 |
+| `workspaces.list` | 未测到 | 未测到 | **没量成**：一次性装配里 `workspaces.open` 直接 `UNAVAILABLE / LOCAL_SANDBOX_UNAVAILABLE`（我这台探针没带 `AGENT_BOX_SANDBOX_MODULE` 与六个插件 `PYTHONPATH`）——这正是 `118` 要机器自报的那类环境事实，不该被写成"干净" |
+| `executions.list` | 未测到 | 未测到 | 同上（0 行 ⇒ 斜率无从谈起） |
+
+⇒ 结论按能说的说：**`AUD-B95` 指的那一格在本树已修并有门（`G5b` 断 40 行 ≤ 41 次读）；其余两个列表面今天没有测量证据，只有"结构上看不到循环内对象读"这条 grep**——
+grep 形状不是证据，所以我把它记成**未测**，而不是记成"已核无问题"。
+补测的门槛写清楚（下一个读的人不必猜）：带上 `AGENT_BOX_SANDBOX_MODULE=agent_box_sandbox_bwrap` ＋ 六个插件 `PYTHONPATH`，
+`workspaces.open` 才会成功；`requestId` 还有 **≥8 字符** 的形状门（我这次连撞两次，都是我探针的错，不是产品的）。
+
+顺带两条形状事实（都是我自己撞出来的，留账免得下次有人当产品缺陷报）：
+① `workspaces.open` 在没有沙箱装配的机器上回 `UNAVAILABLE`＋`details.internalCode=LOCAL_SANDBOX_UNAVAILABLE`（**族位对、内部码在**——115/147 的收口在这条路上是真的）；
+② 短 `requestId` 被 `INVALID_REQUEST: requestId must contain at least 8 characters` 挡下（**先于**其他检查）。
+
+**真实模型调用 0 / ¥0**；探针跑完即删并核实。
