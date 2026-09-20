@@ -95,12 +95,12 @@ revisions: [{"at": "a3c3e3e", "what": "**并入 `AUD-B-034`（confirmed/low，�
 
 ## Stages
 
-- [ ] 1. 观测：三条一手复现（含 `seal_interrupted_turns` 真入口触发 ＋ roster 实测 ＋ 213 条事件取回 `''`）（提交）
-- [ ] 2. **委建子轮过既有链的门**：`AUD-B-031` recovery ＋ **`AUD-B-034` exclusive-home 并发**（两条一起，同一处代码）（提交）
-- [ ] 3. `AUD-B-032`：availability 真供给 **或** 删形参（二选一，写清）（提交）
-- [ ] 4. `AUD-B-029`：取回按「本轮、最新」读 ＋ `get_session` 窗口语义定死（提交）
-- [ ] 5. 门与反例（三处"注释掉必须红"）（提交）
-- [ ] 6. 账与证据（含"recovery 清除入口属另一件事"的边界声明）（提交）
+- [x] 1. 观测：三条一手复现（含 `seal_interrupted_turns` 真入口触发 ＋ roster 实测 ＋ 213 条事件取回 `''`）（提交）
+- [x] 2. **委建子轮过既有链的门**：`AUD-B-031` recovery ＋ **`AUD-B-034` exclusive-home 并发**（两条一起，同一处代码）（提交）
+- [x] 3. `AUD-B-032`：availability 真供给 **或** 删形参（二选一，写清）（提交）
+- [x] 4. `AUD-B-029`：取回按「本轮、最新」读 ＋ `get_session` 窗口语义定死（提交）
+- [x] 5. 门与反例（三处"注释掉必须红"）（提交）
+- [x] 6. 账与证据（含"recovery 清除入口属另一件事"的边界声明）（提交）
 
 ## Gates
 
