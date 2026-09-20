@@ -2214,3 +2214,31 @@ CPython 会把 `OSError(13, …)` 自动提升成 `PermissionError`，**错的�
   报告里那条事实叫 `seedLeg.seatModelAuthority`，跑真机撞到"失败但不知道为什么"时先抄日志那行。
 
 **真实模型调用 0 / ¥0；凭据内容 0 次读取**（座位是 echo peer、key 是本树自造的假值、`MemorySecretStore` 只在测试进程内）。
+
+## seed 腿的**真 socket** 复算（`ui_gates_89_seed_socket_check.py`；2026-09-20 05:5x）
+
+形状门走的是 `TestClient`，它**短路了传输层**——本树已经为这件事付过一次账（101 那次"真实 HTTP bind 复跑"
+改变了结论）。而 QA 是在 TCP 上调这个脚本的。⇒ 补一道**一次性实例**的门：随机端口、自己的临时根、
+in-process uvicorn 线程、假 key、假端点，跑完停自己的线程、删根并核实。**`SOCKET_CHECK_OK`，10 条全过**
+（证据落 [ui-gates-89-socket-check.json](../server-round1/fullstack/ui-gates-89-socket-check.json)，把"回了哪个码"留在盘上而不是留在记忆里）。
+
+四条一手收获：
+
+1. **幂等重放的真实形状**：同 `--label` 重跑 **不会**第二次造 profile——但**不是"回放"**，而是被**类型化拒绝**：
+   `updateConfig` 带 `expectedVersion`（有状态），第二次的请求摘要本来就与第一次不同 ⇒
+   `{"code":"CONFLICT_REQUEST","details":{"internalCode":"IDEMPOTENCY_CONFLICT","retryable":false}}`，
+   且 `server_profiles` 行数 1→1。另一面同时钉住：**换新 label 就真的再种一条**（rows→2）——
+   否则上一条断言只是在量"根卡住了"。⇒ 我此前在脚本帮助文本里写的"答 IDEMPOTENCY_CONFLICT"**不够准**
+   （那是 `internalCode`，族位是 `CONFLICT_REQUEST`），已按 115 的两级形状改口径。
+2. **一条我差点用错的判据**：验"我们把端口还回去了"时先用 `bind`，再用 `connect_ex`——两个都**在这台机器上撒谎**：
+   WSL↔Windows 之间那层代理（**uid=0**）会在我们用过的端口上留 `TIME_WAIT`，
+   实测 listener 已经没了（`/proc/net/tcp` 里 `state=0A` 消失）而 `connect_ex` 仍回 0。
+   ⇒ 判据改成**"该端口上没有 LISTEN 条目"**（并顺手记下还留着谁的什么），
+   这不是洁癖：一条把别人套接字的寿命当成我方资源的门，会红在不相关的事情上（`R-0054 ⑦` 同源）。
+3. **优雅退出这条在本树应用上是够的**：`should_exit` 之后线程 10 s 内 join 回来（`exitedOnGracefulRequestOnly: true`），
+   不需要 `force_exit`——但探针仍把"是否只靠优雅退出"记成事实，免得下次要 force 时没人发现。
+4. 顺带把上一轮 §3b 的第 4 条补全：**座位自己声明模型列表**这件事在 socket 层也一样（同一份代码），
+   跑真机时 `--model-id` 必须来自 `providerModels.probeModels`。
+
+**真实模型调用 0 / ¥0；未接触任何共享环境**（随机高位端口、自己的临时根、跑完删除并核实）。
+复算：`--self-test` 24/24 不回归。

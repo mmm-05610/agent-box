@@ -158,7 +158,12 @@ QA 一手跑到 §3 时撞上：`R-0056` 要求独立数据根 ⇒ 全新根里 
 Server 处理栈（in-process `TestClient`，假 key、假端点，**真实模型调用 0**）⇒ **`SHAPE_CHECK OK 10/10`**，
 其中正例是"seed 走完 ⇒ `profiles.list` 读回 `sendability.state:"ready"`"，反例是"key 文件读不了 / 同 label 改参数重放"两种都必须非零退出。
 `ui_gates_89_seed_profile.py --self-test` **15/15**（端口护栏零请求、0600 之外的 key 文件直接拒、报告是白名单投影、
-凭据/令牌形状会被就地涂掉）。**没验的仍是真机那一腿**：Windows 侧 DPAPI store ＋ 真 key ＋ 真端点 ⇒ 那要跑的人按上面命令做一次。
+凭据/令牌形状会被就地涂掉）。再加一道**真 socket** 复算（`ui_gates_89_seed_socket_check.py`，一次性实例／随机端口／假 key／假端点）：
+`SOCKET_CHECK_OK 10/10`，证据 [ui-gates-89-socket-check.json](ui-gates-89-socket-check.json)。
+同 `--label` 重跑**不会**偷偷种第二条：`updateConfig` 的 `expectedVersion` 使摘要变化 ⇒
+`CONFLICT_REQUEST` ＋ `internalCode: IDEMPOTENCY_CONFLICT`（换新 label 则照种，两条断言互为反例）。
+
+**没验的仍是真机那一腿**：Windows 侧 DPAPI store ＋ 真 key ＋ 真端点 ⇒ 那要跑的人按上面命令做一次。
 
 ## 4 每家的验收判据与记账格式（089 §Requirements + G1/G2/G3）
 

@@ -23,6 +23,9 @@ Usage (Windows side, where the control-plane root lives):
 
 Exit codes: 0 = every requested harness reached `ready` (or `--require-ready` was omitted);
 3 = a typed refusal or a non-ready verdict (the printed `sendability.checks` say which fact);
+   note that re-running with a used `--label` is refused on purpose: `updateConfig` carries an
+   `expectedVersion`, so its request digest really does differ and the Server answers
+   `CONFLICT_REQUEST` / `internalCode: IDEMPOTENCY_CONFLICT` rather than seeding twice.
 4 = this script would have touched a forbidden port (`--forbid-port`, default 18790/18810).
 `--teardown --state-file <f>` archives exactly the Profiles this seed created.
 """
@@ -277,8 +280,9 @@ def main(argv: list[str] | None = None, *, face_factory=None) -> int:
                         help="repeatable; the Stage-1 families are pi and codex")
     parser.add_argument("--profile-prefix", default="089 seed")
     parser.add_argument("--label", default="seed89",
-                        help="idempotency prefix: re-running with the same label replays, "
-                             "changing the parameters under one label answers IDEMPOTENCY_CONFLICT")
+                        help="idempotency prefix: re-running with the same label replays; "
+                             "changing the parameters under one label answers "
+                             "CONFLICT_REQUEST with details.internalCode IDEMPOTENCY_CONFLICT")
     parser.add_argument("--forbid-port", action="append", default=["18790", "18810"],
                         help="R-0056 guard: the acceptance line's instances are not ours to seed")
     parser.add_argument("--state-file", type=Path)
