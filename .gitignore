@@ -1,0 +1,8 @@
+# control/ is a text-only scheduling record. Never commit anything sourced from
+# a credential locator, a trial data root, a user profile, or a session archive.
+*.key
+*.pem
+*secret*
+*token*
+*.zip
+node_modules/
