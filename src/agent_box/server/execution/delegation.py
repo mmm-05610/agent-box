@@ -97,7 +97,8 @@ class DelegationService:
         profiles = self.profiles.list(include_archived=False)
         roster = resolve_roster(
             parent_id=parent_profile_id, edges=edges, profiles=profiles,
-            workspace_of=self._workspace_map(profiles))
+            workspace_of=self._workspace_map(profiles),
+            availability=self._availability_map(profiles))
         return {
             "tools": tool_definitions(roster=roster),
             "roster": roster[:MAX_ROSTER_ENTRIES],
@@ -122,7 +123,8 @@ class DelegationService:
         # silent landing in another project).
         parent_workspace_id = self.records.get_turn_context(parent_turn_id)["workspace_id"]
         roster = resolve_roster(parent_id=parent_profile_id, edges=edges, profiles=profiles,
-                                workspace_of=self._workspace_map(profiles))
+                                workspace_of=self._workspace_map(profiles),
+                                availability=self._availability_map(profiles))
         roster = [entry for entry in roster
                   if entry.get("workspace") == parent_workspace_id]
         # Order 136: `child_limits` must be sourced from the *child's own* rules
@@ -148,6 +150,19 @@ class DelegationService:
         child_profile = self.profiles.get(chosen["profileId"])
         if bool(child_profile.get("archived_at")):
             raise ServerError("PROFILE_ARCHIVED", "Profile is archived", status=409)
+        # Order 146 (`AUD-B-031`, `65:102` "children run through the existing
+        # execution chain"): the existing chain's accept/create_turn gate refuses a
+        # `recovery_pending` Profile with a 409 `PROFILE_RECOVERY_REQUIRED`, but the
+        # delegation path used to bypass it (it inserts the child turn itself). A
+        # profile with unresolved recovery evidence is therefore *unavailable* to a
+        # delegated run too - typed, before any child session or turn is created.
+        if bool(child_profile.get("recovery_pending")):
+            raise DelegationError(
+                "SUBAGENT_UNAVAILABLE",
+                "the subagent Profile has unresolved recovery evidence; "
+                "restart reconciliation is required before it can run",
+                available=[entry["name"] for entry in roster],
+            )
 
         # The ancestry is read out of the ledger, never handed over by the
         # caller: the bridge knows only its own turn, and a self-reported chain
@@ -186,7 +201,7 @@ class DelegationService:
         session_after = self.records.get_session(session_id)
         checkpoint = session_after.get("checkpoint") or {}
         handle = checkpoint.get("native_id") or native_id
-        summary = self._final_message(session_id=session_id, turn_id=turn_id)
+        summary = self._final_message(turn_id=turn_id)
         usage = self._usage_of(turn_id)
         return {
             "subagent": chosen["name"],
@@ -327,6 +342,26 @@ class DelegationService:
         return {str(profile["id"]): self._child_workspace(str(profile["id"]))
                 for profile in profiles}
 
+    def _availability_map(self, profiles: Sequence[Mapping[str, Any]]) -> dict[str, str]:
+        """profile id -> typed unavailability reason, for the roster's `available`.
+
+        Order 146 (`AUD-B-032`): `availability` used to be a parameter no caller
+        supplied, so every entry read `available=true` (the "unavailable" dimension
+        was decorative). Feed the decidable child facts here so the roster's
+        availability - and `run`'s `SUBAGENT_UNAVAILABLE` gate behind it - are real.
+        """
+        reasons: dict[str, str] = {}
+        registry = self.registry
+        for profile in profiles:
+            profile_id = str(profile["id"])
+            if profile.get("archived_at"):
+                reasons[profile_id] = "PROFILE_ARCHIVED"
+            elif bool(profile.get("recovery_pending")):
+                reasons[profile_id] = "PROFILE_RECOVERY_REQUIRED"
+            elif registry is not None and str(profile.get("harness_type")) not in registry:
+                reasons[profile_id] = "HARNESS_UNAVAILABLE"
+        return reasons
+
     def _shared_workspace_id(self, child_profile: Mapping[str, Any]) -> str:
         workspace_id = self._child_workspace(str(child_profile["id"]))
         if workspace_id is not None:
@@ -401,14 +436,33 @@ class DelegationService:
                 child_value, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
             ).encode()).digest
         with self.records.database.transaction() as conn:
-            conn.execute(
-                "INSERT INTO server_turns(id,session_id,profile_id,profile_revision,"
-                "native_generation,state,capture_state,cleanup_state,input_object_digest,"
-                "effective_config_object_digest,parent_turn_id,created_at,updated_at) "
-                "VALUES (?,?,?,1,0,'accepted','pending','pending',?,?,?,?,?)",
-                (turn_id, session_id, child_profile["id"], input_digest,
-                 effective_digest, parent_turn_id, timestamp, timestamp),
-            )
+            # Order 146 (`AUD-B-034`): the exclusive-home concurrency lock is one of
+            # the existing chain's gates; the delegation path used to insert the child
+            # turn without it, so a profile that declared an exclusive home could get
+            # two active turns (one per session). Reuse the same check, atomically.
+            self.records._refuse_exclusive_home_concurrency(conn, child_profile)
+            try:
+                conn.execute(
+                    "INSERT INTO server_turns(id,session_id,profile_id,profile_revision,"
+                    "native_generation,state,capture_state,cleanup_state,input_object_digest,"
+                    "effective_config_object_digest,parent_turn_id,created_at,updated_at) "
+                    "VALUES (?,?,?,1,0,'accepted','pending','pending',?,?,?,?,?)",
+                    (turn_id, session_id, child_profile["id"], input_digest,
+                     effective_digest, parent_turn_id, timestamp, timestamp),
+                )
+            except Exception as exc:
+                # Order 146 (`AUD-B-035`, `65:36` "failure is a typed result"): a
+                # same-session `task_id` retry hits the per-session active-turn index
+                # exactly like the existing chain, so translate the raw
+                # `IntegrityError` (which names table/column) into the same product
+                # code instead of leaking it to the wire.
+                if "UNIQUE constraint failed" in str(exc):
+                    raise ServerError(
+                        "TURN_CONCURRENCY_CONFLICT",
+                        "the subagent session already has an active Turn",
+                        status=409,
+                    ) from exc
+                raise
             conn.execute(
                 "UPDATE server_sessions SET status='active',version=version+1,"
                 "updated_at=? WHERE id=?", (timestamp, session_id),
@@ -423,12 +477,11 @@ class DelegationService:
     def _await_terminal(self, *, session_id: str, turn_id: str, timeout: int) -> dict[str, Any]:
         deadline = time.monotonic() + min(timeout, DEFAULT_TIMEOUT_SECONDS)
         while time.monotonic() < deadline:
-            session = self.records.get_session(session_id)
-            for turn in session["turns"]:
-                if turn["id"] == turn_id and turn["state"] in {
-                    "completed", "failed", "cancelled", "unknown",
-                }:
-                    return dict(turn)
+            # Order 146 (`AUD-B-029`): read this turn's own state, not a scan of a
+            # session snapshot whose turn list is windowed to the first 200 rows.
+            turn = self.records.get_turn_context(turn_id)
+            if turn["state"] in {"completed", "failed", "cancelled", "unknown"}:
+                return dict(turn)
             time.sleep(0.05)
         # Order 141 (`:81` resource boundary must really stop, `:90` no silent
         # degrade): time-out was not a stop entry point, so the child kept running
@@ -450,15 +503,13 @@ class DelegationService:
         return checkpoint.get("native_id")
 
 
-    def _final_message(self, *, session_id: str, turn_id: str) -> str:
-        session = self.records.get_session(session_id)
-        pieces: list[str] = []
-        for event in session["events"]:
-            if event.get("turn_id") != turn_id:
-                continue
-            if event["kind"] == "message.delta":
-                pieces.append(str(event["data"].get("text") or ""))
-        summary = "".join(pieces)
+    def _final_message(self, *, turn_id: str) -> str:
+        # Order 146 (`AUD-B-029`): read the turn's own message deltas, bounded by
+        # the declared summary-character cap - not a session snapshot's first 200
+        # event rows (which truncated the newest content and returned '' on
+        # continuation, so the parent could not tell "the child said nothing" from
+        # "we dropped what it said").
+        summary = "".join(self.records.turn_message_deltas(turn_id))
         if len(summary) > MAX_SUMMARY_CHARS:
             summary = summary[:MAX_SUMMARY_CHARS] + "…"
         return summary

@@ -1021,7 +1021,39 @@ class SessionRecords:
 
     # -- reads --------------------------------------------------------------
 
+    def turn_message_deltas(self, turn_id: str) -> list[str]:
+        """The text of one turn's ``message.delta`` events, in append order.
+
+        Order 146 (`AUD-B-029`): a delegated child's summary must be read from the
+        *turn's own* events, not from a session snapshot's first 200 rows (which
+        truncated the newest content and returned an empty summary on continuation).
+        This is scoped to one turn and unbounded by the session window; the caller
+        still applies the declared summary-character bound.
+        """
+        with self.database.read() as conn:
+            rows = conn.execute(
+                "SELECT data_json FROM server_session_events "
+                "WHERE turn_id=? AND kind='message.delta' ORDER BY seq",
+                (turn_id,),
+            ).fetchall()
+        pieces: list[str] = []
+        for row in rows:
+            try:
+                data = json.loads(row["data_json"])
+            except ValueError:
+                continue
+            pieces.append(str(data.get("text") or ""))
+        return pieces
+
     def get_session(self, session_id: str, *, event_limit: int = 200) -> dict[str, Any]:
+        """One session plus an *oldest-first* `event_limit` head of its turns/events.
+
+        The two lists are a snapshot window, not the whole session: when a session
+        has more rows than the limit, the **oldest** `event_limit` are returned and
+        the newest are dropped, silently. Read them for scalars and existence only.
+        For a turn's own content use `turn_message_deltas`, and for the newest
+        events of a session use `list_events_page` (which reads `DESC` and reverses).
+        """
         with self.database.read() as conn:
             row = conn.execute("SELECT * FROM server_sessions WHERE id=?", (session_id,)).fetchone()
             if row is None:
