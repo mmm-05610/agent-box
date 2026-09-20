@@ -1446,3 +1446,13 @@ pi-production-chain-gate.py  runtime=dfdae54be337c45de58e44161b18880f  A(b1f6e07
 | 142 | 全 | `sidecar.py:631-632` 真值判断 → `is not None`（`{}` 保留、`None` 才是没快照）。**`:893` 复核**：`if ... is None: return None` 是**正确的**未声明分流、非同类吞事实、无需改（唯一吞点在折叠处）。门走真 `workspace_change_set`（fake `workspace.list` client、非直调私有）：空快照 `{}`＋新增文件⇒"全部新增"（G1，原 `None`）；`None`⇒仍 `None`（G2 保持）；非空快照无变化⇒空变更集。反例**已树内实测**：退回真值判断⇒恰空快照门红（回 `None`）、None/非空仍绿 | `test_empty_snapshot_fold_142.py` **3 passed**；change_set+state-capture+git-status 广扫 **8 / 13 passed**（折叠点改动无回退，既有变更集用例全绿）；**Worker 工件不在** ⇒ 069 **真机 WSL 腿 env-blocked**、折叠点三态在树内确定性复跑并绿（G4 如实记） | 0 | 本提交 |
 
 **`132` 对偶面**：这是"同一事实只允许一处记账"的**反向**——一处记账（折叠点）曾**吞掉两件事**（`{}` vs `None`），供 `132` 通用判据吸收。未碰 54 声明形状/wire/protocols，`None` 路径逐字不变。
+
+## 工单 144 — `bounded` 审批 `environmentId` 定档（`AUD-B-026` needs_validation → **结论 2**；2026-09-20，执行者·runtime 线）
+
+> 终态 **`BOUNDED_APPROVAL_ENVIRONMENT_BINDING_DONE`**（定档完成、非停在"没结论"）。三源对账（一手）：声明=**仅 wire 形状校验**（`wire/handlers.py:1744-1748`，与锁工件符、未碰）；产生=本树非-wire `src/` `grep environmentId` **0 命中**、`records.py` 只把 `scope_json` 当证据存/回读；投递=`SidecarHarnessPort.decide_approval` 把 `scope`（含 environmentId）**逐字** `dict(scope)` 转发 harness ⇒ Server 不绑定也不丢弃，只组合+转发＝AGENTS.md"插件拥有原生 harness 语义"。**结论 2（harness 所有）**；缺的只是边界没写下来 + 逐字转发没断言 ⇒ 本单补两者。§Spend：0 真调用。证据 `docs/server-round1/bounded-approval-environment-binding-144.md`。
+
+| 单 | 阶段 | 门 | 回归 | 真实模型 | 提交 |
+| --- | --- | --- | --- | --- | --- |
+| 144 | 全（定档） | G1 账上写明**结论 2** + 逐条三源判据（非"未发现消费者"）。G2 探针走真 `register_approval`+`decide_approval`（stub 只替 harness 侧 channel、非直调私有/非手工喂 frame）。G3 逐字转发断言 `frame["scope"]==scope`（含 environmentId），**反例内建**：转发路径改/丢任一键⇒门红。G4 `bounded` 形状逐字不变（未碰 wire/形状）。**未改产源码**（Server 本就逐字转发，缺的是边界声明+转发断言，现补上） | `test_bounded_approval_forward_144.py` **2 passed**（含 `SidecarHarnessPort` 无 worker 构造 + environmentId 原样到达）；未动 src ⇒ 无回归面；既有 approval/decide 语义不碰 | 0 | 本提交 |
+
+**132 关系**：需 Server 行动处，"声明的授权范围"须与"实际生效范围"同源；此处 Server 该做的行动**正是逐字转发**，门钉住"到达消费者的即声明的"。**若将来要求 Server 端绑定 environmentId 到具体轮环境**＝需 Server 侧"执行环境 id"概念＝产品/合同决定 ⇒ 不在本树自造，本单按结论 2 落边界（不阻塞）。剩 137（stage2-5）／146（5 AUD 大单）。
