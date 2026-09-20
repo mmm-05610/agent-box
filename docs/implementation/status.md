@@ -2271,3 +2271,33 @@ grep 形状不是证据，所以我把它记成**未测**，而不是记成"已�
 ② 短 `requestId` 被 `INVALID_REQUEST: requestId must contain at least 8 characters` 挡下（**先于**其他检查）。
 
 **真实模型调用 0 / ¥0**；探针跑完即删并核实。
+
+## ops 第 145 轮回读：`H-013` 已裁（accept → QA），`H-015` 的"后端三件"我量完了一格——**它不是缺陷，是合同增补**（2026-09-20 09:1x）
+
+- **`H-013`（本线首行）**：**accept → 指派 QA 线**，状态"已裁 → 进行中（QA 线，**等 A 侧 seed**）"。
+  ⇒ **A 侧那一半已经交付并超交付**：seed 脚本（`--self-test` 24/24）＋ 真处理栈形状门（12/12）＋ **真 socket 复算（10/10）**
+  ＋ 跑本 §3b 的 STEP 0 `--preflight`。这一格现在**没有 A 侧待做项**；我在 `H-013` 里给 QA 的续跑判据仍然按原文。
+- **`H-015`（settings 线提的"要后端三件"）**：ops 的裁决留了一个前置——"先一手定档：**合同里到底有没有 `protocols`/`endpoints`**"。我把两棵树的**锁件**都读了：
+  A 树 `contract/wire-v1.schema.registered-c4255b31.json` 与 runtime 树 `generated/wire-v1.schema.snapshot-33methods-stale.json` **同形**——
+  `providerModels.create#params` 的 `models.items.properties` 恰为 `{modelId, displayName, availability, unavailableReason}`、
+  **`additionalProperties: false`**，且该方法体里 `protocols`/`endpoints` **出现 0 次**。
+  ⇒ 三条推论：**① 服务端现状与合同一致**（不是"读面已在、写面不在"的漂移，而是写面从未被授权）；
+  **② 谁按字面实现 ①② 谁就在改自己锁着的协议**（加键 ＋ 放宽 `additionalProperties`），会撞上 `105/113` 那一族；
+  **③ 本树的 `124` 因此不是"等一个文件"**——它的阶段 2 按字面就是合同增补，需 I 拍 ＋ 重锁，
+  `test -f execution/protocols.py` 成立也**不解锁**（我把这条写进 `124` 的判据更正，见下表）。
+  ⇒ 正式落号：**主树 `handoffs.md` `H-018`**（提出者＝A 线；含一行可复算命令与两支出口：先改锁再谈写面 / 或维持四键、把 `092` 文件头那句改成与现实一致＝`H-015` ③ 的另一支）。
+
+**同一次里我自己造成的两处错（都当场修回，写进账）**：
+① 追加表格行时拿**行首前缀**当锚点——这次把别人的 `H-017` 的 id 吞掉了（内容被我并进 `H-018` 那一行）。
+   修法是 `git show HEAD` 取回原行、按 marker 反切、逐字比对 `H-017 identical to HEAD: True`，最终 diff **只剩 1 行新增**。
+② 第一次 repair 脚本按 `"| H-017 |"` 找组合行，没找到（id token 已被吃掉）——**判据本身写错了**，逼我回来看真实 diff 而不是猜。
+⇒ **形制（第二次同族，升成规则）**：往别人的表格里追加行，**不许用行首前缀当锚点**；要么用**整行**（含行尾 `|`）当锚，
+   要么脚本按行号 `insert` 后**立刻用 `git diff --stat` 验证"只多了 N 行"**。`R-0067 ②` 的列分离只在"不碰别人的行"这条上成立。
+
+| 单 | 现态 | 卡在哪（精确） | 解卡入口 |
+| --- | --- | --- | --- |
+| `124` | 未开工（判据更正） | **不是缺一个文件**：`protocols[]`/`endpoints{}`/`models[].{protocols,capabilities}` 进白名单按字面是**合同增补**（锁件里 `models.items.additionalProperties:false`、两键 0 次） | **需用户裁定**（`H-018` 两支出口之一；`R-0070 ②`）——裁定前 `test -f execution/protocols.py` 成立也不开工 |
+| `132` | 未开工 | runtime 树 `130`/`131` 终态码仍 0 命中 | `依赖 130/131`（判据不变） |
+| `089` | seed 腿✅（含真 socket）、G1/G2/G3 未到 | 两家的真发真答 | `依赖 QA 线`（`H-013` 已 accept；A 侧无待做项） |
+
+**真实模型调用 0 / ¥0**；本轮全部是读锁件与一手 grep，未接触凭据内容。
