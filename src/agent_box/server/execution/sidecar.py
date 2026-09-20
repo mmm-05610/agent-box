@@ -628,8 +628,12 @@ class _WorkerChannels:
         #: Order 54: the launcher's before-snapshot of the declared workspace
         #: (path -> {size, digest}); the after listing comes from
         #: `workspace.list` over the same root.
+        #: Order 142: distinguish a *declared empty* workspace (`{}`) from *no
+        #: snapshot at all* (`None`). `{}` is falsy, so the old truthiness test
+        #: folded it into `None` and `workspace_change_set` then reported the WSL
+        #: channel's change set as unknown on every first turn. Keep `{}` as `{}`.
         self.workspace_before_snapshot = (
-            dict(workspace_before_snapshot) if workspace_before_snapshot else None
+            dict(workspace_before_snapshot) if workspace_before_snapshot is not None else None
         )
         #: Read-only configuration that lives *inside* the audited window. It
         #: is not state: it must not enter the audit manifest.

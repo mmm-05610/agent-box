@@ -1436,3 +1436,13 @@ pi-production-chain-gate.py  runtime=dfdae54be337c45de58e44161b18880f  A(b1f6e07
 | 140 | 全 | `aggregate_by_session(S)`：取 S 的**根轮**（`parent_turn_id IS NULL`）→ 沿 `parent_turn_id` 递归收其**委派子树**的 completed 轮用量（`_subtree_usage`）并入 S。无委派⇒每轮皆自根⇒与旧 session-scoped 查询逐字同（G4）；每轮只有一个根⇒跨会话并查不重复计（G3）。门用真 `server_turns`/`server_sessions` 行（父→子→孙，各在别会话）经 `UsageAggregator` 真算：G1+G2 父＝110+9500+100=**9710**、`turnsReported`=3；G3 并查[父,子,孙]⇒父 9710 且三者和**仍 9710**（子/孙对自己被父拥有的轮报 0；双计实装会 >9710）；G4 不委派会话＝50。反例**已树内实测**：关掉后代合并⇒恰两条 rollup 门红（父回落 110）、不委派门仍绿 | `test_delegation_usage_rollup_140.py` **3 passed**；既有 `test_usage_aggregate.py`（无委派）**仍绿**（归因改动对非委派逐字不变）；usage+delegation+subagent 广扫 **64 passed / 1 skipped（env）**；**Worker 工件不在** | 0 | 本提交 |
 
 **OF-14/132 归批**：机制（`parent_turn_id` 链）在场、**归属这一维的接线路径**缺席——与 136/141 同族。**137 剩 stage 2–5**（真 worker emit 需已构建 Worker；本树无预置工件），**主路径 122 的真收口仍待 137**（134 消费侧 + 137 生产侧）。138/139/140/141 四单**逐单串行、逐单提交**已完成。
+
+## 工单 142 — 空快照被折叠成"没有快照"（A 线 `B3` 路由到本树·一行修；2026-09-20，执行者·runtime 线）
+
+> 终态 **`EMPTY_SNAPSHOT_FOLD_DONE`**。`_WorkerChannels.__init__` 用**真值判断**存 before-snapshot ⇒ `{}`（声明过的空工作区，falsy）被折成 `None`（没有快照）⇒ `:893` 的 `is None` 分支把"合法空快照"当"未声明"⇒ WSL 通道变更集**首轮恒 unknown**。§Spend：0 真调用。证据 `docs/server-round1/empty-snapshot-fold-142.md`。
+
+| 单 | 阶段 | 门 | 回归 | 真实模型 | 提交 |
+| --- | --- | --- | --- | --- | --- |
+| 142 | 全 | `sidecar.py:631-632` 真值判断 → `is not None`（`{}` 保留、`None` 才是没快照）。**`:893` 复核**：`if ... is None: return None` 是**正确的**未声明分流、非同类吞事实、无需改（唯一吞点在折叠处）。门走真 `workspace_change_set`（fake `workspace.list` client、非直调私有）：空快照 `{}`＋新增文件⇒"全部新增"（G1，原 `None`）；`None`⇒仍 `None`（G2 保持）；非空快照无变化⇒空变更集。反例**已树内实测**：退回真值判断⇒恰空快照门红（回 `None`）、None/非空仍绿 | `test_empty_snapshot_fold_142.py` **3 passed**；change_set+state-capture+git-status 广扫 **8 / 13 passed**（折叠点改动无回退，既有变更集用例全绿）；**Worker 工件不在** ⇒ 069 **真机 WSL 腿 env-blocked**、折叠点三态在树内确定性复跑并绿（G4 如实记） | 0 | 本提交 |
+
+**`132` 对偶面**：这是"同一事实只允许一处记账"的**反向**——一处记账（折叠点）曾**吞掉两件事**（`{}` vs `None`），供 `132` 通用判据吸收。未碰 54 声明形状/wire/protocols，`None` 路径逐字不变。
