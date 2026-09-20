@@ -57,19 +57,25 @@
 > 契约文件在 `docs/implementation/work-orders/`；**新单与修订由调度者直接投递进来**（父树对本树有白名单写权），
 > 我每个阶段边界重读该目录即可，不需要去别处复制，也没有副本要合并。
 
-### 今晚队列（2026-09-19 19:2x 组织调整 v2；`R-0054` ⑥）
+### 今日队列（**2026-09-20 10:2x**；`R-0080 ①②` **重排**，并覆盖已过期的「今晚队列（2026-09-19 19:2x）」）
+
+> **唯一主线＝「对话区闭环」五步**（`R-0080`；用户 10:15「一定要是对话区的闭环」）：
+> ① 选 profile/model → ② 发一句话 → ③ 服务端受理并落到那家 harness 的原生轮 → ④ **收到 `role=="assistant"` 的 `message.final`** → ⑤ **失败可见且不丢字**。
+> **本树按"离闭环的跳数"排**：本树这一侧断在 **④**，两处具名缺陷都在本树或 runtime（`R-0078`）。
 
 | 序 | 单 | 开工条件（**可判定谓词**；每轮自己核，成立即开工，**不等任何人放行**） |
 | --- | --- | --- |
-| 1 | `087-cancel-recall-flake` | 无条件（本树重启时工作区**干净**，直接开工） |
-| 2 | `QA-008` 新单（`usage.aggregate/export` 真 HTTP 500，主路径） | 由 ops **当轮投递**（`R-0054 ⑧a`）；投递进本树 `work-orders/` 即可开工 |
-| 3 | `QA-009` 新单（`profiles.list` 不投影 `recovery_pending`，主路径） | 同上 |
-| 4 | `103-wire-drive-coverage-meta-gate` | `101` 已收口（谓词已成立） |
-| 5 | `089-four-real-ui-gates` | **`R-0056`：可按合同原文字面开工**——判据＝① `rulings.md` 有 `R-0055`（选 B）② runtime 树 `status.md` 的 `CP1 c1` 记账里写着 `091` 的**传输无关引擎 + 进程内 G1–G4 已绿**（`PARTIAL` 剩余只剩 ②③）⇒ 「控制面同步与每执行凭据投影**可用**」成立。**`091` 的 ③ 真机部署由你自己这个 Stage 现场验并记账**（不再作为前置）。**资源护栏**：Windows 侧 Server 用**独立端口段 + 独立数据根**，不与验收线 A 的 WSL 试用环境（18790 / `~/.agentbox-trial-chat`）抢同一份资源；要复用先与 A 协调并在两树 status 各记一行 |
-| 6 | `099-worker-home-put-dispatch` | 无条件（已投递） |
+| 1 | **`149-credential-identity-injection-seam`**（**闭环第 ④ 步 · 卡点 a**；`R-0078 ①`） | **无条件开工**——注入的凭据必须是一个身份：新鲜装配下绑注入凭据不得再 `CREDENTIAL_NOT_FOUND` |
+| 2 | **`151-wire-controlled-credential-entry-surface`**（`T6-1b`；`R-0077 ①`） | **`149` 收口后**开工（复用 `149` 收出的幂等身份入口，**别造第二套**）；新增 wire 方法 ⇒ 排进**下一次重锁窗口** |
+| 3 | `089-four-real-ui-gates` **收尾** | 闭环的**真 UI 端到端**腿（③④）：QA 第二轮已把 **seed 腿**验通（`b630acd`：pi/codex 两条 ready、重启仍 ready）；**发轮**卡在本树 §1 缺的两条（`AGENT_BOX_SANDBOX_MODULE` 必须与 `PYTHONPATH` **一起**加；只加 `PYTHONPATH` 仍 `UNRESOLVED`）⇒ 按补上的 §1 收口 |
+| 4 | `103-wire-drive-coverage-meta-gate` | **让位**（`R-0080 ②`：非闭环活）——`101` 已收口；只在 1–3 全被阻塞时做 |
+| 5 | `099-worker-home-put-dispatch` | **让位**（同上）；无条件但非闭环 |
 
 > **禁止**：把"等公告点名"当开工条件（`R-0054` ④）。谓词不成立 ⇒ 先做 §8 fallback 清单第一条能做的，别长睡（单次 ≤5 分钟）。
-> **本树不做**：`092–096/100/102/107/108`（runtime 线）、`P*`（两条桌面线）。
+> **本树不做**：`092–096/100/102/107/108`（runtime 线；`R-0080 ②` 已让它们**全部让位**给闭环）、`P*`（两条桌面线）。
+> **开窗前的必过项（`R-0080 ①④` ＋ `R-0078 ③`；2026-09-20 新增）**：本树任何单要**给用户开窗**，必须先在 **fresh 装配**（**新数据根 ＋ 新种/新录凭据**）上**走通闭环五步**；
+> **只在旧装配上绿不算绿**——旧的绿是 `a-r5-pin-check.json` 那台 `~/.agentbox-trial-chat`（`18790`），它**证明不了**新鲜装配。
+> **资源护栏**（沿用）：Windows 侧 Server 用**独立端口段 + 独立数据根**，不与验收线 A 的 WSL 试用环境（`18790` / `~/.agentbox-trial-chat`）抢同一份资源；要复用先与 A 协调并在两树 status 各记一行。
 
 ## 3b 并行预算（执行者侧）
 
@@ -200,6 +206,11 @@ cat /home/maoqh/projects/agent-box-server-round1/docs/implementation/bulletin.md
 见主树 `docs/implementation/README.md §4`：单内不停、批末打 tag 写报告后继续、升级≠停下（标阻塞继续做别的）、
 事实分级（实测/引用/未验证）、门要能被证伪、凭据只作 locator。
 
+**进程纪律（`R-0076` ③；2026-09-20 入规，来自验收线的两次真实自错）**：
+1. **杀任何进程前**，必须先 `tr '\0' ' ' < /proc/<pid>/cmdline`，确认**命中自己的 data-root 或端口**（曾有会话按 `pgrep` 结果**误杀 QA 的 `18810` 环境**）；
+2. **绝不 `kill` 跨命令缓存的旧 pid**（曾有会话把自己的工具 shell 杀掉、退出码 `137`）——每次重新解析 pid；
+3. **杀完另行复核**：进程没了 ＋ 端口释放 ＋ 数据根可重用，三项都记一行。
+
 ## 8b 阻塞时的 fallback 活单清单（`R-0041 ⑦` ＋ `OF-01` 的回退条款）
 
 > **规则：等依赖单次 ≤5 分钟，醒来先做下面第一条能做的**，做完在本树 `status.md` 记一行（带计数/证据）再回到等待。**不许只剩 `sleep`。**
@@ -217,12 +228,13 @@ cat /home/maoqh/projects/agent-box-server-round1/docs/implementation/bulletin.md
 /goal 你是本项目的【后端执行者·A 线（wire / probe / 契约）】（子树 agent-box-env-provider），按队列连续施工。
 
 先完整读这些并遵守：
-- docs/implementation/worktree-charter.md（本树章程：范围/写权/**§3「今晚队列」＝开工顺序与可判定谓词**/§8b fallback/§3c 优先级）
+- docs/implementation/worktree-charter.md（本树章程：范围/写权/**§3「今日队列」＝开工顺序与可判定谓词**/§8b fallback/§3c 优先级）
 - docs/implementation/work-orders/**（契约权威）
 - /home/maoqh/projects/agent-box-server-round1/docs/implementation/ 下的 bulletin.md（最新公告＝「组织调整 v2 / R-0054」）、README.md §3/§4、manifest.json、status.md、rulings.md、prefs.md
   （**`rulings.md` 与 `approval-queue.md` 现在只有对话窗口写——你只读**）
 
-今晚队列：`087` → `QA-008`/`QA-009` 两张新单（由 ops 当轮投递，投进来就做）→ `103` → `099` → `089`（**`R-0056`：按合同原文字面开工**，判据＝`rulings.md` 有 `R-0055` ＋ runtime 树 `status.md` 里 `091` 的引擎/进程内 G1–G4 已绿；**③ 真机部署由你现场验并记账**；Windows Server 用独立端口段与数据根，别抢 A 的 18790 试用环境）。
+今日队列（`R-0080 ①②` 重排，覆盖旧队列；**唯一主线＝对话区闭环五步**）：**`149`（闭环第 ④ 步·卡点 a：注入的凭据必须是一个身份）** → **`151`（`T6-1b` 受控凭据录入口；必须复用 `149` 的幂等入口，并排进下一次重锁窗口）** → `089` **收尾**（真 UI 端到端腿，按补上的 §1 收口）→ `103` / `099`（**让位**：非闭环活，只在 1–3 全阻塞时做）。
+**开窗前的必过项（`R-0080 ①④` ＋ `R-0078 ③`）**：任何单要给用户开窗，先在 **fresh 装配（新数据根 ＋ 新种/新录凭据）** 上**走通闭环五步**；只在旧装配（`18790` / `~/.agentbox-trial-chat`）上绿**不算绿**。
 纪律：单内不停；批末 `git tag -a checkpoint/<批> …` + 把检查点报告写进本树 status 后**继续**；**每张用户可见单收口就打检查点（`R-0053`）**；
 升级标阻塞继续做别的；只写工单声明的 write_paths；`git add -- <显式路径>` + pathspec 提交；不 merge 主干、不 push、不 reset/stash/clean；
 凭据只作 locator；真实调用按 `R-0017`（假端点优先、逐笔记账）。队列做完才可停并写 `QUEUE_EMPTY_AT <日期>`。
