@@ -40,6 +40,58 @@ function envelopeError(code, detail) {
   return error
 }
 
+/** The shape the server's `_safe_code` accepts as a product code. */
+const PRODUCT_CODE_SHAPE = /^[A-Z][A-Z0-9_]{2,127}$/
+
+/**
+ * Operating-system fault names that reach us as `error.code`. They are uppercase
+ * and therefore pass the product-code shape, but they are not product codes: they
+ * are a kernel errno describing a syscall, and they collapse every distinct
+ * failure of that syscall into one non-name (`ENOENT` measured for a missing
+ * adapter binary and for a missing file elsewhere).
+ */
+const OS_FAULT_CODES = new Set([
+  "ENOENT", "EACCES", "EPERM", "ENOEXEC", "EISDIR", "ENOTDIR", "EMFILE", "ENFILE",
+  "EPIPE", "ECONNRESET", "ECONNREFUSED", "ECANCELED", "ERR_STREAM_DESTROYED",
+  "ERR_STREAM_WRITE_AFTER_END",
+])
+
+const LAUNCH_OS_FAULTS = new Set(["ENOENT", "EACCES", "EPERM", "ENOEXEC", "EISDIR", "ENOTDIR"])
+const CHANNEL_OS_FAULTS = new Set([
+  "EPIPE", "ECONNRESET", "ECONNREFUSED", "ECANCELED", "ERR_STREAM_DESTROYED",
+  "ERR_STREAM_WRITE_AFTER_END",
+])
+
+/**
+ * Order 150: which upstream cause may be named on the wire.
+ *
+ * The code taken out of the caught error used to be `error?.code`, unconditionally.
+ * Measured consequence: a spawn failure published the bare errno `ENOENT` as though
+ * it were a product code, while a Harness refusal that *did* state its cause
+ * ("Harness session not found") had no `.code` and therefore published the single
+ * fallback - so the faults with a real cause lost it, and the faults with only a
+ * syscall result got a name that is not a product's. Classify instead: a code is
+ * kept only when it is a product code (shape, and not an OS errno); an OS errno is
+ * translated to the product fault it stands for; a cause that survives only in the
+ * message is recognised from the measured message shapes; and `SIDECAR_OP_FAILED`
+ * is demoted to what it should have been - the last resort, not the first match.
+ */
+function upstreamCauseCode(error) {
+  const raw = typeof error?.code === "string" ? error.code : ""
+  if (raw && !OS_FAULT_CODES.has(raw) && PRODUCT_CODE_SHAPE.test(raw)) return raw
+  const text = String(error?.message ?? error ?? "")
+  if (LAUNCH_OS_FAULTS.has(raw)) return "HARNESS_LAUNCH_FAILED"
+  if (CHANNEL_OS_FAULTS.has(raw)) return "HARNESS_CHANNEL_DEAD"
+  if (/method not found|unknown method|-32601/i.test(text)) return "HARNESS_OP_UNSUPPORTED"
+  if (/\b(credential|api[_ -]?key|token)\b|unauthorized|not authenticated/i.test(text)) {
+    return "HARNESS_CREDENTIAL_UNAVAILABLE"
+  }
+  if (/session[^\n]{0,40}\b(not found|unknown|invalid|does not exist|closed)\b|no such session/i.test(text)) {
+    return "HARNESS_SESSION_UNAVAILABLE"
+  }
+  return "SIDECAR_OP_FAILED"
+}
+
 /** Permission decisions still in flight; every entry resolves to deny on timeout. */
 const pendingPermissions = new Map()
 const CREDENTIAL_PATH = "/runtime/secret/credential"
@@ -342,7 +394,7 @@ async function main() {
         id: request.id ?? null,
         ok: false,
         error: {
-          code: error?.code ?? "SIDECAR_OP_FAILED",
+          code: upstreamCauseCode(error),
           message: safeText(error?.message ?? error, 500),
         },
       }),
