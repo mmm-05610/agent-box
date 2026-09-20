@@ -211,6 +211,7 @@ cat /home/maoqh/projects/agent-box-server-round1/docs/implementation/bulletin.md
 1. **杀任何进程前**，必须先 `tr '\0' ' ' < /proc/<pid>/cmdline`，确认**命中自己的 data-root 或端口**（曾有会话按 `pgrep` 结果**误杀 QA 的 `18810` 环境**）；
 2. **绝不 `kill` 跨命令缓存的旧 pid**（曾有会话把自己的工具 shell 杀掉、退出码 `137`）——每次重新解析 pid；
 3. **杀完另行复核**：进程没了 ＋ 端口释放 ＋ 数据根可重用，三项都记一行。
+4. **起长驻服务**（dev server / 试用 Server / 探针实例）**必须不随工具 shell 退出**：`nohup ... &` 在工具 shell 里**仍会被带走**（A 线实测：vite 掉线，CDP 读到一次 `Something broke in the interface`，而 Windows 侧 `netstat`/`tasklist` 实测无进程占端口 ⇒ 判为环境现象）⇒ 用 `setsid`／`disown`／进程管理器起，**起完立刻复核端口在听**（`ss -ltnp`），**别重复起第二次**。
 
 ## 8b 阻塞时的 fallback 活单清单（`R-0041 ⑦` ＋ `OF-01` 的回退条款）
 
