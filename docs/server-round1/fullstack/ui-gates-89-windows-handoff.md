@@ -45,6 +45,39 @@
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\agentbox-w48-trial\trial-serve.ps1
 ```
 
+> **⚠️ 这一份配方缺了沙箱那一半 ⇒ 照抄必然发不出去**（QA 第二轮一手：`docs/qa/windows-leg-89-r2.md` §2；
+> 本包 §1 的错，不是产品缺陷，也不是跑的人的错）。`trial-serve.ps1:7` 只给了四条 `PYTHONPATH`
+> （`src` ＋ harnesses ＋ runtime-wsl ＋ **sandbox-bwrap**），而 **Windows 侧的 Server 要解析的是
+> `sandbox-windows`** ⇒ `sessions.createAndSend` 会被接受、session 建好，然后
+> `execution.state: failed` ＋ 裸 `EXECUTION_FAILED`，真因只在日志里：
+> `SANDBOX_PROVIDER_UNRESOLVED: no registration, installed entry point or AGENT_BOX_SANDBOX_MODULE …`。
+>
+> **两条一起加（只加 PYTHONPATH 不够——本树一手量过）**：
+>
+> ```powershell
+> $env:PYTHONPATH = "$SourceRoot\src;$SourceRoot\plugins\agent-box-harnesses\src;$SourceRoot\plugins\agent-box-runtime-wsl\src;$SourceRoot\plugins\agent-box-sandbox-windows\src"
+> $env:AGENT_BOX_SANDBOX_MODULE = "agent_box_sandbox_windows"
+> ```
+>
+> 依据（在 Linux 侧对同一条 resolver 做三组对照，`resolve_sandbox_port` 的三条路是
+> 进程内注册表 → **已安装入口点** → `AGENT_BOX_SANDBOX_MODULE`）：
+>
+> | 配置 | 结果 |
+> | --- | --- |
+> | 只 `PYTHONPATH` 指到插件源码 | **仍 UNRESOLVED**——源码路径不是"已安装入口点"，第二条路是空的 |
+> | 加 `AGENT_BOX_SANDBOX_MODULE=agent_box_sandbox_windows` | **解析成 `WindowsSandboxPort`** |
+>
+> 并且 QA 量到那台 venv 里 `entry_points(group='agent_box.plugins')` 回 **`[]`**（插件没 pip 装进
+> `r4c9-env`）⇒ 第二条路在那台机器上**本来就是空的**，env 变量是唯一走得通的路（要长期解决就是把插件装进 venv，属现场/装配的事，不是验收该顺手改的）。
+>
+> **跑之前先花 5 秒自证**（同一条命令也回答"解析成功但失败在更深处"是哪一处）：
+>
+> ```bash
+> python scripts/server-round1/ui_gates_89_sandbox_probe.py --counter-example
+> # exit 0 + "probe": {"status": "available"} = 解析与自检都通，失败在别处；
+> # exit 3 + 那行 UNRESOLVED = 上面两条 env 没生效（常见：设在子 shell 里、没进到 Server 进程）。
+> ```
+
 它做的事（读脚本原文，`C:\agentbox-w48-trial\trial-serve.ps1`）：
 `$SourceRoot = \\wsl.localhost\Ubuntu\home\maoqh\projects\agent-box-env-provider` —— **就是本工作树**，
 所以它跑的是**含 `115`（错误族闭合）与 `117`（`profiles.list` 投影 sendability）的当前源码**；

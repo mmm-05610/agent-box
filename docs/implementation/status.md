@@ -2302,3 +2302,38 @@ grep 形状不是证据，所以我把它记成**未测**，而不是记成"已�
 | `089` | seed 腿✅（含真 socket）、G1/G2/G3 未到 | 两家的真发真答 | `依赖 QA 线`（`H-013` 已 accept；A 侧无待做项） |
 
 **真实模型调用 0 / ¥0**；本轮全部是读锁件与一手 grep，未接触凭据内容。
+
+## QA 第二轮交回来了（`windows-leg-89-r2.md`）：**seed 腿在真控制面上验通**，但**发轮被我这份跑本缺的一半卡住**——已补（2026-09-20 09:2x）
+
+**先记进步**：`preflight CLEAR` ⇒ seed ⇒ **`pi` 与 `codex` 两条都 `sendability.state:"ready"`**（Windows DPAPI store ＋ 真 key，
+`credentialMaterialReadByThisScript: false`），**重启 Server 后仍 `total:2, ready:2`**（持久、可复读）。
+⇒ 我上一轮写"没验的仍是真机那一腿"的那一腿，**在 seed 这一段上已被 QA 一手验通**；护栏也照做（端口 18830、独立数据根、
+只按路径用凭据、清理与按 `OwningProcess` 定位停进程）。
+
+**再记我的账**：QA 的**发轮**（G1/G2）被两处挡住，**第一处是我跑本 §1 的缺陷**——
+`trial-serve.ps1:7` 只给四条 `PYTHONPATH`（含 **sandbox-bwrap**）且**没设 `AGENT_BOX_SANDBOX_MODULE`**，
+而 Windows 侧要解析的是 `sandbox-windows` ⇒ `createAndSend` 被接受、session 建好，随后裸 `EXECUTION_FAILED`，
+真因只在日志里的 `SANDBOX_PROVIDER_UNRESOLVED`。**第二处**是那台 venv 里 `entry_points(agent_box.plugins)` 回 `[]`
+（插件没 pip 装进 `r4c9-env`）⇒ resolver 的第二条路在那台机器上本来就空。
+
+**我没有照抄 QA 的处置，而是把它的必要前提在自己这边量了一遍**（同一条 resolver，Linux 侧三组对照）：
+
+| 配置 | `resolve_sandbox_port("sandbox-windows")` |
+| --- | --- |
+| 只 `PYTHONPATH=src` | `SANDBOX_PROVIDER_UNRESOLVED`（复现 QA 现场，原文一字不差） |
+| **只**把插件源码加进 `PYTHONPATH` | **仍然 UNRESOLVED** ⇒ QA 那句"模块可导入且有工厂"**不足以**证明能解析 |
+| 再加 `AGENT_BOX_SANDBOX_MODULE=agent_box_sandbox_windows` | **解析成功**（`…provider.WindowsSandboxPort`） |
+
+⇒ 跑本 §1 已改成**两条一起加**，并写明"只加 PYTHONPATH 不够"与依据；顺手把 QA 留的"残余"做成一条命令：
+新 `scripts/server-round1/ui_gates_89_sandbox_probe.py`——在跑 Server 的那台机器上分开回答
+**"解析没通"** 还是 **"解析通了、失败在更深处"**（它打印三条路各自看到什么 ＋ 解析后端口对象的自报
+`provider_id`/`descriptor_id`/`probe()`/`declaration_document`）。
+**它自己带反例**（`--counter-example`：换解析另一个 provider 必须回 UNRESOLVED），且两条实测**退出码确有区分**：
+env 齐 ⇒ exit 0 ＋ `probe: {"status": "available"}`；env 缺 ⇒ exit 3 ＋ 一行"PYTHONPATH 单独不够"。
+（一处自纠：第一版我把 stage 2 写成调 `port.create_room()`——该对象根本没有这个方法，是猜的；
+introspect 后改用真 API `probe()/declaration_document()`。另一处：第一次量退出码用了 `… | tail` ⇒ `$?` 量的是 `tail`，
+改成不带管道重量，否则我会把一条错数字写进账。）
+
+**`089` 现态**：seed 腿 ✅（真控制面）· 跑本配方已补 ✅ · **G1/G2 仍未达成**（QA 加完 workaround 后还是 failed 且原因未定位 ⇒
+`ui_gates_89_sandbox_probe.py` 就是下一轮的入口）· G3 仍未跑（要先有成功轮产出的证据目录）⇒ **仍不声明终态码**。
+**本轮真实模型调用 0 / ¥0**（我自己只做 in-process 解析实验；QA 那一次 `createAndSend` 在执行段失败、未产生上游请求）。
