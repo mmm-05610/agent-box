@@ -2424,3 +2424,25 @@ introspect 后改用真 API `probe()/declaration_document()`。另一处：第�
 - **真实模型调用 0 / ¥0；凭据内容 0 次读取**（假 locator／假 `sk-` 值只在测试进程内，试读即时丢弃、从不上行/落证据）。
 - **终态**：`SENDABILITY_RESOLVABLE_CREDENTIAL_DONE`。`149`（身份）＋`152`（可解析）两条合起来才是"能发"的完整判据；`151`（用户可录凭据的产品面）复用 `149` 的 `register_if_missing`。
 - 队列地图：`152` → **本树 DONE**；`pi-deepseek` 那行 → 交回 ops（第二缺陷判据已给）；下一张候选 `151`（wire 受控录入口，新方法＋重锁材料）。
+
+## `151` 勘察（`R-0077 ①`）：Stage 1 观测成立，但**绿收口卡在两仓重锁窗口**（本单边界明写"只备材料、不重锁别仓"）（2026-09-20 11:2x）
+
+**Stage 1 一手（`OF-02` 复核通过）**：派发表 `_handlers` 恰 **64** 个方法、**无任何 `credentials.*`**（脚本枚举 `wire/handlers.py` 的 dispatch 字面量 ⇒ 64、`credentials*`＝NONE）。⇒ "界面/用户今天建不出一个凭据身份"成立；`149` 那条身份入口已就位、等 `151` 来复用作受控录入口。
+
+**为什么本单不能像 `149`/`152` 那样在本树直接绿收口（判据，非偷懒）**：
+- `hello` 的能力表**从 `_handlers` 派生**（`handlers.py:559`）⇒ 加方法后 097 同步门自动一致（不红）。✓
+- **但** `test_wire_artifact_113.py:158` 断言 `--compare` 的 `methodsOnlyInServer == []` ⇒ **每个服务端方法都必须在"锁定的合同"里有一行**。而合同是**前端权威**、**按自身 digest 命名**的 `docs/server-round1/fullstack/contract/wire-v1.schema.registered-c4255b31.json`（`#result` 由前端生成，`wire_artifact.py` 文档字符串："`result` is the frontend's authority…every entry says `undeclared`"）。
+- ⇒ 把 `credentials.register`/`credentials.list` 加进 `_handlers` **必然**让 113 的 `methodsOnlyInServer` 非空 → **门红**，除非**同时**把两方法编进锁定的 `#params`/`#result` 合同——那**正是"两仓重锁"**，`151` 自己写死：「排进下一次重锁窗口」「只备材料，**别自己重锁别仓**」「**别**自称已重锁」。
+- 且新方法还需过 `103` 驱动覆盖元门（每方法要么被真 wire 驱动、要么一条带复验条件的豁免）。
+
+**结论**：`151` 的**代码＋门**可写（复用 `149.register_if_missing`，零第二套语义），但**绿收口的前置是一次协调式两仓合同重锁**——那是 ops/前端在重锁窗口做的**共享、难回退的协议动作**，本单边界明令不得由执行者单方完成。**我不擅自改锁定的 hash 命名合同去把 113 蒙绿**（那等于伪造重锁）。
+
+**已备好的"重锁材料"（交 ops 在窗口内用）**：
+- 两个新方法形状（按既有 `_PARAM_SHAPES` 风格）：
+  - `credentials.register`：required `{requestId, credentialId, kind, sourcePath}`，optional `{label}`；handler **只接受 id/kind/**路径**locator**，内部 `store.import_file(sourcePath)→locator` 后调 `credentials.register_if_missing(...)`，**密钥内容绝不过线**（G4/红线）；返回 `{credentialId, kind, created}`（非密）。
+  - `credentials.list`：required `{requestId}`，optional `{}`；返回 `CredentialRecords.list()`（id/kind/createdAt，**永不含 locator/密钥**）。
+  - **复用点＝`register_if_missing`**（`149`），151 不得另立幂等语义。
+- 151 落地时**同时**要做的三件（缺一即红，按 `40/52/58`/`113` 既有次序）：① 进 `_handlers`＋`_PARAM_SHAPES`＋两个 handler；② `wire_artifact.py --write` 重生本树 `wire-v1.server-inventory.json`；③ 前端把两方法的 `#params`/`#result` 编进锁定合同并**两仓重登记**（`registered-<新digest>.json` 换名 + 更新 `112/105/113` 里对该指针的引用）。
+- **门草图**：录入成功⇒`providerModels.create` 能绑该身份；无密钥来源⇒类型化拒、不留孤儿行；重复录入⇒幂等（`created=False`）；列举只有非密字段；畸形 kind/id/多余键⇒类型化拒；走真 wire（参数表校验在位）。
+
+**队列地图行（`R-0068` 要求新出现的单要么开工、要么记判据）**：`151` 现态＝**Stage 1 完成＋代码可落、但绿收口阻塞**；卡在哪＝**两仓合同重锁窗口**（`113:158` `methodsOnlyInServer==[]` 门 + `#result` 前端权威）；解卡入口＝**依赖重锁窗口（ops/前端）**——窗口一开，按上面材料三步＋门落 `151`，即 `CREDENTIAL_ENTRY_SURFACE_DONE`。本轮**未写任何代码 ⇒ 工作树仍净在 `9b12272`、无门被改红**。
