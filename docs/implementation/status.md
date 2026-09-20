@@ -2387,3 +2387,40 @@ introspect 后改用真 API `probe()/declaration_document()`。另一处：第�
 - **真实模型调用 0 / ¥0；凭据内容 0 次读取**（假 locator／假 `sk-` 值只在测试进程内、从不上行、不落证据）。
 - **终态**：本树代码＋门已收口；DoD-2 里"部署导入改走它"落点在 runtime 树 `bootstrap/**`、launcher 在主树 ⇒ 已在上面写成一行的 ops 确切改动并交回（本单写面外，属边界要求的交回，非未完成）。待 ops 落那两处＋`151` 复用后，缝即闭合。`CREDENTIAL_IDENTITY_SEAM_DONE`。
 - 队列地图：`149` → **本树 DONE（ops handoff 已交回，不阻塞任何树）**；下一张 `151`（复用本入口）。
+
+## `152` `sendability: ready` 必须把"本机能否解析该凭据"算进去（`R-0080`／`ACC-R5-4`；A 线验收第 5 轮一手）（2026-09-20 11:1x）
+
+**`R-0080 ①` 把本单定成本树第一梯队**（闭环 ⑤ 不骗人 ＋ ③④ 能不能发），排在 `149` 之后、与 `149`/`151` 同写面天然串行。
+
+### Stage 1 — 一手复核（`OF-02`：ops 引的行号成立）＋ 复现"记录在 ≠ 能解析"
+- 判定链 `_profile_bindings`（`wire/handlers.py:689-795`）在凭据段只做 `self.model_configs.credentials.get(credential_id, kind=kind)`（`:786`）⇒ 只查**身份行在不在＋kind 对不对**，**从不碰 secret store**；成功即 `ready`。✓（ops 记 781-795＝凭据段，属实）
+- `CredentialRecords.get()`（`credentials.py:51-58`）读 `server_credentials` 表行，**不读密钥**。✓
+- `SecretStore` 协议今天只有 `import_file/read/delete`——**没有 `exists/can_resolve`**（`storage/secrets.py:19-22`，一手确认 `MemorySecretStore.exists` 不存在）。⇒ "能不能解析"无现成查询，**只能试读**（→ 决定选 (a) 支）。
+- **复现形状**（门里一手量，见下）：一条**身份在、kind 对、但 locator 本机读不开**的凭据（＝DPAPI locator 落在 Linux 的等价物），改前链子返回 `ready`（用户一点 ⇒ `EXECUTION_FAILED`）；改后返回 `blocked`。**"记录存在性相同、只有可解析性翻转 ⇒ 判定翻转"** 就是本单的缝。
+
+### Stage 2/3 — 可解析性那一格：选 **分支 (a)**（既有 `read()` 试读即弃，零协议变更、不越界改 `storage/**`）
+在 `handlers.py` 凭据段 `get()` 成功**之后**加一格：
+- **`store is None`（本机没组合 secret store）⇒ 跳过**，保持 117 的冻结等价语义（**out of scope**：本单治的是"store 在、但这条 locator 打不开"，不是"这台机器根本没有 store"；越界降级会撞 117 既钉的 ready，且 store-absent 是另一格配置事实）。
+- **`store` 在、locator 为空 ⇒ `unknown`／`CREDENTIAL_RESOLVABILITY_UNKNOWN`**（没有地址可问 ⇒ 不可判定 ⇒ 绝不 `ready`）。
+- **`store` 在、`read(locator)` 抛 ⇒ `blocked`／`CREDENTIAL_NOT_RESOLVABLE`**（＋`actions`）。**读到的值即时丢弃**，绝不进 `detail`/返回/事件/证据（红线）。
+- **能读 ⇒ 继续 `ready`**。
+`_BINDING_ACTIONS` 加两枚：`CREDENTIAL_NOT_RESOLVABLE`→(`provision_the_credential_on_this_host`,`point_the_model_at_an_available_credential`)、`CREDENTIAL_RESOLVABILITY_UNKNOWN`→(`provision_the_credential_on_this_host`,)。
+**选 (a) 的依据**：(b) 要给 `SecretStore` 加 `exists()` ⇒ 改 `src/agent_box/storage/**`（不在本单写面）⇒ 得交回 ops 开存储面单串行；(a) 用既有 `read()` 即达判据、零协议变更、零越界。
+
+### Stage 4 — 门（`tests/server/test_sendability_resolvable_credential_152.py`，7 门全绿，走真 `profiles.list`）
+- **G1** 记录在＋kind 对＋locator 本机读不开 ⇒ `blocked`／`CREDENTIAL_NOT_RESOLVABLE`、整体不 `ready`、`actions` 非空含 `provision_the_credential_on_this_host`。
+- **G2** locator 可解析（真 import 进 store）⇒ 仍 `ready`（不把正常情形打死）。
+- **G3** 有 store、locator 为空 ⇒ `unknown`／`CREDENTIAL_RESOLVABILITY_UNKNOWN`，不是 `ready`。
+- **反例（门能咬）**：同一条 profile（身份存在性完全相同），`monkeypatch store.read` 从"抛"改成"能读" ⇒ 判定 `blocked → ready` 当场翻转 ⇒ 证明 verdict 由**可解析性**驱动，非 mere presence（去掉那一格＝回到 ACC-R5-4 的谎）。
+- **边界**：无 store 组合 ⇒ `ready`（锁死 out-of-scope 选择，防误伤 117）。
+- **G6 真链＋不过线**：`profiles.list` 走真 wire；密钥形状（假 `sk-…`）`grep` 不到、无 `secret_locator`、只按 id 出现。
+- **G5 既有链不变**：`test_profiles_list_sendability_117.py` **不改、全绿**（含冻结链对照 `test_the_projection_names_what_the_freeze_path_would_hit`）——117 fixture 无 store ⇒ 我的那一格不触发；wrong-kind 用例在 kind 检查处就 blocked（在可解析性之前）⇒ 语义逐字不变。
+
+### Stage 5 — 计数·命令·账（`QA-007` 口径）
+- `PYTHONPATH=src pytest tests/server -q --continue-on-collection-errors` ⇒ **639 passed / 9 failed / 1 skipped / 12 errors（450 s）**。**9 红＋12 err 与 `149` 那轮基线同一批**（`test_accounts`×1／`test_asset_hubs`×2／`test_capability_gate`×6 + 12 import-error 全 = 缺 `agent_box_harnesses`/`sandbox_bwrap`/`runtime_wsl` 插件），**没有一个新增红**；passed 633→639（＋我的 6 条可跑门）。⇒ **`handlers.py` 这一格零回归**。定向连跑 `152 + 117 + 149` **25 passed**。风险已一手排：全仓唯一"批量 ready"断言是 `147` 的 `sendability ready×40`，147 **无 store** ⇒ 那一格 no-op（未进失败集）；`129` 有 store 但不考 sendability。
+- `validate_order --strict --legacy-ok`：**`152`/`149`/`151` 全 `OK`，v2 单 FAIL=0**；`git diff --check` 干净。
+- **DoD-5：`pi-deepseek` 那一行**（凭据可解析却 `blocked`）——本单只**新增**"解析不了⇒blocked"这一格，故一条**可解析**却 blocked 的行必然卡在凭据段**之前**的某一步（`recovery`／`PROFILE_CONFIGURATION_INVALID`／`MODEL_UNAVAILABLE`／`PROVIDER_MODEL_UNUSABLE`），**具体哪一格要从真机那行读回**、本机不可判定 ⇒ **属第二缺陷、不在 152 射程**（Scope 明写"别顺手修"）⇒ **交回 ops/A**（路由是 ops 的事；本树只在 `status` 记此判据与出口：`profiles.list` 该行的 `checks[]` 首个非-ready 项即答案）。
+- **ops handoff**：分支 (a) **不需要**动 `storage/**`（用既有 `read()`）⇒ 本单**无存储面交回**。仅 (b) 才需要，我没走。
+- **真实模型调用 0 / ¥0；凭据内容 0 次读取**（假 locator／假 `sk-` 值只在测试进程内，试读即时丢弃、从不上行/落证据）。
+- **终态**：`SENDABILITY_RESOLVABLE_CREDENTIAL_DONE`。`149`（身份）＋`152`（可解析）两条合起来才是"能发"的完整判据；`151`（用户可录凭据的产品面）复用 `149` 的 `register_if_missing`。
+- 队列地图：`152` → **本树 DONE**；`pi-deepseek` 那行 → 交回 ops（第二缺陷判据已给）；下一张候选 `151`（wire 受控录入口，新方法＋重锁材料）。

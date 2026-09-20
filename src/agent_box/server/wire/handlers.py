@@ -291,6 +291,11 @@ def _artifact_error(exc: ArtifactStoreError) -> WireError:
 _BINDING_ACTIONS: Mapping[str, tuple[str, ...]] = {
     "CREDENTIAL_NOT_FOUND": ("provision_the_credential_on_this_host",
                              "point_the_model_at_an_available_credential"),
+    # Order 152 (`R-0080`, ACC-R5-4): the identity resolves and the kind is right,
+    # but this host cannot open the secret - which the freeze path alone cannot see.
+    "CREDENTIAL_NOT_RESOLVABLE": ("provision_the_credential_on_this_host",
+                                  "point_the_model_at_an_available_credential"),
+    "CREDENTIAL_RESOLVABILITY_UNKNOWN": ("provision_the_credential_on_this_host",),
     "PROVIDER_MODEL_NOT_FOUND": ("choose_an_available_model",),
     "PROVIDER_MODEL_UNUSABLE": ("choose_an_available_model",),
     "PROVIDER_MODEL_REFERENCE_MISSING": ("choose_an_available_model",),
@@ -783,7 +788,7 @@ class WireService:
             # unsendable as one that is absent, and `exists()` alone would call
             # it ready. `test_a_binding..._is_the_wrong_kind...` holds that open.
             try:
-                self.model_configs.credentials.get(credential_id, kind=kind)
+                record = self.model_configs.credentials.get(credential_id, kind=kind)
             except ServerError as error:
                 binding["state"] = "blocked"
                 binding["reason"] = error.code
@@ -792,6 +797,33 @@ class WireService:
                 return [binding], False
             except Exception:  # noqa: BLE001
                 return [binding], True
+            # Order 152 (`R-0080`, ACC-R5-4): the identity resolving is not the same
+            # fact as this host being able to *open* its secret. A Windows DPAPI
+            # locator cannot be read on Linux, yet the row exists and the kind
+            # matches, so the chain above still said `ready` and the user only found
+            # out by getting `EXECUTION_FAILED` after typing. Ask the store, and
+            # never let an unresolvable credential read as sendable.
+            store = getattr(self.model_configs, "secret_store", None)
+            if store is not None:
+                locator = record.get("secret_locator") if isinstance(record, Mapping) else None
+                if not locator:
+                    # No address to try: the resolvability query cannot be formed,
+                    # which is `unknown`, never `ready`.
+                    binding["state"] = "unknown"
+                    binding["reason"] = "CREDENTIAL_RESOLVABILITY_UNKNOWN"
+                    binding["detail"] = (
+                        f"credential {credential_id} carries no locator to resolve "
+                        f"on this host")[:200]
+                    return [binding], False
+                try:
+                    store.read(locator)  # discard: the value must never leave this probe
+                except Exception:  # noqa: BLE001 - cannot open it here is a real blocker
+                    binding["state"] = "blocked"
+                    binding["reason"] = "CREDENTIAL_NOT_RESOLVABLE"
+                    binding["detail"] = (
+                        f"credential {credential_id} is registered but its secret is "
+                        f"not readable on this host (e.g. a locator from another OS)")[:200]
+                    return [binding], False
         return [binding], False
 
     def _sendability(self, row: Mapping[str, Any], projected: Mapping[str, Any],
