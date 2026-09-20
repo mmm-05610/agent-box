@@ -39,6 +39,17 @@ revisions: []
 
 **硬约束**：**不许**把"上限是 8192 所以没事"当结论（实测砍在 ~90 字符）；**不许**把「砍断不可见」并进 `108` 的格子（`R-0076 ④`）。
 
+## Current state（一手）
+
+- **A 的实测（`ACC-R5-9`）**：用户连发三句（「what？」、「说完」、「你只能一次输出这么多吗」）；助手回复被砍，长度 **87 / 89 / 77 / 96 字符**；
+  **四次终态全部 `completed`、`reason` 全部 `None`**；**第 3 轮模型先道歉后又被砍在同一量级** ⇒ **稳定上限，非采样随机**。
+- **ops 一手反证（本轮新读）**：部署模板 `plugins/agent-box-harnesses/deploy/pi/models.json:14` 写的是 **`"maxTokens": 8192`**
+  ⇒ **观察到的 ~90 字符（≈60–70 token）不来自这一层**（或至少不只来自它）。
+- **两个前单的现状（一手，`manifest.json`）**：`108`＝`OUTPUT_CAP_PARAMETERIZED_PARTIAL`（"把 `maxTokens: 64` 参数化到部署"）；
+  `122`＝`TRUNCATION_VISIBLE_PARTIAL`（"砍断要可见"）；`134`/`137` 已 `DONE`（终态原因消费者 ＋ Worker `stopReason` 字段）。
+  ⇒ **词汇与通道已经存在**（`137` 的 `stopReason`），**缺的是"哪一层设的上限"与"这次为什么没报"**。
+- **现场状态（一手，`ps`）**：`18790`＝pid 749（A 的试用实例、用户正在用）；`18810`＝pid 302（QA 环境）⇒ **两个都别动**。
+
 ## Scope
 
 | From | To / action | Reason |
