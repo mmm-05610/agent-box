@@ -73,22 +73,25 @@
 
 > 契约文件在 `docs/implementation/work-orders/`（**与 A 树同一份历史**）；**新单由调度者投递**（父树白名单）。
 
-### 今晚队列（2026-09-19 19:2x 组织调整 v2；`R-0054` ⑥——**本树＝今晚焦点：后端第二波**）
+### 今日队列（**2026-09-20 10:2x**；`R-0080 ①②` **重排**，并覆盖已过期的「今晚队列（2026-09-19 19:2x）」）
+
+> **唯一主线＝「对话区闭环」五步**（`R-0080`；用户 10:15「一定要是对话区的闭环」）：
+> ① 选 profile/model → ② 发一句话 → ③ 服务端受理并落到那家 harness 的原生轮 → ④ **收到 `role=="assistant"` 的 `message.final`** → ⑤ **失败可见且不丢字**。
+> **本树按"离闭环的跳数"排**：本树这一侧断在 **③④**（sidecar 那一族），且 **⑤** 的"失败可见"与本树同源。
 
 | 序 | 单 | 开工条件（**可判定谓词**；每轮自己核，成立即开工，**不等任何人放行**） |
 | --- | --- | --- |
-| 1 | `091` 收口 | 无条件（`090` 已收口） |
-| 2 | `092` **阶段 2** | 无条件。**工作区已有未提交改动＝上一任的活，属你自己**：`src/agent_box/server/model_configs/repository.py`、`service.py`、`src/agent_box/storage/database.py`、`tests/server/test_stage_a_server.py`（改）＋ `tests/server/test_provider_neutralization_092.py`（新）⇒ 先 `git status`/`git diff` 看清，纳入并提交，**别丢**。§3 里"092 与 A 线 105 串行"的理由**已过期**（`104` `PROBE_SSRF_HARDENING_DONE`、`105` `HELLO_HARNESSES_DONE` 且重锁完成） |
-| 3 | `093`（**8 家＝8 个可并行单元**） | `092` 的收口行能在本树 `status.md` 查到（或 `git log --grep` 命中） |
-| 4 | `094` | `092` 收口（同上判据） |
-| 5 | `095` | `094` 收口 |
-| 6 | `096`（`096b` 主体） | `092` 与 `093` 均收口 |
-| 7 | `107`（`096a` thinking） | 无条件可做；**与 `108` 同改一批模板 ⇒ 串行**（`108` 先） |
-| 8 | `100`（逐家＝可并行单元） | **等 A 线 `089`**：判据＝A 树 `status.md` 里能查到 `089` 的收口行 |
-| 9 | `102` | 无条件 |
+| 1 | `146` **收尾** | 无条件（**在飞**：执行者已勾阶段 1–6，`src` 改动由其自己提交；`sessions/**` 已被它占用 ⇒ 别抢） |
+| 2 | **`150-sidecar-op-failure-upstream-cause`**（**闭环第 ③④⑤ 步 · 卡点 b**；`R-0078 ②`） | **无条件开工**——失败的上游原因必须**回传到产品状态**（今天只给一个 `SIDECAR_OP_FAILED`）；与 `148` 同改 `plugins/agent-box-harnesses/runtime/**` ⇒ **串行** |
+| 3 | `148-dispatch-swallowed-exception-bounded-probe` | `146` 收口（或至少它不再改 `execution/**`）；**与 `150` 同族**（被吞异常＝失败不可判），`150` 之后接着做 |
+| 4 | 未收口的 `PARTIAL`（**都在闭环 ⑤ 上**） | `120`（缺凭据类型化，`PARTIAL`）、`122`（截断可见，`PARTIAL`）——`150` 收口后顺手收口；`130`（收不掉进程树，**会污染验收环境**）保持高优先 |
+| 5 | 旧表其余行（`091/092/093/094/095/096/100/107/108`…） | **让位**（`R-0080 ②`：非闭环活——`092`–`096` 设置面、`100` 其余家、`093` 等**全部让位**）；只在 1–4 全被阻塞时做。`102` `109` `110` `111` 已收口 |
 
 > **禁止**：把"等公告点名 / 等调度者放行"当开工条件（`R-0054` ④）。本树实测受害过——等一个**早已过期**的放行，白等一段。
 > **谓词不成立时**：先做 §8 fallback 清单里第一条能做的；确实全被阻塞才在本树 `status.md` 写"等什么 / 为什么别的都不能做 / 预计何时醒"，且**单次等待 ≤5 分钟**。
+> **开窗前的必过项（`R-0080 ①④` ＋ `R-0078 ③`；2026-09-20 新增）**：本树任何单要**给用户开窗**，必须先在 **fresh 装配**（**新数据根 ＋ 新种/新录凭据**）上**走通闭环五步**；
+> **只在旧装配上绿不算绿**——旧的绿是 A 的 `a-r5-pin-check.json`（`18790` / `~/.agentbox-trial-chat`），它**证明不了**新鲜装配。
+> **凭据面边界**：`149`/`151`（凭据身份与 wire 录入口）属 **A 线**；本树**不写** `wire/**`。
 
 ## 3b 并行预算（执行者侧）——**本树是"拆出来提速"的，务必用足**
 
@@ -133,6 +136,12 @@ cat /home/maoqh/projects/agent-box-server-round1/docs/implementation/prefs.md
   校验：`python3 ~/.agents/skills/incremental-work-order/scripts/validate_order.py <本单> --strict`
 - 证据落 `docs/server-round1/**`；本树账 `docs/implementation/status.md`；**凭据只作 locator**、真实调用按 R-0017（假端点优先、逐笔记账）
 
+**进程纪律（`R-0076` ③；2026-09-20 入规，来自验收线的两次真实自错）**：
+1. **杀任何进程前**，必须先 `tr '\0' ' ' < /proc/<pid>/cmdline`，确认**命中自己的 data-root 或端口**（曾有会话按 `pgrep` 结果**误杀 QA 的 `18810` 环境**）；
+2. **绝不 `kill` 跨命令缓存的旧 pid**（曾有会话把自己的工具 shell 杀掉、退出码 `137`）——每次重新解析 pid；
+3. **杀完另行复核**：进程没了 ＋ 端口释放 ＋ 数据根可重用，三项都记一行。
+   **本树尤其相关**：`130`（收不掉进程树）会让残留进程占端口/数据根 ⇒ 起停自验时按上面三条做。
+
 ## 6b 阻塞时的 fallback 活单清单（`R-0041 ⑦` ＋ `OF-01` 的回退条款）
 
 > **为什么有这一节**：同类项目上实测过"进程在、只有 `sleep`、零产出"两段（83 分钟、92 分钟）。**规则：等依赖单次 ≤5 分钟，醒来先做下面第一条能做的**，做完在本树 `status.md` 记一行（带计数/证据）再回到等待。
@@ -152,7 +161,7 @@ cat /home/maoqh/projects/agent-box-server-round1/docs/implementation/prefs.md
 /goal 你是本项目的【后端执行者·runtime 线】（子树 agent-box-runtime-round1），按队列连续施工。
 
 先完整读这些并遵守：
-- docs/implementation/worktree-charter.md（本树章程：归属边界、**§3「今晚队列」＝开工顺序与可判定谓词**、§6b fallback、并行预算）
+- docs/implementation/worktree-charter.md（本树章程：归属边界、**§3「今日队列」＝开工顺序与可判定谓词**、§6b fallback、并行预算）
 - docs/implementation/work-orders/**（契约权威）
 - /home/maoqh/projects/agent-box-server-round1/docs/implementation/ 下的 bulletin.md（公告；最新一条＝「组织调整 v2 / R-0054」）、README.md §3/§4、manifest.json、status.md、rulings.md、prefs.md
 
