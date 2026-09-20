@@ -67,9 +67,10 @@
 | --- | --- | --- |
 | 1 | **`149-credential-identity-injection-seam`**（**闭环第 ④ 步 · 卡点 a**；`R-0078 ①`） | **无条件开工**——注入的凭据必须是一个身份：新鲜装配下绑注入凭据不得再 `CREDENTIAL_NOT_FOUND` |
 | 2 | **`151-wire-controlled-credential-entry-surface`**（`T6-1b`；`R-0077 ①`） | **`149` 收口后**开工（复用 `149` 收出的幂等身份入口，**别造第二套**）；新增 wire 方法 ⇒ 排进**下一次重锁窗口** |
-| 3 | `089-four-real-ui-gates` **收尾** | 闭环的**真 UI 端到端**腿（③④）：QA 第二轮已把 **seed 腿**验通（`b630acd`：pi/codex 两条 ready、重启仍 ready）；**发轮**卡在本树 §1 缺的两条（`AGENT_BOX_SANDBOX_MODULE` 必须与 `PYTHONPATH` **一起**加；只加 `PYTHONPATH` 仍 `UNRESOLVED`）⇒ 按补上的 §1 收口 |
-| 4 | `103-wire-drive-coverage-meta-gate` | **让位**（`R-0080 ②`：非闭环活）——`101` 已收口；只在 1–3 全被阻塞时做 |
-| 5 | `099-worker-home-put-dispatch` | **让位**（同上）；无条件但非闭环 |
+| 3 | **`152-sendability-requires-resolvable-credential`**（**闭环 ⑤/③④**；`ACC-R5-4`，A 线验收第一手发现） | **`149` 之后**开工——`sendability: ready` 必须把「**凭据在本机能否解析**」算进去（今天 21/22 行报 ready，其中 20 行带 **DPAPI locator（Linux 不可解析）**仍算 ready）；与 `149` 是**同一条缝的两面**（身份 ↔ 可解析性），**别两处各修一半** |
+| 4 | `089-four-real-ui-gates` **收尾** | 闭环的**真 UI 端到端**腿（③④）：QA 第二轮已把 **seed 腿**验通（`b630acd`：pi/codex 两条 ready、重启仍 ready）；**发轮**卡在本树 §1 缺的两条（`AGENT_BOX_SANDBOX_MODULE` 必须与 `PYTHONPATH` **一起**加；只加 `PYTHONPATH` 仍 `UNRESOLVED`）⇒ 按补上的 §1 收口 |
+| 5 | `103-wire-drive-coverage-meta-gate` | **让位**（`R-0080 ②`：非闭环活）——`101` 已收口；只在 1–4 全被阻塞时做 |
+| 6 | `099-worker-home-put-dispatch` | **让位**（同上）；无条件但非闭环 |
 
 > **禁止**：把"等公告点名"当开工条件（`R-0054` ④）。谓词不成立 ⇒ 先做 §8 fallback 清单第一条能做的，别长睡（单次 ≤5 分钟）。
 > **本树不做**：`092–096/100/102/107/108`（runtime 线；`R-0080 ②` 已让它们**全部让位**给闭环）、`P*`（两条桌面线）。
