@@ -2337,3 +2337,53 @@ introspect 后改用真 API `probe()/declaration_document()`。另一处：第�
 **`089` 现态**：seed 腿 ✅（真控制面）· 跑本配方已补 ✅ · **G1/G2 仍未达成**（QA 加完 workaround 后还是 failed 且原因未定位 ⇒
 `ui_gates_89_sandbox_probe.py` 就是下一轮的入口）· G3 仍未跑（要先有成功轮产出的证据目录）⇒ **仍不声明终态码**。
 **本轮真实模型调用 0 / ¥0**（我自己只做 in-process 解析实验；QA 那一次 `createAndSend` 在执行段失败、未产生上游请求）。
+
+## `149` 凭据身份注入缝（`R-0078 ①`／`R-0079 ④`）：受支持的注入路径给出的凭据，必须同时是一个可绑定的身份（2026-09-20 10:3x）
+
+**这是 R-0079 今天顺序里唯一还有本树待做项的一张**（`103` DONE / `099` DONE / `089` 只剩 QA 真机腿 ⇒ 见上面的队列地图）。
+
+### Stage 1 — 一手复核（`OF-02`：ops 引的行号逐条成立，无交回）
+- 记录层只认 `server_credentials` 表的 id：`model_configs/repository.py:60-63`（create）／`:92-95`（update）绑前 `SELECT 1 FROM server_credentials WHERE id=?`，查不到即 `CREDENTIAL_NOT_FOUND`（404）。✓（ops 记 63/95＝raise 行）
+- 服务层另有一处 kind 感知校验：`model_configs/service.py:236`（`credentials.get(credential_id, kind=…)`）。
+- `CREDENTIAL_NOT_FOUND → family NOT_FOUND`：`wire/errors.py:47`。✓
+- `credentials.py` 原文确认：`register()` 是裸 `INSERT`（非幂等，dup ⇒ `IntegrityError`）；`get()` 对"不存在"与"种类不符"回**同一个**码（不可区分）。✓
+- **缝的本质＝注入与身份两件事**：`/api/v1/credentials`（REST `sessions/service.py:190-212`）导入时**会**建身份（每次 mint 新 id）；而试用启动器 `--credential-id <选定 id>` 那一支只把密钥放进内存、**从不登记身份** ⇒ 绑它必 `CREDENTIAL_NOT_FOUND`。部署声明那条（`bootstrap/runtime.py:1335-1353`）用 inline `exists()→continue` 自己实现了一遍幂等。⇒ 幂等语义今天散在各调用点，没有唯一一条。
+
+### Stage 2 — 收出唯一那条幂等身份入口（`credentials.py`，本单写面内）
+新增 `CredentialRecords.register_if_missing(credential_id, kind, secret_locator)`：一个事务内**先查后插** ⇒ 名字已解析则原样返回（**不重复行、不覆盖 locator、绝不重读密钥**——本函数只登记身份、不 import secret，store 归调用方）、否则建，返回 `{credential_id, kind, secret_locator?, created: bool}`。`register/exist s/get/list/has` **逐字不动**；`register()` 仍是裸 INSERT（既有调用方行为保持）。⇒ 部署导入、启动器注入、`151` 的 wire 录入面**共用这一条**，不再各写一份。
+
+### Stage 3 — 半状态处置：选 **分支 (a)**（启动判死，零协议变更）
+理由：(b) 的两个显形出口（`server.hello` 加字段／`credentials.list` 新方法）都是 wire 面 ⇒ 归 `151`/协议变更/ops，与本单"服务端内部、零协议变更"的定位冲突；(a) 与既有 `_import_declared_credentials`"宁可 fail start 也不静默留下没凭据的 harness"同源。
+本树可测的判据（G4 断的就是它）：**注入而身份缺失** ⇒ 记录层 `exists()` 回 False、`get()` 类型化抛、绑定 `NOT_FOUND`/`CREDENTIAL_NOT_FOUND` **且不留 provider 行** ⇒ 对任何愿意问的调用方**可见、不静默**；`register_if_missing` 的 `created` 让调用方能在启动时判死。把这条"判死"写进 `bootstrap.start()` 的输出＝**交回 ops**（bootstrap 不在本单写面）。
+
+### OPS 需执行的确切改动（两处均在 149 写面外：`bootstrap/**`＝runtime 树；主树 launcher＝调度树）
+1. **`src/agent_box/server/bootstrap/runtime.py:1353`（部署导入）**：把
+   `records.register(declaration["credentialId"], declaration["kind"], locator)`
+   改为
+   `records.register_if_missing(declaration["credentialId"], declaration["kind"], locator)`
+   （`:1336` 的 `if records.exists(...): continue` 保留 ⇒ "重启不重读密钥"逐字不变；换入口是为了**并发双导入不再 `IntegrityError`**，且全仓幂等语义只剩这一条）。
+2. **主树 `scripts/server-round1/trial-serve-linux.py:83-90`（`--credential-id` 注入支）**：今天只 `credential seeded in memory`、不登记身份。改为：把该凭据**导入本机 store 拿到 locator** 后调 `runtime.repository.credentials.register_if_missing(<credential-id>, <kind>, <locator>)`，并断言返回的身份确在（`exists()`）；若建不出身份 ⇒ **启动即类型化失败**（分支 (a)），别再静默"起了、看着正常、记录层认不出"。**只登记身份（id/kind/locator），密钥内容不过线。**
+   （`kind` 用该家 harness 声明的 `credential_kind`；`151` 落地后 launcher 可改调 151 的新方法，仍复用本条入口。）
+
+### `151` 复用点（判据，写给下一张）
+`151` 的受控凭据录入口**必须调用 `CredentialRecords.register_if_missing`**，**不得**再定义第二套幂等语义；151 建出的身份必须能被 149 的记录层绑定（G1 同一入口）。
+
+### Stage 4 — 门（`tests/server/test_credential_identity_seam_149.py`，全绿，绑一律走真 wire）
+- **G1** 新鲜根＋注入 ⇒ 真 `providerModels.create` 绑该 id **成功**、记录行 +1、kind 感知 `get()` 命中。
+- **G2** 绑从未注入过的 id ⇒ 仍 `NOT_FOUND`＋`internalCode=CREDENTIAL_NOT_FOUND`，记录行不增（**缝不放宽家族**）。
+- **G3** 同一身份两次 ⇒ 第二次 `created=False`、返回原 locator（不覆盖）、`server_credentials` 仍 1 行。
+- **G4** 注入未登记 ⇒ `exists()` False、绑类型化拒（不静默）；调入口后 `created=True`、绑成功。
+- **G5** 改绑走真 wire `providerModels.update`，并由**另一个** wire 方法 `providerModels.list` 读回（非写入回声）。
+- **G6** create/list 输出 `grep` 不到密钥形状（用假 `sk-…` 内容验证不外泄）、无 `locator`。
+- **反例（门能咬）**：把 `register_if_missing` monkeypatch 成"不建行只回 created=False" ⇒ 绑定必须 `CREDENTIAL_NOT_FOUND`（正例 1 当场红）。
+- **形制**：`register_if_missing` 是本类唯一带存在性守卫的入口；`register` 保持裸 INSERT（源码计数钉死，防"第二套幂等"长回来）。
+- 一处自纠：`requestId ≥8 字符` 形状门（本树早已记过）第一版又被我撞（`o149-g1` 太短）⇒ `body()` 补前缀。
+
+### Stage 5 — 计数·命令·账（`QA-007` 口径：附"插件装进本解释器 在/不在"）
+- 命令：`PYTHONPATH=src python3 -m pytest tests/server -q --continue-on-collection-errors`
+  ⇒ **`tests/server` 633 passed / 9 failed / 1 skipped / 12 collection errors**。**9 红＋12 err 全 = 插件包未 pip 装进本解释器**（`agent_box_harnesses`／`agent_box_sandbox_bwrap`／`agent_box_runtime_wsl` `ModuleNotFoundError`），**没有一个引用 `register_if_missing`**；我的改动是 `credentials.py` 纯增量（新方法）＋一个新测试文件 ⇒ **本次零回归**。全量 `PYTHONPATH=src pytest tests/ -q --continue-on-collection-errors` ⇒ **892 passed / 20 failed / 1 skipped / 22 errors（673 s）**；多出的 11 红 + 10 err 全在 `tests/integration/native/*`（真 `bwrap`／transport／catalog 装配，同样缺插件），**全量输出里 `register_if_missing` 出现 0 次**（⇒ 我 8 门全绿、无任何失败涉及本改动）。定向复证既有调用方：`test_credential_import_route` + `test_deployment_credentials` + `test_provider_update_keeps_omitted_112` **46 passed**（`register()` 逐字不变 ⇒ 消费者零回归）。
+- `validate_order --strict`：对 **44–67 冻结 v1 单**报"缺 frontmatter"＝基线（章程 §6）；`--legacy-ok` 全 OK；**`149`/`151` 单 `OK`**。
+- `git diff --check` 干净；改动面只有 `credentials.py` ＋ 新测试（＋本 status 段）。
+- **真实模型调用 0 / ¥0；凭据内容 0 次读取**（假 locator／假 `sk-` 值只在测试进程内、从不上行、不落证据）。
+- **终态**：本树代码＋门已收口；DoD-2 里"部署导入改走它"落点在 runtime 树 `bootstrap/**`、launcher 在主树 ⇒ 已在上面写成一行的 ops 确切改动并交回（本单写面外，属边界要求的交回，非未完成）。待 ops 落那两处＋`151` 复用后，缝即闭合。`CREDENTIAL_IDENTITY_SEAM_DONE`。
+- 队列地图：`149` → **本树 DONE（ops handoff 已交回，不阻塞任何树）**；下一张 `151`（复用本入口）。
