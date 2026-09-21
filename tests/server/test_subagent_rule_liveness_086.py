@@ -23,6 +23,7 @@ from __future__ import annotations
 import pytest
 
 from agent_box.server.errors import ServerError
+from agent_box.server.execution import CancelOutcome
 from agent_box.server.execution.delegation import (
     MAX_SUMMARY_CHARS,
     DelegationError,
@@ -87,6 +88,10 @@ class _NeverFinishes(FakeExecution):
         self.cancelled.append(turn_id)
         self.records.finish_cancelled(turn_id)
         return True
+
+    def cancel_execution(self, turn_id: str):
+        return (CancelOutcome.CONFIRMED_STOPPED if self.cancel(turn_id)
+                else CancelOutcome.REFUSED_NO_ACTIVE_RUN)
 
 
 def test_the_child_s_usage_stays_on_its_own_turn_and_reaches_the_parent_as_a_fact(tmp_path):

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from agent_box.server.errors import ServerError, unavailable
-from agent_box.server.execution import HarnessRegistry, TurnExecutionPort
+from agent_box.server.execution import CancelOutcome, HarnessRegistry, TurnExecutionPort
 from agent_box.server.records import digest, reject_sensitive_keys
 from agent_box.server.sessions.repository import SessionRecords
 
@@ -234,7 +234,9 @@ class SessionService:
         self.records.record_cancel_request(turn_id)
         requested = self.records.get_turn_context(turn_id)
         stopped = requested["state"] in self.records.TERMINAL_TURN_STATES
-        accepted = False if stopped else self.execution.cancel(turn_id)
+        accepted = False if stopped else (
+            self.execution.cancel_execution(turn_id)
+            == CancelOutcome.CONFIRMED_STOPPED)
         if not stopped:
             self.cancel_descendants(turn_id)
         self.on_event()
@@ -255,7 +257,7 @@ class SessionService:
         stopped: list[str] = []
         for child_id in self.records.live_child_turn_ids(turn_id):
             self.records.record_cancel_request(child_id)
-            self.execution.cancel(child_id)
+            self.execution.cancel_execution(child_id)
             stopped.append(child_id)
             stopped.extend(self.cancel_descendants(child_id))
         return stopped

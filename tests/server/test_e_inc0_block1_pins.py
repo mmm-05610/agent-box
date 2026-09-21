@@ -210,13 +210,14 @@ def test_execution_package_does_not_import_product_domain_privates():
 @pytest.mark.parametrize("raw", [
     "max_tokens", "refusal", "content-filtered", "token_exceeded",
     "some-brand-new-reason-π", "REASON_FROM_NEXT_RELEASE",
+    "stop", "complete",
 ])
 def test_non_clean_stop_reason_passes_through_verbatim(raw: str):
     assert _terminal_reason_from_result({"stopReason": raw}) == raw
     assert _terminal_reason_from_result({"stop_reason": raw}) == raw
 
 
-@pytest.mark.parametrize("clean", ["end_turn", "stop", "complete", "", None])
+@pytest.mark.parametrize("clean", ["end_turn", "", None])
 def test_clean_or_missing_stop_reason_stays_none_byte_identical(clean):
     result = {} if clean is None else {"stopReason": clean}
     assert _terminal_reason_from_result(result) is None

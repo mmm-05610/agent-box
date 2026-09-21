@@ -60,6 +60,11 @@ class _StubExecution:
     def cancel(self, execution_id):
         return True
 
+    def cancel_execution(self, execution_id):
+        from agent_box.server.execution import CancelOutcome
+        return (CancelOutcome.CONFIRMED_STOPPED if self.cancel(execution_id)
+                else CancelOutcome.REFUSED_NO_ACTIVE_RUN)
+
 
 @pytest.fixture
 def server(tmp_path, monkeypatch):

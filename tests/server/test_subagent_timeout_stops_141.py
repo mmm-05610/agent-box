@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import pytest
 
+from agent_box.server.execution import CancelOutcome
 from agent_box.server.execution.delegation import DelegationService
 from agent_box.server.idempotency import IdempotentRecords
 from agent_box.server.profiles import ProfileRecords
@@ -49,6 +50,10 @@ class _NeverFinishing:
         self.records.finish_cancelled(turn_id)
         return True
 
+    def cancel_execution(self, turn_id: str):
+        return (CancelOutcome.CONFIRMED_STOPPED if self.cancel(turn_id)
+                else CancelOutcome.REFUSED_NO_ACTIVE_RUN)
+
 
 class _Completing:
     def __init__(self, records) -> None:
@@ -68,6 +73,10 @@ class _Completing:
     def cancel(self, turn_id: str) -> bool:  # pragma: no cover - not used by success path
         self.records.finish_cancelled(turn_id)
         return True
+
+    def cancel_execution(self, turn_id: str):  # pragma: no cover - not used by success path
+        return (CancelOutcome.CONFIRMED_STOPPED if self.cancel(turn_id)
+                else CancelOutcome.REFUSED_NO_ACTIVE_RUN)
 
 
 def _env(tmp_path, *, execution_cls=_NeverFinishing):

@@ -757,6 +757,13 @@ class SidecarExecutionBackend:
                 prior = self._cancel_receipts.get(execution_key)
             if prior is not None:
                 return prior
+            if getattr(target, "port", None) is None:
+                # Pre-port window (submit claimed the key but the factory seam
+                # has not produced a port yet): nothing was dispatched, so there
+                # is no dispatch for a receipt to guard. Answer UNKNOWN honestly
+                # but do NOT record it - a later cancel must still be able to
+                # reach the live port once the run starts (P8, approved (i)).
+                return CancelOutcome.UNKNOWN
             try:
                 accepted = target.port.cancel(execution_key)
             except BaseException:  # noqa: BLE001 - timeout/channel-lost: honest unknown
@@ -1198,8 +1205,9 @@ def _safe_code(exc: BaseException) -> str:
     return "EXECUTION_FAILED"
 
 
-#: ACP's machine-readable stop reasons (an existing vocabulary, not invented).
-_CLEAN_STOP_REASONS = frozenset({"end_turn", "stop", "complete", ""})
+#: ACP's official clean stop reasons only (C-HARNESS@v1 D1 官方5值中的干净集；
+#: "stop"/"complete" 系历史自造，随 R1 移出——非干净值一律透传落库)。
+_CLEAN_STOP_REASONS = frozenset({"end_turn", ""})
 
 
 def _terminal_reason_from_result(result) -> str | None:

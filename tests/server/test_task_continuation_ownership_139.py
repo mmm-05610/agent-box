@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import pytest
 
+from agent_box.server.execution import CancelOutcome
 from agent_box.server.execution.delegation import DelegationService
 from agent_box.server.idempotency import IdempotentRecords
 from agent_box.server.profiles import ProfileRecords
@@ -41,6 +42,10 @@ class _Completing:
     def cancel(self, turn_id):
         self.records.finish_cancelled(turn_id)
         return True
+
+    def cancel_execution(self, turn_id):
+        return (CancelOutcome.CONFIRMED_STOPPED if self.cancel(turn_id)
+                else CancelOutcome.REFUSED_NO_ACTIVE_RUN)
 
 
 def _env(tmp_path):

@@ -617,6 +617,96 @@ def test_forced_interleave_submit_start_window_is_closed():
     assert racer_results[0].dispatch_id == holder_receipt.dispatch_id
 
 
+class _PrePortCancelPort:
+    def __init__(self):
+        self.cancel_calls = 0
+
+    def open_execution(self, key):
+        return "native-p8"
+
+    def cancel(self, key):
+        self.cancel_calls += 1
+        return True
+
+
+def _parked_in_pre_port_window():
+    """Holder submit parked inside the factory seam on its own thread: the key
+    is claimed (pre-port half-window open) while no port exists yet, and the
+    main thread drives cancels into that window deterministically."""
+    port = _PrePortCancelPort()
+    in_factory = threading.Event()
+    release = threading.Event()
+
+    def factory(context, on_event):
+        in_factory.set()
+        assert release.wait(5.0), "holder never released from the seam"
+        return port
+
+    backend = _backend()
+    backend.port_factory = factory
+    return backend, port, in_factory, release
+
+
+def test_forced_interleave_pre_port_cancel_answers_unknown_without_recording():
+    """P8 (approved disposition (i), E-017): a cancel that arrives while the
+    key is claimed but the port does not exist yet answers UNKNOWN honestly
+    and records NOTHING - there was no dispatch for a receipt to guard.
+    Repeated in-window cancels stay idempotent answers, never a permanent
+    receipt that bricks post-start cancellation."""
+    backend, port, in_factory, release = _parked_in_pre_port_window()
+    holder_results = []
+
+    def holder():
+        try:
+            holder_results.append(backend.submit(_request("p8-key")))
+        except BaseException as exc:  # noqa: BLE001
+            holder_results.append(exc)
+
+    thread = threading.Thread(target=holder, name="submit-holder")
+    thread.start()
+    assert in_factory.wait(5.0), "holder never reached the seam"
+    first = backend.cancel_execution("p8-key")
+    second = backend.cancel_execution("p8-key")
+    release.set()
+    thread.join(10)
+
+    assert first is CancelOutcome.UNKNOWN
+    assert second is CancelOutcome.UNKNOWN
+    assert len(holder_results) == 1 and isinstance(holder_results[0], ExecutionReceipt)
+    assert holder_results[0].replayed is False
+    with backend._lock:
+        assert backend._cancel_receipts.get("p8-key") is None, (
+            "a pre-port cancel recorded a receipt for a dispatch that never "
+            "happened")
+    assert port.cancel_calls == 0  # nothing was ever dispatched to cancel
+
+
+def test_forced_interleave_post_start_cancel_still_reaches_live_port():
+    """P8 red-green pair: after the parked start completes, a cancel must
+    reach the live port. Pre-fix code replays the recorded UNKNOWN forever
+    and leaks the run (red: cancel_calls == 0); the fixed code dispatches
+    once and returns CONFIRMED_STOPPED (green)."""
+    backend, port, in_factory, release = _parked_in_pre_port_window()
+    holder_results = []
+
+    def holder():
+        holder_results.append(backend.submit(_request("p8-key")))
+
+    thread = threading.Thread(target=holder, name="submit-holder")
+    thread.start()
+    assert in_factory.wait(5.0), "holder never reached the seam"
+    in_window = backend.cancel_execution("p8-key")  # answered, not recorded
+    release.set()
+    thread.join(10)
+
+    assert in_window is CancelOutcome.UNKNOWN
+    # the holder's submit has fully returned: the run is live behind its port
+    after_start = backend.cancel_execution("p8-key")
+    assert after_start is CancelOutcome.CONFIRMED_STOPPED, (
+        "run leaked: post-start cancel never reached the port")
+    assert port.cancel_calls == 1, "abort must dispatch exactly once"
+
+
 # --------------------------------------------------------------------------
 # a-6 - the closure seam and the anti-growth lock.
 

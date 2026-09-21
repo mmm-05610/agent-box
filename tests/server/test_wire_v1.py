@@ -19,7 +19,9 @@ from fastapi.testclient import TestClient
 import pytest
 
 from agent_box.server.bootstrap import build_runtime
-from agent_box.server.execution import HarnessDescriptor, HarnessRegistry
+from agent_box.server.execution import (
+    CancelOutcome, HarnessDescriptor, HarnessRegistry,
+)
 from agent_box.server.transport.http import create_app
 from agent_box.server.workspaces.local_environment import LocalEnvironmentProvider
 
@@ -75,6 +77,10 @@ class RecordingExecution:
             self.cancelled.append(execution_id)
         self.gate.set()
         return True
+
+    def cancel_execution(self, execution_id):
+        return (CancelOutcome.CONFIRMED_STOPPED if self.cancel(execution_id)
+                else CancelOutcome.REFUSED_NO_ACTIVE_RUN)
 
 
 def registry():

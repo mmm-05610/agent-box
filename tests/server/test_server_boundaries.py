@@ -13,7 +13,9 @@ from fastapi.testclient import TestClient
 
 from agent_box.server.bootstrap import build_runtime
 from agent_box.server.credentials import CredentialRecords
-from agent_box.server.execution import HarnessDescriptor, HarnessRegistry
+from agent_box.server.execution import (
+    CancelOutcome, HarnessDescriptor, HarnessRegistry,
+)
 from agent_box.server.idempotency import IdempotentRecords
 from agent_box.server.persistence import ProductRepositoryView
 from agent_box.server.profiles import ProfileRecords
@@ -43,6 +45,10 @@ class RecordingExecution:
         with self.lock:
             self.cancelled.append(turn_id)
         return True
+
+    def cancel_execution(self, turn_id):
+        return (CancelOutcome.CONFIRMED_STOPPED if self.cancel(turn_id)
+                else CancelOutcome.REFUSED_NO_ACTIVE_RUN)
 
 
 class WslFixture:

@@ -227,6 +227,11 @@ def test_switch_preflight_same_family_idle_guard(tmp_path):
         def cancel(self, turn_id):
             return True
 
+        def cancel_execution(self, turn_id):
+            from agent_box.server.execution import CancelOutcome
+            return (CancelOutcome.CONFIRMED_STOPPED if self.cancel(turn_id)
+                    else CancelOutcome.REFUSED_NO_ACTIVE_RUN)
+
     from agent_box.server.execution import HarnessDescriptor, HarnessRegistry
 
     registry = HarnessRegistry()

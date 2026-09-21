@@ -17,6 +17,7 @@ from pathlib import PurePosixPath
 from typing import Any, Callable, Mapping
 
 from agent_box.server.errors import ServerError
+from agent_box.server.execution import CancelOutcome
 from agent_box.server.execution.artifact_store import ArtifactStoreError
 from agent_box.server.records import canonical, digest, reject_sensitive_keys
 from agent_box.server.wire.envelope import CursorCodec
@@ -2162,7 +2163,8 @@ class WireService:
         if self.execution is None:
             return {"outcome": "unconfirmed", "reason": "EXECUTION_CAPABILITY_UNAVAILABLE"}
         self.sessions.records.record_cancel_request(execution_id)
-        accepted = bool(self.execution.cancel(execution_id))
+        cancel_outcome = self.execution.cancel_execution(execution_id)
+        accepted = cancel_outcome == CancelOutcome.CONFIRMED_STOPPED
         # The same rule the REST cancel applies: an active turn that is asked to
         # stop takes its delegated children with it, whether or not this
         # process's own stop could be confirmed.

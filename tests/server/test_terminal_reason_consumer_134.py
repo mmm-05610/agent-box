@@ -27,13 +27,13 @@ def test_absent_or_clean_stop_reason_is_none():
     assert _terminal_reason_from_result(None) is None
     assert _terminal_reason_from_result({}) is None                     # field absent
     assert _terminal_reason_from_result({"stopReason": "end_turn"}) is None
-    assert _terminal_reason_from_result({"stopReason": "stop"}) is None
     assert _terminal_reason_from_result("not a dict") is None
 
 
 def test_non_clean_stop_reason_is_surfaced():
     assert _terminal_reason_from_result({"stopReason": "max_tokens"}) == "max_tokens"
     assert _terminal_reason_from_result({"stopReason": "refusal"}) == "refusal"
+    assert _terminal_reason_from_result({"stopReason": "stop"}) == "stop"
     assert _terminal_reason_from_result({"stop_reason": "max_turn_requests"}) == "max_turn_requests"
 
 

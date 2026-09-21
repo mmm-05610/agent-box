@@ -19,6 +19,7 @@ from __future__ import annotations
 import pytest
 
 from agent_box.server.errors import ServerError
+from agent_box.server.execution import CancelOutcome
 from agent_box.server.execution.delegation import DelegationService
 from agent_box.server.idempotency import IdempotentRecords
 from agent_box.server.profiles import ProfileRecords
@@ -43,6 +44,10 @@ class _StallThenActive:
     def cancel(self, turn_id):
         self.records.finish_cancelled(turn_id)
         return True
+
+    def cancel_execution(self, turn_id):
+        return (CancelOutcome.CONFIRMED_STOPPED if self.cancel(turn_id)
+                else CancelOutcome.REFUSED_NO_ACTIVE_RUN)
 
 
 def _env(tmp_path, *, home_concurrency=None):
@@ -183,6 +188,10 @@ class _CompletesWithDeltas:
 
     def cancel(self, turn_id):
         return True
+
+    def cancel_execution(self, turn_id):
+        return (CancelOutcome.CONFIRMED_STOPPED if self.cancel(turn_id)
+                else CancelOutcome.REFUSED_NO_ACTIVE_RUN)
 
 
 def _delta_env(tmp_path, *, count: int, text: str, native_id: str):
