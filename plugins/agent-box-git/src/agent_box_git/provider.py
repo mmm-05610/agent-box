@@ -93,7 +93,17 @@ class GitWorkspaceResourceProvider:
     def cleanup(self, execution_id: str) -> None:
         scope = "".join(c if c.isalnum() or c in "-_" else "_" for c in execution_id)
         worktree, marker = self.managed_root / scope, self.managed_root / ".ownership" / f"{scope}.json"
-        if worktree.resolve().parent != self.managed_root or not marker.exists():
+        if worktree.resolve().parent != self.managed_root:
             raise ValueError("refusing to clean unowned worktree")
-        _git(self.repo, "worktree", "remove", "--force", str(worktree))
+        if not marker.exists():
+            # Double release: the managed worktree and its ownership marker are
+            # both gone, so the cleaned state is already reached — this is a
+            # no-op, not an error.  A worktree that is still present without a
+            # marker is unowned and stays refused: idempotency is never an
+            # excuse to delete a resource this provider never took ownership of.
+            if not worktree.exists():
+                return
+            raise ValueError("refusing to clean unowned worktree")
+        if worktree.exists():
+            _git(self.repo, "worktree", "remove", "--force", str(worktree))
         marker.unlink()

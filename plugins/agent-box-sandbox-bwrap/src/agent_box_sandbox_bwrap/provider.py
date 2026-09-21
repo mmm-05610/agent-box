@@ -624,4 +624,8 @@ class ResolvedBwrapSandbox:
         # response contains the provider-private source path.
         for token in self.provider._secret_leases.pop(value, ()):
             self.provider._secret_sources.pop(token, None)
+            # Reclaim the per-token attempt binding too, or _secret_attempts
+            # grows without bound across wraps.  Keyed by token only; never
+            # reads or prints secret content.
+            self.provider._secret_attempts.pop(token, None)
         return {"status": "cleaned", "spec_digest": value}

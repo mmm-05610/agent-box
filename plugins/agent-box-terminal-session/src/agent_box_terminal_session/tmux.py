@@ -169,6 +169,19 @@ class TmuxSession:
 
     def release(self, request: object = None) -> dict[str, object]:
         if self._managed and self._identity is not None:
+            # A managed session may already be gone (the target exited and the
+            # session was reaped, or release ran twice).  kill-session uses
+            # check=True and would raise on a missing target, so probe first
+            # without failing: releasing an already-absent managed session is a
+            # no-op that reports nothing destroyed, not an error.
+            socket = self.ref.metadata.get("socket")
+            prefix = [self.binary]
+            if socket:
+                prefix += ["-L", socket]
+            probe = self._runner([*prefix, "has-session", "-t", self._identity.session_id],
+                                 capture_output=True, text=True, check=False)
+            if getattr(probe, "returncode", 1) != 0:
+                return {"released": True, "destroyed": False, "managed": True}
             self._call("kill-session", "-t", self._identity.session_id)
             return {"released": True, "destroyed": True, "managed": True}
         return {"released": True, "destroyed": False, "managed": False}
