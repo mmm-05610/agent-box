@@ -113,15 +113,20 @@ class TmuxSession:
                 # attempt collide with a session it did not create.  Killing only
                 # when created is set means a failed new-session is never answered
                 # with a kill, and the flag is set nowhere else, so a borrowed
-                # session can never be reached from here.  check=False because the
-                # compensation must not replace the original failure.
+                # session can never be reached from here.  check=False only suppresses a
+                # non-zero exit, so a spawn-level OSError raised here would escape before
+                # the bare `raise` below and bury the failure that made this cleanup
+                # necessary.  The compensation is best-effort in full, like the D3 rollback.
                 if created:
                     socket = self.ref.metadata.get("socket")
                     prefix = [self.binary]
                     if socket:
                         prefix += ["-L", socket]
-                    self._runner([*prefix, "kill-session", "-t", self._session_name()],
-                                 capture_output=True, text=True, check=False)
+                    try:
+                        self._runner([*prefix, "kill-session", "-t", self._session_name()],
+                                     capture_output=True, text=True, check=False)
+                    except BaseException:
+                        pass
                 raise
         elif self._identity is None:
             self.resolve(self.ref)

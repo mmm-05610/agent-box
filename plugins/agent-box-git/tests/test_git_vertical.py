@@ -101,11 +101,13 @@ def test_empty_capture_is_rejected_and_cleanup_keeps_workspace_safe(repo, tmp_pa
     provider.cleanup("E1")
     # P-T1/D2 changed what this line used to assert.  A scope with neither an
     # ownership marker nor a worktree is now indistinguishable from one already
-    # released, so cleanup answers as a no-op instead of raising.  The traversal
-    # is still inert for the reason the containment guard is there at all: the
-    # scope is sanitized, so it can only ever name a direct child of
-    # managed_root and nothing outside it is reachable or removed.
-    assert provider.cleanup("../outside") is None
+    # released, so cleanup answers as a no-op instead of raising.  P-T4/D10 then
+    # gave that no-op a name in the return shape (it used to be `None`); the
+    # behaviour is the same, the assertion is now stronger because it says which
+    # no-op it was.  The traversal is still inert for the reason the containment
+    # guard is there at all: the scope is sanitized, so it can only ever name a
+    # direct child of managed_root and nothing outside it is reachable or removed.
+    assert provider.cleanup("../outside") == {"status": "already_cleaned"}
     assert not (tmp_path / "managed" / "__outside").exists()
     assert not (tmp_path / "managed" / "E1").exists()
     assert list((tmp_path / "managed" / ".ownership").iterdir()) == []

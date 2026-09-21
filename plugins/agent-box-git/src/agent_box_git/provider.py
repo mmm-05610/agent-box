@@ -113,7 +113,7 @@ class GitWorkspaceResourceProvider:
     def _has_ref(self, execution_id: str) -> bool:
         return subprocess.run(["git", "-C", str(self.repo), "show-ref", "--verify", "--quiet", f"refs/agent-box/executions/{execution_id}/output"]).returncode == 0
 
-    def cleanup(self, execution_id: str) -> None:
+    def cleanup(self, execution_id: str) -> dict[str, object]:
         scope = "".join(c if c.isalnum() or c in "-_" else "_" for c in execution_id)
         worktree, marker = self.managed_root / scope, self.managed_root / ".ownership" / f"{scope}.json"
         if worktree.resolve().parent != self.managed_root:
@@ -125,8 +125,22 @@ class GitWorkspaceResourceProvider:
             # marker is unowned and stays refused: idempotency is never an
             # excuse to delete a resource this provider never took ownership of.
             if not worktree.exists():
-                return
+                return {"status": "already_cleaned"}
             raise ValueError("refusing to clean unowned worktree")
+        # Owned (marker present).  Remove the worktree first and the marker last,
+        # so a mid-sequence failure leaves the marker in place and a retry can
+        # still tell this scope is ours and finish the job.  Reversing the order
+        # would drop the marker first and strand the worktree as unowned.
         if worktree.exists():
-            _git(self.repo, "worktree", "remove", "--force", str(worktree))
-        marker.unlink()
+            try:
+                _git(self.repo, "worktree", "remove", "--force", str(worktree))
+            except (subprocess.SubprocessError, OSError):
+                # Fixed status word, not str(exc): the exception text carries the
+                # git argv, which includes the caller-controlled execution_id, and
+                # a cleanup receipt may reach a log (D14).
+                return {"status": {"error": "worktree-removal-failed"}}
+        try:
+            marker.unlink()
+        except OSError:
+            return {"status": {"error": "marker-release-failed"}}
+        return {"status": "cleaned"}

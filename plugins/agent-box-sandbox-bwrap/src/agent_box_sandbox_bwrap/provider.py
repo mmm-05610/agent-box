@@ -636,12 +636,22 @@ class ResolvedBwrapSandbox:
                 if value is None: self.provider._secret_attempts.pop(token, None)
                 else: self.provider._secret_attempts[token] = value
             raise
+    @staticmethod
+    def _receipt_digest(value: str) -> str:
+        # A genuine spec digest is already a sha256: hex string and passes
+        # through unchanged, so the normal path is unaffected.  Anything else is
+        # caller-supplied text (observe/cleanup accept a bare str) and must not be
+        # echoed into a log-reachable receipt field, so fold it to a digest (D14).
+        if re.fullmatch(r"sha256:[0-9a-f]{64}", value):
+            return value
+        return "sha256:" + hashlib.sha256(value.encode("utf-8")).hexdigest()
+
     def observe(self, spec: IsolatedProcessSpec | str):
         value = spec.spec_digest if isinstance(spec, IsolatedProcessSpec) else str(spec)
-        return {"kind": "sandbox", "status": "wrapped", "spec_digest": value, "target_creation_count": 0, "detail": "wrapper compiled; target not spawned"}
+        return {"kind": "sandbox", "status": "wrapped", "spec_digest": self._receipt_digest(value), "target_creation_count": 0, "detail": "wrapper compiled; target not spawned"}
     def cleanup(self, spec: IsolatedProcessSpec | str):
         value = spec.spec_digest if isinstance(spec, IsolatedProcessSpec) else str(spec); record = self.provider.data_dir / "leases" / f"{value.removeprefix('sha256:')}.json"
-        if not record.exists(): return {"status": "already_cleaned", "spec_digest": value}
+        if not record.exists(): return {"status": "already_cleaned", "spec_digest": self._receipt_digest(value)}
         record.unlink()
         # Revocation is deliberately tied to the wrapper receipt; no public
         # response contains the provider-private source path.
@@ -651,4 +661,4 @@ class ResolvedBwrapSandbox:
             # grows without bound across wraps.  Keyed by token only; never
             # reads or prints secret content.
             self.provider._secret_attempts.pop(token, None)
-        return {"status": "cleaned", "spec_digest": value}
+        return {"status": "cleaned", "spec_digest": self._receipt_digest(value)}

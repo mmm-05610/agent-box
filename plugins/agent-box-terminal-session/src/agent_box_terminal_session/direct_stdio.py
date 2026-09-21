@@ -70,14 +70,21 @@ class DirectStdioSession:
         return self._ledger.remember(handle)
 
     def observe(self, scope: object = None) -> dict[str, object]:
-        return {"reachable": True, "unit_alive": self._allocation is not None, "identity": self.ref.native_id, "scope": scope}
+        # `scope` stays in the signature (this is a shared observe verb) but is
+        # deliberately not echoed: it is caller-controlled text, and an observe
+        # receipt may reach a log (D14).  It also carried no information the
+        # caller did not already have, since the caller supplied it.
+        return {"reachable": True, "unit_alive": self._allocation is not None, "identity": self.ref.native_id}
 
     def attach(self):
         return None
 
     def release(self, request: object = None) -> dict[str, object]:
         self._allocation = None
-        return {"released": True, "destroyed": False}
+        # Direct-stdio only ever manages its own lease; there is no borrowed
+        # instance of this provider, so `managed` is constant True (self-audit
+        # §26).  Aligning with the C-RUNTIME@v1 §2 three-state release family.
+        return {"released": True, "destroyed": False, "managed": True}
 
 
 class DirectStdioResourceProvider(DirectStdioSession):
