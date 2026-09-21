@@ -726,16 +726,6 @@ class SidecarExecutionBackend:
         except BaseException:  # noqa: BLE001 - unknown is the honest answer
             return None
 
-    def cancel(self, turn_id: str) -> bool:
-        """Temporary bool shell over the three-state verb (C-EXEC@v1 O-3).
-
-        Only ``confirmed_stopped`` answers True - refused and unknown are both
-        False here because that is exactly the collapse the current consumer
-        already projects (public shape frozen, M-1). The shell is deleted after
-        the consumer switches to ``cancel_execution`` (separate approval).
-        """
-        return self.cancel_execution(turn_id) is CancelOutcome.CONFIRMED_STOPPED
-
     def cancel_execution(self, execution_key: str) -> CancelOutcome:
         """Block-1 tristate cancel. A lost answer is captured and classified
         ``unknown`` here - it is never re-dispatched blindly and never allowed
@@ -895,7 +885,9 @@ class SidecarExecutionBackend:
         with self._lock:
             runs = list(self._active.values())
         for run in runs:
-            self.cancel(run.turn_id)
+            # Answer deliberately discarded, same as the deleted bool shell:
+            # stop() waits on run.done below, it does not project cancel facts.
+            self.cancel_execution(run.turn_id)
         deadline = time.monotonic() + self.STOP_DEADLINE_SECONDS
         for run in runs:
             run.done.wait(max(0, deadline - time.monotonic()))

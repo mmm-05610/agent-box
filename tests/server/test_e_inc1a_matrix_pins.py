@@ -4,7 +4,8 @@ Green pins only: every assertion here must pass against the INC1a product code.
 Covers (E-D2 v1.3 numbering):
 * a-1 contract types importable, frozen, tristate spellings pairwise distinct;
 * word-ban: the neutral contract module carries no product-domain vocabulary;
-* bool shell: `cancel` returns a real bool, confirmed-only True (O-3/M-1);
+* bool shell: deleted in E-INC1b b-1 - counter-pins prove the tristate verb is
+  the only cancel answer surface (O-3 fulfilled, M-1 public shape untouched);
 * R4/R5/R8/R9/R11 on the E-local observe projection (supplement A semantics:
   pure read, NOT_KNOWN is bounded knowledge, late terminal seals, cleanup never
   upgrades, terminal states are absorbing);
@@ -116,18 +117,23 @@ def test_contract_module_carries_no_product_vocabulary():
 
 
 # --------------------------------------------------------------------------
-# bool shell regression lock (O-3: stays until S switches; M-1 public shape).
+# INC1b b-1 counter-evidence family (absorbs the deleted O-3 shell-collapse
+# test): the bool shell is gone and the tristate verb is the ONLY cancel
+# answer surface. The collapse truths that the shell used to pin
+# (confirmed-only-true, unknown-never-leaks) survive verbatim as
+# cancel_execution answers in this file's tristate and no-laundering pins.
 
-def test_cancel_shell_returns_real_bools_with_confirmed_only_true():
-    backend = _backend()
-    assert backend.cancel("never-seen") is False
-    _inject(backend, "t-yes", _AnySpy(cancel_answer=True))
-    assert backend.cancel("t-yes") is True
-    _inject(backend, "t-no", _AnySpy(cancel_answer=False))
-    assert backend.cancel("t-no") is False
-    _inject(backend, "t-boom", _AnySpy(cancel_raises=TimeoutError()))
-    assert backend.cancel("t-boom") is False  # unknown collapses to False, never leaks
-    assert backend.cancel_execution("t-boom") is CancelOutcome.UNKNOWN  # honest on the verb
+def test_bool_cancel_shell_is_permanently_gone():
+    assert not hasattr(TurnExecutionPort, "cancel")
+    assert not hasattr(SidecarExecutionBackend, "cancel")
+    assert not hasattr(_backend(), "cancel")
+
+
+def test_cancel_answer_surface_is_exactly_the_tristate_verb():
+    cancel_surface = [m for m in dir(TurnExecutionPort) if "cancel" in m.lower()]
+    assert cancel_surface == ["cancel_execution"]
+    for verb in ("submit", "cancel_execution", "observe_execution"):
+        assert callable(getattr(_backend(), verb))
 
 
 # --------------------------------------------------------------------------
@@ -766,7 +772,9 @@ def test_closure_rejects_duplicate_targets(tmp_path):
 
 
 # --------------------------------------------------------------------------
-# protocol carrier (a-2): additive verbs declared, shell signatures untouched.
+# protocol carrier (a-2): the three contract verbs are declared with their
+# annotations (the bool shell's presence was locked here until E-INC1b b-1
+# deleted it; its absence is pinned in the counter-evidence family above).
 
 def test_protocol_declares_three_new_verbs_with_contract_annotations():
     expected = {
@@ -778,5 +786,3 @@ def test_protocol_declares_three_new_verbs_with_contract_annotations():
         method = getattr(TurnExecutionPort, name)
         annotation = inspect.signature(method).return_annotation
         assert annotation == ret.__name__ or annotation is ret, name
-    cancel_ret = inspect.signature(TurnExecutionPort.cancel).return_annotation
-    assert cancel_ret is bool or cancel_ret == "bool"  # string under future-annotations

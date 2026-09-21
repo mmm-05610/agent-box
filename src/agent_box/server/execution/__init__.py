@@ -53,14 +53,13 @@ def _validate_wire_protocols(value: Mapping[str, str]) -> dict[str, str]:
 class TurnExecutionPort(Protocol):
     """Product-facing dispatch surface; plugins own the native semantics.
 
-    C-EXEC@v1 block-1 (O-3): the three neutral verbs below are the additive
-    carrier of the contract. The bool ``cancel`` above is the temporary
-    compatibility shell and stays byte-compatible until the consumer switches
-    and the shell is deleted in a separately approved increment.
+    C-EXEC@v1 block-1 (O-3): the three neutral verbs below are the contract
+    carrier. The bool ``cancel`` compatibility shell was deleted in E-INC1b
+    b-1 after the consumer switch; ``cancel_execution`` is the only cancel
+    answer surface.
     """
 
     def accept(self, turn_id: str, *, overrides: Mapping[str, Any] | None = None) -> None: ...
-    def cancel(self, turn_id: str) -> bool: ...
 
     def submit(self, request: ExecutionRequest) -> ExecutionReceipt: ...
     def cancel_execution(self, execution_key: str) -> CancelOutcome: ...

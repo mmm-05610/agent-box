@@ -25,6 +25,24 @@ class CancelOutcome(str, Enum):
     UNKNOWN = "unknown"
 
 
+class DeliveryOutcome(str, Enum):
+    """Naming-round skeleton (E-INC1b b-3, additive definition; no consumer
+    is wired in this batch):
+
+    * the correct confirmation is the native fact itself (snake_case value);
+    * ``refused_<singular reason>`` asserts zero dispatch happened for this
+      key, so replaying the request returns the same verdict safely;
+    * ``unknown`` means the answer was lost - never blind-redispatch.
+
+    Value sets of the outcome enums are never merged: a stop is not a
+    delivery, and pressing one word onto two facts would be a dishonest type.
+    """
+
+    DELIVERED = "delivered"
+    REFUSED_UNKNOWN_ROUTE = "refused_unknown_route"
+    UNKNOWN = "unknown"
+
+
 class ObservationState(str, Enum):
     """What the provider honestly knows about one execution key right now.
 

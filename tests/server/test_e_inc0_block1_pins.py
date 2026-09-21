@@ -92,7 +92,8 @@ def _inject(backend: SidecarExecutionBackend, turn_id: str,
 # contract's public tristate verb `cancel_execution` on the same backend while
 # `cancel` stays the approved bool shell (O-3); the entry point moves, every
 # assertion below is verbatim what C accepted in E-INC0. The bool shell itself
-# is regression-locked in test_e_inc1a_matrix_pins.py.
+# was regression-locked in test_e_inc1a_matrix_pins.py until E-INC1b b-1
+# deleted it (with C's approval); the shell-absence counter-pins live there.
 
 def test_cancel_tristate_all_three_outcomes_are_pairwise_distinguishable():
     backend = _backend()
@@ -150,8 +151,8 @@ def test_cancel_public_return_is_not_a_bare_bool():
 # green part of attack 1: the refusal path never touches a port.
 def test_cancel_with_no_active_run_touches_no_port_and_stays_deterministic():
     backend = _backend()
-    first = backend.cancel("never-seen-turn")
-    second = backend.cancel("never-seen-turn")
+    first = backend.cancel_execution("never-seen-turn")
+    second = backend.cancel_execution("never-seen-turn")
     assert first == second  # deterministic, no state invented for unknown turns
     port = _RecordingPort(answer=True)
     assert port.calls == 0  # nothing was reachable, nothing was dispatched
