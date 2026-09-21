@@ -248,7 +248,12 @@ class SkillStore:
     def disable(self, skill_id: str, expected_revision: int) -> AgentSkillV1:
         current = self._read_metadata(skill_id, expected_revision)
         if current.get("disabled"): return self._value(current)
-        source = self._source(skill_id, expected_revision); revision = expected_revision + 1; base = self._skill_dir(skill_id) / "revisions"; tmp = Path(tempfile.mkdtemp(prefix=f".{revision}.", dir=base)); shutil.copytree(source.path, tmp / "tree"); metadata = dict(current, revision=revision, disabled=True); (tmp / "metadata.json").write_bytes(_json(metadata)); os.replace(tmp, base / str(revision)); self._write_index(); return self._value(metadata)
+        source = self._source(skill_id, expected_revision); revision = expected_revision + 1; base = self._skill_dir(skill_id) / "revisions"; tmp = Path(tempfile.mkdtemp(prefix=f".{revision}.", dir=base))
+        try:
+            shutil.copytree(source.path, tmp / "tree"); metadata = dict(current, revision=revision, disabled=True); (tmp / "metadata.json").write_bytes(_json(metadata)); os.replace(tmp, base / str(revision))
+        except Exception:
+            shutil.rmtree(tmp, ignore_errors=True); raise
+        self._write_index(); return self._value(metadata)
 
     def ref(self, skill_id: str, revision: int | None = None) -> Ref:
         value = self.get(skill_id, revision)
