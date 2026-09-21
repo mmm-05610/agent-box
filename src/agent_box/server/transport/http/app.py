@@ -101,6 +101,22 @@ def create_app(runtime: ServerRuntime) -> FastAPI:
 
     app.add_exception_handler(ServerError, _error_handler)
 
+    @app.exception_handler(Exception)
+    async def _unexpected_exception_handler(request: Request, exc: Exception):
+        # The boundary's own last wall (order 123), registered on the app so it
+        # covers everything no route catches: authentication, envelope decoding,
+        # `encode_result`, the SSE generator, and any route added later. The
+        # status stays 500 — the Server genuinely failed — but the plain-text
+        # body that replaces the contract is what is no longer allowed. The
+        # exception's text never leaves; only its type, as `internalCode`.
+        return JSONResponse(status_code=500, content={
+            "error": {
+                "code": "UNAVAILABLE",
+                "message": "this Server could not answer the request",
+                "details": {"internalCode": type(exc).__name__, "retryable": True},
+            },
+        })
+
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, _exc: RequestValidationError):
         return _error("REQUEST_INVALID", "Request did not match the API schema", 422, False, request.state.request_id)
@@ -163,6 +179,16 @@ def create_app(runtime: ServerRuntime) -> FastAPI:
             result = runtime.wire.dispatch(wire_method, params)
         except WireError as exc:
             return JSONResponse(status_code=200, content=encode_error(request_id, exc))
+        except Exception as exc:  # noqa: BLE001 - order 123, the third wall
+            # Anything escaping the wire layer still leaves as a JSON-RPC error
+            # object. The bare status is what broke the contract: `QA-008`'s
+            # users got `500 / text/plain / 21 bytes` where an envelope belongs.
+            # `internalCode` carries the exception **type** only — its text can
+            # name a host path or a credential locator (`R-0011`).
+            return JSONResponse(status_code=200, content=encode_error(request_id, WireError(
+                "UNAVAILABLE", "this Server could not answer the request",
+                {"internalCode": type(exc).__name__, "retryable": True},
+            )))
         response.headers["X-Wire-Version"] = WIRE_VERSION
         return encode_result(request_id, result)
 
@@ -349,6 +375,10 @@ def create_app(runtime: ServerRuntime) -> FastAPI:
             frames, cursor = runtime.wire.event_stream_batch(session_id, cursor)
         except (WireError, ServerError):
             await websocket.close(code=4400, reason="INVALID_CURSOR_OR_SESSION")
+            return
+        except Exception as exc:  # noqa: BLE001 - order 123: close, never escape
+            # The reason is the exception type, never its text (`R-0011`).
+            await websocket.close(code=4400, reason=type(exc).__name__[:120])
             return
         await websocket.accept()
         try:

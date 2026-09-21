@@ -662,3 +662,99 @@ list 读时派生 `compatibility[]` + `protocolsDeclared`（不落库）、冻�
 
 **前端工件落后＝如实记，不改工件、不跳测试**（G7）：以上到得了 wire 要靠 `wire-v1.ts`/生成工件
 重生成 + 两仓重锁。092 整单在 A/settings 补齐前记 `PROVIDER_REGISTRY_PARTIAL`（wire 半路由）。
+
+---
+
+## 工件口径（Order 113，2026-09-19）：谁生成、怎么比、门怎么指路径
+
+**一句话**：**后端发自己那份能证明的东西（方法集＋参数形状），前端那份带 result schema 的仍是权威**；
+两边**按名字比**，差异逐条点名；**任何门显式写路径，没有默认工件**。
+
+本节把 081 交回的三条（换本体 / 替换本树旧副本 / 明确生成与比较口径）落地成可复跑的动作，
+并就地更正本文件 §081 里那份"本树副本 `a1bd52a4…`，33 方法"的描述——105 收口时该副本已被换成登记对，
+它不再是"过时冒充当前"的那一份；但**"文件名长得像当前工件"这个形状仍然有害**，所以按本节改名归位。
+
+### 1 三件东西各自是什么
+
+| 文件 | 谁生成 | 内容 | 权威范围 |
+| --- | --- | --- | --- |
+| `fullstack/contract/wire-v1.server-inventory.json` | 本树 `scripts/server-round1/wire_artifact.py` | 64 个方法：方法名 → handler 属性 → Server 自己必填/可选的参数名；`result` 一律 `{"declared": false, "authority": "contract"}` | **只有**"派发表与参数门"这一件 |
+| `fullstack/contract/wire-v1.schema.registered-c4255b31.json` | 桌面 settings 线（重锁 `ed6592b7`） | params + **result** 的完整 JSON Schema（134 键 = 64×2 ＋ 6 个协议形状） | **合同工件**；本树这份只是**按摘要命名的登记副本** |
+| `fullstack/generated/README.md` | 手写的指针 | 说明该目录不再放工件、以及上面两份在哪 | — |
+
+副本**文件名里就是它自己的 sha256 前 8 位**：对不上就是过期，不会再出现"无声停在旧版却长得像当前工件"。
+
+### 2 生成与比较（都在本树根目录跑）
+
+```bash
+# 现算后端清单摘要（确定性：同一份源码两次跑必须同值）
+python3 scripts/server-round1/wire_artifact.py --print-digest
+# 重新生成并写入（只允许写本仓内路径，越界即退出）
+python3 scripts/server-round1/wire_artifact.py --write \
+    docs/server-round1/fullstack/contract/wire-v1.server-inventory.json
+# 门/脚本用：清单是否落后于源码 —— 落后退出码 1 并说"regenerate"
+python3 scripts/server-round1/wire_artifact.py --check \
+    docs/server-round1/fullstack/contract/wire-v1.server-inventory.json
+# 两仓对表：把差异**按名字**列出来（有差异退出码 1，不是"静通过"）
+python3 scripts/server-round1/wire_artifact.py --compare \
+    docs/server-round1/fullstack/contract/wire-v1.schema.registered-c4255b31.json
+```
+
+比较只走三条轴：**方法集**、每方法 **required 名集**、Server 接受但合同**没声明的属性名**。
+`result` 不比（后端不声明）。"两条轴都空" 只意味着**这三条轴一致**，不意味着"合同已实现"。
+
+### 3 门入口参数：必须显式指路径
+
+```bash
+# 唯一允许的写法：显式路径
+AGENT_BOX_WIRE_SCHEMA=docs/server-round1/fullstack/contract/wire-v1.schema.registered-c4255b31.json \
+    python3 -m pytest tests/server/test_wire_v1.py -q
+```
+
+`tests/server/test_wire_v1.py` 的 `Wire.call` 只在 `AGENT_BOX_WIRE_SCHEMA` **被设**时校验；
+**没有默认值，也没有"去找本树那份副本"的行为**。规则＝谁要跑 schema 门，谁在命令行/门里写死路径。
+门里若要用登记工件，走 `tests/server/test_hello_harnesses_105.py` 那种**常量路径 ＋ sha 断言**的形状。
+
+### 4 摘要在哪登记
+
+| 事实 | 值（2026-09-19） | 记在哪 |
+| --- | --- | --- |
+| 合同对（桌面重锁） | TS `58d61ebb…` / 工件 `c4255b31dba1ab2c92b57ae668f00eee8c11d17f1a6f0f37a22fba766d2c8c4d` | 主树公告第 58 轮（调度者复算）＋本树 `test_hello_harnesses_105.py:ARTIFACT_SHA256` |
+| 后端清单 | `eaae93303f2380c34256bd4ea3ab03a3e5b922e2816953de82c439aa969bc16d` | 本文件本节 ＋ `--print-digest` 现算（**不是**手填） |
+| 已知漂移（清单 vs 合同） | `providerModels.update` 与 `probeModels` 的 `provenance`：**Server 接受、合同未声明** | `--compare` 输出（可复跑），账上记 098 §9.2 / 交 102 重锁 |
+
+**重锁之后要做的一件事**：把清单重生成一次并跑 `--compare`，若那两条漂移消失则该节与 `--compare`
+的退出码自动变干净——**不需要有人记得改散文**。
+
+### 5 漂移被修好时的那条门会红——预期动作写在这里
+
+`tests/server/test_wire_artifact_113.py::test_the_two_bodies_differ_only_in_the_registered_drift`
+把当前那 2 条 `provenance` 漂移钉成常量 `KNOWN_DRIFT`。**下一次重锁把 `provenance` 编进
+`providerModels.update#params` / `probeModels#params` 之后，这条门会红**——那是设计，不是故障。
+预期动作（按顺序）：
+
+1. 跑 `python3 scripts/server-round1/wire_artifact.py --compare docs/server-round1/fullstack/contract/<新登记的那份>`
+   ⇒ 期望 `optionalNotInContract` 变 `[]`、退出码 0；
+2. 把本文件"工件口径（113）"§4 表里"已知漂移"那一行改成"无（<日期>，<哪次重锁>）"，
+   并把 §1 表里副本文件名换成新摘要（副本**名字必须等于内容哈希**，这条由门钉着）；
+3. 同步 `tests/server/test_wire_artifact_113.py` 的 `KNOWN_DRIFT = []` 与
+   `tests/server/test_hello_harnesses_105.py:ARTIFACT_SHA256`＋那条 105 的门所指的**形状**
+   （105 的门钉的是 `harnesses` 那一面；若这次重锁同时动了 hello 的形状，那条门会自己说）。
+
+**为什么不是"自动通过"**：漂移消失是一件需要有人看一眼的事实（它意味着两份本体真的对齐了），
+所以这里故意让门先红一次，而不是让常量自己跟着动。
+
+### 6 对表必须写明"跑在哪一对摘要上"（公告第 107 轮提的要求，本树的口径本来就该这样）
+
+一句规则：**任何"两仓一致/不一致"的结论，必须同时给出它比的是哪一对摘要**——否则等登记对前进一次，
+旧结论就变成一条没有主语的断言。本树的三处已经这样写了，此处把它立成规矩：
+
+| 位置 | 怎么写明 |
+| --- | --- |
+| 副本文件 | 文件名里就是它自己的 sha256 前 8 位（`wire-v1.schema.registered-<sha8>.json`）；内容与名字不符 ⇒ 门红 |
+| 门 | 常量成对：路径 ＋ `ARTIFACT_SHA256`（`tests/server/test_hello_harnesses_105.py:195`、`tests/server/test_wire_artifact_113.py:REGISTERED_SHA256`） |
+| 比较输出 | `--compare <显式路径>`，路径由命令行给；本文件 §4 的表把"当前登记值"与"已知漂移"并排列着 |
+
+**当前状态（本节写作时）**：本树能读到的登记对仍是 **工件 `c4255b31…`／TS `58d61ebb…`**（公告第 58 轮）。
+`110` 的 `pauseReason` 触发的那次重锁在第 100 轮是以**"该走重锁"**的形式出现的，本树侧尚未读到新登记值；
+新对到达时的动作就是 §5 那三步，且**旧结论要重新跑一遍再说**——不是沿用。

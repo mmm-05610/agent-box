@@ -91,6 +91,16 @@ _BY_CODE: Mapping[str, str] = {
     "SESSION_BUSY": "CONFLICT_REQUEST",
     "EVENT_CURSOR_AHEAD": "INVALID_REQUEST",
     "EVENT_CURSOR_EXPIRED": "INVALID_REQUEST",
+    # Order 147 (`AUD-B-037`): the asset surface's own domain codes. They were
+    # never registered, so the five `except Exception as refusal` copies hardcoded
+    # `INVALID_REQUEST` and folded the code into prose. Registering them lets the
+    # one shared path assign the family, while `details.internalCode` carries the
+    # precise code - the shape order 115 fixed. Client-side catalog problems stay
+    # `INVALID_REQUEST` (the reviewer's ①-④, whose wording must not drift).
+    "CATALOG_INVALID": "INVALID_REQUEST",
+    "CATALOG_SOURCE_MISSING": "INVALID_REQUEST",
+    "CATALOG_ORIGIN_MISSING": "INVALID_REQUEST",
+    "CATALOG_ENTRY_UNKNOWN": "INVALID_REQUEST",
 }
 
 
@@ -102,6 +112,22 @@ def family_for(code: str) -> str:
     return "UNAVAILABLE"
 
 
+def converge_family(value: str, details: dict[str, Any]) -> str:
+    """Project a value that reached the family slot onto a real wire family.
+
+    The alternative is raising, and raising is what made this a user-visible 500:
+    the HTTP route answers anything that escapes `dispatch` as a bare status, so
+    an internal code written into the family position traded a typed contract
+    for twenty-one bytes of plain text (QA-008, AUD-B-001's family).
+    The original value survives as `details.internalCode`, which is the same
+    place `from_server_error` puts it.
+    """
+    family = family_for(value)
+    if family != value:
+        details.setdefault("internalCode", value)
+    return family
+
+
 @dataclass
 class WireError(Exception):
     family: str
@@ -110,8 +136,8 @@ class WireError(Exception):
     current: Any = None
 
     def __post_init__(self) -> None:
-        if self.family not in FAMILIES:
-            raise ValueError(f"unknown wire error family: {self.family}")
+        self.details = dict(self.details)
+        self.family = converge_family(self.family, self.details)
         super().__init__(self.message)
 
     @classmethod

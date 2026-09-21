@@ -19,6 +19,8 @@ so these gates assert the Server behaviour rather than the stale artifact's.
 """
 from __future__ import annotations
 
+import json
+
 import copy
 
 from fastapi.testclient import TestClient
@@ -182,14 +184,24 @@ def test_counter_example_the_scope_bug_returns_the_500(api, monkeypatch):
 
     monkeypatch.setattr(handlers_module.WireService, "_provenance", staticmethod(broken))
     status, text = _raw_create(api, {"authStyle": "api_key"}, "prov-counter-01")
-    assert status == 500, f"the old defect did not reproduce: http={status} {text!r}"
+    # Superseded by order 115, which closed the family this defect used to escape
+    # through: a `NameError` inside a handler can no longer leave as a bare 500.
+    # The gate still bites, one level honest - the request must not succeed, and
+    # the crash has to be named in the body rather than hidden behind a status.
+    assert status == 200, f"unexpected transport failure: http={status} {text!r}"
+    body = json.loads(text)
+    assert "error" in body, body
+    assert body["error"]["code"] == "UNAVAILABLE", body
+    assert body["error"]["details"]["internalCode"] == "NameError", body
+    assert "authStyle" not in text or body["error"]["code"] == "UNAVAILABLE", text
 
     monkeypatch.undo()
     assert handlers_module.WireService._provenance == original
-    #: Same request, same client, only the patch removed - so the 500 above is
-    #: attributed to the defect and not to the payload.
-    fixed_status, _ = _raw_create(api, {"authStyle": "api_key"}, "prov-counter-01b")
+    #: Same request, same client, only the patch removed - so the failure above
+    #: is attributed to the defect and not to the payload.
+    fixed_status, fixed_text = _raw_create(api, {"authStyle": "api_key"}, "prov-counter-01b")
     assert fixed_status == 200, fixed_status
+    assert "result" in json.loads(fixed_text), fixed_text
 
 
 def _raw_create(api, provenance, request_id):

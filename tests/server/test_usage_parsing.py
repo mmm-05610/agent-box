@@ -477,13 +477,26 @@ def test_pull_models_parses_a_loopback_fake(tmp_path):
         server.server_close()
 
 
-def test_pull_models_rejects_oversized_and_shapeless_responses():
+def test_pull_models_rejects_oversized_and_shapeless_responses(monkeypatch):
     """Bounded and honest: too-large and wrong-shaped responses are typed
     refusals, never truncated-then-trusted."""
+    import socket
+
     from agent_box.server.model_configs.probe import (
         MAX_RESPONSE_BYTES,
         ProbeError,
         pull_models,
+    )
+    import agent_box.server.model_configs.probe as probe_module
+
+    #: Order 104 made the endpoint check resolve the name, so a test that fakes
+    #: only the transport would otherwise start needing real DNS. A public
+    #: address stands in for "the name resolved and is a normal provider";
+    #: what is under test is what happens after the response arrives.
+    monkeypatch.setattr(
+        socket, "getaddrinfo",
+        lambda *_a, **_k: [(socket.AF_INET, socket.SOCK_STREAM, 6, "",
+                            ("93.184.216.34", 443))],
     )
 
     class FakeResponse:
@@ -506,8 +519,6 @@ def test_pull_models_rejects_oversized_and_shapeless_responses():
 
     content = b'{"data": ["x" * 10]}'
     oversized = content + b" " * (MAX_RESPONSE_BYTES + 1)
-
-    import agent_box.server.model_configs.probe as probe_module
 
     class _FakeUrlopen:
         def __init__(self, content):
@@ -577,13 +588,23 @@ def test_a_wal_resident_row_is_read_with_its_sidecar(tmp_path):
     reader.close()
 
 
-def test_a_slow_drip_answer_hits_the_total_deadline():
+def test_a_slow_drip_answer_hits_the_total_deadline(monkeypatch):
     """Order 70 G1: the total deadline bounds a drip-feeding endpoint.
 
     The socket timeout alone cannot: every read arrives inside it. With the
     module's total budget shrunk, a drip must surface the typed
     PROBE_TIMEOUT - not the size cap, which this body never reaches."""
+    import socket
+
     import agent_box.server.model_configs.probe as probe_module
+
+    #: As in the oversized-response test above: the transport is faked, so the
+    #: name must not have to exist. (Order 104 is what made the check resolve.)
+    monkeypatch.setattr(
+        socket, "getaddrinfo",
+        lambda *_a, **_k: [(socket.AF_INET, socket.SOCK_STREAM, 6, "",
+                            ("93.184.216.34", 443))],
+    )
 
     class _SlowDrip:
         def __enter__(self):

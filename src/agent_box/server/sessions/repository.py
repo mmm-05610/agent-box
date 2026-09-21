@@ -25,10 +25,19 @@ ACTIVE_TURN_STATES = ("accepted", "dispatching", "running", "capturing")
 #: points (the wire method and the retained REST route) answer the same thing.
 TERMINAL_TURN_STATES = ("completed", "failed", "cancelled", "unknown")
 
+#: Kinds that get a `wire_seq`. This must be **exactly** the set of kinds the wire
+#: turns into frames (`wire/projection.py:_EVENT_KIND_MAP`) — a kind that produces a
+#: frame but is missing here gets no number, and `event_frame` then falls back to the
+#: storage `seq`, so the same stream carries two number spaces and a client that
+#: sorts or de-duplicates by `seq` drops the body and the tool cards (`AUD-B-010`).
+#: The equivalence is a gate, not a comment:
+#: `tests/server/test_wire_seq_numbering_spaces_128.py`.
 WIRE_VISIBLE_EVENT_KINDS = frozenset({
     "turn.accepted", "turn.state", "message.delta", "message.final", "tool.update",
     "approval.requested", "approval.settled", "config.changed", "queue.updated",
     "workspace.connection",
+    # Order 128: these four produce frames and were never numbered.
+    "usage.updated", "thought.delta", "plan.updated", "mode.updated",
 })
 
 

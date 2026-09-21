@@ -1,0 +1,214 @@
+{
+ "checks": {
+  "a_fresh_label_seeds_again": {
+   "exit": 0,
+   "raw": "",
+   "rows": 2
+  },
+  "nothing_secret_in_any_output": {
+   "keyValuePrinted": false,
+   "tokenPrinted": false
+  },
+  "our_own_instance_left_nothing_running_or_behind": {
+   "exitedOnGracefulRequestOnly": true,
+   "portReleased": true,
+   "tempRootRemoved": true
+  },
+  "preflight_after_seeding_says_no_seed_is_needed": {
+   "exit": 0,
+   "profiles": {
+    "ready": 1,
+    "readyHarnesses": [
+     "alpha"
+    ],
+    "total": 1
+   },
+   "wouldSeed": {
+    "needed": false
+   }
+  },
+  "preflight_over_a_real_socket_sees_an_empty_root": {
+   "exit": 0,
+   "profiles": {
+    "ready": 0,
+    "readyHarnesses": [],
+    "total": 0
+   },
+   "verdict": "CLEAR"
+  },
+  "re_running_one_label_refuses_typed_and_seeds_nothing_new": {
+   "exit": 1,
+   "family": "CONFLICT_REQUEST",
+   "internalCode": "IDEMPOTENCY_CONFLICT",
+   "profilesAfter": 1,
+   "profilesBefore": 1,
+   "refusal": " refused {\\\"code\\\": \\\"CONFLICT_REQUEST\\\", \\\"message\\\": \\\"Idempotency-Key was already used with a different request\\\", \\\"details\\\": {\\\"internalCode\\\": \\\"IDEMPOTENCY_CONFLICT\\\", \\\"retryable\\\": false}}\"}"
+  },
+  "seed_over_a_real_socket_reaches_ready": {
+   "exit": 0,
+   "raw": null,
+   "verdicts": {
+    "alpha": "ready"
+   }
+  },
+  "teardown_over_the_socket_archives_the_seeded_profile": {
+   "exit": 0,
+   "teardown": {
+    "alpha": "archived"
+   }
+  },
+  "the_real_bind_answers_live": {
+   "live": [
+    200,
+    {
+     "status": "alive"
+    }
+   ],
+   "port": 40741
+  },
+  "token_file_exists_where_the_recipe_points": {
+   "path": "secrets/http-token"
+  }
+ },
+ "cleanup": {
+  "exitedOnGracefulRequestOnly": true,
+  "portReleased": true,
+  "tempRootRemoved": true
+ },
+ "cleanupPortProbe": {
+  "allSocketsOnThePort": [
+   {
+    "state": "06",
+    "table": "/proc/net/tcp",
+    "uid": "0"
+   },
+   {
+    "state": "06",
+    "table": "/proc/net/tcp",
+    "uid": "0"
+   },
+   {
+    "state": "06",
+    "table": "/proc/net/tcp",
+    "uid": "0"
+   },
+   {
+    "state": "06",
+    "table": "/proc/net/tcp",
+    "uid": "0"
+   },
+   {
+    "state": "06",
+    "table": "/proc/net/tcp",
+    "uid": "0"
+   },
+   {
+    "state": "06",
+    "table": "/proc/net/tcp",
+    "uid": "0"
+   },
+   {
+    "state": "06",
+    "table": "/proc/net/tcp",
+    "uid": "0"
+   },
+   {
+    "state": "06",
+    "table": "/proc/net/tcp",
+    "uid": "0"
+   },
+   {
+    "state": "06",
+    "table": "/proc/net/tcp",
+    "uid": "0"
+   },
+   {
+    "state": "06",
+    "table": "/proc/net/tcp",
+    "uid": "0"
+   },
+   {
+    "state": "06",
+    "table": "/proc/net/tcp",
+    "uid": "0"
+   },
+   {
+    "state": "06",
+    "table": "/proc/net/tcp",
+    "uid": "0"
+   },
+   {
+    "state": "06",
+    "table": "/proc/net/tcp",
+    "uid": "0"
+   },
+   {
+    "state": "06",
+    "table": "/proc/net/tcp",
+    "uid": "0"
+   },
+   {
+    "state": "06",
+    "table": "/proc/net/tcp",
+    "uid": "0"
+   },
+   {
+    "state": "06",
+    "table": "/proc/net/tcp",
+    "uid": "0"
+   },
+   {
+    "state": "06",
+    "table": "/proc/net/tcp",
+    "uid": "0"
+   },
+   {
+    "state": "06",
+    "table": "/proc/net/tcp",
+    "uid": "0"
+   },
+   {
+    "state": "06",
+    "table": "/proc/net/tcp",
+    "uid": "0"
+   },
+   {
+    "state": "06",
+    "table": "/proc/net/tcp",
+    "uid": "0"
+   },
+   {
+    "state": "06",
+    "table": "/proc/net/tcp",
+    "uid": "0"
+   },
+   {
+    "state": "06",
+    "table": "/proc/net/tcp",
+    "uid": "0"
+   },
+   {
+    "state": "06",
+    "table": "/proc/net/tcp",
+    "uid": "0"
+   },
+   {
+    "state": "06",
+    "table": "/proc/net/tcp",
+    "uid": "0"
+   },
+   {
+    "state": "06",
+    "table": "/proc/net/tcp",
+    "uid": "0"
+   }
+  ],
+  "stillListening": []
+ },
+ "failures": [],
+ "kind": "SEED_SOCKET_CHECK",
+ "order": "089",
+ "realModelRequests": 0,
+ "result": "SOCKET_CHECK_OK",
+ "upstreamContacted": false
+}

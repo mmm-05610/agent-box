@@ -167,6 +167,86 @@ def _overlap(spans: list[tuple[str, int, int]]) -> bool:
     return start_a < end_b and start_b < end_a
 
 
+class _Section:
+    """One trip through the guard's seam; `release` is what the Server calls."""
+
+    def __init__(self, spy: "_SeamSpy", hold):
+        self._spy = spy
+        self._hold = hold
+
+    def release(self) -> None:
+        self._spy.leave(self._hold)
+
+
+class _SeamSpy:
+    """Count how many first-runs are inside the creation window at once.
+
+    Order 119 replaced the wall-clock judge with this one: an interval
+    comparison can only see an overlap that happened to occur, so a loaded
+    machine turned the counter-example red without any product change (`QA-011`).
+    `events` is program order under a lock and `peak` is the maximum number of
+    sections open simultaneously, so the verdict is a property of the code path.
+
+    `hold_first_open` (bypass leg) keeps the first section open until a second
+    one arrives - the overlap is produced, not sampled.
+    `defer_second_until_first_left` (the reproduction leg) does the opposite: it
+    models a machine that scheduled the second run after the first finished,
+    which is exactly the condition that made the old judge lie.
+    """
+
+    def __init__(self, *, bypass: bool, hold_first_open: bool = False,
+                 defer_second_until_first_left: bool = False):
+        self.bypass = bypass
+        self.hold_first_open = hold_first_open
+        self.defer_second = defer_second_until_first_left
+        self.inner = None if bypass else first_run_gate()
+        self.mu = threading.Lock()
+        self.events: list[str] = []
+        self.consults = 0
+        self.inside = 0
+        self.peak = 0
+        self.second_arrived = threading.Event()
+        self.first_left = threading.Event()
+
+    def acquire(self, key):
+        with self.mu:
+            self.consults += 1
+        if self.defer_second and not self.first_left.wait(timeout=60):
+            raise AssertionError("the first first-run never finished - not a load question")
+        hold = None if self.inner is None else self.inner.acquire(key)
+        with self.mu:
+            self.inside += 1
+            self.peak = max(self.peak, self.inside)
+            self.events.append("in")
+            if self.inside >= 2:
+                self.second_arrived.set()
+        return _Section(self, hold)
+
+    def leave(self, hold) -> None:
+        if hold is not None:
+            hold.release()
+        # The forcing goes here, not inside `acquire`: the guard's seam is on the
+        # dispatcher thread, so waiting in `acquire` would block the very
+        # dispatch that has to bring the second run in (measured that way - the
+        # first version of this spy deadlocked and timed out at 60 s). Leaving is
+        # what the run's own completion thread does, so holding it open forces
+        # the overlap without serialising anything.
+        with self.mu:
+            waiting = self.hold_first_open and self.inside == 1 and not self.second_arrived.is_set()
+        if waiting:
+            # A liveness bound, never the judge: if no partner shows up, the
+            # product serialised the two runs by itself and this leg has to say
+            # so loudly instead of quietly passing.
+            assert self.second_arrived.wait(timeout=60), (
+                "the second first-run never entered while the first was inside, even "
+                "with the guard bypassed - investigate before trusting this green")
+        with self.mu:
+            self.inside -= 1
+            self.events.append("out")
+            if self.inside == 0:
+                self.first_left.set()
+
+
 @pytest.mark.skipif(shutil.which("bwrap") is None, reason="bwrap is required")
 def test_two_profiles_first_runs_do_not_overlap_through_the_server(tmp_path):
     """Order 80 G1, at the Server: the lock serialises the creation window."""
@@ -178,22 +258,95 @@ def test_two_profiles_first_runs_do_not_overlap_through_the_server(tmp_path):
 
 @pytest.mark.skipif(shutil.which("bwrap") is None, reason="bwrap is required")
 def test_without_the_gate_the_same_first_runs_overlap(tmp_path, monkeypatch):
-    """The gate's counter-example: bypass it and the windows intersect again.
+    """The gate's counter-example, judged by program order (order 119).
 
-    Without this, "they do not overlap" could hold for any reason; with it, the
-    test is falsifiable - the same shape overlaps when the gate is not there,
-    which is precisely the window the real harness collides in.
+    Order 80 wrote this as a comparison of wall-clock intervals, so a busy
+    machine could push the two windows apart and turn "the guard is what
+    serialises them" into a false red - `QA-011` measured exactly that
+    (5 passed isolated, 1 failed under eight busy loops, same sha). The judge
+    here is the seam the Server actually uses: how many first-runs were inside
+    the creation window at once, read off an ordered event log. The overlap is
+    *produced* (the bypassed first section stays open until a second arrives)
+    instead of sampled, so no amount of machine load can make it go away.
     """
     import agent_box.server.execution.sidecar_backend as backend_module
 
-    class _NoLock:
-        def acquire(self, _key):
-            return None
-
-    monkeypatch.setattr(backend_module, "first_run_gate", lambda: _NoLock())
+    spy = _SeamSpy(bypass=True, hold_first_open=True)
+    monkeypatch.setattr(backend_module, "first_run_gate", lambda: spy)
     spans = _two_profile_first_runs(tmp_path, prompt_prefix="window:")
     assert len(spans) == 2, spans
-    assert _overlap(spans), spans
+    assert spy.consults == 2, spy.events
+    assert spy.peak == 2, spy.events
+    assert spy.events == ["in", "in", "out", "out"], spy.events
+
+
+@pytest.mark.skipif(shutil.which("bwrap") is None, reason="bwrap is required")
+def test_the_guard_keeps_one_first_run_inside_the_window_at_a_time(tmp_path, monkeypatch):
+    """The positive half, load-free: the guard is on the path, and it never has
+    two exclusive sections open. `Order 80 G1` above still compares timestamps,
+    which can only be wrong in the safe direction - this cannot be wrong at all
+    by timing, and it is what bites if the product stops consulting the guard
+    (`consults` falls to 0, which no clock-based reading would ever notice).
+    """
+    import agent_box.server.execution.sidecar_backend as backend_module
+
+    spy = _SeamSpy(bypass=False)
+    monkeypatch.setattr(backend_module, "first_run_gate", lambda: spy)
+    spans = _two_profile_first_runs(tmp_path, prompt_prefix="window:")
+    assert len(spans) == 2, spans
+    assert spy.consults == 2, spy.events
+    assert spy.peak == 1, spy.events
+    assert spy.events == ["in", "out", "in", "out"], spy.events
+
+
+def test_the_old_judge_was_a_function_of_timing_not_of_the_product():
+    """QA-011's false red, made deterministic instead of by machine load.
+
+    Two clock shapes of *one* product outcome ("the guard was not consulted and
+    nothing serialised the two runs"): an idle machine reported them as
+    overlapping, a busy one would not. `_overlap` reads only the numbers, so its
+    verdict about the product flips with the scheduler. The seam judge reads
+    event order, and `hold_first_open` makes the overlap happen instead of
+    waiting to catch it - so repeated runs cannot disagree.
+
+    The historical experiment (needs CPU burners, so it is a command here rather
+    than a test - `QA-011` ran it on the pre-119 file):
+
+        for i in 1 2 3 4 5 6 7 8; do (timeout 240 python3 -c 'while True: pass' &) ; done
+        python3 -m pytest tests/server/test_first_run_lock.py -q   # 1 failed, 4 passed
+        python3 -m pytest tests/server/test_first_run_lock.py -q   # isolated: 5 passed
+    """
+    separated = [("role-a", 0, 5), ("role-b", 10, 15)]
+    together = [("role-a", 0, 12), ("role-b", 10, 15)]
+    assert _overlap(together) and not _overlap(separated), "the judge keyed on the clock"
+
+    spy = _SeamSpy(bypass=True, hold_first_open=True)
+    for _attempt in range(3):
+        first = spy.acquire("local:kilo")
+        second = spy.acquire("local:kilo")
+        first.release()
+        second.release()
+    assert spy.peak == 2, spy.events
+    assert spy.events == ["in", "in", "out", "out"] * 3, spy.events
+
+
+def test_the_new_judges_never_reach_for_the_clock():
+    """G3 (order 119): the verdict must be a property of the code path.
+
+    A scan of this file's own text is enough here because the thing being
+    forbidden is a *kind* of judgement - `time.sleep`, or an interval comparison
+    in a gate that is supposed to be falsifiable about the product.
+    """
+    source = pathlib.Path(__file__).read_text(encoding="utf-8")
+    spy_block = source[source.index("class _Section:"):source.index(
+        "@pytest.mark.skipif", source.index("class _SeamSpy:"))]
+    assert "time.sleep" not in spy_block, "the seam spy started measuring time"
+    for name in ("test_without_the_gate_the_same_first_runs_overlap",
+                 "test_the_guard_keeps_one_first_run_inside_the_window_at_a_time"):
+        body = source.split(f"def {name}(", 1)[1].split("\n\n\n", 1)[0]
+        assert "time.sleep" not in body, name
+        assert "_overlap(" not in body, f"{name} went back to comparing intervals"
+        assert "spy.peak" in body and "spy.events" in body, name
 
 
 # --------------------------------------------------------------------------

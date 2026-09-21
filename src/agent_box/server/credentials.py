@@ -20,6 +20,47 @@ class CredentialRecords:
             )
         return {"credential_id": credential_id, "kind": kind}
 
+    def register_if_missing(
+        self, credential_id: str, kind: str, secret_locator: str,
+    ) -> dict[str, Any]:
+        """Establish an injectable credential as a bindable identity, once.
+
+        Order 149 (`R-0078 ①`) is the single idempotent identity entry: every
+        *supported* injection path - the deployment declaration, the trial
+        launcher's ``--credential-id`` injection, and order 151's controlled wire
+        entry - resolves its credential to a name the record layer can bind, and
+        they share this one definition rather than re-implementing an ``exists()``
+        guard next to a bare ``register()``.
+
+        A name that already resolves is left exactly as it is - no second row, and
+        the secret source is never re-read (the caller owns the store; this names
+        the identity, it does not import a secret). Checking and creating happen in
+        one transaction, so a concurrent double-declare cannot raise
+        ``IntegrityError``. ``created`` reports which of the two happened so a
+        caller can judge the half state (a name injected but never registered)
+        rather than guess.
+
+        It deliberately does not touch the wire family: a credential that was never
+        injected stays a ``CREDENTIAL_NOT_FOUND`` at bind time, because widening
+        that would turn "bound to the wrong credential" into a failure at
+        execution time.
+        """
+        with self.database.transaction() as conn:
+            prior = conn.execute(
+                "SELECT id,kind,secret_locator,created_at FROM server_credentials WHERE id=?",
+                (credential_id,),
+            ).fetchone()
+            if prior is not None:
+                return {
+                    "credential_id": prior["id"], "kind": prior["kind"],
+                    "secret_locator": prior["secret_locator"], "created": False,
+                }
+            conn.execute(
+                "INSERT INTO server_credentials(id,kind,secret_locator,created_at) VALUES (?,?,?,?)",
+                (credential_id, kind, secret_locator, now()),
+            )
+        return {"credential_id": credential_id, "kind": kind, "created": True}
+
     def list(self) -> list[dict[str, Any]]:
         """Every registered credential, without its locator.
 

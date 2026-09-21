@@ -6,17 +6,21 @@ behavior lives here: this module is the contract's edge.
 """
 from __future__ import annotations
 
+import hashlib
 import json
+import logging
 from pathlib import Path
+import re
 import shutil
 import mimetypes
 from pathlib import PurePosixPath
 from typing import Any, Callable, Mapping
 
 from agent_box.server.errors import ServerError
+from agent_box.server.execution.artifact_store import ArtifactStoreError
 from agent_box.server.records import canonical, digest, reject_sensitive_keys
 from agent_box.server.wire.envelope import CursorCodec
-from agent_box.server.wire.errors import WireError
+from agent_box.server.wire.errors import WireError, family_for
 from agent_box.server.accounts.records import account_view
 from agent_box.server.assets.records import asset_view
 from agent_box.server.hooks.records import hook_view
@@ -97,7 +101,7 @@ _PARAM_SHAPES = {
         {"harness"}, set(),
     ),
     "providerArtifacts.install": (
-        {"requestId", "harness", "version", "sourceToken"}, set(),
+        {"requestId", "harness", "version", "sourceToken", "digest"}, set(),
     ),
     "providerArtifacts.rollback": (
         {"requestId", "harness", "version"}, set(),
@@ -223,6 +227,156 @@ def _models(value: Any) -> list[dict[str, Any]]:
             "availability": availability, "unavailableReason": reason,
         })
     return result
+
+
+#: The artifact store speaks its own codes; the wire speaks twelve families.
+#: These are the store's facts that a client can act on, so they must not
+#: arrive as a 500 - and the internal code stays in `details` because the
+#: projection is a narrowing, not a replacement of what went wrong.
+#: `CONFLICT_REQUEST` for an already-installed version follows the precedent
+#: `ENTERPRISE_STATE_CONFLICT` sets in errors.py: the world is not the shape
+#: the request assumed.
+_ARTIFACT_FAMILIES = {
+    "ARTIFACT_VERSION_MISSING": "NOT_FOUND",
+    "ARTIFACT_SOURCE_MISSING": "NOT_FOUND",
+    "ARTIFACT_VERSION_EXISTS": "CONFLICT_REQUEST",
+}
+
+
+#: The asset/catalog surface answers typed refusals with `CatalogError(code, message)`
+#: and everything else with whatever Python raised. Order 147 (`AUD-B-037`) is the
+#: record of what the five copies of `except Exception as refusal` did with that:
+#: they wrote `INVALID_REQUEST: <ClassName>: <str(exc)>`, so a permission or disk
+#: failure on the Server told the client its request was illegal, and the raw text
+#: carried absolute paths (including the data root) out over the wire.
+_LOG = logging.getLogger(__name__)
+_CODE_SHAPE = re.compile(r"[A-Z][A-Z0-9_]{2,127}")
+
+
+def _asset_refusal(exc: BaseException) -> WireError:
+    """One path for the asset surface's refusals - five copies were five truths.
+
+    A code that is shaped like a registered domain code keeps its own words: the
+    family `errors.family_for` assigns it, the same `code: message` text the
+    surface has always sent, and `details.internalCode` so the precise code is
+    structured rather than embedded prose (the shape order 115 fixed).
+
+    Anything else is a Server-side fault, not the caller's mistake: it answers
+    `UNAVAILABLE` with a machine-readable `internalCode` of the exception *type*
+    only. The raw text goes to the Server log, never to the client - which is
+    what `_safe_code` does in `execution/sidecar_backend.py`.
+    """
+    code = getattr(exc, "code", None)
+    if isinstance(code, str) and _CODE_SHAPE.fullmatch(code):
+        message = str(getattr(exc, "message", "the asset surface refused the request"))
+        return WireError(family_for(code), f"{code}: {message}",
+                         {"internalCode": code, "retryable": family_for(code) == "UNAVAILABLE"})
+    _LOG.warning("asset surface raised %s: %s", type(exc).__name__, exc)
+    return WireError("UNAVAILABLE", "the asset surface could not complete the request",
+                     {"internalCode": type(exc).__name__, "retryable": True})
+
+
+def _artifact_error(exc: ArtifactStoreError) -> WireError:
+    return WireError(
+        _ARTIFACT_FAMILIES.get(exc.code, "INVALID_REQUEST"),
+        str(exc),
+        {"internalCode": exc.code},
+    )
+
+
+#: What a user can actually do about each send blocker, in wire terms that exist
+#: today. A recovery state has no entry because no method in the 64 clears it —
+#: inventing one is a product decision (approval queue), not a projection detail,
+#: and "there is nothing you can do from here" is the honest answer (order 117).
+_BINDING_ACTIONS: Mapping[str, tuple[str, ...]] = {
+    "CREDENTIAL_NOT_FOUND": ("provision_the_credential_on_this_host",
+                             "point_the_model_at_an_available_credential"),
+    # Order 152 (`R-0080`, ACC-R5-4): the identity resolves and the kind is right,
+    # but this host cannot open the secret - which the freeze path alone cannot see.
+    "CREDENTIAL_NOT_RESOLVABLE": ("provision_the_credential_on_this_host",
+                                  "point_the_model_at_an_available_credential"),
+    "CREDENTIAL_RESOLVABILITY_UNKNOWN": ("provision_the_credential_on_this_host",),
+    "PROVIDER_MODEL_NOT_FOUND": ("choose_an_available_model",),
+    "PROVIDER_MODEL_UNUSABLE": ("choose_an_available_model",),
+    "PROVIDER_MODEL_REFERENCE_MISSING": ("choose_an_available_model",),
+    "MODEL_UNAVAILABLE": ("choose_an_available_model",),
+    "PROFILE_CONFIGURATION_INVALID": ("choose_a_model",),
+}
+
+
+#: Which directory a model-slot reference points at. One string, and the gate
+#: in `tests/server/test_config_describe_slots_125.py` is the thing that keeps
+#: `model_configs` a single table rather than a guess.
+SLOT_TABLE = "providerModels"
+
+
+def _model_reference_list(value: Any) -> list[dict[str, str]]:
+    """Every Provider/Model reference inside a control value, in document order.
+
+    A control may hold one reference (the shape order 60 shipped) or a list of
+    them (R-0013's v2 multi-slot). This mirrors
+    `model_configs.service._model_references`, and a gate compares the two on
+    fixed samples so the copy cannot drift silently.
+    """
+    found: list[dict[str, str]] = []
+    if isinstance(value, Mapping):
+        if isinstance(value.get("providerId"), str) and isinstance(value.get("modelId"), str):
+            found.append({"providerId": str(value["providerId"]),
+                          "modelId": str(value["modelId"])})
+        for nested in value.values():
+            found += _model_reference_list(nested)
+    elif isinstance(value, list):
+        for nested in value:
+            found += _model_reference_list(nested)
+    return found
+
+
+class _CallReader:
+    """One wire call's worth of object reads, de-duplicated by digest (order 147).
+
+    `AUD-B-040` measured `profiles.list` walking the model resolution once *per
+    row*: with 40 profiles over a single provider whose model list is 285 KB,
+    one call issued 80 `objects.read`s and re-hashed 11 MB, because `read()`
+    verifies the digest by re-hashing the whole object and nothing memoised it.
+    Memoising on the digest does not weaken that check - the digest *is* the
+    immutability argument - and it is scoped to one call, so no projection can
+    outlive the composition that produced it.
+    """
+
+    def __init__(self, objects: Any) -> None:
+        self._objects = objects
+        self._bytes: dict[str, bytes] = {}
+        self._parsed: dict[str, Any] = {}
+        self._indexes: dict[str, dict[str, Any]] = {}
+        self._records: dict[str, Any] = {}
+
+    def read(self, digest: str) -> bytes:
+        cached = self._bytes.get(digest)
+        if cached is None:
+            cached = self._objects.read(digest)
+            self._bytes[digest] = cached
+        return cached
+
+    def parsed(self, digest: str) -> Any:
+        cached = self._parsed.get(digest)
+        if cached is None:
+            cached = json.loads(self.read(digest))
+            self._parsed[digest] = cached
+        return cached
+
+    def index(self, digest: str, *, section: str, field: str) -> dict[str, Any]:
+        """`modelId -> model`, built once per object instead of a linear scan per row."""
+        cached = self._indexes.get(digest)
+        if cached is None:
+            items = self.parsed(digest).get(section) or []
+            cached = {str(item[field]): item for item in items if field in item}
+            self._indexes[digest] = cached
+        return cached
+
+    def record(self, provider_id: str, fetch: Callable[[], Any]) -> Any:
+        if provider_id not in self._records:
+            self._records[provider_id] = fetch()
+        return self._records[provider_id]
 
 
 class WireService:
@@ -368,8 +522,21 @@ class WireService:
             _request_id(params["requestId"])
         try:
             return handler(params)
+        except WireError:
+            # A typed refusal is the contract answering, not a crash: the wall
+            # below must never re-project it onto `UNAVAILABLE`.
+            raise
         except ServerError as exc:
             raise WireError.from_server_error(exc) from exc
+        except Exception as exc:  # noqa: BLE001 - the wire contract, not the caller's convenience
+            # The last wall of the error family (order 115): anything else that
+            # escapes a handler still leaves this Server as a JSON-RPC error
+            # object. The exception's *text* never goes out — it can name a host
+            # path or a credential locator — only its type, as `internalCode`.
+            raise WireError(
+                "UNAVAILABLE", "this Server could not answer the request",
+                {"internalCode": type(exc).__name__, "retryable": True},
+            ) from exc
 
     # -- discovery ---------------------------------------------------------
 
@@ -396,11 +563,28 @@ class WireService:
                 entry["reason"] = reason
             capabilities.append(entry)
         auth = {"required": True, "schemes": ["session_token"]} if self.token_required else {"required": False}
+        harnesses = []
+        # The family directory is a deployment fact - which harnesses this Server
+        # can run - so it comes from the registry, never from the records: a
+        # fresh deployment has no records, and deriving the list from them was
+        # what left a client with nothing to choose. `registered()` is already
+        # sorted by id, so this is the registry's own order rather than a second
+        # sort that could later disagree with it. Only what a family *declares*
+        # is published, and a declaration that is absent stays absent.
+        for harness_id in self.harnesses.registered():
+            descriptor = self.harnesses.get(harness_id)
+            entry: dict[str, Any] = {"id": harness_id}
+            if descriptor.credential_kind is not None:
+                entry["credentialKind"] = descriptor.credential_kind
+            if descriptor.model_control_id is not None:
+                entry["modelControlId"] = descriptor.model_control_id
+            harnesses.append(entry)
         return {
             "serverId": self._server_id_provider(),
             "protocolVersion": WIRE_VERSION,
             "capabilities": capabilities,
             "auth": auth,
+            "harnesses": harnesses,
         }
 
     def _capability(self, capability_id: str) -> tuple[bool, str | None]:
@@ -484,11 +668,14 @@ class WireService:
         if not isinstance(include, bool):
             raise WireError("INVALID_REQUEST", "includeArchived must be a boolean")
         items = []
+        # One reader per call: `profiles.list` used to re-resolve the same provider
+        # and the same model list for every row (order 147, `AUD-B-040`).
+        read = _CallReader(self.objects)
         for row in self.profiles.records.list(include_archived=include):
-            items.append(self._profile(row))
+            items.append(self._profile(row, read))
         return {"items": items, "nextCursor": None}
 
-    def _profile(self, row: Mapping[str, Any]) -> dict[str, Any]:
+    def _profile(self, row: Mapping[str, Any], read: _CallReader | None = None) -> dict[str, Any]:
         item = profile_record(row)
         descriptor = (
             self.harnesses.get(row["harness_type"])
@@ -499,7 +686,203 @@ class WireService:
             for key, value in (descriptor.capability_claims if descriptor else {}).items()
             if isinstance(value, bool)
         }
+        item["sendability"] = self._sendability(row, item, read)
         return item
+
+    # -- sendability (order 117, QA-009) -----------------------------------
+
+    def _profile_bindings(self, row: Mapping[str, Any],
+                          read: _CallReader | None = None,
+                          ) -> tuple[list[dict[str, Any]], bool]:
+        """Re-walk the model resolution a turn would do, and say what it would hit.
+
+        `freeze_execution_configuration` (`model_configs/service.py:134-180`) is
+        the code that decides whether a Profile can actually run: it reads the
+        model control out of the Profile's configuration object, resolves the
+        provider record, then the model, then the credential. A client could only
+        learn the outcome by sending a message, so this walks the same chain and
+        reports the first thing it would trip on — the *rules* are copied here,
+        not imported, because `model_configs/**` is the runtime line's surface
+        (charter §3); `test_a_blocker_the_freeze_path_would_hit_is_named` is what
+        keeps the two from drifting.
+        """
+        empty: tuple[list[dict[str, Any]], bool] = ([], False)
+        read = read or _CallReader(self.objects)
+        descriptor = (
+            self.harnesses.get(row["harness_type"])
+            if row["harness_type"] in self.harnesses else None
+        )
+        if descriptor is None:
+            # An unregistered harness is a different visible fact (capabilities);
+            # nothing here can say whether a model would resolve.
+            return [], True
+        control_id = getattr(descriptor, "model_control_id", None)
+        if control_id is None:
+            return empty  # this harness takes no provider/model reference at all
+        if self.model_configs is None:
+            return [], True
+        digest = row.get("config_object_digest")
+        if not digest:
+            return [{
+                "providerModelId": None, "modelId": None,
+                "state": "blocked", "reason": "PROFILE_CONFIGURATION_INVALID",
+                "detail": f"control {control_id} selects no Provider/Model configuration",
+            }], False
+        try:
+            document = read.parsed(digest)
+        except Exception:  # noqa: BLE001 - unreadable configuration is unknown, not fine
+            return [], True
+        reference = (document.get("configuration") or {}).get(control_id)
+        if (not isinstance(reference, Mapping) or not isinstance(reference.get("providerId"), str)
+                or not isinstance(reference.get("modelId"), str) or not reference["modelId"]):
+            return [{
+                "providerModelId": None, "modelId": None,
+                "state": "blocked", "reason": "PROFILE_CONFIGURATION_INVALID",
+                "detail": f"control {control_id} must select a Provider/Model configuration",
+            }], False
+        binding: dict[str, Any] = {
+            "providerModelId": reference["providerId"], "modelId": reference["modelId"],
+            "controlId": control_id, "state": "ready", "reason": None, "detail": None,
+        }
+        try:
+            provider = read.record(
+                binding["providerModelId"],
+                lambda: self.model_configs.records.get(binding["providerModelId"]),
+            )
+        except ServerError as error:
+            binding["state"] = "blocked"
+            binding["reason"] = ("PROVIDER_MODEL_NOT_FOUND" if error.code == "PROVIDER_MODEL_NOT_FOUND"
+                                 else "PROFILE_CONFIGURATION_INVALID")
+            binding["detail"] = str(error.message)[:200]
+            return [binding], False
+        except Exception:  # noqa: BLE001
+            return [], True
+        if provider["archived_at"] is not None or provider["harness_type"] != row["harness_type"]:
+            binding["state"] = "blocked"
+            binding["reason"] = "PROVIDER_MODEL_UNUSABLE"
+            binding["detail"] = ("archived" if provider["archived_at"] is not None
+                                 else "the provider record belongs to a different harness")
+            return [binding], False
+        try:
+            models = read.index(provider["models_object_digest"],
+                                section="models", field="modelId")
+        except Exception:  # noqa: BLE001
+            return [binding], True
+        model = models.get(binding["modelId"])
+        if model is None:
+            binding["state"] = "blocked"
+            binding["reason"] = "PROVIDER_MODEL_REFERENCE_MISSING"
+            binding["detail"] = "the referenced model is not on that provider record"
+            return [binding], False
+        if model.get("availability") == "unavailable":
+            binding["state"] = "blocked"
+            binding["reason"] = "MODEL_UNAVAILABLE"
+            binding["detail"] = str(model.get("unavailableReason") or "")[:200]
+            return [binding], False
+        credential_id = provider.get("credential_id")
+        binding["credentialId"] = credential_id
+        kind = getattr(descriptor, "credential_kind", None)
+        if kind is not None and credential_id is not None:
+            # The same kind-scoped lookup the freeze path performs: a credential
+            # that exists but is not of the kind this harness takes is just as
+            # unsendable as one that is absent, and `exists()` alone would call
+            # it ready. `test_a_binding..._is_the_wrong_kind...` holds that open.
+            try:
+                record = self.model_configs.credentials.get(credential_id, kind=kind)
+            except ServerError as error:
+                binding["state"] = "blocked"
+                binding["reason"] = error.code
+                binding["detail"] = (
+                    f"this host has no credential {credential_id} of kind {kind}")[:200]
+                return [binding], False
+            except Exception:  # noqa: BLE001
+                return [binding], True
+            # Order 152 (`R-0080`, ACC-R5-4): the identity resolving is not the same
+            # fact as this host being able to *open* its secret. A Windows DPAPI
+            # locator cannot be read on Linux, yet the row exists and the kind
+            # matches, so the chain above still said `ready` and the user only found
+            # out by getting `EXECUTION_FAILED` after typing. Ask the store, and
+            # never let an unresolvable credential read as sendable.
+            store = getattr(self.model_configs, "secret_store", None)
+            if store is not None:
+                locator = record.get("secret_locator") if isinstance(record, Mapping) else None
+                if not locator:
+                    # No address to try: the resolvability query cannot be formed,
+                    # which is `unknown`, never `ready`.
+                    binding["state"] = "unknown"
+                    binding["reason"] = "CREDENTIAL_RESOLVABILITY_UNKNOWN"
+                    binding["detail"] = (
+                        f"credential {credential_id} carries no locator to resolve "
+                        f"on this host")[:200]
+                    return [binding], False
+                try:
+                    store.read(locator)  # discard: the value must never leave this probe
+                except Exception:  # noqa: BLE001 - cannot open it here is a real blocker
+                    binding["state"] = "blocked"
+                    binding["reason"] = "CREDENTIAL_NOT_RESOLVABLE"
+                    binding["detail"] = (
+                        f"credential {credential_id} is registered but its secret is "
+                        f"not readable on this host (e.g. a locator from another OS)")[:200]
+                    return [binding], False
+        return [binding], False
+
+    def _sendability(self, row: Mapping[str, Any], projected: Mapping[str, Any],
+                     read: _CallReader | None = None) -> dict[str, Any]:
+        """Can this Profile take a message here, answered **before** one is sent.
+
+        QA-009's complaint is that both blockers existed only as a failure after
+        the user had typed: 409 `PROFILE_RECOVERY_REQUIRED` at accept, and a
+        credential that was never provisioned on this host arriving as
+        `EXECUTION_FAILED` inside the turn. The accept-time behaviour is
+        unchanged — this only says it out loud earlier — and every fact that
+        could not be read is reported as `unknown`, never as "sendable".
+        """
+        checks: list[dict[str, Any]] = []
+        recovery = projected.get("recoveryPending")
+        if recovery is True:
+            checks.append({
+                "key": "recovery", "state": "blocked",
+                "reason": "PROFILE_RECOVERY_REQUIRED",
+                "message": "this Profile is waiting on a recovery the Server has not completed",
+                # No wire method clears this state today: saying so is the honest
+                # part of "what can the user do" (the clearing face is a product
+                # decision in the approval queue, not something to invent here).
+                "actions": [],
+            })
+        elif recovery is False:
+            checks.append({"key": "recovery", "state": "ready", "reason": None,
+                           "message": None, "actions": []})
+        else:
+            checks.append({"key": "recovery", "state": "unknown",
+                           "reason": "RECOVERY_STATE_UNREADABLE",
+                           "message": "this Server could not read the recovery state",
+                           "actions": []})
+        bindings, unreadable = self._profile_bindings(row, read)
+        for binding in bindings:
+            checks.append({
+                "key": "model:" + (binding.get("providerModelId")
+                                   or binding.get("controlId") or "unset"),
+                "state": binding["state"],
+                "reason": binding.get("reason"),
+                "message": binding.get("detail"),
+                "actions": _BINDING_ACTIONS.get(binding.get("reason") or "", []),
+                "credentialId": binding.get("credentialId"),
+            })
+        if unreadable:
+            checks.append({"key": "model", "state": "unknown", "reason": "CONFIGURATION_UNREADABLE",
+                           "message": "this Server could not read the Profile's configuration",
+                           "actions": []})
+        for state in ("blocked", "unknown"):
+            hit = next((item for item in checks if item["state"] == state), None)
+            if hit is not None:
+                return {
+                    "state": state,
+                    "reason": hit["reason"],
+                    "message": hit["message"],
+                    "actions": sorted({action for item in checks for action in item["actions"]}),
+                    "checks": checks,
+                }
+        return {"state": "ready", "reason": None, "message": None, "actions": [], "checks": checks}
 
     # -- managed hooks (Order 59) ------------------------------------------
 
@@ -597,9 +980,7 @@ class WireService:
                 source_path=_Path(_bounded(params["sourcePath"], "sourcePath", 4096)),
             )
         except Exception as refusal:  # noqa: BLE001 - typed by the store
-            raise WireError("INVALID_REQUEST",
-                            f"{getattr(refusal, 'code', type(refusal).__name__)}: "
-                            f"{getattr(refusal, 'message', refusal)}")
+            raise _asset_refusal(refusal) from refusal
         return {"catalog": self._catalog_view(snapshot)}
 
     def assets_catalog(self, params: Mapping[str, Any]) -> dict[str, Any]:
@@ -636,9 +1017,7 @@ class WireService:
                 records=records, skills=skills, mcp=mcp,
             )
         except Exception as refusal:  # noqa: BLE001 - typed by the store
-            raise WireError("INVALID_REQUEST",
-                            f"{getattr(refusal, 'code', type(refusal).__name__)}: "
-                            f"{getattr(refusal, 'message', refusal)}")
+            raise _asset_refusal(refusal) from refusal
         return {"installed": installed}
 
     def assets_probe(self, params: Mapping[str, Any]) -> dict[str, Any]:
@@ -681,9 +1060,7 @@ class WireService:
         try:
             facts = skills.install(source, asset_id=asset_id, revision=revision)
         except Exception as refusal:  # noqa: BLE001 - typed by the store
-            raise WireError("INVALID_REQUEST",
-                            f"{getattr(refusal, 'code', type(refusal).__name__)}: "
-                            f"{getattr(refusal, 'message', refusal)}")
+            raise _asset_refusal(refusal) from refusal
         published = records.publish(
             key=_request_id(params["requestId"]),
             request_digest=digest({"assetId": asset_id, "revision": revision,
@@ -706,9 +1083,7 @@ class WireService:
         try:
             canonical = mcp.install(definition, asset_id=asset_id, revision=revision)
         except Exception as refusal:  # noqa: BLE001 - typed by the store
-            raise WireError("INVALID_REQUEST",
-                            f"{getattr(refusal, 'code', type(refusal).__name__)}: "
-                            f"{getattr(refusal, 'message', refusal)}")
+            raise _asset_refusal(refusal) from refusal
         published = records.publish(
             key=_request_id(params["requestId"]),
             request_digest=digest({"assetId": asset_id, "revision": revision,
@@ -739,9 +1114,7 @@ class WireService:
             facts = self.plugin_assets.install(
                 source, asset_id=asset_id, revision=revision)
         except Exception as refusal:  # noqa: BLE001 - typed by the store
-            raise WireError("INVALID_REQUEST",
-                            f"{getattr(refusal, 'code', type(refusal).__name__)}: "
-                            f"{getattr(refusal, 'message', refusal)}")
+            raise _asset_refusal(refusal) from refusal
         published = records.publish(
             key=_request_id(params["requestId"]),
             request_digest=digest({"assetId": asset_id, "revision": revision,
@@ -867,6 +1240,25 @@ class WireService:
                 "importing one file into a multi-file login state is not supported",
             )
         payload = source.read_bytes()
+        # Order 129 (`AUD-B-012`): the locked contract requires `requestId`, and the
+        # two sibling methods (`accounts.create`, `accounts.bind`) run theirs through
+        # the idempotency layer. This handler never read the key, so a retry of one
+        # import executed a second time instead of replaying - and a second execution
+        # mints a second locator, because `write_asset` names a fresh one per call.
+        key = _request_id(params["requestId"])
+        request_digest = digest({
+            "accountId": account_id, "sourcePath": str(source), "size": size,
+            "sha256": hashlib.sha256(payload).hexdigest(),
+        })
+        scope = "accounts.importAsset"
+        # Not a fresh `IdempotentRecords`: this is the instance `accounts.create`
+        # already uses, so the family really does share one path and one table.
+        idempotency = accounts.idempotency
+        prior = idempotency.get(scope, key, request_digest)
+        if prior is not None:
+            # The receipt is the answer, so a replay is byte-identical to the
+            # first response rather than a second observation of the record.
+            return prior[1]
         locator, digest_value = assets.write_asset(
             account_id=account_id, files={name: payload}, kind="subscription",
         )
@@ -874,7 +1266,14 @@ class WireService:
             account_id, locator=locator, digest=digest_value,
             state=str(account["state"]),
         )
-        return {"account": account_view(accounts.get(account_id))}
+        body = {"account": account_view(accounts.get(account_id))}
+        # `save` re-checks inside its own transaction and returns the winner's
+        # receipt, so two racing first attempts cannot both claim the key. The
+        # window that remains is the side effect between the check here and the
+        # insert there: closing it needs the asset write inside the same
+        # transaction, which lives in `assets/**` and not in this order's surface.
+        idempotency.save(scope, key, request_digest, 200, body)
+        return body
 
     def _subscription_files_for(self, harness: str) -> tuple[str, ...]:
         """The family's declared subscription files, from the deployment."""
@@ -1193,23 +1592,27 @@ class WireService:
     def _artifact_store(self):
         if self.artifact_store is None:
             raise WireError(
-                "ARTIFACT_STORE_UNAVAILABLE",
+                "UNAVAILABLE",
                 "this composition has no artifact management face",
+                {"internalCode": "ARTIFACT_STORE_UNAVAILABLE"},
             )
         return self.artifact_store
 
     def provider_artifacts_list(self, params: Mapping[str, Any]) -> dict[str, Any]:
         harness = _bounded(params["harness"], "harness", 64)
         store = self._artifact_store()
-        versions = store.installed(harness)
-        return {
-            "harness": harness,
-            "versions": [
-                {"version": version, **store.summary(harness, version)}
-                for version in versions
-            ],
-            "current": store.current_reference(harness),
-        }
+        try:
+            versions = store.installed(harness)
+            return {
+                "harness": harness,
+                "versions": [
+                    {"version": version, **store.summary(harness, version)}
+                    for version in versions
+                ],
+                "current": store.current_reference(harness),
+            }
+        except ArtifactStoreError as exc:
+            raise _artifact_error(exc) from exc
 
     def provider_artifacts_install(self, params: Mapping[str, Any]) -> dict[str, Any]:
         """Install a version the execution side has staged under the store's
@@ -1218,9 +1621,13 @@ class WireService:
         harness = _bounded(params["harness"], "harness", 64)
         version = _bounded(params["version"], "version", 64)
         token = _bounded(params["sourceToken"], "sourceToken")
+        digest = _bounded(params["digest"], "digest", 128)
         store = self._artifact_store()
-        source = store.incoming_dir(token)
-        receipt = store.install(harness, version, source, params["digest"])
+        try:
+            source = store.incoming_dir(token)
+            receipt = store.install(harness, version, source, digest)
+        except ArtifactStoreError as exc:
+            raise _artifact_error(exc) from exc
         shutil.rmtree(source, ignore_errors=True)
         return {"harness": harness, "version": version,
                 "digest": receipt["digest"], "entries": receipt["entries"]}
@@ -1229,8 +1636,11 @@ class WireService:
         harness = _bounded(params["harness"], "harness", 64)
         version = _bounded(params["version"], "version", 64)
         store = self._artifact_store()
-        store.rollback(harness, version)
-        return {"harness": harness, "current": store.current_reference(harness)}
+        try:
+            store.rollback(harness, version)
+            return {"harness": harness, "current": store.current_reference(harness)}
+        except ArtifactStoreError as exc:
+            raise _artifact_error(exc) from exc
 
     def usage_aggregate(self, params: Mapping[str, Any]) -> dict[str, Any]:
         """Order 53: per-session usage aggregation over the ledger.
@@ -1241,8 +1651,9 @@ class WireService:
         """
         if self.usage_aggregator is None:
             raise WireError(
-                "USAGE_AGGREGATOR_UNAVAILABLE",
+                "UNAVAILABLE",
                 "this composition exposes no usage-aggregation face",
+                {"internalCode": "USAGE_AGGREGATOR_UNAVAILABLE"},
             )
         session_ids = params.get("sessions") or []
         if not isinstance(session_ids, list) or not all(
@@ -1326,17 +1737,24 @@ class WireService:
     _PROVENANCE_FIELDS = ("baseUrl", "authStyle", "wireApi", "fieldsSource")
 
     @classmethod
-    def _provenance(cls, params: Mapping[str, Any]) -> dict[str, str] | None:
+    def _provenance(cls, params: Mapping[str, Any]) -> dict[str, str | None] | None:
+        """Order 112: a field the request did not name keeps its stored value;
+        a field it named as `null` is a request to *clear* it. Collapsing the
+        two is how a user's edit gets eaten: the row keeps the old fact, the
+        answer is 200, and nothing says the clear was ignored."""
         raw = params.get("provenance")
         if raw is None:
             return None
         if (not isinstance(raw, Mapping)
                 or not set(raw) <= set(cls._PROVENANCE_FIELDS)):
             raise WireError("INVALID_REQUEST", "provenance carries unknown fields")
-        provenance: dict[str, str] = {}
+        provenance: dict[str, str | None] = {}
         for field in cls._PROVENANCE_FIELDS:
-            value = raw.get(field)
+            if field not in raw:
+                continue
+            value = raw[field]
             if value is None:
+                provenance[field] = None
                 continue
             value = _bounded(str(value), f"provenance.{field}", 512)
             allowed = cls._PROVENANCE_ENUMS.get(field)
@@ -1413,11 +1831,8 @@ class WireService:
             descriptor = self.harnesses.get(harness)
             for control_id, values in sorted((descriptor.control_options or {}).items()):
                 current = configured.get(control_id)
-                holds_reference = (
-                    isinstance(current, Mapping) and self.model_configs is not None
-                    and isinstance(current.get("providerId"), str)
-                    and isinstance(current.get("modelId"), str)
-                )
+                references = _model_reference_list(current)
+                holds_reference = bool(references) and self.model_configs is not None
                 # The control the deployment names as its model control takes a
                 # Provider/Model reference and declares no static values for it
                 # (the reference comes from the directory, and
@@ -1429,18 +1844,15 @@ class WireService:
                 # this really is an enumeration and stays one.
                 if (descriptor.model_control_id == control_id and not values
                         and self.model_configs is not None):
-                    model = (self.model_configs.reference(current["providerId"], current["modelId"])
-                             if holds_reference else None)
                     controls.append({
                         "kind": "model_slot", "controlId": control_id, "editable": True,
-                        "slots": [{"name": control_id, "model": model}],
+                        "slots": self._slot_entries(control_id, references, current),
                     })
                     continue
                 if holds_reference:
-                    model = self.model_configs.reference(current["providerId"], current["modelId"])
                     controls.append({
                         "kind": "model_slot", "controlId": control_id, "editable": True,
-                        "slots": [{"name": control_id, "model": model}],
+                        "slots": self._slot_entries(control_id, references, current),
                     })
                     continue
                 controls.append({
@@ -1460,6 +1872,37 @@ class WireService:
                 control["multiline"] = False
             controls.append(control)
         return controls
+
+    def _slot_entries(self, control_id: str, references: list[dict[str, str]],
+                      current: Any) -> list[dict[str, Any]]:
+        """One entry per Provider/Model reference a model control holds (order 125).
+
+        Before this, a control holding a *list* of references projected exactly
+        one slot built from `control_id` alone, so a client could not see past
+        the first seat - 092's G8 named that shape ("只投影第一个槽必须门红").
+
+        The legacy single-reference shape is emitted **verbatim**
+        (`{"name": control_id, "model": ...}`) because order 60's wire test pins
+        that dict key for key; only a value that is actually a list gains the
+        table-reference keys. A reference that no longer resolves is not papered
+        over: `model_configs.reference` raises typed, same as before.
+        """
+        if self.model_configs is None:
+            return [{"name": control_id, "model": None}]
+        if not isinstance(current, list):
+            one = references[0] if references else None
+            return [{"name": control_id,
+                     "model": (self.model_configs.reference(one["providerId"], one["modelId"])
+                               if one else None)}]
+        entries = []
+        for index, reference in enumerate(references):
+            model = self.model_configs.reference(reference["providerId"], reference["modelId"])
+            entries.append({
+                "name": f"{control_id}[{index}]", "slotIndex": index,
+                "table": SLOT_TABLE, "providerId": reference["providerId"],
+                "modelId": reference["modelId"], "model": model,
+            })
+        return entries
 
     def _locked_controls(self, profile: Mapping[str, Any]) -> list[str]:
         """Controls a security rule pins; they can never be overridden."""
