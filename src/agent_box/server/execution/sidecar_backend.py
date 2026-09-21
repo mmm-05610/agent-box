@@ -961,27 +961,18 @@ def _capability_gate(port: SidecarHarnessPort, turn_id: str) -> None:
     )
 
 
-def _carries_untrusted_sidecar_code(exc: BaseException) -> bool:
-    """True when the chain carries a code from the post-open transport family.
+#: The codes a **pre-start refusal** owns. They are claims about a stage - "the
+#: start was refused before any native contact" - and only
+#: :class:`CapabilityGateRefusal` may make that claim. A post-open failure that
+#: merely reuses one of these strings is not making that claim, so the ambiguous
+#: stage must not publish it (LNX-002 ruling, decision 1).
+#:
+#: This is the mirror of a global allow-list, not a copy of one: the vocabulary is
+#: owned by the type that raises it, and the same string published from a genuine
+#: pre-start refusal stays correct - that path is an ``ExecutionStartRejected`` and
+#: never reaches the check in ``_safe_code``.
+PRE_START_REFUSAL_CODES = frozenset({"CAPABILITY_REQUIREMENT_UNSATISFIED"})
 
-    ``SidecarError`` is what a post-open response path raises, and its ``code`` is
-    whatever the far side — or a test double — put there. On the ambiguous stage
-    that is not a statement about the stage, so it is not publishable.
-
-    Two exceptions in that family *do* speak about a stage and are trusted by
-    name: :class:`CapabilityGateRefusal` (pre-start, and normally converted to
-    ``ExecutionStartRejected`` before it gets here) and
-    :class:`SidecarRunRecoveryFailure` (this stage's own recovery path).
-    """
-    seen: set[int] = set()
-    current: BaseException | None = exc
-    while current is not None and id(current) not in seen:
-        seen.add(id(current))
-        if isinstance(current, SidecarError) and not isinstance(
-                current, (CapabilityGateRefusal, SidecarRunRecoveryFailure)):
-            return True
-        current = current.__cause__ or current.__context__
-    return False
 
 
 def _safe_code(exc: BaseException) -> str:
@@ -997,20 +988,21 @@ def _safe_code(exc: BaseException) -> str:
             if isinstance(explicit, str) and re.fullmatch(r"[A-Z][A-Z0-9_]{2,127}", explicit):
                 return explicit
         current = current.__cause__ or current.__context__
-    if isinstance(exc, DispatchAmbiguous) and _carries_untrusted_sidecar_code(exc):
+    if isinstance(exc, DispatchAmbiguous) and getattr(exc, "code", None) in PRE_START_REFUSAL_CODES:
         # LNX-002 ruling, decision 1. The ambiguous stage asserts one thing only:
         # we cannot tell whether the start and its side effects happened. A code
-        # inherited from a post-open `SidecarError` is not evidence about the
-        # stage, so the *published* reason stays the generic one and the original
-        # cause stays on the chain (and on this log) rather than being promoted.
+        # that belongs to the pre-start refusal vocabulary is a claim about a
+        # stage this stage cannot make, so the *published* reason stays generic and
+        # the original cause stays on the chain (and on this log).
         #
-        # This is decided by stage and exception type, never by the code string:
-        # the same string published from a genuine pre-start refusal is correct
-        # and never reaches here, because that refusal is an
+        # A genuine pre-start refusal never reaches here: it is an
         # `ExecutionStartRejected` and the walk above already returned its code.
+        # Every other post-open code is still published - order 150's
+        # HARNESS_LAUNCH_FAILED / HARNESS_SESSION_UNAVAILABLE are exactly the
+        # diagnoses the client needs, and they are not stage claims.
         logging.getLogger(__name__).error(
-            "ambiguous dispatch keeps the generic reason: the code it carried came "
-            "from a post-open SidecarError, which says nothing about the stage",
+            "ambiguous dispatch keeps the generic reason: it carried a pre-start "
+            "refusal code, which says nothing about whether the start happened",
             exc_info=exc)
         return "EXECUTION_FAILED"
     explicit = getattr(exc, "code", None)
