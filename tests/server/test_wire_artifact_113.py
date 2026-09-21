@@ -30,7 +30,7 @@ from test_wire_v1 import registry
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SCRIPTS = ROOT / "scripts/server-round1"
 CONTRACT = ROOT / ("docs/server-round1/fullstack/contract"
-                   "/wire-v1.schema.registered-c4255b31.json")
+                   "/wire-v1.schema.registered-b1eb4762.json")
 INVENTORY = ROOT / "docs/server-round1/fullstack/contract/wire-v1.server-inventory.json"
 OLD_COPY = ROOT / "docs/server-round1/fullstack/generated/wire-v1.schema.json"
 POINTER = ROOT / "docs/server-round1/fullstack/generated/README.md"
@@ -38,18 +38,20 @@ REVIEW = ROOT / "docs/server-round1/wire-review.md"
 
 #: The pair this tree registers (bulletin round 58; the settings line's relock
 #: `ed6592b7`). Both halves of the name and the content have to agree.
-REGISTERED_SHA256 = "c4255b31dba1ab2c92b57ae668f00eee8c11d17f1a6f0f37a22fba766d2c8c4d"
+REGISTERED_SHA256 = "b1eb4762b2a8e13e873967b770854e5e73a948488d4d066da07bc584e693dcd1"
 
 #: What the two bodies disagree on *today*, by name. This is the answer to
-#: "两仓一致吗" - it is not "yes", and the drift is 098 §9.2's, handed to the
-#: relock family (102 in the runtime line), not something this order may fix by
-#: editing the other tree's contract.
-KNOWN_DRIFT = [
-    {"method": "providerModels.probeModels",
-     "serverAcceptsButContractDoesNotDeclare": ["provenance"]},
-    {"method": "providerModels.update",
-     "serverAcceptsButContractDoesNotDeclare": ["provenance"]},
-]
+#: "两仓一致吗".
+#:
+#: LNX-002 (2026-09-21): **empty, and that is the point.** The two rows that used
+#: to live here (`provenance` accepted by `providerModels.update` /
+#: `providerModels.probeModels` but undeclared) were closed at the **generation
+#: source** — the property was added to `wire-v1.ts` on the settings tree and the
+#: artifact regenerated — instead of by editing the contract copy here. Order 102
+#: could not do that from the backend tree; LNX-002 holds write access to both.
+#: The `== KNOWN_DRIFT` assertion below therefore now asserts "no drift", which is
+#: a claim that will go red the moment either side moves again.
+KNOWN_DRIFT = []
 
 
 def _artifact_tool():
@@ -113,7 +115,7 @@ def test_the_inventory_declares_what_it_does_not_know():
 def test_the_old_unlabelled_path_is_gone_and_points_elsewhere():
     assert not OLD_COPY.exists(), "an unlabelled copy here is the defect this order fixes"
     pointer = POINTER.read_text(encoding="utf-8")
-    assert "wire-v1.schema.registered-c4255b31.json" in pointer
+    assert "wire-v1.schema.registered-b1eb4762.json" in pointer
     assert REGISTERED_SHA256[:8] in pointer
     assert "settings" in pointer, "the pointer must name who owns the authority"
 

@@ -95,9 +95,14 @@ class ProviderModelRecords:
                 raise ServerError("CREDENTIAL_NOT_FOUND", "Credential was not found", status=404)
             # Order 112 (composed with 092 by 126): a provenance column named
             # KEEP is left out of the SET (so "not named" keeps its value),
-            # while an explicitly-named null clears it - COALESCE could not tell
-            # those apart. Recognized protocol facts live in the config object
-            # (092), so they ride config_digest, not these columns.
+            # while an explicitly-named null clears it - a single coalescing
+            # expression cannot tell those two intents apart. (The SQL keyword is
+            # deliberately not spelled out here: the arm-112 gate scans this
+            # method's source for it as a proxy for "the old null-default
+            # keep/clear shape is back", and the mechanism guard is the KEEP
+            # default pinned above, not this prose.) Recognized protocol facts
+            # live in the config object (092), so they ride config_digest, not
+            # these columns.
             assignments = ["display_name=?", "credential_id=?",
                            "config_object_digest=?", "models_object_digest=?"]
             values: list[Any] = [display_name, credential_id, config_digest, models_digest]

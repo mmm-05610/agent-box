@@ -679,7 +679,7 @@ list 读时派生 `compatibility[]` + `protocolsDeclared`（不落库）、冻�
 | 文件 | 谁生成 | 内容 | 权威范围 |
 | --- | --- | --- | --- |
 | `fullstack/contract/wire-v1.server-inventory.json` | 本树 `scripts/server-round1/wire_artifact.py` | 64 个方法：方法名 → handler 属性 → Server 自己必填/可选的参数名；`result` 一律 `{"declared": false, "authority": "contract"}` | **只有**"派发表与参数门"这一件 |
-| `fullstack/contract/wire-v1.schema.registered-c4255b31.json` | 桌面 settings 线（重锁 `ed6592b7`） | params + **result** 的完整 JSON Schema（134 键 = 64×2 ＋ 6 个协议形状） | **合同工件**；本树这份只是**按摘要命名的登记副本** |
+| `fullstack/contract/wire-v1.schema.registered-b1eb4762.json` | 桌面 settings 线（重锁 `ed6592b7`） | params + **result** 的完整 JSON Schema（134 键 = 64×2 ＋ 6 个协议形状） | **合同工件**；本树这份只是**按摘要命名的登记副本** |
 | `fullstack/generated/README.md` | 手写的指针 | 说明该目录不再放工件、以及上面两份在哪 | — |
 
 副本**文件名里就是它自己的 sha256 前 8 位**：对不上就是过期，不会再出现"无声停在旧版却长得像当前工件"。
@@ -697,7 +697,7 @@ python3 scripts/server-round1/wire_artifact.py --check \
     docs/server-round1/fullstack/contract/wire-v1.server-inventory.json
 # 两仓对表：把差异**按名字**列出来（有差异退出码 1，不是"静通过"）
 python3 scripts/server-round1/wire_artifact.py --compare \
-    docs/server-round1/fullstack/contract/wire-v1.schema.registered-c4255b31.json
+    docs/server-round1/fullstack/contract/wire-v1.schema.registered-b1eb4762.json
 ```
 
 比较只走三条轴：**方法集**、每方法 **required 名集**、Server 接受但合同**没声明的属性名**。
@@ -707,7 +707,7 @@ python3 scripts/server-round1/wire_artifact.py --compare \
 
 ```bash
 # 唯一允许的写法：显式路径
-AGENT_BOX_WIRE_SCHEMA=docs/server-round1/fullstack/contract/wire-v1.schema.registered-c4255b31.json \
+AGENT_BOX_WIRE_SCHEMA=docs/server-round1/fullstack/contract/wire-v1.schema.registered-b1eb4762.json \
     python3 -m pytest tests/server/test_wire_v1.py -q
 ```
 
@@ -719,9 +719,9 @@ AGENT_BOX_WIRE_SCHEMA=docs/server-round1/fullstack/contract/wire-v1.schema.regis
 
 | 事实 | 值（2026-09-19） | 记在哪 |
 | --- | --- | --- |
-| 合同对（桌面重锁） | TS `58d61ebb…` / 工件 `c4255b31dba1ab2c92b57ae668f00eee8c11d17f1a6f0f37a22fba766d2c8c4d` | 主树公告第 58 轮（调度者复算）＋本树 `test_hello_harnesses_105.py:ARTIFACT_SHA256` |
+| 合同对（桌面重锁） | TS `c48d2dfc…bec58bb` / 工件 `b1eb4762b2a8e13e873967b770854e5e73a948488d4d066da07bc584e693dcd1` | **LNX-002 重锁（2026-09-21，两线合流后的第一次重生成）** ＋ 本树 `test_hello_harnesses_105.py:ARTIFACT_SHA256`、`test_wire_artifact_113.py:REGISTERED_SHA256` |
 | 后端清单 | `eaae93303f2380c34256bd4ea3ab03a3e5b922e2816953de82c439aa969bc16d` | 本文件本节 ＋ `--print-digest` 现算（**不是**手填） |
-| 已知漂移（清单 vs 合同） | `providerModels.update` 与 `probeModels` 的 `provenance`：**Server 接受、合同未声明** | `--compare` 输出（可复跑），账上记 098 §9.2 / 交 102 重锁 |
+| 已知漂移（清单 vs 合同） | **无（2026-09-21，LNX-002 重锁）** | `--compare` 四条轴全空、退出码 0（可复跑）；§5 那三步已执行，见 §7 |
 
 **重锁之后要做的一件事**：把清单重生成一次并跑 `--compare`，若那两条漂移消失则该节与 `--compare`
 的退出码自动变干净——**不需要有人记得改散文**。
@@ -758,3 +758,51 @@ AGENT_BOX_WIRE_SCHEMA=docs/server-round1/fullstack/contract/wire-v1.schema.regis
 **当前状态（本节写作时）**：本树能读到的登记对仍是 **工件 `c4255b31…`／TS `58d61ebb…`**（公告第 58 轮）。
 `110` 的 `pauseReason` 触发的那次重锁在第 100 轮是以**"该走重锁"**的形式出现的，本树侧尚未读到新登记值；
 新对到达时的动作就是 §5 那三步，且**旧结论要重新跑一遍再说**——不是沿用。
+
+### 7 LNX-002 重锁登记（2026-09-21，两线合流后）——§5 那三步的执行记录
+
+两棵候选树由 LNX-002 合流（backend `integration/linux-native-0`），这是合流后的第一次重生成。
+`§6` 那句"当前状态"是它写作时的事实，此处不改写历史，只登记新的一对。
+
+| 事实 | 值 |
+| --- | --- |
+| TS 权威 `apps/desktop/src/types/wire/wire-v1.ts` | `c48d2dfcdf8d3d5f10d1837ceb793de1f6e7ff590d148cc7be7c13403bec58bb` |
+| 合同工件（两树逐字节同一份） | `b1eb4762b2a8e13e873967b770854e5e73a948488d4d066da07bc584e693dcd1` |
+| 后端清单 `wire-v1.server-inventory.json` | `eaae93303f2380c34256bd4ea3ab03a3e5b922e2816953de82c439aa969bc16d`（未动：`handlers.py` 本次零改动） |
+| 方法数 | **64**（不变） |
+| 被取代的一对（历史保留） | TS `763758f0…025b57` / 工件 `2dd26561…ccd64c` |
+
+**关掉的两类漂移，都在生成源上改、不在合同副本上改**（§5 步骤 1 的证据是退出码，不是转述）：
+
+1. **§4 登记过的那 2 条**（098 §9.2 / 交 102 的那批）：`providerModels.update` 与
+   `providerModels.probeModels` 接受 `provenance` 而合同未声明。已在 `wire-v1.ts` 给两个
+   schema 补上与 `create` 同形的 `provenance`，枚举与服务端 `_PROVENANCE_ENUMS` 逐值一致
+   （`wireApi` 线上仍是两值 `chat_completions|responses`——`normalize_wire_api` 定义了但全仓零调用，
+   这一点与 §3 的登记一致）。
+2. **§4 从未登记过的一类**：绑定工件后跑 `AGENT_BOX_WIRE_SCHEMA=… pytest tests/server/test_wire_v1.py`
+   时 5 条门红，同一根因——服务端**一直在发**而合同**从未声明**的两个 Profile 读面事实：
+   `recoveryPending`（`wire/projection.py:160`，三态，`null` 是"未知"不是"没被挡"）与
+   `sendability`（`wire/handlers.py:689` 挂在每个返回 Profile 的方法上，117/QA-009，152 把
+   "身份解析得到但本机打不开秘密"钉成 `blocked`）。**控制实验**：用改动前的工件 `c4255b31…`
+   跑同一组门，同样 5 红 ⇒ 这是合流前就存在的**跨仓漂移**，不是本次收敛引入的。
+
+`--compare` 四条轴（`methodsOnlyInServer` / `methodsOnlyInContract` / `requiredSetDrift` /
+`optionalNotInContract`）**全空、退出码 0**；`--check` 报清单现算一致。
+
+**§5 步骤 2/3 的落点**：
+
+- 副本换名：`contract/wire-v1.schema.registered-b1eb4762.json`（名 = 自身 sha256 前 8 位），
+  旧的 `…-c4255b31.json` 移出；`fullstack/generated/README.md` 的指针同步。
+- `test_wire_artifact_113.py`：`CONTRACT` 路径、`REGISTERED_SHA256`、**`KNOWN_DRIFT = []`**。
+- `test_hello_harnesses_105.py`：`ARTIFACT` 路径、`ARTIFACT_SHA256`；该文件里那条
+  `test_wire_protocols_is_not_published_because_the_descriptor_has_no_such_field`
+  **按它自己写好的到期条件**换成 `test_wire_protocols_reached_the_descriptor_and_is_still_not_published`
+  ——092 已在 runtime 线落地（`execution/__init__.py:_validate_wire_protocols`），描述符现在**有**该字段；
+  hello 仍然只发 `{id, credentialKind?, modelControlId?}`，那一半断言原样保留（仍可被证伪）。
+- `test_provider_update_keeps_omitted_112.py`：`ARTIFACT` 路径；属性集锁改为按名排除 `provenance`
+  （它是 112 的 provenance 对象、不是列），空值表仍是整七列，不做静默放宽。
+- `wire-drive-coverage.md` 按 `scripts/server-round1/wire_drive_coverage.py --markdown` 重生成（64/64，缺口 0）。
+- `model_configs/repository.py` 的 `update`：arm-112 的反例门把该方法源码里扫这个 SQL 关键字当作
+  "旧 null 默认 + 保留/清空不分 的形状回来了"的**代理**。合流取的 runtime 注释把它写全了，于是门打在散文上——
+  机制（`KEEP` 默认，另有签名钉）本来是对的。注释改成"一条合并表达式分不清这两种意图"并写明原因，
+  机制断言一字未动。

@@ -50,7 +50,7 @@ BODY = {"displayName": "Official API", "harness": "alpha", "provider": "opaque-p
 #: it for its own digest). Read for one thing only: which columns are nullable.
 ARTIFACT = (pathlib.Path(__file__).resolve().parents[2]
             / "docs/server-round1/fullstack/contract"
-            / "wire-v1.schema.registered-c4255b31.json")
+            / "wire-v1.schema.registered-b1eb4762.json")
 
 
 @pytest.fixture
@@ -349,7 +349,13 @@ def test_the_nullability_table_is_read_from_the_contract_and_not_typed_in():
         if field in NULLABLE_PER_CONTRACT
     }, (NULLABLE_PER_CONTRACT, derived)
     # and the columns this file reasons about are exactly the ones update accepts
-    assert set(properties) == {
+    # `provenance` is excluded by name: it is the Order 112 provenance *object*,
+    # not a column, so it has no row in the nullability table above. LNX-002
+    # declared it in the contract at the generation source because the Server's
+    # own `_PARAM_SHAPES["providerModels.update"]` already accepts it (pinned by
+    # `test_the_locked_param_shape_for_update_is_untouched` below) — excluding it
+    # here keeps the column claim exact instead of widening it to hide the change.
+    assert set(properties) - {"provenance"} == {
         "requestId", "providerModelId", "expectedVersion", "displayName",
         "credentialId", "configuration", "models"}
 

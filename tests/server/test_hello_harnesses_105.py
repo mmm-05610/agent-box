@@ -168,18 +168,28 @@ def test_harness_ids_do_not_leak_into_the_capability_table(hello):
     assert capability_ids & {entry["id"] for entry in result["harnesses"]} == set()
 
 
-# -- the field that must stay absent until 092 lands -----------------------
+# -- the field 092 added: landed on the descriptor, still not published here --
 
-def test_wire_protocols_is_not_published_because_the_descriptor_has_no_such_field(hello):
-    """The order's §Current state lists `wireProtocols` among the descriptor's
-    fields; it is not there (092 is still ahead, and after R-0022 it is the
-    runtime line's). Publishing an invented key would be the easier wrong answer.
+def test_wire_protocols_reached_the_descriptor_and_is_still_not_published(hello):
+    """The replacement this pin asked for. The previous version asserted
+    `wire_protocols` was absent from `HarnessDescriptor` *because 092 had not
+    landed yet*, and said so: "when 092 adds the field it goes red and the
+    replacement - publish the key set - is a deliberate edit."
 
-    This test is a pin, not a description: when 092 adds the field it goes red
-    and the replacement - publish the key set - is a deliberate edit.
+    092 has landed in the LNX-002 integration base (the runtime line carries
+    `execution/__init__.py:_validate_wire_protocols` and
+    `bootstrap/runtime.py` wires the seat map in), so the field is asserted
+    present by name here rather than assumed away.
+
+    What did **not** change: `server.hello` still publishes only what a family
+    declares, and the family directory stays `{id, credentialKind?,
+    modelControlId?}`. Protocol facts ride the `providerModels` read face (092
+    stage 2), which is a different surface — and the registered artifact encodes
+    exactly that, so `test_the_relocked_artifact_accepts_what_the_server_emits`
+    above would refuse an `wireProtocols` key appearing here unannounced.
     """
     fields = {f.name for f in dataclasses.fields(HarnessDescriptor)}
-    assert "wire_protocols" not in fields
+    assert "wire_protocols" in fields
     _runtime, _api, result = hello
     assert all("wireProtocols" not in entry for entry in result["harnesses"])
 
@@ -191,12 +201,18 @@ def test_wire_protocols_is_not_published_because_the_descriptor_has_no_such_fiel
 #: a copy; a file whose name is its own hash cannot quietly stop being current.
 ARTIFACT = (pathlib.Path(__file__).resolve().parents[2]
             / "docs/server-round1/fullstack/contract"
-            / "wire-v1.schema.registered-c4255b31.json")
+            / "wire-v1.schema.registered-b1eb4762.json")
 
 #: The pair this tree registers. The relock landed in the settings line at
 #: `ed6592b7`, encoding the shape this Server actually emits; the digest below
 #: is that artifact, copied into this tree so the gate is reproducible here.
-ARTIFACT_SHA256 = "c4255b31dba1ab2c92b57ae668f00eee8c11d17f1a6f0f37a22fba766d2c8c4d"
+#:
+#: LNX-002 (2026-09-21) re-registered this pair: the artifact now also declares
+#: the profile read-face facts the Server already emitted (`recoveryPending`,
+#: `sendability`) and the two `provenance` params the Server already accepted, so
+#: `server.hello#result` is unchanged but the file it lives in is new. `harnesses`
+#: — the face this order pins — is byte-for-byte the same shape.
+ARTIFACT_SHA256 = "b1eb4762b2a8e13e873967b770854e5e73a948488d4d066da07bc584e693dcd1"
 
 
 def _hello_schema():

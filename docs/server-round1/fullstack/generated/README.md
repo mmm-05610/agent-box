@@ -11,7 +11,7 @@
 
 | 东西 | 现在在哪 | 怎么知道它是哪一份 |
 | --- | --- | --- |
-| 桌面登记的工件**副本**（证据用，非权威） | `../contract/wire-v1.schema.registered-c4255b31.json` | **文件名里就是它的 sha256 前 8 位**，对不上就是过期 |
+| 桌面登记的工件**副本**（证据用，非权威） | `../contract/wire-v1.schema.registered-b1eb4762.json` | **文件名里就是它的 sha256 前 8 位**，对不上就是过期 |
 | 后端自己的**清单工件**（64 方法：派发表 + 参数形状） | `../contract/wire-v1.server-inventory.json` | `python3 scripts/server-round1/wire_artifact.py --print-digest` 现算 |
 | 生成 / 比较 / 门入口参数的口径 | `docs/server-round1/wire-review.md` 的"工件口径（113）"一节 | 一处规则 |
 
