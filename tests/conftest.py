@@ -33,10 +33,21 @@ def pytest_runtest_logreport(report):
         _SKIPPED_REASONS.append(str(report.longrepr))
 
 
-def _presence_lines(presence):
+def _presence_lines(presence, failures=0):
     classes = {f"skip-{index}": presence.classify_skip(reason)
                for index, reason in enumerate(_SKIPPED_REASONS)}
-    return presence.render(classes)
+    return presence.render(classes, failures=failures)
+
+
+def _counted_failures(terminalreporter) -> int:
+    """Everything that means "this run did not pass".
+
+    `failed` is a test that ran and failed. `error` is a collection error or a
+    fixture/teardown error - it must count too, or a session that could not even
+    collect would report the green verdict (LNX-002 review, item 1).
+    """
+    stats = terminalreporter.stats
+    return len(stats.get("failed", [])) + len(stats.get("error", []))
 
 
 def pytest_terminal_summary(terminalreporter):
@@ -46,14 +57,19 @@ def pytest_terminal_summary(terminalreporter):
     artifacts missing, 0 with them added back - and both reads had no failure in
     them. `QA-007` asked a person to write the "Worker 工件在/不在" line; this
     writes it, so a count cannot be quoted without it.
+
+    LNX-002 review, item 1: this block used to compute the failure count and then
+    drop it on the way into `render`, so `verdict()` never saw it and a run with
+    three failures still printed `VERDICT=GREEN_NO_SKIPS`. The count is now
+    threaded through, and collection/teardown errors count as failures.
     """
     presence = _presence()
     if presence is None:
         terminalreporter.write_line(
             f"VERDICT=DEGRADED_PRESENCE_REPORT_UNAVAILABLE ({_PRESENCE_PATH})")
         return
-    failures = len(terminalreporter.stats.get("failed", []))
-    for line in _presence_lines(presence):
+    failures = _counted_failures(terminalreporter)
+    for line in _presence_lines(presence, failures):
         terminalreporter.write_line(line)
     if os.environ.get("AGENTBOX_STRICT_PRESENCE"):
         terminalreporter.write_line("STRICT_PRESENCE=1 (a non-green VERDICT fails the session)")

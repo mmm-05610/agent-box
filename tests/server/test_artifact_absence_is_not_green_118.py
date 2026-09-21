@@ -222,10 +222,26 @@ def test_the_inventory_names_the_gates_that_would_have_been_silent():
 
 
 def test_every_claimed_artifact_path_is_named_here_rather_than_inferred():
-    """A presence report whose list drifted from reality is the 097 disease."""
+    """A presence report whose list drifted from reality is the 097 disease.
+
+    LNX-002 review item 3: what this tree is missing is an **artifact-preparation
+    gap** (the Worker binaries were never built here and the ACP npm closure was
+    never installed). Those absences are named in `PREPARATION_GAPS`, each with
+    the step it waits on, and this asserts the register is *exactly* the measured
+    absence - in both directions:
+
+    * an absence with no entry fails, so a new gap cannot slip in unregistered;
+    * an entry that is actually present fails, so the register cannot rot into a
+      standing excuse once the artifacts exist.
+
+    It does not claim the artifacts are present, and nothing was copied in from
+    another tree to make it pass.
+    """
     labels = {label for label, _present, _relative in presence.artifact_presence()}
     assert labels == set(presence.ARTIFACT_PATHS)
-    present = {label for label, ok, _ in presence.artifact_presence() if ok}
-    assert present == labels, (
-        f"this tree measured these absent: {sorted(labels - present)} - "
-        "the report's own list no longer matches the environment it describes")
+    absent = {label for label, ok, _ in presence.artifact_presence() if not ok}
+    assert absent == set(presence.PREPARATION_GAPS), (
+        f"measured absent: {sorted(absent)}; registered: {sorted(presence.PREPARATION_GAPS)} - "
+        "a new absence needs a named preparation step, and a satisfied entry must leave the register")
+    for label, reason in presence.PREPARATION_GAPS.items():
+        assert reason.strip(), label

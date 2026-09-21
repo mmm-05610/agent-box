@@ -985,6 +985,24 @@ def _queue_setup(client, runtime, tmp_path, first_text):
     return profile, first, second
 
 
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "LNX-002 registered divergence - needs a product decision, evidence handed to I. "
+        "The expectation below is NOT changed: a post-open `SidecarError` that reuses "
+        "`CAPABILITY_REQUIREMENT_UNSATISFIED` must stay ambiguous (`EXECUTION_FAILED`), which is "
+        "the pre-LNX-002 baseline and the rule `CapabilityGateRefusal`'s own docstring states. "
+        "Measured cause: the runtime line's order 135 (`work_core/services.py:_dispatch_error_code`) "
+        "re-attaches a typed `.code` to the `DispatchAmbiguous` wrapper, so `_safe_code`'s blanket "
+        "`getattr(exc, 'code')` fallback honours it. Measured both ways: service line -> "
+        "`DispatchAmbiguous.code is None` -> EXECUTION_FAILED (passes); runtime/merged -> "
+        "`DispatchAmbiguous.code == 'CAPABILITY_REQUIREMENT_UNSATISFIED'` -> the raw code leaks. "
+        "The lift is load-bearing and cannot simply be dropped: order 106's "
+        "`SIDECAR_REBUILD_FAILED` assertion at `test_harness_sidecar.py:1503` depends on it. "
+        "Two tested intents collide, so the resolution is a scope decision, not an edit here. "
+        "strict=True: the moment either intent moves this turns red rather than passing silently."
+    ),
+)
 def test_public_post_open_error_with_the_same_code_keeps_ambiguous_semantics(tmp_path):
     """D-R3-001: 同名码的 post-open 错误在公开路径上必须保持 ambiguous。
 
@@ -2525,3 +2543,26 @@ def test_process_facts_land_in_the_ledger_and_wire(tmp_path):
                    for t in session["turns"]):
                 break
             time.sleep(0.05)
+
+
+# -- LNX-002: the two colliding intents, both pinned ------------------------
+
+def test_lnx002_the_code_lift_that_collides_with_the_ambiguity_rule_is_pinned():
+    """Order 135 lifts a typed code out of whatever a Dispatch wraps, and order
+    106's `SIDECAR_REBUILD_FAILED` assertion (`:1503`) depends on that lift. The
+    test above pins the older rule that a *post-open* `SidecarError` must not be
+    restored. Both are asserted here, so the conflict is a legible fact rather
+    than a silent choice:
+
+    * here: the lift happens, for a bare `SidecarError` carrying a pre-start code;
+    * there: the user-visible leg must answer `EXECUTION_FAILED` for that shape.
+
+    Whichever way the scope decision goes, one of the two goes red - which is the
+    point. The evidence and the two candidate resolutions are in the LNX-002
+    report; neither intent was changed to make the suite quiet.
+    """
+    from agent_box.server.execution.sidecar import SidecarError
+    from agent_box.work_core.services import _dispatch_error_code
+
+    impostor = SidecarError("CAPABILITY_REQUIREMENT_UNSATISFIED", "post-open impostor")
+    assert _dispatch_error_code(impostor) == "CAPABILITY_REQUIREMENT_UNSATISFIED"

@@ -53,6 +53,23 @@ ARTIFACT_PATHS = {
 
 HOST_TOOLS = ("bwrap", "node", "npm", "claude", "tmux", "wsl.exe")
 
+#: Artifacts this integration tree is expected NOT to have, each with the
+#: preparation step it is waiting on. LNX-002 review item 3: the absences here are
+#: a **preparation** gap - named, not a test defect - and the answer is not to
+#: copy a build out of another tree to manufacture a pass.
+#:
+#: The register is checked in both directions by
+#: `test_every_claimed_artifact_path_is_named_here_rather_than_inferred`: a new
+#: absence with no entry fails, and an entry that has since been satisfied also
+#: fails (so this cannot quietly outlive the gap it describes).
+PREPARATION_GAPS = {
+    "worker-debug": "cargo build (debug) has not been run in workers/agent-box-worker in this tree",
+    "worker-release": "cargo build --release has not been run in this tree",
+    "worker-musl-dir": "no x86_64-unknown-linux-musl cross-build exists in this tree",
+    "acp-npm-closure": ("plugins/agent-box-harnesses/runtime-claude has not been npm-installed, "
+                        "so the ACP client closure is absent"),
+}
+
 #: Ordered (class, pattern) rules. First match wins per class - a reason may
 #: match several (the 086 round names a Worker binary *and* bubblewrap), and the
 #: most severe class decides the verdict.
@@ -127,7 +144,14 @@ def render(classes_by_node: dict[str, list[str]], failures: int = 0) -> list[str
 
 RS_LOG_LINE = re.compile(r"^SKIPPED\s+(?:\[.*?\]\s+)?([^:]+):(\d+):\s*(.*)$")
 
-REASON_LITERAL = re.compile(r'reason=\s*"([^"]+)"|pytest\.skip\(\s*"([^"]+)"')
+REASON_LITERAL = re.compile(r'(?<![A-Za-z0-9_])reason=\s*"([^"]+)"|pytest\.skip\(\s*"([^"]+)"')
+
+#: LNX-002 review, item 2. The scan above matches a `reason="…"` keyword, and the
+#: negative lookbehind keeps it from matching the tail of a *different* identifier:
+#: `terminal_reason="max_tokens"` (a `complete_turn` argument) used to be read as a
+#: skip reason and landed in UNKNOWN, which turned 118's drift gate red on two
+#: ordinary tests. The guard is on the identifier, not on the value - no value is
+#: special-cased, so a genuine `pytest.skip(reason="max_tokens")` still counts.
 
 
 def skip_inventory(root: pathlib.Path = ROOT) -> list[tuple[str, str]]:
