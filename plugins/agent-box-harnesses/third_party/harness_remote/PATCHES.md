@@ -89,6 +89,82 @@ absent field is filled in, and a missing field stays missing. What the real
 harnesses report is still a later verification question — the fake peer is what
 this seam is exercised with.
 
+## 5. `bridge/src/acp-client.js` — the stdout line buffer is per-process, and flushed on the way out
+
+Upstream `#start` resets `#stderr` and `#stderrPartial` for every attempt — the in-file comment
+records why: carrying that buffer across restarts made each exit message repeat all the previous
+ones. `#buffer`, the stdout side of the same boundary problem, was never reset. A process that died
+mid-frame therefore left its tail bytes in the buffer, and the next process's first message arrived
+prefixed with them. Measured on this snapshot: the response to the new process's `initialize` was
+consumed as part of the stale line, so a restart never completed the handshake and hung until
+`ACP adapter request timed out: initialize`.
+
+The same `#buffer` also made the *last* frame of a run disappear. `#consume` only dispatches text up
+to a newline, so a final frame written without one stays in the buffer, and neither `close()` nor
+the `exit` handler looked at it. Because a `session/prompt` response is frequently the last frame an
+adapter writes before exiting, a turn could end with no answer reaching the caller and no trace of
+why.
+
+This patch keeps the frame rules untouched and fixes only the buffer's lifetime:
+
+- `#start` clears `#buffer` alongside the two stderr fields, so a restart begins clean.
+- New `#flushBuffer()` hands whatever is left to the existing `#consumeMessage`, called from the
+  `exit` handler (before the exit is reported and pending work is rejected, while the child
+  identity is still this one) and from `close()` (before the child is dropped). `#consume` never
+  leaves more than one newline-free fragment in the buffer, so this is at most one frame.
+- Unparseable residue takes the existing `protocol-error` channel. No new event type, no change to
+  what the bridge projects outward: this is the internal frame lifecycle only.
+
+Deliberately **not** in this patch: an orphan response (`id` absent from `#pending`) and a
+well-formed JSON message carrying neither `id` nor `method` still produce no event. Making those
+visible adds an observable on the bridge's internal event bus and belongs to the frame-layer
+replacement, where it can be checked against the six-row baseline invariant at the same time
+(AgentBox H, central ruling `H-increment1b-framebuffer.md` §3).
+
+> Numbering note: the central approval for the truncation-visibility work (`H-increment1-truncation.md`)
+> called the `acp-service.js` change "补丁#5", but `acp-client.js` above claimed §5 first — both
+> increments were approved in the same window. Patch #4 is this file's `acp-service.js` stopReason
+> retention; the truncation-visibility change that follows is §6. The section number carries no
+> meaning beyond order of writing; the `PATCH (AgentBox 增量1)` markers in the source are the
+> authority for what belongs to this patch.
+
+## 6. `bridge/src/acp-service.js` — a turn's silent tail and its missing stopReason become facts
+
+Patch #4 stopped discarding the `session/prompt` response, but it left two things unreadable on the
+completion leg, both measured against this snapshot before the change (AgentBox H, `H2-current-state-map.md`
+§6b X1–X3):
+
+- A turn whose response carried no `stopReason` resolved exactly like a turn that ended cleanly.
+  Nothing upstream could distinguish "the harness said `end_turn`" from "the harness said nothing",
+  so a truncated answer was reported as a finished one.
+- Once the drain window closed, `#handleNotification` returned early for a late assistant chunk.
+  The chunk and the fact that it had been rejected both disappeared. With `promptSettleMs = 0`
+  (every AgentBox profile until this round) the window never closed at all and the session stayed
+  in `#promptedSessions` for its lifetime, so a *later* turn's chunks were folded into the earlier
+  one — the "session still rewritten after completion" behaviour X1 measured.
+
+This patch changes the reporting, not the accept/reject decision:
+
+- `responseRecorded` distinguishes "answered without a stopReason" from "never answered". A turn
+  that answered but did not report a reason now emits `session.stop_reason_not_reported` with the
+  raw value (`null` when absent). It is deliberately **not** mapped to `end_turn`; a turn that
+  errored is covered by `session.error` and cannot produce both.
+- When a session's own drain window closes, that session enters `#tailWindowClosed`, and every
+  assistant chunk rejected after that point emits `session.tail_dropped` with a running count and
+  the character length of the text that was dropped. The pre-existing rejection is unchanged:
+  this makes the loss visible, it does not widen the window or rescue the chunk.
+- A new turn clears both records, so a count never bleeds from one turn into the next.
+- Sessions with `promptSettleMs = 0` are never added to `#tailWindowClosed`. Their permissive
+  historical behaviour (chunks after the response are accepted) is preserved verbatim; making a
+  zero-drain profile opt into a real window is a per-profile value decision, and the five AgentBox
+  profiles now declare one (see `runtime/profile_extensions.mjs`), which is what turns X1's
+  unbounded rewrite into a bounded, reported window for them.
+
+The events are emitted on the bridge's internal `AcpService` bus with the existing
+`session.*`/`#emit(type, sessionId, extra)` convention. They are **not** part of the public wire:
+projecting them into the execution surface is Server's call, and the envelope shape stays frozen
+(central ruling R3, `message.final` → IFR-06).
+
 ## Not adopted
 
 `machine-daemon.js`, `daemon-cli.js`, `machine-registry.js`, `task-*`,

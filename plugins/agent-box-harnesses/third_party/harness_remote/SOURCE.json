@@ -10,8 +10,8 @@
       "path": "bridge/src/acp-client.js",
       "origin": "upstream",
       "upstream_sha256": "d7546376cf48035b2b04170769331b9acb94de3371b5aa9ad093d132dfdbb87d",
-      "current_sha256": "977c00ec986bd48bca3dc164c3ff8aa50769b886528c5feaea50be113d8dd4a7",
-      "patch": "async permission resolver (see PATCHES.md)"
+      "current_sha256": "47d34b48b13633b559a9707b52ecf74a94a647af916eb082ad990ebb0a9f28c1",
+      "patch": "async permission resolver; per-process stdout line buffer (see PATCHES.md §1 and §5)"
     },
     {
       "path": "bridge/src/acp-prompt-echo-filter.js",
@@ -29,8 +29,8 @@
       "origin": "upstream",
       "upstream_sha256": "050760aa5cc1c88a29eb1668c74467165effbec23295f03379c7e25f8733bc81",
       "current_sha256": "050760aa5cc1c88a29eb1668c74467165effbec23295f03379c7e25f8733bc81",
-      "patched_sha256": "51f3b4e6998a2ce9505ce6833c8e38cfa7d3e12444f61388e9f2672b9e202448",
-      "patch": "grouped config options in model selection; turn response retained so stopReason survives (see PATCHES.md)"
+      "patched_sha256": "39f4c5e4f6a048693ca161f559ed803f28b57258ca2c8a896d4e367fae00b0c4",
+      "patch": "grouped config options in model selection; turn response retained so stopReason survives; missing stopReason and post-window tail chunks reported (see PATCHES.md §3–§4 and §6)"
     },
     {
       "path": "bridge/src/agent-model-catalog.js",

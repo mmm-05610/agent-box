@@ -415,6 +415,8 @@ export class AcpService {
       this.#turnGenerations.delete(sessionID)
       this.#cancelledSessions.delete(sessionID)
       this.#promptedSessions.delete(sessionID)
+      this.#tailWindowClosed.delete(sessionID)
+      this.#tailsDroppedAfterSettle.delete(sessionID)
       this.#queues.delete(sessionID)
       this.#dirtySnapshots.delete(sessionID)
       this.#dirtyStart.delete(sessionID)
@@ -451,6 +453,12 @@ export class AcpService {
   // completion leg instead of being discarded with the request promise.
   #turnResponses = new Map()
   #promptedSessions = new Set()
+  // PATCH (AgentBox 增量1): which sessions have had their post-turn drain window close, and how
+  // many assistant chunks arrived after it closed. A chunk that the live-turn gate rejects while
+  // its session is listed here is a tail the adapter sent too late, and that loss is reported
+  // instead of vanishing. Cleared when the session starts another turn or is cancelled.
+  #tailWindowClosed = new Set()
+  #tailsDroppedAfterSettle = new Map()
   #chunkMessageIDs = new Map()
   // PI's journal is authoritative, but a provider rejection can be emitted by ACP before the journal
   // has flushed its terminal assistant error. These ids keep only that short-lived bridge copy alive.
@@ -833,6 +841,8 @@ export class AcpService {
     this.#turnGenerations.delete(sessionID)
     this.#cancelledSessions.delete(sessionID)
     this.#promptedSessions.delete(sessionID)
+    this.#tailWindowClosed.delete(sessionID)
+    this.#tailsDroppedAfterSettle.delete(sessionID)
     this.#queues.delete(sessionID)
     this.#active.delete(sessionID)
     this.#acpOpenSessions.delete(sessionID)
@@ -1308,6 +1318,10 @@ export class AcpService {
       }
     }
     this.#promptedSessions.add(sessionID)
+    // PATCH (AgentBox 增量1): a new turn reopens the window, so a tail reported for the previous one
+    // can never be attributed to this turn.
+    this.#tailWindowClosed.delete(sessionID)
+    this.#tailsDroppedAfterSettle.delete(sessionID)
     if (!recorded) this.#recordPrompt(sessionID, text, attachments)
     this.#active.add(sessionID)
     this.#chunkMessageIDs.delete(`${sessionID}:assistant`)
@@ -1324,10 +1338,14 @@ export class AcpService {
     // being dropped. The generation guard is the same one the failure/`finally`
     // paths already use: a cancelled or superseded turn stores nothing, so no
     // other turn can inherit its reason. Absent stays absent - nothing is invented.
+    // PATCH (AgentBox 增量1): `responseRecorded` separates "this turn answered, without a
+    // stopReason" from "this turn never answered", which the completion leg reports differently.
+    let responseRecorded = false
     void promptRequest.then(
       (response) => {
         if (this.#turnGenerations.get(sessionID) !== generation) return
         this.#turnResponses.set(`${sessionID}:${generation}`, response)
+        responseRecorded = true
       },
       () => {}
     )
@@ -1345,11 +1363,29 @@ export class AcpService {
         await new Promise((resolve) => setTimeout(resolve, this.#promptSettleMs))
       }
       if (this.#turnGenerations.get(sessionID) !== generation) return
+      // PATCH (AgentBox 增量1): "the adapter never said why the turn ended" is a different fact
+      // from "the turn ended cleanly". Patch #4 stopped discarding the response; this makes its
+      // absence readable on the completion leg. A turn that errored is covered by `session.error`
+      // and stays out of here, so the two never report the same turn.
+      if (responseRecorded) {
+        const response = this.#turnResponses.get(`${sessionID}:${generation}`)
+        if (typeof response?.stopReason !== "string") {
+          this.#emit("session.stop_reason_not_reported", sessionID, {
+            responseRecorded: true,
+            stopReason: response?.stopReason ?? null,
+          })
+        }
+      }
       this.#active.delete(sessionID)
       // Older adapters intentionally deliver assistant chunks after their RPC response, so their
       // historical zero-drain behavior must stay permissive. PI opts into a real drain window above;
       // once it closes, an even later chunk belongs to a subsequent native lifecycle, not this turn.
-      if (this.#promptSettleMs > 0) this.#promptedSessions.delete(sessionID)
+      if (this.#promptSettleMs > 0) {
+        this.#promptedSessions.delete(sessionID)
+        // PATCH (AgentBox 增量1): from here on, a rejected assistant chunk is a *reported* loss.
+        this.#tailWindowClosed.add(sessionID)
+        this.#tailsDroppedAfterSettle.delete(sessionID)
+      }
       this.#chunkMessageIDs.delete(`${sessionID}:assistant`)
       // The turn is over, so no activity it started is still running, whatever the adapter said.
       this.#settleActivity(sessionID)
@@ -2015,7 +2051,22 @@ export class AcpService {
     const partType = thought ? "reasoning" : image ? "file" : "text"
     // Acknowledgements only suppress a live echo of the prompt we just recorded;
     if (role === "assistant" && !replaying && this.#cancelledSessions.has(sessionId)) return
-    if (role === "assistant" && !replaying && !this.#active.has(sessionId) && !this.#promptedSessions.has(sessionId)) return
+    if (role === "assistant" && !replaying && !this.#active.has(sessionId) && !this.#promptedSessions.has(sessionId)) {
+      // PATCH (AgentBox 增量1): for a session whose drain window already closed, this chunk is not
+      // "traffic from a later lifecycle" that can be ignored - it is content this turn produced and
+      // the bridge is throwing away. Report it, with the running count and size, on the same bus the
+      // Worker already forwards. Sessions without a closed window keep the original silent behavior.
+      if (this.#tailWindowClosed.has(sessionId)) {
+        const dropped = (this.#tailsDroppedAfterSettle.get(sessionId) ?? 0) + 1
+        this.#tailsDroppedAfterSettle.set(sessionId, dropped)
+        this.#emit("session.tail_dropped", sessionId, {
+          dropped,
+          characters: typeof update.content?.text === "string" ? update.content.text.length : 0,
+          sessionUpdate: update.sessionUpdate,
+        })
+      }
+      return
+    }
     if (role === "user" && !replaying && this.#isAcknowledgedPromptChunk(sessionId, update.content.text)) return
     if (role === "user" && !image && isHarnessInjectedText(update.content.text)) return
     if (!replaying && session) session.updatedAt = new Date().toISOString()

@@ -108,6 +108,27 @@ export function textOfParts(parts) {
     .map((part) => part.text).join("")
 }
 
+/**
+ * 尾部校准的判定：流式文本、权威记录与实际到达的增量数三者之间的关系。
+ *
+ * PATCH (AgentBox 增量1)：与 `tailSuffix` 同样单独成函数是为了能被测；这里只**给结论**，
+ * 补发与审计由 `prompt` 执行。结论本身要能被调用方看见，因为审计文件是可选的、写失败也不
+ * 报错，而"产品收到的文本未必是原生记录的那一份"只有转写的所有者能决定怎么处理。
+ *
+ * - `record-only` —— SSE 一个增量都没到：整段记录就是需要补发的全部。
+ * - `completed`  —— 记录以流为前缀且更长：补发缺的那一段后缀，已流出的一字不改。
+ * - `mismatch`   —— 流不是记录的前缀：两者不一致，不猜顺序、不重写，只报事实。
+ * - `matched`    —— 流与记录完全一致。
+ * - `record-empty` —— 记录里没有助手文本可比（例如只回了 reasoning），不能称其为一致。
+ */
+export function tailVerdict({ streamed, recorded, deltas }) {
+  if (deltas === 0) return { outcome: "record-only", supplement: typeof recorded === "string" ? recorded : "" }
+  const suffix = tailSuffix(streamed, recorded)
+  if (suffix) return { outcome: "completed", supplement: suffix }
+  if (recorded && !recorded.startsWith(streamed)) return { outcome: "mismatch", supplement: "" }
+  return { outcome: recorded ? "matched" : "record-empty", supplement: "" }
+}
+
 /** 审计钩子：只有显式声明且位于本次工作目录内的绝对路径才会被写入。 */
 export function auditPathFor(environment, directory) {
   const value = environment ? environment.AGENTBOX_DRIVER_AUDIT : undefined
@@ -447,20 +468,25 @@ export async function createDriver(context) {
       active = null
     }
     const authoritative = textOfParts(response?.parts)
-    if (current.deltas === 0) {
-      // 兜底：SSE 未送达任何增量时，把这一轮的最终文本作为一次增量上报，
-      // 保证产品的转写不会丢掉真实答案。
-      if (authoritative) emit({ event: DELTA_EVENT, data: { text: authoritative } })
-    } else if (tailSuffix(current.text, authoritative)) {
-      // 尾部校准：`message.part.delta` 可能比 prompt 的返回晚到，最后一个增量就永远
-      // 丢了（实测比原生记录少一片）。以返回值为权威，只补缺失的后缀，已流出的部分
-      // 一字不改。
-      const suffix = tailSuffix(current.text, authoritative)
-      emit({ event: DELTA_EVENT, data: { text: suffix } })
-      audit({ event: "tail-completed", sessionId, missing: suffix.length })
-    } else if (authoritative && !authoritative.startsWith(current.text)) {
-      // 流与记录不一致时只记录事实，不猜顺序、不重写已发出的增量。
+    // PATCH (AgentBox 增量1): the tail calibration's verdict has to reach the caller. Before this it
+    // was written only to the audit file, which is opt-in (`AGENTBOX_DRIVER_AUDIT`) and whose failed
+    // writes are swallowed on purpose, so with auditing off a mismatch between what the product was
+    // streamed and what the native record holds left no trace at all. The verdict carries lengths
+    // only — no transcript content is part of the fact — and every branch keeps its old action.
+    const verdict = tailVerdict({
+      streamed: current.text, recorded: authoritative, deltas: current.deltas,
+    })
+    if (verdict.supplement) emit({ event: DELTA_EVENT, data: { text: verdict.supplement } })
+    if (verdict.outcome === "completed") {
+      audit({ event: "tail-completed", sessionId, missing: verdict.supplement.length })
+    } else if (verdict.outcome === "mismatch") {
       audit({ event: "tail-mismatch", sessionId, streamed: current.text.length, recorded: authoritative.length })
+    }
+    const tail = {
+      outcome: verdict.outcome,
+      emittedCharacters: verdict.supplement.length,
+      streamedCharacters: current.text.length,
+      recordedCharacters: authoritative.length,
     }
     audit({
       event: "prompt", sessionId, model: String(model),
@@ -473,6 +499,7 @@ export async function createDriver(context) {
       sessionId,
       messageId: response && response.info ? response.info.id ?? null : null,
       deltas: current.deltas,
+      tail,
     }
   }
 

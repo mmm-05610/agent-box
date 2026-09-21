@@ -30,6 +30,24 @@ const COMMON_ACP_CAPABILITIES = {
 }
 
 /**
+ * Post-turn drain window (D-0011 truncation visibility).
+ *
+ * An ACP adapter may write the `session/prompt` response and then its last `session/update`
+ * notifications. Without a window, the bridge broadcasts "this turn settled" — and persists it —
+ * before that tail is ingested, so the completion fact can precede the content it describes and the
+ * session can still be rewritten afterwards. With a window, the tail is ingested first, and a chunk
+ * that still arrives late is reported as a loss instead of disappearing (`session.tail_dropped`,
+ * see `acp-service.js`).
+ *
+ * 250 ms is a **neutral declared value, not a per-harness measurement**: it is the only window size
+ * this repository has ever had evidence for (Pi's upstream profile). The other ACP families here
+ * have not been measured against a real peer this round, which is exactly why the loss is now
+ * reported rather than assumed away — a wrong number shows up in the record instead of silently
+ * dropping content. Each family's own value stays an open verification item (H5 增量 1).
+ */
+const ACP_PROMPT_SETTLE_MS = 250
+
+/**
  * Capability claims below are limited to what the bounded zero-credential
  * handshake actually advertised (promptCapabilities `image`;
  * sessionCapabilities `fork`/`list`/`resume`). Anything not observed stays
@@ -46,6 +64,7 @@ export const AGENTBOX_HARNESS_PROFILES = {
     // resolver decides, and an unanswered decision denies. `deny` is the
     // honest default for the prompt-less model-catalog connection too.
     permissionMode: "deny",
+    promptSettleMs: ACP_PROMPT_SETTLE_MS,
     modelVariantConfigIDs: [],
     capabilities: {
       ...COMMON_ACP_CAPABILITIES,
@@ -78,6 +97,7 @@ export const AGENTBOX_HARNESS_PROFILES = {
     command: process.platform === "win32" ? "dsh.cmd" : "dsh",
     args: ["--profile", "acp"],
     permissionMode: "deny",
+    promptSettleMs: ACP_PROMPT_SETTLE_MS,
     modelVariantConfigIDs: [],
     capabilities: {
       ...COMMON_ACP_CAPABILITIES,
@@ -111,6 +131,7 @@ export const AGENTBOX_HARNESS_PROFILES = {
     args: [],
     adapterCommand: process.platform === "win32" ? "claude-agent-acp.cmd" : "claude-agent-acp",
     permissionMode: "deny",
+    promptSettleMs: ACP_PROMPT_SETTLE_MS,
     modelVariantConfigIDs: [],
     capabilities: {
       ...COMMON_ACP_CAPABILITIES,
@@ -137,6 +158,7 @@ export const AGENTBOX_HARNESS_PROFILES = {
     args: ["--acp"],
     adapterCommand: process.platform === "win32" ? "qwen.cmd" : "qwen",
     permissionMode: "deny",
+    promptSettleMs: ACP_PROMPT_SETTLE_MS,
     modelVariantConfigIDs: [],
     capabilities: {
       ...COMMON_ACP_CAPABILITIES,
@@ -164,6 +186,7 @@ export const AGENTBOX_HARNESS_PROFILES = {
     args: ["acp"],
     adapterCommand: process.platform === "win32" ? "kilo.exe" : "kilo",
     permissionMode: "deny",
+    promptSettleMs: ACP_PROMPT_SETTLE_MS,
     modelVariantConfigIDs: [],
     capabilities: {
       ...COMMON_ACP_CAPABILITIES,

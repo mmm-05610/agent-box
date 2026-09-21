@@ -137,6 +137,10 @@ export class AcpClient extends EventEmitter {
     // message repeat the previous ones, so a single "pi-acp: not found" arrived three times over.
     this.#stderr = ""
     this.#stderrPartial = ""
+    // PATCH (AgentBox 增量1b): the same carry-over existed one side over. A half stdout frame from
+    // the previous process was prepended to this process's first message, which ate the response to
+    // `initialize` and wedged restart until the startup timeout.
+    this.#buffer = ""
     child.stdout.setEncoding("utf8")
     child.stderr.setEncoding("utf8")
     child.stdout.on("data", (chunk) => this.#consume(chunk))
@@ -154,6 +158,10 @@ export class AcpClient extends EventEmitter {
         this.emit("stderr", this.#stderrPartial)
         this.#stderrPartial = ""
       }
+      // PATCH (AgentBox 增量1b): a final frame without a trailing newline never reached
+      // `#consumeMessage`, so the turn's own response could vanish in silence. Flush it while the
+      // child identity is still this one, before the exit is reported and pending work is rejected.
+      this.#flushBuffer()
       const reason = this.#stderrSummary()
       this.#handleExit(new Error(
         `ACP adapter exited (${code ?? "unknown"}${signal ? `, ${signal}` : ""})${reason ? `: ${reason}` : ""}`
@@ -255,6 +263,9 @@ export class AcpClient extends EventEmitter {
 
   close() {
     const child = this.#child
+    // PATCH (AgentBox 增量1b): see the `exit` flush. Flushing before the child is dropped keeps a
+    // residue that is a valid response from being lost when the bridge closes on purpose.
+    this.#flushBuffer()
     this.#child = undefined
     if (child && !child.killed) child.kill()
     this.#rejectPending(new Error("ACP adapter closed"))
@@ -269,6 +280,19 @@ export class AcpClient extends EventEmitter {
       if (line) this.#consumeMessage(line)
       boundary = this.#buffer.indexOf("\n")
     }
+  }
+
+  /**
+   * PATCH (AgentBox 增量1b): give whatever is left in the line buffer the same treatment as a
+   * complete line. `#consume` only ever leaves a residue without a newline in it, so this is at most
+   * one frame. Unparseable residue takes the existing `protocol-error` channel rather than
+   * introducing a new event type.
+   */
+  #flushBuffer() {
+    const residue = this.#buffer
+    this.#buffer = ""
+    const line = residue.trim()
+    if (line) this.#consumeMessage(line)
   }
 
   #consumeMessage(line) {
