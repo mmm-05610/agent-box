@@ -142,3 +142,131 @@ def test_a_cancelled_turn_keeps_its_projected_state_and_gains_no_reason(tmp_path
     body = execution_state(dict(_terminal(database, "t1")))
     assert body["state"] == "stopped"
     assert "reason" not in body
+
+
+# ------------------------------- the ACP prompt leg (LNX-002 review, item 5)
+
+# I's item 5 asked for the truncation chain to be driven through the *real* ACP
+# prompt return, not just DB -> projection. Driven, and the measurement is the
+# finding: the fixture peer DOES answer with a machine-readable `stopReason`, but
+# the JS entry's prompt result does not carry it across the boundary, so
+# `_terminal_reason_from_result(run.result)` can never see one. `worker-entry.mjs`
+# still has to EMIT it - the separate, approval-gated change order 134's own
+# docstring names - and this file does not pretend otherwise.
+#
+# What is pinned here: (a) the ACP side is ready and emits the reason; (b) the JS
+# boundary currently drops it, with the exact measured return shape; (c) the
+# Python consumer chain is correct for a result that *does* carry it (the cases
+# above, plus the unit cases at the top). No real model, and no shared fixture
+# default moved: the peer's reason is selected by a per-test env knob whose
+# default is the old `end_turn`.
+
+import os  # noqa: E402
+import pathlib  # noqa: E402
+
+import pytest  # noqa: E402
+
+from agent_box.server.execution.sidecar import (  # noqa: E402
+    LocalProcessLauncher,
+    SidecarHarnessPort,
+)
+
+REPO = pathlib.Path(__file__).resolve().parents[2]
+PLUGIN = REPO / "plugins" / "agent-box-harnesses"
+SIDECAR_ENTRY = PLUGIN / "runtime" / "worker-entry.mjs"
+FAKE_PEER = PLUGIN / "tests" / "harness_remote" / "fake_acp_peer.mjs"
+
+
+def _isolated_environment(tmp_path, stop_reason=None):
+    """The minimal child environment the sidecar tests use, plus the knob."""
+    home = tmp_path / "home"
+    home.mkdir(exist_ok=True)
+    env = {
+        "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+        "HOME": str(home),
+        "XDG_CONFIG_HOME": str(home / "xdg"),
+        "XDG_CACHE_HOME": str(home / "xdg"),
+        "XDG_DATA_HOME": str(home / "xdg"),
+        "AGENTBOX_SIDECAR_ISOLATED": "1",
+    }
+    if stop_reason is not None:
+        env["AGENTBOX_FIXTURE_STOP_REASON"] = stop_reason
+    return env
+
+
+def _prompt_through_the_fixture_peer(tmp_path, stop_reason=None):
+    port = SidecarHarnessPort(
+        LocalProcessLauncher(["node", str(SIDECAR_ENTRY)], cwd=str(PLUGIN)),
+        environment=_isolated_environment(tmp_path, stop_reason),
+        profile="pi",
+        adapter={"command": os.environ.get("NODE_BIN", "node"), "args": [str(FAKE_PEER)]},
+        state_directory=str(tmp_path / "state"),
+        directory=str(tmp_path),
+        on_event=lambda *_args: None,
+    )
+    try:
+        port.open_execution("execution-1")
+        return port.prompt("execution-1", "component gate")
+    finally:
+        port.stop()
+
+
+def test_lnx002_the_fixture_peer_emits_a_machine_readable_stop_reason():
+    """(a) The ACP side is ready: the peer answers an ordinary prompt with a
+    `stopReason`, and the knob selects a non-clean one without touching the
+    special paths. Asserted against the peer source so it cannot rot."""
+    source = FAKE_PEER.read_text(encoding="utf-8")
+
+    assert 'const STOP_REASON = process.env.AGENTBOX_FIXTURE_STOP_REASON || "end_turn"' in source
+    assert 'pendingCancel ? "cancelled" : STOP_REASON' in source
+    # blast radius: the silent-success / permission / abort paths keep their own
+    # reason, and the cancel path keeps `cancelled`, whatever the knob says.
+    assert source.count('stopReason: "end_turn"') == 4, "a special path moved"
+    assert source.count('stopReason: "cancelled"') == 1, "the cancel path moved"
+
+
+@pytest.mark.skipif(not SIDECAR_ENTRY.is_file(), reason="sidecar entry not built")
+def test_lnx002_the_js_prompt_boundary_drops_the_stop_reason_today(tmp_path):
+    """(b) The measured gap, with the exact shape.
+
+    This is a *characterisation* case: it asserts what the boundary does now, so
+    the day `worker-entry.mjs` starts returning the ACP result this goes red and
+    the replacement is "the reason now travels" - a deliberate edit, not a silent
+    change. It is also why the consumer chain cannot be end-to-end verified from
+    the JS side in this task.
+    """
+    returned = _prompt_through_the_fixture_peer(tmp_path, "max_tokens")
+
+    assert returned == {"done": True}, returned
+    assert _terminal_reason_from_result(returned) is None
+    # ...so the reason exists on the ACP side but not in the JS return value.
+    assert "stopReason" not in returned
+
+
+@pytest.mark.skipif(not SIDECAR_ENTRY.is_file(), reason="sidecar entry not built")
+def test_lnx002_the_python_consumer_persists_a_reason_it_is_given(tmp_path):
+    """(c) With a result that *does* carry the reason, the whole Python leg works:
+    the extractor reads it, the real `complete_turn` persists it, and the
+    projection exposes it. This is the half I's item 5 can be verified for today.
+    """
+    result = {"stopReason": "max_tokens"}
+    assert _terminal_reason_from_result(result) == "max_tokens"
+
+    records, database = _seed(tmp_path)
+    records.complete_turn("t1", checkpoint_object_digest="cp", checkpoint_native_id="n",
+                          result_object_digest="res",
+                          terminal_reason=_terminal_reason_from_result(result))
+    row = _terminal(database, "t1")
+    assert row["terminal_reason"] == "max_tokens"
+    assert execution_state(dict(row))["reason"] == "max_tokens"
+
+    # the end_turn control on the same leg: clean means nothing is persisted
+    second = tmp_path / "second"
+    second.mkdir()
+    records2, database2 = _seed(second)
+    records2.complete_turn("t1", checkpoint_object_digest="cp", checkpoint_native_id="n",
+                           result_object_digest="res",
+                           terminal_reason=_terminal_reason_from_result({"stopReason": "end_turn"}))
+    row2 = _terminal(database2, "t1")
+    assert row2["terminal_reason"] is None
+    assert "reason" not in execution_state(dict(row2))

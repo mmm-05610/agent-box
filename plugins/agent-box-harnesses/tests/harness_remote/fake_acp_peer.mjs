@@ -21,6 +21,15 @@ const SILENCE_MS = Number.parseInt(process.env.AGENTBOX_FIXTURE_SILENCE_MS ?? "0
 const promptSilenceMs = Number.isFinite(SILENCE_MS) && SILENCE_MS > 0 ? SILENCE_MS : 0
 const PROMPT_SILENCE_DEFAULT_MS = 8_000
 
+// LNX-002: the machine-readable stop reason this peer answers an ordinary prompt
+// with. Defaults to `end_turn`, so every existing prompt path is byte-identical
+// and no shared fixture default moves; the truncation pass-through test sets
+// `AGENTBOX_FIXTURE_STOP_REASON=max_tokens` to drive the ACP result -> JS return
+// -> Python completion leg with a non-clean reason. Only the ordinary completion
+// below honours it: the silent-success, permission, cancel and abort paths keep
+// their own reasons on purpose.
+const STOP_REASON = process.env.AGENTBOX_FIXTURE_STOP_REASON || "end_turn"
+
 // The peer declares exactly the one model it accepts. A bridge that is asked for
 // a model resolves it against the options the harness advertised and refuses
 // anything not on the list, so a peer that advertises none is a harness that can
@@ -137,7 +146,7 @@ for await (const line of rl) {
       setTimeout(() => send({ jsonrpc: "2.0", id, error: { code: -32001, message: "controlled failure" } }), 500)
       continue
     }
-    send({ jsonrpc: "2.0", id, result: { stopReason: pendingCancel ? "cancelled" : "end_turn" } })
+    send({ jsonrpc: "2.0", id, result: { stopReason: pendingCancel ? "cancelled" : STOP_REASON } })
     pendingCancel = false
   } else if (method === "session/cancel") {
     pendingCancel = true
