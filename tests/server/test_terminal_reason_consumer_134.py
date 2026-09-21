@@ -15,6 +15,7 @@ change); this order is only the safe consumer that turns it on when it arrives.
 from __future__ import annotations
 
 from agent_box.server.execution.sidecar_backend import _terminal_reason_from_result
+from agent_box.server.wire.projection import execution_state
 from agent_box.server.idempotency import IdempotentRecords
 from agent_box.server.sessions import SessionRecords
 from agent_box.storage import Database
@@ -83,3 +84,61 @@ def test_complete_turn_without_reason_leaves_it_null(tmp_path):
     records.complete_turn("t1", checkpoint_object_digest="cp", checkpoint_native_id="n",
                           result_object_digest="res")
     assert _terminal(database, "t1")["terminal_reason"] is None
+
+
+# ------------------------------------------- the wire reason (LNX-002)
+
+# I's `control/LNX-003-review.md` item 2 asked for this channel (ACP result -> JS
+# pass-through -> the Python dual-spelling read) to be verified on the **wire**
+# half as well. The docstring above claims the projection "already exposes [it]
+# as `reason`" and nothing drove that claim. These cases close the loop from the
+# persisted row through the projection, and they add assertions only: they reuse
+# `_seed` / `_terminal` and change no shared fixture, so no other case's meaning
+# moves. Scope (item 5): this verifies the *consumer* on the local leg. It does
+# not claim real-harness truncation is solved, and an undeclared remote-Worker
+# schema is not evidence that this local channel cannot carry the reason.
+
+def test_the_persisted_max_tokens_reason_reaches_the_wire_projection(tmp_path):
+    """DB -> projection, end to end: `terminal_reason` becomes the wire `reason`."""
+    records, database = _seed(tmp_path)
+    records.complete_turn("t1", checkpoint_object_digest="cp", checkpoint_native_id="n",
+                          result_object_digest="res", terminal_reason="max_tokens")
+    row = _terminal(database, "t1")
+    assert row["terminal_reason"] == "max_tokens"        # persisted (134)
+
+    body = execution_state(dict(row))
+    assert body["state"] == "completed"
+    assert body["reason"] == "max_tokens"                # and visible to the leg
+
+
+def test_the_end_turn_control_carries_no_reason_on_the_wire(tmp_path):
+    """The `end_turn` control, kept at the wire layer: a clean turn claims nothing.
+
+    Without this half, "the reason is exposed" would also be satisfied by a
+    projection that invented one for every turn.
+    """
+    records, database = _seed(tmp_path)
+    records.complete_turn("t1", checkpoint_object_digest="cp", checkpoint_native_id="n",
+                          result_object_digest="res")
+    row = _terminal(database, "t1")
+
+    assert row["terminal_reason"] is None
+    assert "reason" not in execution_state(dict(row))
+
+
+def test_a_cancelled_turn_keeps_its_projected_state_and_gains_no_reason(tmp_path):
+    """The existing cancel behaviour, preserved at the projection layer.
+
+    `cancelled` projects as `stopped` - the contract's word - and the truncation
+    channel adds no key to it, so switching truncation on cannot retell a user's
+    stop as a truncation.
+    """
+    records, database = _seed(tmp_path)
+    records.complete_turn("t1", checkpoint_object_digest="cp", checkpoint_native_id="n",
+                          result_object_digest="res")
+    with database.transaction() as conn:
+        conn.execute("UPDATE server_turns SET state='cancelled' WHERE id='t1'")
+
+    body = execution_state(dict(_terminal(database, "t1")))
+    assert body["state"] == "stopped"
+    assert "reason" not in body
