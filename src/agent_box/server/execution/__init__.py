@@ -14,6 +14,9 @@ from agent_box.resource_contracts.harness_capabilities import (
     merge_capabilities,
     validate_claims,
 )
+from agent_box.server.execution.execution_contract import (
+    CancelOutcome, ExecutionObservation, ExecutionReceipt, ExecutionRequest,
+)
 from agent_box.server.execution.protocols import (
     CANONICAL_PROTOCOLS, CANONICAL_PROTOCOL_SET, MAX_WIRE_PROTOCOLS,
 )
@@ -48,10 +51,20 @@ def _validate_wire_protocols(value: Mapping[str, str]) -> dict[str, str]:
 
 
 class TurnExecutionPort(Protocol):
-    """Product-facing dispatch surface; plugins own the native semantics."""
+    """Product-facing dispatch surface; plugins own the native semantics.
+
+    C-EXEC@v1 block-1 (O-3): the three neutral verbs below are the additive
+    carrier of the contract. The bool ``cancel`` above is the temporary
+    compatibility shell and stays byte-compatible until the consumer switches
+    and the shell is deleted in a separately approved increment.
+    """
 
     def accept(self, turn_id: str, *, overrides: Mapping[str, Any] | None = None) -> None: ...
     def cancel(self, turn_id: str) -> bool: ...
+
+    def submit(self, request: ExecutionRequest) -> ExecutionReceipt: ...
+    def cancel_execution(self, execution_key: str) -> CancelOutcome: ...
+    def observe_execution(self, execution_key: str) -> ExecutionObservation: ...
 
 
 @dataclass(frozen=True)
@@ -153,5 +166,6 @@ class HarnessRegistry:
 from .sidecar_backend import SidecarExecutionBackend  # noqa: E402
 
 __all__ = [
+    "CancelOutcome", "ExecutionObservation", "ExecutionReceipt", "ExecutionRequest",
     "HarnessDescriptor", "HarnessRegistry", "SidecarExecutionBackend", "TurnExecutionPort",
 ]

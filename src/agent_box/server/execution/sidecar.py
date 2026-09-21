@@ -214,11 +214,39 @@ def _require_matching_artifact_authorizations(
         raise ValueError("SIDECAR_RUNTIME_ARTIFACT_DECLARATION_MISMATCH")
 
 
+def _safe_bundle_relative(value: str) -> bool:
+    return (isinstance(value, str) and not value.startswith("/")
+            and "\x00" not in value and "//" not in value
+            and not any(part in {"", ".", ".."} for part in value.split("/")))
+
+
 def sidecar_bundle_files(
-    plugin_root: Path | str, *, additional_files: Mapping[str, bytes] | None = None,
+    plugin_root: Path | str, *,
+    closure: Sequence[tuple[str, str]] | None = None,
+    additional_files: Mapping[str, bytes] | None = None,
 ) -> dict[str, bytes]:
-    """Load the reviewed sidecar closure for one bounded Worker projection."""
+    """Load the reviewed sidecar closure for one bounded Worker projection.
+
+    E-INC1a (a-6): ``closure`` is the neutral seam - a pure data list of
+    ``(source_relative, target_relative)`` pairs. When given, this function
+    assembles exactly what the declaration says (path-safety validation and
+    bounds unchanged) and touches none of the literal view layout below.
+    The ``closure=None`` branch is the *frozen compatibility shell* for the
+    bootstrap call site's two-positional shape: the hardcoded
+    view-layout names are Harness-runtime content, owned by H (C-HARNESS,
+    IFR-04), and this shell leaves with INC1b once that declaration exists -
+    nothing outside it may grow these literals (pinned in the group tests).
+    """
     root = Path(plugin_root).resolve()
+    if closure is not None:
+        files: dict[str, bytes] = {}
+        for source_relative, target_relative in closure:
+            if not _safe_bundle_relative(source_relative) or not _safe_bundle_relative(target_relative):
+                raise ValueError("SIDECAR_BUNDLE_PATH_INVALID")
+            if target_relative in files:
+                raise ValueError("SIDECAR_BUNDLE_PATH_CONFLICT")
+            files[target_relative] = (root / source_relative).read_bytes()
+        return _finish_bundle(files, additional_files)
     runtime = root / "runtime"
     snapshot = root / "third_party" / "harness_remote"
     source = json.loads((snapshot / "SOURCE.json").read_text(encoding="utf-8"))
@@ -248,10 +276,16 @@ def sidecar_bundle_files(
         files[f"agentbox-sidecar/third_party/harness_remote/{relative}"] = (
             snapshot / relative
         ).read_bytes()
+    return _finish_bundle(files, additional_files)
+
+
+def _finish_bundle(
+    files: dict[str, bytes], additional_files: Mapping[str, bytes] | None,
+) -> dict[str, bytes]:
+    """Shared tail: caller extras and the worker bounds, identical for both
+    the declared-closure path and the frozen compatibility shell."""
     for relative, content in (additional_files or {}).items():
-        if (not isinstance(relative, str) or relative.startswith("/")
-                or "\x00" in relative or "//" in relative
-                or any(part in {"", ".", ".."} for part in relative.split("/"))):
+        if not _safe_bundle_relative(relative):
             raise ValueError("SIDECAR_BUNDLE_PATH_INVALID")
         if relative in files:
             raise ValueError("SIDECAR_BUNDLE_PATH_CONFLICT")
