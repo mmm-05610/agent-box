@@ -190,6 +190,7 @@ export async function createDriver(context) {
   let host = null
   let catalog = null
   let stopEvents = null
+  let resetStreamBuffer = null
   let active = null
   let closed = false
 
@@ -286,40 +287,97 @@ export async function createDriver(context) {
     const reader = response.body.getReader()
     const decoder = new TextDecoder()
     let buffer = ""
+    // PATCH (AgentBox 增量1c-b): the block parser is shared by the streaming loop and by the two
+    // paths that used to have none (end of stream, reader error, turn boundary), so a frame can no
+    // longer disappear simply because its terminator never arrived. It returns how many `data:`
+    // lines it saw and how many of those were undecodable, which is what makes a framing failure
+    // distinguishable from "this host does not stream" without inventing a new public fact.
+    function consumeBlock(block) {
+      let dataLines = 0
+      let undecodable = 0
+      for (const line of block.split("\n")) {
+        if (!line.startsWith("data: ")) continue
+        dataLines += 1
+        let event = null
+        try {
+          event = JSON.parse(line.slice(6))
+        } catch {
+          event = null
+        }
+        if (!event) {
+          undecodable += 1
+          continue
+        }
+        if (event.type === "message.part.delta") {
+          const properties = event.properties ?? {}
+          const text = typeof properties.delta === "string" ? properties.delta : ""
+          if (text && properties.field === "text" && active && active.sessionId === properties.sessionID) {
+            active.deltas += 1
+            active.text += text
+            emit({ event: DELTA_EVENT, data: { text } })
+          }
+        }
+      }
+      return { dataLines, undecodable }
+    }
+    // A stream that ends — cleanly or not — may still hold bytes that never saw a "\n\n". They are
+    // already in this process, so losing them is ours, not the host's. Whatever still cannot be
+    // decoded is counted into the existing opt-in audit channel (lengths only, never content).
+    function flushRemaining(reason) {
+      buffer += decoder.decode()
+      if (buffer.length === 0) return
+      const remainder = buffer
+      buffer = ""
+      const { dataLines, undecodable } = consumeBlock(remainder)
+      if (dataLines > 0) {
+        audit({
+          event: "stream-tail", reason, characters: remainder.length, dataLines, undecodable,
+        })
+      }
+    }
+    // Mirror of 增量1b's per-`#start` reset on the ACP leg: this leg has no restart event to hang it
+    // on, and the only boundary it does have is the turn. A partial frame left by turn N can never
+    // be completed by turn N+1 — it can only corrupt N+1's first frame — so it is dropped here, and
+    // the drop is counted rather than silent.
+    resetStreamBuffer = () => {
+      if (buffer.length > 0) {
+        audit({ event: "stream-tail-discarded", characters: buffer.length })
+        buffer = ""
+      }
+    }
     const pump = (async () => {
       try {
         while (true) {
           const { value, done } = await reader.read()
-          if (done) break
+          if (done) {
+            flushRemaining("done")
+            break
+          }
           buffer += decoder.decode(value, { stream: true })
           let boundary = buffer.indexOf("\n\n")
           while (boundary !== -1) {
             const block = buffer.slice(0, boundary)
             buffer = buffer.slice(boundary + 2)
-            for (const line of block.split("\n")) {
-              if (!line.startsWith("data: ")) continue
-              let event = null
-              try {
-                event = JSON.parse(line.slice(6))
-              } catch {
-                event = null
-              }
-              if (!event) continue
-              if (event.type === "message.part.delta") {
-                const properties = event.properties ?? {}
-                const text = typeof properties.delta === "string" ? properties.delta : ""
-                if (text && properties.field === "text" && active && active.sessionId === properties.sessionID) {
-                  active.deltas += 1
-                  active.text += text
-                  emit({ event: DELTA_EVENT, data: { text } })
-                }
-              }
-            }
+            consumeBlock(block)
             boundary = buffer.indexOf("\n\n")
           }
         }
-      } catch {
-        // 流断开不是驱动失败：prompt 仍有返回值兜底，审计会记录实际增量数。
+      } catch (error) {
+        // 流断开不是驱动失败：prompt 仍有返回值兜底。但"不是失败"不等于"不必说"——中断现在
+        // 带上已收到的字节数进审计，且已收到的部分照旧交付，损失由此变为有界。
+        //
+        // 但**主动 close() 也会走到这里**（stopEvents 里的 controller.abort() 会让 read() 抛
+        // AbortError）。那不是"流断了"：把它记成中断，就等于给每次正常停机留一条假事实，正是
+        // 本组 X18 在 abort() 一侧量到并批评的那类错。所以下面按"是不是我们自己关的"分流。
+        const aborted = controller.signal.aborted || closed
+        const pendingCharacters = buffer.length
+        flushRemaining(aborted ? "aborted" : "reader-error")
+        if (aborted) return
+        audit({
+          event: "stream-interrupted",
+          pendingCharacters,
+          message: redact(String(error?.message ?? error), 200),
+        })
       }
     })()
     return () => {
@@ -328,7 +386,14 @@ export async function createDriver(context) {
       } catch {
         // 关闭路径上的异常不得覆盖主结果。
       }
-      void pump
+      // `pump` handles its own read failures; this catches anything thrown by the handlers
+      // themselves, and records it instead of becoming an unhandled rejection.
+      pump.catch((error) => {
+        audit({
+          event: "stream-pump-failed",
+          message: redact(String(error?.message ?? error), 200),
+        })
+      })
     }
   }
 
@@ -452,6 +517,8 @@ export async function createDriver(context) {
     }
     const current = { sessionId, deltas: 0, text: "" }
     active = current
+    // PATCH (AgentBox 增量1c-b ⑦): 轮次边界丢弃上一轮残留的半帧（丢弃被计数，不是静默消失）。
+    if (resetStreamBuffer) resetStreamBuffer()
     let response = null
     try {
       response = await expectJson("POST", `/session/${encodeURIComponent(sessionId)}/message`, {
