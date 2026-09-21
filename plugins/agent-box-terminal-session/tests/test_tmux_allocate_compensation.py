@@ -108,3 +108,41 @@ def test_borrowed_allocation_never_reaches_the_compensation():
     assert not any("new-session" in argv for argv, check in state["calls"])
     assert not any("set-option" in argv for argv, check in state["calls"])
     assert allocation.terminal_ref == session.ref
+
+
+def test_the_compensation_reaches_the_server_and_name_it_created_on(tmp_path):
+    # The compensation builds its `-L <socket>` prefix separately from `_call`, so
+    # the two can drift apart and the kill would then tear down a session on some
+    # *other* tmux server.  Pin them equal against the argv actually dispatched.
+    state = _state(fail={"set-option"})
+    with pytest.raises(subprocess.CalledProcessError):
+        _managed(state).allocate()
+    created = next(argv for argv, check in state["calls"] if "new-session" in argv)
+    killed = state["killed"][0]
+    assert killed[:killed.index("kill-session")] == created[:created.index("new-session")]
+    assert killed[-1] == created[created.index("-s") + 1]                # same session name
+    assert "-t" in killed
+
+
+def test_the_compensation_runs_after_the_failure_it_answers_for():
+    # A kill dispatched before the failure would mean the method destroyed a
+    # session it had no reason to doubt, and a second kill after it would mean the
+    # window is not exactly-one wide.
+    state = _state(fail={"set-option"})
+    with pytest.raises(subprocess.CalledProcessError):
+        _managed(state).allocate()
+    verbs = [next(v for v in ("new-session", "set-option", "display-message", "kill-session") if v in argv)
+             for argv, check in state["calls"]]
+    assert verbs == ["new-session", "set-option", "kill-session"]
+
+
+def test_a_managed_ref_cannot_be_made_without_a_socket_to_compensate_on():
+    # Guard preserved (护栏不放宽): the compensation can only address the right
+    # server because a managed Ref is required to name its socket at construction.
+    # An empty, path-shaped or spaced socket is refused before any session exists,
+    # so no managed session can ever be created outside a named server.
+    for bad in ("", "/tmp/tmux", "two sockets"):
+        with pytest.raises(ValueError, match="unsafe or missing socket"):
+            TmuxSession.managed_ref(host_affinity="host:one", socket=bad)
+    with pytest.raises(ValueError, match="unsafe or missing socket"):
+        TmuxSession.managed_ref(host_affinity="", socket="p0")

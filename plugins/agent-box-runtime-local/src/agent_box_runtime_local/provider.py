@@ -162,6 +162,34 @@ class LocalHostTransport:
         self._envs[token] = values
         return token
 
+    def _reclaim(self, tokens: tuple[str, ...]) -> int:
+        """Drop the bindings this transport issued and nobody can spend again.
+
+        A token is spendable exactly once: the operation that consumed it is
+        recorded in ``_consumed`` before the executor runs and is deliberately
+        never unwound.  Leaving the path - and above all the environment values,
+        which are the reason a token exists instead of a bare argument - bound
+        afterwards only keeps them alive, so they are released with the spend.
+        """
+        removed = 0
+        for token in tokens:
+            ledger = self._paths if token.startswith("cwd:") else self._envs if token.startswith("env:") else None
+            if ledger is not None and ledger.pop(token, None) is not None:
+                removed += 1
+        return removed
+
+    def release(self) -> dict[str, int]:
+        """Release every issued binding left unspent when the host is released.
+
+        ``_consumed`` is not part of a release: it is the replay guard itself, and
+        forgetting it is precisely what the guard exists to prevent, so a released
+        transport keeps refusing the spawn tokens it already spent.
+        """
+        released = {"paths": len(self._paths), "envs": len(self._envs)}
+        self._paths.clear()
+        self._envs.clear()
+        return released
+
     def make_operation(self, *, attempt_key: str, spawn_token: str, spec_digest: str,
                        argv: tuple[str, ...], cwd_token: str, env_token: str) -> HostTransportOperation:
         if not argv or len(argv) > 64 or any(not isinstance(x, str) or not x or "\0" in x for x in argv):
@@ -239,6 +267,10 @@ class LocalHostTransport:
             native = self._executor(argv, cwd=str(cwd), env=dict(env))
         except OSError as exc:
             raise CompositionRejected(CompositionErrorCode.CAPABILITY_UNAVAILABLE, str(exc)) from exc
+        finally:
+            # Both tokens were spent the moment the operation was recorded, and
+            # the ledger keeps no operation that can still be replayed.
+            self._reclaim((cwd_token, env_token))
         self.last_native = native
         return "local:" + digest({"attempt": operation.attempt_key, "native": repr(native)})[7:31]
 
@@ -264,12 +296,16 @@ class LocalRuntimeHost:
     def cleanup(self) -> dict[str, object]:
         # An answer, not a silence: the coordinator's release loop skips a host
         # that has no `cleanup`, so "nothing to release" and "release verb was
-        # never declared" are indistinguishable in the cleanup record.  This host
-        # owns no process, session, mount or worktree of its own, and
-        # staging_tokens/path_tokens are never populated, so releasing it is a
-        # no-op that can now be reported as one.  A future host-owned resource
-        # must be released here rather than silently re-passing that judgement.
-        return {"released": True, "destroyed": False, "owned": False}
+        # never declared" are indistinguishable in the cleanup record.  The host
+        # owns no process, session, mount or worktree, but its transport does hold
+        # every path and environment binding it issued, and those are released
+        # here.  The receipt is the `C-RUNTIME@v1` §2 three-state shape: released
+        # because the host is let go, not destroyed because nothing durable it
+        # owned was removed, and not managed because it managed no resource of its
+        # own beyond those bindings.  A future host-owned resource must be
+        # released here rather than silently re-passing that judgement.
+        return {"released": True, "destroyed": False, "managed": False,
+                "reclaimed": self.transport.release()}
 
 
 class LocalRuntimeHostProvider:

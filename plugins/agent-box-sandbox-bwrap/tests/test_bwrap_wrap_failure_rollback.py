@@ -108,3 +108,46 @@ def test_an_attempt_binding_from_a_prior_attempt_is_not_erased(tmp_path):
         resolved.wrap(MountPlan(((source, "/runtime/home", "rw"),), secret_mounts=(mount,)),
                       _command(), attempt_key="attempt-E1")
     assert provider._secret_attempts["token-one"] == "attempt-E0"
+
+
+def test_rollback_leaves_an_unrelated_successful_spec_untouched(tmp_path):
+    # Collateral-damage pin: the rollback is keyed to *this* attempt's tokens, so a
+    # spec that already wrapped successfully must keep both its lease and its
+    # token binding.  A rollback that swept the ledgers wholesale would silently
+    # un-protect a live sandbox's secrets.
+    provider, resolved = _provider(tmp_path)
+    source = _profile(tmp_path, provider)
+    live, _live_path = _secret(tmp_path, provider, "token-live", "auth-live", scope="execution:E9")
+    spec = resolved.wrap(MountPlan(((source, "/runtime/home", "rw"),), secret_mounts=(live,)),
+                         _command(), attempt_key="attempt-E9")
+    before = dict(provider._secret_leases)
+    assert before, "the successful wrap must have written a lease"
+
+    doomed, doomed_path = _secret(tmp_path, provider, "token-doomed", "auth-doomed")
+    doomed_path.unlink()
+    with pytest.raises(ProjectionRejected):
+        resolved.wrap(MountPlan(((source, "/runtime/home", "rw"),), secret_mounts=(doomed,)),
+                      _command(), attempt_key="attempt-E1")
+
+    assert provider._secret_leases == before                        # live lease intact
+    assert provider._secret_attempts["token-live"] == "attempt-E9"   # live binding intact
+    assert "token-doomed" not in provider._secret_attempts
+    assert resolved.cleanup(spec)["status"] == "cleaned"
+
+
+def test_the_rejection_does_not_carry_secret_content_or_its_host_path(tmp_path):
+    # The failure path is the one place a provider is tempted to explain itself by
+    # naming what it could not read.  Every message on this path is a constant
+    # literal, so neither the secret bytes nor their host location may appear.
+    provider, resolved = _provider(tmp_path)
+    source = _profile(tmp_path, provider)
+    mount, path = _secret(tmp_path, provider, "token-one", "auth-one")
+    path.unlink()
+
+    with pytest.raises(ProjectionRejected) as caught:
+        resolved.wrap(MountPlan(((source, "/runtime/home", "rw"),), secret_mounts=(mount,)),
+                      _command(), attempt_key="attempt-E1")
+    assert "SECRET_MUST_NEVER_APPEAR" not in str(caught.value)
+    assert path.parent.name not in str(caught.value)
+    assert "SECRET_MUST_NEVER_APPEAR" not in repr(caught.value)
+    assert path.name not in repr(provider._secret_attempts)         # ledger keys stay opaque
