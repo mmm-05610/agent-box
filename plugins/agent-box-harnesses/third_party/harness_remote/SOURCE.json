@@ -29,8 +29,8 @@
       "origin": "upstream",
       "upstream_sha256": "050760aa5cc1c88a29eb1668c74467165effbec23295f03379c7e25f8733bc81",
       "current_sha256": "050760aa5cc1c88a29eb1668c74467165effbec23295f03379c7e25f8733bc81",
-      "patched_sha256": "00b739b4cd1841fd87e47363f31e970a6bae4d2f6628464e40f1aaa668e2d95b",
-      "patch": "grouped config options in model selection (see PATCHES.md)"
+      "patched_sha256": "51f3b4e6998a2ce9505ce6833c8e38cfa7d3e12444f61388e9f2672b9e202448",
+      "patch": "grouped config options in model selection; turn response retained so stopReason survives (see PATCHES.md)"
     },
     {
       "path": "bridge/src/agent-model-catalog.js",

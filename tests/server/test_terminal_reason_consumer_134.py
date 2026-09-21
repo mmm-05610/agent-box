@@ -144,22 +144,18 @@ def test_a_cancelled_turn_keeps_its_projected_state_and_gains_no_reason(tmp_path
     assert "reason" not in body
 
 
-# ------------------------------- the ACP prompt leg (LNX-002 review, item 5)
+# ---------------- the ACP prompt leg, end to end (LNX-002 ruling, decision 2)
 
-# I's item 5 asked for the truncation chain to be driven through the *real* ACP
-# prompt return, not just DB -> projection. Driven, and the measurement is the
-# finding: the fixture peer DOES answer with a machine-readable `stopReason`, but
-# the JS entry's prompt result does not carry it across the boundary, so
-# `_terminal_reason_from_result(run.result)` can never see one. `worker-entry.mjs`
-# still has to EMIT it - the separate, approval-gated change order 134's own
-# docstring names - and this file does not pretend otherwise.
+# The earlier case here pinned "the JS boundary drops the reason" as a
+# characterisation. I's ruling refused to settle for that, and the loss is now
+# fixed in the vendored bridge (`third_party/harness_remote/bridge/src/acp-service.js`,
+# registered as PATCHES.md §4): the turn's own `session/prompt` response is kept
+# per generation and handed back by `promptAndWait`. These are the
+# target-behaviour regressions that replace it.
 #
-# What is pinned here: (a) the ACP side is ready and emits the reason; (b) the JS
-# boundary currently drops it, with the exact measured return shape; (c) the
-# Python consumer chain is correct for a result that *does* carry it (the cases
-# above, plus the unit cases at the top). No real model, and no shared fixture
-# default moved: the peer's reason is selected by a per-test env knob whose
-# default is the old `end_turn`.
+# Scope, stated plainly: the fake peer is what this seam is exercised with. What
+# the *real* harnesses report is still a later verification question, and a
+# missing field keeps its absent/unknown meaning here — nothing is invented.
 
 import os  # noqa: E402
 import pathlib  # noqa: E402
@@ -194,79 +190,112 @@ def _isolated_environment(tmp_path, stop_reason=None):
     return env
 
 
-def _prompt_through_the_fixture_peer(tmp_path, stop_reason=None):
-    port = SidecarHarnessPort(
-        LocalProcessLauncher(["node", str(SIDECAR_ENTRY)], cwd=str(PLUGIN)),
-        environment=_isolated_environment(tmp_path, stop_reason),
-        profile="pi",
-        adapter={"command": os.environ.get("NODE_BIN", "node"), "args": [str(FAKE_PEER)]},
-        state_directory=str(tmp_path / "state"),
-        directory=str(tmp_path),
-        on_event=lambda *_args: None,
-    )
+@pytest.fixture
+def fixture_port(tmp_path):
+    """A factory for real ports on the real JS entry and the fixture peer."""
+    ports = []
+
+    def start(stop_reason=None):
+        port = SidecarHarnessPort(
+            LocalProcessLauncher(["node", str(SIDECAR_ENTRY)], cwd=str(PLUGIN)),
+            environment=_isolated_environment(tmp_path, stop_reason),
+            profile="pi",
+            adapter={"command": os.environ.get("NODE_BIN", "node"), "args": [str(FAKE_PEER)]},
+            state_directory=str(tmp_path / "state"),
+            directory=str(tmp_path),
+            on_event=lambda *_args: None,
+        )
+        ports.append(port)
+        return port
+
     try:
-        port.open_execution("execution-1")
-        return port.prompt("execution-1", "component gate")
+        yield start
     finally:
-        port.stop()
+        for port in ports:
+            port.stop()
 
 
-def test_lnx002_the_fixture_peer_emits_a_machine_readable_stop_reason():
-    """(a) The ACP side is ready: the peer answers an ordinary prompt with a
-    `stopReason`, and the knob selects a non-clean one without touching the
-    special paths. Asserted against the peer source so it cannot rot."""
-    source = FAKE_PEER.read_text(encoding="utf-8")
-
-    assert 'const STOP_REASON = process.env.AGENTBOX_FIXTURE_STOP_REASON || "end_turn"' in source
-    assert 'pendingCancel ? "cancelled" : STOP_REASON' in source
-    # blast radius: the silent-success / permission / abort paths keep their own
-    # reason, and the cancel path keeps `cancelled`, whatever the knob says.
-    assert source.count('stopReason: "end_turn"') == 4, "a special path moved"
-    assert source.count('stopReason: "cancelled"') == 1, "the cancel path moved"
-
-
-@pytest.mark.skipif(not SIDECAR_ENTRY.is_file(), reason="sidecar entry not built")
-def test_lnx002_the_js_prompt_boundary_drops_the_stop_reason_today(tmp_path):
-    """(b) The measured gap, with the exact shape.
-
-    This is a *characterisation* case: it asserts what the boundary does now, so
-    the day `worker-entry.mjs` starts returning the ACP result this goes red and
-    the replacement is "the reason now travels" - a deliberate edit, not a silent
-    change. It is also why the consumer chain cannot be end-to-end verified from
-    the JS side in this task.
-    """
-    returned = _prompt_through_the_fixture_peer(tmp_path, "max_tokens")
-
-    assert returned == {"done": True}, returned
-    assert _terminal_reason_from_result(returned) is None
-    # ...so the reason exists on the ACP side but not in the JS return value.
-    assert "stopReason" not in returned
-
-
-@pytest.mark.skipif(not SIDECAR_ENTRY.is_file(), reason="sidecar entry not built")
-def test_lnx002_the_python_consumer_persists_a_reason_it_is_given(tmp_path):
-    """(c) With a result that *does* carry the reason, the whole Python leg works:
-    the extractor reads it, the real `complete_turn` persists it, and the
-    projection exposes it. This is the half I's item 5 can be verified for today.
-    """
-    result = {"stopReason": "max_tokens"}
-    assert _terminal_reason_from_result(result) == "max_tokens"
-
+def _persist_and_project(tmp_path, result, *, turn="t1"):
+    """Run the real completion path for a result and return the projected body."""
     records, database = _seed(tmp_path)
-    records.complete_turn("t1", checkpoint_object_digest="cp", checkpoint_native_id="n",
+    records.complete_turn(turn, checkpoint_object_digest="cp", checkpoint_native_id="n",
                           result_object_digest="res",
                           terminal_reason=_terminal_reason_from_result(result))
-    row = _terminal(database, "t1")
+    return _terminal(database, turn)
+
+
+@pytest.mark.skipif(not SIDECAR_ENTRY.is_file(), reason="sidecar entry not built")
+def test_max_tokens_travels_from_the_acp_peer_to_the_wire_reason(tmp_path, fixture_port):
+    """The whole leg I's ruling asked for: ACP fixture -> bridge -> worker-entry ->
+    Python completion -> DB -> wire reason."""
+    port = fixture_port("max_tokens")
+    port.open_execution("execution-1")
+    result = port.prompt("execution-1", "component gate")
+
+    # the bridge now hands the turn's own ACP response back, verbatim
+    assert result == {"stopReason": "max_tokens"}, result
+    assert _terminal_reason_from_result(result) == "max_tokens"
+
+    row = _persist_and_project(tmp_path, result)
     assert row["terminal_reason"] == "max_tokens"
     assert execution_state(dict(row))["reason"] == "max_tokens"
 
-    # the end_turn control on the same leg: clean means nothing is persisted
-    second = tmp_path / "second"
-    second.mkdir()
-    records2, database2 = _seed(second)
-    records2.complete_turn("t1", checkpoint_object_digest="cp", checkpoint_native_id="n",
-                           result_object_digest="res",
-                           terminal_reason=_terminal_reason_from_result({"stopReason": "end_turn"}))
-    row2 = _terminal(database2, "t1")
-    assert row2["terminal_reason"] is None
-    assert "reason" not in execution_state(dict(row2))
+
+@pytest.mark.skipif(not SIDECAR_ENTRY.is_file(), reason="sidecar entry not built")
+def test_end_turn_through_the_same_leg_claims_nothing(tmp_path, fixture_port):
+    """The clean control on the same leg: `end_turn` is not a truncation, so
+    nothing is persisted and the projection carries no reason key."""
+    port = fixture_port(None)  # the peer's own default
+    port.open_execution("execution-1")
+    result = port.prompt("execution-1", "component gate")
+
+    assert result == {"stopReason": "end_turn"}, result
+    assert _terminal_reason_from_result(result) is None
+
+    row = _persist_and_project(tmp_path, result)
+    assert row["terminal_reason"] is None
+    assert "reason" not in execution_state(dict(row))
+
+
+@pytest.mark.skipif(not SIDECAR_ENTRY.is_file(), reason="sidecar entry not built")
+def test_two_consecutive_turns_each_keep_their_own_reason(tmp_path, fixture_port):
+    """Attribution across consecutive turns on one session.
+
+    The knob gives the first turn `max_tokens` and the second `end_turn`. If a
+    reason were cached, shared or taken from the wrong generation, the second turn
+    would inherit the first one's truncation — this is the case that would catch it.
+    """
+    port = fixture_port("max_tokens,end_turn")
+    port.open_execution("execution-1")
+
+    first = port.prompt("execution-1", "first turn")
+    assert first == {"stopReason": "max_tokens"}, first
+    second = port.prompt("execution-1", "second turn")
+    assert second == {"stopReason": "end_turn"}, second
+
+    first_root = tmp_path / "first"
+    second_root = tmp_path / "second"
+    first_root.mkdir(exist_ok=True)
+    second_root.mkdir(exist_ok=True)
+    # each seed is its own database, so both use its own `t1`
+    first_row = _persist_and_project(first_root, first)
+    second_row = _persist_and_project(second_root, second)
+
+    assert execution_state(dict(first_row))["reason"] == "max_tokens"
+    assert second_row["terminal_reason"] is None
+    assert "reason" not in execution_state(dict(second_row))
+
+
+def test_the_knob_cannot_move_the_cancel_or_special_paths():
+    """The fixture knob's blast radius, asserted against the peer source.
+
+    Only the ordinary completion reads the sequence: the cancel, abort,
+    silent-success and permission paths keep their own reasons, so selecting
+    `max_tokens` cannot retell a user's stop as a truncation.
+    """
+    source = FAKE_PEER.read_text(encoding="utf-8")
+
+    assert 'process.env.AGENTBOX_FIXTURE_STOP_REASON || "end_turn"' in source
+    assert 'pendingCancel ? "cancelled" : nextStopReason()' in source
+    assert source.count('stopReason: "end_turn"') == 4, "a special path moved"
+    assert source.count('stopReason: "cancelled"') == 1, "the cancel path moved"

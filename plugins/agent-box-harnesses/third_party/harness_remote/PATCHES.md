@@ -62,6 +62,33 @@ opaque value, non-grouped pickers flatten to themselves, and no harness name
 appears in the patch. Provenance is recorded in `SOURCE.json`
 (`patched_sha256`).
 
+## 4. `bridge/src/acp-service.js` — the turn's own `stopReason` is kept
+
+Upstream fires the ACP `session/prompt` request for a turn and drops its response
+(`void this.#acp.request(...)`), while `promptAndWait`'s success path called
+`resolve()` with no value. The harness's machine-readable terminal statement —
+`{ stopReason }` on the JSON-RPC result — was therefore lost at the bridge, and
+every completion leg above it could only ever see "done". A field added further
+up cannot recover a value that was already discarded here.
+
+The patch keeps the response and hands it back, bound to the turn that produced
+it:
+
+- `#turnResponses` stores the response under `${sessionID}:${generation}`, using
+  the same generation guard the failure and `finally` paths already use. A turn
+  whose generation has moved on (cancelled, superseded) stores nothing, so one
+  turn's reason can never be handed to another — including two Sessions at once.
+- `promptAndWait` resolves with the **finished** generation's response, taken
+  once (`#takeTurnResponse`). It is `undefined` when there is none, which leaves
+  the caller's existing absent/unknown semantics untouched.
+- `#startTurn` drops responses left behind by an earlier generation, so nothing
+  accumulates.
+
+The upstream value is preserved verbatim: no `stopReason` is synthesised, no
+absent field is filled in, and a missing field stays missing. What the real
+harnesses report is still a later verification question — the fake peer is what
+this seam is exercised with.
+
 ## Not adopted
 
 `machine-daemon.js`, `daemon-cli.js`, `machine-registry.js`, `task-*`,

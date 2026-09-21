@@ -25,10 +25,16 @@ const PROMPT_SILENCE_DEFAULT_MS = 8_000
 // with. Defaults to `end_turn`, so every existing prompt path is byte-identical
 // and no shared fixture default moves; the truncation pass-through test sets
 // `AGENTBOX_FIXTURE_STOP_REASON=max_tokens` to drive the ACP result -> JS return
-// -> Python completion leg with a non-clean reason. Only the ordinary completion
-// below honours it: the silent-success, permission, cancel and abort paths keep
-// their own reasons on purpose.
+// -> Python completion leg with a non-clean reason. A comma-separated list is
+// consumed one entry per ordinary prompt (`"max_tokens,end_turn"`), which is how
+// two consecutive turns are given different terminal states; past the end of the
+// list the default `end_turn` applies. Only the ordinary completion below honours
+// it: the silent-success, permission, cancel and abort paths keep their own
+// reasons on purpose.
 const STOP_REASON = process.env.AGENTBOX_FIXTURE_STOP_REASON || "end_turn"
+const STOP_REASON_SEQUENCE = STOP_REASON.split(",").map((item) => item.trim()).filter(Boolean)
+let promptOrdinal = 0
+const nextStopReason = () => STOP_REASON_SEQUENCE[promptOrdinal++] ?? "end_turn"
 
 // The peer declares exactly the one model it accepts. A bridge that is asked for
 // a model resolves it against the options the harness advertised and refuses
@@ -146,7 +152,7 @@ for await (const line of rl) {
       setTimeout(() => send({ jsonrpc: "2.0", id, error: { code: -32001, message: "controlled failure" } }), 500)
       continue
     }
-    send({ jsonrpc: "2.0", id, result: { stopReason: pendingCancel ? "cancelled" : STOP_REASON } })
+    send({ jsonrpc: "2.0", id, result: { stopReason: pendingCancel ? "cancelled" : nextStopReason() } })
     pendingCancel = false
   } else if (method === "session/cancel") {
     pendingCancel = true

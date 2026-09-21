@@ -985,25 +985,26 @@ def _queue_setup(client, runtime, tmp_path, first_text):
     return profile, first, second
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "LNX-002 registered divergence - needs a product decision, evidence handed to I. "
-        "The expectation below is NOT changed: a post-open `SidecarError` that reuses "
-        "`CAPABILITY_REQUIREMENT_UNSATISFIED` must stay ambiguous (`EXECUTION_FAILED`), which is "
-        "the pre-LNX-002 baseline and the rule `CapabilityGateRefusal`'s own docstring states. "
-        "Measured cause: the runtime line's order 135 (`work_core/services.py:_dispatch_error_code`) "
-        "re-attaches a typed `.code` to the `DispatchAmbiguous` wrapper, so `_safe_code`'s blanket "
-        "`getattr(exc, 'code')` fallback honours it. Measured both ways: service line -> "
-        "`DispatchAmbiguous.code is None` -> EXECUTION_FAILED (passes); runtime/merged -> "
-        "`DispatchAmbiguous.code == 'CAPABILITY_REQUIREMENT_UNSATISFIED'` -> the raw code leaks. "
-        "The lift is load-bearing and cannot simply be dropped: order 106's "
-        "`SIDECAR_REBUILD_FAILED` assertion at `test_harness_sidecar.py:1503` depends on it. "
-        "Two tested intents collide, so the resolution is a scope decision, not an edit here. "
-        "strict=True: the moment either intent moves this turns red rather than passing silently."
-    ),
-)
 def test_public_post_open_error_with_the_same_code_keeps_ambiguous_semantics(tmp_path):
+    """LNX-002 ruling decision 1, delivered as a pass rather than a registration.
+
+    Measured cause, kept here because it is what the fix is about: this used to
+    fail because the runtime line's order 135 re-attached a typed ``.code`` to the
+    ``DispatchAmbiguous`` wrapper and ``_safe_code``'s blanket ``getattr(exc,
+    "code")`` fallback honoured it. The two trees disagreed for a real reason -
+    the service line leaves ``DispatchAmbiguous.code`` as ``None`` - and the lift
+    is load-bearing for order 106 (see the rebuild cases below), so it could not
+    simply be dropped.
+
+    The fix is stage/type-derived, not string-derived: ``_safe_code`` refuses to
+    publish a code that the chain inherited from a post-open ``SidecarError``
+    (``_carries_untrusted_sidecar_code``), because the ambiguous stage asserts only
+    that we cannot tell whether the start happened. A genuine pre-start refusal is
+    an ``ExecutionStartRejected`` and is still published, and this stage's own
+    recovery failure carries a trusted type. The expectation below was never
+    changed to match the observed error code.
+    """
+
     """D-R3-001: 同名码的 post-open 错误在公开路径上必须保持 ambiguous。
 
     能力门先通过（端口带齐中立材料），open_execution 抛出普通 SidecarError，

@@ -22,7 +22,7 @@ from agent_box.work_core import (
     ExecutionFinalizationRequest, ExecutionProjection, ExecutionStartReceipt,
     Freshness, Outcome, Phase, ProviderDescriptor, Ref, RefType,
 )
-from agent_box.work_core.errors import ExecutionStartRejected
+from agent_box.work_core.errors import DispatchAmbiguous, ExecutionStartRejected
 from agent_box.work_core.registry import ExtensionRegistry
 from agent_box.work_core.repository import CoreRepository
 from agent_box.work_core.services import ExecutionService, WorkService
@@ -392,8 +392,7 @@ class SidecarExecutionBackend:
                 # Rebuild this execution on a fresh sidecar, then retry.
                 port.close_execution(turn_id)
                 port.open_execution(turn_id)
-        raise SidecarError(
-            "SIDECAR_REBUILD_FAILED",
+        raise SidecarRunRecoveryFailure(
             "sidecar stayed closed after "
             f"{self.PROMPT_REBUILD_LIMIT} rebuild attempt(s); last: {last}",
         )
@@ -893,6 +892,19 @@ class CapabilityGateRefusal(SidecarError):
         super().__init__("CAPABILITY_REQUIREMENT_UNSATISFIED", reason)
 
 
+class SidecarRunRecoveryFailure(SidecarError):
+    """Raised by the run-recovery path when a fresh sidecar cannot be obtained.
+
+    Typed on purpose, like :class:`CapabilityGateRefusal`, and for the same
+    reason: it is a statement about *this* stage — the sidecar was open and the
+    prompt boundary failed — so ``_safe_code`` may publish its code. A bare
+    ``SidecarError`` may not; see LNX-002 ruling decision 1.
+    """
+
+    def __init__(self, reason: str) -> None:
+        super().__init__("SIDECAR_REBUILD_FAILED", reason)
+
+
 def _capability_gate(port: SidecarHarnessPort, turn_id: str) -> None:
     """Refuse an execution whose slice capabilities are not provably satisfied.
 
@@ -949,6 +961,29 @@ def _capability_gate(port: SidecarHarnessPort, turn_id: str) -> None:
     )
 
 
+def _carries_untrusted_sidecar_code(exc: BaseException) -> bool:
+    """True when the chain carries a code from the post-open transport family.
+
+    ``SidecarError`` is what a post-open response path raises, and its ``code`` is
+    whatever the far side — or a test double — put there. On the ambiguous stage
+    that is not a statement about the stage, so it is not publishable.
+
+    Two exceptions in that family *do* speak about a stage and are trusted by
+    name: :class:`CapabilityGateRefusal` (pre-start, and normally converted to
+    ``ExecutionStartRejected`` before it gets here) and
+    :class:`SidecarRunRecoveryFailure` (this stage's own recovery path).
+    """
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(current, SidecarError) and not isinstance(
+                current, (CapabilityGateRefusal, SidecarRunRecoveryFailure)):
+            return True
+        current = current.__cause__ or current.__context__
+    return False
+
+
 def _safe_code(exc: BaseException) -> str:
     # 先沿异常链寻找由 provider 显式标注的「启动未发生」拒绝码（gate 在
     # open_execution 前抛出的 ExecutionStartRejected 会带上原因码）；只有这一类
@@ -962,6 +997,22 @@ def _safe_code(exc: BaseException) -> str:
             if isinstance(explicit, str) and re.fullmatch(r"[A-Z][A-Z0-9_]{2,127}", explicit):
                 return explicit
         current = current.__cause__ or current.__context__
+    if isinstance(exc, DispatchAmbiguous) and _carries_untrusted_sidecar_code(exc):
+        # LNX-002 ruling, decision 1. The ambiguous stage asserts one thing only:
+        # we cannot tell whether the start and its side effects happened. A code
+        # inherited from a post-open `SidecarError` is not evidence about the
+        # stage, so the *published* reason stays the generic one and the original
+        # cause stays on the chain (and on this log) rather than being promoted.
+        #
+        # This is decided by stage and exception type, never by the code string:
+        # the same string published from a genuine pre-start refusal is correct
+        # and never reaches here, because that refusal is an
+        # `ExecutionStartRejected` and the walk above already returned its code.
+        logging.getLogger(__name__).error(
+            "ambiguous dispatch keeps the generic reason: the code it carried came "
+            "from a post-open SidecarError, which says nothing about the stage",
+            exc_info=exc)
+        return "EXECUTION_FAILED"
     explicit = getattr(exc, "code", None)
     value = str(explicit or exc).strip().upper()
     if re.fullmatch(r"[A-Z][A-Z0-9_]{2,127}", value):

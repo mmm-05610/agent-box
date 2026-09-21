@@ -446,6 +446,10 @@ export class AcpService {
   #listeners = new Set()
   #turnGenerations = new Map()
   #cancelledSessions = new Set()
+  // PATCH (AgentBox LNX-002): the ACP `session/prompt` response of each turn,
+  // kept per generation so the harness's own `stopReason` survives to the
+  // completion leg instead of being discarded with the request promise.
+  #turnResponses = new Map()
   #promptedSessions = new Set()
   #chunkMessageIDs = new Map()
   // PI's journal is authoritative, but a provider rejection can be emitted by ACP before the journal
@@ -1242,7 +1246,15 @@ export class AcpService {
     this.#startTurn(sessionID, text, false, attachments)
   }
 
-  /** Start a prompt through the session service and resolve only when that turn becomes idle. */
+  /**
+   * Start a prompt through the session service and resolve only when that turn becomes idle.
+   *
+   * PATCH (AgentBox LNX-002): it now resolves with that turn's own ACP
+   * `session/prompt` response, so the harness's `stopReason` is not lost. The
+   * response is taken by the *finished* generation, and taken once; a cancelled
+   * or superseded turn has none, so it resolves `undefined` and the caller keeps
+   * its existing absent semantics.
+   */
   async promptAndWait(sessionID, text, model, attachments = []) {
     return new Promise((resolve, reject) => {
       let started = false
@@ -1252,7 +1264,7 @@ export class AcpService {
         settled = true
         unsubscribe()
         if (error) reject(error)
-        else resolve()
+        else resolve(this.#takeTurnResponse(sessionID))
       }
       const unsubscribe = this.subscribe((event) => {
         if (event.sessionId !== sessionID) return
@@ -1268,6 +1280,18 @@ export class AcpService {
     })
   }
 
+  // PATCH (AgentBox LNX-002): read the finished generation's response once.
+  // Bound by generation on purpose: the reason of one turn must never be handed
+  // to another (cancel, same-session queueing, or two Sessions at once).
+  #takeTurnResponse(sessionID) {
+    const generation = this.#turnGenerations.get(sessionID)
+    if (generation === undefined) return undefined
+    const key = `${sessionID}:${generation}`
+    const response = this.#turnResponses.get(key)
+    this.#turnResponses.delete(key)
+    return response
+  }
+
   #startTurn(sessionID, text, recorded = false, attachments = []) {
     // From the first turn this bridge runs, its own stream is the live record for the session, the
     // same way taking ownership of an external session stops the journal being re-read for it.
@@ -1275,18 +1299,39 @@ export class AcpService {
     const generation = (this.#turnGenerations.get(sessionID) ?? 0) + 1
     this.#turnGenerations.set(sessionID, generation)
     this.#cancelledSessions.delete(sessionID)
+    // PATCH (AgentBox LNX-002): a new generation owns the session's next
+    // response; anything left from an earlier one can never be taken again, so
+    // drop it rather than let it accumulate.
+    for (const key of [...this.#turnResponses.keys()]) {
+      if (key.startsWith(`${sessionID}:`) && key !== `${sessionID}:${generation}`) {
+        this.#turnResponses.delete(key)
+      }
+    }
     this.#promptedSessions.add(sessionID)
     if (!recorded) this.#recordPrompt(sessionID, text, attachments)
     this.#active.add(sessionID)
     this.#chunkMessageIDs.delete(`${sessionID}:assistant`)
     this.#emit("session.updated", sessionID)
-    void this.#acp.request("session/prompt", {
+    const promptRequest = this.#acp.request("session/prompt", {
       sessionId: sessionID,
       prompt: [
         ...(text ? [{ type: "text", text }] : []),
         ...attachments.map((attachment) => ({ type: "image", mimeType: attachment.mime, data: attachment.data }))
       ]
-    }, 300_000).catch((error) => {
+    }, 300_000)
+    // PATCH (AgentBox LNX-002): keep this turn's own response, bound to its
+    // generation, so the harness's `stopReason` reaches `promptAndWait` instead of
+    // being dropped. The generation guard is the same one the failure/`finally`
+    // paths already use: a cancelled or superseded turn stores nothing, so no
+    // other turn can inherit its reason. Absent stays absent - nothing is invented.
+    void promptRequest.then(
+      (response) => {
+        if (this.#turnGenerations.get(sessionID) !== generation) return
+        this.#turnResponses.set(`${sessionID}:${generation}`, response)
+      },
+      () => {}
+    )
+    void promptRequest.catch((error) => {
       if (this.#turnGenerations.get(sessionID) === generation) {
         this.#recordTurnFailure(sessionID, error.message)
         this.#emit("session.error", sessionID, { message: error.message })
