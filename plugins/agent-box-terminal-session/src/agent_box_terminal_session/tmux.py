@@ -97,12 +97,32 @@ class TmuxSession:
         if self._managed:
             # Creation is an empty tmux shell pane, not target launch.  No
             # ProcessSpec or HostTransport is available at this point.
-            self._call("new-session", "-d", "-s", self._session_name(), "-n", "execution")
-            # Preserve a completed/failed managed pane long enough for bounded
-            # evidence capture; this is terminal allocation policy, not target
-            # creation or completion interpretation.
-            self._call("set-option", "-t", self._session_name(), "remain-on-exit", "on")
-            self._identity = self._read_identity(self._session_name())
+            created = False
+            try:
+                self._call("new-session", "-d", "-s", self._session_name(), "-n", "execution")
+                created = True
+                # Preserve a completed/failed managed pane long enough for bounded
+                # evidence capture; this is terminal allocation policy, not target
+                # creation or completion interpretation.
+                self._call("set-option", "-t", self._session_name(), "remain-on-exit", "on")
+                self._identity = self._read_identity(self._session_name())
+            except BaseException:
+                # A session this call created but could not finish configuring is
+                # this call's to remove: set-option and the identity readback both
+                # run after new-session, and a pane left behind makes the next
+                # attempt collide with a session it did not create.  Killing only
+                # when created is set means a failed new-session is never answered
+                # with a kill, and the flag is set nowhere else, so a borrowed
+                # session can never be reached from here.  check=False because the
+                # compensation must not replace the original failure.
+                if created:
+                    socket = self.ref.metadata.get("socket")
+                    prefix = [self.binary]
+                    if socket:
+                        prefix += ["-L", socket]
+                    self._runner([*prefix, "kill-session", "-t", self._session_name()],
+                                 capture_output=True, text=True, check=False)
+                raise
         elif self._identity is None:
             self.resolve(self.ref)
         assert self._identity is not None

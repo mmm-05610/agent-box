@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from typing import Mapping, Sequence
 
 from agent_box.resource_contracts.home_projection import GUEST_HOME
-from .provider import compile_remote_bwrap_argv, compile_remote_sidecar_bwrap_argv
+from .provider import SIDECAR_ENTRYPOINT, compile_remote_bwrap_argv, compile_remote_sidecar_bwrap_argv
 
 
 @dataclass(frozen=True)
@@ -66,7 +66,7 @@ def compose_sidecar_room(
     state_window_target: str | None = None,
     state_overlays: Sequence[tuple[str, str]] = (),
     state_ephemeral_paths: Sequence[str] = (),
-    entrypoint: str = "/runtime/view/agentbox-sidecar/runtime/worker-entry.mjs",
+    entrypoint: str = SIDECAR_ENTRYPOINT,
 ) -> SandboxRoom:
     """Compose the launch plan for one sidecar execution.
 

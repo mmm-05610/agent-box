@@ -261,6 +261,16 @@ class LocalRuntimeHost:
             raise ValueError("RuntimeBundle host identity mismatch")
         return bundle
 
+    def cleanup(self) -> dict[str, object]:
+        # An answer, not a silence: the coordinator's release loop skips a host
+        # that has no `cleanup`, so "nothing to release" and "release verb was
+        # never declared" are indistinguishable in the cleanup record.  This host
+        # owns no process, session, mount or worktree of its own, and
+        # staging_tokens/path_tokens are never populated, so releasing it is a
+        # no-op that can now be reported as one.  A future host-owned resource
+        # must be released here rather than silently re-passing that judgement.
+        return {"released": True, "destroyed": False, "owned": False}
+
 
 class LocalRuntimeHostProvider:
     provider_id = PROVIDER_ID

@@ -28,14 +28,30 @@ def test_nested_readonly_secret_is_private_and_execution_scoped(tmp_path):
     assert str(secret) not in spec.local_argv
     assert any(spec.carrier_argv[i:i + 2] == ("--ro-bind", str(secret)) for i in range(len(spec.carrier_argv) - 1))
     assert spec.local_argv[-1] == "/runtime/bin/codex"
+    # A second attempt cannot borrow a token a still-live earlier attempt bound.
+    # This check has to precede the release: P-T1/D1 reclaims the binding on
+    # cleanup, and after this suite that is the behaviour under test rather than
+    # an obstacle to it.
+    with pytest.raises(ProjectionRejected, match="another attempt"):
+        resolved.wrap(
+            MountPlan(((source, "/runtime/home", "rw"),), secret_mounts=(mount,)),
+            HarnessCommandSpec(("/runtime/bin/codex",), "/runtime/home"), attempt_key="attempt-E2"
+        )
     assert resolved.cleanup(spec)["status"] == "cleaned"
     with pytest.raises(ProjectionRejected): resolved.wrap(
         MountPlan(((source, "/runtime/home", "rw"),), secret_mounts=(mount,)),
         HarnessCommandSpec(("/runtime/bin/codex",), "/runtime/home"), attempt_key="attempt-E1"
     )
     provider.register_prepared_secret_mount(mount, secret)
-    with pytest.raises(ProjectionRejected, match="another attempt"):
-        resolved.wrap(MountPlan(((source, "/runtime/home", "rw"),), secret_mounts=(mount,)), HarnessCommandSpec(("/runtime/bin/codex",), "/runtime/home"), attempt_key="attempt-E2")
+    # Releasing reclaimed both the registration and the attempt binding, so a
+    # freshly prepared token serves the next attempt without residue from the last.
+    retried = resolved.wrap(
+        MountPlan(((source, "/runtime/home", "rw"),), secret_mounts=(mount,)),
+        HarnessCommandSpec(("/runtime/bin/codex",), "/runtime/home"), attempt_key="attempt-E1"
+    )
+    assert "opaque-secret-token" in provider._secret_attempts
+    assert resolved.cleanup(retried)["status"] == "cleaned"
+    assert provider._secret_attempts == {}
 
 
 @pytest.mark.parametrize("target", ["/workspace/auth.json", "/runtime/bin/codex", "/runtime/home/../auth.json"])

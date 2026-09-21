@@ -99,8 +99,16 @@ def test_empty_capture_is_rejected_and_cleanup_keeps_workspace_safe(repo, tmp_pa
     with pytest.raises(ValueError, match="NO_WORKSPACE_CHANGES"):
         provider.capture(execution_id="E1", workspace=w1, frozen_ref=ref)
     provider.cleanup("E1")
-    with pytest.raises(ValueError):
-        provider.cleanup("../outside")
+    # P-T1/D2 changed what this line used to assert.  A scope with neither an
+    # ownership marker nor a worktree is now indistinguishable from one already
+    # released, so cleanup answers as a no-op instead of raising.  The traversal
+    # is still inert for the reason the containment guard is there at all: the
+    # scope is sanitized, so it can only ever name a direct child of
+    # managed_root and nothing outside it is reachable or removed.
+    assert provider.cleanup("../outside") is None
+    assert not (tmp_path / "managed" / "__outside").exists()
+    assert not (tmp_path / "managed" / "E1").exists()
+    assert list((tmp_path / "managed" / ".ownership").iterdir()) == []
 
 
 def test_host_neutral_coordinator_commits_git_contribution_to_core(repo, tmp_path, tmp_agent_box_home):

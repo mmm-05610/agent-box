@@ -204,6 +204,12 @@ def _reject_colliding_targets(targets: Sequence[str]) -> None:
 MAX_EPHEMERAL_MOUNTS = 8
 EPHEMERAL_TMPFS_BYTES = 256 * 1024 * 1024
 
+#: The one Worker-hosted Harness entrypoint this template may launch.  It is
+#: spelled once: the room builder defaults to it and the compiler below rejects
+#: anything else, so a drift between the two could only ever be a refusal that
+#: no caller can satisfy.  Guest-side and fixed by design.
+SIDECAR_ENTRYPOINT = "/runtime/view/agentbox-sidecar/runtime/worker-entry.mjs"
+
 def compile_remote_sidecar_bwrap_argv(
     *, workspace: str, runtime_view: str, environment: Mapping[str, str],
     secret: str | None = None,
@@ -214,7 +220,7 @@ def compile_remote_sidecar_bwrap_argv(
     state_overlay_mounts: Sequence[tuple[str, str]] = (),
     runtime_artifact_mounts: Sequence[tuple[str, str]] = (),
     ephemeral_state_mounts: Sequence[str] = (),
-    entrypoint: str = "/runtime/view/agentbox-sidecar/runtime/worker-entry.mjs",
+    entrypoint: str = SIDECAR_ENTRYPOINT,
 ) -> list[str]:
     """Compile the fixed Worker-hosted Harness sidecar template.
 
@@ -242,7 +248,7 @@ def compile_remote_sidecar_bwrap_argv(
                 or "//" in value or any(part in {".", ".."} for part in value.split("/"))
                 or str(PurePosixPath(value)) != value):
             raise ProjectionRejected("remote mount source is not a canonical absolute path")
-    if entrypoint != "/runtime/view/agentbox-sidecar/runtime/worker-entry.mjs":
+    if entrypoint != SIDECAR_ENTRYPOINT:
         raise ProjectionRejected("sidecar entrypoint is outside the fixed template")
     if secret_target != "/runtime/secret/credential":
         raise ProjectionRejected("sidecar secret target is outside the fixed template")
@@ -573,46 +579,63 @@ class ResolvedBwrapSandbox:
         return cwd
     def wrap(self, mount_plan: MountPlan, command: HarnessCommandSpec, *, attempt_key: str) -> IsolatedProcessSpec:
         if not attempt_key: raise ValueError("attempt_key is required")
-        cwd = self._validate(mount_plan, command, attempt_key)
-        binary = self.provider.binary
-        if binary is None:
-            raise SandboxUnavailable("bwrap binary is unavailable")
-        argv = _minimal_rootfs_argv(binary, self.ref.network_mode)
-        secret_mounts = [(secret, self._secret_path(secret, attempt_key))
-                         for secret in mount_plan.secret_mounts]
-        for directory in _guest_directory_list(
-            ("/runtime", GUEST_HOME, "/runtime/bin", "/runtime/hooks"),
-            [*[target for _source, target, _access in mount_plan.mounts],
-             *mount_plan.tmpfs_targets,
-             *[secret.guest_target for secret, _path in secret_mounts]],
-        ):
-            argv += ["--dir", directory]
-        entries: list[tuple[int, int, str, str, str]] = [
-            (0 if access == "rw" else 1, len(PurePosixPath(target).parts),
-             "--bind" if access == "rw" else "--ro-bind", str(self._source_path(source)), target)
-            for source, target, access in mount_plan.mounts
-        ]
-        # A secret is read-only and is emitted at its own depth, so it always
-        # wins over the writable profile parent it may live in.  Paths are not
-        # included in public records.
-        entries += [
-            (2, len(PurePosixPath(secret.guest_target).parts), "--ro-bind", str(path), secret.guest_target)
-            for secret, path in secret_mounts
-        ]
-        for flag, source, target in _ordered_binds(entries):
-            argv += [flag, source, target]
-        for target in mount_plan.tmpfs_targets: argv += ["--tmpfs", target]
-        argv += ["--chdir", cwd, "--clearenv"]
-        for key, value in sorted(command.environment.items()): argv += ["--setenv", key, value]
-        argv += ["--"] + list(command.argv)
-        public_argv = tuple("<secret-source>" if any(str(value) == str(path) for _secret, path in secret_mounts) else value for value in argv)
-        spec_digest = digest({"policy": self.ref.policy_digest, "mounts": mount_plan.digest, "command": command.digest, "argv": public_argv})
-        record = self.provider.data_dir / "leases" / f"{spec_digest.removeprefix('sha256:')}.json"; record.parent.mkdir(parents=True, exist_ok=True)
-        if not record.exists(): record.write_text(json.dumps({"spec_digest": spec_digest, "state": "wrapped", "secret_mounts": len(mount_plan.secret_mounts)}, sort_keys=True))
-        self.provider._secret_leases[spec_digest] = tuple(m.token for m in mount_plan.secret_mounts)
-        # Token contents are opaque to the Sandbox, but its prefix identifies
-        # the only HostTransport-consumable capability class.
-        return IsolatedProcessSpec("spawn:" + digest({"attempt": attempt_key, "spec": spec_digest}), attempt_key, spec_digest, command.io_mode, public_argv, carrier_argv=tuple(argv))
+        # A secret is bound to this attempt (`_secret_path` records it) before
+        # the plan is allowed to reject it, so every raise below - the target
+        # collision in `_validate`, the unavailable-source check, or the later
+        # re-read in the compile - would otherwise leave `_secret_attempts`
+        # holding this attempt's binding for a spec that was never wrapped.
+        # cleanup() cannot reclaim it: no lease receipt exists until the last
+        # line, so it answers `already_cleaned`.  Snapshot the tokens this call
+        # can bind and restore them on the failure path.  Keyed by token only;
+        # `_secret_sources` belongs to the prepare call that wrote it and stays
+        # registered so a retry with the same token remains possible.
+        prior = {secret.token: self.provider._secret_attempts.get(secret.token) for secret in mount_plan.secret_mounts}
+        try:
+            cwd = self._validate(mount_plan, command, attempt_key)
+            binary = self.provider.binary
+            if binary is None:
+                raise SandboxUnavailable("bwrap binary is unavailable")
+            argv = _minimal_rootfs_argv(binary, self.ref.network_mode)
+            secret_mounts = [(secret, self._secret_path(secret, attempt_key))
+                             for secret in mount_plan.secret_mounts]
+            for directory in _guest_directory_list(
+                ("/runtime", GUEST_HOME, "/runtime/bin", "/runtime/hooks"),
+                [*[target for _source, target, _access in mount_plan.mounts],
+                 *mount_plan.tmpfs_targets,
+                 *[secret.guest_target for secret, _path in secret_mounts]],
+            ):
+                argv += ["--dir", directory]
+            entries: list[tuple[int, int, str, str, str]] = [
+                (0 if access == "rw" else 1, len(PurePosixPath(target).parts),
+                 "--bind" if access == "rw" else "--ro-bind", str(self._source_path(source)), target)
+                for source, target, access in mount_plan.mounts
+            ]
+            # A secret is read-only and is emitted at its own depth, so it always
+            # wins over the writable profile parent it may live in.  Paths are not
+            # included in public records.
+            entries += [
+                (2, len(PurePosixPath(secret.guest_target).parts), "--ro-bind", str(path), secret.guest_target)
+                for secret, path in secret_mounts
+            ]
+            for flag, source, target in _ordered_binds(entries):
+                argv += [flag, source, target]
+            for target in mount_plan.tmpfs_targets: argv += ["--tmpfs", target]
+            argv += ["--chdir", cwd, "--clearenv"]
+            for key, value in sorted(command.environment.items()): argv += ["--setenv", key, value]
+            argv += ["--"] + list(command.argv)
+            public_argv = tuple("<secret-source>" if any(str(value) == str(path) for _secret, path in secret_mounts) else value for value in argv)
+            spec_digest = digest({"policy": self.ref.policy_digest, "mounts": mount_plan.digest, "command": command.digest, "argv": public_argv})
+            record = self.provider.data_dir / "leases" / f"{spec_digest.removeprefix('sha256:')}.json"; record.parent.mkdir(parents=True, exist_ok=True)
+            if not record.exists(): record.write_text(json.dumps({"spec_digest": spec_digest, "state": "wrapped", "secret_mounts": len(mount_plan.secret_mounts)}, sort_keys=True))
+            self.provider._secret_leases[spec_digest] = tuple(m.token for m in mount_plan.secret_mounts)
+            # Token contents are opaque to the Sandbox, but its prefix identifies
+            # the only HostTransport-consumable capability class.
+            return IsolatedProcessSpec("spawn:" + digest({"attempt": attempt_key, "spec": spec_digest}), attempt_key, spec_digest, command.io_mode, public_argv, carrier_argv=tuple(argv))
+        except BaseException:
+            for token, value in prior.items():
+                if value is None: self.provider._secret_attempts.pop(token, None)
+                else: self.provider._secret_attempts[token] = value
+            raise
     def observe(self, spec: IsolatedProcessSpec | str):
         value = spec.spec_digest if isinstance(spec, IsolatedProcessSpec) else str(spec)
         return {"kind": "sandbox", "status": "wrapped", "spec_digest": value, "target_creation_count": 0, "detail": "wrapper compiled; target not spawned"}

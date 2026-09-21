@@ -60,8 +60,31 @@ class GitWorkspaceResourceProvider:
             if _git(worktree, "rev-parse", "HEAD^{commit}") != commit:
                 raise ValueError("existing worktree HEAD differs from frozen commit")
         else:
-            _git(self.repo, "worktree", "add", "--detach", str(worktree), commit)
-            marker.write_text(json.dumps({"execution_id": context.execution_id, "commit": commit, "tree": tree}, sort_keys=True))
+            # Claim before creating: a marker that precedes the worktree is the
+            # safe direction to crash in (cleanup() tolerates marker-without-
+            # worktree), while a worktree that precedes its marker is an
+            # unowned orphan that can never be reclaimed and blocks re-resolution.
+            identity = json.dumps({"execution_id": context.execution_id, "commit": commit, "tree": tree}, sort_keys=True)
+            if marker.exists() and json.loads(marker.read_text()) != {"execution_id": context.execution_id, "commit": commit, "tree": tree}:
+                raise ValueError("existing worktree ownership or identity mismatch")
+            claimed = not marker.exists()
+            marker.write_text(identity)
+            try:
+                _git(self.repo, "worktree", "add", "--detach", str(worktree), commit)
+            except BaseException:
+                # Roll back the creation and not only the claim: a failed add can
+                # leave the directory behind.  The marker is dropped only once the
+                # worktree is provably gone, so a half-created worktree is never
+                # abandoned unowned - it stays reclaimable by cleanup().  A
+                # concurrent resolver's marker is never ours to remove.
+                if worktree.exists():
+                    try:
+                        _git(self.repo, "worktree", "remove", "--force", str(worktree))
+                    except BaseException:
+                        pass
+                if claimed and not worktree.exists() and marker.exists() and marker.read_text() == identity:
+                    marker.unlink()
+                raise
         return WorkspaceV1(worktree, f"git:{commit}")
 
     def capture(self, *, execution_id: str, workspace: WorkspaceV1, frozen_ref: Ref) -> tuple[Ref, tuple[object, ...]]:
