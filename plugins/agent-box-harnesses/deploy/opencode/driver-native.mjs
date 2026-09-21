@@ -314,7 +314,17 @@ export async function createDriver(context) {
           if (text && properties.field === "text" && active && active.sessionId === properties.sessionID) {
             active.deltas += 1
             active.text += text
-            emit({ event: DELTA_EVENT, data: { text } })
+            // X19（C 21:31Z 裁定「按来源分流」）：订阅者的错**不是**"流断了"。`emit` 单独包一层
+            // try——不是把它移出外层 try（移出会让同一个抛错击穿泵，那是新失败模式）。这里只多一条
+            // 可选审计事实，与 `abort-failed` 同族；对外事件/枚举/出口零新增。
+            try {
+              emit({ event: DELTA_EVENT, data: { text } })
+            } catch (error) {
+              audit({
+                event: "subscriber-error",
+                message: redact(String(error?.message ?? error), 200),
+              })
+            }
           }
         }
       }
@@ -386,8 +396,9 @@ export async function createDriver(context) {
       } catch {
         // 关闭路径上的异常不得覆盖主结果。
       }
-      // `pump` handles its own read failures; this catches anything thrown by the handlers
-      // themselves, and records it instead of becoming an unhandled rejection.
+      // `pump` handles its own read failures; this is the backstop for the pump's own machinery
+      // failing, and records it instead of becoming an unhandled rejection. X19 之后订阅者的错已在
+      // 源头分流 ⇒ 这条线不再有"被误标的订阅者"这条来源。
       pump.catch((error) => {
         audit({
           event: "stream-pump-failed",
@@ -573,10 +584,15 @@ export async function createDriver(context) {
   async function abort(sessionId) {
     if (typeof sessionId !== "string" || sessionId.length === 0) return
     try {
-      await rawRequest("POST", `/session/${encodeURIComponent(sessionId)}/abort`, {})
-      audit({ event: "abort", sessionId })
+      const result = await rawRequest("POST", `/session/${encodeURIComponent(sessionId)}/abort`, {})
+      // `rawRequest` 对非 2xx **不抛**，所以旧写法在 500 / 404 之后照样落一条"已 abort"——那是
+      // X18 ②③ 量到的"记错"（三行里唯一会主动污染既有诊断的一行）。只有 2xx 才配得上完成形状；
+      // 被拒时记下状态码本身，既不新增公开枚举/事件/出口事实，也不再让失败看起来像成功。
+      if (result.status >= 200 && result.status < 300) audit({ event: "abort", sessionId })
+      else audit({ event: "abort-failed", sessionId, status: result.status })
     } catch {
-      // 中止是尽力而为：会话可能已经结束。
+      // 中止是尽力而为：会话可能已经结束。fetch 失败（宿主不可达）今日仍无痕——那是 X18 ④，
+      // 让它"变可见"需要新的出口事实，按裁定随增量 2 与 abort 返回契约一起处置，本轮不擅自补。
     }
   }
 
