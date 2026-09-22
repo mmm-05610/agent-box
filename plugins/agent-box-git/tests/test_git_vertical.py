@@ -13,6 +13,7 @@ from agent_box.work_core.repository import CoreRepository, RefRelation
 from agent_box.work_core.services import ExecutionService, WorkService
 from agent_box.extensions.finalization import HostFinalizationCoordinator
 from agent_box_git.contributor import GitFinalizationContributor
+from agent_box_git.workspace_errors import GitWorkspaceRejected
 
 
 @pytest.fixture
@@ -96,7 +97,7 @@ def test_empty_capture_is_rejected_and_cleanup_keeps_workspace_safe(repo, tmp_pa
     provider = GitWorkspaceResourceProvider(repo, tmp_path / "managed")
     ref = provider.make_ref("HEAD")
     w1 = provider.resolve(WorkspaceV1.contract_id, ref, context=ResourceResolutionContext("E1"))
-    with pytest.raises(ValueError, match="NO_WORKSPACE_CHANGES"):
+    with pytest.raises(GitWorkspaceRejected, match="NO_WORKSPACE_CHANGES"):
         provider.capture(execution_id="E1", workspace=w1, frozen_ref=ref)
     provider.cleanup("E1")
     # P-T1/D2 changed what this line used to assert.  A scope with neither an

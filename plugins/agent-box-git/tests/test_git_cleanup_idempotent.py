@@ -8,6 +8,7 @@ import pytest
 from agent_box.resource_contracts import WorkspaceV1
 from agent_box.work_core.registry import ResourceResolutionContext
 from agent_box_git.provider import GitWorkspaceResourceProvider
+from agent_box_git.workspace_errors import GitWorkspaceRejected
 
 
 def _git(path: Path, *args: str) -> str:
@@ -49,6 +50,6 @@ def test_cleanup_still_refuses_unowned_worktree(repo, tmp_path):
     marker = provider.managed_root / ".ownership" / f"{scope}.json"
     marker.unlink()                       # drop ownership but leave the worktree on disk
     assert (provider.managed_root / scope).exists()
-    with pytest.raises(ValueError, match="refusing to clean unowned worktree"):
+    with pytest.raises(GitWorkspaceRejected, match="refusing to clean unowned worktree"):
         provider.cleanup(scope)
     assert (provider.managed_root / scope).exists()   # untouched: never delete what we no longer own

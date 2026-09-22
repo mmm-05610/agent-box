@@ -7,9 +7,12 @@ import subprocess
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
+from agent_box.extensions.runtime_composition import CompositionErrorCode, CompositionRejected
 from agent_box.resource_contracts import WorkspaceV1
 from agent_box.work_core.models import Ref, RefType
 from agent_box.work_core.registry import ProviderDescriptor, ResourceResolutionContext
+
+from agent_box_git.workspace_errors import GitWorkspaceErrorCode, GitWorkspaceRejected
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -28,7 +31,7 @@ class GitWorkspaceResourceProvider:
     def __init__(self, repo: Path, managed_root: Path) -> None:
         self.repo, self.managed_root = repo.resolve(), managed_root.resolve()
         if not (self.repo / ".git").exists():
-            raise ValueError(f"not a Git repository: {self.repo}")
+            raise GitWorkspaceRejected(GitWorkspaceErrorCode.REPOSITORY_INVALID, "not a Git repository")
         self.managed_root.mkdir(parents=True, exist_ok=True)
 
     def descriptor(self) -> ProviderDescriptor:
@@ -41,24 +44,24 @@ class GitWorkspaceResourceProvider:
 
     def resolve(self, contract_id: str, ref: Ref, *, context: ResourceResolutionContext | None = None) -> WorkspaceV1:
         if contract_id != WorkspaceV1.contract_id or ref.type is not RefType.WORKSPACE:
-            raise ValueError("Git workspace contract requires WorkspaceRef")
+            raise CompositionRejected(CompositionErrorCode.INVALID_BINDING, "Git workspace contract requires WorkspaceRef")
         if Path(unquote(urlparse(ref.uri or "").path)).resolve() != self.repo:
-            raise ValueError("WorkspaceRef repository authority mismatch")
+            raise GitWorkspaceRejected(GitWorkspaceErrorCode.AUTHORITY_MISMATCH, "WorkspaceRef repository authority mismatch")
         commit = _git(self.repo, "rev-parse", f"{ref.native_id}^{{commit}}")
         tree = _git(self.repo, "rev-parse", f"{commit}^{{tree}}")
         if commit != ref.native_id or ref.metadata.get("tree") != tree:
-            raise ValueError("WorkspaceRef exact commit/tree mismatch")
+            raise GitWorkspaceRejected(GitWorkspaceErrorCode.EXACT_REF_MISMATCH, "WorkspaceRef exact commit/tree mismatch")
         if context is None or not context.execution_id:
-            raise ValueError("Git materialization requires execution scope")
+            raise GitWorkspaceRejected(GitWorkspaceErrorCode.EXECUTION_SCOPE_MISSING, "Git materialization requires execution scope")
         scope = "".join(c if c.isalnum() or c in "-_" else "_" for c in context.execution_id)
         worktree = self.managed_root / scope
         marker = self.managed_root / ".ownership" / f"{scope}.json"
         marker.parent.mkdir(parents=True, exist_ok=True)
         if worktree.exists():
             if not marker.exists() or json.loads(marker.read_text()) != {"execution_id": context.execution_id, "commit": commit, "tree": tree}:
-                raise ValueError("existing worktree ownership or identity mismatch")
+                raise GitWorkspaceRejected(GitWorkspaceErrorCode.OWNERSHIP_CONFLICT, "existing worktree ownership or identity mismatch")
             if _git(worktree, "rev-parse", "HEAD^{commit}") != commit:
-                raise ValueError("existing worktree HEAD differs from frozen commit")
+                raise GitWorkspaceRejected(GitWorkspaceErrorCode.WORKSPACE_DRIFT, "existing worktree HEAD differs from frozen commit")
         else:
             # Claim before creating: a marker that precedes the worktree is the
             # safe direction to crash in (cleanup() tolerates marker-without-
@@ -66,7 +69,7 @@ class GitWorkspaceResourceProvider:
             # unowned orphan that can never be reclaimed and blocks re-resolution.
             identity = json.dumps({"execution_id": context.execution_id, "commit": commit, "tree": tree}, sort_keys=True)
             if marker.exists() and json.loads(marker.read_text()) != {"execution_id": context.execution_id, "commit": commit, "tree": tree}:
-                raise ValueError("existing worktree ownership or identity mismatch")
+                raise GitWorkspaceRejected(GitWorkspaceErrorCode.OWNERSHIP_CONFLICT, "existing worktree ownership or identity mismatch")
             claimed = not marker.exists()
             marker.write_text(identity)
             try:
@@ -90,19 +93,19 @@ class GitWorkspaceResourceProvider:
     def capture(self, *, execution_id: str, workspace: WorkspaceV1, frozen_ref: Ref) -> tuple[Ref, tuple[object, ...]]:
         expected = self.managed_root / "".join(c if c.isalnum() or c in "-_" else "_" for c in execution_id)
         if workspace.path.resolve() != expected or not workspace.path.exists():
-            raise ValueError("workspace is not the execution-owned managed worktree")
+            raise GitWorkspaceRejected(GitWorkspaceErrorCode.OWNERSHIP_CONFLICT, "workspace is not the execution-owned managed worktree")
         head = _git(workspace.path, "rev-parse", "HEAD^{commit}")
         if head != frozen_ref.native_id:
-            raise ValueError("worktree HEAD drifted from frozen input commit")
+            raise GitWorkspaceRejected(GitWorkspaceErrorCode.WORKSPACE_DRIFT, "worktree HEAD drifted from frozen input commit")
         _git(workspace.path, "add", "-A")
         tree = _git(workspace.path, "write-tree")
         existing = _git(self.repo, "show-ref", "--hash", f"refs/agent-box/executions/{execution_id}/output") if self._has_ref(execution_id) else ""
         base_tree = _git(self.repo, "rev-parse", f"{frozen_ref.native_id}^{{tree}}")
         if tree == base_tree:
-            raise ValueError("NO_WORKSPACE_CHANGES")
+            raise GitWorkspaceRejected(GitWorkspaceErrorCode.NO_WORKSPACE_CHANGES)
         if existing:
             if _git(self.repo, "rev-parse", f"{existing}^{{tree}}") != tree:
-                raise ValueError("internal output ref conflicts with current captured tree")
+                raise GitWorkspaceRejected(GitWorkspaceErrorCode.OUTPUT_REF_CONFLICT, "internal output ref conflicts with current captured tree")
             commit = existing
         else:
             commit = subprocess.run(["git", "-C", str(self.repo), "commit-tree", tree, "-p", frozen_ref.native_id], input=f"Agent-Box execution output {execution_id}\n", text=True, check=True, stdout=subprocess.PIPE).stdout.strip()
@@ -117,7 +120,7 @@ class GitWorkspaceResourceProvider:
         scope = "".join(c if c.isalnum() or c in "-_" else "_" for c in execution_id)
         worktree, marker = self.managed_root / scope, self.managed_root / ".ownership" / f"{scope}.json"
         if worktree.resolve().parent != self.managed_root:
-            raise ValueError("refusing to clean unowned worktree")
+            raise GitWorkspaceRejected(GitWorkspaceErrorCode.UNOWNED_RESOURCE, "refusing to clean unowned worktree")
         if not marker.exists():
             # Double release: the managed worktree and its ownership marker are
             # both gone, so the cleaned state is already reached — this is a
@@ -126,7 +129,7 @@ class GitWorkspaceResourceProvider:
             # excuse to delete a resource this provider never took ownership of.
             if not worktree.exists():
                 return {"status": "already_cleaned"}
-            raise ValueError("refusing to clean unowned worktree")
+            raise GitWorkspaceRejected(GitWorkspaceErrorCode.UNOWNED_RESOURCE, "refusing to clean unowned worktree")
         # Owned (marker present).  Remove the worktree first and the marker last,
         # so a mid-sequence failure leaves the marker in place and a retry can
         # still tell this scope is ours and finish the job.  Reversing the order

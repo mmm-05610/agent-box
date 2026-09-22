@@ -11,6 +11,7 @@ from agent_box.resource_contracts import WorkspaceV1
 from agent_box.work_core.registry import ResourceResolutionContext
 from agent_box_git import provider as provider_module
 from agent_box_git.provider import GitWorkspaceResourceProvider
+from agent_box_git.workspace_errors import GitWorkspaceRejected
 
 
 def _git(path: Path, *args: str) -> str:
@@ -119,7 +120,7 @@ def test_a_marker_we_did_not_write_is_never_clobbered_or_removed(repo, tmp_path)
     marker.parent.mkdir(parents=True, exist_ok=True)
     foreign = json.dumps({"execution_id": "someone-else", "commit": "c" * 40, "tree": "t" * 40}, sort_keys=True)
     marker.write_text(foreign)
-    with pytest.raises(ValueError, match="ownership or identity mismatch"):
+    with pytest.raises(GitWorkspaceRejected, match="ownership or identity mismatch"):
         _resolve(provider)
     assert marker.read_text() == foreign
     assert not (provider.managed_root / "exec-1").exists()

@@ -22,6 +22,7 @@ from agent_box.resource_contracts import WorkspaceV1
 from agent_box.work_core.registry import ResourceResolutionContext
 from agent_box_git import provider as git_provider
 from agent_box_git.provider import GitWorkspaceResourceProvider
+from agent_box_git.workspace_errors import GitWorkspaceRejected
 
 
 def _git(path, *args):
@@ -132,7 +133,7 @@ def test_the_unowned_worktree_guard_is_not_relaxed_by_the_new_return_shape(repo,
     _materialize(provider, "exec-1")
     _worktree, marker = _scope_path(provider, "exec-1")
     marker.unlink()
-    with pytest.raises(ValueError, match="refusing to clean unowned worktree"):
+    with pytest.raises(GitWorkspaceRejected, match="refusing to clean unowned worktree"):
         provider.cleanup("exec-1")
 
 
