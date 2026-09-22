@@ -69,13 +69,38 @@ def test_disable_failure_leaves_no_unowned_revision_directory(tmp_path):
     store.disable(first.skill_id, 1)
     revisions = tmp_path / "store" / "skills" / first.skill_id / "revisions"
     before = sorted(p.name for p in revisions.iterdir())
-    # Gap A (typed reject for a stale token) is deferred to R-6/INC2, so this pins
-    # only the compensation and stays valid under whatever the failure turns into.
+    # Gap A is closed by the R-6/INC2 token guard, so the stale token is refused
+    # before any revision directory is built; this example keeps pinning only the
+    # compensation (it stays valid whatever the failure turns into).
     try:
         store.disable(first.skill_id, 1)
     except Exception:
         pass
     assert sorted(p.name for p in revisions.iterdir()) == before
+
+
+def test_disable_stale_token_is_typed_conflict_before_any_revision(tmp_path):
+    store = SkillStore(tmp_path / "store")
+    first = store.import_directory(make_skill(tmp_path / "source"))
+    disabled = store.disable(first.skill_id, 1)
+    assert disabled.revision == 2
+    revisions = tmp_path / "store" / "skills" / first.skill_id / "revisions"
+    before = sorted(p.name for p in revisions.iterdir())
+    # The same token and the same shape as import_directory: a stale token is a
+    # typed refusal, not a bare OSError from the os.replace collision.
+    with pytest.raises(ValueError, match="REVISION_CONFLICT"):
+        store.disable(first.skill_id, 1)
+    with pytest.raises(ValueError, match="REVISION_CONFLICT"):
+        store.disable(first.skill_id, disabled.revision + 1)
+    # Nothing was staged: no extra revision and no leftover temporary directory.
+    assert sorted(p.name for p in revisions.iterdir()) == before == ["1", "2"]
+    # The guard is deliberately no wider than the stale token: a skill with no
+    # revision at all keeps the more specific not-found refusal.
+    with pytest.raises(KeyError, match="SKILL_NOT_FOUND"):
+        store.disable("no-such-skill", 1)
+    # The tombstone token itself is still idempotent and still grows nothing.
+    assert store.disable(first.skill_id, disabled.revision).revision == 2
+    assert sorted(p.name for p in revisions.iterdir()) == ["1", "2"]
 
 
 def test_disable_with_tombstone_revision_makes_no_new_revision(tmp_path):

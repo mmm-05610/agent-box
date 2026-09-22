@@ -246,6 +246,18 @@ class SkillStore:
         return tuple(values)
 
     def disable(self, skill_id: str, expected_revision: int) -> AgentSkillV1:
+        # Same token and same shape as import_directory, and intentionally no wider:
+        # when revisions exist, a token that does not name the current one is refused
+        # up front, so a stale caller can never reach the os.replace below and surface
+        # as a bare OSError collision.  The guard deliberately does not fire when no
+        # revision exists at all - that stays the more specific SKILL_NOT_FOUND from
+        # _read_metadata, so the only observable change is the stale-token refusal.
+        # Non-discriminating: the current revision is still the only one that can be
+        # disabled, and an already-tombstoned token still short-circuits to the same
+        # value instead of growing a new revision.
+        latest = self._latest(skill_id)
+        if latest is not None and int(latest["revision"]) != expected_revision:
+            raise ValueError("REVISION_CONFLICT")
         current = self._read_metadata(skill_id, expected_revision)
         if current.get("disabled"): return self._value(current)
         source = self._source(skill_id, expected_revision); revision = expected_revision + 1; base = self._skill_dir(skill_id) / "revisions"; tmp = Path(tempfile.mkdtemp(prefix=f".{revision}.", dir=base))
