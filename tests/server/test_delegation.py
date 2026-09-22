@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import pytest
 
+from agent_box.server.execution import HarnessDescriptor, HarnessRegistry
 from agent_box.server.errors import ServerError
 from agent_box.server.execution.delegation import DelegationService
 from agent_box.server.idempotency import IdempotentRecords
@@ -56,7 +57,21 @@ def _pieces(tmp_path):
     records = SessionRecords(database, idempotency)
     objects = ObjectStore(tmp_path / "data")
     execution = FakeExecution(records)
-    sessions = SessionService(records, idempotency, objects, harnesses=None,
+    # a-3 A-family rebuild: the fixture now accepts a real Turn through the
+    # service route, which asserts the harness the same way production send
+    # does - register the families the fixture Profiles declare.
+    harnesses = HarnessRegistry()
+    harnesses.register(HarnessDescriptor(
+        "codex", credential_kind=None,
+        configuration_validator=lambda value: None if isinstance(value, dict) else ValueError(),
+        capability_claims={"stream": True},
+    ))
+    harnesses.register(HarnessDescriptor(
+        "claude-code", credential_kind=None,
+        configuration_validator=lambda value: None if isinstance(value, dict) else ValueError(),
+        capability_claims={"stream": True},
+    ))
+    sessions = SessionService(records, idempotency, objects, harnesses=harnesses,
                               profiles=profiles, credentials=None, execution=execution)
     service = DelegationService(records=records, profiles=profiles, sessions=sessions,
                                 execution=execution, objects=objects)
@@ -93,36 +108,39 @@ def _setup(tmp_path):
         sessions.create_session(f"seed-{callable_profile['profile_id']}", {
             "workspace_id": workspace["workspace_id"],
             "profile_id": callable_profile["profile_id"]})
-    with database.transaction() as conn:
-        conn.execute(
-            "INSERT INTO server_turns(id,session_id,profile_id,profile_revision,"
-            "native_generation,state,capture_state,cleanup_state,input_object_digest,"
-            "created_at,updated_at) VALUES ('parent-turn',?,?,1,0,'running','pending',"
-            "'pending','x','t','t')",
-            (session["session_id"], parent["profile_id"]),
-        )
-    return database, profiles, records, sessions, execution, service, parent, child, other
+    # a-3 gate-reds ruling (C 06:19/06:30Z) A-family rebuild: the parent Turn
+    # is constructed through the acceptance route (SessionService.create_turn ->
+    # publish effective configuration), like production, so the frozen object
+    # carries the permissions section delegation narrows from. Returns the
+    # real turn id; every former 'parent-turn' literal now uses it.
+    _, parent_turn = sessions.create_turn(session["session_id"], "parent-key", {
+        "text": "parent task",
+        "expected_profile_revision": int(profiles.get(parent["profile_id"])["config_revision"]),
+    })
+    parent_turn_id = parent_turn["turn_id"]
+    return (database, profiles, records, sessions, execution, service,
+            parent, child, other, parent_turn_id)
 
 
 def test_zero_grants_means_no_tools_and_no_run(tmp_path):
-    _db, _profiles, _records, _sessions, _execution, service, parent, _child, _other = _setup(tmp_path)
+    _db, _profiles, _records, _sessions, _execution, service, parent, _child, _other, parent_turn_id = _setup(tmp_path)
     listing = service.list_for(parent_profile_id=parent["profile_id"])
     assert listing == {"tools": [], "roster": []}
     with pytest.raises(DelegationError) as refused:
-        service.run(parent_turn_id="parent-turn", parent_profile_id=parent["profile_id"],
+        service.run(parent_turn_id=parent_turn_id, parent_profile_id=parent["profile_id"],
                     arguments={"subagent": "beta", "description": "do some work", "prompt": "x"})
     assert refused.value.code == "SUBAGENT_NOT_AUTHORIZED"
 
 
 def test_a_granted_run_completes_links_and_returns_the_bounded_summary(tmp_path):
-    database, profiles, records, _sessions, execution, service, parent, child, _other = _setup(tmp_path)
+    database, profiles, records, _sessions, execution, service, parent, child, _other, parent_turn_id = _setup(tmp_path)
     profiles.grant_subagent(parent_id=parent["profile_id"], child_id=child["profile_id"])
 
     listing = service.list_for(parent_profile_id=parent["profile_id"])
     assert [tool["name"] for tool in listing["tools"]] == ["list_subagents", "run_subagent"]
     assert [entry["name"] for entry in listing["roster"]] == ["beta"]
 
-    result = service.run(parent_turn_id="parent-turn", parent_profile_id=parent["profile_id"],
+    result = service.run(parent_turn_id=parent_turn_id, parent_profile_id=parent["profile_id"],
                          arguments={"subagent": "beta", "description": "do some work",
                                     "prompt": "Summarise the thing."})
     assert result["state"] == "completed"
@@ -134,22 +152,24 @@ def test_a_granted_run_completes_links_and_returns_the_bounded_summary(tmp_path)
     with database.read() as conn:
         row = conn.execute("SELECT parent_turn_id FROM server_turns WHERE id=?",
                            (result["turnId"],)).fetchone()
-    assert row["parent_turn_id"] == "parent-turn"
+    assert row["parent_turn_id"] == parent_turn_id
     # The ledger is what knows who is whose child (order 086 wires the stop).
-    assert records.live_child_turn_ids("parent-turn") == []
+    assert records.live_child_turn_ids(parent_turn_id) == []
     with database.transaction() as conn:
         conn.execute("UPDATE server_turns SET state='running' WHERE id=?", (result["turnId"],))
-    assert records.live_child_turn_ids("parent-turn") == [result["turnId"]]
-    assert execution.accepted == [result["turnId"]]
+    assert records.live_child_turn_ids(parent_turn_id) == [result["turnId"]]
+    assert execution.accepted == [parent_turn_id, result["turnId"]], (
+        "a-3 rebuild: the fixture parent is now accepted through the "
+        "service route too; the child is accepted exactly once after it")
 
 
 def test_continuation_depends_on_family_and_unknown_handles_refuse(tmp_path):
-    database, profiles, _records, _sessions, _execution, service, parent, child, other = _setup(tmp_path)
+    database, profiles, _records, _sessions, _execution, service, parent, child, other, parent_turn_id = _setup(tmp_path)
     profiles.grant_subagent(parent_id=parent["profile_id"], child_id=child["profile_id"])
     profiles.grant_subagent(parent_id=parent["profile_id"], child_id=other["profile_id"])
 
     with pytest.raises(DelegationError) as unknown:
-        service.run(parent_turn_id="parent-turn", parent_profile_id=parent["profile_id"],
+        service.run(parent_turn_id=parent_turn_id, parent_profile_id=parent["profile_id"],
                     arguments={"subagent": "beta", "description": "do some work",
                                "prompt": "x", "task_id": "native-nope"})
     assert unknown.value.code == "SUBAGENT_TASK_UNKNOWN"
@@ -168,16 +188,16 @@ def test_continuation_depends_on_family_and_unknown_handles_refuse(tmp_path):
         conn.execute("UPDATE server_sessions SET checkpoint_native_id='native-foreign' "
                      "WHERE id=?", (foreign["session_id"],))
     with pytest.raises(DelegationError) as mismatch:
-        service.run(parent_turn_id="parent-turn", parent_profile_id=parent["profile_id"],
+        service.run(parent_turn_id=parent_turn_id, parent_profile_id=parent["profile_id"],
                     arguments={"subagent": "beta", "description": "do some work",
                                "prompt": "x", "task_id": "native-foreign"})
     assert mismatch.value.code == "SUBAGENT_TASK_FAMILY_MISMATCH"
 
     # Within the same family, the handle continues the same session.
-    first = service.run(parent_turn_id="parent-turn", parent_profile_id=parent["profile_id"],
+    first = service.run(parent_turn_id=parent_turn_id, parent_profile_id=parent["profile_id"],
                         arguments={"subagent": "beta", "description": "do some work",
                                    "prompt": "first"})
-    second = service.run(parent_turn_id="parent-turn", parent_profile_id=parent["profile_id"],
+    second = service.run(parent_turn_id=parent_turn_id, parent_profile_id=parent["profile_id"],
                          arguments={"subagent": "beta", "description": "do more work",
                                     "prompt": "again", "task_id": first["task_id"]})
     assert second["resumed"] is True and second["sessionId"] == first["sessionId"]
@@ -192,18 +212,18 @@ def test_fan_out_refuses_and_the_caller_no_longer_reports_its_own_ancestry(tmp_p
     says nothing about who is actually waiting - which is how 65's rule ended up
     written down and never live.
     """
-    _db, profiles, _records, _sessions, _execution, service, parent, child, _other = _setup(tmp_path)
+    _db, profiles, _records, _sessions, _execution, service, parent, child, _other, parent_turn_id = _setup(tmp_path)
     profiles.grant_subagent(parent_id=parent["profile_id"], child_id=child["profile_id"])
 
     with pytest.raises(DelegationError) as fan_out:
-        service.run(parent_turn_id="parent-turn", parent_profile_id=parent["profile_id"],
+        service.run(parent_turn_id=parent_turn_id, parent_profile_id=parent["profile_id"],
                     arguments={"subagent": "beta", "description": "do some work", "prompt": "x"},
                     calls_this_turn=4)
     assert fan_out.value.code == "SUBAGENT_TURNS_EXCEEDED"
 
 
 def test_a_failed_child_returns_its_typed_code_not_raw_output(tmp_path):
-    database, profiles, records, sessions, _execution, _service, parent, child, _other = _setup(tmp_path)
+    database, profiles, records, sessions, _execution, _service, parent, child, _other, parent_turn_id = _setup(tmp_path)
     profiles.grant_subagent(parent_id=parent["profile_id"], child_id=child["profile_id"])
     failing = FakeExecution(records, fail_code="TURN_FAILED_FOR_TEST")
     service = DelegationService(records=records, profiles=profiles,
@@ -212,7 +232,7 @@ def test_a_failed_child_returns_its_typed_code_not_raw_output(tmp_path):
                                     harnesses=None, profiles=profiles, credentials=None,
                                     execution=failing),
                                 execution=failing, objects=ObjectStore(tmp_path / "data"))
-    result = service.run(parent_turn_id="parent-turn", parent_profile_id=parent["profile_id"],
+    result = service.run(parent_turn_id=parent_turn_id, parent_profile_id=parent["profile_id"],
                          arguments={"subagent": "beta", "description": "do some work",
                                     "prompt": "x"})
     assert result["state"] == "failed" and result["errorCode"] == "TURN_FAILED_FOR_TEST"
@@ -428,7 +448,7 @@ def test_the_parents_denials_narrow_the_child_and_its_own_allow_set_stands(tmp_p
     child's frozen posture; the child's own rules decide everything else."""
     import json
 
-    database, profiles, _records, _sessions, _execution, service, parent, child, _other = _setup(tmp_path)
+    database, profiles, _records, _sessions, _execution, service, parent, child, _other, parent_turn_id = _setup(tmp_path)
     # The parent is on `plan` (edit/bash/external_directory denied) and adds
     # its own deny on webfetch; the child is on `default` with no rules.
     profiles.set_permissions(
@@ -438,7 +458,7 @@ def test_the_parents_denials_narrow_the_child_and_its_own_allow_set_stands(tmp_p
         key="pp", request_digest="pp")
     profiles.grant_subagent(parent_id=parent["profile_id"], child_id=child["profile_id"])
 
-    result = service.run(parent_turn_id="parent-turn", parent_profile_id=parent["profile_id"],
+    result = service.run(parent_turn_id=parent_turn_id, parent_profile_id=parent["profile_id"],
                          arguments={"subagent": "beta", "description": "do some work",
                                     "prompt": "x"})
     with database.read() as conn:
@@ -460,9 +480,9 @@ def test_the_parents_denials_narrow_the_child_and_its_own_allow_set_stands(tmp_p
 def test_a_child_approval_is_mirrored_into_the_parent_turn(tmp_path):
     """Order 65: the subagent's `ask` rises into the parent as the same kind
     of interruption the parent already handles (same approval id)."""
-    database, _profiles, records, _sessions, _execution, service, parent, child, _other = _setup(tmp_path)
+    database, _profiles, records, _sessions, _execution, service, parent, child, _other, parent_turn_id = _setup(tmp_path)
     _profiles.grant_subagent(parent_id=parent["profile_id"], child_id=child["profile_id"])
-    result = service.run(parent_turn_id="parent-turn", parent_profile_id=parent["profile_id"],
+    result = service.run(parent_turn_id=parent_turn_id, parent_profile_id=parent["profile_id"],
                          arguments={"subagent": "beta", "description": "do some work",
                                     "prompt": "x"}, )
     child_turn = result["turnId"]
@@ -485,7 +505,7 @@ def test_a_child_approval_is_mirrored_into_the_parent_turn(tmp_path):
     parent_session = records.get_session(parent_session_id)
     mirrored = [event for event in parent_session["events"]
                 if event["kind"] == "approval.requested"
-                and event.get("turn_id") == "parent-turn"]
+                and event.get("turn_id") == parent_turn_id]
     assert mirrored, "the interruption reached the parent turn"
     assert mirrored[-1]["data"]["from_subagent"]["turnId"] == child_turn
     assert mirrored[-1]["data"]["approval_id"].startswith("approval_")
@@ -677,7 +697,7 @@ def test_two_subagent_calls_in_one_turn_both_complete_and_attribute(tmp_path):
     the other's record."""
     import threading
 
-    database, profiles, records, _sessions, _execution, service, parent, child, other = _setup(tmp_path)
+    database, profiles, records, _sessions, _execution, service, parent, child, other, parent_turn_id = _setup(tmp_path)
     profiles.grant_subagent(parent_id=parent["profile_id"], child_id=child["profile_id"])
     profiles.grant_subagent(parent_id=parent["profile_id"], child_id=other["profile_id"])
 
@@ -687,7 +707,7 @@ def test_two_subagent_calls_in_one_turn_both_complete_and_attribute(tmp_path):
     def run(name: str) -> None:
         try:
             results[name] = service.run(
-                parent_turn_id="parent-turn", parent_profile_id=parent["profile_id"],
+                parent_turn_id=parent_turn_id, parent_profile_id=parent["profile_id"],
                 arguments={"subagent": name, "description": "do some work", "prompt": "x"})
         except BaseException as exc:  # noqa: BLE001
             errors.append(f"{name}: {exc}")
@@ -705,7 +725,8 @@ def test_two_subagent_calls_in_one_turn_both_complete_and_attribute(tmp_path):
     with database.read() as conn:
         linked = [
             row[0] for row in conn.execute(
-                "SELECT id FROM server_turns WHERE parent_turn_id='parent-turn' ORDER BY id"
+                "SELECT id FROM server_turns WHERE parent_turn_id=? ORDER BY id",
+                (parent_turn_id,)
             ).fetchall()
         ]
     assert sorted(turn_ids) == linked
