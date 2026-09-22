@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 const root = path.dirname(fileURLToPath(import.meta.url))
 for (const [folder, id, entries] of [
+  ['agent-ui-probe', 'example.agent-ui', { entry: 'entry.tsx' }],
   ['foundation-demo', 'example.foundation', { entry: 'entry.tsx' }],
   ['hello-extension', 'example.hello', { entry: 'entry.tsx' }],
   ['service-contract', 'example.contracts', { entry: 'entry.ts', contract: 'contract.ts' }],
@@ -19,5 +20,6 @@ for (const [folder, id, entries] of [
     external: ['react', 'react/*', 'react-dom', 'react-dom/*', '@ordessa/extension-api', '@extensions/*'],
   })
   await copyFile(path.join(root, folder, 'manifest.json'), path.join(output, 'manifest.json'))
+  if (id === 'example.agent-ui') await copyFile(path.join(root, '../node_modules/@assistant-ui/react/LICENSE'), path.join(output, 'assistant-ui-LICENSE'))
 }
 console.log('Built standalone examples into examples/dist; host was not rebuilt.')

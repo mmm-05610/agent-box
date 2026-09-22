@@ -4,6 +4,7 @@ import { writeFile } from 'node:fs/promises'
 import { discover } from './extensions'
 import { protocolHandler } from './extension-protocol'
 import { verifyLayout } from './smoke-layout'
+import { verifyAgentUI } from './smoke-agent'
 
 app.setName('Ordessa Desktop')
 if (process.env.MODULAR_USER_DATA) app.setPath('userData', process.env.MODULAR_USER_DATA)
@@ -84,6 +85,14 @@ app.whenReady().then(async () => {
         await writeFile(process.env.MODULAR_SCREENSHOT, (await win.webContents.capturePage()).toPNG())
         await win.webContents.executeJavaScript(`(async()=>{ [...document.querySelectorAll('nav button')].find(b=>b.getAttribute('aria-label')==='设置').click(); await new Promise(r=>setTimeout(r,100)); })()`)
         await writeFile(process.env.MODULAR_SCREENSHOT + '.settings.png', (await win.webContents.capturePage()).toPNG())
+      }
+    }
+    if (process.env.MODULAR_AGENT_SMOKE === '1') {
+      Object.assign(result, { agent: await verifyAgentUI(win) })
+      if (process.env.MODULAR_SCREENSHOT) {
+        win.showInactive()
+        await new Promise(resolve => setTimeout(resolve, 150))
+        await writeFile(process.env.MODULAR_SCREENSHOT, (await win.webContents.capturePage()).toPNG())
       }
     }
     console.log('MODULAR_LOADER_READY', JSON.stringify(result))

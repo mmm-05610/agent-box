@@ -10,6 +10,7 @@
     "packages/extension-loader"
   ],
   "scripts": {
+    "test:agent-ui": "node apps/desktop/scripts/test-agent-ui.mjs",
     "build:foundations": "node extensions/build.mjs",
     "dev": "npm run --workspace apps/desktop dev",
     "build": "npm run --workspace apps/desktop build",
@@ -26,5 +27,8 @@
   },
   "dependencies": {
     "react-resizable-panels": "4.13.2"
+  },
+  "devDependencies": {
+    "@assistant-ui/react": "0.15.21"
   }
 }
