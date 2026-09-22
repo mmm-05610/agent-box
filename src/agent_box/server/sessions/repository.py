@@ -261,11 +261,12 @@ class SessionRecords:
             conn.execute(
                 "INSERT INTO server_turns(id,session_id,profile_id,profile_revision,native_generation,"
                 "state,capture_state,cleanup_state,input_object_digest,effective_config_object_digest,"
-                "queue_item_id,created_at,updated_at) "
-                "VALUES (?,?,?,?,?,'accepted','pending','pending',?,?,?,?,?)",
+                "queue_item_id,execution_key,created_at,updated_at) "
+                "VALUES (?,?,?,?,?,'accepted','pending','pending',?,?,?,?,?,?)",
                 (execution_id, session_id, profile["id"], config_version,
                  int(profile["native_generation"]), input_object_digest,
-                 effective_config_object_digest, queue_item_id, timestamp, timestamp),
+                 effective_config_object_digest, queue_item_id,
+                 f"execution:{execution_id}", timestamp, timestamp),
             )
         except Exception as exc:
             if "UNIQUE constraint failed" in str(exc):
@@ -609,11 +610,12 @@ class SessionRecords:
             self._refuse_exclusive_home_concurrency(conn, profile)
             try:
                 conn.execute(
-                    "INSERT INTO server_turns(id,session_id,profile_id,profile_revision,native_generation,state,capture_state,cleanup_state,input_object_digest,effective_config_object_digest,created_at,updated_at) "
-                    "VALUES (?,?,?,?,?,'accepted','pending','pending',?,?,?,?)",
+                    "INSERT INTO server_turns(id,session_id,profile_id,profile_revision,native_generation,state,capture_state,cleanup_state,input_object_digest,effective_config_object_digest,execution_key,created_at,updated_at) "
+                    "VALUES (?,?,?,?,?,'accepted','pending','pending',?,?,?,?,?)",
                     (turn_id, session_id, session["profile_id"], expected_profile_revision,
                      int(profile["native_generation"]), input_object_digest,
-                     effective_config_object_digest, timestamp, timestamp),
+                     effective_config_object_digest, f"execution:{turn_id}",
+                     timestamp, timestamp),
                 )
             except Exception as exc:
                 if "UNIQUE constraint failed" in str(exc):
