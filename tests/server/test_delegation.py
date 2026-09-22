@@ -78,7 +78,7 @@ def _pieces(tmp_path):
     return database, profiles, workspaces, records, sessions, execution, service
 
 
-def _setup(tmp_path):
+def _setup(tmp_path, *, parent_permissions=None):
     database, profiles, workspaces, records, sessions, execution, service = _pieces(tmp_path)
     objects = service.objects
 
@@ -97,6 +97,12 @@ def _setup(tmp_path):
                             config_digest=digest, credential_id=None)[1]
     other = profiles.create(key="o", request_digest="o", name="gamma", harness_type="codex",
                             config_digest=digest, credential_id=None)[1]
+    if parent_permissions is not None:
+        preset, rules = parent_permissions
+        profiles.set_permissions(
+            profile_id=parent["profile_id"], preset=preset, rules=rules,
+            expected_version=profiles.get(parent["profile_id"])["version"],
+            key="pp", request_digest="pp")
     workspace = workspaces.create(
         key="w", request_digest="w", distribution="Ubuntu", remote_user="tester",
         remote_path="/workspace", connection_id="c")[1]
@@ -448,14 +454,11 @@ def test_the_parents_denials_narrow_the_child_and_its_own_allow_set_stands(tmp_p
     child's frozen posture; the child's own rules decide everything else."""
     import json
 
-    database, profiles, _records, _sessions, _execution, service, parent, child, _other, parent_turn_id = _setup(tmp_path)
     # The parent is on `plan` (edit/bash/external_directory denied) and adds
-    # its own deny on webfetch; the child is on `default` with no rules.
-    profiles.set_permissions(
-        profile_id=parent["profile_id"], preset="plan",
-        rules=[{"key": "webfetch", "action": "deny"}],
-        expected_version=profiles.get(parent["profile_id"])["version"],
-        key="pp", request_digest="pp")
+    # its own deny on webfetch before its turn is accepted and frozen; the
+    # child is on `default` with no rules.
+    database, profiles, _records, _sessions, _execution, service, parent, child, _other, parent_turn_id = _setup(
+        tmp_path, parent_permissions=("plan", [{"key": "webfetch", "action": "deny"}]))
     profiles.grant_subagent(parent_id=parent["profile_id"], child_id=child["profile_id"])
 
     result = service.run(parent_turn_id=parent_turn_id, parent_profile_id=parent["profile_id"],
