@@ -277,8 +277,8 @@ def deployment_document(
 def main(arguments: Sequence[str] | None = None) -> int:
     """Emit the production deployment file for one built artifact."""
     parser = argparse.ArgumentParser(description="Emit the Pi production deployment file.")
-    parser.add_argument("--artifact-source", required=True,
-                        help="canonical WSL path of the built Pi runtime artifact")
+    parser.add_argument("--artifact-token", required=True,
+                        help="mount token the deployment binds to the built Pi runtime artifact")
     parser.add_argument("--tree-digest", required=True,
                         help="the artifact manifest's sha256: tree digest")
     parser.add_argument("--out", required=True, help="path of the deployment file to write")
