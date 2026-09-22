@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import pytest
 
+from agent_box.server.execution import HarnessDescriptor, HarnessRegistry
 from agent_box.server.errors import ServerError
 from agent_box.server.execution import CancelOutcome
 from agent_box.server.execution.delegation import DelegationService
@@ -59,7 +60,13 @@ def _env(tmp_path, *, home_concurrency=None):
     records = SessionRecords(database, idempotency, home_concurrency=home_concurrency or {})
     objects = ObjectStore(tmp_path / "data")
     execution = _StallThenActive(records)
-    sessions = SessionService(records, idempotency, objects, harnesses=None,
+    harnesses = HarnessRegistry()
+    harnesses.register(HarnessDescriptor(
+        "codex", credential_kind=None,
+        configuration_validator=lambda value: None if isinstance(value, dict) else ValueError(),
+        capability_claims={"stream": True},
+    ))
+    sessions = SessionService(records, idempotency, objects, harnesses=harnesses,
                               profiles=profiles, credentials=None, execution=execution)
     service = DelegationService(records=records, profiles=profiles, sessions=sessions,
                                 execution=execution, objects=objects)
@@ -78,14 +85,16 @@ def _env(tmp_path, *, home_concurrency=None):
     child_seed = sessions.create_session("child-seed", {
         "workspace_id": ws, "profile_id": child["profile_id"]})[1]
     profiles.grant_subagent(parent_id=parent["profile_id"], child_id=child["profile_id"])
-    with database.transaction() as conn:
-        conn.execute(
-            "INSERT INTO server_turns(id,session_id,profile_id,profile_revision,native_generation,"
-            "state,capture_state,cleanup_state,input_object_digest,created_at,updated_at) "
-            "VALUES ('parent-turn',?,?,1,0,'running','pending','pending','x','t','t')",
-            (parent_session["session_id"], parent["profile_id"]))
+    # a-3 A-family rebuild (C ruling 06:19Z): the live parent Turn arrives via
+    # the acceptance route so its frozen effective object carries the
+    # permissions section delegation narrows from, as in production.
+    _, parent_turn = sessions.create_turn(parent_session["session_id"], "parent-key", {
+        "text": "parent task",
+        "expected_profile_revision": int(profiles.get(parent["profile_id"])["config_revision"]),
+    })
     return dict(database=database, profiles=profiles, records=records, sessions=sessions,
                 service=service, execution=execution, parent=parent, child=child, ws=ws,
+                parent_turn_id=parent_turn["turn_id"],
                 child_seed=child_seed["session_id"])
 
 
@@ -101,7 +110,7 @@ def test_recovery_pending_child_is_refused_and_no_turn_is_created(tmp_path):
                      (env["child"]["profile_id"],))
     before = _turn_count(env["database"])
     with pytest.raises(DelegationError) as refused:
-        env["service"].run(parent_turn_id="parent-turn",
+        env["service"].run(parent_turn_id=env["parent_turn_id"],
                            parent_profile_id=env["parent"]["profile_id"],
                            arguments={"subagent": "beta", "description": "do some work",
                                       "prompt": "x", "timeout": 1})
@@ -133,7 +142,7 @@ def test_exclusive_home_child_cannot_get_a_second_active_turn(tmp_path):
             "'pending','x','t','t')",
             (env["child_seed"], env["child"]["profile_id"]))
     with pytest.raises(ServerError) as conflict:
-        env["service"].run(parent_turn_id="parent-turn",
+        env["service"].run(parent_turn_id=env["parent_turn_id"],
                            parent_profile_id=env["parent"]["profile_id"],
                            arguments={"subagent": "beta", "description": "do some work",
                                       "prompt": "x", "timeout": 1})
@@ -156,7 +165,7 @@ def test_same_session_retry_task_id_exits_typed_not_raw_integrity_error(tmp_path
             "'pending','x','t','t')",
             (env["child_seed"], env["child"]["profile_id"]))
     with pytest.raises(ServerError) as conflict:
-        env["service"].run(parent_turn_id="parent-turn",
+        env["service"].run(parent_turn_id=env["parent_turn_id"],
                            parent_profile_id=env["parent"]["profile_id"],
                            arguments={"subagent": "beta", "description": "do some work",
                                       "prompt": "y", "task_id": "native-child"})
@@ -207,14 +216,14 @@ def test_continuation_summary_is_the_new_turns_text_not_empty(tmp_path):
     # must return *this* turn's answer - the old read returned "" silently.
     env = _delta_env(tmp_path, count=260, text="a", native_id="native-kid")
     first = env["service"].run(
-        parent_turn_id="parent-turn", parent_profile_id=env["parent"]["profile_id"],
+        parent_turn_id=env["parent_turn_id"], parent_profile_id=env["parent"]["profile_id"],
         arguments={"subagent": "beta", "description": "first the work", "prompt": "x",
                    "timeout": 5})
     assert first["summary"] == "a" * 260          # complete, not silently head-cut
     assert first["state"] == "completed"
 
     second = env["service"].run(
-        parent_turn_id="parent-turn", parent_profile_id=env["parent"]["profile_id"],
+        parent_turn_id=env["parent_turn_id"], parent_profile_id=env["parent"]["profile_id"],
         arguments={"subagent": "beta", "description": "continue the work", "prompt": "y",
                    "task_id": first["task_id"], "timeout": 5})
     assert second["resumed"] is True
@@ -228,7 +237,7 @@ def test_over_window_summary_is_marked_never_silent(tmp_path):
     from agent_box.server.execution.delegation import MAX_SUMMARY_CHARS
     env = _delta_env(tmp_path, count=400, text="z" * 40, native_id="native-long")
     result = env["service"].run(
-        parent_turn_id="parent-turn", parent_profile_id=env["parent"]["profile_id"],
+        parent_turn_id=env["parent_turn_id"], parent_profile_id=env["parent"]["profile_id"],
         arguments={"subagent": "beta", "description": "answer very long", "prompt": "x",
                    "timeout": 5})
     assert len(result["summary"]) == MAX_SUMMARY_CHARS + 1
