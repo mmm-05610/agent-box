@@ -17,20 +17,28 @@ const KNOWN_EVENT_TYPES = new Set(['agent_start', 'agent_end', 'agent_settled', 
   'summarization_retry_scheduled', 'summarization_retry_attempt_start', 'summarization_retry_finished',
   'extension_error', 'extension_ui_request', 'extension_ui_expired', 'transport_exit'])
 
-function projectMessage(value: Value, id: string): AgentMessage | undefined {
+/** Tool facts arrive from three sources (assistant toolCall blocks, tool_execution events,
+ * toolResult messages); each toolCallId projects onto exactly one card. */
+type ToolUpdate = { id: string; name?: string; arguments?: unknown; result?: unknown; status?: AgentToolCall['status'] }
+
+function projectMessage(value: Value, id: string): { message?: AgentMessage; tools?: ToolUpdate[] } {
   const role = str(value.role)
-  if (role !== 'user' && role !== 'assistant' && role !== 'toolResult') return
-  const tools: AgentToolCall[] = []
-  if (role === 'assistant' && Array.isArray(value.content)) for (const part of value.content) {
-    const item = object(part)
-    if (item?.type === 'toolCall' && str(item.id)) tools.push({ id: item.id as string, name: str(item.name) ?? 'Tool', arguments: item.arguments, status: 'running' })
+  if (role === 'user') return { message: { id, role: 'user', text: textBlocks(value.content) } }
+  if (role === 'assistant') {
+    const tools: ToolUpdate[] = []
+    if (Array.isArray(value.content)) for (const part of value.content) {
+      const item = object(part)
+      if (item?.type === 'toolCall' && str(item.id)) tools.push({ id: item.id as string, name: str(item.name), arguments: item.arguments, status: 'running' })
+    }
+    const stop = str(value.stopReason)
+    return { message: { id, role: 'assistant', text: textBlocks(value.content),
+      reasoning: thinkingBlocks(value.content) || undefined,
+      status: stop === 'aborted' ? 'cancelled' : stop === 'error' ? 'failed' : stop === 'stop' ? 'completed' : undefined },
+      tools: tools.length ? tools : undefined }
   }
-  if (role === 'toolResult') tools.push({ id: str(value.toolCallId) ?? id, name: str(value.toolName) ?? 'Tool', result: textBlocks(value.content),
-    status: value.isError === true ? 'failed' : 'completed' })
-  const stop = str(value.stopReason)
-  return { id, role: role === 'user' ? 'user' : 'assistant', text: textBlocks(value.content),
-    reasoning: thinkingBlocks(value.content) || undefined, tools: tools.length ? tools : undefined,
-    status: stop === 'aborted' ? 'cancelled' : stop === 'error' ? 'failed' : stop === 'stop' ? 'completed' : undefined }
+  if (role === 'toolResult') return { tools: [{ id: str(value.toolCallId) ?? '', name: str(value.toolName),
+    result: textBlocks(value.content), status: value.isError === true ? 'failed' : 'completed' }] }
+  return {}
 }
 
 /** Pi 0.86.1 RPC event projection; each session's native RpcClient has its own process. */
@@ -44,6 +52,7 @@ export class PiClient implements AgentClient {
   private activeRuns = new Map<string, string>()
   private activeMessages = new Map<string, string>()
   private lastStop = new Map<string, string>()
+  private tools = new Map<string, Map<string, AgentToolCall>>()
   private interactionRoutes = new Map<string, { sessionId: string; requestId: string; method: string; used: boolean }>()
   private constructor(private bridge: AgentNativeBridge) {
     this.unsubscribeNative = bridge.subscribe(event => {
@@ -82,6 +91,24 @@ export class PiClient implements AgentClient {
     const previous = this.state.messages[sessionId]?.find(item => item.id === id) ?? { id, role: 'assistant' as const, text: '' }
     this.upsert(sessionId, change(previous))
   }
+  /** Merge one tool fact into the per-session card map; terminal states are sticky
+   * so a late running update cannot regress a completed or failed card. */
+  private mergeTool(cards: Map<string, AgentToolCall>, update: ToolUpdate): AgentMessage {
+    const previous = cards.get(update.id)
+    const sticky = previous && (previous.status === 'completed' || previous.status === 'failed') && update.status === 'running'
+    const next: AgentToolCall = { id: update.id, name: update.name ?? previous?.name ?? 'Tool',
+      arguments: update.arguments ?? previous?.arguments,
+      result: sticky ? previous.result : update.result ?? previous?.result,
+      status: sticky ? previous.status : update.status ?? previous?.status ?? 'running' }
+    cards.set(update.id, next)
+    return { id: `pi-tool-${update.id}`, role: 'assistant', text: '', tools: [next] }
+  }
+  private upsertTool(sessionId: string, update: ToolUpdate) {
+    if (!update.id) return
+    const cards = this.tools.get(sessionId) ?? new Map<string, AgentToolCall>()
+    this.tools.set(sessionId, cards)
+    this.upsert(sessionId, this.mergeTool(cards, update))
+  }
   private receive(frame: unknown) {
     const wrapper = object(frame)
     if (!wrapper) { this.publish({ diagnostic: 'Unknown Pi native event' }); return }
@@ -114,11 +141,16 @@ export class PiClient implements AgentClient {
     }
     if (type === 'message_update') {
       const delta = object(event.assistantMessageEvent), id = this.activeMessages.get(sessionId)
-      if (!id || !delta) return
+      if (!delta) return
       const text = delta.type === 'text_delta' ? str(delta.delta) : undefined
-      if (text !== undefined) this.patch(sessionId, id, previous => ({ ...previous, text: previous.text + text }))
+      if (id && text !== undefined) this.patch(sessionId, id, previous => ({ ...previous, text: previous.text + text }))
       const thinking = delta.type === 'thinking_delta' ? str(delta.delta) : undefined
-      if (thinking !== undefined) this.patch(sessionId, id, previous => ({ ...previous, reasoning: (previous.reasoning ?? '') + thinking }))
+      if (id && thinking !== undefined) this.patch(sessionId, id, previous => ({ ...previous, reasoning: (previous.reasoning ?? '') + thinking }))
+      if (delta.type === 'toolcall_start') this.upsertTool(sessionId, { id: str(delta.id) ?? '', name: str(delta.toolName), status: 'running' })
+      if (delta.type === 'toolcall_end') {
+        const call = object(delta.toolCall)
+        this.upsertTool(sessionId, { id: str(call?.id) ?? str(delta.id) ?? '', name: str(call?.name), arguments: call?.arguments, status: 'running' })
+      }
       return
     }
     if (type === 'message_end') {
@@ -126,7 +158,8 @@ export class PiClient implements AgentClient {
       if (!message) return
       const id = message.role === 'assistant' ? this.activeMessages.get(sessionId) ?? `pi-message-${++this.sequence}` : `pi-message-${++this.sequence}`
       const projected = projectMessage(message, id)
-      if (projected) this.upsert(sessionId, projected)
+      if (projected.message) this.upsert(sessionId, projected.message)
+      for (const tool of projected.tools ?? []) this.upsertTool(sessionId, tool)
       if (message.role === 'assistant') {
         this.activeMessages.delete(sessionId)
         if (str(message.stopReason)) this.lastStop.set(sessionId, message.stopReason as string)
@@ -136,11 +169,9 @@ export class PiClient implements AgentClient {
     if (type === 'tool_execution_start' || type === 'tool_execution_update' || type === 'tool_execution_end') {
       const toolId = str(event.toolCallId)
       if (!toolId) return
-      const id = `pi-tool-${toolId}`
-      const tool: AgentToolCall = { id: toolId, name: str(event.toolName) ?? 'Tool', arguments: event.args,
+      this.upsertTool(sessionId, { id: toolId, name: str(event.toolName), arguments: event.args,
         result: type === 'tool_execution_update' ? event.partialResult : type === 'tool_execution_end' ? event.result : undefined,
-        status: type === 'tool_execution_end' ? event.isError === true ? 'failed' : 'completed' : 'running' }
-      this.upsert(sessionId, { id, role: 'assistant', text: '', tools: [tool] })
+        status: type === 'tool_execution_end' ? event.isError === true ? 'failed' : 'completed' : 'running' })
       return
     }
     if (type === 'agent_settled') {
@@ -148,9 +179,12 @@ export class PiClient implements AgentClient {
       if (id) {
         const run = this.state.runs[id]
         const stop = this.lastStop.get(sessionId)
-        // A requested stop that settles without a final assistant message still means cancelled.
-        const status: RunStatus = run?.status === 'stop-requested' || stop === 'aborted' ? 'cancelled'
-          : stop === 'error' ? 'failed' : 'completed'
+        // agent_settled only proves the run ended. An explicit final stopReason
+        // is authoritative; a requested stop implies cancellation only when no
+        // final assistant message ever arrived (e.g. aborted before output).
+        const status: RunStatus = stop === 'aborted' ? 'cancelled' : stop === 'error' ? 'failed'
+          : stop === 'stop' ? 'completed'
+          : run?.status === 'stop-requested' ? 'cancelled' : 'completed'
         this.updateRun(id, sessionId, status)
         this.activeRuns.delete(sessionId); this.lastStop.delete(sessionId)
       }
@@ -200,8 +234,19 @@ export class PiClient implements AgentClient {
     const sessionId = str(result.sessionId), state = object(result.state)
     if (!sessionId || !state) throw Error('Pi returned invalid session state')
     const messages = Array.isArray(result.messages) ? result.messages.map(object).filter(Boolean) as Value[] : []
-    this.publish({ selectedSessionId: sessionId, messages: { ...this.state.messages,
-      [sessionId]: messages.map((message, index) => projectMessage(message, `pi-history-${sessionId}-${index}`)).filter((message): message is AgentMessage => !!message) } })
+    const cards = new Map<string, AgentToolCall>()
+    const history: AgentMessage[] = []
+    for (const [index, message] of messages.entries()) {
+      const projected = projectMessage(message, `pi-history-${sessionId}-${index}`)
+      if (projected.message) history.push(projected.message)
+      for (const tool of projected.tools ?? []) if (tool.id) {
+        const card = this.mergeTool(cards, tool)
+        const existing = history.findIndex(item => item.id === card.id)
+        if (existing < 0) history.push(card); else history[existing] = card
+      }
+    }
+    this.tools.set(sessionId, cards)
+    this.publish({ selectedSessionId: sessionId, messages: { ...this.state.messages, [sessionId]: history } })
     await this.loadOptions(sessionId, state)
     return sessionId
   }
@@ -274,7 +319,7 @@ export class PiClient implements AgentClient {
   dispose() {
     if (this.isDisposed) return
     this.isDisposed = true
-    this.unsubscribeNative(); this.listeners.clear(); this.interactionRoutes.clear()
+    this.unsubscribeNative(); this.listeners.clear(); this.interactionRoutes.clear(); this.tools.clear()
     if (this.instanceId) void this.bridge.close(this.instanceId).catch(() => {})
   }
 }

@@ -30,7 +30,9 @@ class Bridge implements AgentNativeBridge {
       case 'new': return { sessionId: 'N', state: stateOf('N'), messages: [] }
       case 'open': return { sessionId: frame.params.sessionId, state: stateOf(frame.params.sessionId), messages: [
         { role: 'user', content: [{ type: 'text', text: 'hi' }] },
-        { role: 'assistant', stopReason: 'stop', content: [{ type: 'text', text: 'done' }] },
+        { role: 'assistant', stopReason: 'stop', content: [{ type: 'text', text: 'done' },
+          { type: 'toolCall', id: 'ht1', name: 'read', arguments: { path: '/x' } }] },
+        { role: 'toolResult', toolCallId: 'ht1', toolName: 'read', content: [{ type: 'text', text: 'file body' }], isError: false },
       ] }
       case 'models': return [{ provider: 'anthropic', id: 'claude' }, { provider: 'openai', id: 'gpt' }]
       case 'thinking-levels': return ['low', 'medium']
@@ -49,7 +51,11 @@ it('connects, loads server history and declared session options', async () => {
     await client.openSession('A')
     expect(bridge.sent.find(item => item.frame.method === 'open')?.frame.params).toEqual({ sessionId: 'A' })
     expect(client.getSnapshot().selectedSessionId).toBe('A')
-    expect(client.getSnapshot().messages.A.map(item => [item.role, item.text])).toEqual([['user', 'hi'], ['assistant', 'done']])
+    // History tool facts merge into one card; the assistant message stays text-only.
+    expect(client.getSnapshot().messages.A.filter(item => item.id === 'pi-tool-ht1')).toHaveLength(1)
+    expect(client.getSnapshot().messages.A.find(item => item.id === 'pi-tool-ht1')?.tools?.[0])
+      .toMatchObject({ id: 'ht1', name: 'read', arguments: { path: '/x' }, result: 'file body', status: 'completed' })
+    expect(client.getSnapshot().messages.A.find(item => item.text === 'done')?.tools).toBeUndefined()
     expect(client.getSnapshot().options.map(item => [item.id, item.value])).toEqual([['model', 'anthropic/claude'], ['thinking', 'medium']])
     await client.setOption('model', 'openai/gpt')
     expect(bridge.sent.at(-1)?.frame).toEqual({ method: 'set-model', params: { sessionId: 'A', provider: 'openai', modelId: 'gpt' } })
@@ -89,17 +95,42 @@ it('keeps stop requested distinct from terminal confirmation', async () => {
     bridge.emit('A', { type: 'agent_start' })
     await client.stop('A', 'pi-run-1')
     expect(client.getSnapshot().runs['pi-run-1'].status).toBe('stop-requested')
-    bridge.emit('A', { type: 'message_end', message: { role: 'assistant', stopReason: 'stop', content: [] } })
+    // Normal completion racing the stop request: agent_settled alone does not
+    // mean cancellation, and the explicit final stopReason wins over the request.
+    bridge.emit('A', { type: 'message_end', message: { role: 'assistant', stopReason: 'stop', content: [{ type: 'text', text: 'full answer' }] } })
+    expect(client.getSnapshot().messages.A.at(-1)).toMatchObject({ text: 'full answer', status: 'completed' })
     bridge.emit('A', { type: 'agent_settled' })
-    expect(client.getSnapshot().runs['pi-run-1'].status).toBe('cancelled') // Requested stop wins without an aborted marker.
+    expect(client.getSnapshot().runs['pi-run-1'].status).toBe('completed')
     bridge.emit('A', { type: 'agent_start' }) // Late event must not resurrect the run.
-    expect(client.getSnapshot().runs['pi-run-1'].status).toBe('cancelled')
     bridge.emit('A', { type: 'agent_settled' })
-    expect(client.getSnapshot().runs['pi-run-1'].status).toBe('cancelled')
+    expect(client.getSnapshot().runs['pi-run-1'].status).toBe('completed')
   } finally { client.dispose() }
 })
 
-it('streams text, reasoning and tools with authoritative message_end', async () => {
+it('infers cancelled only when a requested stop settles without a final message', async () => {
+  const bridge = new Bridge(), client = await PiClient.connect(bridge)
+  const lastRun = () => Object.keys(client.getSnapshot().runs).at(-1)!
+  try {
+    await client.openSession('A')
+    await client.send('A', 'one')
+    bridge.emit('A', { type: 'agent_start' })
+    await client.stop('A', lastRun())
+    bridge.emit('A', { type: 'agent_settled' }) // Aborted before any assistant output.
+    expect(client.getSnapshot().runs[lastRun()].status).toBe('cancelled')
+    await client.send('A', 'two')
+    bridge.emit('A', { type: 'agent_start' })
+    bridge.emit('A', { type: 'message_end', message: { role: 'assistant', stopReason: 'aborted', content: [] } })
+    bridge.emit('A', { type: 'agent_settled' })
+    expect(client.getSnapshot().runs[lastRun()].status).toBe('cancelled') // Server-said aborted.
+    await client.send('A', 'three')
+    bridge.emit('A', { type: 'agent_start' })
+    bridge.emit('A', { type: 'message_end', message: { role: 'assistant', stopReason: 'error', content: [] } })
+    bridge.emit('A', { type: 'agent_settled' })
+    expect(client.getSnapshot().runs[lastRun()].status).toBe('failed')
+  } finally { client.dispose() }
+})
+
+it('merges one tool card per toolCallId across the full event sequence', async () => {
   const bridge = new Bridge(), client = await PiClient.connect(bridge)
   try {
     await client.openSession('A')
@@ -107,17 +138,33 @@ it('streams text, reasoning and tools with authoritative message_end', async () 
     bridge.emit('A', { type: 'message_start', message: { role: 'assistant' } })
     bridge.emit('A', { type: 'message_update', assistantMessageEvent: { type: 'thinking_delta', delta: 'pondering' } })
     bridge.emit('A', { type: 'message_update', assistantMessageEvent: { type: 'text_delta', delta: 'Hello ' } })
-    bridge.emit('A', { type: 'message_update', assistantMessageEvent: { type: 'text_delta', delta: 'world' } })
-    const streamed = client.getSnapshot().messages.A.at(-1)!
-    expect(streamed).toMatchObject({ text: 'Hello world', reasoning: 'pondering' })
+    bridge.emit('A', { type: 'message_update', assistantMessageEvent: { type: 'toolcall_start', contentIndex: 1, id: 't1', toolName: 'bash' } })
+    expect(client.getSnapshot().messages.A.filter(item => item.id === 'pi-tool-t1')).toHaveLength(1)
+    expect(client.getSnapshot().messages.A.find(item => item.id === 'pi-tool-t1')?.tools?.[0]).toMatchObject({ id: 't1', name: 'bash', status: 'running' })
     bridge.emit('A', { type: 'tool_execution_start', toolCallId: 't1', toolName: 'bash', args: { command: 'ls' } })
     bridge.emit('A', { type: 'tool_execution_update', toolCallId: 't1', toolName: 'bash', partialResult: { content: [{ type: 'text', text: 'partial' }] } })
-    expect(client.getSnapshot().messages.A.at(-1)?.tools?.[0]).toMatchObject({ id: 't1', status: 'running', result: { content: [{ type: 'text', text: 'partial' }] } })
+    const duringRun = client.getSnapshot().messages.A.find(item => item.id === 'pi-tool-t1')?.tools?.[0]
+    expect(duringRun).toMatchObject({ id: 't1', name: 'bash', arguments: { command: 'ls' }, status: 'running', result: { content: [{ type: 'text', text: 'partial' }] } })
     bridge.emit('A', { type: 'tool_execution_end', toolCallId: 't1', toolName: 'bash', result: { content: [{ type: 'text', text: 'full' }] }, isError: false })
-    expect(client.getSnapshot().messages.A.at(-1)?.tools?.[0]).toMatchObject({ status: 'completed' })
-    bridge.emit('A', { type: 'message_end', message: { role: 'assistant', stopReason: 'stop', content: [{ type: 'text', text: 'Hello world' }] } })
-    const settled = client.getSnapshot().messages.A.find(item => item.id === streamed.id)!
-    expect(settled).toMatchObject({ text: 'Hello world', status: 'completed' })
+    bridge.emit('A', { type: 'message_update', assistantMessageEvent: { type: 'toolcall_end', contentIndex: 1, id: 't1',
+      toolCall: { type: 'toolCall', id: 't1', name: 'bash', arguments: { command: 'ls' } } } })
+    bridge.emit('A', { type: 'message_end', message: { role: 'assistant', stopReason: 'stop', content: [
+      { type: 'thinking', thinking: 'pondering' },
+      { type: 'text', text: 'Hello world' }, { type: 'toolCall', id: 't1', name: 'bash', arguments: { command: 'ls' } }] } })
+    // The authoritative toolResult merges into the same card.
+    bridge.emit('A', { type: 'message_end', message: { role: 'toolResult', toolCallId: 't1', toolName: 'bash',
+      content: [{ type: 'text', text: 'tool done' }], isError: false } })
+    const messages = client.getSnapshot().messages.A
+    expect(messages.filter(item => item.id === 'pi-tool-t1')).toHaveLength(1)
+    expect(messages.find(item => item.id === 'pi-tool-t1')?.tools?.[0])
+      .toMatchObject({ id: 't1', name: 'bash', arguments: { command: 'ls' }, result: 'tool done', status: 'completed' })
+    const settled = messages.find(item => item.text === 'Hello world')!
+    expect(settled).toMatchObject({ text: 'Hello world', reasoning: 'pondering', status: 'completed' })
+    expect(settled.tools).toBeUndefined() // Assistant text and tool cards stay separate messages.
+    // A late running update after the terminal card cannot regress it.
+    bridge.emit('A', { type: 'tool_execution_update', toolCallId: 't1', toolName: 'bash', partialResult: { content: [{ type: 'text', text: 'late partial' }] } })
+    expect(client.getSnapshot().messages.A.find(item => item.id === 'pi-tool-t1')?.tools?.[0])
+      .toMatchObject({ status: 'completed', result: 'tool done' })
   } finally { client.dispose() }
 })
 
