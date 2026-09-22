@@ -278,6 +278,27 @@ def _server_id(database: Database) -> str:
         return identity
 
 
+def _core_filer(port):
+    """a-3 K2-S' flip - central proxy filing authorization
+    (`C-notice-S-proxy-two-lines.md` 05:16Z): the two record-filing calls the
+    E leg removes from the sidecar accept, re-composed on the Session side.
+    The post-commit step (`SessionService.file_core_records`) calls this with
+    the Turn's own `execution_key`; dispatch stays in the port."""
+    def _file(turn_id: str, session_id: str, execution_key: str):
+        work = port.work_service.create_work(
+            "AgentBox Session Turn",
+            metadata={"session_id": session_id, "turn_id": turn_id},
+        )
+        core_execution = port.execution_service.create_execution(
+            work.id, port.provider.provider_id,
+            responsibility_intent="execute one accepted Session Turn through its Harness extension",
+            provenance={"session_id": session_id, "turn_id": turn_id},
+        )
+        return {"work_id": work.id, "core_execution_id": core_execution.id,
+                "dispatch_id": None}
+    return _file
+
+
 def build_runtime(
     data_root: Path | str, *,
     harnesses: HarnessRegistry | None = None,
@@ -392,7 +413,8 @@ def build_runtime(
                                      harnesses=registry, profiles=profile_records,
                                      credentials=credentials, queue=queue_records,
                                      execution=execution, on_event=notifier.notify,
-                                     secret_store=secrets_store)
+                                     secret_store=secrets_store,
+                                     core_filer=(_core_filer(execution) if execution is not None else None))
     session_service.bind_model_configs(provider_model_service)
     service = ProductService(
         workspace_service, profile_service, session_service,

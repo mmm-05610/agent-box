@@ -468,10 +468,12 @@ class DelegationService:
                 conn.execute(
                     "INSERT INTO server_turns(id,session_id,profile_id,profile_revision,"
                     "native_generation,state,capture_state,cleanup_state,input_object_digest,"
-                    "effective_config_object_digest,parent_turn_id,created_at,updated_at) "
-                    "VALUES (?,?,?,1,0,'accepted','pending','pending',?,?,?,?,?)",
+                    "effective_config_object_digest,parent_turn_id,captured_profile_revision,"
+                    "created_at,updated_at) "
+                    "VALUES (?,?,?,1,0,'accepted','pending','pending',?,?,?,?,?,?)",
                     (turn_id, session_id, child_profile["id"], input_digest,
-                     effective_digest, parent_turn_id, timestamp, timestamp),
+                     effective_digest, parent_turn_id, expected_revision,
+                     timestamp, timestamp),
                 )
             except Exception as exc:
                 # Order 146 (`AUD-B-035`, `65:36` "failure is a typed result"): a
