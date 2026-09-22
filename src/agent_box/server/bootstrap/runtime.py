@@ -31,11 +31,11 @@ from agent_box.extensions.runtime_composition.sandbox_port import resolve_sandbo
 from agent_box.server.idempotency import IdempotentRecords
 from agent_box.server.model_configs import ProviderModelRecords, ProviderModelService
 from agent_box.server.profiles import ProfileRecords, ProfileService
-from agent_box.server.services import ProductService
 from agent_box.server.sessions import SessionRecords, SessionService
 from agent_box.server.sessions.queue import QueueRecords
 from agent_box.server.wire.handlers import WireService
 from agent_box.server.workspaces import WorkspaceRecords, WorkspaceService, WslConnectionPort
+from agent_box.service import ProductService
 from agent_box.storage import Database, ObjectStore, SecretStore
 
 
