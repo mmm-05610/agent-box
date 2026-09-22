@@ -5,9 +5,10 @@
   "type": "module",
   "workspaces": [
     "apps/desktop",
-    "packages/desktop-host",
-    "packages/extension-api",
-    "packages/extension-loader"
+    "platform/extension-api",
+    "platform/extension-loader",
+    "platform/extension-host",
+    "platform/native-bridge"
   ],
   "scripts": {
     "test:agent-ui": "node apps/desktop/scripts/test-agent-ui.mjs",

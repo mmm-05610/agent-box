@@ -23,7 +23,7 @@
   "include": [
     "src",
     "electron",
-    "../../packages/*/src",
+    "../../platform/*/src",
     "../../extensions/*/src",
     "../../examples/*/src"
   ]

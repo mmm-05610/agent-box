@@ -3,7 +3,7 @@
 import { spawn } from 'node:child_process'
 import { StringDecoder } from 'node:string_decoder'
 import path from 'node:path'
-import type { NativeConnection, NativeTransport } from '../../../apps/desktop/electron/native-bridge'
+import type { NativeConnection, NativeTransport } from '../../../platform/native-bridge/src/index'
 
 const MAX_LINE = 1024 * 1024
 export default function createTransport(): NativeTransport {

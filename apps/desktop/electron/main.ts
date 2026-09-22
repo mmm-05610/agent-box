@@ -1,11 +1,11 @@
 import { app, BrowserWindow, ipcMain, protocol, session } from 'electron'
 import path from 'node:path'
 import { writeFile } from 'node:fs/promises'
-import { discover } from './extensions'
-import { protocolHandler } from './extension-protocol'
+import { discover } from '@ordessa/extension-host/main'
+import { protocolHandler } from '@ordessa/extension-host/main'
 import { verifyLayout } from './smoke-layout'
 import { verifyAgentUI } from './smoke-agent'
-import { installNativeBridge } from './native-bridge'
+import { installNativeBridge } from '@ordessa/native-bridge'
 
 app.setName('Ordessa Desktop')
 if (process.env.MODULAR_USER_DATA) app.setPath('userData', process.env.MODULAR_USER_DATA)

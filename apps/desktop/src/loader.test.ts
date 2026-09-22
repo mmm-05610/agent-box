@@ -2,12 +2,12 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { mkdtemp, mkdir, writeFile, symlink, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { discover, confinedFile } from '../electron/extensions'
-import { protocolHandler } from '../electron/extension-protocol'
+import { discover, confinedFile } from '@ordessa/extension-host/main'
+import { protocolHandler } from '@ordessa/extension-host/main'
 import { parseManifest } from '@ordessa/extension-loader/manifest'
 import { loadExtensions } from '@ordessa/extension-loader'
 import { scoped, Token } from '@ordessa/extension-api'
-import { runtime } from '@modular/desktop-host'
+import { runtime } from '@ordessa/extension-host'
 const dirs: string[] = []
 const manifest = { id: 'test.one', version: '0.1.0', hostApi: '2', entry: 'entry.js' }
 it('bounds a stalled factory, preserves healthy modules, and ignores late results', async () => {

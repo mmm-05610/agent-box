@@ -3,7 +3,7 @@ import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { describe, expect, it, vi } from 'vitest'
 import { Token } from '@lumino/coreutils'
-import { runtime, scoped, OwnedResources, type Plugin } from '@modular/desktop-host'
+import { runtime, scoped, OwnedResources, type Plugin } from '@ordessa/extension-host'
 import { App } from './app'
 
 describe('Lumino desktop host', () => {

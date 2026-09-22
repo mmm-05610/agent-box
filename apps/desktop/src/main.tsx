@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import { createRoot } from 'react-dom/client'
-import { runtime } from '@modular/desktop-host'
+import { runtime } from '@ordessa/extension-host'
 import { App } from './app'
 import { installedExtensions } from './extensions'
 import './host.css'

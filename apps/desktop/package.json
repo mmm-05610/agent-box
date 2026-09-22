@@ -13,7 +13,8 @@
     "start": "node scripts/run-dev.mjs"
   },
   "dependencies": {
-    "@modular/desktop-host": "0.1.0",
+    "@ordessa/extension-host": "0.1.0",
+    "@ordessa/native-bridge": "0.1.0",
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "@ordessa/extension-api": "0.1.0",

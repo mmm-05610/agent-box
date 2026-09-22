@@ -2,7 +2,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { SessionManager } from '@earendil-works/pi-coding-agent'
 import { RpcClient } from './vendor/rpc-client.js'
-import type { NativeConnection, NativeTransport } from '../../../apps/desktop/electron/native-bridge'
+import type { NativeConnection, NativeTransport } from '../../../platform/native-bridge/src/index'
 
 type Frame = { method: string; params?: Record<string, unknown> }
 type Opened = { client: RpcClient; sessionId: string; sessionFile: string; unsubscribe: () => void }

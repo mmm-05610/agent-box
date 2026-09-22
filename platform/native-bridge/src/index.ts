@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { pathToFileURL } from 'node:url'
 import type { BrowserWindow } from 'electron'
 import { ipcMain } from 'electron'
-import { confinedFile, type Discovery } from './extensions'
+import { confinedFile, type Discovery } from '@ordessa/extension-host/main'
 
 export interface NativeConnection {
   send(frame: unknown): Promise<unknown>
