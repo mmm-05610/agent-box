@@ -1,4 +1,4 @@
-export interface Manifest { id: string; version: string; hostApi: string; entry: string }
+export interface Manifest { id: string; version: string; hostApi: string; entry: string; native?: string }
 export interface ExtensionDescriptor { manifest: Manifest; url: string }
 export interface Diagnostic { id: string; error: string }
 export interface Catalog { extensions: ExtensionDescriptor[]; failures: Diagnostic[] }
@@ -14,5 +14,7 @@ export function parseManifest(value: unknown): Manifest {
   if (typeof m.version !== 'string' || !/^\d+\.\d+\.\d+$/.test(m.version)) throw Error('Invalid version')
   if (m.hostApi !== '2') throw Error('Incompatible host API (expected 2)')
   if (!safeRelative(m.entry) || !m.entry.endsWith('.js')) throw Error('Invalid module entry')
-  return { id: m.id, version: m.version, hostApi: m.hostApi, entry: m.entry }
+  if (m.native !== undefined && (!safeRelative(m.native) || !m.native.endsWith('.js'))) throw Error('Invalid native entry')
+  return { id: m.id, version: m.version, hostApi: m.hostApi, entry: m.entry,
+    ...(m.native === undefined ? {} : { native: m.native }) }
 }

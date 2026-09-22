@@ -62,6 +62,17 @@ describe('extension discovery and confinement', () => {
   it.each(['../entry.js', '/tmp/entry.js', 'file:///tmp/a.js', 'dist\\a.js', 'dist/%2e%2e/a.js'])('rejects invalid entry %s', entry => {
     expect(() => parseManifest({ ...manifest, entry })).toThrow()
   })
+  it('requires an enabled native entry to exist inside its extension', async () => {
+    expect(() => parseManifest({ ...manifest, native: '../escape.js' })).toThrow('Invalid native entry')
+    const root = await fixture(); await enable(root)
+    const extension = path.join(root, 'extensions', 'one')
+    await writeFile(path.join(extension, 'manifest.json'), JSON.stringify({ ...manifest, native: 'native.js' }))
+    const result = await discover(root)
+    expect(result.installed.size).toBe(0)
+    expect(result.catalog.failures.some(f => f.id === manifest.id)).toBe(true)
+    await writeFile(path.join(extension, 'native.js'), 'export default () => ({})')
+    expect((await discover(root)).installed.size).toBe(1)
+  })
   it('rejects incompatible versions', () => {
     expect(() => parseManifest({ ...manifest, hostApi: '1' })).toThrow('Incompatible')
   })

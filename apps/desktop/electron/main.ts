@@ -5,6 +5,7 @@ import { discover } from './extensions'
 import { protocolHandler } from './extension-protocol'
 import { verifyLayout } from './smoke-layout'
 import { verifyAgentUI } from './smoke-agent'
+import { installNativeBridge } from './native-bridge'
 
 app.setName('Ordessa Desktop')
 if (process.env.MODULAR_USER_DATA) app.setPath('userData', process.env.MODULAR_USER_DATA)
@@ -22,6 +23,7 @@ app.whenReady().then(async () => {
   })
   win.setMenuBarVisibility(false)
   win.setAutoHideMenuBar(true)
+  installNativeBridge(win, discovery)
   ipcMain.handle('extensions:catalog', event => {
     if (event.sender !== win.webContents || event.senderFrame !== win.webContents.mainFrame ||
         event.senderFrame.url !== 'ordessa://desktop/index.html') throw Error('Untrusted catalog caller')

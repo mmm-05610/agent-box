@@ -7,7 +7,9 @@ const output = path.join(root, 'extensions/dist')
 await mkdir(output, { recursive: true })
 for (const [id, folder, files] of [
   ['ordessa.contracts', 'packages/foundation-contracts', { entry: 'entry.ts', contract: 'contract.ts' }],
+  ['ordessa.agent-contracts', 'packages/agent-ui-contracts', { entry: 'entry.ts', contract: 'contract.ts' }],
   ['ordessa.commands', 'extensions/commands', { entry: 'entry.ts' }],
+  ['ordessa.agent-connections', 'extensions/agent-connections', { entry: 'entry.ts' }],
   ['ordessa.workbench', 'extensions/workbench', { entry: 'entry.tsx' }],
   ['ordessa.settings', 'extensions/settings', { entry: 'entry.tsx' }],
 ]) {

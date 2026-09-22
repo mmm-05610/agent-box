@@ -61,6 +61,7 @@ export async function discover(dataRoot: string, bundledRoot?: string): Promise<
     const extension = matches[0]
     try {
       await confinedFile(extension.root, extension.manifest.entry)
+      if (extension.manifest.native) await confinedFile(extension.root, extension.manifest.native)
       installed.set(id, extension)
       catalog.extensions.push({ manifest: extension.manifest, url: 'ordessa://desktop/extensions/' + id + '/' + extension.manifest.entry })
     } catch (error) { catalog.failures.push({ id, error: String(error) }) }

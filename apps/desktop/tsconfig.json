@@ -11,6 +11,7 @@
     "strict": true,
     "paths": {
       "@extensions/ordessa.contracts/contract.js": ["../../packages/foundation-contracts/src/contract.ts"],
+      "@extensions/ordessa.agent-contracts/contract.js": ["../../packages/agent-ui-contracts/src/contract.ts"],
       "@extensions/example.contracts/contract.js": ["../../examples/service-contract/src/contract.ts"]
     },
     "skipLibCheck": true,
