@@ -47,6 +47,23 @@ const SECRET_BYTES = 32
 /** 不传 title 时 OpenCode 会为了生成标题多发一次 provider 请求；这里给一个常量标题。 */
 const FALLBACK_TITLE = "agentbox-session"
 
+/**
+ * abort 结果的**内部事实枚举**（Half-B 批文 `approvals/Half-B-internal-release.md`，04:55Z）。
+ *
+ * 三值只进**可选审计载荷**（字段 `abortOutcome`）：事件名零新增、`tail.outcome` 五值零新增、
+ * 返回契约不动（`abort()` 仍返回 undefined）、公开投影不动（候 B2 版本窗）。三值互不合并（H9 纪律）：
+ *   ABORTED                — 对端 2xx 确认停之后才落，"已发出"不配用它；
+ *   REFUSED_NO_ACTIVE_TURN — 对端 404 明示无此会话 ⇒ 无在飞轮次（未命中任何在飞轮次，重放安全）；
+ *   UNKNOWN                — 已下发但结果未知：其余非 2xx 无法归类、fetch 抛错、超时（禁盲重投）。
+ * 与 `tail.outcome` 是两枚不同的枚举，字段名因此不叫 outcome——x20 冻结钉扫描的是 tail 面那组
+ * 字面量，混用会让两枚事实互相污染；事件名集合的冻结仍由那枚钉守住（本批零新增事件名）。
+ */
+export const AbortOutcome = Object.freeze({
+  ABORTED: "ABORTED",
+  REFUSED_NO_ACTIVE_TURN: "REFUSED_NO_ACTIVE_TURN",
+  UNKNOWN: "UNKNOWN",
+})
+
 export class DriverError extends Error {
   constructor(code, message) {
     super(`${code}: ${message}`)
@@ -597,16 +614,49 @@ export async function createDriver(context) {
 
   async function abort(sessionId) {
     if (typeof sessionId !== "string" || sessionId.length === 0) return
+    // 失败记录的唯一落点（Half-B）：事件字面量在本文件里只出现一次——x20 冻结钉按字面量
+    // **多重集**比对源码，三处各写一遍会让那枚钉红；本结构同时让"失败面只有一种写法"成为代码事实。
+    const recordFailure = (fields) => {
+      try {
+        audit({ event: "abort-failed", ...fields })
+      } catch {
+        // 审计线自身的失败不得让 abort() 变成抛错。
+      }
+    }
+    let result
     try {
-      const result = await rawRequest("POST", `/session/${encodeURIComponent(sessionId)}/abort`, {})
-      // `rawRequest` 对非 2xx **不抛**，所以旧写法在 500 / 404 之后照样落一条"已 abort"——那是
-      // X18 ②③ 量到的"记错"（三行里唯一会主动污染既有诊断的一行）。只有 2xx 才配得上完成形状；
-      // 被拒时记下状态码本身，既不新增公开枚举/事件/出口事实，也不再让失败看起来像成功。
-      if (result.status >= 200 && result.status < 300) audit({ event: "abort", sessionId })
-      else audit({ event: "abort-failed", sessionId, status: result.status })
+      result = await rawRequest("POST", `/session/${encodeURIComponent(sessionId)}/abort`, {})
+    } catch (error) {
+      // Half-B / X18④：请求已下发但结果未知（fetch 抛错、超时、通道断）⇒ **当场记有痕
+      // `UNKNOWN`**，不再无痕（1e 前科族闭口）。仍不新增事件名、不改返回契约（abort() 仍返回
+      // undefined，X18(a) 按裁定归增量 2）。归因线自保护（1e 先例）：格式化器可注入，
+      // 它一抛不得把这条记录连同"尽力而为的 abort"一起带走。
+      let detail
+      try {
+        detail = redact(String(error?.message ?? error), 200)
+      } catch {
+        detail = ""
+      }
+      recordFailure({ sessionId, abortOutcome: AbortOutcome.UNKNOWN, message: detail })
+      return
+    }
+    // 分级（Half-B 批文 04:55Z，映射表见 outbox/goal-H-021 §2(B)）：只有 2xx 才配得上完成形状
+    // （1c(b2) 起）；404 是对端明示"无此会话 ⇒ 无在飞轮次"（重放安全）⇒ REFUSED；其余非 2xx
+    // 无法归类 ⇒ UNKNOWN——500 不蕴含"没有在飞轮次"，记 refused 即冒充（H9 纪律 (b)）。
+    // 三值只走载荷字段 `abortOutcome`，事件名两词零新增。
+    try {
+      if (result.status >= 200 && result.status < 300) {
+        audit({ event: "abort", sessionId, abortOutcome: AbortOutcome.ABORTED })
+      } else {
+        recordFailure({
+          sessionId,
+          status: result.status,
+          abortOutcome: result.status === 404
+            ? AbortOutcome.REFUSED_NO_ACTIVE_TURN : AbortOutcome.UNKNOWN,
+        })
+      }
     } catch {
-      // 中止是尽力而为：会话可能已经结束。fetch 失败（宿主不可达）今日仍无痕——那是 X18 ④，
-      // 让它"变可见"需要新的出口事实，按裁定随增量 2 与 abort 返回契约一起处置，本轮不擅自补。
+      // 完成形状记录的格式化失败不是驱动失败；abort 始终是尽力而为，不因记录而抛。
     }
   }
 

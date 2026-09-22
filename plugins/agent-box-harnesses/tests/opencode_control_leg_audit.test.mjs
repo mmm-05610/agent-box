@@ -6,6 +6,10 @@
  * 在 1c 之前的树（`61c1c5f`）上，②③ 两钉必须为红 —— 那正是"钉有牙"，不是回归；
  * 正向对照与"reject 无痕"两钉在两棵树上都必须为绿（前者防"探针坏"，后者钉住**本轮刻意未改**的那一行）。
  *
+ * **Half-B 翻转记录（批文 04:55Z，验收 2 红-绿双向）**：末行"reject 无痕"钉钉的正是本批批准
+ * 改写的那一行（X18④ 无痕→有痕 `UNKNOWN`）⇒ 该钉期望按批文翻转（`goal-H-021` §2(A) 预申报）；
+ * 其余五钉字节零触、原样绿；三值归因细节由新文件 `opencode_abort_outcome_halfb.test.mjs` 承担。
+ *
  * 边界：不 spawn、不读凭据、不调模型、不触真实 OpenCode 构建；全部 HTTP 由临时替换的全局 `fetch`
  * 回答；审计写进 `os.tmpdir()` 下的临时目录并自删，不落仓内。
  */
@@ -128,12 +132,21 @@ test("③ abort 打到从未存在的会话（404）⇒ 记失败，且与②在
   } finally { await pin.restore() }
 })
 
-test("④ 连 HTTP 状态都拿不到（fetch reject）⇒ 仍零记录：本轮刻意**未**改的一行，钉住它没被顺手扩权", async () => {
+test("④ 连 HTTP 状态都拿不到（fetch reject）⇒ **Half-B 起翻转极性**：有痕 UNKNOWN、零完成形、向上仍零事件", async () => {
+  // 原期望（零记录）钉的正是本批批准改写的那一行：批文验收 2 明令红-绿双向——
+  // "abort 抛错无痕"在 pristine 上红、新形绿。翻转不是放宽：断言从"什么都没有"变为
+  // "恰一条可归因记录且不得冒充完成"（其余五钉字节未动，见文件头 Half-B 翻转记录）。
   const pin = await withDriver({ abortBehaviour: () => { throw new TypeError("fetch failed") } })
   try {
-    await pin.abort()
-    assert.equal(abortRecords(pin.auditLines()).length, 0,
-      "批准的是『失败不得记成成功』，不是『无痕要变成有痕』⇒ 这一行在两棵树上同读")
+    const returned = await pin.abort()
+    assert.equal(returned, undefined, "返回契约仍不动（X18(a) 归增量 2）")
+    assert.equal(pin.emitted.length, 0, "向上仍零事件（事件名零新增的另一面）")
+    const lines = pin.auditLines()
+    assert.equal(abortRecords(lines).filter((r) => r.event === "abort").length, 0,
+      "零完成形：未知不冒充已停（1c(b2) 的反例钉在新形状下继续成立）")
+    const failures = abortRecords(lines).filter((r) => r.event === "abort-failed")
+    assert.equal(failures.length, 1, "X18④ 本体：断线不再是零记录（批文验收 2 的新形绿）")
+    assert.equal(failures[0].abortOutcome, "UNKNOWN", "有痕的归因是 UNKNOWN（批文原词，字面量直钉不依赖导出）")
     assert.equal(pin.requests.filter(([m, t]) => m === "POST" && t.endsWith("/abort")).length, 1,
       "探针侧能确认请求真的试过（这个信息产品永远拿不到）")
   } finally { await pin.restore() }
