@@ -63,24 +63,34 @@ def test_cancel_answer_surface_collapses_to_exactly_one_public_verb():
 
 
 def test_cancel_receipts_have_exactly_one_writing_function():
-    """Structural single-source lock: every `_cancel_receipts[...] = ...`
-    store in the backend module sits inside `cancel_execution` - the replay
-    and submit paths are readers only, so no second writer can accumulate
-    cancel facts outside the receipts' owning verb."""
-    tree = ast.parse(inspect.getsource(sb_module))
-    writers: set[str] = set()
-    for outer in ast.walk(tree):
-        if not isinstance(outer, ast.FunctionDef):
-            continue
-        for node in ast.walk(outer):
-            if isinstance(node, ast.Assign) and any(
-                isinstance(t, ast.Subscript)
-                and isinstance(t.value, ast.Attribute)
-                and t.value.attr == "_cancel_receipts"
-                for t in node.targets
-            ):
-                writers.add(outer.name)
-    assert writers == {"cancel_execution"}
+    """Structural single-source lock (per decisions/E2b-pin-amendments-ruling.md,
+    MB-E2b equal-move): the ONLY receipt-ledger store lives inside the
+    tracker's `cancel_execution` verb in ``agent_box.execution.lifecycle`` -
+    the backend module's delegations, the replay and the submit paths are
+    readers only, so no second writer can accumulate cancel facts outside
+    the receipts' owning verb."""
+    import agent_box.execution.lifecycle as lifecycle_module
+
+    def writers_of(module, ledger_attr: str) -> set[str]:
+        tree = ast.parse(inspect.getsource(module))
+        found: set[str] = set()
+        for outer in ast.walk(tree):
+            if not isinstance(outer, ast.FunctionDef):
+                continue
+            for node in ast.walk(outer):
+                if isinstance(node, ast.Assign) and any(
+                    isinstance(t, ast.Subscript)
+                    and isinstance(t.value, ast.Attribute)
+                    and t.value.attr == ledger_attr
+                    for t in node.targets
+                ):
+                    found.add(outer.name)
+        return found
+
+    assert writers_of(sb_module, "_cancel_receipts") == set()
+    assert writers_of(lifecycle_module, "cancel_receipts") == {"cancel_execution"}
+    # the tracker holds no store under the legacy private spelling either
+    assert writers_of(lifecycle_module, "_cancel_receipts") == set()
 
 
 class _GateLock:

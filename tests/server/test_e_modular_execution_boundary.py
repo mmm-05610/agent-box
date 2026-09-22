@@ -50,8 +50,11 @@ PACKAGE_EXPOSED_BEFORE = (
     "CancelOutcome", "ExecutionObservation", "ExecutionReceipt",
     "ExecutionRequest", "TurnExecutionPort",
 )
+# threading/uuid added by decisions/E2b-pin-amendments-ruling.md: the
+# lifecycle machine's lock and dispatch-id minting need them; still stdlib.
 STDLIB_ROOTS = frozenset(
-    {"__future__", "dataclasses", "datetime", "enum", "types", "typing"}
+    {"__future__", "dataclasses", "datetime", "enum", "threading", "types",
+     "typing", "uuid"}
 )
 
 
