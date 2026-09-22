@@ -18,6 +18,17 @@ All three are reversal pins: red against a pristine `b15c435` tree (the old
 accept assembles `effective_value` and calls `objects.publish` mid-call),
 green after b-4. The red side is reproducible in a throwaway clone sim.
 
+Flip accounting (a-3 merged-form gate, `decisions/a3-gate-reds-ruling.md`
+C-family, 06:19Z): with K2-E landed, `accept` reads the pre-created
+work/execution identity off the row **before** it binds any resource and
+refuses a row without one typed (`IDEMPOTENCY_CONFLICT`); these fixtures
+predate that precondition, so their `pytest.raises(Exception)` swallowed the
+refusal and `_bound_profile` starved (StopIteration). The fix is assembly-
+shape rebuild only - `_stamp_acceptance_identity` simulates the acceptance
+path's step on the row exactly like the a3 E-half pins' `row_identity=True`
+precedent - **every assertion in this file is byte-identical**; no expectation
+was changed, no skip added.
+
 Run (from `source/`):
     PYTHONPATH=src:$(ls -d plugins/*/src | paste -sd:) \
     ../tmp/venv/bin/python -m pytest tests/server/test_e_inc1b_b4_pins.py -q
@@ -138,6 +149,27 @@ def _bound_profile(recorder):
     return next(v for cid, v in recorder.bound if cid == PROFILE_CONTRACT)
 
 
+def _stamp_acceptance_identity(backend, records, turn_ids) -> None:
+    """K2 甲 precondition, simulated on the row (a3-gate-reds-ruling C族翻账):
+    work + execution created once by "the acceptance path's step", their
+    identity stamped where the consumer reads it. Real Core records (DB only -
+    `create_work`/`create_execution` publish nothing, so the pins' `objects
+    .publishes == []` locks stay honest), so the flow reaches this file's
+    designed `_StopAtPortFactory` boundary instead of dying earlier."""
+    for turn_id in turn_ids:
+        context = records.contexts[turn_id]
+        work = backend.work_service.create_work(
+            "AgentBox Session Turn",
+            metadata={"session_id": context["session_id"], "turn_id": turn_id})
+        execution = backend.execution_service.create_execution(
+            work.id, backend.provider.provider_id,
+            responsibility_intent="execute one accepted Session Turn through its Harness extension",
+            provenance={"session_id": context["session_id"], "turn_id": turn_id})
+        context["execution_key"] = f"execution:{turn_id}"   # K1.1-family spelling
+        context["work_id"] = work.id
+        context["execution_id"] = execution.id
+
+
 def _seed(tmp_path):
     """Publish the frozen effective object and two live profile generations
     directly, outside the counting wrapper."""
@@ -165,6 +197,7 @@ def test_live_profile_edit_between_turns_cannot_move_the_frozen_effective_object
         "b4a-2": _context(i, live_v2, frozen),
     })
     backend, bound_rec = _backend(records, objects)
+    _stamp_acceptance_identity(backend, records, ["b4a-1", "b4a-2"])
 
     with pytest.raises(Exception):
         backend.accept("b4a-1")
@@ -192,6 +225,7 @@ def test_overrides_parameter_is_retired_from_the_accept_signature(tmp_path, tmp_
     objects = _CountingObjects(store)
     records = _FakeRecords({"b4b-1": _context(i, live_v1, frozen)})
     backend, bound_rec = _backend(records, objects)
+    _stamp_acceptance_identity(backend, records, ["b4b-1"])
     with pytest.raises(Exception):
         backend.accept("b4b-1")
     assert _bound_profile(bound_rec).digest == frozen
@@ -240,6 +274,7 @@ def test_N1_background_write_in_the_acceptance_window_never_reaches_publish(tmp_
             return ctx
 
     backend, bound_rec = _backend(_GatedRecords(records.contexts), objects)
+    _stamp_acceptance_identity(backend, records, ["b4n1-1"])
 
     outcome: list[BaseException] = []
     window_write: list[tuple[str, str] | None] = [None]
