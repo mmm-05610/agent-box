@@ -29,6 +29,7 @@ app.whenReady().then(async () => {
   if (smoke) {
     const result = await win.webContents.executeJavaScript(`(async () => {
       for (let i = 0; i < 100 && !document.documentElement.dataset.ready; i++) await new Promise(r => setTimeout(r, 50));
+      for (let i = 0; i < 20 && !document.documentElement.dataset.settled; i++) await new Promise(r => setTimeout(r, 50));
       const pages = [...document.querySelectorAll('nav button')].map(b => b.textContent);
       const views = [];
       for (const button of document.querySelectorAll('nav button')) {
@@ -40,6 +41,7 @@ app.whenReady().then(async () => {
       return {
         ready: document.documentElement.dataset.ready === 'true', pages, views,
         errors: [...document.querySelectorAll('[role="alert"]')].map(p => p.textContent),
+        starting: [...document.querySelectorAll('[role="status"]')].map(p => p.textContent),
         nodeAbsent: typeof require === 'undefined' && typeof process === 'undefined',
         bridgeKeys: Object.keys(window.extensionCatalog ?? {}),
       };

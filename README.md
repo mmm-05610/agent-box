@@ -21,12 +21,14 @@ apps/desktop/
   scripts/                       构建、启动、Electron 验收
 packages/
   desktop-host/                  Lumino 运行环境与通用 Shell
-  extension-api/                 共享插件契约、Token、贡献表、scoped 清理
+  extension-api/                 共享插件契约、Token、受限上下文与资源作用域
   extension-loader/              manifest 类型、模块加载、工厂校验
 examples/
   hello-extension/               使用 React Hook 的独立页面
-  service-provider/              服务与共享契约模块
-  service-consumer/              从提供者的契约模块导入同一个 Token
+  service-contract/              独立服务契约与唯一 Token
+  service-provider/              第一种服务实现
+  service-provider-alt/          可替换的第二种服务实现
+  service-consumer/              仅依赖契约，不依赖某个提供者
   build.mjs                      只构建示例，不重建桌面
 ```
 
@@ -44,7 +46,7 @@ xvfb-run -a npm run test:electron
 xvfb-run -a npm run test:extensions
 ```
 
-最后一项在临时目录实测七种组合，并断言宿主 dist 的 SHA-256 全程不变。
+最后一项在临时目录实测九种组合，并断言宿主 dist 的 SHA-256 全程不变。
 不会安装示例到你的正式数据目录。烟测使用软件渲染和测试专用 --no-sandbox，
 不代表生产 OS 沙箱通过验证；普通 start/dev 不关闭沙箱。
 
@@ -90,7 +92,10 @@ extension-folder/
 
 入口是浏览器 ESM，默认导出 createPlugin(api)，返回一个 Lumino 插件。
 plugin.id 必须与 manifest.id 相同；一个扩展包返回一个插件。
-api.scoped() 管理登记的本地资源。业务依赖仍用 provides/requires/optional，
+宿主为每次激活强制创建资源作用域：context.pages.add() 自动归属当前插件，
+context.resources.add() 登记其他可释放资源。失败/停用时统一回收，作用域关闭后拒绝迟到注册。
+插件没有全局页面表或清空他人贡献的接口；api.scoped() 只是便利函数，不是清理的前提。
+业务依赖仍用 provides/requires/optional，
 不再维护一套清单层的插件依赖调度器。
 
 构建扩展时将以下依赖 external：
@@ -102,9 +107,9 @@ react、react/*、react-dom、react-dom/*、@ordessa/extension-api、@extensions
 私有依赖随扩展打包；不可保留其他裸 npm 导入或引入 Node/Electron。
 不要把 React 或公共 API 打包进每个扩展。
 共享服务契约使用固定模块地址，例如：
-@extensions/example.provider/contract.js。
+@extensions/example.contracts/contract.js。
 提供者内部也必须导入同一个独立构建的 contract.js，不能各自内联一份 Token。
-示例的 multi-entry/splitting 构建演示了这一点。
+示例的独立契约构建演示了这一点；替换提供者不需要修改消费者，也不需要保留旧提供者。
 
 新增领域能力不需要增加宿主的固定共享映射：
 共享领域契约跟随对应扩展包，通过 @extensions/<id>/... 地址加载。
@@ -120,7 +125,10 @@ react、react/*、react-dom、react-dom/*、@ordessa/extension-api、@extensions
 - 重复包 ID/提供者拒绝，不以目录顺序选择赢家；坏模块不影响无关插件。
 - 启用变更需重启；无市场、远程下载、自动更新或热卸载。
 - 仅支持可信本地代码，所有扩展同进程/同源，不是恶意代码安全沙箱。
-- 工厂/activate 应迅速返回。恶意同步死循环或永不完成的 Promise 不受此机制隔离。
+- Shell 先显示；模块/工厂并行加载，每包默认 5 秒截止，迟到结果不采用。
+- 截止不等于取消：模块顶层与工厂应只构造定义，不得在那里注册贡献或启动外部副作用。
+- 无关插件并行激活；未完成的 activate 显示“启动中”，不会挡住其他插件，真实依赖仍须等待。
+- 同步死循环不能隔离；未登记的副作用不能回收，不承诺取消在途激活或提供热卸载。
 - 安装目录必须只由可信用户维护；不承诺抵御并发替换文件的恶意本地写入者。
 - 页面关闭不意味着插件停用或远端任务取消。
 

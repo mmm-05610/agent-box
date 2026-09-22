@@ -5,7 +5,9 @@ import path from 'node:path'
 const root = path.dirname(fileURLToPath(import.meta.url))
 for (const [folder, id, entries] of [
   ['hello-extension', 'example.hello', { entry: 'entry.tsx' }],
-  ['service-provider', 'example.provider', { entry: 'entry.ts', contract: 'contract.ts' }],
+  ['service-contract', 'example.contracts', { entry: 'entry.ts', contract: 'contract.ts' }],
+  ['service-provider', 'example.provider', { entry: 'entry.ts' }],
+  ['service-provider-alt', 'example.provider-alt', { entry: 'entry.ts' }],
   ['service-consumer', 'example.consumer', { entry: 'entry.tsx' }],
 ]) {
   const output = path.join(root, 'dist', id)

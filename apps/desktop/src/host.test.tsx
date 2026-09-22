@@ -7,6 +7,51 @@ import { runtime, scoped, OwnedResources, type Plugin } from '@modular/desktop-h
 import { App } from './app'
 
 describe('Lumino desktop host', () => {
+  it('owns raw plugin contributions and rejects late writes without exposing the registry', async () => {
+    let context: Parameters<Plugin['activate']>[0]
+    const page = { id: 'raw', title: 'Raw', component: () => null }
+    const app = runtime([
+      { id: 'raw', activate(host) { context = host; host.pages.add(page) } },
+      { id: 'other', activate(host) { host.pages.add({ ...page, id: 'other' }) } },
+    ])
+    await app.activate('raw'); await app.activate('other')
+    expect(Object.keys(context!.pages)).toEqual(['add'])
+    expect(Object.keys(context!.resources)).toEqual(['add'])
+    await app.deactivate('raw')
+    expect(app.host.pages.getSnapshot().map(p => p.id)).toEqual(['other'])
+    expect(() => context!.pages.add(page)).toThrow('closed')
+    expect(app.host.pages.getSnapshot().map(p => p.id)).toEqual(['other'])
+  })
+  it('rolls back raw plugins without requiring scoped()', async () => {
+    const app = runtime([{ id: 'raw', activate(host) {
+      host.pages.add({ id: 'orphan', title: 'Orphan', component: () => null })
+      throw Error('failed')
+    } }])
+    await expect(app.activate('raw')).rejects.toThrow('failed')
+    expect(app.host.pages.getSnapshot()).toEqual([])
+  })
+  it('immediately releases resources arriving after scope closure', () => {
+    const owned = new OwnedResources()
+    let released = false
+    owned.dispose()
+    expect(() => owned.add({ isDisposed: false, dispose() { released = true } })).toThrow('closed')
+    expect(released).toBe(true)
+  })
+  it('starts healthy plugins while an unrelated activation is pending', async () => {
+    let finish!: () => void
+    const pending = new Promise<void>(resolve => { finish = resolve })
+    const app = runtime([
+      { id: 'slow', autoStart: true, activate: () => pending },
+      { id: 'healthy', autoStart: true, activate: () => undefined },
+    ])
+    const completion = app.start()
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(app.getSnapshot()).toEqual(expect.arrayContaining([
+      { id: 'slow', phase: 'starting' }, { id: 'healthy', phase: 'active' },
+    ]))
+    finish(); await completion
+    expect(app.getSnapshot().every(p => p.phase === 'active')).toBe(true)
+  })
   it('starts without business plugins or public raw registry', async () => {
     const app = runtime([])
     await app.start()

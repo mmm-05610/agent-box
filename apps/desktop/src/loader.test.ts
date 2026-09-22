@@ -10,6 +10,19 @@ import { scoped, Token } from '@ordessa/extension-api'
 import { runtime } from '@modular/desktop-host'
 const dirs: string[] = []
 const manifest = { id: 'test.one', version: '0.1.0', hostApi: '1', entry: 'entry.js' }
+it('bounds a stalled factory, preserves healthy modules, and ignores late results', async () => {
+  let finish!: (value: unknown) => void
+  const pending = new Promise(resolve => { finish = resolve })
+  const result = await loadExtensions({ failures: [], extensions: [
+    { manifest, url: 'slow' },
+    { manifest: { ...manifest, id: 'test.healthy' }, url: 'healthy' },
+  ] }, async url => ({ default: () => url === 'slow' ? pending : { id: 'test.healthy', activate() {} } }), 10)
+  expect(result.plugins.map(p => p.id)).toEqual(['test.healthy'])
+  expect(result.failures[0].error).toContain('timed out')
+  finish({ id: 'test.one', activate() {} })
+  await new Promise(resolve => setTimeout(resolve, 0))
+  expect(result.plugins.map(p => p.id)).toEqual(['test.healthy'])
+})
 async function fixture() {
   const root = await mkdtemp(path.join(tmpdir(), 'ordessa-loader-test-')); dirs.push(root)
   await mkdir(path.join(root, 'extensions', 'one'), { recursive: true })

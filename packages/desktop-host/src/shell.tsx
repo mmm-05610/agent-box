@@ -18,7 +18,7 @@ export function Shell({ host }: { host: Host }) {
     </aside>
     <main>
       <header><span>{page?.title ?? '工作区'}</span>{page && <button onClick={() => select(null)}>关闭视图</button>}</header>
-      {View ? <ViewBoundary key={page.id}><View /></ViewBoundary> : <section data-testid="empty"><h1>桌面已就绪</h1><p>当前未启用功能扩展。</p></section>}
+      {View ? <ViewBoundary key={page.id}><View /></ViewBoundary> : <section data-testid="empty"><h1>桌面已就绪</h1><p>{pages.length ? '从侧栏选择一个页面。' : '当前没有注册页面。'}</p></section>}
     </main>
   </div>;
 }
