@@ -138,11 +138,49 @@ def test_behaviour_readings_are_unchanged_after_the_split():
 
 
 def test_dsh_package_import_needs_no_yaml_and_its_lazysurface_is_frozen():
-    # declared path (goal-H-027): without the PEP 562 facade this import dies on
-    # `production.py:50 import yaml` in any PyYAML-less environment - which is
-    # exactly what would have made the aggregation (and this file) uncollectable.
+    # P-B note: the yaml dependency itself moved into the render functions
+    # (PB-dsh-pilot-release.md §三处改码②), so this import - and the legacy
+    # alias below - need no PyYAML in any environment now.
     import agent_box_harnesses.dsh as dsh_pkg
     assert tuple(dsh_pkg.__all__) == FROZEN_DSH_LAZY_NAMES
     # name not in the lazy list still fails loudly (no silent dict expansion)
     with pytest.raises(AttributeError):
         dsh_pkg.does_not_exist
+
+
+# -- P-B pilot pins (approvals/PB-dsh-pilot-release.md §5): legacy == new package
+
+def test_legacy_dsh_names_resolve_to_the_very_same_new_package_objects():
+    """One module object under both names (M1-P-A① alias discipline).
+
+    Covers package + both submodules: no file may ever execute twice, or the
+    registry would get two REGISTRY-shaped states across the boundary.
+    """
+    import agent_box_harness_dsh as new_pkg
+    from agent_box_harness_dsh import native as new_native
+    from agent_box_harness_dsh import production as new_production
+
+    import agent_box_harnesses.dsh as legacy_pkg
+    from agent_box_harnesses.dsh import native as legacy_native
+    from agent_box_harnesses.dsh import production as legacy_production
+
+    assert legacy_pkg is new_pkg
+    assert legacy_production is new_production
+    assert legacy_native is new_native
+    # nm's aggregation still reads through the legacy relative import and lands
+    # on the new module object (the aggregation line itself stayed untouched).
+    assert nm._FAMILY_DIALECTS["dsh"] is new_native.DIALECTS
+
+
+def test_new_pilot_package_declares_zero_entry_points():
+    """Capability-absence stands: the pilot package must not register any entry point."""
+    import tomllib
+    from pathlib import Path
+
+    package_root = Path(__file__).resolve().parents[2] / "agent-box-harness-dsh"
+    data = tomllib.loads((package_root / "pyproject.toml").read_text(encoding="utf-8"))
+    assert data["project"]["name"] == "agent-box-harness-dsh"
+    assert "entry-points" not in data["project"], (
+        "P-B red line: adding an entry point here would be capability expansion")
+    assert data["project"]["dependencies"] == ["pacthold==2.0.0a1"], (
+        "no new dependency: PyYAML stays undeclared (closure width unchanged)")
