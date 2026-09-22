@@ -21,14 +21,15 @@ class Bridge implements AgentNativeBridge {
   }
   async send(instanceId: string, frame: any) {
     this.sent.push({ instanceId, frame })
-    if (this.exited.has(frame.params?.sessionId)) throw Error('Pi session is not open')
+    // Native 'open' restarts an exited session's process; live RPC ops on it fail.
+    if (this.exited.has(frame.params?.sessionId) && !['open', 'list'].includes(frame.method)) throw Error('Pi session is not open')
     switch (frame.method) {
       case 'list': return [
         { id: 'A', title: 'Alpha', updatedAt: '2026-09-01T00:00:00.000Z', detail: '/tmp' },
         { id: 'B', title: 'Beta', updatedAt: '2026-09-02T00:00:00.000Z', detail: '/tmp' },
       ]
       case 'new': return { sessionId: 'N', state: stateOf('N'), messages: [] }
-      case 'open': return { sessionId: frame.params.sessionId, state: stateOf(frame.params.sessionId), messages: [
+      case 'open': this.exited.delete(frame.params.sessionId); return { sessionId: frame.params.sessionId, state: stateOf(frame.params.sessionId), messages: [
         { role: 'user', content: [{ type: 'text', text: 'hi' }] },
         { role: 'assistant', stopReason: 'stop', content: [{ type: 'text', text: 'done' },
           { type: 'toolCall', id: 'ht1', name: 'read', arguments: { path: '/x' } }] },
@@ -165,6 +166,79 @@ it('merges one tool card per toolCallId across the full event sequence', async (
     bridge.emit('A', { type: 'tool_execution_update', toolCallId: 't1', toolName: 'bash', partialResult: { content: [{ type: 'text', text: 'late partial' }] } })
     expect(client.getSnapshot().messages.A.find(item => item.id === 'pi-tool-t1')?.tools?.[0])
       .toMatchObject({ status: 'completed', result: 'tool done' })
+  } finally { client.dispose() }
+})
+
+it('keeps an unmapped final stopReason unknown instead of guessing', async () => {
+  const bridge = new Bridge(), client = await PiClient.connect(bridge)
+  const lastRun = () => Object.keys(client.getSnapshot().runs).at(-1)!
+  try {
+    await client.openSession('A')
+    await client.send('A', 'one')
+    bridge.emit('A', { type: 'agent_start' })
+    await client.stop('A', lastRun())
+    // A final message exists, so the stop request cannot infer cancellation,
+    // and an unmapped reason has no protocol basis for any definite verdict.
+    bridge.emit('A', { type: 'message_end', message: { role: 'assistant', stopReason: 'lengthLimit', content: [] } })
+    bridge.emit('A', { type: 'agent_settled' })
+    expect(client.getSnapshot().runs[lastRun()].status).toBe('unknown')
+    expect(client.getSnapshot().diagnostic).toContain('unmapped stopReason: lengthLimit')
+    await client.send('A', 'two')
+    bridge.emit('A', { type: 'agent_start' })
+    bridge.emit('A', { type: 'message_end', message: { role: 'assistant', stopReason: 'lengthLimit', content: [] } })
+    bridge.emit('A', { type: 'agent_settled' })
+    expect(client.getSnapshot().runs[lastRun()].status).toBe('unknown') // Never silently completed.
+  } finally { client.dispose() }
+})
+
+it('keeps a settled run unknown when no final assistant message ever arrives', async () => {
+  const bridge = new Bridge(), client = await PiClient.connect(bridge)
+  const lastRun = () => Object.keys(client.getSnapshot().runs).at(-1)!
+  try {
+    await client.openSession('A')
+    await client.send('A', 'one')
+    bridge.emit('A', { type: 'agent_start' })
+    bridge.emit('A', { type: 'agent_settled' })
+    expect(client.getSnapshot().runs[lastRun()].status).toBe('unknown')
+    await client.send('A', 'two')
+    bridge.emit('A', { type: 'agent_start' })
+    bridge.emit('A', { type: 'message_end', message: { role: 'assistant', content: [{ type: 'text', text: 'partial' }] } }) // No stopReason at all.
+    bridge.emit('A', { type: 'agent_settled' })
+    expect(client.getSnapshot().runs[lastRun()].status).toBe('unknown')
+  } finally { client.dispose() }
+})
+
+it('does not carry verdict or streaming state across runs and processes', async () => {
+  const bridge = new Bridge(), client = await PiClient.connect(bridge)
+  const lastRun = () => Object.keys(client.getSnapshot().runs).at(-1)!
+  try {
+    await client.openSession('A')
+    await client.send('A', 'one')
+    bridge.emit('A', { type: 'agent_start' })
+    bridge.emit('A', { type: 'message_start', message: { role: 'assistant' } })
+    bridge.emit('A', { type: 'message_update', assistantMessageEvent: { type: 'text_delta', delta: 'first' } })
+    await client.stop('A', lastRun())
+    bridge.emit('A', { type: 'agent_settled' })
+    expect(client.getSnapshot().runs[lastRun()].status).toBe('cancelled')
+    await client.send('A', 'two')
+    bridge.emit('A', { type: 'agent_start' })
+    // A stray delta without message_start must not append to the previous run's streaming message.
+    bridge.emit('A', { type: 'message_update', assistantMessageEvent: { type: 'text_delta', delta: 'second' } })
+    bridge.emit('A', { type: 'agent_settled' })
+    expect(client.getSnapshot().runs[lastRun()].status).toBe('unknown')
+    const texts = client.getSnapshot().messages.A.map(item => item.text)
+    expect(texts).toContain('first')
+    expect(texts).not.toContain('firstsecond')
+    await client.send('A', 'three')
+    bridge.emit('A', { type: 'agent_start' })
+    bridge.emit('A', { type: 'message_end', message: { role: 'assistant', stopReason: 'error', content: [] } }) // No settle follows.
+    bridge.emit('A', { type: 'transport_exit' })
+    expect(client.getSnapshot().runs[lastRun()].status).toBe('unknown')
+    await client.openSession('A') // Reopened through a fresh process.
+    await client.send('A', 'four')
+    bridge.emit('A', { type: 'agent_start' })
+    bridge.emit('A', { type: 'agent_settled' })
+    expect(client.getSnapshot().runs[lastRun()].status).toBe('unknown') // Not 'failed' from the dead run's reason.
   } finally { client.dispose() }
 })
 

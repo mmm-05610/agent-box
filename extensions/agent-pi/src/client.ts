@@ -51,7 +51,8 @@ export class PiClient implements AgentClient {
   private sequence = 0
   private activeRuns = new Map<string, string>()
   private activeMessages = new Map<string, string>()
-  private lastStop = new Map<string, string>()
+  /** Per-session verdict facts for the current run; never carried across runs. */
+  private runFacts = new Map<string, { reason?: string; sawAssistantEnd: boolean }>()
   private tools = new Map<string, Map<string, AgentToolCall>>()
   private interactionRoutes = new Map<string, { sessionId: string; requestId: string; method: string; used: boolean }>()
   private constructor(private bridge: AgentNativeBridge) {
@@ -121,6 +122,7 @@ export class PiClient implements AgentClient {
       const id = this.activeRuns.get(sessionId)
       if (id) this.updateRun(id, sessionId, 'unknown')
       this.activeRuns.delete(sessionId)
+      this.runFacts.delete(sessionId); this.activeMessages.delete(sessionId) // Facts from a dead process never apply to a reopened session.
       this.publish({ diagnostic: `Pi session ${sessionId} disconnected; active outcome unknown`,
         interactions: this.state.interactions.map(item => item.sessionId === sessionId && (item.state === 'pending' || item.state === 'responding') ? { ...item, state: 'unknown' } : item) })
       return
@@ -162,7 +164,8 @@ export class PiClient implements AgentClient {
       for (const tool of projected.tools ?? []) this.upsertTool(sessionId, tool)
       if (message.role === 'assistant') {
         this.activeMessages.delete(sessionId)
-        if (str(message.stopReason)) this.lastStop.set(sessionId, message.stopReason as string)
+        // Last assistant message of the run wins; an absent stopReason is recorded too.
+        this.runFacts.set(sessionId, { reason: str(message.stopReason), sawAssistantEnd: true })
       }
       return
     }
@@ -178,15 +181,21 @@ export class PiClient implements AgentClient {
       const id = this.activeRuns.get(sessionId)
       if (id) {
         const run = this.state.runs[id]
-        const stop = this.lastStop.get(sessionId)
-        // agent_settled only proves the run ended. An explicit final stopReason
-        // is authoritative; a requested stop implies cancellation only when no
-        // final assistant message ever arrived (e.g. aborted before output).
-        const status: RunStatus = stop === 'aborted' ? 'cancelled' : stop === 'error' ? 'failed'
-          : stop === 'stop' ? 'completed'
-          : run?.status === 'stop-requested' ? 'cancelled' : 'completed'
+        const facts = this.runFacts.get(sessionId)
+        // agent_settled only proves the run ended. A mapped final stopReason is
+        // the only protocol basis for a definite verdict; an unmapped reason or
+        // a missing final message stays unknown. A requested stop counts as
+        // cancelled only when no final assistant message ever arrived.
+        let status: RunStatus
+        if (facts?.reason === 'stop') status = 'completed'
+        else if (facts?.reason === 'aborted') status = 'cancelled'
+        else if (facts?.reason === 'error') status = 'failed'
+        else {
+          if (facts?.reason) this.publish({ diagnostic: `Pi run ended with unmapped stopReason: ${facts.reason}` })
+          status = run?.status === 'stop-requested' && !facts?.sawAssistantEnd ? 'cancelled' : 'unknown'
+        }
         this.updateRun(id, sessionId, status)
-        this.activeRuns.delete(sessionId); this.lastStop.delete(sessionId)
+        this.activeRuns.delete(sessionId); this.runFacts.delete(sessionId); this.activeMessages.delete(sessionId)
       }
       this.publish({ interactions: this.state.interactions.map(item => item.sessionId === sessionId && item.state === 'pending' ? { ...item, state: 'expired' } : item) })
       return
@@ -246,6 +255,9 @@ export class PiClient implements AgentClient {
       }
     }
     this.tools.set(sessionId, cards)
+    // A live run keeps its bookkeeping across reopen (the native side reuses the
+    // process); residual facts only exist when no run is tracked for this session.
+    if (!this.activeRuns.has(sessionId)) { this.runFacts.delete(sessionId); this.activeMessages.delete(sessionId) }
     this.publish({ selectedSessionId: sessionId, messages: { ...this.state.messages, [sessionId]: history } })
     await this.loadOptions(sessionId, state)
     return sessionId
@@ -262,6 +274,7 @@ export class PiClient implements AgentClient {
     if (this.activeRuns.has(sessionId)) throw Error('Pi session already running')
     const id = `pi-run-${++this.sequence}`
     this.activeRuns.set(sessionId, id)
+    this.runFacts.delete(sessionId); this.activeMessages.delete(sessionId) // A new run starts with no inherited verdict or streaming state.
     this.updateRun(id, sessionId, 'starting')
     try { await this.request('prompt', { sessionId, text }) }
     catch (error) { this.updateRun(id, sessionId, 'unknown'); this.activeRuns.delete(sessionId); throw error }
@@ -320,6 +333,7 @@ export class PiClient implements AgentClient {
     if (this.isDisposed) return
     this.isDisposed = true
     this.unsubscribeNative(); this.listeners.clear(); this.interactionRoutes.clear(); this.tools.clear()
+    this.activeRuns.clear(); this.runFacts.clear(); this.activeMessages.clear()
     if (this.instanceId) void this.bridge.close(this.instanceId).catch(() => {})
   }
 }
