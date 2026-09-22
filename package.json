@@ -11,6 +11,7 @@
   ],
   "scripts": {
     "test:agent-ui": "node apps/desktop/scripts/test-agent-ui.mjs",
+    "test:agent-shell": "node apps/desktop/scripts/test-agent-shell.mjs",
     "build:foundations": "node extensions/build.mjs",
     "dev": "npm run --workspace apps/desktop dev",
     "build": "npm run --workspace apps/desktop build",
@@ -26,6 +27,7 @@
     "node": ">=22.22.0"
   },
   "dependencies": {
+    "@earendil-works/pi-coding-agent": "0.86.1",
     "react-resizable-panels": "4.13.2"
   },
   "devDependencies": {
