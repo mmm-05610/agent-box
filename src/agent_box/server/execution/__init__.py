@@ -2,12 +2,17 @@
 
 Server composes extensions through these types only; concrete Harness
 implementations are selected in `server/bootstrap` and owned by plugins.
+MB-E2a: the pure contract definitions (``CancelOutcome`` …
+``ExecutionObservation`` and ``TurnExecutionPort``) live once in
+``agent_box.execution.contracts`` and are re-exported here as the same
+objects for historical import paths.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable, Mapping, Protocol
+from typing import Any, Callable, Mapping
 
+from agent_box.execution.contracts import TurnExecutionPort
 from agent_box.resource_contracts.harness_capabilities import (
     CapabilityDeclaration,
     capability_view as _capability_view,
@@ -48,22 +53,6 @@ def _validate_wire_protocols(value: Mapping[str, str]) -> dict[str, str]:
             raise HarnessDescriptorError(f"wire_protocols value for {key!r} must be non-empty")
         normalized[key] = dialect
     return {name: normalized[name] for name in CANONICAL_PROTOCOLS if name in normalized}
-
-
-class TurnExecutionPort(Protocol):
-    """Product-facing dispatch surface; plugins own the native semantics.
-
-    C-EXEC@v1 block-1 (O-3): the three neutral verbs below are the contract
-    carrier. The bool ``cancel`` compatibility shell was deleted in E-INC1b
-    b-1 after the consumer switch; ``cancel_execution`` is the only cancel
-    answer surface.
-    """
-
-    def accept(self, turn_id: str) -> None: ...
-
-    def submit(self, request: ExecutionRequest) -> ExecutionReceipt: ...
-    def cancel_execution(self, execution_key: str) -> CancelOutcome: ...
-    def observe_execution(self, execution_key: str) -> ExecutionObservation: ...
 
 
 @dataclass(frozen=True)

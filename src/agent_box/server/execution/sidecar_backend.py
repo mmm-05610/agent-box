@@ -13,14 +13,14 @@ import uuid
 from pathlib import PurePosixPath
 from typing import Any, Callable, Mapping
 
+from agent_box.execution.contracts import (
+    CancelOutcome, EvidenceClass, ExecutionObservation, ExecutionReceipt,
+    ExecutionRequest, ObservationState,
+)
 from agent_box.extensions import capability
 from agent_box.extensions.runtime_composition.sandbox_port import SandboxPortUnavailable
 from agent_box.resource_contracts import AgentBoxProfileV1, PromptFragmentV1, WorkspaceV1
 from agent_box.server.errors import ServerError
-from agent_box.server.execution.execution_contract import (
-    CancelOutcome, EvidenceClass, ExecutionObservation, ExecutionReceipt,
-    ExecutionRequest, ObservationState,
-)
 from agent_box.server.execution.first_run_lock import first_run_gate
 from agent_box.server.execution.placement import PlacementUnsupported
 from agent_box.server.execution.sidecar import SidecarError, SidecarHarnessPort
