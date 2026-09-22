@@ -17,7 +17,8 @@ from __future__ import annotations
 
 import pytest
 
-from agent_box.server.execution import CancelOutcome
+from agent_box.server.execution import (CancelOutcome, HarnessDescriptor,
+                                   HarnessRegistry)
 from agent_box.server.execution.delegation import DelegationService
 from agent_box.server.idempotency import IdempotentRecords
 from agent_box.server.profiles import ProfileRecords
@@ -57,7 +58,13 @@ def _env(tmp_path):
     records = SessionRecords(database, idempotency)
     objects = ObjectStore(tmp_path / "data")
     execution = _Completing(records)
-    sessions = SessionService(records, idempotency, objects, harnesses=None,
+    _harnesses = HarnessRegistry()
+    _harnesses.register(HarnessDescriptor(
+        "codex", credential_kind=None,
+        configuration_validator=lambda value: None if isinstance(value, dict) else ValueError(),
+        capability_claims={"stream": True},
+    ))
+    sessions = SessionService(records, idempotency, objects, harnesses=_harnesses,
                               profiles=profiles, credentials=None, execution=execution)
     service = DelegationService(records=records, profiles=profiles, sessions=sessions,
                                 execution=execution, objects=objects)
@@ -84,12 +91,13 @@ def _env(tmp_path):
     sessions.create_session("c-seed", {"workspace_id": ws_parent, "profile_id": authorized["profile_id"]})
     profiles.grant_subagent(parent_id=parent["profile_id"], child_id=authorized["profile_id"])
 
-    with database.transaction() as conn:
-        conn.execute(
-            "INSERT INTO server_turns(id,session_id,profile_id,profile_revision,native_generation,"
-            "state,capture_state,cleanup_state,input_object_digest,created_at,updated_at) "
-            "VALUES ('parent-turn',?,?,1,0,'running','pending','pending','x','t','t')",
-            (parent_session["session_id"], parent["profile_id"]))
+    # a-3 A-family rebuild (C ruling 06:19Z): live parent via the acceptance route
+    # so its frozen object carries the permissions section; fake port leaves it running.
+    _, _parent_turn = sessions.create_turn(parent_session["session_id"], "parent-key", {
+        "text": "parent task",
+        "expected_profile_revision": int(profiles.get(parent["profile_id"])["config_revision"]),
+    })
+    service.parent_turn_id = _parent_turn["turn_id"]
 
     def session_with_handle(profile_id, workspace_id, key, handle):
         sid = sessions.create_session(key, {
@@ -109,7 +117,7 @@ def _env(tmp_path):
 
 
 def _run(env, args):
-    return env["service"].run(parent_turn_id="parent-turn",
+    return env["service"].run(parent_turn_id=env["service"].parent_turn_id,
                               parent_profile_id=env["parent"]["profile_id"], arguments=args)
 
 
