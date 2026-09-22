@@ -1,12 +1,17 @@
-from .generic.factory import build_registration, descriptor
-from agent_box.extensions import PluginContext
-class _Plugin:
-    def __init__(self,harness_type=None): self.harness_type=harness_type
-    def descriptor(self): return descriptor(self.harness_type)
-    def build(self,context:PluginContext): return build_registration(context,self.harness_type)
-def create_profile_store(): return _Plugin()
-def create_codex(): return _Plugin("codex")
-def create_claude(): return _Plugin("claude-code")
-def create_opencode(): return _Plugin("opencode")
-def create_hermes(): return _Plugin("hermes")
-def create_pi(): return _Plugin("pi")
+"""Compatibility alias — the implementation moved to `agent_box_harness.entrypoints` (M1-P-A①).
+
+The module object below replaces this name in `sys.modules`, so every existing
+importer keeps the same module, the same attribute objects (including private
+helpers) and the same module-level state. Nothing here is a copy: the new
+package holds the only implementation.
+
+Public paths are untouched: the six `agent_box.plugins` entry points and the
+`agent_box_harnesses` package resource `harnesses.toml` (which the loader still
+reads from this package) keep working unchanged.
+Approval: `approvals/M1-PA1-release.md` §一.
+"""
+import sys as _sys
+
+from agent_box_harness import entrypoints as _implementation
+
+_sys.modules[__name__] = _implementation

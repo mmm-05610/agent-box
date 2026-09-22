@@ -1,38 +1,17 @@
-from __future__ import annotations
-import hashlib
-import tomllib
-from dataclasses import dataclass
-from importlib import resources
-from .schema import HarnessDefinition, definition_from_dict
+"""Compatibility alias — the implementation moved to `agent_box_harness.registry.loader` (M1-P-A①).
 
-@dataclass(frozen=True)
-class RegistryDiagnostics:
-    digest: str
-    errors: tuple[str, ...] = ()
+The module object below replaces this name in `sys.modules`, so every existing
+importer keeps the same module, the same attribute objects (including private
+helpers) and the same module-level state. Nothing here is a copy: the new
+package holds the only implementation.
 
-class HarnessRegistry:
-    def __init__(self, definitions, digest, diagnostics=()):
-        self._definitions = {d.harness_type: d for d in definitions}
-        self.digest = digest
-        self.diagnostics = RegistryDiagnostics(digest, tuple(diagnostics))
-    def get(self, harness_type): return self._definitions[harness_type]
-    def all(self): return tuple(self._definitions[k] for k in sorted(self._definitions))
-    def __len__(self): return len(self._definitions)
+Public paths are untouched: the six `agent_box.plugins` entry points and the
+`agent_box_harnesses` package resource `harnesses.toml` (which the loader still
+reads from this package) keep working unchanged.
+Approval: `approvals/M1-PA1-release.md` §一.
+"""
+import sys as _sys
 
-def load_registry(text: str) -> HarnessRegistry:
-    raw = tomllib.loads(text)
-    if raw.get("schema_version") != 1: raise ValueError("unsupported registry schema_version")
-    entries = raw.get("harness", [])
-    if not isinstance(entries, list) or len(entries) > 16: raise ValueError("invalid harness registry")
-    defs = []; seen = set(); drivers = set()
-    for entry in entries:
-        definition = definition_from_dict(entry)
-        if definition.harness_type in seen: raise ValueError("duplicate harness_type")
-        if definition.driver in drivers: raise ValueError("duplicate driver")
-        seen.add(definition.harness_type); drivers.add(definition.driver); defs.append(definition)
-    digest = "sha256:" + hashlib.sha256(text.encode()).hexdigest()
-    return HarnessRegistry(tuple(defs), digest)
+from agent_box_harness.registry import loader as _implementation
 
-def load_builtin_registry() -> HarnessRegistry:
-    text = resources.files("agent_box_harnesses").joinpath("harnesses.toml").read_text(encoding="utf-8")
-    return load_registry(text)
+_sys.modules[__name__] = _implementation

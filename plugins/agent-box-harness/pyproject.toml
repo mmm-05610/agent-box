@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61,<77"]
+build-backend = "setuptools.build_meta"
+[project]
+name = "agent-box-harness"
+version = "2.0.0a1"
+description = "Brand-neutral Harness core (extracted from agent-box-harnesses)"
+requires-python = ">=3.10"
+# The Host extension API and the profile/work contracts this core imports.
+dependencies = ["pacthold==2.0.0a1"]
+# NO entry points on purpose (approval M1-P-A1-release.md §一): the discovery
+# surface must not change while the implementation is being moved. Until P-B,
+# `agent-box-harnesses` keeps the six `agent_box.plugins` entry points and its
+# per-family parts, and every legacy module name re-exports from this package.
+[tool.setuptools.packages.find]
+where = ["src"]

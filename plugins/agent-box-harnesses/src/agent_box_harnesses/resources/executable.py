@@ -1,9 +1,17 @@
-"""Bounded executable resolution; registry values never become shell code."""
-from pathlib import Path
-import os
-def resolve_executable(identity: str, resolver_kind: str, *, search_path=None):
-    if resolver_kind not in {"PATH", "PATH_OR_BUNDLE"}: raise ValueError("unsupported executable resolver")
-    for directory in (search_path or os.environ.get("PATH","")).split(":"):
-        candidate=Path(directory)/identity
-        if candidate.is_file() and os.access(candidate,os.X_OK): return candidate
-    raise FileNotFoundError(identity)
+"""Compatibility alias — the implementation moved to `agent_box_harness.resources.executable` (M1-P-A①).
+
+The module object below replaces this name in `sys.modules`, so every existing
+importer keeps the same module, the same attribute objects (including private
+helpers) and the same module-level state. Nothing here is a copy: the new
+package holds the only implementation.
+
+Public paths are untouched: the six `agent_box.plugins` entry points and the
+`agent_box_harnesses` package resource `harnesses.toml` (which the loader still
+reads from this package) keep working unchanged.
+Approval: `approvals/M1-PA1-release.md` §一.
+"""
+import sys as _sys
+
+from agent_box_harness.resources import executable as _implementation
+
+_sys.modules[__name__] = _implementation

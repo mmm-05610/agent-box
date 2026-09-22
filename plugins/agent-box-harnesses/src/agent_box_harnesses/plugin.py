@@ -1,14 +1,17 @@
-"""Compatibility-free official Harness plugin entry point facade."""
-from .entrypoints import create_profile_store, create_codex, create_claude, create_opencode, create_hermes, create_pi
-def create_plugin(): return create_codex()
-# Direct-instantiation facade retained for the SDK's bundle-level catalog
-# checks. It is not an entry point and owns no alternate registry.
-class HarnessesPlugin:
-    def descriptor(self):
-        from agent_box.extensions import PluginDescriptor
-        return PluginDescriptor("harnesses", "Agent-Box Harnesses", "2.0.0a1", description="Official declarative Harness bundle", config_namespace="harnesses")
-    def build(self, context):
-        from agent_box.extensions import PluginRegistration
-        from .codex.credentials import CodexCredentialSource
-        registration=create_codex().build(context)
-        return PluginRegistration(execution_providers=registration.execution_providers, resource_selectors=registration.resource_selectors, host_controls=registration.host_controls, harness_managers=registration.harness_managers, credential_materializers=(CodexCredentialSource(home=context.agent_box_home),))
+"""Compatibility alias — the implementation moved to `agent_box_harness.plugin` (M1-P-A①).
+
+The module object below replaces this name in `sys.modules`, so every existing
+importer keeps the same module, the same attribute objects (including private
+helpers) and the same module-level state. Nothing here is a copy: the new
+package holds the only implementation.
+
+Public paths are untouched: the six `agent_box.plugins` entry points and the
+`agent_box_harnesses` package resource `harnesses.toml` (which the loader still
+reads from this package) keep working unchanged.
+Approval: `approvals/M1-PA1-release.md` §一.
+"""
+import sys as _sys
+
+from agent_box_harness import plugin as _implementation
+
+_sys.modules[__name__] = _implementation
