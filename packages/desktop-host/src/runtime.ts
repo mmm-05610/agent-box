@@ -1,7 +1,7 @@
 import { PluginRegistry } from '@lumino/coreutils'
-import { Contributions, OwnedResources, type Host, type Page, type Plugin, type PluginContext } from '@ordessa/extension-api'
+import { Contributions, OwnedResources, type Host, type RootView, type Plugin, type PluginContext } from '@ordessa/extension-api'
 export { scoped, OwnedResources } from '@ordessa/extension-api'
-export type { Host, Page, Plugin } from '@ordessa/extension-api'
+export type { Host, RootView, Plugin } from '@ordessa/extension-api'
 export interface PluginState { id: string; phase: 'registered' | 'starting' | 'active' | 'stopped' | 'failed'; error?: string }
 export function runtime(plugins: Plugin<any>[]) {
   const providers = new Set(), ids = new Set<string>()
@@ -11,7 +11,7 @@ export function runtime(plugins: Plugin<any>[]) {
     if (plugin.provides && providers.has(plugin.provides)) throw Error('Duplicate provider: ' + plugin.provides.name)
     if (plugin.provides) providers.add(plugin.provides)
   }
-  const host: Host = { pages: new Contributions<Page>() }
+  const host: Host = { roots: new Contributions<RootView>() }
   const registry = new PluginRegistry<Host>()
   registry.application = host
   const failures: { id: string; error: string }[] = []
@@ -39,11 +39,12 @@ export function runtime(plugins: Plugin<any>[]) {
           const resources = new OwnedResources()
           owned = resources
           const context: PluginContext = Object.freeze({
-            pages: Object.freeze({ add(page: Page) {
+            root: Object.freeze({ mount(view: RootView) {
               if (resources.isDisposed) throw Error('Plugin scope is closed')
-              return resources.add(host.pages.add(page))
+              if (host.roots.getSnapshot().length) throw Error('Root view already mounted')
+              return resources.add(host.roots.add(view))
             } }),
-            resources: Object.freeze({ add: resources.add.bind(resources) }),
+            resources: Object.freeze({ get isDisposed() { return resources.isDisposed }, add: resources.add.bind(resources) }),
           })
           active = { context, services }
           try {

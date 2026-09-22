@@ -2,10 +2,10 @@ import { spawn } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 const app = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-export async function launchSmoke(home) {
+export async function launchSmoke(home, extraEnv = {}) {
   const child = spawn(path.resolve(app, '../../node_modules/electron/dist/electron'),
     ['--no-sandbox', '--disable-gpu', '--ozone-platform=x11', '.'], {
-      cwd: app, env: { ...process.env, MODULAR_USER_DATA: home, ORDESSA_EXTENSION_HOME: home, MODULAR_SMOKE: '1', ELECTRON_DISABLE_SECURITY_WARNINGS: 'true' },
+      cwd: app, env: { ...process.env, MODULAR_USER_DATA: home, ORDESSA_EXTENSION_HOME: home, ORDESSA_EMPTY_HOST: '1', MODULAR_SMOKE: '1', ELECTRON_DISABLE_SECURITY_WARNINGS: 'true', ...extraEnv },
       stdio: ['ignore', 'pipe', 'pipe'],
     })
   let output = '', timedOut = false

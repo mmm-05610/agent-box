@@ -24,12 +24,16 @@ export class OwnedResources {
     if (errors.length) throw new AggregateError(errors, 'Extension cleanup failed')
   }
 }
-export interface Page { id: string; title: string; component: ComponentType }
+export interface RootView { id: string; component: ComponentType }
+export interface ResourceScope {
+  readonly isDisposed: boolean
+  add<T extends IDisposable>(item: T): T
+}
 // Host is private to product composition; plugins receive the narrower context.
-export interface Host { pages: Contributions<Page> }
+export interface Host { roots: Contributions<RootView> }
 export interface PluginContext {
-  readonly pages: { add(page: Page): IDisposable }
-  readonly resources: { add<T extends IDisposable>(item: T): T }
+  readonly root: { mount(view: RootView): IDisposable }
+  readonly resources: ResourceScope
 }
 export type Plugin<T = unknown> = IPlugin<PluginContext, T>
 /** Convenience only: ownership/rollback is enforced by the runtime for ALL plugins. */
@@ -39,4 +43,5 @@ export function scoped<T>(definition: Omit<Plugin<T>, 'activate'> & {
   return { ...definition, activate: (host, ...services) => definition.activate(host, host.resources, ...services) }
 }
 export { Token, Contributions }
-export const HOST_API_VERSION = '1'
+export type { IDisposable }
+export const HOST_API_VERSION = '2'

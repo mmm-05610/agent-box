@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, protocol, session } from 'electron'
 import path from 'node:path'
+import { writeFile } from 'node:fs/promises'
 import { discover } from './extensions'
 import { protocolHandler } from './extension-protocol'
 
@@ -9,7 +10,8 @@ const smoke = process.env.MODULAR_SMOKE === '1'
 if (smoke) app.disableHardwareAcceleration()
 protocol.registerSchemesAsPrivileged([{ scheme: 'ordessa', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }])
 app.whenReady().then(async () => {
-  const discovery = await discover(process.env.ORDESSA_EXTENSION_HOME ?? app.getPath('userData'))
+  const bundled = process.env.ORDESSA_EMPTY_HOST === '1' ? undefined : path.resolve(__dirname, '../../../extensions/dist')
+  const discovery = await discover(process.env.ORDESSA_EXTENSION_HOME ?? app.getPath('userData'), bundled)
   protocol.handle('ordessa', protocolHandler(path.join(__dirname, 'renderer'), discovery))
   session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false))
   const win = new BrowserWindow({
@@ -30,22 +32,56 @@ app.whenReady().then(async () => {
     const result = await win.webContents.executeJavaScript(`(async () => {
       for (let i = 0; i < 100 && !document.documentElement.dataset.ready; i++) await new Promise(r => setTimeout(r, 50));
       for (let i = 0; i < 20 && !document.documentElement.dataset.settled; i++) await new Promise(r => setTimeout(r, 50));
-      const pages = [...document.querySelectorAll('nav button')].map(b => b.textContent);
+      const pages = [...document.querySelectorAll('[data-region] header [role="group"] button')].map(b => b.textContent);
       const views = [];
-      for (const button of document.querySelectorAll('nav button')) {
+      for (const button of document.querySelectorAll('[data-region] header [role="group"] button')) {
         button.click(); await new Promise(r => setTimeout(r, 30));
         const increment = document.querySelector('[data-testid="increment"]');
         if (increment) { increment.click(); await new Promise(r => setTimeout(r, 30)); }
-        views.push(document.querySelector('main').textContent);
+        views.push(document.querySelector('[data-region="main"]').textContent);
       }
       return {
         ready: document.documentElement.dataset.ready === 'true', pages, views,
+        rootMounted: !!document.querySelector('[data-testid="workspace"]'),
+        settingsEntry: [...document.querySelectorAll('nav button')].some(b => b.textContent === '设置'),
+        emptyHost: !!document.querySelector('[data-testid="empty"]'),
         errors: [...document.querySelectorAll('[role="alert"]')].map(p => p.textContent),
         starting: [...document.querySelectorAll('[role="status"]')].map(p => p.textContent),
         nodeAbsent: typeof require === 'undefined' && typeof process === 'undefined',
         bridgeKeys: Object.keys(window.extensionCatalog ?? {}),
       };
     })()`)
+    if (process.env.MODULAR_FOUNDATION_SMOKE === '1') {
+      Object.assign(result, await win.webContents.executeJavaScript(`(async () => {
+        const wait = () => new Promise(r => setTimeout(r, 60));
+        const click = async selector => { const el = document.querySelector(selector); if (!el) throw Error('Missing '+selector); el.focus(); el.click(); await wait(); };
+        await click('[data-testid="demo-counter"]');
+        const entry = [...document.querySelectorAll('nav button')].find(b => b.textContent === '设置');
+        entry.focus(); entry.click(); await wait();
+        const inert = document.querySelector('[data-testid="workspace"]').inert;
+        const focusOnReturn = document.activeElement.textContent === '← 返回工作区';
+        const field = document.querySelector('[data-setting="demo.text"] input');
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(field, '桌面输入');
+        field.dispatchEvent(new Event('input', {bubbles:true})); await wait();
+        await click('[data-setting="demo.text"] button');
+        const saved = field.value === '桌面输入' && document.querySelector('[data-setting="demo.text"]').textContent.includes('已保存并重新读取');
+        await click('[data-testid="external-update"]');
+        const externalUpdate = field.value === '外部更新';
+        await click('[data-setting="demo.fail"] button');
+        const failureVisible = document.querySelector('[data-setting="demo.fail"] [role="alert"]').textContent.includes('演示保存失败');
+        await click('[data-testid="full-page"] header button');
+        const preserved = document.querySelector('[data-testid="demo-counter"]').textContent === '计数 1';
+        const focusRestored = document.activeElement === entry;
+        return { foundation: { inert, focusOnReturn, saved, externalUpdate, failureVisible, preserved, focusRestored } };
+      })()`))
+      if (process.env.MODULAR_SCREENSHOT) {
+        win.showInactive() // Test-only Xvfb window: force a painted frame before capture.
+        await new Promise(resolve => setTimeout(resolve, 150))
+        await writeFile(process.env.MODULAR_SCREENSHOT, (await win.webContents.capturePage()).toPNG())
+        await win.webContents.executeJavaScript(`(async()=>{ [...document.querySelectorAll('nav button')].find(b=>b.textContent==='设置').click(); await new Promise(r=>setTimeout(r,100)); })()`)
+        await writeFile(process.env.MODULAR_SCREENSHOT + '.settings.png', (await win.webContents.capturePage()).toPNG())
+      }
+    }
     console.log('MODULAR_LOADER_READY', JSON.stringify(result))
     app.exit(result.ready && result.nodeAbsent ? 0 : 1)
   }

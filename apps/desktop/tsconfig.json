@@ -9,6 +9,10 @@
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
     "strict": true,
+    "paths": {
+      "@extensions/ordessa.contracts/contract.js": ["../../packages/foundation-contracts/src/contract.ts"],
+      "@extensions/example.contracts/contract.js": ["../../examples/service-contract/src/contract.ts"]
+    },
     "skipLibCheck": true,
     "noEmit": true,
     "types": [
@@ -18,6 +22,8 @@
   "include": [
     "src",
     "electron",
-    "../../packages/*/src"
+    "../../packages/*/src",
+    "../../extensions/*/src",
+    "../../examples/*/src"
   ]
 }

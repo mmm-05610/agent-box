@@ -10,6 +10,7 @@
     "packages/extension-loader"
   ],
   "scripts": {
+    "build:foundations": "node extensions/build.mjs",
     "dev": "npm run --workspace apps/desktop dev",
     "build": "npm run --workspace apps/desktop build",
     "typecheck": "npm run --workspace apps/desktop typecheck",
@@ -17,6 +18,7 @@
     "test:electron": "npm run --workspace apps/desktop test:electron",
     "build:examples": "node examples/build.mjs",
     "test:extensions": "node apps/desktop/scripts/test-extensions.mjs",
+    "test:foundations": "node apps/desktop/scripts/test-foundations.mjs",
     "start": "npm run --workspace apps/desktop start"
   },
   "engines": {

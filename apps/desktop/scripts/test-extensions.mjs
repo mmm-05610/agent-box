@@ -23,7 +23,8 @@ const before = await digest(build)
 const home = await mkdtemp(path.join(tmpdir(), 'ordessa-extension-smoke-'))
 const reports = []
 const extensions = path.join(home, 'extensions')
-async function enable(ids) { await writeFile(path.join(home, 'extensions.json'), JSON.stringify({ enabled: ids })) }
+const foundations = ['ordessa.contracts', 'ordessa.commands', 'ordessa.workbench', 'ordessa.settings']
+async function enable(ids) { await writeFile(path.join(home, 'extensions.json'), JSON.stringify({ enabled: ids.length ? [...foundations, ...ids] : [] })) }
 async function install(id, folder = id) { await cp(path.join(root, 'examples/dist', id), path.join(extensions, folder), { recursive: true }) }
 async function check(name, expected, verify = () => {}) {
   const result = await launchSmoke(home)
@@ -36,6 +37,7 @@ async function check(name, expected, verify = () => {}) {
 }
 try {
   await mkdir(extensions)
+  for (const id of foundations) await cp(path.join(root, 'extensions/dist/extensions', id), path.join(extensions, id), { recursive: true })
   await check('empty', [], r => assert.deepEqual(r.errors, []))
   await install('example.hello')
   await check('discovered but not approved', [], r => assert.deepEqual(r.errors, []))
@@ -60,7 +62,7 @@ try {
   })
   assert.equal(await digest(path.join(extensions, 'example.consumer')), consumerDigest)
   await mkdir(path.join(extensions, 'slow'))
-  await writeFile(path.join(extensions, 'slow/manifest.json'), JSON.stringify({ id: 'example.slow', version: '0.1.0', hostApi: '1', entry: 'entry.js' }))
+  await writeFile(path.join(extensions, 'slow/manifest.json'), JSON.stringify({ id: 'example.slow', version: '0.1.0', hostApi: '2', entry: 'entry.js' }))
   await writeFile(path.join(extensions, 'slow/entry.js'), 'export default () => ({id:"example.slow", autoStart:true, activate:() => new Promise(()=>{})})')
   await enable(['example.slow', 'example.hello'])
   await check('pending activation does not block shell or healthy extension', ['Hello'], r => {
@@ -71,7 +73,7 @@ try {
   await enable([])
   await check('disabled after restart', [], r => assert.deepEqual(r.errors, []))
   await mkdir(path.join(extensions, 'broken'))
-  await writeFile(path.join(extensions, 'broken/manifest.json'), JSON.stringify({ id: 'example.broken', version: '0.1.0', hostApi: '1', entry: 'entry.js' }))
+  await writeFile(path.join(extensions, 'broken/manifest.json'), JSON.stringify({ id: 'example.broken', version: '0.1.0', hostApi: '2', entry: 'entry.js' }))
   await writeFile(path.join(extensions, 'broken/entry.js'), 'this is invalid javascript !!')
   await enable(['example.hello', 'example.broken'])
   await check('malformed module does not stop healthy plugin', ['Hello'], r => assert.ok(r.errors.some(e => e.includes('example.broken'))))

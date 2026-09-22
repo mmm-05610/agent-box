@@ -12,7 +12,7 @@ export function parseManifest(value: unknown): Manifest {
   const m = value as Record<string, unknown>
   if (typeof m.id !== 'string' || !ID.test(m.id) || m.id.length > 100) throw Error('Invalid extension id')
   if (typeof m.version !== 'string' || !/^\d+\.\d+\.\d+$/.test(m.version)) throw Error('Invalid version')
-  if (m.hostApi !== '1') throw Error('Incompatible host API (expected 1)')
+  if (m.hostApi !== '2') throw Error('Incompatible host API (expected 2)')
   if (!safeRelative(m.entry) || !m.entry.endsWith('.js')) throw Error('Invalid module entry')
   return { id: m.id, version: m.version, hostApi: m.hostApi, entry: m.entry }
 }

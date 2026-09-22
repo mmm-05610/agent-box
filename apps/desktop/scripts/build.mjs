@@ -3,6 +3,7 @@ import { mkdir } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+await import('../../../extensions/build.mjs')
 await mkdir(path.join(root, 'dist/renderer/shared'), { recursive: true })
 // All shared entrypoints are one splitting build, so React and API have one identity.
 await build({

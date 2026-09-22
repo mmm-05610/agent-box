@@ -14,11 +14,17 @@ export async function confinedFile(root: string, relative: string): Promise<stri
   if (!(await stat(file)).isFile()) throw Error('Expected regular file')
   return file
 }
-export async function discover(dataRoot: string): Promise<Discovery> {
+export async function discover(dataRoot: string, bundledRoot?: string): Promise<Discovery> {
   const catalog: Catalog = { extensions: [], failures: [] }, installed = new Map<string, Installed>()
   let enabled: string[] = []
   try {
-    const config = JSON.parse(await readFile(path.join(dataRoot, 'extensions.json'), 'utf8'))
+    let source: string
+    try { source = await readFile(path.join(dataRoot, 'extensions.json'), 'utf8') }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT' || !bundledRoot) throw error
+      source = await readFile(path.join(bundledRoot, 'extensions.json'), 'utf8')
+    }
+    const config = JSON.parse(source)
     if (!Array.isArray(config.enabled) || !config.enabled.every((id: unknown) => typeof id === 'string' && ID.test(id)) ||
         new Set(config.enabled).size !== config.enabled.length) throw Error('enabled must be a unique id list')
     enabled = config.enabled
@@ -26,23 +32,25 @@ export async function discover(dataRoot: string): Promise<Discovery> {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') catalog.failures.push({ id: 'configuration', error: String(error) })
     return { catalog, installed } // Missing or malformed approval is fail-closed.
   }
-  const extensionRoot = path.join(dataRoot, 'extensions')
   const candidates = new Map<string, Installed[]>()
-  let directories: Dirent[]
-  try { directories = await readdir(extensionRoot, { withFileTypes: true }) }
-  catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') catalog.failures.push({ id: 'discovery', error: String(error) })
-    directories = []
-  }
-  for (const directory of directories.sort((a, b) => a.name.localeCompare(b.name))) {
-    if (!directory.isDirectory()) continue // Reject directory symlinks.
-    try {
-      const root = path.join(extensionRoot, directory.name)
-      const manifest = parseManifest(JSON.parse(await readFile(await confinedFile(root, 'manifest.json'), 'utf8')))
-      const values = candidates.get(manifest.id) ?? []
-      values.push({ root: await realpath(root), manifest })
-      candidates.set(manifest.id, values)
-    } catch (error) { catalog.failures.push({ id: directory.name, error: String(error) }) }
+  for (const origin of [...new Set([dataRoot, ...(bundledRoot ? [bundledRoot] : [])])]) {
+    const extensionRoot = path.join(origin, 'extensions')
+    let directories: Dirent[]
+    try { directories = await readdir(extensionRoot, { withFileTypes: true }) }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') catalog.failures.push({ id: 'discovery', error: String(error) })
+      directories = []
+    }
+    for (const directory of directories.sort((a, b) => a.name.localeCompare(b.name))) {
+      if (!directory.isDirectory()) continue // Reject directory symlinks.
+      try {
+        const root = path.join(extensionRoot, directory.name)
+        const manifest = parseManifest(JSON.parse(await readFile(await confinedFile(root, 'manifest.json'), 'utf8')))
+        const values = candidates.get(manifest.id) ?? []
+        values.push({ root: await realpath(root), manifest })
+        candidates.set(manifest.id, values)
+      } catch (error) { catalog.failures.push({ id: directory.name, error: String(error) }) }
+    }
   }
   for (const id of enabled) {
     const matches = candidates.get(id) ?? []

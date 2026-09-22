@@ -9,7 +9,7 @@ import { loadExtensions } from '@ordessa/extension-loader'
 import { scoped, Token } from '@ordessa/extension-api'
 import { runtime } from '@modular/desktop-host'
 const dirs: string[] = []
-const manifest = { id: 'test.one', version: '0.1.0', hostApi: '1', entry: 'entry.js' }
+const manifest = { id: 'test.one', version: '0.1.0', hostApi: '2', entry: 'entry.js' }
 it('bounds a stalled factory, preserves healthy modules, and ignores late results', async () => {
   let finish!: (value: unknown) => void
   const pending = new Promise(resolve => { finish = resolve })
@@ -33,6 +33,17 @@ async function fixture() {
 async function enable(root: string, enabled = ['test.one']) { await writeFile(path.join(root, 'extensions.json'), JSON.stringify({ enabled })) }
 afterEach(async () => { for (const dir of dirs.splice(0)) await rm(dir, { recursive: true, force: true }) })
 describe('extension discovery and confinement', () => {
+  it('uses bundled defaults only when user approval is absent; malformed or empty override never falls back', async () => {
+    const bundled = await fixture(), user = await fixture()
+    await enable(bundled)
+    // Avoid an identity collision with the bundled fixture.
+    await rm(path.join(user, 'extensions/one'), { recursive: true })
+    expect((await discover(user, bundled)).installed.has('test.one')).toBe(true)
+    await enable(user, [])
+    expect((await discover(user, bundled)).installed.size).toBe(0)
+    await writeFile(path.join(user, 'extensions.json'), 'invalid')
+    expect((await discover(user, bundled)).installed.size).toBe(0)
+  })
   it('does not enable discovered code without explicit approval', async () => {
     const root = await fixture()
     expect((await discover(root)).catalog.extensions).toEqual([])
@@ -52,7 +63,7 @@ describe('extension discovery and confinement', () => {
     expect(() => parseManifest({ ...manifest, entry })).toThrow()
   })
   it('rejects incompatible versions', () => {
-    expect(() => parseManifest({ ...manifest, hostApi: '2' })).toThrow('Incompatible')
+    expect(() => parseManifest({ ...manifest, hostApi: '1' })).toThrow('Incompatible')
   })
   it('rejects duplicate identities without a directory-order winner', async () => {
     const root = await fixture(); await enable(root)
