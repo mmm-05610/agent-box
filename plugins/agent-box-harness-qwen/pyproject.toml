@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61,<77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-box-harness-qwen"
+version = "2.0.0a1"
+description = "Qwen Code Harness integration plugin (P-QWEN-001: second per-Agent package, equal-move only)"
+requires-python = ">=3.10"
+# The host extension API this package's registry import chain reaches through
+# `agent_box_harness.registry`. PyYAML is not declared (this family never
+# renders yaml) and no other dependency joins: the redistribution closure stays
+# exactly as wide as before the split.
+dependencies = ["pacthold==2.0.0a1"]
+
+# NO entry points on purpose (approval P-QWEN-001-release.md): qwen has no
+# production entry point today - the capability-absence register stands, and
+# adding one here would be capability expansion. Discovery keeps going through
+# the legacy `harnesses.toml` declaration (P-C territory, untouched).
+
+[tool.setuptools.packages.find]
+where = ["src"]

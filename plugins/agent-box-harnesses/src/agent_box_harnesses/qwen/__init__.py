@@ -1,41 +1,15 @@
-"""Third-party Qwen Code Harness; runtime ownership remains with composition ports.
+"""Compatibility alias — the implementation moved to `agent_box_harness_qwen` (P-QWEN-001).
 
-Work Order 43. The family currently consists of the production deployment
-template only: the managed sidecar chain composes the pinned artifact's
-`qwen --acp` entry through the generic ACP registration, so no branded
-provider or projection module exists.
+Three-line shims, M1-P-A① alias discipline: submodules are pre-registered in
+`sys.modules` before this package name is replaced, so both names resolve to
+the **same** module objects and no file ever executes twice.
 """
-from .production import (
-    ADAPTER_ARTIFACT_ENTRY,
-    ADAPTER_PACKAGE,
-    ADAPTER_VERSION,
-    ARTIFACT_NAME,
-    ARTIFACT_TARGET,
-    CREDENTIAL_ENVIRONMENT,
-    CREDENTIAL_KIND,
-    HARNESS_HOME,
-    MODEL_CONTROL_ID,
-    NATIVE_MODEL_VALUE,
-    OFFICIAL_BASE_URL,
-    PRODUCT_MODEL_ID,
-    QwenProductionTemplateError,
-    QWEN_PROVIDER,
-    STATE_TARGET,
-    capability_claims,
-    deployment_document,
-    documented_differences,
-    harness_deployment,
-    loopback_environment,
-    model_aliases,
-    native_model,
-    projection_files,
-)
+import sys as _sys
 
-__all__ = [
-    "ADAPTER_ARTIFACT_ENTRY", "ADAPTER_PACKAGE", "ADAPTER_VERSION", "ARTIFACT_NAME",
-    "ARTIFACT_TARGET", "CREDENTIAL_ENVIRONMENT", "CREDENTIAL_KIND", "HARNESS_HOME",
-    "MODEL_CONTROL_ID", "NATIVE_MODEL_VALUE", "OFFICIAL_BASE_URL", "PRODUCT_MODEL_ID",
-    "QwenProductionTemplateError", "QWEN_PROVIDER", "STATE_TARGET", "capability_claims",
-    "deployment_document", "documented_differences", "harness_deployment",
-    "loopback_environment", "model_aliases", "native_model", "projection_files",
-]
+import agent_box_harness_qwen as _implementation
+from agent_box_harness_qwen import native as _native
+from agent_box_harness_qwen import production as _production
+
+_sys.modules[__name__ + ".native"] = _native
+_sys.modules[__name__ + ".production"] = _production
+_sys.modules[__name__] = _implementation

@@ -184,3 +184,52 @@ def test_new_pilot_package_declares_zero_entry_points():
         "P-B red line: adding an entry point here would be capability expansion")
     assert data["project"]["dependencies"] == ["pacthold==2.0.0a1"], (
         "no new dependency: PyYAML stays undeclared (closure width unchanged)")
+
+
+# -- P-QWEN-001 pins (approvals/P-QWEN-001-release.md): identity / zero-EP / no double implementation
+
+def test_legacy_qwen_names_resolve_to_the_very_same_new_package_objects():
+    """Package + both submodules: one module object under both names, nm included."""
+    import agent_box_harness_qwen as new_pkg
+    from agent_box_harness_qwen import native as new_native
+    from agent_box_harness_qwen import production as new_production
+
+    import agent_box_harnesses.qwen as legacy_pkg
+    from agent_box_harnesses.qwen import native as legacy_native
+    from agent_box_harnesses.qwen import production as legacy_production
+
+    assert legacy_pkg is new_pkg
+    assert legacy_production is new_production
+    assert legacy_native is new_native
+    assert nm._FAMILY_DIALECTS["qwen"] is new_native.DIALECTS
+
+
+def test_new_qwen_package_declares_zero_entry_points():
+    """Capability-absence register stands; discovery stays on harnesses.toml (P-C)."""
+    import tomllib
+    from pathlib import Path
+
+    package_root = Path(__file__).resolve().parents[2] / "agent-box-harness-qwen"
+    data = tomllib.loads((package_root / "pyproject.toml").read_text(encoding="utf-8"))
+    assert data["project"]["name"] == "agent-box-harness-qwen"
+    assert "entry-points" not in data["project"], (
+        "P-QWEN-001 red line: adding an entry point would be capability expansion")
+    assert data["project"]["dependencies"] == ["pacthold==2.0.0a1"]
+
+
+def test_no_double_implementation_across_legacy_and_new_qwen():
+    """Legacy files are pure shims; the implementation exists exactly once (new package)."""
+    from pathlib import Path
+
+    plugin_root = Path(__file__).resolve().parents[2]
+    legacy_dir = plugin_root / "agent-box-harnesses" / "src" / "agent_box_harnesses" / "qwen"
+    new_dir = plugin_root / "agent-box-harness-qwen" / "src" / "agent_box_harness_qwen"
+
+    for name in ("__init__.py", "production.py", "native.py"):
+        legacy_src = (legacy_dir / name).read_text(encoding="utf-8")
+        assert "_implementation" in legacy_src and "sys.modules" in legacy_src, name
+        assert "\ndef " not in legacy_src and "\nclass " not in legacy_src, (
+            f"{name}: legacy side grew a real definition - that would be a second implementation")
+    # the real body lives only in the new package
+    assert "def harness_deployment" in (new_dir / "production.py").read_text(encoding="utf-8")
+    assert "DIALECTS" in (new_dir / "native.py").read_text(encoding="utf-8")

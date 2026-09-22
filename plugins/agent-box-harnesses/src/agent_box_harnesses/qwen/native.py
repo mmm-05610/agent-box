@@ -1,14 +1,6 @@
-"""qwen's native-config dialect facts: **nothing is pinned, by rule** (P-A② split).
+"""Compatibility alias — the implementation moved to `agent_box_harness_qwen.native` (P-QWEN-001)."""
+import sys as _sys
 
-qwen is env-only (OPENAI_BASE_URL with no per-protocol native file). Pinned to
-nothing here - every protocol-specific write is refused by the shared engine,
-never guessed. The empty table and the absent target are **explicit family
-rules**, not omissions (before P-A② they lived as ``{}``/absent entries in the
-shared module's literals).
-"""
-from __future__ import annotations
+from agent_box_harness_qwen import native as _implementation
 
-DIALECTS: dict[str, tuple[str, str | None]] = {}
-
-#: No first-hand-pinned native config target path for this family.
-NATIVE_TARGET: str | None = None
+_sys.modules[__name__] = _implementation
