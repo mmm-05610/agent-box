@@ -36,7 +36,7 @@ class _StallThenActive:
         self.records = records
         self.accepted: list[str] = []
 
-    def accept(self, turn_id, *, overrides=None) -> None:
+    def accept(self, turn_id) -> None:
         self.accepted.append(turn_id)
         self.records.set_turn_dispatch(turn_id, work_id="w", execution_id="e",
                                        dispatch_id="d", state="running")
@@ -176,7 +176,7 @@ class _CompletesWithDeltas:
         self.native_id = native_id
         self.completed: list[str] = []
 
-    def accept(self, turn_id, *, overrides=None) -> None:
+    def accept(self, turn_id) -> None:
         self.records.set_turn_dispatch(turn_id, work_id="w", execution_id="e",
                                        dispatch_id="d", state="running")
         for _ in range(self.count):

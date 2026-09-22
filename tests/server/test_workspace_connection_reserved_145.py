@@ -54,7 +54,7 @@ NEIGHBOURS = {
 
 
 class _StubExecution:
-    def accept(self, execution_id, *, overrides=None):
+    def accept(self, execution_id):
         return None
 
     def cancel(self, execution_id):

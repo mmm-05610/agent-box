@@ -54,7 +54,7 @@ PRE_128_NUMBERED = frozenset(set(FRAME_KINDS) - set(NEWLY_NUMBERED))
 class _StubExecution:
     """An execution backend that accepts and never runs: this order is about numbering."""
 
-    def accept(self, execution_id, *, overrides=None):
+    def accept(self, execution_id):
         return None
 
     def cancel(self, execution_id):

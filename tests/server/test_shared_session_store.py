@@ -221,7 +221,7 @@ def test_switch_preflight_same_family_idle_guard(tmp_path):
                              shared_store_guards={"kilo": guard})
 
     class _NoExecution:
-        def accept(self, turn_id, *, overrides=None):
+        def accept(self, turn_id):
             return None
 
         def cancel(self, turn_id):

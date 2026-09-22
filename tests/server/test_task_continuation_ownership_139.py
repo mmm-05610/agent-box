@@ -31,7 +31,7 @@ class _Completing:
     def __init__(self, records) -> None:
         self.records = records
 
-    def accept(self, turn_id, *, overrides=None) -> None:
+    def accept(self, turn_id) -> None:
         self.records.set_turn_dispatch(turn_id, work_id="w", execution_id="e", dispatch_id="d", state="running")
         self.records.append_turn_event(turn_id, "message.delta", {"text": f"summary of {turn_id}"})
         self.records.complete_turn(

@@ -28,7 +28,7 @@ class FakeExecution:
         self.accepted: list[str] = []
         self.fail_code = fail_code
 
-    def accept(self, turn_id: str, *, overrides=None) -> None:
+    def accept(self, turn_id: str) -> None:
         self.accepted.append(turn_id)
         row = self.records.get_turn_context(turn_id)
         session_id = row["session_id"]

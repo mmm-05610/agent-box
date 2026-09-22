@@ -35,7 +35,7 @@ class RecordingExecution:
         self.hold = hold
         self.gate = threading.Event()
 
-    def accept(self, turn_id, *, overrides=None):
+    def accept(self, turn_id):
         with self.lock:
             self.accepted.append(turn_id)
         if self.hold:

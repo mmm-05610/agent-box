@@ -32,7 +32,7 @@ class _FakeExecution:
         self.records = records
         self.accepted: list[str] = []
 
-    def accept(self, turn_id: str, *, overrides=None) -> None:
+    def accept(self, turn_id: str) -> None:
         self.accepted.append(turn_id)
         self.records.set_turn_dispatch(
             turn_id, work_id="w", execution_id="e", dispatch_id="d", state="running")

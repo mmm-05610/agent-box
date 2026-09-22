@@ -79,7 +79,7 @@ class _NeverFinishes(FakeExecution):
         super().__init__(records)
         self.cancelled: list[str] = []
 
-    def accept(self, turn_id: str, *, overrides=None) -> None:
+    def accept(self, turn_id: str) -> None:
         self.accepted.append(turn_id)
         self.records.set_turn_dispatch(turn_id, work_id="w", execution_id="e",
                                        dispatch_id="d", state="running")
@@ -137,7 +137,7 @@ def test_the_summary_is_the_child_s_final_message_bounded_not_its_transcript(tmp
     records = env["records"]
 
     class _LongSummary(FakeExecution):
-        def accept(self, turn_id: str, *, overrides=None) -> None:
+        def accept(self, turn_id: str) -> None:
             self.accepted.append(turn_id)
             records.set_turn_dispatch(turn_id, work_id="w", execution_id="e", dispatch_id="d",
                                       state="running")

@@ -67,7 +67,7 @@ class RecordingExecution:
         if not block:
             self.gate.set()
 
-    def accept(self, execution_id, *, overrides=None):
+    def accept(self, execution_id):
         with self.lock:
             self.accepted.append(execution_id)
         self.gate.wait(5)
