@@ -18,6 +18,9 @@ import { App } from './app'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 const cleanup: (() => void | Promise<void>)[] = []
+// jsdom has no layout/ResizeObserver. Geometry is verified separately in Electron.
+window.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} }
+window.matchMedia = (query: string) => ({ matches: false, media: query, onchange: null, addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {}, dispatchEvent: () => true })
 afterEach(async () => { for (const fn of cleanup.splice(0).reverse()) await fn(); vi.restoreAllMocks() })
 async function mount(element: React.ReactNode) {
   const container = document.createElement('div'); document.body.append(container)
@@ -27,7 +30,7 @@ async function mount(element: React.ReactNode) {
   return container
 }
 async function click(container: HTMLElement, text: string) {
-  const button = [...container.querySelectorAll('button')].find(b => b.textContent === text)
+  const button = [...container.querySelectorAll('button')].find(b => b.getAttribute('aria-label') === text || b.textContent === text)
   expect(button, text).toBeTruthy()
   await act(async () => { button!.focus(); button!.click() })
   return button!
@@ -96,6 +99,27 @@ describe('foundation service boundaries', () => {
 })
 
 describe('workbench UI', () => {
+  it('moves an active component without remounting, and collapse is not close', async () => {
+    const owner = new OwnedResources(), model = createWorkbench(owner), commands = createCommands(owner)
+    function Counter() { const [n, set] = useState(0); return <button onClick={() => set(n + 1)}>move count {n}</button> }
+    const view = { id: 'counter', title: 'Counter', presentation: 'region' as const, region: 'main' as const, component: Counter }
+    const handle = model.service.forScope(owner).addView(view)
+    model.service.open('counter')
+    const container = await mount(<WorkbenchShell model={model} commands={commands} />)
+    await click(container, 'move count 0')
+    await act(async () => model.move('counter', 'right'))
+    expect(container.querySelector('[data-region=right]')?.textContent).toContain('move count 1')
+    expect(container.querySelector('[data-region=main]')?.textContent).not.toContain('move count')
+    await act(async () => model.collapse('right', true))
+    expect(model.getSelection().right).toBe('counter')
+    await act(async () => model.collapse('right', false))
+    expect(container.querySelector('[data-region=right]')?.textContent).toContain('move count 1')
+    await act(async () => model.resetLayout())
+    expect(container.querySelector('[data-region=main]')?.textContent).toContain('move count 1')
+    await act(async () => { handle.dispose(); model.service.forScope(owner).addView(view) })
+    expect(model.regionOf(view)).toBe('main')
+    expect(() => model.move('unknown', 'left')).toThrow('Invalid')
+  })
   it('covers all five regions, preserves background state/focus across full-page, cleans removed pages', async () => {
     const lifetime = new OwnedResources(), fullOwner = new OwnedResources()
     const commands = createCommands(lifetime), model = createWorkbench(lifetime)
@@ -129,7 +153,7 @@ describe('workbench UI', () => {
     model.service.forScope(scope).addUI({ id: 'a', order: 1, kind: 'command', slot: 'toolbar', command: 'also-missing' })
     const container = await mount(<WorkbenchShell model={model} commands={commands} />)
     expect([...container.querySelectorAll('.wb-actions button')].map(b => b.textContent)).toEqual(['also-missing（不可用）', 'missing（不可用）'])
-    expect(container.querySelectorAll('button:disabled')).toHaveLength(2)
+    expect(container.querySelectorAll('.wb-actions button:disabled')).toHaveLength(2)
     await act(async () => model.service.open('bad'))
     expect(container.querySelector('[role=alert]')).not.toBeNull()
     await click(container, '← 返回工作区')

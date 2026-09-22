@@ -12,7 +12,7 @@ export type Region = 'left' | 'right' | 'bottom' | 'main' | 'top'
 interface ViewBase { id: string; title: string; order?: number; component: ComponentType }
 export type View = ViewBase & ({ presentation: 'region'; region: Region } | { presentation: 'full-page' })
 export type UIContribution = { id: string; order?: number } & (
-  { kind: 'command'; slot: 'navigation' | 'toolbar' | 'statusbar'; command: string; label?: string } |
+  { kind: 'command'; slot: 'navigation' | 'toolbar' | 'statusbar'; command: string; label?: string; section?: 'primary' | 'utility'; icon?: ComponentType } |
   { kind: 'component'; slot: 'statusbar'; component: ComponentType }
 )
 export interface Workbench {

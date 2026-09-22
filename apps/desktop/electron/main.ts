@@ -3,6 +3,7 @@ import path from 'node:path'
 import { writeFile } from 'node:fs/promises'
 import { discover } from './extensions'
 import { protocolHandler } from './extension-protocol'
+import { verifyLayout } from './smoke-layout'
 
 app.setName('Ordessa Desktop')
 if (process.env.MODULAR_USER_DATA) app.setPath('userData', process.env.MODULAR_USER_DATA)
@@ -18,6 +19,8 @@ app.whenReady().then(async () => {
     width: 1220, height: 800, minWidth: 760, minHeight: 520, show: !smoke,
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true },
   })
+  win.setMenuBarVisibility(false)
+  win.setAutoHideMenuBar(true)
   ipcMain.handle('extensions:catalog', event => {
     if (event.sender !== win.webContents || event.senderFrame !== win.webContents.mainFrame ||
         event.senderFrame.url !== 'ordessa://desktop/index.html') throw Error('Untrusted catalog caller')
@@ -43,7 +46,7 @@ app.whenReady().then(async () => {
       return {
         ready: document.documentElement.dataset.ready === 'true', pages, views,
         rootMounted: !!document.querySelector('[data-testid="workspace"]'),
-        settingsEntry: [...document.querySelectorAll('nav button')].some(b => b.textContent === '设置'),
+        settingsEntry: [...document.querySelectorAll('nav button')].some(b => b.getAttribute('aria-label') === '设置'),
         emptyHost: !!document.querySelector('[data-testid="empty"]'),
         errors: [...document.querySelectorAll('[role="alert"]')].map(p => p.textContent),
         starting: [...document.querySelectorAll('[role="status"]')].map(p => p.textContent),
@@ -56,7 +59,7 @@ app.whenReady().then(async () => {
         const wait = () => new Promise(r => setTimeout(r, 60));
         const click = async selector => { const el = document.querySelector(selector); if (!el) throw Error('Missing '+selector); el.focus(); el.click(); await wait(); };
         await click('[data-testid="demo-counter"]');
-        const entry = [...document.querySelectorAll('nav button')].find(b => b.textContent === '设置');
+        const entry = [...document.querySelectorAll('nav button')].find(b => b.getAttribute('aria-label') === '设置');
         entry.focus(); entry.click(); await wait();
         const inert = document.querySelector('[data-testid="workspace"]').inert;
         const focusOnReturn = document.activeElement.textContent === '← 返回工作区';
@@ -74,11 +77,12 @@ app.whenReady().then(async () => {
         const focusRestored = document.activeElement === entry;
         return { foundation: { inert, focusOnReturn, saved, externalUpdate, failureVisible, preserved, focusRestored } };
       })()`))
+      if (process.env.MODULAR_LAYOUT_SMOKE === '1') Object.assign(result, { layout: await verifyLayout(win) })
       if (process.env.MODULAR_SCREENSHOT) {
         win.showInactive() // Test-only Xvfb window: force a painted frame before capture.
         await new Promise(resolve => setTimeout(resolve, 150))
         await writeFile(process.env.MODULAR_SCREENSHOT, (await win.webContents.capturePage()).toPNG())
-        await win.webContents.executeJavaScript(`(async()=>{ [...document.querySelectorAll('nav button')].find(b=>b.textContent==='设置').click(); await new Promise(r=>setTimeout(r,100)); })()`)
+        await win.webContents.executeJavaScript(`(async()=>{ [...document.querySelectorAll('nav button')].find(b=>b.getAttribute('aria-label')==='设置').click(); await new Promise(r=>setTimeout(r,100)); })()`)
         await writeFile(process.env.MODULAR_SCREENSHOT + '.settings.png', (await win.webContents.capturePage()).toPNG())
       }
     }

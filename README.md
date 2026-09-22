@@ -22,7 +22,7 @@ extensions/
     entry.tsx                  提供服务并挂载根界面
     model.ts                   注册表、视图打开/关闭状态
     shell.tsx                  五区域、整页、导航/工具/状态插槽
-    styles.ts                  工作台布局样式
+    styles.ts                  紧凑桌面布局、分隔线与拖放提示
   settings/src/
     entry.tsx                  注册命令、整页和导航入口
     model.ts                   设置分组与项目注册表
@@ -108,11 +108,22 @@ export default () => ({
 
 ### 工作台
 
+工作台复用 MIT 许可的 [react-resizable-panels](https://github.com/bvaughn/react-resizable-panels) 4.13.2，作为扩展私有依赖打包，不进入宿主 API。
+左侧窄导航栏、底部工具入口、顶部紧凑工具栏；Electron 默认菜单隐藏（Alt 可显示）。
+
+- 拖动区域之间的分隔线调整宽高；分隔线可通过 Tab 聚焦，再用方向键调整。
+- 顶部布局按钮或区域内“−”收起侧栏/上下方面板，再点顶部按钮展开并恢复原尺寸。
+- 双击分隔线恢复该区域默认比例。
+- 拖动视图标题到左/右/上/下/主区，也可用标题栏“移动…”选择目标；整页视图不参与区域移动。
+- “↺”重置布局，恢复扩展声明的位置和默认尺寸。
+- 折叠、移动和整页覆盖保留组件实例；**关闭视图**仍卸载。切换同一区域活动视图仍按既有规则卸载前一个。
+- 布局仅在本窗口内记忆，不承诺重启持久化；没有注册视图的区域不占空间，展开按钮禁用。
+
 - 区域：`left / right / bottom / main / top`，每区域一个活动视图。
 - 整页：`presentation: 'full-page'`，同时一个；统一返回入口，无页面栈。
 - `open(id)` / `close(id)`：整页期间保留后台工作台组件，隐藏/inert 防止焦点进入；返回恢复焦点。
 - 普通区域关闭或切换会卸载对应视图；需长期保留的数据属于扩展服务。
-- UI 插槽：`navigation / toolbar` 只允许命令；`statusbar` 允许命令或组件。
+- UI 插槽：`navigation / toolbar` 只允许命令；`statusbar` 允许命令或组件。命令贡献可选 `icon`；导航可选 `section: 'utility'` 放到左下角，不在 workbench 写死设置 ID。
 - 缺失命令禁用并显示原因；失败不自动重试。渲染错误按视图/组件隔离。
 - 注册区域视图会出现在该区域切换栏；不会自动生成全局导航入口。
 
@@ -151,9 +162,10 @@ v1 的 pages 接口已移除，v1 manifest 明确拒绝，不伪称兼容。
 - 无关插件并行激活，待完成状态可见；依赖慢服务的消费者仍需等待。
 - 工厂只构造定义，副作用在 activate 中创建并登记清理。
 - 仅可信同进程/同源扩展；不隔离恶意同步死循环或未登记副作用。
-- 未做多实例、拖拽、布局存储、快捷键、热卸载 UI、通知系统、网络/凭据桥。
+- 未做多实例、浮动窗口/跨窗口停靠、布局持久化、快捷键体系、热卸载 UI、通知系统、网络/凭据桥。
 - 页面关闭不取消后台执行。组件隐藏不意味着服务暂停。
 
 ## 依赖
 
-Lumino BSD-3-Clause；React/Electron MIT。保持现有依赖版本，无新增运行时框架。
+Lumino BSD-3-Clause；React/Electron/react-resizable-panels MIT。面板库的许可证随工作台工件一同复制。
+本轮 npm audit 报告原有 Electron/extract-zip、Vitest/mocker 依赖链 4 项告警（2 high / 2 moderate）；面板库未被列入。未自动强制升级，发布前仍需单独处理。

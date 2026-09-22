@@ -8,7 +8,7 @@ export default function createPlugin() {
       const model = createSettings(context.resources), views = workbench.forScope(context.resources)
       views.addView({ id: 'ordessa.settings.page', title: '设置', presentation: 'full-page', component: () => <SettingsPage model={model} /> })
       commands.forScope(context.resources).add({ id: 'ordessa.settings.open', title: '设置', execute: () => workbench.open('ordessa.settings.page') })
-      views.addUI({ id: 'ordessa.settings.entry', kind: 'command', slot: 'navigation', command: 'ordessa.settings.open', order: 1000 })
+      views.addUI({ id: 'ordessa.settings.entry', kind: 'command', slot: 'navigation', command: 'ordessa.settings.open', section: 'utility', icon: () => <span aria-hidden="true">⚙</span>, order: 1000 })
       return model.service
     },
   }

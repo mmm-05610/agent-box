@@ -18,5 +18,6 @@ for (const [id, folder, files] of [
     external: ['react', 'react/*', 'react-dom', 'react-dom/*', '@ordessa/extension-api', '@extensions/*'],
   })
   await writeFile(path.join(target, 'manifest.json'), JSON.stringify({ id, version: '0.1.0', hostApi: '2', entry: 'entry.js' }))
+  if (id === 'ordessa.workbench') await copyFile(path.join(root, 'node_modules/react-resizable-panels/LICENSE.md'), path.join(target, 'react-resizable-panels-LICENSE.md'))
 }
 await copyFile(path.join(root, 'extensions/product.json'), path.join(output, 'extensions.json'))
