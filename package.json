@@ -12,6 +12,7 @@
   "scripts": {
     "test:agent-ui": "node apps/desktop/scripts/test-agent-ui.mjs",
     "test:agent-shell": "node apps/desktop/scripts/test-agent-shell.mjs",
+    "test:agent-process": "node apps/desktop/scripts/test-agent-process.mjs",
     "build:foundations": "node extensions/build.mjs",
     "dev": "npm run --workspace apps/desktop dev",
     "build": "npm run --workspace apps/desktop build",

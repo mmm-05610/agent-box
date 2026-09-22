@@ -104,6 +104,7 @@ app.whenReady().then(async () => {
         return {
           navigation: !!entry,
           codexVisible: !![...document.querySelectorAll('.agent-connections button')].find(button => button.textContent.includes('Codex')),
+          piVisible: !![...document.querySelectorAll('.agent-connections button')].find(button => button.textContent.includes('Pi')),
           emptyConversation: !!document.querySelector('.agent-placeholder')?.textContent.includes('Choose a connection'),
           requestsView: [...document.querySelectorAll('[data-region="right"] [role="group"] button')].some(button => button.textContent === 'Requests'),
         };

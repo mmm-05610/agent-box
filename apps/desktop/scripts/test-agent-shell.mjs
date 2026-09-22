@@ -17,6 +17,6 @@ try {
   assert.ok(result.pages.includes('Conversation'))
   assert.ok(result.pages.includes('Sessions'))
   assert.ok(result.pages.includes('Requests'))
-  assert.deepEqual(result.agentShell, { navigation: true, codexVisible: true, emptyConversation: true, requestsView: true })
+  assert.deepEqual(result.agentShell, { navigation: true, codexVisible: true, piVisible: true, emptyConversation: true, requestsView: true })
   console.log(JSON.stringify({ ready: result.ready, pages: result.pages, agentShell: result.agentShell, nodeAbsent: result.nodeAbsent }))
 } finally { await rm(home, { recursive: true, force: true }) }
