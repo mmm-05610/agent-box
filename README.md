@@ -32,6 +32,16 @@ extensions/
   product.json                 产品默认启用名单
   build.mjs                   单独构建基础扩展及契约工件
 examples/                      独立样例，不默认安装/启用
+packages/agent-ui-contracts/   共享 Agent 语义契约与服务 Token
+packages/foundation-contracts/ 独立 Commands/Workbench/Settings Token 契约
+extensions/
+  agent-connections/           接入登记与连接服务（两适配器注册同一服务）
+  agent-sessions/              连接/会话所有权，独立于挂载视图
+  agent-conversation/          assistant-ui 对话视图（Sessions/Conversation/Requests）
+  agent-interactions/          待处理交互视图
+  agent-codex/                 Codex 0.155.1 App Server 适配器
+  agent-pi/                    Pi 0.86.1 RPC 适配器（每会话一个 RPC 进程）
+  agent-preview.json           双 Agent 预览启用名单（显式选择，不是产品默认）
 ```
 
 `foundation-contracts` 构建为 `ordessa.contracts` 扩展工件，消费者统一导入
@@ -49,9 +59,11 @@ npm start                      # 仅启动，不重建
 npm run dev                    # 构建并启动
 npm run build:foundations      # 只构建基础扩展，不重建宿主
 npm run build:examples         # 只构建样例
+node apps/desktop/scripts/test-agent-process.mjs   # 隔离真实 CLI 进程，无模型调用
 xvfb-run -a npm run test:electron
 xvfb-run -a npm run test:extensions
 xvfb-run -a npm run test:foundations
+xvfb-run -a npm run test:agent-shell
 ```
 
 默认显示空工作台与“设置”入口，设置页默认没有业务设置。
@@ -136,6 +148,48 @@ export default () => ({
 外部通知刷新值（也会替换未保存草稿）；第一版不做草稿冲突合并，复杂编辑可用 custom。
 分组尚未注册的项目保留在注册表并显示诊断，不随加载顺序丢弃。
 settings 不保存配置，不接触凭据，也不替业务提供者决定数据根。
+
+## Agent 接入（Codex 与 Pi，同一套 UI）
+
+两个适配器注册到同一个 scoped 连接服务，同一界面内切换连接，不改 UI 代码，不依赖 Ordessa 后端。
+`extensions/agent-preview.json` 是显式预览名单，包含两个适配器；产品默认名单 `product.json` 不含它们。
+
+启用预览（不会改写已有配置，`extensions.json` 是完整覆盖）：
+
+```sh
+mkdir -p .local-desktop && cp extensions/agent-preview.json .local-desktop/extensions.json
+npm run dev
+```
+
+两个适配器的原生传输都要求设置绝对工作区路径（子进程的 cwd，也是会话归属目录）：
+
+```sh
+ORDESSA_AGENT_CWD=$HOME/projects/some-workspace npm run dev
+```
+
+### 接入 Codex（0.155.1）
+
+1. 本机安装 `codex` CLI 0.155.1 并在 PATH 上（`codex --version` 核对）。
+2. 启动后进入 Agents → Conversation，选择 Codex 连接。
+   适配器以 stdio 启动 `codex app-server --stdio`，使用你本机 Codex 的默认 `CODEX_HOME` 状态。
+3. 会话历史来自服务端 `thread/list`/`thread/resume`；停止走 `turn/interrupt`，终态以 `turn/completed` 为准。
+
+### 接入 Pi（@earendil-works/pi-coding-agent 0.86.1）
+
+1. 无需单独安装 CLI：适配器通过仓库固定依赖 0.86.1 的官方 RPC 客户端派生 `node cli.js --mode rpc` 子进程。
+2. 选择 Pi 连接后，每个打开的会话各持一个独立 RPC 进程，并行会话互不取消
+   （该安装版本的 `switch_session` 会中止活动会话，因此不复用单进程切换）。
+3. 历史来自官方 `SessionManager.list`（默认在 `~/.pi/agent`，可用 `PI_CODING_AGENT_DIR` 覆盖）；
+   注意 Pi 只有在出现首条 assistant 消息后才落盘会话文件，空会话不出现在历史里。
+4. 停止走 `abort`（等待空闲才返回），终态以 `agent_settled` 为准。
+
+### 边界与未验证项
+
+- 语义区分：切换会话≠取消；停止请求≠停止确认；断连后运行结果为 unknown，不伪造成功/失败。
+- Pi 扩展 UI 对话（select/confirm/input/editor）按交互请求呈现，与工具审批语义分开；响应一次性绑定会话与请求 ID。
+- 真实模型对话（两轮、流式、工具、审批的真实模型链路）未在本任务验证，需要另行授权后才进行；
+  已验证范围见 `control/reports/FE-AGENT-001/verification.md`。
+- 原生桥只开放 open/send/close/事件订阅，传输实现限定在适配器的 `native.js`，由清单校验后加载。
 
 ## 安装示例（可选，不是产品默认内容）
 
