@@ -114,6 +114,7 @@ CREATE TABLE IF NOT EXISTS server_turns (
     execution_id TEXT,
     dispatch_id TEXT,
     execution_key TEXT,
+    captured_profile_revision INTEGER,
     result_object_digest TEXT,
     error_code TEXT,
     change_set_object_digest TEXT,
@@ -333,16 +334,23 @@ def _migrate_18_to_19(conn: sqlite3.Connection) -> None:
 
 
 def _migrate_20_to_21(conn: sqlite3.Connection) -> None:
-    """a-3 K1.1: every Turn row carries its own idempotent Core-filing key.
+    """a-3 K1.1+K1.2: two turn columns, two separate semantics, one window.
 
-    `execution_key` is minted by the Session side at acceptance (derived from
-    the turn id: idempotent, debuggable, no secret content) and later consumed
-    by the post-commit filing step as the Work Core idempotency key. Existing
-    rows keep NULL - a turn filed before this build has no Session-side key,
-    which is the honest absence (raw NULL per the s-c1 read discipline), not
-    a fabricated one. Pure DDL add: zero backfill, zero rewrites.
+    `execution_key` (K1.1) is minted by the Session side at acceptance
+    (turn-id derived: idempotent, debuggable, no secret content) and consumed
+    by the post-commit filing step as the Work Core idempotency key.
+    `captured_profile_revision` (K1.2, ruling t39=甲) records the revision the
+    c-1B delegation anchor was enforced against - its only writer is that
+    anchored INSERT (E leg), so Session-side rows keep NULL: never written,
+    honest absence. Both are pure DDL adds: zero backfill, zero rewrites;
+    pre-existing rows expose raw NULL per the s-c1 discipline and object-plane
+    shape (b), same wording precedent as pause_reason@18->19. The existing
+    `profile_revision` column's semantics are untouched (micro-ruling alpha).
     """
-    _add_columns(conn, "server_turns", {"execution_key": "TEXT"})
+    _add_columns(conn, "server_turns", {
+        "execution_key": "TEXT",
+        "captured_profile_revision": "INTEGER",
+    })
 
 
 def _migrate_19_to_20(conn: sqlite3.Connection) -> None:
