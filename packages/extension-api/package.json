@@ -1,5 +1,5 @@
 {
-  "name": "@modular/desktop-host",
+  "name": "@ordessa/extension-api",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -8,7 +8,8 @@
   },
   "dependencies": {
     "@lumino/coreutils": "2.2.3",
-    "@ordessa/extension-api": "0.1.0"
+    "@lumino/disposable": "2.1.6",
+    "@lumino/signaling": "2.1.6"
   },
   "peerDependencies": {
     "react": "^19.0.0"

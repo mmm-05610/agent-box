@@ -9,12 +9,15 @@
     "build": "node scripts/build.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --maxWorkers=1",
-    "test:electron": "node scripts/smoke-electron.mjs"
+    "test:electron": "node scripts/smoke-electron.mjs",
+    "start": "node scripts/run-dev.mjs"
   },
   "dependencies": {
     "@modular/desktop-host": "0.1.0",
     "react": "19.2.7",
-    "react-dom": "19.2.7"
+    "react-dom": "19.2.7",
+    "@ordessa/extension-api": "0.1.0",
+    "@ordessa/extension-loader": "0.1.0"
   },
   "devDependencies": {
     "@types/node": "22.20.1",

@@ -5,14 +5,19 @@
   "type": "module",
   "workspaces": [
     "apps/desktop",
-    "packages/desktop-host"
+    "packages/desktop-host",
+    "packages/extension-api",
+    "packages/extension-loader"
   ],
   "scripts": {
     "dev": "npm run --workspace apps/desktop dev",
     "build": "npm run --workspace apps/desktop build",
     "typecheck": "npm run --workspace apps/desktop typecheck",
     "test": "npm run --workspace apps/desktop test",
-    "test:electron": "npm run --workspace apps/desktop test:electron"
+    "test:electron": "npm run --workspace apps/desktop test:electron",
+    "build:examples": "node examples/build.mjs",
+    "test:extensions": "node apps/desktop/scripts/test-extensions.mjs",
+    "start": "npm run --workspace apps/desktop start"
   },
   "engines": {
     "node": ">=22.22.0"

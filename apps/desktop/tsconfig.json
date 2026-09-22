@@ -18,6 +18,6 @@
   "include": [
     "src",
     "electron",
-    "../../packages/desktop-host/src"
+    "../../packages/*/src"
   ]
 }

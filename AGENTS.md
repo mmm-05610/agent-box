@@ -1,8 +1,10 @@
 # Minimal Ordessa Desktop
 
 This is the clean Lumino desktop skeleton, not the historical Hermes client.
-Only apps/desktop and packages/desktop-host are active product packages.
-The static extension manifest is empty. Do not import or copy legacy business code unless requested.
+The product packages are apps/desktop, desktop-host, extension-api and extension-loader.
+Business extensions are discovered from a configured local directory and explicitly enabled.
+Examples are independent build inputs, not host imports or application dependencies.
+Do not import or copy legacy business code unless requested.
 Keep the host domain-neutral. Lumino owns plugin dependency resolution and lifecycle.
 Use explicit package exports; do not add a second plugin scheduler or expose its raw registry.
 No credentials, real backend requests, pushes, or publishing main changes.

@@ -1,3 +1,5 @@
-import type { Plugin } from '@modular/desktop-host'
-// Static product composition; business extensions migrate explicitly later.
-export const extensions: Plugin<any>[] = []
+import { loadExtensions, type Catalog } from '@ordessa/extension-loader'
+declare global { interface Window { extensionCatalog: { read(): Promise<Catalog> } } }
+export async function installedExtensions() {
+  return loadExtensions(await window.extensionCatalog.read())
+}

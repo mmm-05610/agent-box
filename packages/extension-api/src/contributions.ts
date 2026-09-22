@@ -1,7 +1,7 @@
 import { DisposableDelegate, type IDisposable } from '@lumino/disposable';
 import { Signal } from '@lumino/signaling';
 
-/** Product UI registrations only. Plugin dependency/lifecycle logic lives in Lumino. */
+/** Shared contribution primitive; plugin lifecycle is owned by Lumino. */
 export class Contributions<T extends { id: string }> implements IDisposable {
   private values = new Map<string, T>();
   private snapshot: readonly T[] = [];

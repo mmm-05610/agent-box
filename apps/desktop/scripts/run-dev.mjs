@@ -6,7 +6,12 @@ import { fileURLToPath } from 'node:url'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const userData = await mkdtemp(path.join(tmpdir(), 'modular-dev-'))
 const electron = path.resolve(root, '../../node_modules/electron/dist/electron')
-const child = spawn(electron, ['.'], { cwd: root, env: { ...process.env, MODULAR_USER_DATA: userData }, stdio: 'inherit' })
+const child = spawn(electron, ['.'], {
+  cwd: root,
+  env: { ...process.env, MODULAR_USER_DATA: userData,
+    ORDESSA_EXTENSION_HOME: process.env.ORDESSA_EXTENSION_HOME ?? path.resolve(root, '../../.local-desktop') },
+  stdio: 'inherit',
+})
 process.on('SIGINT', () => child.kill('SIGINT'))
 process.on('SIGTERM', () => child.kill('SIGTERM'))
 try {

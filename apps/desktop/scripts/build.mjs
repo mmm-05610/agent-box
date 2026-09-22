@@ -1,9 +1,24 @@
 import { build } from 'esbuild'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-await mkdir(path.join(root, 'dist/renderer'), { recursive: true })
-await build({ entryPoints: [path.join(root, 'src/main.tsx')], outfile: path.join(root, 'dist/renderer/main.js'), bundle: true, platform: 'browser', format: 'esm', target: 'chrome132', jsx: 'automatic', loader: { '.css': 'css' } })
-await writeFile(path.join(root, 'dist/renderer/index.html'), '<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="./main.css"><title>Ordessa Desktop</title></head><body><div id="root"></div><script type="module" src="./main.js"></script></body></html>')
-await build({ entryPoints: [path.join(root, 'electron/main.ts')], outfile: path.join(root, 'dist/electron-main.cjs'), bundle: true, platform: 'node', format: 'cjs', target: 'node22', external: ['electron'] })
+await mkdir(path.join(root, 'dist/renderer/shared'), { recursive: true })
+// All shared entrypoints are one splitting build, so React and API have one identity.
+await build({
+  entryPoints: Object.fromEntries(['react', 'jsx-runtime', 'react-dom', 'react-dom-client', 'api'].map(name => [name, path.join(root, 'src/shared/' + name + '.ts')])),
+  outdir: path.join(root, 'dist/renderer/shared'), bundle: true, splitting: true,
+  platform: 'browser', format: 'esm', target: 'chrome132',
+  define: { 'process.env.NODE_ENV': '"production"' },
+})
+await build({
+  entryPoints: [path.join(root, 'src/main.tsx')], outfile: path.join(root, 'dist/renderer/main.js'),
+  bundle: true, platform: 'browser', format: 'esm', target: 'chrome132', jsx: 'automatic',
+  external: ['react', 'react/*', 'react-dom', 'react-dom/*', '@ordessa/extension-api'],
+  loader: { '.css': 'css' },
+})
+for (const name of ['main', 'preload']) await build({
+  entryPoints: [path.join(root, 'electron/' + name + '.ts')],
+  outfile: path.join(root, 'dist', name === 'main' ? 'electron-main.cjs' : 'preload.cjs'),
+  bundle: true, platform: 'node', format: 'cjs', target: 'node22', external: ['electron'],
+})

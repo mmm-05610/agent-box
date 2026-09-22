@@ -1,16 +1,13 @@
 {
-  "name": "@modular/desktop-host",
+  "name": "@ordessa/extension-loader",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./manifest": "./src/manifest.ts"
   },
   "dependencies": {
-    "@lumino/coreutils": "2.2.3",
     "@ordessa/extension-api": "0.1.0"
-  },
-  "peerDependencies": {
-    "react": "^19.0.0"
   }
 }
