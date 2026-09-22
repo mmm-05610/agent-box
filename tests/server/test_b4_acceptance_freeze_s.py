@@ -6,6 +6,9 @@
 `test_block3_freeze_gap_characterization_s.py` 的 T2——同一断言面由「表征现状 bug」收紧为
 「断言修复后行为」，方向=收紧、非弱化；T1（队列对照）语义不变更。
 INC1c s-c1 再翻转：F5 由「COALESCE 回退保留」翻为「历史 NULL 行暴露原始 NULL」（同方向=收紧）。
+a-3 K3' 记账（显式，非静默）：受理冻结件在原有形状上**加性**携带 `permissions` 节
+（受理时一次算定的 posture），F1/F4 的期望 digest 随之重算=收紧面扩大（digest 值变、
+不透明引用语义不变、公开 wire 零动）；profile 活值列与此节无涉（:133 保持裸 CONFIG）。
 
 - F1 冻结非活行：受理后编辑 Profile，`get_turn_context` 原始键
   `effective_config_object_digest` 恒=受理时冻结件（修前红=直建行该列 NULL）。
@@ -29,6 +32,7 @@ from agent_box.server.execution import HarnessDescriptor, HarnessRegistry
 from agent_box.server.idempotency import IdempotentRecords
 from agent_box.server.persistence import ProductRepositoryView
 from agent_box.server.profiles import ProfileRecords
+from agent_box.server.profiles.permissions import resolve_all
 from agent_box.server.sessions import SessionRecords, SessionService
 from agent_box.storage import Database, ObjectStore
 from agent_box.server.workspaces import WorkspaceRecords
@@ -50,6 +54,16 @@ class RecordingPort:
 def canonical(value: dict) -> bytes:
     return json.dumps(value, ensure_ascii=False, sort_keys=True,
                       separators=(",", ":")).encode()
+
+
+#: a-3 K3': the acceptance freeze now carries the once-resolved posture section
+#: (fixture profiles are created without permission edits -> default preset,
+#: empty rules), so the effective digest recomputation must mirror it exactly.
+DEFAULT_POSTURE = resolve_all([], preset="default")
+
+
+def frozen_effective(config: dict) -> bytes:
+    return canonical({**config, "permissions": DEFAULT_POSTURE})
 
 
 def alpha_registry() -> HarnessRegistry:
@@ -105,7 +119,7 @@ def accept_one_turn(tmp_path, *, publish_calls=None):
         objects.publish = counting
     _, turn = sessions.create_turn(session["session_id"], "turn-key",
                                    {"text": "hi", "expected_profile_revision": 1})
-    frozen = objects.publish(canonical(CONFIG_BEFORE)).digest
+    frozen = objects.publish(frozen_effective(CONFIG_BEFORE)).digest
     return {"port": port, "profiles": profiles, "sessions": sessions,
             "records": records, "objects": objects, "pid": profile["profile_id"],
             "sid": session["session_id"], "turn_id": turn["turn_id"], "frozen": frozen}
@@ -129,7 +143,8 @@ def test_f1_f2_direct_turn_freezes_effective_config_against_later_edit(tmp_path)
     ctx = h["records"].get_turn_context(h["turn_id"])
     assert ctx["effective_config_object_digest"] == h["frozen"], (
         "受理后编辑不得改变已冻结的 effective 引用")
-    assert json.loads(h["objects"].read(ctx["effective_config_object_digest"])) == CONFIG_BEFORE
+    assert json.loads(h["objects"].read(ctx["effective_config_object_digest"])) == {
+        **CONFIG_BEFORE, "permissions": DEFAULT_POSTURE}
     assert ctx["config_object_digest"] == h["frozen"], (
         "COALESCE 在冻结非空行上取 t.effective_*，与 p.config_object_digest 活值脱钩")
 
@@ -199,7 +214,8 @@ def test_f4_n1_forced_interleave_edit_between_freeze_and_tx_is_409(tmp_path):
     _, turn = sessions.create_turn(sid, "turn-key-2",
                                    {"text": "hi", "expected_profile_revision": revision})
     ctx = records.get_turn_context(turn["turn_id"])
-    assert ctx["effective_config_object_digest"] == objects.publish(canonical(CONFIG_AFTER)).digest
+    assert ctx["effective_config_object_digest"] == objects.publish(
+        frozen_effective(CONFIG_AFTER)).digest
 
 
 def test_f5_legacy_null_row_exposes_raw_null_after_s_c1(tmp_path):

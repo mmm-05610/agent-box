@@ -7,6 +7,7 @@ from typing import Any, Mapping
 
 from agent_box.server.errors import ServerError, unavailable
 from agent_box.server.execution import CancelOutcome, HarnessRegistry, TurnExecutionPort
+from agent_box.server.profiles.permissions import resolve_all
 from agent_box.server.records import digest, reject_sensitive_keys
 from agent_box.server.sessions.repository import SessionRecords
 
@@ -73,6 +74,18 @@ class SessionService:
         }
         if execution is not None:
             value["execution"] = dict(execution)
+        # a-3 K3' (S freeze side): the Profile's posture is resolved once at
+        # acceptance and frozen into the Turn's effective object, so a delegated
+        # child can narrow from this frozen fact instead of re-deriving it from
+        # the live Profile row (the last "version frozen != content frozen"
+        # second-producer path). Purely additive: nothing on the Server side
+        # reads this object's content today, and older turns' objects keep
+        # whatever shape they were published with - history is never rewritten.
+        raw_rules = profile.get("permission_rules_json")
+        value["permissions"] = resolve_all(
+            json.loads(raw_rules) if raw_rules else [],
+            preset=str(profile.get("permission_preset") or "default"),
+        )
         record = self.objects.publish(json.dumps(
             value, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
         ).encode())
