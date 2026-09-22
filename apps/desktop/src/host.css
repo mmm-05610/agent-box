@@ -1,0 +1,11 @@
+:root { font-family: system-ui, sans-serif; color: #263247; background: #f5f6f8; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+.desktop-host { display: grid; grid-template-columns: 200px minmax(0, 1fr); min-height: 100vh; }
+.desktop-host aside { padding: 24px 16px; border-right: 1px solid #dce1e8; }
+.desktop-host small { font-weight: normal; }
+.desktop-host nav { display: grid; gap: 8px; margin-top: 28px; }
+.desktop-host header { display: flex; justify-content: space-between; padding: 20px 28px; border-bottom: 1px solid #dce1e8; }
+.desktop-host section { padding: 64px 32px; }
+.desktop-host p { color: #59667b; }
+.desktop-host button { font: inherit; padding: 8px 12px; cursor: pointer; }

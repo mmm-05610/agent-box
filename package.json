@@ -1,0 +1,20 @@
+{
+  "name": "ordessa-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/desktop",
+    "packages/desktop-host"
+  ],
+  "scripts": {
+    "dev": "npm run --workspace apps/desktop dev",
+    "build": "npm run --workspace apps/desktop build",
+    "typecheck": "npm run --workspace apps/desktop typecheck",
+    "test": "npm run --workspace apps/desktop test",
+    "test:electron": "npm run --workspace apps/desktop test:electron"
+  },
+  "engines": {
+    "node": ">=22.22.0"
+  }
+}
