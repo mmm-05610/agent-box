@@ -412,6 +412,7 @@ def test_restart_seals_unfinished_turn_as_unknown_without_redispatch(tmp_path):
         first.repository.create_turn(
             session_id=session["session_id"], key="t", request_digest="t",
             input_object_digest=prompt.digest, expected_profile_revision=1,
+            effective_config_object_digest=config.digest,
         )
     finally:
         first.stop()

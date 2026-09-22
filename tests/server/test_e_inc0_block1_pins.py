@@ -192,17 +192,34 @@ def test_sidecar_backend_contains_no_business_ledger_read():
     assert ".database.read" not in src
 
 
+# E-INC1b b-4 leg split (词面零弱化, per-path approved): the joint pin was a
+# strict xfail over BOTH modules; b-4 removes the sidecar_backend violation for
+# good, so that leg is promoted to a permanent green lock here. The delegation
+# leg stays strict-xfail below - promoting it early would misstate the whole
+# invariant as green while its second write point (`_create_child_turn` bare
+# INSERT + `_merged_posture` live assembly) is still adjudicated to INC1c.
+
+def test_sidecar_backend_does_not_import_product_domain_privates():
+    src = inspect.getsource(sb)
+    assert "agent_box.server.profiles" not in src, (
+        "sidecar_backend reaches into the product configuration domain; "
+        "posture must arrive as frozen input (S-2 / C-EXEC@v1 later blocks)")
+
+
 @pytest.mark.xfail(strict=True,
-                   reason="U3/S-2, by design of the staged handoff: sidecar_backend "
-                          "imports product-domain permissions directly; the frozen-input "
-                          "handoff lands in E-INC1c, and this strict xfail is the drift lock")
-def test_execution_package_does_not_import_product_domain_privates():
+                   reason="E-INC1c候批 by design of the staged handoff (C-registered "
+                          "scope): delegation's second "
+                          "turn-row write point (`_create_child_turn` bare INSERT, "
+                          "no frozen digest) and `_merged_posture` live assembly "
+                          "are the remaining drift face; the sidecar_backend leg "
+                          "went green at E-INC1b b-4 and this split pin must not "
+                          "be read as the package-wide invariant being green")
+def test_delegation_does_not_import_product_domain_privates_yet():
     import agent_box.server.execution.delegation as delegation
-    for module in (sb, delegation):
-        src = inspect.getsource(module)
-        assert "agent_box.server.profiles" not in src, (
-            f"{module.__name__} reaches into the product configuration domain; "
-            "posture must arrive as frozen input (S-2 / C-EXEC@v1 later blocks)")
+    src = inspect.getsource(delegation)
+    assert "agent_box.server.profiles" not in src, (
+        f"{delegation.__name__} reaches into the product configuration domain; "
+        "posture must arrive as frozen input (S-2 / C-EXEC@v1 later blocks)")
 
 
 # --------------------------------------------------------------------------

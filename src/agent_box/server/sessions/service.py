@@ -156,17 +156,33 @@ class SessionService:
             return prior
         overrides = self._validated_overrides(session_id, body)
         self._assert_session_harness(session_id)
+        # b-4/O-B3-1: freeze the effective configuration at acceptance with the
+        # same helper pair the intent path uses; the Turn row carries the digest.
+        _session, profile = self._session_profile(session_id)
+        if int(profile["config_revision"]) != int(body["expected_profile_revision"]):
+            raise ServerError(
+                "PROFILE_REVISION_CONFLICT",
+                "Profile revision changed before Turn creation",
+                status=409,
+            )
+        effective, execution = self._effective_configuration(
+            profile["id"], overrides or [],
+        )
+        frozen_digest = self._publish_effective_configuration(
+            profile["id"], effective, execution,
+        )
         claimed, status, result = self.records.create_turn(
             session_id=session_id, key=key, request_digest=request_digest,
             input_object_digest=self._publish_input(body),
             expected_profile_revision=body["expected_profile_revision"],
+            effective_config_object_digest=frozen_digest,
         )
         self.on_event()
         if claimed:
             # Exactly the acceptance owner dispatches; a concurrent replay
             # observes the committed receipt and must not dispatch again.
             try:
-                self.execution.accept(result["turn_id"], overrides=overrides)
+                self.execution.accept(result["turn_id"])
             except Exception:
                 # Dispatch/capture failures are durable Turn events recorded
                 # by the execution port. The accepted HTTP receipt stays the

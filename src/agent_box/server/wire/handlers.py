@@ -2351,7 +2351,11 @@ class WireService:
 
     def _dispatch(self, execution_id: str, overrides: list[dict[str, Any]]) -> None:
         try:
-            self.execution.accept(execution_id, overrides=self._override_mapping(overrides))
+            # b-4 joint signature: the effective configuration is frozen at
+            # acceptance, so dispatch no longer carries overrides (E accepts
+            # and ignores the legacy parameter; dead-param cleanup is a
+            # later micro-batch).
+            self.execution.accept(execution_id)
         except Exception:
             # Dispatch failures are durable execution facts recorded by the
             # execution port; acceptance itself stays a valid receipt.

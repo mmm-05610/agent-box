@@ -245,33 +245,15 @@ class SidecarExecutionBackend:
         self.queue = queue
 
     def accept(self, turn_id: str, *, overrides: Mapping[str, Any] | None = None) -> None:
+        # E-INC1b b-4: the effective configuration is frozen at turn-creation
+        # time by the Session side and consumed here as the turn row's raw key
+        # (never the COALESCE'd live-row fallback). `overrides` is deliberately
+        # unused pending the S⊗E joint signature note on retiring it; the
+        # Protocol signature itself is unchanged.
         context = self.records.get_turn_context(turn_id)
         stored = json.loads(self.objects.read(context["input_object_digest"]))
         message = stored.get("message") or stored
-        profile_value = json.loads(self.objects.read(context["config_object_digest"]))
-        configuration = dict(profile_value.get("configuration") or {})
-        configuration.update(dict(overrides or {}))
-        effective_value = {
-            "schema_version": 1, "harness_type": context["harness_type"],
-            "configuration": configuration,
-        }
-        # Order 60 A/B: the profile's permission posture is part of what this
-        # turn freezes - the next turn picks up an edited rule set.
-        rules_json = context.get("permission_rules_json")
-        preset = context.get("permission_preset")
-        if rules_json or preset:
-            import json as _json
-
-            from agent_box.server.profiles.permissions import resolve_all
-
-            rules = _json.loads(rules_json) if rules_json else []
-            effective_value["permissions"] = resolve_all(
-                rules, preset=preset or "default")
-        if profile_value.get("execution") is not None:
-            effective_value["execution"] = profile_value["execution"]
-        effective = self.objects.publish(json.dumps(
-            effective_value, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
-        ).encode())
+        effective_digest = context["effective_config_object_digest"]
         work = self.work_service.create_work(
             "AgentBox Session Turn", metadata={"session_id": context["session_id"], "turn_id": turn_id},
         )
@@ -292,7 +274,7 @@ class SidecarExecutionBackend:
             (AgentBoxProfileV1.contract_id, self.resources.bind(
                 AgentBoxProfileV1.contract_id, f"profile-{turn_id}",
                 AgentBoxProfileV1(
-                    context["profile_id"], context["harness_type"], effective.digest,
+                    context["profile_id"], context["harness_type"], effective_digest,
                     int(context["profile_revision"]),
                 ),
             )),

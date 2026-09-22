@@ -569,6 +569,7 @@ class SessionRecords:
     def create_turn(
         self, *, session_id: str, key: str, request_digest: str,
         input_object_digest: str, expected_profile_revision: int,
+        effective_config_object_digest: str,
     ) -> tuple[bool, int, dict[str, Any]]:
         """Accept one business intent.
 
@@ -608,10 +609,11 @@ class SessionRecords:
             self._refuse_exclusive_home_concurrency(conn, profile)
             try:
                 conn.execute(
-                    "INSERT INTO server_turns(id,session_id,profile_id,profile_revision,native_generation,state,capture_state,cleanup_state,input_object_digest,created_at,updated_at) "
-                    "VALUES (?,?,?,?,?,'accepted','pending','pending',?,?,?)",
+                    "INSERT INTO server_turns(id,session_id,profile_id,profile_revision,native_generation,state,capture_state,cleanup_state,input_object_digest,effective_config_object_digest,created_at,updated_at) "
+                    "VALUES (?,?,?,?,?,'accepted','pending','pending',?,?,?,?)",
                     (turn_id, session_id, session["profile_id"], expected_profile_revision,
-                     int(profile["native_generation"]), input_object_digest, timestamp, timestamp),
+                     int(profile["native_generation"]), input_object_digest,
+                     effective_config_object_digest, timestamp, timestamp),
                 )
             except Exception as exc:
                 if "UNIQUE constraint failed" in str(exc):
