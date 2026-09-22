@@ -252,3 +252,18 @@ def test_p6b_successor_hook_dormant_without_filer(tmp_path):
     successor = _complete(h, turn1, _enqueue_next(h))["next_execution_id"]
     filing = h["records"].get_turn_filing(successor)
     assert filing["work_id"] is None and filing["dispatch_id"] is None
+
+
+def test_p10_runtime_composes_filer_only_for_the_real_sidecar_port(tmp_path):
+    """a-3 门控回归钉（C 解锁 06:30Z）：假端口栈＝建档缝恒休眠（批前原形），
+    生产真组合路径由 P8 证——两向夹住 isinstance 门，禁再无条件组合。"""
+    from agent_box.server.bootstrap import build_runtime
+
+    from test_a3_k2_filing_s import alpha_registry
+    runtime = build_runtime(tmp_path / "root", harnesses=alpha_registry(),
+                            execution=RecordingPort())
+    session_service = runtime.service.sessions
+    assert session_service.core_filer is None, (
+        "stand-in port must NOT compose the filer (wire-fixture dormancy)")
+    assert session_service.records.core_filer is None, (
+        "the records seam stays dormant with a stand-in port")

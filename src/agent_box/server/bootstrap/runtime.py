@@ -26,6 +26,7 @@ from agent_box.server.approvals import ApprovalRecords
 from agent_box.server.credentials import CredentialRecords
 from agent_box.server.events import EventNotifier
 from agent_box.server.execution import HarnessRegistry, TurnExecutionPort
+from agent_box.server.execution.sidecar_backend import SidecarExecutionBackend as _SidecarBackendCls
 from agent_box.extensions.runtime_composition.sandbox_port import resolve_sandbox_port
 from agent_box.server.idempotency import IdempotentRecords
 from agent_box.server.model_configs import ProviderModelRecords, ProviderModelService
@@ -414,7 +415,14 @@ def build_runtime(
                                      credentials=credentials, queue=queue_records,
                                      execution=execution, on_event=notifier.notify,
                                      secret_store=secrets_store,
-                                     core_filer=(_core_filer(execution) if execution is not None else None))
+                                     # a-3 gate fix (C unlock 06:30Z, t52-verified): the filer is
+                                     # composed only when the port is the real sidecar backend -
+                                     # test stacks injecting stand-in ports keep the filing seam
+                                     # dormant exactly as before the flip; production build always
+                                     # composes (the "production must compose" pin stands).
+                                     core_filer=(_core_filer(execution)
+                                                 if isinstance(execution, _SidecarBackendCls)
+                                                 else None))
     session_service.bind_model_configs(provider_model_service)
     service = ProductService(
         workspace_service, profile_service, session_service,
