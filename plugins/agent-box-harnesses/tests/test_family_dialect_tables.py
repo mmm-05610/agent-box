@@ -233,3 +233,52 @@ def test_no_double_implementation_across_legacy_and_new_qwen():
     # the real body lives only in the new package
     assert "def harness_deployment" in (new_dir / "production.py").read_text(encoding="utf-8")
     assert "DIALECTS" in (new_dir / "native.py").read_text(encoding="utf-8")
+
+
+# -- H-KILO-001 pins (approvals/H-KILO-001-release.md): identity / zero-EP / no double implementation
+
+def test_legacy_kilo_names_resolve_to_the_very_same_new_package_objects():
+    """Package + both submodules: one module object under both names, nm included."""
+    import agent_box_harness_kilo as new_pkg
+    from agent_box_harness_kilo import native as new_native
+    from agent_box_harness_kilo import production as new_production
+
+    import agent_box_harnesses.kilo as legacy_pkg
+    from agent_box_harnesses.kilo import native as legacy_native
+    from agent_box_harnesses.kilo import production as legacy_production
+
+    assert legacy_pkg is new_pkg
+    assert legacy_production is new_production
+    assert legacy_native is new_native
+    assert nm._FAMILY_DIALECTS["kilo"] is new_native.DIALECTS
+
+
+def test_new_kilo_package_declares_zero_entry_points():
+    """Capability-absence register stands; discovery stays on harnesses.toml (P-C)."""
+    import tomllib
+    from pathlib import Path
+
+    package_root = Path(__file__).resolve().parents[2] / "agent-box-harness-kilo"
+    data = tomllib.loads((package_root / "pyproject.toml").read_text(encoding="utf-8"))
+    assert data["project"]["name"] == "agent-box-harness-kilo"
+    assert "entry-points" not in data["project"], (
+        "H-KILO-001 red line: adding an entry point would be capability expansion")
+    assert data["project"]["dependencies"] == ["pacthold==2.0.0a1"]
+
+
+def test_no_double_implementation_across_legacy_and_new_kilo():
+    """Legacy files are pure shims; the implementation exists exactly once (new package)."""
+    from pathlib import Path
+
+    plugin_root = Path(__file__).resolve().parents[2]
+    legacy_dir = plugin_root / "agent-box-harnesses" / "src" / "agent_box_harnesses" / "kilo"
+    new_dir = plugin_root / "agent-box-harness-kilo" / "src" / "agent_box_harness_kilo"
+
+    for name in ("__init__.py", "production.py", "native.py"):
+        legacy_src = (legacy_dir / name).read_text(encoding="utf-8")
+        assert "_implementation" in legacy_src and "sys.modules" in legacy_src, name
+        assert "\ndef " not in legacy_src and "\nclass " not in legacy_src, (
+            f"{name}: legacy side grew a real definition - that would be a second implementation")
+    # the real body lives only in the new package
+    assert "def harness_deployment" in (new_dir / "production.py").read_text(encoding="utf-8")
+    assert "DIALECTS" in (new_dir / "native.py").read_text(encoding="utf-8")

@@ -1,43 +1,15 @@
-"""Third-party Kilo CLI Harness; runtime ownership remains with composition ports.
+"""Compatibility alias — the implementation moved to `agent_box_harness_kilo` (H-KILO-001).
 
-Work Order 43 follow-up. The family currently consists of the production
-deployment template only: the managed sidecar chain composes the pinned
-artifact's native binary (`kilo acp`) through the generic ACP registration,
-so no branded provider or projection module exists.
+Three-line shims, M1-P-A① alias discipline: submodules are pre-registered in
+`sys.modules` before this package name is replaced, so both names resolve to
+the **same** module objects and no file ever executes twice.
 """
-from .production import (
-    ADAPTER_ARTIFACT_ENTRY,
-    ADAPTER_PACKAGE,
-    ADAPTER_VERSION,
-    ARTIFACT_NAME,
-    ARTIFACT_TARGET,
-    CREDENTIAL_ENVIRONMENT,
-    CREDENTIAL_KIND,
-    KiloProductionTemplateError,
-    KILO_PROVIDER,
-    MODEL_CONTROL_ID,
-    NATIVE_MODEL_VALUE,
-    OFFICIAL_BASE_URL,
-    PRODUCT_MODEL_ID,
-    STATE_TARGET,
-    adapter_environment,
-    capability_claims,
-    config_document,
-    deployment_document,
-    documented_differences,
-    harness_deployment,
-    loopback_config_document,
-    model_aliases,
-    native_model,
-    projection_files,
-)
+import sys as _sys
 
-__all__ = [
-    "ADAPTER_ARTIFACT_ENTRY", "ADAPTER_PACKAGE", "ADAPTER_VERSION", "ARTIFACT_NAME",
-    "ARTIFACT_TARGET", "CREDENTIAL_ENVIRONMENT", "CREDENTIAL_KIND",
-    "KiloProductionTemplateError", "KILO_PROVIDER", "MODEL_CONTROL_ID",
-    "NATIVE_MODEL_VALUE", "OFFICIAL_BASE_URL", "PRODUCT_MODEL_ID", "STATE_TARGET",
-    "adapter_environment", "capability_claims", "config_document",
-    "deployment_document", "documented_differences", "harness_deployment",
-    "loopback_config_document", "model_aliases", "native_model", "projection_files",
-]
+import agent_box_harness_kilo as _implementation
+from agent_box_harness_kilo import native as _native
+from agent_box_harness_kilo import production as _production
+
+_sys.modules[__name__ + ".native"] = _native
+_sys.modules[__name__ + ".production"] = _production
+_sys.modules[__name__] = _implementation
