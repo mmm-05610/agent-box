@@ -2035,6 +2035,7 @@ class WireService:
             public_message=public_message, overrides=overrides,
         )
         if outcome == "accepted" and body.get("executionId"):
+            self.sessions.file_core_records(body["executionId"])
             self._dispatch(body["executionId"])
         if outcome in {"accepted", "replay"}:
             session = self.sessions.records.get_session(body["sessionId"])
@@ -2077,6 +2078,7 @@ class WireService:
             public_message=public_message, overrides=overrides,
         )
         if outcome == "accepted" and body.get("executionId"):
+            self.sessions.file_core_records(body["executionId"])
             self._dispatch(body["executionId"])
         if outcome == "replay":
             return {

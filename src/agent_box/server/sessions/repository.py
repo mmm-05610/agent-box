@@ -702,6 +702,23 @@ class SessionRecords:
             raise ServerError("TURN_NOT_FOUND", "Turn was not found", status=404)
         return dict(row)
 
+    def get_turn_filing(self, turn_id: str) -> dict[str, Any]:
+        """The filing facts of one Turn (a-3 K2-S): key, links, session.
+
+        Deliberately narrow: the post-commit filing step must see exactly the
+        idempotency inputs and the current Core links (NULL until filed), and
+        nothing else - it never re-reads the live Profile.
+        """
+        with self.database.read() as conn:
+            row = conn.execute(
+                "SELECT id,session_id,execution_key,work_id,execution_id,dispatch_id "
+                "FROM server_turns WHERE id=?",
+                (turn_id,),
+            ).fetchone()
+        if row is None:
+            raise ServerError("TURN_NOT_FOUND", "Turn was not found", status=404)
+        return dict(row)
+
     def set_turn_dispatch(
         self, turn_id: str, *, work_id: str, execution_id: str,
         dispatch_id: str, state: str = "running",

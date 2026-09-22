@@ -17,7 +17,7 @@ class SessionService:
                  harnesses: HarnessRegistry, profiles, credentials,
                  queue=None,
                  execution: TurnExecutionPort | None = None,
-                 on_event=None, secret_store=None) -> None:
+                 on_event=None, secret_store=None, core_filer=None) -> None:
         self.records = records
         self.idempotency = idempotency
         self.objects = objects
@@ -29,6 +29,34 @@ class SessionService:
         self.secret_store = secret_store
         self.on_event = on_event or (lambda: None)
         self.model_configs = None
+        self.core_filer = core_filer
+
+    def file_core_records(self, turn_id: str) -> None:
+        """a-3 K2-S: post-commit Core filing, idempotency-first.
+
+        Runs after the acceptance transaction committed and before dispatch.
+        Dormant while no filer is composed in (the composition wiring flips
+        with the E leg's key-consuming accept - S-DM1-style confluence, never
+        a double-file window). The turn's own `execution_key` (or, for rows
+        predating the migration, its turn-id derivation) is the Work Core
+        idempotency key, so a replay re-files nothing; the receipt's
+        correlation is persisted as given, never computed here.
+        """
+        if self.core_filer is None:
+            return
+        filing = self.records.get_turn_filing(turn_id)
+        if filing["work_id"] is not None or filing["dispatch_id"] is not None:
+            return
+        execution_key = filing["execution_key"] or f"execution:{turn_id}"
+        receipt = self.core_filer(
+            turn_id=turn_id, session_id=filing["session_id"],
+            execution_key=execution_key,
+        )
+        self.records.set_turn_dispatch(
+            turn_id, work_id=receipt["work_id"],
+            execution_id=receipt["core_execution_id"],
+            dispatch_id=receipt["dispatch_id"], state="accepted",
+        )
 
     def bind_model_configs(self, model_configs) -> None:
         self.model_configs = model_configs
@@ -195,6 +223,7 @@ class SessionService:
             # Exactly the acceptance owner dispatches; a concurrent replay
             # observes the committed receipt and must not dispatch again.
             try:
+                self.file_core_records(result["turn_id"])
                 self.execution.accept(result["turn_id"])
             except Exception:
                 # Dispatch/capture failures are durable Turn events recorded
