@@ -10,8 +10,8 @@ from typing import Any
 from agent_box.server.credentials import CredentialRecords
 from agent_box.server.idempotency import IdempotentRecords
 from agent_box.server.profiles import ProfileRecords
-from agent_box.server.sessions import SessionRecords
 from agent_box.server.workspaces import WorkspaceRecords
+from agent_box.service.sessions import SessionRecords
 from agent_box.storage import Database
 
 
