@@ -24,62 +24,53 @@ from __future__ import annotations
 
 from typing import Mapping
 
+# P-A② (approvals/PA2-dialect-release.md): each family's dialect facts live in
+# that family's own module; this file keeps exactly one brand touch point - the
+# explicit aggregation below - the same position `adapters/__init__.py` holds
+# for ADAPTERS. Eight explicit imports (one per family package).
+from .claude import native as _claude_native
+from .codex import native as _codex_native
+from .dsh import native as _dsh_native
+from .hermes import native as _hermes_native
+from .kilo import native as _kilo_native
+from .opencode import native as _opencode_native
+from .pi import native as _pi_native
+from .qwen import native as _qwen_native
+
 #: The canonical protocol vocabulary (092's contract, four values).
 CANONICAL_PROTOCOLS = ("openai-chat", "openai-responses", "anthropic-messages", "gemini-generate")
 
-#: For each family, the native field a protocol is written to and the dialect
-#: value that family's own file uses for that canonical protocol - each value is
-#: first-hand from the checked-in template (see the citation). A family/protocol
-#: pair absent here has NO pinned native field -> :func:`translate_protocol`
-#: refuses it (it is not "unsupported forever", only "not pinned yet: refuse").
+#: Aggregated per-family dialect table (P-A②): values are the family modules'
+#: own `DIALECTS` objects - same table, not a copy. A family/protocol pair absent
+#: here has NO pinned native field -> :func:`translate_protocol` refuses it (it
+#: is not "unsupported forever", only "not pinned yet: refuse"). The citation
+#: for every value lives next to it, in the family's `native.py`.
 #:
-#:   family        protocol           native field      dialect value            first-hand source
-_FAMILY_DIALECTS: dict[str, dict[str, tuple[str, str]]] = {
-    "codex": {
-        # deploy/codex/config.toml [model_providers.deepseek] wire_api="responses";
-        # wire/handlers.py accepts wireApi {chat_completions, responses}.
-        "openai-responses": ("wire_api", "responses"),
-        "openai-chat": ("wire_api", "chat"),
-    },
-    "pi": {
-        # deploy/pi/models.json providers.deepseek.api = "openai-completions".
-        "openai-chat": ("api", "openai-completions"),
-    },
-    "hermes": {
-        # deploy/hermes/config.yaml providers.custom.transport = "chat_completions".
-        "openai-chat": ("transport", "chat_completions"),
-    },
-    "opencode": {
-        # deploy/opencode/opencode.json provider.deepseek.npm = "@ai-sdk/openai-compatible".
-        "openai-chat": ("npm", "@ai-sdk/openai-compatible"),
-    },
-    "kilo": {
-        # deploy/kilo/kilo.json is a fork of opencode; same @ai-sdk dialect.
-        "openai-chat": ("npm", "@ai-sdk/openai-compatible"),
-    },
-    "claude-code": {
-        # deploy/claude/settings.json env.ANTHROPIC_BASE_URL=".../anthropic": claude
-        # speaks anthropic-messages only; there is NO pinned native field for a
-        # chat protocol, so openai-chat/responses/gemini are refused below.
-        "anthropic-messages": ("ANTHROPIC_BASE_URL", None),  # None -> no dialect token, only the endpoint
-    },
-    # dsh has no independent protocol field (the vendor key `llm-<vendor>` carries
-    # the endpoint; there is no first-hand native *protocol* key) and qwen is
-    # env-only (OPENAI_BASE_URL with no per-protocol native file). Both are pinned
-    # to nothing here -> every protocol-specific write is refused, per the rule.
-    "dsh": {},
-    "qwen": {},
+#:   family        protocol           native field      dialect value
+_FAMILY_DIALECTS: dict[str, dict[str, tuple[str, str | None]]] = {
+    "codex": _codex_native.DIALECTS,
+    "pi": _pi_native.DIALECTS,
+    "hermes": _hermes_native.DIALECTS,
+    "opencode": _opencode_native.DIALECTS,
+    "kilo": _kilo_native.DIALECTS,
+    # harness id key is `claude-code`; the family package directory is `claude`
+    # (naming mismatch kept as-is by the approval).
+    "claude-code": _claude_native.DIALECTS,
+    "dsh": _dsh_native.DIALECTS,
+    "qwen": _qwen_native.DIALECTS,
 }
 
-#: Families with a first-hand-pinned native config target path (relative to the
-#: guest home) for the endpoint/protocol/limit fields (093 stage 1).
+#: Aggregated native target paths (P-A②): the six families that pin one. dsh and
+#: qwen pin `None` in their own modules and stay **absent** here - exactly the
+#: pre-P-A② shape; `materialize_family` reads this with `.get()`, so absent and
+#: None would resolve identically for them either way.
 _NATIVE_TARGET = {
-    "codex": "config.toml",
-    "opencode": "opencode.json",
-    "kilo": "kilo.json",
-    "pi": "models.json",
-    "hermes": "config.yaml",
-    "claude-code": "settings.json",
+    "codex": _codex_native.NATIVE_TARGET,
+    "opencode": _opencode_native.NATIVE_TARGET,
+    "kilo": _kilo_native.NATIVE_TARGET,
+    "pi": _pi_native.NATIVE_TARGET,
+    "hermes": _hermes_native.NATIVE_TARGET,
+    "claude-code": _claude_native.NATIVE_TARGET,
 }
 
 
