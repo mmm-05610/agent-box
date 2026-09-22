@@ -16,7 +16,8 @@ from __future__ import annotations
 
 import pytest
 
-from agent_box.server.execution import CancelOutcome
+from agent_box.server.execution import (CancelOutcome, HarnessDescriptor,
+                                   HarnessRegistry)
 from agent_box.server.execution.delegation import DelegationService
 from agent_box.server.idempotency import IdempotentRecords
 from agent_box.server.profiles import ProfileRecords
@@ -88,7 +89,13 @@ def _env(tmp_path, *, execution_cls=_NeverFinishing):
     records = SessionRecords(database, idempotency)
     objects = ObjectStore(tmp_path / "data")
     execution = execution_cls(records)
-    sessions = SessionService(records, idempotency, objects, harnesses=None,
+    _harnesses = HarnessRegistry()
+    _harnesses.register(HarnessDescriptor(
+        "codex", credential_kind=None,
+        configuration_validator=lambda value: None if isinstance(value, dict) else ValueError(),
+        capability_claims={"stream": True},
+    ))
+    sessions = SessionService(records, idempotency, objects, harnesses=_harnesses,
                               profiles=profiles, credentials=None, execution=execution)
     service = DelegationService(records=records, profiles=profiles, sessions=sessions,
                                 execution=execution, objects=objects)
@@ -108,13 +115,15 @@ def _env(tmp_path, *, execution_cls=_NeverFinishing):
     sessions.create_session("child-seed", {
         "workspace_id": workspace["workspace_id"], "profile_id": child["profile_id"]})
     profiles.grant_subagent(parent_id=parent["profile_id"], child_id=child["profile_id"])
-    with database.transaction() as conn:
-        conn.execute(
-            "INSERT INTO server_turns(id,session_id,profile_id,profile_revision,"
-            "native_generation,state,capture_state,cleanup_state,input_object_digest,"
-            "created_at,updated_at) VALUES ('parent-turn',?,?,1,0,'running','pending',"
-            "'pending','x','t','t')",
-            (parent_session["session_id"], parent["profile_id"]))
+    # a-3 A-family rebuild (C ruling 06:19Z): the live parent arrives via the
+    # acceptance route so its frozen object carries the permissions section;
+    # the shared fake port leaves it running (dispatch only), matching every
+    # observation in this file.
+    _, _parent_turn = sessions.create_turn(parent_session["session_id"], "parent-key", {
+        "text": "parent task",
+        "expected_profile_revision": int(profiles.get(parent["profile_id"])["config_revision"]),
+    })
+    service.parent_turn_id = _parent_turn["turn_id"]
     return database, records, sessions, service, parent, child
 
 
@@ -127,7 +136,7 @@ def _turn_state(database, turn_id):
 def test_timeout_cancels_the_child_and_keeps_the_typed_code(tmp_path):
     database, records, _sessions, service, parent, _child = _env(tmp_path)
     with pytest.raises(DelegationError) as timed_out:
-        service.run(parent_turn_id="parent-turn", parent_profile_id=parent["profile_id"],
+        service.run(parent_turn_id=service.parent_turn_id, parent_profile_id=parent["profile_id"],
                     arguments={"subagent": "beta", "description": "do some work",
                                "prompt": "x", "timeout": 1})
     # G2: still the typed code, not a generic collapse.
@@ -140,14 +149,15 @@ def test_timeout_cancels_the_child_and_keeps_the_typed_code(tmp_path):
 def test_timeout_leaves_the_child_not_active_on_the_ledger(tmp_path):
     database, _records, _sessions, service, parent, _child = _env(tmp_path)
     with pytest.raises(DelegationError):
-        service.run(parent_turn_id="parent-turn", parent_profile_id=parent["profile_id"],
+        service.run(parent_turn_id=service.parent_turn_id, parent_profile_id=parent["profile_id"],
                     arguments={"subagent": "beta", "description": "do some work",
                                "prompt": "x", "timeout": 1})
     # The timed-out child turn (the only child turn for parent-turn) must have left the
     # active set - the resource boundary actually stopped it (G1).
     with database.read() as conn:
         kids = [str(r["id"]) for r in conn.execute(
-            "SELECT id FROM server_turns WHERE parent_turn_id='parent-turn'").fetchall()]
+            "SELECT id FROM server_turns WHERE parent_turn_id=?",
+            (service.parent_turn_id,)).fetchall()]
     assert kids, "a child turn was created before the wait"
     assert all(_turn_state(database, kid) not in ACTIVE_STATES for kid in kids), kids
 
@@ -155,7 +165,7 @@ def test_timeout_leaves_the_child_not_active_on_the_ledger(tmp_path):
 def test_success_path_is_unchanged(tmp_path):
     # A child that finishes inside the deadline returns the normal body, unchanged.
     database, _records, _sessions, service, parent, _child = _env(tmp_path, execution_cls=_Completing)
-    result = service.run(parent_turn_id="parent-turn", parent_profile_id=parent["profile_id"],
+    result = service.run(parent_turn_id=service.parent_turn_id, parent_profile_id=parent["profile_id"],
                          arguments={"subagent": "beta", "description": "do some work",
                                     "prompt": "x", "timeout": 5})
     assert result["state"] == "completed"
