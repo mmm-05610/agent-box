@@ -76,12 +76,14 @@ def test_migrate_19_to_20_is_idempotent(tmp_path):
     assert column[3] == 0
 
 
-def test_fresh_schema_is_at_version_20_with_nullable_harness(tmp_path):
+def test_fresh_schema_is_at_version_21_with_nullable_harness(tmp_path):
+    # Version constant follows every approved migration (a-3 K1 20->21 here);
+    # the harness-nullability assertion this pin really guards is unchanged.
     database = db.Database(tmp_path / "db.sqlite3")
     database.initialize()
     with database.read() as conn:
         assert conn.execute(
-            "SELECT version FROM agentbox_product_schema WHERE singleton=1").fetchone()[0] == 20
+            "SELECT version FROM agentbox_product_schema WHERE singleton=1").fetchone()[0] == 21
         column = next(r for r in conn.execute("PRAGMA table_info(server_provider_models)")
                       if r[1] == "harness_type")
         assert column[3] == 0
