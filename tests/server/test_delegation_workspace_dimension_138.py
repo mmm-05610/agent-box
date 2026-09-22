@@ -19,6 +19,7 @@ from __future__ import annotations
 import pytest
 
 from agent_box.server.execution.delegation import DelegationService
+from agent_box.server.execution import HarnessDescriptor, HarnessRegistry
 from agent_box.server.idempotency import IdempotentRecords
 from agent_box.server.profiles import ProfileRecords
 from agent_box.server.profiles.subagents import DelegationError
@@ -58,7 +59,13 @@ def _env(tmp_path):
     records = SessionRecords(database, idempotency)
     objects = ObjectStore(tmp_path / "data")
     execution = _FakeExecution(records)
-    sessions = SessionService(records, idempotency, objects, harnesses=None,
+    _harnesses = HarnessRegistry()
+    _harnesses.register(HarnessDescriptor(
+        "codex", credential_kind=None,
+        configuration_validator=lambda value: None if isinstance(value, dict) else ValueError(),
+        capability_claims={"stream": True},
+    ))
+    sessions = SessionService(records, idempotency, objects, harnesses=_harnesses,
                               profiles=profiles, credentials=None, execution=execution)
     service = DelegationService(records=records, profiles=profiles, sessions=sessions,
                                 execution=execution, objects=objects)
@@ -82,13 +89,13 @@ def _env(tmp_path):
     sessions.create_session("remote-seed", {"workspace_id": ws_b, "profile_id": remote["profile_id"]})
     profiles.grant_subagent(parent_id=parent["profile_id"], child_id=local["profile_id"])
     profiles.grant_subagent(parent_id=parent["profile_id"], child_id=remote["profile_id"])
-    with database.transaction() as conn:
-        conn.execute(
-            "INSERT INTO server_turns(id,session_id,profile_id,profile_revision,"
-            "native_generation,state,capture_state,cleanup_state,input_object_digest,"
-            "created_at,updated_at) VALUES ('parent-turn',?,?,1,0,'running','pending',"
-            "'pending','x','t','t')",
-            (parent_session["session_id"], parent["profile_id"]))
+    # a-3 A-family rebuild (C ruling 06:19Z): live parent via the acceptance route
+    # so its frozen object carries the permissions section; fake port leaves it running.
+    _, _parent_turn = sessions.create_turn(parent_session["session_id"], "parent-key", {
+        "text": "parent task",
+        "expected_profile_revision": int(profiles.get(parent["profile_id"])["config_revision"]),
+    })
+    service.parent_turn_id = _parent_turn["turn_id"]
     return database, service, parent, ws_a, ws_b
 
 
@@ -101,7 +108,7 @@ def _child_session_workspace(database, session_id):
 
 def test_same_workspace_child_lands_in_the_parent_workspace(tmp_path):
     database, service, parent, ws_a, _ws_b = _env(tmp_path)
-    result = service.run(parent_turn_id="parent-turn", parent_profile_id=parent["profile_id"],
+    result = service.run(parent_turn_id=service.parent_turn_id, parent_profile_id=parent["profile_id"],
                          arguments={"subagent": "beta", "description": "do some work",
                                     "prompt": "x"})
     assert _child_session_workspace(database, result["sessionId"]) == ws_a
@@ -112,7 +119,7 @@ def test_cross_workspace_child_is_not_offered(tmp_path):
     # is not a candidate; requesting it refuses explicitly - it must NOT land in B.
     _database, service, parent, _ws_a, ws_b = _env(tmp_path)
     with pytest.raises(DelegationError) as refused:
-        service.run(parent_turn_id="parent-turn", parent_profile_id=parent["profile_id"],
+        service.run(parent_turn_id=service.parent_turn_id, parent_profile_id=parent["profile_id"],
                     arguments={"subagent": "gamma", "description": "do some work", "prompt": "x"})
     assert refused.value.code == "SUBAGENT_NOT_AUTHORIZED"
     # And no child session was ever created in the other project.
@@ -135,7 +142,7 @@ def test_counterexample_inference_based_placement_would_reach_another_project(tm
     # refuses and creates no child session there - `gamma` keeps only its one seed session.
     database, service, parent, _ws_a, ws_b = _env(tmp_path)
     with pytest.raises(DelegationError):
-        service.run(parent_turn_id="parent-turn", parent_profile_id=parent["profile_id"],
+        service.run(parent_turn_id=service.parent_turn_id, parent_profile_id=parent["profile_id"],
                     arguments={"subagent": "gamma", "description": "do some work", "prompt": "x"})
     with database.read() as conn:
         gamma_sessions_in_b = conn.execute(

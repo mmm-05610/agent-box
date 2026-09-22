@@ -19,6 +19,7 @@ from __future__ import annotations
 import pytest
 
 from agent_box.server.execution.delegation import DelegationService
+from agent_box.server.execution import HarnessDescriptor, HarnessRegistry
 from agent_box.server.idempotency import IdempotentRecords
 from agent_box.server.profiles import ProfileRecords
 from agent_box.server.profiles.subagents import DelegationError, validate_run_arguments
@@ -51,6 +52,9 @@ class _FakeRegistry:
     def __init__(self, control_id: str) -> None:
         self._control_id = control_id
 
+    def __contains__(self, harness: str) -> bool:
+        return harness == "codex"
+
     def get(self, harness: str):
         return type("Descriptor", (), {"model_control_id": self._control_id})()
 
@@ -64,7 +68,13 @@ def _env(tmp_path, *, child_preset: str | None = None, registry=None, child_conf
     records = SessionRecords(database, idempotency)
     objects = ObjectStore(tmp_path / "data")
     execution = _FakeExecution(records)
-    sessions = SessionService(records, idempotency, objects, harnesses=None,
+    _harnesses = HarnessRegistry()
+    _harnesses.register(HarnessDescriptor(
+        "codex", credential_kind=None,
+        configuration_validator=lambda value: None if isinstance(value, dict) else ValueError(),
+        capability_claims={"stream": True},
+    ))
+    sessions = SessionService(records, idempotency, objects, harnesses=_harnesses,
                               profiles=profiles, credentials=None, execution=execution)
     service = DelegationService(records=records, profiles=profiles, sessions=sessions,
                                 execution=execution, registry=registry, objects=objects)
@@ -93,18 +103,18 @@ def _env(tmp_path, *, child_preset: str | None = None, registry=None, child_conf
         "workspace_id": workspace["workspace_id"], "profile_id": parent["profile_id"]})[1]
     sessions.create_session("child-seed", {
         "workspace_id": workspace["workspace_id"], "profile_id": child["profile_id"]})
-    with database.transaction() as conn:
-        conn.execute(
-            "INSERT INTO server_turns(id,session_id,profile_id,profile_revision,"
-            "native_generation,state,capture_state,cleanup_state,input_object_digest,"
-            "created_at,updated_at) VALUES ('parent-turn',?,?,1,0,'running','pending',"
-            "'pending','x','t','t')",
-            (session["session_id"], parent["profile_id"]))
+    # a-3 A-family rebuild (C ruling 06:19Z): parent via the acceptance route;
+    # the fake port leaves it running after dispatch.
+    _, _parent_turn = sessions.create_turn(session["session_id"], "parent-key", {
+        "text": "parent task",
+        "expected_profile_revision": int(profiles.get(parent["profile_id"])["config_revision"]),
+    })
+    service.parent_turn_id = _parent_turn["turn_id"]
     return service, parent, child
 
 
 def _run(service, parent, args):
-    return service.run(parent_turn_id="parent-turn",
+    return service.run(parent_turn_id=service.parent_turn_id,
                        parent_profile_id=parent["profile_id"], arguments=args)
 
 
