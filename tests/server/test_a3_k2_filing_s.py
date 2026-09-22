@@ -23,6 +23,7 @@ from agent_box.server.idempotency import IdempotentRecords
 from agent_box.server.profiles import ProfileRecords
 from agent_box.server.profiles.permissions import resolve_all
 from agent_box.server.sessions import SessionRecords, SessionService
+from agent_box.server.sessions.queue import QueueRecords
 from agent_box.server.workspaces import WorkspaceRecords
 from agent_box.storage import Database, ObjectStore
 
@@ -99,6 +100,7 @@ def make_stack(tmp_path, *, filer=None):
     })[1]
     return {"database": database, "profiles": profiles, "sessions": sessions,
             "records": records, "objects": objects, "port": port,
+            "idempotency": idempotency,
             "pid": profile["profile_id"], "sid": session["session_id"],
             "wid": workspace["workspace_id"]}
 
@@ -189,3 +191,64 @@ def test_p5_k3_freeze_two_halves(tmp_path):
     assert ctx2["effective_config_object_digest"] != ctx["effective_config_object_digest"]
     fresh = json.loads(h["objects"].read(ctx2["effective_config_object_digest"]))
     assert fresh["configuration"] == EDITED["configuration"], "下 turn：新值可分辨"
+
+
+def _enqueue_next(h):
+    queue = QueueRecords(h["database"], h["idempotency"])
+    msg_digest = h["objects"].publish(
+        canonical({"message": {"text": "next", "attachments": []}})).digest
+    eff_digest = h["objects"].publish(
+        canonical({**CONFIG, "permissions": DEFAULT_POSTURE})).digest
+    with h["database"].transaction() as conn:
+        queue.enqueue_in_transaction(
+            conn, session_id=h["sid"], profile_id=h["pid"], config_version=1,
+            request_id="rq-2", request_digest="rd-2",
+            message_object_digest=msg_digest,
+            effective_config_object_digest=eff_digest,
+        )
+    return queue
+
+
+def _run_turn(h, turn_id):
+    h["records"].set_turn_dispatch(
+        turn_id, work_id="pre-work", execution_id="pre-exec",
+        dispatch_id="pre-disp", state="running")
+
+
+def _complete(h, turn_id, queue):
+    digest_value = h["objects"].publish(canonical({"result": "done"})).digest
+    result, _event = h["records"].complete_turn(
+        turn_id, checkpoint_object_digest=digest_value,
+        checkpoint_native_id="cp-1", result_object_digest=digest_value,
+        queue_records=queue)
+    return result
+
+
+def test_p6_queue_adopted_successor_filed_after_completion_commit(tmp_path):
+    """K2-S'（C 04:35 裁开放点①＝后补钩子制）：认领后继随完成事务提交后落档。"""
+    filer = RecordingFiler()
+    h = make_stack(tmp_path, filer=filer)
+    turn1 = rest_accept(h)
+    assert len(filer.calls) == 1
+    _run_turn(h, turn1)
+    successor = _complete(h, turn1, _enqueue_next(h))["next_execution_id"]
+    assert successor, "队列后继应被认领"
+    assert [c["turn_id"] for c in filer.calls] == [turn1, successor], (
+        "建档跟随受理/认领点：完成事务提交后恰一行、其后继身份")
+    assert filer.calls[1]["execution_key"] == f"execution:{successor}"
+    filing = h["records"].get_turn_filing(successor)
+    assert filing["execution_key"] == f"execution:{successor}", (
+        "K1.1 键随 _insert_execution 落行（认领点同族）")
+    assert (filing["work_id"], filing["dispatch_id"]) == ("work-2", "disp-2"), (
+        "后继链接随提交后步写回")
+    assert row(h, successor, "state")["state"] == "accepted"
+
+
+def test_p6b_successor_hook_dormant_without_filer(tmp_path):
+    """中立性对第四点同样成立：未组合 filer 时完成路径零建档零异常。"""
+    h = make_stack(tmp_path)
+    turn1 = rest_accept(h)
+    _run_turn(h, turn1)
+    successor = _complete(h, turn1, _enqueue_next(h))["next_execution_id"]
+    filing = h["records"].get_turn_filing(successor)
+    assert filing["work_id"] is None and filing["dispatch_id"] is None

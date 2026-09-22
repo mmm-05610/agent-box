@@ -56,9 +56,12 @@ class SessionRecords:
 
     def __init__(self, database: Database, idempotency: IdempotentRecords, *,
                  home_concurrency: Mapping[str, str] | None = None,
-                 shared_store_guards: Mapping[str, Callable[[], None]] | None = None) -> None:
+                 shared_store_guards: Mapping[str, Callable[[], None]] | None = None,
+                 core_filer: Callable[..., Mapping[str, Any]] | None = None) -> None:
         self.database = database
         self.idempotency = idempotency
+        #: a-3 K2-S/K2-S' single filing seam (see attach_core_filer).
+        self.core_filer = core_filer
         #: Order 66 stage B: per-family read-only guards for the shared session
         #: library, run before a role switch is admitted. A family absent from
         #: this mapping has no shared store to guard (profile-home) or has
@@ -702,6 +705,43 @@ class SessionRecords:
             raise ServerError("TURN_NOT_FOUND", "Turn was not found", status=404)
         return dict(row)
 
+    def attach_core_filer(self, filer) -> None:
+        """Compose the Core filing collaborator exactly once (no probing)."""
+        if self.core_filer is not None and self.core_filer is not filer:
+            raise ServerError(
+                "IDEMPOTENCY_CONFLICT", "Core filer already composed", status=409,
+            )
+        self.core_filer = filer
+
+    def file_core_records(self, turn_id: str) -> None:
+        """a-3 K2-S/K2-S': post-commit Core filing, idempotency-first.
+
+        The single implementation home for every filing point: the three
+        acceptance entries route here through the service, and the queue-
+        adoption successor is filed by `complete_turn` itself right after its
+        transaction commits. Dormant while no filer is composed (the runtime
+        wiring flips with the E leg - confluence by construction, never a
+        double-file window). The turn's own `execution_key` (or, for rows
+        predating the migration, its turn-id derivation) is the Work Core
+        idempotency key, so a replay re-files nothing; the receipt's
+        correlation is persisted as given, never computed here.
+        """
+        if self.core_filer is None:
+            return
+        filing = self.get_turn_filing(turn_id)
+        if filing["work_id"] is not None or filing["dispatch_id"] is not None:
+            return
+        execution_key = filing["execution_key"] or f"execution:{turn_id}"
+        receipt = self.core_filer(
+            turn_id=turn_id, session_id=filing["session_id"],
+            execution_key=execution_key,
+        )
+        self.set_turn_dispatch(
+            turn_id, work_id=receipt["work_id"],
+            execution_id=receipt["core_execution_id"],
+            dispatch_id=receipt["dispatch_id"], state="accepted",
+        )
+
     def get_turn_filing(self, turn_id: str) -> dict[str, Any]:
         """The filing facts of one Turn (a-3 K2-S): key, links, session.
 
@@ -887,7 +927,14 @@ class SessionRecords:
             updated = conn.execute("SELECT * FROM server_turns WHERE id=?", (turn_id,)).fetchone()
             result = dict(updated)
             result["next_execution_id"] = next_execution_id
-            return result, event
+        if next_execution_id is not None:
+            # a-3 K2-S' (C-notice-S-a3half-ruled 04:35Z, open point 1 = post-hook):
+            # a queue-adopted successor is filed right after the completion
+            # transaction commits - filing follows the acceptance/claim points;
+            # E's chained dispatch stays a pure consumer (missing row key is a
+            # typed refusal). Dormant while no filer is composed.
+            self.file_core_records(str(next_execution_id))
+        return result, event
 
     def mark_turn_cleanup(self, turn_id: str, state: str) -> None:
         with self.database.transaction() as conn:
