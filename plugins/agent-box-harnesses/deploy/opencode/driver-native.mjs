@@ -383,28 +383,42 @@ export async function createDriver(context) {
         const pendingCharacters = buffer.length
         flushRemaining(aborted ? "aborted" : "reader-error")
         if (aborted) return
+        // X20(b)：主事实不得被"记录它的那一步"自己的错抹掉。格式化器（`redact`）是可注入的，
+        // 它一抛就让整个 catch 体带着 `stream-interrupted` 一起消失。先算，算不出就留空串。
+        let interruption
+        try {
+          interruption = redact(String(error?.message ?? error), 200)
+        } catch {
+          interruption = ""
+        }
         audit({
           event: "stream-interrupted",
           pendingCharacters,
-          message: redact(String(error?.message ?? error), 200),
+          message: interruption,
         })
       }
     })()
+    // X20(a)：处理器必须挂在 `pump` 创建处，不能等收摊。原先 `.catch` 只存在于下面的 teardown
+    // 闭包里 ⇒ 泵在 `close()` 之前死掉就是一条无人认领的 rejection（Node 15+ 默认策略下是真实
+    // worker 里的进程级事件），而 `stream-pump-failed` 要等 teardown 才被补记，归因由时机变成事后。
+    // 处理器体自己也得关住异常：它再抛就是第二条未处理拒绝，且会把刚保住的主事实连同审计线一起带走。
+    // （X19 之后订阅者的错已在源头分流 ⇒ 这条线不再有"被误标的订阅者"这条来源。）
+    pump.catch((error) => {
+      try {
+        audit({
+          event: "stream-pump-failed",
+          message: redact(String(error?.message ?? error), 200),
+        })
+      } catch {
+        // 审计线自身的失败不得再变成一条未处理拒绝。
+      }
+    })
     return () => {
       try {
         controller.abort()
       } catch {
         // 关闭路径上的异常不得覆盖主结果。
       }
-      // `pump` handles its own read failures; this is the backstop for the pump's own machinery
-      // failing, and records it instead of becoming an unhandled rejection. X19 之后订阅者的错已在
-      // 源头分流 ⇒ 这条线不再有"被误标的订阅者"这条来源。
-      pump.catch((error) => {
-        audit({
-          event: "stream-pump-failed",
-          message: redact(String(error?.message ?? error), 200),
-        })
-      })
     }
   }
 
