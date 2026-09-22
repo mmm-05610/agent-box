@@ -2,7 +2,7 @@ import { Token, type IDisposable, type ResourceScope } from '@ordessa/extension-
 
 export type Availability = 'supported' | 'unsupported' | 'unknown' | 'unavailable'
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error'
-export type RunStatus = 'running' | 'stop-requested' | 'completed' | 'cancelled' | 'failed' | 'unknown'
+export type RunStatus = 'starting' | 'running' | 'stop-requested' | 'completed' | 'cancelled' | 'failed' | 'unknown'
 
 export interface AgentCapabilities {
   history: Availability
@@ -49,6 +49,7 @@ export interface AgentInteraction {
   title: string
   detail?: string
   choices?: readonly { id: string; label: string }[]
+  fields?: readonly { id: string; title: string; detail?: string; choices?: readonly { id: string; label: string }[]; secret?: boolean }[]
   state: 'pending' | 'responding' | 'resolved' | 'expired' | 'unknown'
 }
 export interface AgentOption {
@@ -73,6 +74,7 @@ export type InteractionAnswer =
   | { kind: 'choice'; choiceId: string }
   | { kind: 'confirm'; confirmed: boolean }
   | { kind: 'text'; value: string }
+  | { kind: 'answers'; answers: Readonly<Record<string, readonly string[]>> }
   | { kind: 'cancel' }
 
 /** A live, authoritative adapter instance. Operations never imply a terminal run state. */
@@ -99,3 +101,26 @@ export interface AgentConnections {
   connect(id: string): Promise<AgentClient>
 }
 export const AgentConnectionsToken = new Token<AgentConnections>('ordessa.agent.connections.v1')
+
+export interface AgentWorkspaceSnapshot {
+  available: readonly Pick<AgentConnector, 'id' | 'title'>[]
+  selectedConnectionId?: string
+  connectingId?: string
+  error?: string
+  agent?: AgentSnapshot
+}
+/** Owns connected instances independently of mounted Workbench views. */
+export interface AgentSessions {
+  getSnapshot(): AgentWorkspaceSnapshot
+  subscribe(listener: () => void): () => void
+  selectConnection(id: string): Promise<void>
+  reconnect(id: string): Promise<void>
+  refreshSessions(): Promise<void>
+  newSession(): Promise<void>
+  openSession(id: string): Promise<void>
+  send(text: string): Promise<void>
+  stop(runId: string): Promise<void>
+  respond(interactionId: string, answer: InteractionAnswer): Promise<void>
+  setOption(id: string, value: string): Promise<void>
+}
+export const AgentSessionsToken = new Token<AgentSessions>('ordessa.agent.sessions.v1')

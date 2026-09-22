@@ -97,6 +97,18 @@ app.whenReady().then(async () => {
         await writeFile(process.env.MODULAR_SCREENSHOT, (await win.webContents.capturePage()).toPNG())
       }
     }
+    if (process.env.MODULAR_AGENT_SHELL_SMOKE === '1') {
+      Object.assign(result, { agentShell: await win.webContents.executeJavaScript(`(async () => {
+        const entry = [...document.querySelectorAll('nav button')].find(button => button.getAttribute('aria-label') === 'Agents');
+        entry?.click(); await new Promise(resolve => setTimeout(resolve, 100));
+        return {
+          navigation: !!entry,
+          codexVisible: !![...document.querySelectorAll('.agent-connections button')].find(button => button.textContent.includes('Codex')),
+          emptyConversation: !!document.querySelector('.agent-placeholder')?.textContent.includes('Choose a connection'),
+          requestsView: [...document.querySelectorAll('[data-region="right"] [role="group"] button')].some(button => button.textContent === 'Requests'),
+        };
+      })()`) })
+    }
     console.log('MODULAR_LOADER_READY', JSON.stringify(result))
     app.exit(result.ready && result.nodeAbsent ? 0 : 1)
   }

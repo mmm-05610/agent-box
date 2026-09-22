@@ -5,7 +5,7 @@ import { ipcMain } from 'electron'
 import { confinedFile, type Discovery } from './extensions'
 
 export interface NativeConnection {
-  send(frame: unknown): Promise<void>
+  send(frame: unknown): Promise<unknown>
   close(): Promise<void>
 }
 export interface NativeTransport {
@@ -59,7 +59,9 @@ export function installNativeBridge(win: BrowserWindow, discovery: Discovery) {
     validateFrame(frame)
     const item = live.get(instanceId)
     if (!item) throw Error('Native instance unavailable')
-    await item.connection.send(frame)
+    const result = await item.connection.send(frame)
+    if (result !== undefined) validateFrame(result)
+    return result
   }
   const close = async (event: Electron.IpcMainInvokeEvent, instanceId: string) => {
     trusted(event)
