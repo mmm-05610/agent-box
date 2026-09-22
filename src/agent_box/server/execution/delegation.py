@@ -492,15 +492,23 @@ class DelegationService:
                     "Profile revision changed before delegated Turn creation",
                     status=409,
                 )
+            # a-3 key cell (race ruling §一.2①, E sole writer): the child row
+            # mints its K1.1-family key at creation - `execution:{turn_id}`,
+            # the same derivation as the Session write points - so the
+            # acceptance consumer reads it instead of refusing an identity-less
+            # row. The column arrives with S's K1.1 schema v21: on this single
+            # leg the INSERT is a declared confluence red until the merge lands
+            # S's six first.
             try:
                 conn.execute(
                     "INSERT INTO server_turns(id,session_id,profile_id,profile_revision,"
                     "native_generation,state,capture_state,cleanup_state,input_object_digest,"
-                    "effective_config_object_digest,parent_turn_id,captured_profile_revision,"
-                    "created_at,updated_at) "
-                    "VALUES (?,?,?,1,0,'accepted','pending','pending',?,?,?,?,?,?)",
+                    "effective_config_object_digest,execution_key,parent_turn_id,"
+                    "captured_profile_revision,created_at,updated_at) "
+                    "VALUES (?,?,?,1,0,'accepted','pending','pending',?,?,?,?,?,?,?)",
                     (turn_id, session_id, child_profile["id"], input_digest,
-                     effective_digest, parent_turn_id, expected_revision,
+                     effective_digest, f"execution:{turn_id}", parent_turn_id,
+                     expected_revision,
                      timestamp, timestamp),
                 )
             except Exception as exc:

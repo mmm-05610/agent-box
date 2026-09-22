@@ -19,6 +19,12 @@ Red sides (per V2 §5, `pristine` = the batch baseline `19dce83`):
   the locally built `turn-dispatch:<turn>`), and `_merged_posture` still reads
   both postures from live Profile rows (so the parent's later live edit leaks
   into the child and a parent turn without a frozen section is not refused).
+* key-cell pins (race ruling §一.2①): the behavioral pin is RED on the merged
+  form *without* E's key cell (`execution_key` NULL on the child row - clean
+  assertion) and ERRORS on this single-leg tree with `no such column:
+  execution_key` - **declared confluence red**: the column arrives with S's
+  K1.1 schema v21, and the merge order lands S's six commits first. The
+  spelling counter-lock needs no schema and flips red/green on the line alone.
 
 Run (from `source/`):
     PYTHONPATH=src:$(ls -d plugins/*/src | paste -sd:) \
@@ -287,3 +293,66 @@ def test_a3_k2_row_identity_is_the_only_dispatch_key_source():
     assert 'f"turn-dispatch:{turn_id}"' not in source
     assert "execution_key" in source
     assert 'context.get("work_id")' in source
+
+
+# ---------------------------------------------------------------------------
+# key cell (race ruling §一.2①, E sole writer) - the child row mints its key.
+
+def _key_pieces(tmp_path):
+    """Minimal delegation pieces: a child Profile and a session bound to it,
+    no parent Turn row (parent_turn_id stays an opaque handle here, as the
+    INC1c N1 pins already exercise) and no execution port (creation never
+    touches one)."""
+    database = Database(tmp_path / "data")
+    database.initialize()
+    idempotency = IdempotentRecords(database)
+    profiles = ProfileRecords(database, idempotency)
+    workspaces = WorkspaceRecords(database, idempotency)
+    records = SessionRecords(database, idempotency)
+    objects = ObjectStore(tmp_path / "data")
+    sessions = SessionService(records, idempotency, objects, harnesses=None,
+                             profiles=profiles, credentials=None, execution=None)
+    service = DelegationService(records=records, profiles=profiles, sessions=sessions,
+                               execution=None, objects=objects)
+    config_digest = objects.publish(json.dumps(
+        {"schema_version": 1, "harness_type": "codex",
+         "configuration": {"model": "m"}}).encode()).digest
+    child = profiles.create(key="c", request_digest="c", name="beta",
+                            harness_type="codex", config_digest=config_digest,
+                            credential_id=None)[1]
+    workspace = workspaces.create(
+        key="w", request_digest="w", distribution="Ubuntu", remote_user="tester",
+        remote_path="/workspace", connection_id="c")[1]
+    session_row = sessions.create_session("seed-key-cell", {
+        "workspace_id": workspace["workspace_id"],
+        "profile_id": child["profile_id"]})[1]
+    return database, records, profiles, service, child, session_row
+
+
+def test_a3_key_cell_child_row_carries_the_derived_execution_key(tmp_path):
+    """The delegation child INSERT mints `execution:{turn_id}` at creation,
+    read through `get_turn_context` - the exact read point K2-E accept
+    consumes - so the child acceptance leg finds the identity instead of
+    refusing an identity-less row."""
+    (_database, records, profiles, service, child, session_row) = _key_pieces(tmp_path)
+    fresh = profiles.get(child["profile_id"])
+    turn_id = service._create_child_turn(
+        session_id=session_row["session_id"], child_profile=fresh,
+        parent_turn_id="parent-turn", prompt="go", model=None, posture=None)
+
+    context = records.get_turn_context(turn_id)
+    assert context.get("execution_key") == f"execution:{turn_id}", (
+        "the child row must carry its K1.1-family derived key "
+        f"`execution:{turn_id}` at creation, got "
+        f"{context.get('execution_key')!r}: the consumer reads it, never mints it")
+
+
+def test_a3_key_cell_derivation_spelling_matches_the_session_family():
+    """Schema-free counter-lock: the derivation must stay the exact K1.1
+    family spelling (flips red on the line alone, both sim directions)."""
+    source = inspect.getsource(DelegationService._create_child_turn)
+    assert 'f"execution:{turn_id}"' in source, (
+        "the child key must be derived as `execution:{turn_id}`, the same "
+        "spelling the Session write points mint")
+    assert "turn-dispatch:" not in source, (
+        "the retired dispatch-literal family must not re-enter the child INSERT")
