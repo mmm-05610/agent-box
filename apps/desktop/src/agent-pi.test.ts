@@ -108,7 +108,7 @@ it('keeps stop requested distinct from terminal confirmation', async () => {
   } finally { client.dispose() }
 })
 
-it('infers cancelled only when a requested stop settles without a final message', async () => {
+it('keeps an unconfirmed requested stop unknown; only aborted verdicts cancelled', async () => {
   const bridge = new Bridge(), client = await PiClient.connect(bridge)
   const lastRun = () => Object.keys(client.getSnapshot().runs).at(-1)!
   try {
@@ -116,13 +116,14 @@ it('infers cancelled only when a requested stop settles without a final message'
     await client.send('A', 'one')
     bridge.emit('A', { type: 'agent_start' })
     await client.stop('A', lastRun())
-    bridge.emit('A', { type: 'agent_settled' }) // Aborted before any assistant output.
-    expect(client.getSnapshot().runs[lastRun()].status).toBe('cancelled')
+    bridge.emit('A', { type: 'agent_settled' }) // Stop requested, run ended, no final message: never confirmed.
+    expect(client.getSnapshot().runs[lastRun()].status).toBe('unknown')
+    expect(client.getSnapshot().diagnostic).toContain('Stop was requested')
     await client.send('A', 'two')
     bridge.emit('A', { type: 'agent_start' })
     bridge.emit('A', { type: 'message_end', message: { role: 'assistant', stopReason: 'aborted', content: [] } })
     bridge.emit('A', { type: 'agent_settled' })
-    expect(client.getSnapshot().runs[lastRun()].status).toBe('cancelled') // Server-said aborted.
+    expect(client.getSnapshot().runs[lastRun()].status).toBe('cancelled') // Server-confirmed aborted.
     await client.send('A', 'three')
     bridge.emit('A', { type: 'agent_start' })
     bridge.emit('A', { type: 'message_end', message: { role: 'assistant', stopReason: 'error', content: [] } })
@@ -219,7 +220,7 @@ it('does not carry verdict or streaming state across runs and processes', async 
     bridge.emit('A', { type: 'message_update', assistantMessageEvent: { type: 'text_delta', delta: 'first' } })
     await client.stop('A', lastRun())
     bridge.emit('A', { type: 'agent_settled' })
-    expect(client.getSnapshot().runs[lastRun()].status).toBe('cancelled')
+    expect(client.getSnapshot().runs[lastRun()].status).toBe('unknown') // Stop requested, never confirmed.
     await client.send('A', 'two')
     bridge.emit('A', { type: 'agent_start' })
     // A stray delta without message_start must not append to the previous run's streaming message.

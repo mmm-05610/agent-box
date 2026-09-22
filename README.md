@@ -182,9 +182,10 @@ ORDESSA_AGENT_CWD=$HOME/projects/some-workspace npm run dev
 3. 历史来自官方 `SessionManager.list`（默认在 `~/.pi/agent`，可用 `PI_CODING_AGENT_DIR` 覆盖）；
    注意 Pi 只有在出现首条 assistant 消息后才落盘会话文件，空会话不出现在历史里。
 4. 停止走 `abort`（等待空闲才返回）。`agent_settled` 只表示运行结束，不构成结论：
-   终态仅依据最终 assistant 消息的 `stopReason`（stop/aborted/error 分别映射完成/取消/失败）；
-   未知 `stopReason` 或没有最终消息时保持 unknown，不推断成功或取消；仅“请求过停止且无最终消息”
-   判为取消。轮次状态不跨轮携带：新轮次、断连或重开会话都会清理上一轮的判定与流式状态。
+   终态仅依据最终 assistant 消息的 `stopReason`（stop/aborted/error 分别映射完成/取消/失败，
+   其中明确 `aborted` 是唯一可判取消的核实依据）；未知 `stopReason` 或没有最终消息时保持
+   unknown，不推断成功或取消——已请求停止也不例外，此时诊断会提示"已请求停止但结果未确认"。
+   轮次状态不跨轮携带：新轮次、断连或重开会话都会清理上一轮的判定与流式状态。
 
 ### 边界与未验证项
 

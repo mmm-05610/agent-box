@@ -51,8 +51,8 @@ export class PiClient implements AgentClient {
   private sequence = 0
   private activeRuns = new Map<string, string>()
   private activeMessages = new Map<string, string>()
-  /** Per-session verdict facts for the current run; never carried across runs. */
-  private runFacts = new Map<string, { reason?: string; sawAssistantEnd: boolean }>()
+  /** Per-session final-message stopReason of the current run; never carried across runs. */
+  private runFacts = new Map<string, { reason?: string }>()
   private tools = new Map<string, Map<string, AgentToolCall>>()
   private interactionRoutes = new Map<string, { sessionId: string; requestId: string; method: string; used: boolean }>()
   private constructor(private bridge: AgentNativeBridge) {
@@ -165,7 +165,7 @@ export class PiClient implements AgentClient {
       if (message.role === 'assistant') {
         this.activeMessages.delete(sessionId)
         // Last assistant message of the run wins; an absent stopReason is recorded too.
-        this.runFacts.set(sessionId, { reason: str(message.stopReason), sawAssistantEnd: true })
+        this.runFacts.set(sessionId, { reason: str(message.stopReason) })
       }
       return
     }
@@ -183,16 +183,17 @@ export class PiClient implements AgentClient {
         const run = this.state.runs[id]
         const facts = this.runFacts.get(sessionId)
         // agent_settled only proves the run ended. A mapped final stopReason is
-        // the only protocol basis for a definite verdict; an unmapped reason or
-        // a missing final message stays unknown. A requested stop counts as
-        // cancelled only when no final assistant message ever arrived.
+        // the only protocol basis for a definite verdict — an explicit `aborted`
+        // is the only verified cancellation. A requested stop never verdicts:
+        // without a confirmation it stays unknown, with a diagnostic.
         let status: RunStatus
         if (facts?.reason === 'stop') status = 'completed'
         else if (facts?.reason === 'aborted') status = 'cancelled'
         else if (facts?.reason === 'error') status = 'failed'
         else {
           if (facts?.reason) this.publish({ diagnostic: `Pi run ended with unmapped stopReason: ${facts.reason}` })
-          status = run?.status === 'stop-requested' && !facts?.sawAssistantEnd ? 'cancelled' : 'unknown'
+          else if (run?.status === 'stop-requested') this.publish({ diagnostic: 'Stop was requested; the run ended, but its outcome was never confirmed' })
+          status = 'unknown'
         }
         this.updateRun(id, sessionId, status)
         this.activeRuns.delete(sessionId); this.runFacts.delete(sessionId); this.activeMessages.delete(sessionId)
