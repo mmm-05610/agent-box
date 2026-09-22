@@ -17,8 +17,10 @@ both sides share:
 * :class:`RoomInvariants` - the properties the caller requires of any provider
   (a real writable home directory, immutable read-only inputs, no residue in
   temporary paths, no credential in argv, and the declared network posture);
-* :class:`IsolatedProcessSpec` - the translation: argv plus the guest
-  environment the provider decided for its own idiom;
+* :class:`RoomProcessSpec` - the translation: argv plus the guest
+  environment the provider decided for its own idiom (kept under this local
+  name so the provider-private env face stays outside the frozen public
+  projection; the legacy alias below keeps every existing import working);
 * :class:`SandboxPort` - the interface a resolved provider implements;
 * :func:`resolve_sandbox_port` - name-based resolution through the installed
   plugin entry points (`agent_box.plugins`), never a concrete import.
@@ -129,11 +131,17 @@ class SidecarRoomRequest:
 
 
 @dataclass(frozen=True)
-class IsolatedProcessSpec:
+class RoomProcessSpec:
     """A provider's translation of one request."""
 
     argv: tuple[str, ...]
     environment: Mapping[str, str]
+
+
+#: Backward-compatibility alias (INC2-A per E-015 pre-ruling): the re-export,
+#: fake, bwrap and tests-integration reference surfaces keep importing the old
+#: name untouched; retirement of the alias is a separate approved batch.
+IsolatedProcessSpec = RoomProcessSpec
 
 
 class SandboxPort(Protocol):
@@ -141,7 +149,7 @@ class SandboxPort(Protocol):
 
     provider_id: str
 
-    def compose_sidecar_room(self, request: SidecarRoomRequest) -> IsolatedProcessSpec:
+    def compose_sidecar_room(self, request: SidecarRoomRequest) -> RoomProcessSpec:
         """Translate the demand into a runnable, isolated process spec."""
 
     def declaration_document(self, *, readonly_targets: Sequence[str],
@@ -264,6 +272,7 @@ def resolve_sandbox_port(name: str) -> SandboxPort:
 __all__ = [
     "IsolatedProcessSpec",
     "RoomInvariants",
+    "RoomProcessSpec",
     "SANDBOX_PORT_FACTORY",
     "SANDBOX_PORT_MODULE_VARIABLE",
     "SandboxInvariantUnsupported",

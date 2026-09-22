@@ -20,6 +20,15 @@ RUNTIME_HOST_CONTRACT_ID = "agent-box.runtime-host@1"
 SANDBOX_CONTRACT_ID = "agent-box.sandbox@1"
 TERMINAL_SESSION_CONTRACT_ID = "agent-box.terminal-session@1"
 
+#: C-RUNTIME@v1 §1. A provider that does not list this capability in its
+#: `CapabilitySet` stays fully valid and need not implement the compensation
+#: verbs; consumers must then treat those components as side-effecting and
+#: must not duck-dispatch unannounced verbs.
+COMPENSATION_CAPABILITY = "composition.compensation@1"
+#: Closed expression of `RuntimeHost.terminate` over the existing
+#: `HostTransport.submit` channel (C-RUNTIME@v1 §1; no new process SPI).
+TERMINATE_TRANSPORT_KIND = "terminate@1"
+
 
 @dataclass(frozen=True)
 class RuntimeHostV1:
@@ -477,6 +486,18 @@ class RuntimeHost(Protocol):
     transport: "HostTransport"
     def resolve(self, ref: RuntimeHostRef) -> "RuntimeHost": ...
     def stage(self, bundle: RuntimeBundle) -> RuntimeBundle: ...
+    # C-RUNTIME@v1 §1 additive declarations (composition.compensation@1).
+    # A host that does not declare the capability need not grow these verbs;
+    # consumers then treat it as side-effecting (no duck-dispatch guessing).
+    # The host-side cleanup verb is named `cleanup` per the INC2-A note —
+    # terminal `release` is a different verb of a different family, not
+    # renamed into this one. Terminate travels the closed transport:
+    # `submit(HostTransportOperation(..., transport_kind="terminate@1"))`.
+    def terminate(self, op: HostTransportOperation) -> object: ...
+    # Observed host shapes: the composition host cleans up by its own
+    # attempt state (zero args); the execution-keyed form carries
+    # `execution_id`. Both satisfy this declaration; neither is renamed.
+    def cleanup(self, execution_id: str | None = None) -> Mapping[str, object]: ...
 
 
 class Sandbox(Protocol):
@@ -484,6 +505,9 @@ class Sandbox(Protocol):
     capabilities: CapabilitySet
     def resolve(self, ref: SandboxRef) -> "Sandbox": ...
     def wrap(self, mount_plan: MountPlan, command: HarnessCommandSpec, *, attempt_key: str) -> IsolatedProcessSpec: ...
+    # C-RUNTIME@v1 §1 additive: cleanup family receipt
+    # (`{"status": "cleaned"|"already_cleaned"|{"error": ...}}`, §2).
+    def cleanup(self, spec: IsolatedProcessSpec) -> Mapping[str, object]: ...
 
 
 class TerminalSession(Protocol):
@@ -492,6 +516,9 @@ class TerminalSession(Protocol):
     def resolve(self, ref: TerminalSessionRef) -> "TerminalSession": ...
     def allocate(self) -> TerminalAllocation: ...
     def run(self, host_transport: "HostTransport", spec: IsolatedProcessSpec, attempt_key: str) -> TerminalRunHandle: ...
+    # C-RUNTIME@v1 §1 additive: tristate release family
+    # (`{"released": bool, "destroyed": bool, "managed": bool}`, §2).
+    def release(self, request: object | None = None) -> Mapping[str, object]: ...
 
 
 class HostTransport(Protocol):

@@ -160,12 +160,40 @@ class RuntimeCompositionCoordinator:
             return {"status": "already_cleaned"}
         host, sandbox, terminal, isolated = parts
         results: dict[str, object] = {}
-        for name, component, method, argument in (("sandbox", sandbox, "cleanup", isolated), ("terminal", terminal, "release", None), ("host", host, "cleanup", None)):
-            action = getattr(component, method, None)
-            if callable(action):
-                try:
-                    results[name] = action(argument) if argument is not None else action()
-                except Exception as exc:  # independent cleanup continues
-                    results[name] = {"error": str(exc)[:240]}
+        # C-RUNTIME@v1 §1 (INC2-A): the compensation verbs are named here
+        # statically - no string-verb duck dispatch. A port that never grew
+        # the verb keeps the conservative skip every pre-capability provider
+        # has always had (its missing attribute is not a failure); a verb
+        # that raises keeps the error fact and the remaining components are
+        # still compensated independently. Routing is byte-identical to the
+        # retired duck dispatch for every existing provider shape.
+        try:
+            sandbox_cleanup = sandbox.cleanup
+        except AttributeError:
+            sandbox_cleanup = None
+        if callable(sandbox_cleanup):
+            try:
+                results["sandbox"] = (sandbox_cleanup(isolated)
+                                      if isolated is not None else sandbox_cleanup())
+            except Exception as exc:  # independent cleanup continues
+                results["sandbox"] = {"error": str(exc)[:240]}
+        try:
+            terminal_release = terminal.release
+        except AttributeError:
+            terminal_release = None
+        if callable(terminal_release):
+            try:
+                results["terminal"] = terminal_release()
+            except Exception as exc:
+                results["terminal"] = {"error": str(exc)[:240]}
+        try:
+            host_cleanup = host.cleanup
+        except AttributeError:
+            host_cleanup = None
+        if callable(host_cleanup):
+            try:
+                results["host"] = host_cleanup()
+            except Exception as exc:
+                results["host"] = {"error": str(exc)[:240]}
         self._cleanup.pop(attempt, None)
         return results or {"status": "cleaned"}
