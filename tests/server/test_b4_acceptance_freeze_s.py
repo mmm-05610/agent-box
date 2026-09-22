@@ -1,17 +1,20 @@
 """S 组 /tests/server — INC1b b-4：直建受理路径「受理时冻结输入」钉（O-B3-1 单生产者）。
 
 批准依据：`approvals/INC1b-release.md` + `decisions/INC1b-b4-confluence-interface.md` §1
-（采 D2＋「同一次读」硬绑定）。翻转记账（显式，非静默）：本文件 F1/F2 面替代原 git-外表征钉
+（采 D2＋「同一次读」硬绑定）；INC1c 依据 `approvals/INC1c-release.md` s-c1/s-c2。
+翻转记账（显式，非静默）：本文件 F1/F2 面替代原 git-外表征钉
 `test_block3_freeze_gap_characterization_s.py` 的 T2——同一断言面由「表征现状 bug」收紧为
 「断言修复后行为」，方向=收紧、非弱化；T1（队列对照）语义不变更。
+INC1c s-c1 再翻转：F5 由「COALESCE 回退保留」翻为「历史 NULL 行暴露原始 NULL」（同方向=收紧）。
 
 - F1 冻结非活行：受理后编辑 Profile，`get_turn_context` 原始键
-  `effective_config_object_digest` 恒=受理时冻结件（修前红=直建行该列 NULL、COALESCE 走活行）。
-- F2 COALESCE 并立：冻结行上 coalesced `config_object_digest` 取冻结值（不再同源活读）。
+  `effective_config_object_digest` 恒=受理时冻结件（修前红=直建行该列 NULL）。
+- F2 冻结行读取：s-c1 后 coalesced 键 `config_object_digest` 即原始冻结值本身（无回退）。
 - F3 replay 不重冻：同键重放幂等先行，零 publish、零重派。
 - F4 N1 强制交错（直建入口）：冻结计算与受理事务之间落一次配置编辑提交
   ⇒ PROFILE_REVISION_CONFLICT(409)、零 turn 行（锚不被绕、无漂移中间态）。
-- F5 legacy 回退保留（Q3）：既有 effective=NULL 行的 COALESCE 活回退语义不变（纯加性绿锁）。
+- F5 legacy（s-c1 翻转后）：既有 effective=NULL 行读侧暴露**原始 NULL**，不再活行回退；
+  活值仅经显式别名 `profile_config_object_digest` 可读（删回退不损失信息）。
 """
 from __future__ import annotations
 
@@ -40,7 +43,7 @@ class RecordingPort:
     def __init__(self) -> None:
         self.accepted: list[str] = []
 
-    def accept(self, turn_id, *, overrides=None):
+    def accept(self, turn_id) -> None:
         self.accepted.append(turn_id)
 
 
@@ -199,8 +202,10 @@ def test_f4_n1_forced_interleave_edit_between_freeze_and_tx_is_409(tmp_path):
     assert ctx["effective_config_object_digest"] == objects.publish(canonical(CONFIG_AFTER)).digest
 
 
-def test_f5_legacy_null_row_keeps_coalesce_fallback(tmp_path):
-    """Q3 保留锁（纯加性、修前后皆绿）：历史 effective=NULL 行仍走活行回退，本批不改历史可见语义。"""
+def test_f5_legacy_null_row_exposes_raw_null_after_s_c1(tmp_path):
+    """INC1c s-c1 翻转钉（显式收紧记账）：legacy effective=NULL 行读侧暴露**原始 NULL**，
+    不再活行回退。旧语义（COALESCE 回退）下本钉红、新语义下绿——方向=收紧、非弱化；
+    accept 侧维持 β2 的 typed 拒绝（历史 NULL 行永不被执行，E 域现行为）。"""
     port = RecordingPort()
     database, profiles, sessions, records, objects, workspaces = make_stack(tmp_path, port)
     before_digest = objects.publish(canonical(CONFIG_BEFORE)).digest
@@ -226,5 +231,8 @@ def test_f5_legacy_null_row_keeps_coalesce_fallback(tmp_path):
         )
     ctx = records.get_turn_context("legacy-turn")
     assert ctx["effective_config_object_digest"] is None
-    assert ctx["config_object_digest"] == profiles.get(profile["profile_id"])["config_object_digest"], (
-        "legacy 行 COALESCE 回退保留（INC1c 才处置）")
+    assert ctx["config_object_digest"] is None, (
+        "s-c1：读回退已删，历史 NULL 行暴露原始 NULL（不静默改用当前配置）")
+    assert ctx["profile_config_object_digest"] == profiles.get(
+        profile["profile_id"])["config_object_digest"], (
+        "活值仍可经显式别名 profile_config_object_digest 读到（回退删除不损失信息）")

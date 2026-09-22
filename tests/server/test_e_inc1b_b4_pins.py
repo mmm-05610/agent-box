@@ -167,10 +167,10 @@ def test_live_profile_edit_between_turns_cannot_move_the_frozen_effective_object
     backend, bound_rec = _backend(records, objects)
 
     with pytest.raises(Exception):
-        backend.accept("b4a-1", overrides=None)
+        backend.accept("b4a-1")
     first = _bound_profile(bound_rec)
     with pytest.raises(Exception):
-        backend.accept("b4a-2", overrides=None)
+        backend.accept("b4a-2")
     second = _bound_profile(bound_rec)
 
     assert first.digest == frozen
@@ -179,16 +179,21 @@ def test_live_profile_edit_between_turns_cannot_move_the_frozen_effective_object
     assert objects.publishes == [], "acceptance must contribute no new object"
 
 
-def test_overrides_are_not_applied_at_acceptance_pending_the_joint_signature_note(tmp_path, tmp_agent_box_home):
-    # decisions §2: TurnExecutionPort signature is unchanged; the concrete
-    # accept body ignores `overrides` (the tendency is retirement with S's
-    # call-site dropping the pass) - never a late merge into a frozen object.
+def test_overrides_parameter_is_retired_from_the_accept_signature(tmp_path, tmp_agent_box_home):
+    # INC1c c-5 (joint signature note终稿, approvals/INC1c-release.md 裁③): the
+    # β2 promise was "kept-and-ignored pending the note"; the note landed, so
+    # the parameter is deleted from the Protocol and both concrete accepts.
+    # Word change is the ruling's result, not a weakening of a green promise.
+    import inspect as _inspect
+    from agent_box.server.execution import TurnExecutionPort
+    for target in (TurnExecutionPort.accept, SidecarExecutionBackend.accept):
+        assert "overrides" not in _inspect.signature(target).parameters, target
     store, i, frozen, live_v1, _ = _seed(tmp_path)
     objects = _CountingObjects(store)
     records = _FakeRecords({"b4b-1": _context(i, live_v1, frozen)})
     backend, bound_rec = _backend(records, objects)
     with pytest.raises(Exception):
-        backend.accept("b4b-1", overrides={"model": "late-override"})
+        backend.accept("b4b-1")
     assert _bound_profile(bound_rec).digest == frozen
     assert objects.publishes == []
 
@@ -241,7 +246,7 @@ def test_N1_background_write_in_the_acceptance_window_never_reaches_publish(tmp_
 
     def accept_leg():
         try:
-            backend.accept("b4n1-1", overrides=None)
+            backend.accept("b4n1-1")
         except BaseException as exc:  # the pin boundary is expected
             outcome.append(exc)
 

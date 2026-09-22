@@ -194,10 +194,23 @@ def test_sidecar_backend_contains_no_business_ledger_read():
 
 # E-INC1b b-4 leg split (词面零弱化, per-path approved): the joint pin was a
 # strict xfail over BOTH modules; b-4 removes the sidecar_backend violation for
-# good, so that leg is promoted to a permanent green lock here. The delegation
-# leg stays strict-xfail below - promoting it early would misstate the whole
-# invariant as green while its second write point (`_create_child_turn` bare
-# INSERT + `_merged_posture` live assembly) is still adjudicated to INC1c.
+# good, so that leg is promoted to a permanent green lock here.
+#
+# INC1c c-2 翻转记账 (flip accounting per C-notice-E-041-ruled 裁1; approvals/
+# INC1c-release.md 裁② B案): the delegation leg below is promoted from a strict
+# xfail that pinned the *A案 vision* invariant (zero literal
+# `agent_box.server.profiles` imports anywhere in delegation) to a permanent
+# green lock pinning the **B案终局界 invariant**. Direction of the swap is a
+# *semantics change under adjudication, not a weakening of a green lock* (the
+# node was xfail; A案's package-wide claim is NOT declared green - it is
+# registered as a product question after BE-PROFILE-001, per the same ruling):
+#   old (A案愿景): delegation may not import the product configuration domain.
+#   new (B案终局界): (1) all product-domain reach is a top-level *declared*
+#   import block - hidden function-local imports are forbidden (static half,
+#   below); (2) the creation-point freeze is same-transaction anchored
+#   (409 PROFILE_REVISION_CONFLICT on a mid-window live-row edit) and accept
+#   never picks a live row - both pinned red/green-bidirectional in
+#   tests/server/test_e_inc1c_n1_pins.py (behavioural half).
 
 def test_sidecar_backend_does_not_import_product_domain_privates():
     src = inspect.getsource(sb)
@@ -206,20 +219,31 @@ def test_sidecar_backend_does_not_import_product_domain_privates():
         "posture must arrive as frozen input (S-2 / C-EXEC@v1 later blocks)")
 
 
-@pytest.mark.xfail(strict=True,
-                   reason="E-INC1c候批 by design of the staged handoff (C-registered "
-                          "scope): delegation's second "
-                          "turn-row write point (`_create_child_turn` bare INSERT, "
-                          "no frozen digest) and `_merged_posture` live assembly "
-                          "are the remaining drift face; the sidecar_backend leg "
-                          "went green at E-INC1b b-4 and this split pin must not "
-                          "be read as the package-wide invariant being green")
-def test_delegation_does_not_import_product_domain_privates_yet():
+def test_delegation_product_domain_reach_is_top_level_declared_only():
+    import ast
     import agent_box.server.execution.delegation as delegation
-    src = inspect.getsource(delegation)
-    assert "agent_box.server.profiles" not in src, (
-        f"{delegation.__name__} reaches into the product configuration domain; "
-        "posture must arrive as frozen input (S-2 / C-EXEC@v1 later blocks)")
+    tree = ast.parse(inspect.getsource(delegation))
+
+    def module_of(node):
+        if isinstance(node, ast.ImportFrom):
+            return node.module or ""
+        if isinstance(node, ast.Import):
+            return ",".join(alias.name for alias in node.names)
+        return ""
+
+    hidden = [
+        (getattr(node, "lineno", None), module_of(node))
+        for fn in ast.walk(tree)
+        if isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef))
+        for node in ast.walk(fn)
+        if isinstance(node, (ast.Import, ast.ImportFrom))
+        and module_of(node).startswith("agent_box.server.profiles")
+    ]
+    assert not hidden, (
+        f"hidden function-local product-domain imports in delegation: {hidden}; "
+        "B案终局界 requires one auditable top-level declared import block "
+        "(INC1c c-2 flip accounting - the A案 zero-import invariant is NOT "
+        "claimed green here, it waits on BE-PROFILE-001)")
 
 
 # --------------------------------------------------------------------------

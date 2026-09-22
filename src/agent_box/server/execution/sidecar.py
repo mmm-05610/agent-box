@@ -1449,9 +1449,8 @@ class SidecarHarnessPort:
         read = getattr(envelope, "read_subscription", None)
         return read() if callable(read) else {}
 
-    def accept(self, execution_id: str, *, overrides: Mapping[str, Any] | None = None) -> None:
+    def accept(self, execution_id: str) -> None:
         """Open the execution; the prompt is issued by `prompt`."""
-        del overrides
         self.open_execution(execution_id)
 
     def prompt(

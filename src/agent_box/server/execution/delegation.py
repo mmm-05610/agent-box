@@ -28,6 +28,12 @@ import time
 from typing import Any, Iterable, Mapping, Sequence
 
 from agent_box.server.errors import ServerError
+# INC1c c-1B/c-2 (E2): the product-domain reach of this module is declared as
+# one top-level block only - hidden function-local imports of the same domain
+# are gone (the `_merged_posture` leg). The roster semantics and the posture
+# resolver stay produced here at the creation point (adjudicated B案), now
+# anchored the same way the Session leg anchors (INC1c-release裁①).
+from agent_box.server.profiles.permissions import resolve_all
 from agent_box.server.profiles.subagents import (
     DEFAULT_TIMEOUT_SECONDS,
     DelegationError,
@@ -384,8 +390,6 @@ class DelegationService:
         """
         import json
 
-        from agent_box.server.profiles.permissions import resolve_all
-
         def posture_of(row: Mapping[str, Any]) -> dict[str, Any]:
             raw = row.get("permission_rules_json")
             rules = json.loads(raw) if raw else []
@@ -413,6 +417,9 @@ class DelegationService:
 
         turn_id = opaque_id("turn")
         timestamp = now()
+        # INC1c c-1B (B案 anchoring): the revision the frozen assembly above was
+        # computed from, re-checked inside the acceptance transaction below.
+        expected_revision = int(child_profile["config_revision"])
         # The turn's input is a real published object (the delegated prompt),
         # and its effective configuration starts from the child Profile's own
         # frozen configuration - the model slot and every other control are the
@@ -441,6 +448,22 @@ class DelegationService:
             # turn without it, so a profile that declared an exclusive home could get
             # two active turns (one per session). Reuse the same check, atomically.
             self.records._refuse_exclusive_home_concurrency(conn, child_profile)
+            # INC1c c-1B: Session-isomorphic same-transaction anchor - a live-row
+            # edit between the frozen assembly above and this INSERT is refused
+            # with the same typed conflict the Session leg raises (never a
+            # silently re-read live configuration).
+            anchor = conn.execute(
+                "SELECT config_revision FROM server_profiles WHERE id=?",
+                (child_profile["id"],),
+            ).fetchone()
+            if anchor is None:
+                raise ServerError("PROFILE_NOT_FOUND", "Profile was not found", status=404)
+            if int(anchor["config_revision"]) != expected_revision:
+                raise ServerError(
+                    "PROFILE_REVISION_CONFLICT",
+                    "Profile revision changed before delegated Turn creation",
+                    status=409,
+                )
             try:
                 conn.execute(
                     "INSERT INTO server_turns(id,session_id,profile_id,profile_revision,"

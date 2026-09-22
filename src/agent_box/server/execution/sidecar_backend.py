@@ -244,12 +244,12 @@ class SidecarExecutionBackend:
     def bind_queue(self, queue) -> None:
         self.queue = queue
 
-    def accept(self, turn_id: str, *, overrides: Mapping[str, Any] | None = None) -> None:
+    def accept(self, turn_id: str) -> None:
         # E-INC1b b-4: the effective configuration is frozen at turn-creation
         # time by the Session side and consumed here as the turn row's raw key
-        # (never the COALESCE'd live-row fallback). `overrides` is deliberately
-        # unused pending the S⊗E joint signature note on retiring it; the
-        # Protocol signature itself is unchanged.
+        # (never the COALESCE'd live-row fallback). INC1c c-5 (joint signature
+        # note, C-notice-E-041-ruled 裁③): the retired `overrides` parameter
+        # is deleted here, in the Protocol, and in sidecar.
         context = self.records.get_turn_context(turn_id)
         stored = json.loads(self.objects.read(context["input_object_digest"]))
         message = stored.get("message") or stored

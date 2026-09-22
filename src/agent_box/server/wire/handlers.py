@@ -2035,7 +2035,7 @@ class WireService:
             public_message=public_message, overrides=overrides,
         )
         if outcome == "accepted" and body.get("executionId"):
-            self._dispatch(body["executionId"], overrides)
+            self._dispatch(body["executionId"])
         if outcome in {"accepted", "replay"}:
             session = self.sessions.records.get_session(body["sessionId"])
             return {
@@ -2077,7 +2077,7 @@ class WireService:
             public_message=public_message, overrides=overrides,
         )
         if outcome == "accepted" and body.get("executionId"):
-            self._dispatch(body["executionId"], overrides)
+            self._dispatch(body["executionId"])
         if outcome == "replay":
             return {
                 "outcome": "accepted",
@@ -2349,20 +2349,14 @@ class WireService:
         ]
         return message
 
-    def _dispatch(self, execution_id: str, overrides: list[dict[str, Any]]) -> None:
+    def _dispatch(self, execution_id: str) -> None:
         try:
-            # b-4 joint signature: the effective configuration is frozen at
-            # acceptance, so dispatch no longer carries overrides (E accepts
-            # and ignores the legacy parameter; dead-param cleanup is a
-            # later micro-batch).
+            # INC1c c-5/s-c2: the effective configuration is frozen at
+            # acceptance, so dispatch carries nothing but the execution id
+            # (the legacy overrides parameter and its mapping helper retired
+            # with the joint signature note).
             self.execution.accept(execution_id)
         except Exception:
             # Dispatch failures are durable execution facts recorded by the
             # execution port; acceptance itself stays a valid receipt.
             pass
-
-    @staticmethod
-    def _override_mapping(overrides: list[dict[str, Any]]) -> dict[str, Any] | None:
-        if not overrides:
-            return None
-        return {item["controlId"]: item["value"] for item in overrides}
