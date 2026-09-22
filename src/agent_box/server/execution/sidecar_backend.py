@@ -9,7 +9,6 @@ import logging
 import re
 import threading
 import time
-import uuid
 from pathlib import PurePosixPath
 from typing import Any, Callable, Mapping
 
@@ -17,11 +16,12 @@ from agent_box.execution.contracts import (
     CancelOutcome, EvidenceClass, ExecutionObservation, ExecutionReceipt,
     ExecutionRequest, ObservationState,
 )
+from agent_box.execution.first_run_lock import first_run_gate
+from agent_box.execution.lifecycle import NeutralRun, NeutralRunTracker
 from agent_box.extensions import capability
 from agent_box.extensions.runtime_composition.sandbox_port import SandboxPortUnavailable
 from agent_box.resource_contracts import AgentBoxProfileV1, PromptFragmentV1, WorkspaceV1
 from agent_box.server.errors import ServerError
-from agent_box.server.execution.first_run_lock import first_run_gate
 from agent_box.server.execution.placement import PlacementUnsupported
 from agent_box.server.execution.sidecar import SidecarError, SidecarHarnessPort
 from agent_box.work_core import (
@@ -61,30 +61,11 @@ class _Run:
     completion_thread: threading.Thread | None = None
 
 
-@dataclass
-class _NeutralRun:
-    """One execution tracked through the neutral verbs (C-EXEC@v1 block1).
-
-    Deliberately free of product identity: the run is keyed by the caller's
-    opaque ``execution_key`` and carries only dispatch facts and captured
-    evidence. It is a projection of what this process knows, never an
-    authoritative ledger.
-    """
-
-    execution_key: str
-    dispatch_id: str
-    port: Any
-    native_id: str = ""
-    created_at: datetime = field(
-        default_factory=lambda: datetime.now(timezone.utc))
-    cancel_lock: threading.Lock = field(default_factory=threading.Lock)
-    cancel_confirmed: bool = False
-    #: The start intent reached the port but `open_execution` did not answer —
-    #: honestly unresolved, never silently rewritten as "nothing was started".
-    start_uncertain: bool = False
-    #: (kind, observed_at) pairs captured from the sidecar event callback;
-    #: monotonic by construction - evidence is only ever appended.
-    evidence: list[tuple[str, datetime]] = field(default_factory=list)
+#: MB-E2b equal-move: the neutral run type is defined once in
+#: ``agent_box.execution.lifecycle`` (``NeutralRun``); this historical name
+#: keeps pointing at the same class object - identity-pinned by
+#: ``tests/server/test_e_modular_execution_lifecycle.py``.
+_NeutralRun = NeutralRun
 
 
 class _BoundResources:
@@ -225,7 +206,6 @@ class SidecarExecutionBackend:
         self.registry.register_execution_provider(self.provider)
         self._turn_by_core: dict[str, str] = {}
         self._contexts: dict[str, Mapping[str, Any]] = {}
-        self._active: dict[str, _Run] = {}
         #: Completion workers still running. A run is retired from `_active` when
         #: its durable result is written, but the worker itself may still be
         #: finishing; stopping must wait for every live one, so they are tracked
@@ -233,13 +213,17 @@ class SidecarExecutionBackend:
         self._completion_threads: set[threading.Thread] = set()
         self._approval_ports: dict[str, SidecarHarnessPort] = {}
         self._message_parts: dict[str, list[str]] = {}
-        #: Neutral-verb state (C-EXEC@v1 block1, E-INC1a): runs tracked by the
-        #: caller's opaque key, and cancel receipts kept for replay. A receipt
-        #: outlives its run on purpose: a replay after retirement must return
-        #: the original honest answer, never a fresh dispatch or a new refusal.
-        self._neutral_runs: dict[str, _NeutralRun] = {}
-        self._cancel_receipts: dict[str, CancelOutcome] = {}
-        self._lock = threading.RLock()
+        #: Neutral-verb state (C-EXEC@v1 block1, E-INC1a) lives once in the
+        #: tracker (MB-E2b equal-move); the attributes below are aliases onto
+        #: the SAME ledger objects and lock - never copies - so business runs
+        #: (registered into ``_active``) and neutral runs answer through the
+        #: one cancel state machine. Identity-pinned by
+        #: ``tests/server/test_e_modular_execution_lifecycle.py``.
+        self._lifecycle = NeutralRunTracker()
+        self._active: dict[str, _Run] = self._lifecycle.active_runs
+        self._neutral_runs = self._lifecycle.runs
+        self._cancel_receipts = self._lifecycle.cancel_receipts
+        self._lock = self._lifecycle.lock
         self.queue = None
 
     def bind_queue(self, queue) -> None:
@@ -726,45 +710,7 @@ class SidecarExecutionBackend:
         to leak as an exception, because both would erase the distinction the
         contract promises the consumer.
         """
-        with self._lock:
-            prior = self._cancel_receipts.get(execution_key)
-            target = self._active.get(execution_key) or self._neutral_runs.get(execution_key)
-        if prior is not None:
-            return prior
-        if target is None:
-            outcome = CancelOutcome.REFUSED_NO_ACTIVE_RUN
-            with self._lock:
-                self._cancel_receipts[execution_key] = outcome
-            return outcome
-        with target.cancel_lock:
-            with self._lock:
-                prior = self._cancel_receipts.get(execution_key)
-            if prior is not None:
-                return prior
-            if getattr(target, "port", None) is None:
-                # Pre-port window (submit claimed the key but the factory seam
-                # has not produced a port yet): nothing was dispatched, so there
-                # is no dispatch for a receipt to guard. Answer UNKNOWN honestly
-                # but do NOT record it - a later cancel must still be able to
-                # reach the live port once the run starts (P8, approved (i)).
-                return CancelOutcome.UNKNOWN
-            try:
-                accepted = target.port.cancel(execution_key)
-            except BaseException:  # noqa: BLE001 - timeout/channel-lost: honest unknown
-                accepted = None
-            if accepted is None:
-                outcome = CancelOutcome.UNKNOWN
-            elif accepted:
-                outcome = CancelOutcome.CONFIRMED_STOPPED
-                target.cancel_confirmed = True
-            else:
-                outcome = CancelOutcome.REFUSED_NO_ACTIVE_RUN
-            # recorded while still holding the run's cancel lock: a racer
-            # woken from that lock must find the receipt, never a window
-            # in which it would dispatch the abort a second time.
-            with self._lock:
-                self._cancel_receipts[execution_key] = outcome
-        return outcome
+        return self._lifecycle.cancel_execution(execution_key)
 
     def observe_execution(self, execution_key: str) -> ExecutionObservation:
         """Pure read of what this process currently knows (E-D2 supplement A).
@@ -775,31 +721,7 @@ class SidecarExecutionBackend:
         ambiguous dispatch, and that proof arrives through the consumer's
         channel, never from this method.
         """
-        now = datetime.now(timezone.utc)
-        with self._lock:
-            run = self._active.get(execution_key)
-            neutral = self._neutral_runs.get(execution_key)
-        if run is not None:
-            if run.result is not None:
-                state, evidence = ObservationState.TERMINAL, EvidenceClass.TERMINAL_RECEIPT
-            elif run.cancel_confirmed:
-                state, evidence = (
-                    ObservationState.STOPPED_CONFIRMED, EvidenceClass.CANCEL_CONFIRMATION)
-            elif run.native_id:
-                state, evidence = ObservationState.RUNNING, EvidenceClass.NATIVE_REPORT
-            else:
-                state, evidence = ObservationState.RUNNING, EvidenceClass.DISPATCH_ACK
-        elif neutral is not None:
-            if neutral.cancel_confirmed:
-                state, evidence = (
-                    ObservationState.STOPPED_CONFIRMED, EvidenceClass.CANCEL_CONFIRMATION)
-            elif neutral.evidence:
-                state, evidence = ObservationState.RUNNING, EvidenceClass.NATIVE_REPORT
-            else:
-                state, evidence = ObservationState.RUNNING, EvidenceClass.DISPATCH_ACK
-        else:
-            state, evidence = ObservationState.NOT_KNOWN_TO_E, EvidenceClass.NONE
-        return ExecutionObservation(execution_key, state, evidence, now)
+        return self._lifecycle.observe_execution(execution_key)
 
     def submit(self, request: ExecutionRequest) -> ExecutionReceipt:
         """Neutral start path - no business record is created, read, or
@@ -811,66 +733,14 @@ class SidecarExecutionBackend:
         exists left no dispatch behind, so it registers nothing and leaves the
         key clean for a fresh attempt.
         """
-        execution_key = request.execution_key
-        with self._lock:
-            existing = self._neutral_runs.get(execution_key)
-            if existing is not None:
-                return ExecutionReceipt(execution_key, existing.dispatch_id, replayed=True)
-            # Claim the key *before* the seam exists: two racing submits of one
-            # key must not each build a port and each open a start. A typed
-            # refusal from the factory (nothing was dispatched) releases the
-            # claim again, so the key stays clean for a fresh attempt.
-            run = _NeutralRun(
-                execution_key=execution_key, dispatch_id=f"neutral:{uuid.uuid4()}",
-                port=None)
-            self._neutral_runs[execution_key] = run
-            self._cancel_receipts.pop(execution_key, None)
-        context = {
-            "execution_key": execution_key,
-            "bundle_ref": request.bundle_ref,
-            "resource_bindings": [
-                {"contract_id": b.contract_id, "object_digest": b.object_digest,
-                 "mount_token": b.mount_token}
-                for b in request.resource_bindings
-            ],
-            "capability_demand": sorted(request.capability_demand),
-            "deadline_policy": None if request.deadline_policy is None else {
-                "hard_deadline": (
-                    None if request.deadline_policy.hard_deadline is None
-                    else request.deadline_policy.hard_deadline.isoformat()),
-                "idle_timeout_seconds": request.deadline_policy.idle_timeout_seconds,
-            },
-            # Passed through unparsed; the sidecar seam normalizes this with
-            # C-HARNESS (IFR-04). Nothing here interprets the values.
-            "correlation": dict(request.correlation),
-        }
-        try:
-            port = self.port_factory(
-                context,
-                lambda execution_id, kind, data: self._neutral_event(execution_id, kind, data),
-            )
-        except BaseException:
-            # typed refusal before the seam produced anything: release the
-            # claim so the key is honestly absent again (nothing was dispatched)
-            with self._lock:
-                if self._neutral_runs.get(execution_key) is run:
-                    del self._neutral_runs[execution_key]
-            raise
-        run.port = port
-        try:
-            run.native_id = str(port.open_execution(execution_key))
-        except BaseException:
-            run.start_uncertain = True
-            raise
-        self.on_event()
-        return ExecutionReceipt(execution_key, run.dispatch_id)
+        return self._lifecycle.submit(
+            request, port_factory=self.port_factory, on_event=self.on_event,
+        )
 
-    def _neutral_event(self, execution_key: str, kind: str, data: Mapping[str, Any]) -> None:
-        with self._lock:
-            run = self._neutral_runs.get(execution_key)
-            if run is not None:
-                run.evidence.append((str(kind), datetime.now(timezone.utc)))
-        self.on_event()
+    def _neutral_event(self, execution_id: str, kind: str, data: Mapping[str, Any]) -> None:
+        self._lifecycle.note_native_event(
+            execution_id, kind, data, on_event=self.on_event,
+        )
 
     #: How long `stop()` waits for prompts and durable completions to settle.
     STOP_DEADLINE_SECONDS = 15.0
