@@ -186,8 +186,12 @@ class DelegationService:
             parent_workspace_id=parent_workspace_id)
 
         # Create the child turn as a normal turn, linked to the parent.
+        # a-3 K3'-E: the parent's posture原料 now travels through the parent
+        # Turn's frozen effective configuration instead of re-reading the
+        # parent Profile's live row - the second derivation path is gone.
         merged_posture = self._merged_posture(
-            parent_profile_id=parent_profile_id, child_profile=child_profile)
+            parent_turn_id=parent_turn_id, parent_profile_id=parent_profile_id,
+            child_profile=child_profile)
         turn_id = self._create_child_turn(
             session_id=session_id, child_profile=child_profile,
             parent_turn_id=parent_turn_id, prompt=validated["prompt"],
@@ -378,7 +382,8 @@ class DelegationService:
         )
 
     def _merged_posture(
-        self, *, parent_profile_id: str, child_profile: Mapping[str, Any],
+        self, *, parent_turn_id: str, parent_profile_id: str,
+        child_profile: Mapping[str, Any],
     ) -> dict[str, Any]:
         """The child's posture, narrowed by the parent's prohibitions.
 
@@ -387,24 +392,47 @@ class DelegationService:
         delegation can tighten a key but never widen one. The result is frozen
         into the child turn's effective configuration, exactly where the
         runtime reads a turn's posture from.
-        """
-        import json
 
+        a-3 K3'-E: the parent's own posture is read from the parent Turn's
+        **frozen** effective configuration (top-level `permissions`, frozen
+        once at acceptance), never re-derived from the parent Profile's live
+        row. A parent Turn that carries no such section (a turn accepted before
+        the section existed) is refused typed instead of silently falling back
+        to a live read.
+        """
         def posture_of(row: Mapping[str, Any]) -> dict[str, Any]:
             raw = row.get("permission_rules_json")
             rules = json.loads(raw) if raw else []
             return resolve_all(rules, preset=str(row.get("permission_preset") or "default"))
 
-        parent = self.profiles.get(parent_profile_id)
-        parent_posture = posture_of(parent)
+        parent_context = self.records.get_turn_context(parent_turn_id)
+        parent_posture = self._frozen_posture(parent_context)
+        if parent_posture is None:
+            raise ServerError(
+                "PROFILE_CONFIGURATION_INVALID",
+                "the parent Turn has no frozen permission posture to narrow the child",
+                status=409,
+            )
         child = self.profiles.get(str(child_profile["id"]))
         child_posture = posture_of(child)
         merged_keys = {
-            key: "deny" if parent_posture["keys"].get(key) == "deny" else action
+            key: "deny" if parent_posture.get("keys", {}).get(key) == "deny" else action
             for key, action in child_posture["keys"].items()
         }
         return {"preset": child_posture["preset"], "keys": merged_keys,
                 "inheritedFrom": parent_profile_id}
+
+    def _frozen_posture(self, turn_context: Mapping[str, Any]) -> dict[str, Any] | None:
+        """The `permissions` section of a Turn's frozen effective configuration,
+        or `None` when the turn (or this composition) carries none."""
+        digest = turn_context.get("effective_config_object_digest")
+        if self.objects is None or not isinstance(digest, str) or not digest.strip():
+            return None
+        value = json.loads(self.objects.read(digest))
+        if not isinstance(value, Mapping):
+            return None
+        posture = value.get("permissions")
+        return dict(posture) if isinstance(posture, Mapping) else None
 
     def _create_child_turn(
         self, *, session_id: str, child_profile: Mapping[str, Any],

@@ -16,6 +16,7 @@ from typing import Any, Callable, Mapping
 from agent_box.extensions import capability
 from agent_box.extensions.runtime_composition.sandbox_port import SandboxPortUnavailable
 from agent_box.resource_contracts import AgentBoxProfileV1, PromptFragmentV1, WorkspaceV1
+from agent_box.server.errors import ServerError
 from agent_box.server.execution.execution_contract import (
     CancelOutcome, EvidenceClass, ExecutionObservation, ExecutionReceipt,
     ExecutionRequest, ObservationState,
@@ -254,14 +255,25 @@ class SidecarExecutionBackend:
         stored = json.loads(self.objects.read(context["input_object_digest"]))
         message = stored.get("message") or stored
         effective_digest = context["effective_config_object_digest"]
-        work = self.work_service.create_work(
-            "AgentBox Session Turn", metadata={"session_id": context["session_id"], "turn_id": turn_id},
-        )
-        core_execution = self.execution_service.create_execution(
-            work.id, self.provider.provider_id,
-            responsibility_intent="execute one accepted Session Turn through its Harness extension",
-            provenance={"session_id": context["session_id"], "turn_id": turn_id},
-        )
+        # a-3 K2-E (读法甲, approvals/a-3-release.md K2 + C-notice-E-047-051-ruled
+        # §3): the Core bookkeeping of an accepted Session Turn - work and
+        # execution - is created by the Session acceptance path *before* this
+        # consumer runs (提交后紧随步＋幂等先行＝重放零再建档), and its identity
+        # travels on the turn row. This consumer reads that identity and never
+        # mints a second producer; a row that carries none is refused typed
+        # instead of silently re-creating a second work/execution pair.
+        execution_key = context.get("execution_key")
+        work_id = context.get("work_id")
+        execution_id = context.get("execution_id")
+        if not all(
+            isinstance(value, str) and value.strip()
+            for value in (execution_key, work_id, execution_id)
+        ):
+            raise ServerError(
+                "IDEMPOTENCY_CONFLICT",
+                "the accepted Turn carries no pre-created execution identity",
+                status=409,
+            )
         inputs = (
             (WorkspaceV1.contract_id, self.resources.bind(
                 WorkspaceV1.contract_id, f"workspace-{turn_id}",
@@ -280,17 +292,17 @@ class SidecarExecutionBackend:
             )),
         )
         with self._lock:
-            self._turn_by_core[core_execution.id] = turn_id
+            self._turn_by_core[execution_id] = turn_id
             self._contexts[turn_id] = context
             self._message_parts[turn_id] = []
         try:
             receipt = self.execution_service.dispatch_execution(
-                core_execution.id, inputs, self.registry, f"turn-dispatch:{turn_id}",
+                execution_id, inputs, self.registry, execution_key,
             )
             run = self.provider.get_handle(receipt.dispatch_id)
-            run.work_id = work.id
+            run.work_id = work_id
             self.records.set_turn_dispatch(
-                turn_id, work_id=work.id, execution_id=core_execution.id,
+                turn_id, work_id=work_id, execution_id=execution_id,
                 dispatch_id=receipt.dispatch_id, state="running",
             )
             with self._lock:
