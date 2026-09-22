@@ -358,8 +358,8 @@ def deployment_document(
 def main(arguments: Sequence[str] | None = None) -> int:
     """为一个已构建的工件输出生产部署文件。"""
     parser = argparse.ArgumentParser(description="Emit the Codex production deployment file.")
-    parser.add_argument("--artifact-source", required=True,
-                        help="canonical WSL path of the built Codex runtime artifact")
+    parser.add_argument("--artifact-token", required=True,
+                        help="mount token the deployment binds to the built Codex runtime artifact")
     parser.add_argument("--tree-digest", required=True,
                         help="the artifact manifest's sha256: tree digest")
     parser.add_argument("--out", required=True, help="path of the deployment file to write")

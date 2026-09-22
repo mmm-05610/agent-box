@@ -162,7 +162,7 @@ Windows 证据要点：8 秒静默在**默认 5 秒租约**下完成（`elapsed_
 
 - **真实模型门仍未执行**：本层只是无模型的能力来源收敛；四家仍 `MODEL_NOT_VERIFIED`，
   `workbench_model_verified_count = 0`。
-- **Codex 生产封装仍未完成**：其能力只有静态候选，没有任何动态观测。
+- **Codex 生产封装已完成并有过全链门证据**（`codex/production.py`＋`codex-production-chain-gate.py`，离线与真实模型预检通过，见 [live-model-preflight.md](live-model-preflight.md) §6 Codex 与 [codex-production-packaging.md](codex-production-packaging.md)）；本层 workbench observed 仍只有静态候选——门证据尚未吸收为逐项声明。
 - **Pi 的 `attach`**：静态候选保留，有效能力为 false，直到有一次真实附件运行。
 - **Profile HOME 隔离**：已实施（`PROFILE_NATIVE_HOME_ISOLATION_IMPLEMENTED`，四家
   `DONE_FOR_FOUR_FAMILIES`），见 [profile-home-isolation.md](profile-home-isolation.md) §8b。

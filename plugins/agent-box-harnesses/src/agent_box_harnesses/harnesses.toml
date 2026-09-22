@@ -3,9 +3,11 @@ schema_version = 1
 [[harness]]
 schema_version = 1
 driver = "codex"
-# 静态候选（产品层声明上限），**不是**观测结论：Codex 目前还没有生产封装（无
-# `codex/production.py` 对应的部署模板、没有跑过真实假端点全链门），因此这里的每
-# 一项 observed 都只能留空。真实模型的 Codex 门要等 42-D 的四家真实模型门阶段。
+# 静态候选（产品层声明上限），**不是**观测结论：Codex 生产封装已在树（
+# `codex/production.py`＋`codex-production-chain-gate.py` 全链门，离线与真实模型
+# 预检均已通过，见 docs/server-round1/fullstack/codex-production-packaging.md 与
+# live-model-preflight.md §6 Codex）；本段 observed 仍逐项留空——门证据尚未被吸收
+# 为 workbench 逐项声明。
 # 逐项证据见 plugins/agent-box-harnesses/tests/test_capability_declarations.py 的
 # FAMILY_MATRIX。
 capabilities = ["start", "observe", "finish", "attach", "stream", "permissions", "native_continuation"]
