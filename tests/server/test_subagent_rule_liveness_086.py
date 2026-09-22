@@ -35,13 +35,25 @@ from test_delegation import FakeExecution, _setup
 
 def _delegating_parent(tmp_path, *, grandchild: bool = False):
     """alpha -> beta (and beta -> gamma), with a parent turn in the ledger."""
-    database, profiles, records, sessions, execution, service, parent, child, other = _setup(
-        tmp_path)
+    (database, profiles, records, sessions, execution, service, parent, child,
+     other, parent_turn_id) = _setup(tmp_path)
+    # The shared fixture's fake port completes what it accepts; these tests
+    # observe a LIVE parent mid-flight (stops, late completions, usage of
+    # their own), so the parent row is set back to running here - the frozen
+    # effective object from the acceptance route stays, which is what the
+    # narrowed posture reads.
+    with records.database.transaction() as conn:
+        conn.execute(
+            "UPDATE server_turns SET state='running', result_object_digest=NULL,"
+            "usage_input_tokens=NULL, usage_output_tokens=NULL,"
+            "usage_total_tokens=NULL, usage_source=NULL WHERE id=?",
+            (parent_turn_id,))
     profiles.grant_subagent(parent_id=parent["profile_id"], child_id=child["profile_id"])
     if grandchild:
         profiles.grant_subagent(parent_id=child["profile_id"], child_id=other["profile_id"])
     return dict(database=database, profiles=profiles, records=records, sessions=sessions,
-                execution=execution, service=service, parent=parent, child=child, other=other)
+                execution=execution, service=service, parent=parent, child=child,
+                other=other, parent_turn_id=parent_turn_id)
 
 
 def _start_a_running_child(env, *, turn_id: str = "kid-turn") -> str:
@@ -62,8 +74,8 @@ def _start_a_running_child(env, *, turn_id: str = "kid-turn") -> str:
             "INSERT INTO server_turns(id,session_id,profile_id,profile_revision,"
             "native_generation,state,capture_state,cleanup_state,input_object_digest,"
             "parent_turn_id,created_at,updated_at) "
-            "VALUES (?,?,?,1,0,'running','pending','pending','x','parent-turn','t','t')",
-            (turn_id, str(session_row["id"]), child["profile_id"]),
+            "VALUES (?,?,?,1,0,'running','pending','pending','x',?,'t','t')",
+            (turn_id, str(session_row["id"]), child["profile_id"], env["parent_turn_id"]),
         )
     return turn_id
 
@@ -99,13 +111,13 @@ def test_the_child_s_usage_stays_on_its_own_turn_and_reaches_the_parent_as_a_fac
     env = _delegating_parent(tmp_path)
     service, records, parent = env["service"], env["records"], env["parent"]
 
-    result = service.run(parent_turn_id="parent-turn",
+    result = service.run(parent_turn_id=env["parent_turn_id"],
                          parent_profile_id=parent["profile_id"],
                          arguments={"subagent": "beta", "description": "do some work",
                                     "prompt": "x"})
     # The parent then finishes with usage of its own - smaller than the child's,
     # so a roll-up that wrote the child's numbers onto the parent is visible.
-    records.complete_turn("parent-turn", checkpoint_object_digest="sha256:p",
+    records.complete_turn(env["parent_turn_id"], checkpoint_object_digest="sha256:p",
                           checkpoint_native_id="native-parent", result_object_digest="sha256:pr",
                           usage={"inputTokens": 3, "outputTokens": 2, "totalTokens": 5},
                           usage_source="fake-parent")
@@ -114,16 +126,17 @@ def test_the_child_s_usage_stays_on_its_own_turn_and_reaches_the_parent_as_a_fac
         rows = {row["id"]: dict(row) for row in conn.execute(
             "SELECT id, profile_id, parent_turn_id, usage_input_tokens, usage_output_tokens, "
             "usage_total_tokens, usage_source FROM server_turns "
-            "WHERE id IN ('parent-turn', ?)", (result["turnId"],))}
+            "WHERE id IN (:p, :c)", {"p": env["parent_turn_id"],
+                                     "c": result["turnId"]})}
     child_row = rows[result["turnId"]]
 
-    assert child_row["parent_turn_id"] == "parent-turn", child_row
+    assert child_row["parent_turn_id"] == env["parent_turn_id"], child_row
     assert child_row["profile_id"] == env["child"]["profile_id"], (
         "the delegated turn ran under the wrong Profile")
     assert (child_row["usage_input_tokens"], child_row["usage_output_tokens"],
             child_row["usage_total_tokens"]) == (11, 7, 18), child_row
     # The counterexample: a copy-onto-parent roll-up would read 14/9/23 here.
-    parent_row = rows["parent-turn"]
+    parent_row = rows[env["parent_turn_id"]]
     assert (parent_row["usage_input_tokens"], parent_row["usage_output_tokens"],
             parent_row["usage_total_tokens"]) == (3, 2, 5), parent_row
     # The parent still learns the child's cost, as a fact in the result it asked for.
@@ -150,7 +163,7 @@ def test_the_summary_is_the_child_s_final_message_bounded_not_its_transcript(tmp
                 usage_source="fake")
 
     env["service"].execution = _LongSummary(records)
-    wide = env["service"].run(parent_turn_id="parent-turn",
+    wide = env["service"].run(parent_turn_id=env["parent_turn_id"],
                               parent_profile_id=env["parent"]["profile_id"],
                               arguments={"subagent": "beta", "description": "do some work",
                                          "prompt": "x"})
@@ -161,7 +174,7 @@ def test_the_summary_is_the_child_s_final_message_bounded_not_its_transcript(tmp
     # Inside the bound the summary is verbatim: a truncator that mangled short
     # answers would fail here, not on the long side alone.
     narrow = _delegating_parent(tmp_path / "narrow")
-    short = narrow["service"].run(parent_turn_id="parent-turn",
+    short = narrow["service"].run(parent_turn_id=narrow["parent_turn_id"],
                                  parent_profile_id=narrow["parent"]["profile_id"],
                                  arguments={"subagent": "beta", "description": "do some work",
                                             "prompt": "x"})
@@ -182,11 +195,12 @@ def test_cancelling_the_parent_reaches_the_child_turn_that_is_still_running(tmp_
     _start_a_running_child(env)
     with records.database.read() as conn:
         kids = [str(row["id"]) for row in conn.execute(
-            "SELECT id FROM server_turns WHERE parent_turn_id='parent-turn'").fetchall()]
+            "SELECT id FROM server_turns WHERE parent_turn_id=?",
+            (env["parent_turn_id"],)).fetchall()]
     assert kids, "the ledger has a live child turn to stop"
     assert records.get_turn_context(kids[0])["state"] == "running"
 
-    sessions.cancel_turn("parent-turn", "cancel-parent-1")
+    sessions.cancel_turn(env["parent_turn_id"], "cancel-parent-1")
 
     states = {kid: records.get_turn_context(kid)["state"] for kid in kids}
     assert states == {kids[0]: "cancelled"}, (
@@ -215,7 +229,8 @@ def test_the_wire_stop_applies_the_same_rule(tmp_path):
     _start_a_running_child(env)   # see 141 note in the sibling test above
     with records.database.read() as conn:
         kids = [str(row["id"]) for row in conn.execute(
-            "SELECT id FROM server_turns WHERE parent_turn_id='parent-turn'").fetchall()]
+            "SELECT id FROM server_turns WHERE parent_turn_id=?",
+            (env["parent_turn_id"],)).fetchall()]
     assert kids and records.get_turn_context(kids[0])["state"] == "running"
 
     from types import SimpleNamespace
@@ -223,8 +238,8 @@ def test_the_wire_stop_applies_the_same_rule(tmp_path):
     outcome = WireService.runs_stop(
         SimpleNamespace(sessions=sessions, execution=stalled), {
             "requestId": "stop-1",
-            "sessionId": records.get_turn_context("parent-turn")["session_id"],
-            "executionId": "parent-turn",
+            "sessionId": records.get_turn_context(env["parent_turn_id"])["session_id"],
+            "executionId": env["parent_turn_id"],
         })
     assert outcome["outcome"] == "stop_requested", outcome
     assert kids[0] in stalled.cancelled, (
@@ -249,7 +264,7 @@ def test_a_three_edge_ring_closes_on_its_third_hop_and_is_refused(tmp_path):
     profiles.grant_subagent(parent_id=env["other"]["profile_id"],
                             child_id=env["parent"]["profile_id"])
 
-    first = service.run(parent_turn_id="parent-turn",
+    first = service.run(parent_turn_id=env["parent_turn_id"],
                         parent_profile_id=env["parent"]["profile_id"],
                         arguments={"subagent": "beta", "description": "do some work",
                                    "prompt": "x"})
@@ -295,11 +310,11 @@ def test_a_grandchild_delegation_is_allowed_now_that_depth_is_not_a_ceiling(tmp_
     sessions = env["sessions"]
     # The fourth Profile needs a workspace to run in, exactly like the others.
     sessions.create_session("seed-delta", {
-        "workspace_id": env["records"].get_turn_context("parent-turn")["workspace_id"],
+        "workspace_id": env["records"].get_turn_context(env["parent_turn_id"])["workspace_id"],
         "profile_id": fourth["profile_id"]})
     profiles.grant_subagent(parent_id=env["other"]["profile_id"], child_id=fourth["profile_id"])
 
-    hop = service.run(parent_turn_id="parent-turn",
+    hop = service.run(parent_turn_id=env["parent_turn_id"],
                       parent_profile_id=env["parent"]["profile_id"],
                       arguments={"subagent": "beta", "description": "do some work",
                                  "prompt": "x"})
