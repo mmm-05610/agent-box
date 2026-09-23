@@ -3,10 +3,18 @@ import assert from 'node:assert/strict'
 
 const hashAnnotation = value => [...value].reduce((n, c) => (n * 31 + c.charCodeAt(0)) % 138003713, 0)
 const dictionaryAnnotation = hashAnnotation('spellcheck_hunspell_dictionary')
-// Chromium's spellcheck_hunspell_dictionary source declares this initial URL.
-// A redirect to any other host needs a separate reviewed destination decision.
+// Fixed Electron 40.10.2 / Chromium 144.0.7559.236 dictionary source.
+// Only this source's one observed HTTPS resource redirect is background traffic.
 const dictionaryOrigin = 'https://redirector.gvt1.com'
 const dictionaryPath = /^\/edgedl\/chrome\/dict\/[^/]+\.bdic$/
+const sensitiveQueryName = /(?:token|auth|bearer|secret|password|credential|prompt|message|session|workspace|payload|body)/i
+const sensitiveRequestField = /^(?:authorization|proxy_authorization|cookie|request_cookie|bearer|token|secret|credential|password|request_?body|upload(?:_?data)?|post_?data|prompt|message)$/i
+const hasSensitiveRequestField = value => {
+  if (typeof value === 'string') return /(?:authorization|cookie)\s*:|\bbearer\s+/i.test(value)
+  if (Array.isArray(value)) return value.some(hasSensitiveRequestField)
+  if (!value || typeof value !== 'object') return false
+  return Object.entries(value).some(([name, item]) => sensitiveRequestField.test(name) || hasSensitiveRequestField(item))
+}
 const probeAddress = '2001:4860:4860::8888' // Chromium 144 host_resolver_manager.cc kIPv6ProbeAddress.
 const key = source => Number.isInteger(source?.type) && Number.isInteger(source?.id) ? `${source.type}:${source.id}` : null
 const loopback = value => value.startsWith('127.') || value === '::1' || value.startsWith('::ffff:127.')
@@ -115,12 +123,26 @@ export function classifyPairNetwork(files, netlog, serverOrigin) {
     if (!urls.length) { unknownRequests.push(source); continue }
     const methods = events.flatMap(event => typeof event.params?.method === 'string' ? [event.params.method] : [])
     const annotation = events.map(event => event.params?.traffic_annotation).find(Number.isInteger)
-    const allServer = urls.every(raw => { try { return new URL(raw).origin === server.origin } catch { return false } })
+    const redirects = events.filter(event => event.type === types.URL_REQUEST_REDIRECTED)
+    const distinctUrls = new Set(urls)
+    const allServer = annotation !== dictionaryAnnotation && redirects.length === 0 && distinctUrls.size === 1 &&
+      methods.includes('POST') && methods.every(method => method === 'POST') &&
+      urls.every(raw => { try { const url = new URL(raw); return url.origin === server.origin &&
+        url.pathname.startsWith('/wire/v1/') && !url.search && !url.hash && !url.username && !url.password } catch { return false } })
+    const initial = (() => { try { return new URL(urls[0]) } catch { return null } })()
+    const redirect = redirects[0]
+    const redirectLocation = typeof redirect?.params?.location === 'string' ? redirect.params.location : null
+    const redirectFollowed = redirects.length === 0 ? distinctUrls.size === 1 :
+      redirects.length === 1 && distinctUrls.size === 2 && redirectLocation !== urls[0] &&
+      events.slice(events.indexOf(redirect) + 1).some(event => event.params?.url === redirectLocation)
+    const resourceUrls = redirects.length === 0 ? urls : [...urls, redirectLocation]
     const dictionary = annotation === dictionaryAnnotation && methods.includes('GET') && methods.every(m => m === 'GET') &&
-      !events.some(event => event.type === types.URL_REQUEST_REDIRECTED) &&
-      urls.every(raw => { try { const url = new URL(raw); return url.origin === dictionaryOrigin &&
-        url.username === '' && url.password === '' && dictionaryPath.test(url.pathname) &&
-        !url.search && !url.hash } catch { return false } })
+      redirects.length <= 1 && redirectFollowed && !events.some(event => hasSensitiveRequestField(event.params)) &&
+      initial?.origin === dictionaryOrigin && dictionaryPath.test(initial.pathname) &&
+      !initial.search && !initial.hash && !initial.username && !initial.password &&
+      resourceUrls.every(raw => { try { const url = new URL(raw); return url.protocol === 'https:' &&
+        url.pathname.endsWith('.bdic') && !url.username && !url.password &&
+        [...url.searchParams.keys()].every(name => !sensitiveQueryName.test(name)) } catch { return false } })
     if (allServer) continue
     if (dictionary) dictionaryRequests.push(source)
     else unknownRequests.push(source)

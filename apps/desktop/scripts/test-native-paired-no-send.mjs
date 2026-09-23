@@ -74,6 +74,11 @@ try {
   assert.equal(ready.bcProfileUniqueReady, true)
   assert.equal(ready.project?.normalizedPath, path.join(pairRoot, 'project'))
   assert.ok(typeof ready.project.workspaceId === 'string' && ready.project.workspaceId.length > 0)
+  const electronVersion = '40.10.2' // Reviewed Chromium 144.0.7559.236 dictionary request source.
+  const electronPackage = JSON.parse(await readFile(path.resolve(app, '../../node_modules/electron/package.json'), 'utf8'))
+  const lock = JSON.parse(await readFile(path.resolve(app, '../../package-lock.json'), 'utf8'))
+  assert.equal(electronPackage.version, electronVersion, 'Paired network gate requires its reviewed Electron build')
+  assert.equal(lock.packages?.['node_modules/electron']?.version, electronVersion)
   secureFile(await lstat(ready.tokenFile)) // metadata only; native main opens and reads it.
   await mkdir(userData, { mode: 0o700 })
   secureDir(await lstat(userData))

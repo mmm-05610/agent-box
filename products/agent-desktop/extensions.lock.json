@@ -20,7 +20,7 @@
     "extensions/ordessa.agent-conversation/manifest.json": "0ea0e4217d9160320674195fedcaa8d488a62f35ff2af2b5f1846d8dae4e02c2",
     "extensions/ordessa.agent-server/entry.js": "f53bdbd32b515109eb49996ec6d3f7c7052bd7b90f2a27923309684cde88c82a",
     "extensions/ordessa.agent-server/manifest.json": "9ef54daa07944a50a28d9e5fcebb817eb497547057577d8f0222c5936993aa8e",
-    "extensions/ordessa.agent-server/native.js": "bdea95d9c84bafc61d7b3a24c84a05f5d8a5dc2fbe59388813a30e2025e8ca9b",
+    "extensions/ordessa.agent-server/native.js": "323f31705cab9798d8e83380a455d2bbe78ab28ce11c1a181febf58601ce4607",
     "extensions/ordessa.agent-sessions/entry.js": "4672169795b0a270246a806ebfc150bb9eebb64183d73ac26b3488945cddd931",
     "extensions/ordessa.agent-sessions/manifest.json": "388cb60e6390898a419e2e55f3ef28b9948d1e755210c4d0e342b2a43b486066",
     "extensions/ordessa.commands/entry.js": "5753e6e0802627ebf4ac4f1d65e6fc6e536ccd4cd7d1a831781da3d1c5215381",

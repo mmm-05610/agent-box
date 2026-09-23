@@ -42,14 +42,42 @@ const unknownRequest = classifyPairNetwork(traces, { constants, events: [...even
   { time: '1330', type: 20, source: source(1, 9), params: { url: 'https://other.invalid/unknown', method: 'GET' } }] }, origin)
 assert.equal(unknownRequest.pass, false)
 assert.equal(unknownRequest.unknownRequests, 1)
+const resourceUrl = 'https://resource.invalid/dict/en.bdic?signature=FAKE_RESOURCE_SIGNATURE'
+const withRedirect = location => [...events,
+  { time: '1315', type: 13, source: source(1, 2), params: { location } },
+  { time: '1320', type: 20, source: source(1, 2), params: { url: location, method: 'GET' } }]
+const approvedRedirect = classifyPairNetwork(traces, { constants, events: withRedirect(resourceUrl) }, origin)
+assert.equal(approvedRedirect.pass, true)
+assert.equal(approvedRedirect.dictionaryRequests, 1)
 const dictionaryRedirect = classifyPairNetwork(traces, { constants, events: [...events,
   { time: '1320', type: 20, source: source(1, 2), params: { url: 'https://unreviewed.invalid/dict/en.bdic' } }] }, origin)
 assert.equal(dictionaryRedirect.pass, false)
 assert.equal(dictionaryRedirect.unknownRequests, 1)
-const sameOriginRedirect = classifyPairNetwork(traces, { constants, events: [...events,
-  { time: '1320', type: 13, source: source(1, 2), params: { url: 'https://redirector.gvt1.com/edgedl/chrome/dict/en.bdic' } }] }, origin)
-assert.equal(sameOriginRedirect.pass, false)
-assert.equal(sameOriginRedirect.unknownRequests, 1)
+for (const location of ['http://resource.invalid/dict/en.bdic',
+  'https://user:password@resource.invalid/dict/en.bdic',
+  'https://resource.invalid/not-a-dictionary',
+  'https://resource.invalid/dict/en.bdic?server_token=FAKE_BEARER']) {
+  const refused = classifyPairNetwork(traces, { constants, events: withRedirect(location) }, origin)
+  assert.equal(refused.pass, false)
+  assert.equal(refused.unknownRequests, 1)
+}
+for (const params of [{ headers: ['Authorization: Bearer FAKE_BEARER'] },
+  { request_body: 'FAKE_PROMPT' }, { upload_data: 'FAKE_PROMPT' }]) {
+  const leaked = classifyPairNetwork(traces, { constants, events: [...withRedirect(resourceUrl),
+    { time: '1325', type: 20, source: source(1, 2), params }] }, origin)
+  assert.equal(leaked.pass, false)
+  assert.equal(leaked.unknownRequests, 1)
+}
+const crossUsed = classifyPairNetwork(traces, { constants, events: events.map(event =>
+  event.source?.type === 1 && event.source?.id === 2 ? { ...event, params: { ...event.params,
+    url: `${origin}/wire/v1/sessions.createAndSend`, method: 'POST' } } : event) }, origin)
+assert.equal(crossUsed.pass, false, 'dictionary annotation cannot relabel a business POST')
+const serverRedirect = classifyPairNetwork(traces, { constants, events: [...events,
+  { time: '1120', type: 13, source: source(1, 1), params: { location: resourceUrl } }] }, origin)
+assert.equal(serverRedirect.pass, false, 'business Server fetch cannot borrow the dictionary redirect rule')
+const missingLocation = classifyPairNetwork(traces, { constants, events: [...events,
+  { time: '1315', type: 13, source: source(1, 2), params: {} }] }, origin)
+assert.equal(missingLocation.pass, false)
 const wrongDictionaryPath = classifyPairNetwork(traces, { constants, events: events.map(event =>
   event.source?.type === 1 && event.source?.id === 2 ? { ...event, params: { ...event.params,
     url: 'https://redirector.gvt1.com/unrelated/en.bdic' } } : event) }, origin)
@@ -66,6 +94,7 @@ assert.equal(credentialDestinationAllowed('http://127.0.0.1:43891/wire/v1/server
 assert.ok(!JSON.stringify({ positive }).includes(fakeSecret))
 console.log(JSON.stringify({ synthetic: 'PASS', udpProbeNotTcp: true, remoteTcpRejected: true,
   remoteSendRejected: true, unknownTypeRejected: true, unknownRequestRejected: true,
-  credentialRemoteRejected: true, dictionaryRedirectRejected: true, sameOriginRedirectRejected: true,
+  credentialRemoteRejected: true, reviewedDictionaryRedirectAccepted: true, unexplainedRedirectRejected: true,
+  downgradeUserinfoBodyAuthRejected: true, businessDictionaryCrossUseRejected: true,
   wrongDictionaryPathRejected: true, missingDestinationRejected: true,
   truncatedRejected: true, redacted: true }))
