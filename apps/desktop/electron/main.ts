@@ -99,18 +99,28 @@ app.whenReady().then(async () => {
     }
     if (process.env.MODULAR_AGENT_SHELL_SMOKE === '1') {
       Object.assign(result, { agentShell: await win.webContents.executeJavaScript(`(async () => {
+        const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
         const entry = [...document.querySelectorAll('nav button')].find(button => button.getAttribute('aria-label') === 'Agents');
-        entry?.click(); await new Promise(resolve => setTimeout(resolve, 100));
-        const statusToggle = document.querySelector('.conn-status-toggle');
-        statusToggle?.click(); await new Promise(resolve => setTimeout(resolve, 100));
+        entry?.click(); await wait(100);
+        const emptyConversation = !!document.querySelector('.agent-placeholder')?.textContent.includes('Choose a connection');
+        const toggle = document.querySelector('.conn-status-toggle');
+        toggle?.click(); await wait(100);
         const popover = document.querySelector('[role="group"][aria-label="Agent connections"]');
         const connectorButtons = popover ? [...popover.querySelectorAll('button')] : [];
+        const tab = label => [...document.querySelectorAll('[data-region] header [role="group"] button')].find(button => button.textContent === label);
+        tab('Sessions')?.click(); await wait(100);
+        const panel = document.querySelector('.agent-sessions');
+        const panelButtons = panel ? [...panel.querySelectorAll('button')] : [];
         return {
-          navigation: !!entry,
+          navigation: !!entry, statusbarToggle: !!toggle, popover: !!popover,
           codexVisible: connectorButtons.some(button => button.textContent.includes('Codex')),
           piVisible: connectorButtons.some(button => button.textContent.includes('Pi')),
-          emptyConversation: !!document.querySelector('.agent-placeholder')?.textContent.includes('Choose a connection'),
-          requestsView: [...document.querySelectorAll('[data-region="right"] [role="group"] button')].some(button => button.textContent === 'Requests'),
+          emptyConversation,
+          newSessionEntry: panelButtons.some(button => button.textContent === 'New session'),
+          panelOwnConnectionUi: !!panel?.querySelector('.conn-status') || panelButtons.some(button => ['Reconnect', 'Connect'].includes(button.textContent)),
+          projectPicker: !!document.querySelector('.agent-project-picker'),
+          rightRequests: [...document.querySelectorAll('[data-region="right"] button')].some(button => button.textContent === 'Requests'),
+          rightTab: !!tab('Requests'),
         };
       })()`) })
     }

@@ -16,7 +16,14 @@ try {
   assert.deepEqual(result.errors, [])
   assert.ok(result.pages.includes('Conversation'))
   assert.ok(result.pages.includes('Sessions'))
-  assert.ok(result.pages.includes('Requests'))
-  assert.deepEqual(result.agentShell, { navigation: true, codexVisible: true, piVisible: true, emptyConversation: true, requestsView: true })
+  assert.ok(!result.pages.includes('Requests'))
+  assert.deepEqual(result.agentShell, {
+    navigation: true, statusbarToggle: true, popover: true,
+    codexVisible: true, piVisible: true,
+    emptyConversation: true,
+    newSessionEntry: true, panelOwnConnectionUi: false,
+    projectPicker: false,
+    rightRequests: false, rightTab: false,
+  })
   console.log(JSON.stringify({ ready: result.ready, pages: result.pages, agentShell: result.agentShell, nodeAbsent: result.nodeAbsent }))
 } finally { await rm(home, { recursive: true, force: true }) }
