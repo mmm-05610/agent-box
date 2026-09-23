@@ -155,7 +155,9 @@ app.whenReady().then(async () => {
       })()`) })
     }
     console.log('MODULAR_LOADER_READY', JSON.stringify(result))
-    app.exit(result.ready && result.nodeAbsent ? 0 : 1)
+    // C-0074 paired diagnostic needs the command-line default NetLog to flush on normal quit.
+    if (process.env.MODULAR_PAIR_NETWORK_DIAG === '1' && process.env.MODULAR_NATIVE_PAIR_SMOKE === '1') app.quit()
+    else app.exit(result.ready && result.nodeAbsent ? 0 : 1)
   }
 }).catch(error => { console.error(error); app.exit(1) })
 app.on('window-all-closed', () => app.quit())
