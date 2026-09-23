@@ -135,6 +135,11 @@ export interface AgentWorkspaceSnapshot {
     workspaceId?: string
     canSend: boolean
     blockReason?: 'unsupported' | 'no-project' | 'project-invalid'
+    /** How the last draft ended, so downstream can distinguish without guessing (C-0030):
+     * 'discarded' = discardDraft, the previously selected session was never cleared and is restored;
+     * 'opened' = openSession moved the selection away from the draft. Cleared by the next startDraft;
+     * an accepted first send ends the draft by selecting the new real session and reports no endedBy. */
+    endedBy?: 'discarded' | 'opened'
   }
 }
 /** Owns connected instances independently of mounted Workbench views. */

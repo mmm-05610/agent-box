@@ -9,7 +9,7 @@ import type { AgentClient, AgentConnections, AgentSessions, AgentSnapshot, Agent
 export function createAgentSessions(lifetime: ResourceScope, connections: AgentConnections): AgentSessions {
   void lifetime // workspace ownership moved to the connections service scope (P2-1)
   const workspace = connections.workspace
-  interface ConnState { draftActive: boolean; requestId?: string; restoreFailed: boolean }
+  interface ConnState { draftActive: boolean; draftEndedBy?: 'discarded' | 'opened'; requestId?: string; restoreFailed: boolean }
   const states = new Map<string, ConnState>()
   const stateFor = (id: string) => { let s = states.get(id); if (!s) states.set(id, s = { draftActive: false, restoreFailed: false }); return s }
   // Non-secret UI selection: last valid project per authenticated Server instance (origin+serverId),
@@ -68,7 +68,7 @@ export function createAgentSessions(lifetime: ResourceScope, connections: AgentC
   let cached: { base: AgentWorkspaceSnapshot; signature: string; derived: AgentWorkspaceSnapshot } | null = null
   const signature = (base: AgentWorkspaceSnapshot) => {
     const state = base.selectedConnectionId ? stateFor(base.selectedConnectionId) : undefined
-    return `${base.selectedConnectionId ?? '-'}|${state?.draftActive}|${state?.restoreFailed}|${base.agent?.connection.capabilities.workspaces}|${base.agent?.workspaces?.selectedWorkspaceId}`
+    return `${base.selectedConnectionId ?? '-'}|${state?.draftActive}|${state?.draftEndedBy}|${state?.restoreFailed}|${base.agent?.connection.capabilities.workspaces}|${base.agent?.workspaces?.selectedWorkspaceId}`
   }
   function derive(base: AgentWorkspaceSnapshot): AgentWorkspaceSnapshot {
     if (!base.selectedConnectionId) return base
@@ -81,6 +81,7 @@ export function createAgentSessions(lifetime: ResourceScope, connections: AgentC
       workspaceId: base.agent?.workspaces?.selectedWorkspaceId,
       canSend: block === undefined,
       ...(block ? { blockReason: block } : {}),
+      ...(state.draftEndedBy ? { endedBy: state.draftEndedBy } : {}),
     } }
   }
   const gate = () => {
@@ -103,13 +104,25 @@ export function createAgentSessions(lifetime: ResourceScope, connections: AgentC
     refreshSessions: () => workspace.selected().refreshSessions(),
     // Legacy passthrough kept type-compatible for the direct prototypes; the CP UI never calls it (FC-0021).
     newSession: () => workspace.selected().newSession().then(() => undefined),
-    openSession: id => { const state = workspace.getSnapshot().selectedConnectionId ? stateFor(workspace.getSnapshot().selectedConnectionId!) : undefined; if (state) state.draftActive = false; return workspace.selected().openSession(id) },
+    openSession: id => {
+      const connId = workspace.getSnapshot().selectedConnectionId
+      const state = connId ? stateFor(connId) : undefined
+      // Opening a session ends an active draft as a step-away (C-0030): the draft may be
+      // resumed by a later startDraft with its own semantics; nothing is sent on this path.
+      if (state?.draftActive) { state.draftActive = false; state.draftEndedBy = 'opened' }
+      return workspace.selected().openSession(id)
+    },
     send: async text => {
       const client = workspace.selected()
-      const sessionId = client.getSnapshot().selectedSessionId
-      if (sessionId) return client.send(sessionId, text) // existing session keeps its own bound project
       const state = stateFor(workspace.getSnapshot().selectedConnectionId ?? '-')
-      if (!state.draftActive) throw Error('No Agent session selected')
+      // C-0030: while a draft is active its send is exactly one createAndSend — a previously
+      // selected session must never capture the draft's first text. Continuation only applies
+      // outside a draft, and keeps that session's own bound project.
+      if (!state.draftActive) {
+        const sessionId = client.getSnapshot().selectedSessionId
+        if (sessionId) return client.send(sessionId, text)
+        throw Error('No Agent session selected')
+      }
       gate() // first send is blocked without a revalidated project — never falls back
       if (!client.createAndSend) throw Error('Agent project gate: unsupported')
       const workspaceId = client.getSnapshot().workspaces?.selectedWorkspaceId!
@@ -127,6 +140,7 @@ export function createAgentSessions(lifetime: ResourceScope, connections: AgentC
           throw Error('Agent first-send session mismatch')
         state.requestId = undefined
         state.draftActive = false
+        state.draftEndedBy = undefined // an accepted send ends the draft by selecting the new real session
         notify()
       } catch (error) { notify(); throw error }
     },
@@ -137,8 +151,11 @@ export function createAgentSessions(lifetime: ResourceScope, connections: AgentC
     },
     respond: (id, answer) => workspace.selected().respond(id, answer),
     setOption: (id, value) => workspace.selected().setOption(id, value),
-    startDraft: () => { const id = workspace.getSnapshot().selectedConnectionId; if (id) { stateFor(id).draftActive = true; notify() } },
-    discardDraft: () => { const id = workspace.getSnapshot().selectedConnectionId; if (id) { const state = stateFor(id); state.draftActive = false; state.requestId = undefined; notify() } },
+    // startDraft deliberately leaves the client-side selection untouched: discarding must
+    // restore the previously selected session (C-0030), and safety comes from send() never
+    // routing to a selection while a draft is active.
+    startDraft: () => { const id = workspace.getSnapshot().selectedConnectionId; if (id) { const state = stateFor(id); state.draftActive = true; state.draftEndedBy = undefined; notify() } },
+    discardDraft: () => { const id = workspace.getSnapshot().selectedConnectionId; if (id) { const state = stateFor(id); const wasActive = state.draftActive; state.draftActive = false; state.requestId = undefined; if (wasActive) state.draftEndedBy = 'discarded'; notify() } },
     selectWorkspace: async id => {
       const client = workspace.selected()
       if (!client.openWorkspace) throw Error('Agent project gate: unsupported')

@@ -271,3 +271,80 @@ it('an accepted-but-unverifiable first send never lists a ghost session and keep
   expect(sessions.getSnapshot().draft?.active).toBe(false)
   expect(a.client.getSnapshot().sessions.filter(s => s.id === 'R1')).toHaveLength(1)
 })
+
+it('draft first send reaches createAndSend exactly once and never the previously open session (C-0030 拦截反例)', async () => {
+  const a = projectClient('A', 'https://s1')
+  const sessions = await harness({ id: 'A', build: () => a.client })
+  await sessions.selectConnection('A')
+  await sessions.openSession('E1') // an old session is selected before New session is clicked
+  await sessions.selectWorkspace!('/srv/a')
+  sessions.startDraft!()
+  expect(a.client.getSnapshot().selectedSessionId).toBe('E1') // startDraft deliberately keeps it for discard-restore
+  await sessions.send('draft text')
+  expect(a.calls.sends).toHaveLength(1)
+  expect(a.calls.sends[0]).toMatchObject({ workspaceId: '/srv/a', text: 'draft text' })
+  expect(a.client.getSnapshot().messages.E1).toBeUndefined() // the old session never captured the draft text
+  expect(a.client.getSnapshot()).toMatchObject({ selectedSessionId: 'R1' })
+  const draft = sessions.getSnapshot().draft
+  expect(draft?.active).toBe(false)
+  expect(draft?.endedBy).toBeUndefined() // an accepted send is distinguishable from discard/away
+})
+
+it('discardDraft restores the previously selected session in place and reports endedBy discarded (恢复定义)', async () => {
+  const a = projectClient('A', 'https://s1')
+  const sessions = await harness({ id: 'A', build: () => a.client })
+  await sessions.selectConnection('A')
+  await sessions.openSession('E1')
+  await sessions.selectWorkspace!('/srv/a')
+  sessions.startDraft!()
+  sessions.discardDraft!()
+  expect(sessions.getSnapshot().draft).toMatchObject({ active: false, endedBy: 'discarded' })
+  expect(a.client.getSnapshot().selectedSessionId).toBe('E1') // restore = the selection was never cleared
+  expect(a.calls.sends).toHaveLength(0)
+})
+
+it('openSession during an active draft ends it as opened and sends nothing (可区分下游语义)', async () => {
+  const a = projectClient('A', 'https://s1')
+  const sessions = await harness({ id: 'A', build: () => a.client })
+  await sessions.selectConnection('A')
+  await sessions.openSession('E1')
+  await sessions.selectWorkspace!('/srv/a')
+  sessions.startDraft!()
+  await sessions.openSession('E1')
+  expect(sessions.getSnapshot().draft).toMatchObject({ active: false, endedBy: 'opened' })
+  expect(a.calls.sends).toHaveLength(0)
+  // The step-away is resumable: a re-start keeps the held requestId path intact and ends cleanly.
+  sessions.startDraft!()
+  expect(sessions.getSnapshot().draft).toMatchObject({ active: true })
+  expect(sessions.getSnapshot().draft?.endedBy).toBeUndefined() // startDraft clears the previous ending
+})
+
+it('an unknown draft outcome with an old session selected keeps the requestId and never falls back to it (unknown 不降级)', async () => {
+  const a = projectClient('A', 'https://s1', { rejectFirstSend: true })
+  const sessions = await harness({ id: 'A', build: () => a.client })
+  await sessions.selectConnection('A')
+  await sessions.openSession('E1')
+  await sessions.selectWorkspace!('/srv/a')
+  sessions.startDraft!()
+  await expect(sessions.send('hi')).rejects.toThrow('outcome unknown')
+  expect(sessions.getSnapshot().draft?.active).toBe(true)
+  await sessions.send('hi')
+  expect(a.calls.sends).toHaveLength(2)
+  expect(a.calls.sends[0]!.requestId).toBe(a.calls.sends[1]!.requestId)
+  expect(a.client.getSnapshot().messages.E1).toBeUndefined() // retry also goes only through createAndSend
+})
+
+it('switching connections with a live draft sends nothing on either side (切换零发送)', async () => {
+  const a1 = projectClient('A1', 'https://s1')
+  const a2 = projectClient('A2', 'https://s2')
+  const sessions = await harness({ id: 'A1', build: () => a1.client }, { id: 'A2', build: () => a2.client })
+  await sessions.selectConnection('A1')
+  sessions.startDraft!()
+  await sessions.selectConnection('A2')
+  expect(sessions.getSnapshot().draft).toMatchObject({ active: false, canSend: false, blockReason: 'no-project' })
+  expect(a2.calls.sends).toHaveLength(0)
+  await sessions.selectConnection('A1')
+  expect(sessions.getSnapshot().draft?.active).toBe(true) // draft state is per-connection, never leaked or sent
+  expect(a1.calls.sends).toHaveLength(0)
+  expect(a2.calls.sends).toHaveLength(0)
+})
