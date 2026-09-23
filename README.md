@@ -9,7 +9,7 @@
 ```text
 apps/desktop/
   electron/                    窗口、受限清单 IPC、文件协议、发现
-  src/                         启动、最小诊断、React 入口、测试
+  renderer/                    启动、最小诊断、React 入口、测试
   scripts/                     构建、启动、Electron 验收
 platform/
   extension-api/               Token、PluginContext、资源作用域、根贡献
@@ -24,37 +24,33 @@ contracts/
   agent-ui/                    运行时工件 ordessa.agent-contracts（re-export 下列两域）
   connections/                 AgentConnections 服务 Token 契约
   agent/                       共享 Agent 语义契约与 AgentSessions Token
-extensions/
-  commands/src/entry.ts        命令服务（不是按钮）
-  workbench/src/
-    entry.tsx                  提供服务并挂载根界面
-    model.ts                   注册表、视图打开/关闭状态
-    shell.tsx                  五区域、整页、导航/工具/状态插槽
-    styles.ts                  紧凑桌面布局、分隔线与拖放提示
-  settings/src/
-    entry.tsx                  注册命令、整页和导航入口
-    model.ts                   设置分组与项目注册表
-    page.tsx                   设置分类、字段与自定义区块
-    field.tsx                  读写/订阅、校验、竞争保护
-  shared/                      扩展内部小型辅助代码，不是宿主服务
-  product.json                 产品默认启用名单
-  build.mjs                   单独构建基础扩展及契约工件
+plugins/
+  commands/                    命令服务（不是按钮）
+  workbench/                   五区域整页壳、导航/工具/状态插槽
+  settings/                    设置分组、页面与字段读写
+  connections/service/         接入登记与连接服务（两适配器注册同一服务）
+  agent/
+    sessions/                  连接/会话所有权，独立于挂载视图
+    conversation/              assistant-ui 对话视图（Sessions/Conversation/Requests）
+    interactions/              待处理交互视图
+  connectors/
+    codex/                     Codex 0.155.1 App Server 适配器
+    pi/                        Pi 0.86.1 RPC 适配器（每会话一个 RPC 进程）
+products/agent-desktop/
+  extensions.json              产品默认启用名单（双 Agent 全量，运行时唯一名单）
+  extensions.foundations.json  仅基础三件套的附属名单
+  extensions.lock.json         交付核对锁（文件 sha256 + 生成时 base，运行时不读）
+tooling/
+  build-all.mjs                按 package.json ordessa 段发现并串行构建全部插件包
+  build-extension.mjs          单包 esbuild 构建契约（external pin 集、native、清单拷贝）
+  build-examples.mjs           独立样例构建
 examples/                      独立样例，不默认安装/启用
-contracts/agent-ui/            共享 Agent 语义契约与服务 Token（域：contracts/connections + contracts/agent）
-contracts/foundation/          独立 Commands/Workbench/Settings Token 契约（域：contracts/{commands,workbench,settings}）
-extensions/
-  agent-connections/           接入登记与连接服务（两适配器注册同一服务）
-  agent-sessions/              连接/会话所有权，独立于挂载视图
-  agent-conversation/          assistant-ui 对话视图（Sessions/Conversation/Requests）
-  agent-interactions/          待处理交互视图
-  agent-codex/                 Codex 0.155.1 App Server 适配器
-  agent-pi/                    Pi 0.86.1 RPC 适配器（每会话一个 RPC 进程）
-  agent-preview.json           双 Agent 预览启用名单（显式选择，不是产品默认）
 ```
 
-`foundation-contracts` 构建为 `ordessa.contracts` 扩展工件，消费者统一导入
+每个插件与契约包自带 package.json（含 `ordessa` 段）、静态 manifest.json 与 build.mjs；
+`contracts/foundation` 构建为 `ordessa.contracts` 扩展工件，消费者统一导入
 `@extensions/ordessa.contracts/contract.js`，保证 Token 字节模块身份一致。
-替换实现不需要保留旧实现包。当前契约在一个工件中，未把每个类型拆成独立 npm 包。
+替换实现不需要保留旧实现包。当前契约在各运行时工件内为多域 re-export，未把每个域拆成独立运行时插件。
 
 ## 启动与验证
 
@@ -75,8 +71,8 @@ xvfb-run -a npm run test:agent-shell
 ```
 
 默认显示空工作台与“设置”入口，设置页默认没有业务设置。
-默认启用名单来自 `extensions/product.json`，不是宿主里的具体插件导入。
-构建工件在 `extensions/dist/`，分发时需与 `apps/desktop/dist/` 一起保留当前相对布局。
+默认启用名单来自 `products/agent-desktop/extensions.json`，不是宿主里的具体插件导入。
+构建工件在 `products/agent-desktop/dist/`，分发时需与 `apps/desktop/dist/` 一起保留当前相对布局。
 
 start/dev 的本地扩展目录默认 `.local-desktop`，可由 `ORDESSA_EXTENSION_HOME` 指定。
 其 `extensions.json` 若存在，**完整替代**默认名单；`{"enabled":[]}` 明确回到无根界面的最小宿主。
@@ -160,7 +156,7 @@ settings 不保存配置，不接触凭据，也不替业务提供者决定数�
 ## Agent 接入（Codex 与 Pi，同一套 UI）
 
 两个适配器注册到同一个 scoped 连接服务，同一界面内切换连接，不改 UI 代码，不依赖 Ordessa 后端。
-`extensions/agent-preview.json` 是显式预览名单，包含两个适配器；产品默认名单 `product.json` 不含它们。
+`products/agent-desktop/extensions.json` 是运行时默认名单，包含两个适配器；附属的 `extensions.foundations.json` 仅含基础三件套。
 
 启用预览（不会改写已有配置，`extensions.json` 是完整覆盖）：
 

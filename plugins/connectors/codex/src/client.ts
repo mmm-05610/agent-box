@@ -1,5 +1,5 @@
 import type { AgentClient, AgentInteraction, AgentMessage, AgentOption, AgentSnapshot, AgentToolCall, InteractionAnswer, RunStatus } from '@extensions/ordessa.agent-contracts/contract.js'
-import type { AgentNativeBridge } from '../../../../apps/desktop/src/agent-native'
+import type { AgentNativeBridge } from '../../../../apps/desktop/renderer/agent-native'
 import type { InitializeParams } from './generated/InitializeParams'
 import type { Thread } from './generated/v2/Thread'
 import type { ThreadItem } from './generated/v2/ThreadItem'

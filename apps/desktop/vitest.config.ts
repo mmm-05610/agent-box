@@ -5,5 +5,5 @@ export default defineConfig({
     '@extensions/ordessa.contracts/contract.js': fileURLToPath(new URL('../../contracts/foundation/src/contract.ts', import.meta.url)),
     '@extensions/ordessa.agent-contracts/contract.js': fileURLToPath(new URL('../../contracts/agent-ui/src/contract.ts', import.meta.url)),
   } },
-  test: { include: ['src/**/*.test.tsx', 'src/**/*.test.ts'] },
+  test: { include: ['renderer/**/*.test.tsx', 'renderer/**/*.test.ts'] },
 })

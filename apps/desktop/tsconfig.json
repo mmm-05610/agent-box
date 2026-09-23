@@ -21,7 +21,7 @@
     ]
   },
   "include": [
-    "src",
+    "renderer",
     "electron",
     "../../platform/*/src",
     "../../contracts/*/src",

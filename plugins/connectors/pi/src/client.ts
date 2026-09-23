@@ -1,5 +1,5 @@
 import type { AgentClient, AgentInteraction, AgentMessage, AgentOption, AgentSnapshot, AgentToolCall, InteractionAnswer, RunStatus } from '@extensions/ordessa.agent-contracts/contract.js'
-import type { AgentNativeBridge } from '../../../../apps/desktop/src/agent-native'
+import type { AgentNativeBridge } from '../../../../apps/desktop/renderer/agent-native'
 
 type Value = Record<string, unknown>
 const object = (value: unknown): Value | undefined => value && typeof value === 'object' && !Array.isArray(value) ? value as Value : undefined
