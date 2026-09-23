@@ -195,6 +195,13 @@ it('draft UI: New session opens the picker with zero backend calls, picking clea
   await act(async () => { project.click() })
   expect(project.getAttribute('aria-pressed')).toBe('true')
   expect(container.querySelector('p.agent-notice')).toBeNull()
+  // Renderer remount (FC-0030): the draft and its validated selection live in the service, so a
+  // freshly mounted browser restores the same picker state without any new backend operation.
+  const again = await mount(<SessionBrowser service={sessions} />)
+  expect(again.querySelector('.agent-draft')).not.toBeNull()
+  expect([...again.querySelectorAll('.agent-project-picker button')]
+    .find(node => node.textContent === '/srv/a')?.getAttribute('aria-pressed')).toBe('true')
+  expect(again.querySelector('p.agent-notice')).toBeNull()
   const discard = [...container.querySelectorAll('button')].find(node => node.textContent === 'Discard draft')!
   await act(async () => { discard.click() })
   expect(container.querySelector('.agent-draft')).toBeNull()

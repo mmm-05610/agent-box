@@ -11,7 +11,7 @@ interface ProjectCall { workspaceId: string; text: string; requestId: string }
 
 /** Reactive fake backend-capable client; every createAndSend/openWorkspace is recorded and
  * `fails` stays mutable so a project can become invalid after it was remembered. */
-function projectClient(id: string, serverInstanceId: string | undefined, options: { rejectFirstSend?: boolean; drop?: string } = {}) {
+function projectClient(id: string, serverInstanceId: string | undefined, options: { rejectFirstSend?: boolean; ghostFirstSend?: boolean; drop?: string } = {}) {
   let snapshot: AgentSnapshot = {
     connection: { id, title: id, status: 'connected', ...(serverInstanceId ? { serverInstanceId } : {}), capabilities },
     sessions: [{ id: 'E1', title: 'Existing chat', workspaceId: '/srv/old' }],
@@ -47,6 +47,7 @@ function projectClient(id: string, serverInstanceId: string | undefined, options
       sends.push({ workspaceId, text, requestId })
       sendAttempt += 1
       if (options.rejectFirstSend && sendAttempt === 1) throw Error('outcome unknown after disconnect')
+      if (options.ghostFirstSend && sendAttempt === 1) return { sessionId: 'ghost' } // "accepted" while the snapshot still lacks it (FC-0031)
       write({
         selectedSessionId: 'R1',
         sessions: [...snapshot.sessions, { id: 'R1', title: text.slice(0, 12), workspaceId }],
@@ -253,4 +254,20 @@ it('a stored id no longer listed unarchived blocks sends without opening it, and
   await later.selectConnection('L2')
   expect(fresh.calls.opens).toHaveLength(0)
   expect(later.getSnapshot().draft).toMatchObject({ canSend: false, blockReason: 'no-project' })
+})
+
+it('an accepted-but-unverifiable first send never lists a ghost session and keeps the same requestId for the retry (FC-0031)', async () => {
+  const a = projectClient('A', 'https://s1', { ghostFirstSend: true })
+  const sessions = await harness({ id: 'A', build: () => a.client })
+  await sessions.selectConnection('A')
+  await sessions.selectWorkspace!('/srv/a')
+  sessions.startDraft!()
+  await expect(sessions.send('hi')).rejects.toThrow('first-send session mismatch')
+  expect(a.client.getSnapshot().sessions.map(s => s.id)).not.toContain('ghost') // no fabricated history entry or draft end
+  expect(sessions.getSnapshot().draft?.active).toBe(true)
+  await sessions.send('hi') // a retry replays the same requestId; only the snapshot-confirmed id ends the draft
+  expect(a.calls.sends).toHaveLength(2)
+  expect(a.calls.sends[0]!.requestId).toBe(a.calls.sends[1]!.requestId)
+  expect(sessions.getSnapshot().draft?.active).toBe(false)
+  expect(a.client.getSnapshot().sessions.filter(s => s.id === 'R1')).toHaveLength(1)
 })
