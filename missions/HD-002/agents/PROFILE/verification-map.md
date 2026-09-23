@@ -25,3 +25,16 @@
 
 - BE：在 `f3bcbde9` **现跑** `PYTHONPATH=src python3 -m unittest discover -s tests -p "test_*.py"` → `Ran 58 tests … OK`，跑后 `git status --porcelain` 仍空（无写产物）。
 - FE：在 `e869683469` 现跑于 `/tmp` 镜像（同一借用 TS 6.0.3）→ tsc `--noEmit` exit 0、CJS 出件 exit 0、`node --test` **12 passed / 0 failed**、esbuild `/tmp` 15.4kb；产品树 `git status --porcelain` 空。
+
+## 复跑配方（供暂停/接手后不重新摸索，均为本机实测过的形状）
+
+本机事实先记账，否则会白试：这台机器的 Node 构建**没有 TypeScript 支持**（直接跑 `.ts` 报 `ERR_NO_TYPESCRIPT`），没有 `pytest`，`uv` 建的 venv 里没有 `pip`；仓库内**零安装**是本包的边界，所以借用姊妹树 `harness-desktop-002/fc/node_modules`（实测存在 `typescript/bin/tsc` = Version 6.0.3、`.bin/esbuild`）跑门，产品树与被测提交都不因此改动。借用根路径为绝对 `/home/maoqh/projects/ordessa/worktrees/harness-desktop-002/fc/node_modules`，从 `profile/backend/plugins/...` 用 `../../fc` 之类相对路径**够不到**（本轮照错写法实测 `No such file or directory`）。
+
+1. 镜像：`mkdir -p /tmp/pf-run/{plugins,platform}` → 拷 `frontend/plugins/profile`、`frontend/platform/extension-api` → `ln -s <上面那个绝对路径> /tmp/pf-run/node_modules`。
+2. 类型门：`node <fc>/node_modules/typescript/bin/tsc -p plugins/profile/tsconfig.json --noEmit` → exit 0（含 `src/*.tsx` 与 tests）。
+3. 为跑 `node --test` 需先出 CJS 副本：同一 `tsc` 加 `--rewriteRelativeImportExtensions --allowImportingTsExtensions --esModuleInterop --types node`，输出到 `/tmp/pf-run/cjs` → exit 0。**不要**再传 `--moduleResolution node10`：TS 6 以 `TS5107` 直接失败（本包两次踩过）。然后 `node --test tests/*.test.js` → 12 passed / 0 failed。
+4. 产物门：复刻 `tooling/build-extension.mjs` 的选项（bundle/splitting/esm/browser/jsx automatic + 同 externals）用 esbuild 出到 `/tmp/pf-ext/ordessa.profile`，**因为 `buildExtension` 的 `outputRoot` 是 `products/agent-desktop/dist`，属产品装配、在本包写域外**；出件 exit 0、15.4kb、含真实 ProfilePanel。
+5. BE：`PYTHONPATH=src python3 -m unittest discover -s tests -p "test_*.py"` → `Ran 58 tests … OK`（系统解释器 3.14，无安装）。**必须 `cd` 到 `profile/backend/plugins/agent-box-profile-preset/` 再跑**：在 backend 仓库根跑会命中主线自己的 `src/` 与 `tests/`，本轮实测得到误导性的 `Ran 9 tests … FAILED (errors=9)`，那不是本包回归。加 `PYTHONDONTWRITEBYTECODE=1` 可保证跑后 `git status --porcelain` 仍空。分发级隔离证明另有 `python3 -m pip wheel --no-deps --no-build-isolation --no-index -w /tmp/pfwheel .`，其 11 条目无 `entry_points.txt`、`METADATA` 无 `Requires-Dist`。
+6. **绝不跑** `tooling/build-all.mjs`：它自动发现带 `ordessa.id` 的 `plugins/**/package.json` 并重写已提交的 `products/agent-desktop/extensions.lock.json`（该风险仍是活的，处置权在 FC/C，见 status 的 `synced_facts`）。
+
+本配方第 2–5 条的路径与 cwd 陷阱在 04:33 当场实测过（BE 58 现跑 OK、两树仍 clean、tsc/esbuild 路径存在）；FE 的 3、4 两条沿用当轮跑出 12/12 与 15.4kb 的同一命令行形状，未在今日重跑全链——若复跑与此处不符，以现跑输出为准并把差异登记进 status。本表只声明「独立插件验证」，复跑全绿也不构成接缝验证、产品装配或用户验收。
