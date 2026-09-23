@@ -1,4 +1,4 @@
-import { useState, useSyncExternalStore } from 'react'
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { AssistantRuntimeProvider, useExternalStoreRuntime, ThreadPrimitive, MessagePrimitive, MessagePartPrimitive,
   type AppendMessage, type ThreadMessageLike, type ToolCallMessagePartProps } from '@assistant-ui/react'
 import type { AgentMessage, AgentSessions, AgentToolCall, AgentWorkspaceSnapshot } from '@extensions/ordessa.agent-contracts/contract.js'
@@ -15,6 +15,11 @@ const draftBlockCopy: Record<NonNullable<Draft['blockReason']>, string> = {
 }
 
 function useWorkspace(service: AgentSessions) { return useSyncExternalStore(service.subscribe, service.getSnapshot) }
+// Pane identity inside one connection: a draft is keyed by a fixed marker that no session id can produce,
+// so `session:<id>` and the draft slot never collide (FC-0052).
+const draftPane = 'draft'
+const sessionPane = (sessionId: string) => `session:${sessionId}`
+interface Compositions { read(connectionId: string, pane: string): string; write(connectionId: string, pane: string, value: string): void }
 const errorText = (error: unknown) => error instanceof Error ? error.message : String(error)
 // Provider and thinking-intensity selection stay off this surface by product decision; any other supported option still renders.
 const hiddenOptionIds = new Set(['model', 'thinking', 'effort'])
@@ -49,12 +54,17 @@ function ToolPart({ toolName, argsText, result, artifact }: ToolCallMessagePartP
 function ChatMessage() {
   return <MessagePrimitive.Root className="agent-message"><MessagePrimitive.Parts components={{ Text: TextPart, Reasoning: ReasoningPart, tools: { Fallback: ToolPart } }} /></MessagePrimitive.Root>
 }
-function ConversationThread({ service, connectionId, sessionId, draft }: { service: AgentSessions; connectionId: string; sessionId: string; draft: Draft | undefined }) {
+function ConversationThread({ service, connectionId, sessionId, draft, compositions }: { service: AgentSessions; connectionId: string; sessionId: string; draft: Draft | undefined; compositions: Compositions }) {
   const state = useWorkspace(service), agent = state.agent!
   const [actionError, setActionError] = useState('')
-  // Held in this component so a rejected send cannot silently empty the field (FC-0043 Q3).
-  const [text, setText] = useState(''), [sending, setSending] = useState(false)
+  // FC-0043's rule, kept deliberately: a draft is the pane only while nothing is selected, because the
+  // facade routes a send by `selectedSessionId` first (plugins/agent/sessions/src/model.ts:110).
   const drafting = !sessionId && draft?.active === true
+  const pane = drafting ? draftPane : sessionPane(sessionId)
+  // Held above the keyed remount so switching panes costs the user nothing, and a rejected send cannot
+  // silently empty the field (FC-0043 Q3).
+  const [text, setText] = useState(() => compositions.read(connectionId, pane)), [sending, setSending] = useState(false)
+  const edit = (value: string) => { setText(value); compositions.write(connectionId, pane, value) }
   const blocked = drafting && draft?.canSend === false
   const messages = agent.messages[sessionId] ?? []
   const run = Object.values(agent.runs).filter(item => item.sessionId === sessionId).at(-1)
@@ -63,7 +73,7 @@ function ConversationThread({ service, connectionId, sessionId, draft }: { servi
     if (sending || blocked || !value.trim()) return
     setSending(true); setActionError('')
     // The facade only resolves once the real session id is confirmed in the snapshot; anything else keeps the text.
-    try { await service.send(value); setText('') } catch (error) { setActionError(errorText(error)) }
+    try { await service.send(value); edit('') } catch (error) { setActionError(errorText(error)) }
     finally { setSending(false) }
   }
   const runtime = useExternalStoreRuntime({ messages, isRunning: running, convertMessage,
@@ -89,7 +99,7 @@ function ConversationThread({ service, connectionId, sessionId, draft }: { servi
       {drafting && blocked && <p role="status" className="agent-compose-block">{draftBlockCopy[draft!.blockReason ?? 'no-project']}</p>}
       <form onSubmit={event => { event.preventDefault(); void submit() }}>
         <textarea aria-label="Message" placeholder={drafting ? 'Message the new session' : 'Message this agent'}
-          value={text} onChange={event => setText(event.target.value)} readOnly={sending}
+          value={text} onChange={event => edit(event.target.value)} readOnly={sending}
           onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void submit() } }} />
         <button type="submit" disabled={sending || blocked || !text.trim()}>{drafting ? 'Start session' : 'Send'}</button>
       </form>
@@ -100,10 +110,34 @@ function ConversationThread({ service, connectionId, sessionId, draft }: { servi
   </section></AssistantRuntimeProvider>
 }
 export function Conversation({ service }: { service: AgentSessions }) {
-  const state = useWorkspace(service), agent = state.agent, sessionId = agent?.selectedSessionId
+  const state = useWorkspace(service), agent = state.agent, sessionId = agent?.selectedSessionId, connectionId = state.selectedConnectionId
+  // Unsent text lives here, not in the thread: the thread remounts on every pane change (FC-0052).
+  const compositions = useState(() => new Map<string, Map<string, string>>())[0]
+  const lastDraftState = useState(() => new Map<string, { active: boolean; sessionId: string }>())[0]
+  const store = useMemo<Compositions>(() => ({
+    read(connection, pane) { return compositions.get(connection)?.get(pane) ?? '' },
+    write(connection, pane, value) {
+      let panes = compositions.get(connection)
+      if (!panes) compositions.set(connection, panes = new Map())
+      panes.set(pane, value)
+    },
+  }), [compositions])
+  // The Sessions facade ends a draft both on discard and on opening another session
+  // (plugins/agent/sessions/src/model.ts:106, :141), and only this surface can tell them apart:
+  // a draft that ends while the selection stays exactly as it was was discarded, so it must not
+  // come back. A draft that ends because the selection moved is only being waited on.
+  const active = state.draft?.active === true
+  useEffect(() => {
+    if (!connectionId) return
+    const current = { active, sessionId: sessionId ?? '' }
+    const previous = lastDraftState.get(connectionId)
+    lastDraftState.set(connectionId, current)
+    if (previous?.active && !active && previous.sessionId === current.sessionId)
+      compositions.get(connectionId)?.delete(draftPane)
+  })
   // A draft has no backend session yet, so the absence of a selection is the new-session case, not an empty pane (FC-0030).
-  if (!state.selectedConnectionId) return <div className="agent-panel agent-placeholder"><style>{styles}</style><h2>Choose a connection</h2><p>Select an enabled agent from the left panel.</p></div>
+  if (!connectionId) return <div className="agent-panel agent-placeholder"><style>{styles}</style><h2>Choose a connection</h2><p>Select an enabled agent from the left panel.</p></div>
   if (!agent) return <div className="agent-panel agent-placeholder"><style>{styles}</style><h2>Connecting</h2><p>{state.error ?? 'Waiting for the agent connection.'}</p></div>
-  if (!sessionId && !state.draft?.active) return <div className="agent-panel agent-placeholder"><style>{styles}</style><h2>Choose a session</h2><p>Open a previous session or start a new one.</p></div>
-  return <ConversationThread key={`${state.selectedConnectionId}:${sessionId ?? 'draft'}`} service={service} connectionId={state.selectedConnectionId} sessionId={sessionId ?? ''} draft={state.draft} />
+  if (!active && !sessionId) return <div className="agent-panel agent-placeholder"><style>{styles}</style><h2>Choose a session</h2><p>Open a previous session or start a new one.</p></div>
+  return <ConversationThread key={`${connectionId}:${sessionId ?? 'draft'}`} service={service} connectionId={connectionId} sessionId={sessionId ?? ''} draft={state.draft} compositions={store} />
 }

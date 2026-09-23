@@ -303,3 +303,143 @@ it('keeps the composed text across a lost connection and a send attempted while 
   expect(calls.send).toEqual(['half-written\nmessage'])
   expect(field()).toBe('')
 })
+
+/** Multi-pane harness: any number of connections carrying the SAME session ids, so a gate can show that
+ *  retention is partitioned by connection and by pane rather than by whatever happens to be on screen. */
+async function openPanes(connectionIds: string[]) {
+  interface Pane { snapshot: AgentSnapshot; listeners: Set<() => void>
+    calls: { send: string[]; create: { workspaceId: string; text: string; requestId: string }[]; newSession: number } }
+  const panes = new Map<string, Pane>()
+  for (const id of connectionIds) panes.set(id, {
+    calls: { send: [], create: [], newSession: 0 }, listeners: new Set(),
+    snapshot: {
+      connection: { id, title: id, status: 'connected', capabilities: { ...capabilities, workspaces: 'supported' } },
+      sessions: [{ id: 'S1', title: 'Session one' }, { id: 'S2', title: 'Session two' }],
+      sessionList: 'ready', messages: {}, runs: {}, interactions: [], options: [],
+      workspaces: { state: 'ready', items: [{ id: 'W1', normalizedPath: `/srv/${id}` }] },
+    },
+  })
+  const registryScope = new OwnedResources(), sessionScope = new OwnedResources(), connectorScope = new OwnedResources()
+  cleanup.push(async () => { sessionScope.dispose(); connectorScope.dispose(); registryScope.dispose() })
+  const registry = createAgentConnections(registryScope)
+  for (const id of connectionIds) registry.forScope(connectorScope).add({ id, title: id, connect: async () => {
+    const pane = panes.get(id)!
+    const write = (patch: Partial<AgentSnapshot>) => {
+      pane.snapshot = { ...pane.snapshot, ...patch }
+      for (const listener of [...pane.listeners]) listener()
+    }
+    const client: AgentClient = {
+      get isDisposed() { return false },
+      dispose() { pane.listeners.clear() },
+      getSnapshot: () => pane.snapshot,
+      subscribe(listener) { pane.listeners.add(listener); return () => { pane.listeners.delete(listener) } },
+      async refreshSessions() {},
+      async newSession() { pane.calls.newSession++; throw Error('the draft surface must not create a backend session') },
+      async openSession(opened) { write({ selectedSessionId: opened }) },
+      async send(_sessionId, text) { pane.calls.send.push(text) },
+      async stop() {}, async respond() {}, async setOption() {}, async refreshWorkspaces() {},
+      async openWorkspace(workspaceId) {
+        write({ workspaces: { ...pane.snapshot.workspaces!, selectedWorkspaceId: workspaceId } })
+        return { id: workspaceId, normalizedPath: `/srv/${id}` }
+      },
+      createAndSend: async (workspaceId, text, requestId) => {
+        pane.calls.create.push({ workspaceId, text, requestId })
+        write({ sessions: [...pane.snapshot.sessions, { id: 'S9', title: 'Draft run', workspaceId }], selectedSessionId: 'S9' })
+        return { sessionId: 'S9' }
+      },
+    }
+    return client
+  } })
+  const sessions = createAgentSessions(sessionScope, registry)
+  await sessions.selectConnection(connectionIds[0])
+  const container = await mount(<Conversation service={sessions} />)
+  const field = () => container.querySelector<HTMLTextAreaElement>('textarea[aria-label=Message]')!.value
+  const typeText = async (value: string) => {
+    await act(async () => {
+      const input = container.querySelector('textarea[aria-label=Message]')!
+      const nativeValue = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')!.set!
+      nativeValue.call(input, value)
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+  }
+  const clickSend = async () => { await act(async () => { container.querySelector<HTMLButtonElement>('.agent-compose button[type=submit]')!.click() }) }
+  return {
+    container, field, typeText, clickSend, calls: (id: string) => panes.get(id)!.calls,
+    paneTitle: () => container.querySelector('.agent-conversation-head h2')?.textContent,
+    openSession: async (target: string) => { await act(async () => { await sessions.openSession(target) }) },
+    selectConnection: async (target: string) => { await act(async () => { await sessions.selectConnection(target) }) },
+    startDraft: async () => { await act(async () => { sessions.startDraft?.() }) },
+    discardDraft: async () => { await act(async () => { sessions.discardDraft?.() }) },
+    selectWorkspace: async (target: string) => { await act(async () => { await sessions.selectWorkspace?.(target) }) },
+  }
+}
+
+it('gives every session its own unsent text across switching and sends nothing on a switch (gate 11)', async () => {
+  const h = await openPanes(['A'])
+  await h.openSession('S1')
+  await h.typeText('half-typed in S1')
+  await h.openSession('S2')
+  // A pane the user never typed in stays empty: this is per-pane retention, not one shared buffer.
+  expect(h.field()).toBe('')
+  await h.typeText('half-typed in S2')
+  await h.openSession('S1')
+  expect(h.field()).toBe('half-typed in S1')
+  await h.openSession('S2')
+  expect(h.field()).toBe('half-typed in S2')
+  expect(h.calls('A').send).toEqual([])
+  // Positive control: the restored text is the live value, not a display echo — sending it ships exactly that.
+  await h.openSession('S1')
+  await h.clickSend()
+  expect(h.calls('A').send).toEqual(['half-typed in S1'])
+  expect(h.field()).toBe('')
+  await h.openSession('S2')
+  expect(h.field()).toBe('half-typed in S2')
+})
+
+it('keeps the same session id on two connections apart and sends nothing on a connection switch (gate 12)', async () => {
+  const h = await openPanes(['A', 'B'])
+  await h.openSession('S1')
+  await h.typeText('written on A')
+  await h.selectConnection('B')
+  // B has no selection yet, so it shows the placeholder rather than A's half-written text.
+  expect(h.container.textContent).toContain('Choose a session')
+  await h.openSession('S1')
+  expect(h.field()).toBe('')
+  await h.typeText('written on B')
+  await h.selectConnection('A')
+  // A kept its own selection, and with it its own text: the two S1 panes never share a buffer.
+  expect(h.paneTitle()).toBe('Session one')
+  expect(h.field()).toBe('written on A')
+  await h.selectConnection('B')
+  expect(h.field()).toBe('written on B')
+  expect(h.calls('A').send).toEqual([])
+  expect(h.calls('B').send).toEqual([])
+  expect(h.calls('A').create).toEqual([])
+})
+
+it('keeps a draft across a connection round trip, and empties it on discard and after a confirmed send (gate 13)', async () => {
+  const h = await openPanes(['A', 'B'])
+  await h.startDraft()
+  await h.typeText('draft that waits while I look at B')
+  await h.selectConnection('B')
+  await h.startDraft()
+  expect(h.field()).toBe('')
+  await h.selectConnection('A')
+  // A's draft was never discarded, only unselected: a connection switch must not cost the text.
+  expect(h.paneTitle()).toBe('New session')
+  expect(h.field()).toBe('draft that waits while I look at B')
+  await h.discardDraft()
+  expect(h.container.textContent).toContain('Choose a session')
+  await h.startDraft()
+  expect(h.field()).toBe('')
+  // The first send the snapshot confirms clears the draft, and its text does not follow into the session.
+  await h.selectWorkspace('W1')
+  await h.typeText('opens the real session')
+  await h.clickSend()
+  expect(h.calls('A').create).toEqual([{ workspaceId: 'W1', text: 'opens the real session', requestId: expect.stringMatching(/^[0-9a-f-]{36}$/) }])
+  expect(h.paneTitle()).toBe('Draft run')
+  expect(h.field()).toBe('')
+  await h.openSession('S1')
+  expect(h.field()).toBe('')
+  expect(h.calls('A').send).toEqual([])
+})
