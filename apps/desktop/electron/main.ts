@@ -165,7 +165,7 @@ app.whenReady().then(async () => {
         const firstStarted = await compose('Reply exactly HD002_FE_OK_1.', 'Start session');
         if (firstStarted) console.log('HD002_FE_ATTEMPT_1');
         const firstOpened = firstStarted && await waitFor(() =>
-          document.querySelector('.agent-conversation-head small')?.textContent === 'SESSION', 250);
+          document.querySelector('.agent-conversation-head small')?.textContent === 'SESSION');
         const firstReply = firstOpened && await waitFor(() =>
           messages().length >= 2 && messages().at(-1)?.textContent?.includes('HD002_FE_OK_1'));
         const secondStarted = firstReply && await compose('Reply exactly HD002_FE_OK_2.', 'Send');

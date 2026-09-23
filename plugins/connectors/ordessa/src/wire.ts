@@ -85,14 +85,14 @@ export interface StreamHandle { close(): void }
 /** Subscription is the socket itself: one session per connection, resuming from a `history.snapshot`
  * cursor. Node sends no Origin header here, which the Server's loopback policy accepts. */
 /** Only Node's WebSocket honours a header-bearing options object; the DOM lib types the second argument as protocols. */
-type NodeWebSocket = (url: string, options: { headers: Record<string, string> }) => WebSocket
+type NodeWebSocket = new (url: string, options: { headers: Record<string, string> }) => WebSocket
 const connectEventSocket = WebSocket as unknown as NodeWebSocket
 
 export function openEventStream(target: ServerTarget, sessionId: string, cursor: string | undefined,
   handlers: { frame(frame: EventFrame): void; down(reason: string): void }): StreamHandle {
   const query = new URLSearchParams({ sessionId })
   if (cursor) query.set('cursor', cursor)
-  const socket = connectEventSocket(`${target.socket}/wire/v1/event-stream?${query}`, {
+  const socket = new connectEventSocket(`${target.socket}/wire/v1/event-stream?${query}`, {
     headers: { authorization: `Bearer ${target.token}` },
   })
   // One terminal statement per subscription: a failing socket reports error and close back to back,
