@@ -1,13 +1,7 @@
 import type { PluginContext } from '@ordessa/extension-api'
-import { WorkbenchToken, type Workbench } from '@extensions/ordessa.contracts/contract.js'
-import { AgentSessionsToken, type AgentSessions } from '@extensions/ordessa.agent-contracts/contract.js'
-import { InteractionPanel } from './view'
 
+/** The request cards moved into the conversation surface (FC-0028), so this plugin registers no view at all:
+ *  a right-region pane would show requests from another session or duplicate answers to the same request. */
 export default function createPlugin() {
-  return { id: 'ordessa.agent-interactions', autoStart: true, requires: [WorkbenchToken, AgentSessionsToken],
-    activate(context: PluginContext, workbench: Workbench, sessions: AgentSessions) {
-      workbench.forScope(context.resources).addView({ id: 'agent.interactions', title: 'Requests', presentation: 'region', region: 'right',
-        component: () => <InteractionPanel service={sessions} /> })
-    },
-  }
+  return { id: 'ordessa.agent-interactions', autoStart: true, requires: [], activate(_context: PluginContext) {} }
 }

@@ -74,7 +74,9 @@ it('keeps an unknown run outcome distinct from a failure (gate 1)', async () => 
   const notices = [...container.querySelectorAll('p[role=status].agent-notice')].map(node => node.textContent)
   expect(notices).toContain('Run outcome unknown after disconnect.')
   expect(container.querySelector('[data-status=failed]')).toBeNull()
-  expect(container.textContent).not.toContain('failed')
+  // Only rendered text may read as a failure: the stylesheet legitimately names a failed tool state.
+  const section = container.querySelector('section.agent-conversation')!
+  expect([...section.childNodes].filter(node => node.nodeName !== 'STYLE').map(node => node.textContent).join('')).not.toContain('failed')
   // A disconnected connection always renders the loss alert, so alert presence is asserted by its text, not by role count.
   await act(async () => { write({ connection: { id: 'A', title: 'A', status: 'connected', capabilities } }) })
   expect(container.querySelector('[role=alert].agent-error')).toBeNull()
@@ -101,4 +103,29 @@ it('renders no model entry in the conversation while other options survive (gate
   expect(section.textContent).not.toContain('Model for next turn')
   // The suppression is UI-only: the contract still carries the model option.
   expect(snapshot().options.map(option => option.id)).toContain('model')
+})
+
+it('hides thinking and effort alongside the model while a supported option survives (gate 3)', async () => {
+  const option = (id: string, title: string) => ({ id, title, value: 'a', availability: 'supported' as const, values: [{ id: 'a', title: 'A' }] })
+  const { container } = await openConversation({ options: [option('model', 'Model'), option('thinking', 'Thinking budget'),
+    option('effort', 'Reasoning effort'), option('style', 'Response style')] })
+  const section = container.querySelector('section.agent-conversation')!
+  const selects = [...section.querySelectorAll('select')]
+  expect(selects).toHaveLength(1)
+  // Positive control in the same render: an unrelated supported option really does reach this surface.
+  expect(selects[0].closest('label')?.textContent).toContain('Response style')
+  for (const hidden of ['Model', 'Thinking budget', 'Reasoning effort']) expect(section.textContent).not.toContain(hidden)
+})
+
+it('labels each tool outcome with the state the connector reported (gate 4)', async () => {
+  const tool = (id: string, status: 'running' | 'completed' | 'failed' | 'unknown', result?: string) => ({ id, name: `tool-${id}`, arguments: { path: id }, result, status })
+  const message = { id: 'm1', role: 'assistant' as const, text: 'Working', status: 'running' as const,
+    tools: [tool('t1', 'running'), tool('t2', 'completed', 'ok'), tool('t3', 'failed', 'denied'), tool('t4', 'unknown')] }
+  const { container } = await openConversation({ messages: { S1: [message] } })
+  const states = [...container.querySelectorAll('.agent-tool')].map(node => node.getAttribute('data-tool-state'))
+  expect(states).toEqual(['running', 'completed', 'failed', 'unknown'])
+  // A tool whose outcome is unknown must not read as still running, and a failed one must not read as a result.
+  const summaries = [...container.querySelectorAll('.agent-tool summary')].map(node => node.textContent)
+  expect(summaries).toEqual(['tool-t1 · Running', 'tool-t2 · Result', 'tool-t3 · Failed', 'tool-t4 · Outcome unknown'])
+  expect(container.querySelector('.agent-tool[data-tool-state=unknown] pre')?.textContent).toContain('"path": "t4"')
 })

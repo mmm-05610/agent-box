@@ -1,11 +1,14 @@
 import { useState, useSyncExternalStore } from 'react'
 import { AssistantRuntimeProvider, useExternalStoreRuntime, ThreadPrimitive, MessagePrimitive, MessagePartPrimitive, ComposerPrimitive,
   type AppendMessage, type ThreadMessageLike, type ToolCallMessagePartProps } from '@assistant-ui/react'
-import type { AgentMessage, AgentSessions } from '@extensions/ordessa.agent-contracts/contract.js'
+import type { AgentMessage, AgentSessions, AgentToolCall } from '@extensions/ordessa.agent-contracts/contract.js'
 import { styles } from './styles'
+import { SessionInteractions } from './interaction-card'
 
 function useWorkspace(service: AgentSessions) { return useSyncExternalStore(service.subscribe, service.getSnapshot) }
 const errorText = (error: unknown) => error instanceof Error ? error.message : String(error)
+// Provider and thinking-intensity selection stay off this surface by product decision; any other supported option still renders.
+const hiddenOptionIds = new Set(['model', 'thinking', 'effort'])
 
 export function convertMessage(message: AgentMessage): ThreadMessageLike {
   const content: ThreadMessageLike['content'] = [
@@ -13,7 +16,10 @@ export function convertMessage(message: AgentMessage): ThreadMessageLike {
     ...(message.text ? [{ type: 'text' as const, text: message.text }] : []),
     ...(message.tools ?? []).map(tool => ({ type: 'tool-call' as const, toolCallId: tool.id, toolName: tool.name,
       args: { value: JSON.stringify(tool.arguments ?? null) }, argsText: JSON.stringify(tool.arguments ?? null),
-      result: tool.result === undefined ? undefined : typeof tool.result === 'string' ? tool.result : JSON.stringify(tool.result) })),
+      result: tool.result === undefined ? undefined : typeof tool.result === 'string' ? tool.result : JSON.stringify(tool.result),
+      // The connector reports four terminal-ish states; result presence alone cannot distinguish unknown from running.
+      artifact: { toolStatus: tool.status },
+      ...(tool.status === 'failed' ? { isError: true } : {}) })),
   ]
   return { id: message.id, role: message.role === 'user' ? 'user' : 'assistant', content,
     ...(message.role !== 'user' ? { status: message.status === 'starting' || message.status === 'running' || message.status === 'stop-requested' ? { type: 'running' as const }
@@ -23,9 +29,13 @@ export function convertMessage(message: AgentMessage): ThreadMessageLike {
 }
 function TextPart() { return <MessagePartPrimitive.Text smooth={false} /> }
 function ReasoningPart() { return <details className="agent-reasoning"><summary>Thinking</summary><MessagePartPrimitive.Text smooth={false} /></details> }
-function ToolPart({ toolName, args, result }: ToolCallMessagePartProps) {
-  return <details className="agent-tool"><summary>{toolName} · {result === undefined ? 'Running' : 'Result'}</summary>
-    <pre>{JSON.stringify(args, null, 2)}</pre>{result !== undefined && <pre>{typeof result === 'string' ? result : JSON.stringify(result, null, 2)}</pre>}</details>
+// Partially streamed arguments are not valid JSON yet; show them verbatim rather than dropping them.
+const prettyJson = (text: string) => { try { return JSON.stringify(JSON.parse(text), null, 2) } catch { return text } }
+const toolStateLabels: Record<AgentToolCall['status'], string> = { running: 'Running', completed: 'Result', failed: 'Failed', unknown: 'Outcome unknown' }
+function ToolPart({ toolName, argsText, result, artifact }: ToolCallMessagePartProps) {
+  const status = (artifact as { toolStatus: AgentToolCall['status'] }).toolStatus
+  return <details className="agent-tool" data-tool-state={status}><summary>{toolName} · {toolStateLabels[status]}</summary>
+    <pre>{prettyJson(argsText)}</pre>{result !== undefined && <pre>{typeof result === 'string' ? result : JSON.stringify(result, null, 2)}</pre>}</details>
 }
 function ChatMessage() {
   return <MessagePrimitive.Root className="agent-message"><MessagePrimitive.Parts components={{ Text: TextPart, Reasoning: ReasoningPart, tools: { Fallback: ToolPart } }} /></MessagePrimitive.Root>
@@ -50,7 +60,8 @@ function ConversationThread({ service, connectionId, sessionId }: { service: Age
     {run?.status === 'stop-requested' && <p role="status" className="agent-notice">Stop requested. Waiting for the agent to confirm.</p>}
     {run?.status === 'unknown' && <p role="status" className="agent-notice">Run outcome unknown after disconnect.</p>}
     {agent.diagnostic && <p role="status" className="agent-notice">{agent.diagnostic}</p>}
-    {agent.options.length > 0 && <div className="agent-options">{agent.options.filter(option => option.id !== 'model' && option.availability === 'supported' && option.values?.length).map(option =>
+    <SessionInteractions service={service} agent={agent} sessionId={sessionId} />
+    {agent.options.length > 0 && <div className="agent-options">{agent.options.filter(option => !hiddenOptionIds.has(option.id) && option.availability === 'supported' && option.values?.length).map(option =>
       <label key={option.id}>{option.title}<select value={option.value ?? ''} onChange={event => { setActionError(''); void service.setOption(option.id, event.target.value).catch(error => setActionError(errorText(error))) }}>
         {option.values!.map(value => <option key={value.id} value={value.id}>{value.title}</option>)}
       </select></label>)}</div>}
