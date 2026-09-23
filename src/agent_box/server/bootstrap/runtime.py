@@ -25,6 +25,7 @@ from agent_box.extensions import capability
 from agent_box.server.approvals import ApprovalRecords
 from agent_box.server.credentials import CredentialRecords
 from agent_box.server.events import EventNotifier
+from agent_box.server.errors import ServerError
 from agent_box.server.execution import HarnessRegistry, TurnExecutionPort
 from agent_box.server.execution.sidecar_backend import SidecarExecutionBackend as _SidecarBackendCls
 from agent_box.extensions.runtime_composition.sandbox_port import resolve_sandbox_port
@@ -251,10 +252,15 @@ class ServerRuntime:
                         or profile["archived_at"] is not None
                         or profile["credential_id"] is not None
                         or profile["account_id"] is not None
+                        or profile["recovery_pending"]
                         or stored.get("configuration") != {}):
                     raise RuntimeError("NATIVE_PROFILE_CONFLICT")
                 self.service.sessions._assert_profile_executable(profile["id"])
                 self.native_profile_id = str(profile["id"])
+                self.service.sessions.bind_native_profile(
+                    self.native_profile_id, self.native_harness_id,
+                    profile["config_object_digest"],
+                )
             self.repository.mark_workspaces_unverified()
             self.repository.recover_interrupted_turns()
             from agent_box.work_core import db as core_db
@@ -538,11 +544,22 @@ def build_runtime_from_native_adapter(
                 raise RuntimeError("NATIVE_PROJECT_REQUIRED")
             environment = dict(os.environ)
             environment.pop("AGENTBOX_SIDECAR_ISOLATED", None)
+            resume_native_id = None
+            checkpoint_digest = context.get("checkpoint_object_digest")
+            if checkpoint_digest and context.get("checkpoint_native_id"):
+                try:
+                    checkpoint = json.loads(objects.read(checkpoint_digest))
+                except Exception:
+                    checkpoint = None
+                if (isinstance(checkpoint, dict) and checkpoint.get("resumable") is True
+                        and checkpoint.get("harnessType") == harness_id
+                        and checkpoint.get("nativeSessionId") == context["checkpoint_native_id"]):
+                    resume_native_id = context["checkpoint_native_id"]
             return NativeHarnessPort(
                 NativeProcessLauncher((node, str(entry), "--native"), cwd=project),
                 environment=environment, profile=harness_id, adapter=adapter,
                 directory=project, state_directory=str(root / "native-bridge" / harness_id),
-                resume_native_id=context.get("checkpoint_native_id"),
+                resume_native_id=resume_native_id,
                 on_event=on_event,
             )
 
@@ -556,14 +573,32 @@ def build_runtime_from_native_adapter(
         local_workspace_provider=LocalEnvironmentProvider(execution_mode="native"),
     )
     runtime.native_harness_id = harness_id
+    def validate_native_workspace(workspace_id):
+        if not isinstance(workspace_id, str) or not workspace_id:
+            raise ServerError("NATIVE_PROJECT_REQUIRED", "a selected project is required", status=422)
+        workspace = runtime.service.workspaces.records.get(workspace_id)
+        if workspace["env_kind"] != "local":
+            raise ServerError("NATIVE_PLACEMENT_UNSUPPORTED", "native Server requires a local project", status=409)
+        selected = workspace["normalized_path"]
+        normalized = runtime.service.workspaces.local.validate(selected)
+        if normalized != selected:
+            raise ServerError("NATIVE_PROJECT_CHANGED", "selected project changed", status=409)
+    runtime.service.sessions.bind_native_workspace_validator(validate_native_workspace)
     def native_identity():
         identity = runtime.native_profile_id
         try:
             profile = runtime.service.profiles.records.get(identity) if identity else None
+            stored = (json.loads(runtime.objects.read(profile["config_object_digest"]))
+                      if profile is not None else None)
         except Exception:
             profile = None
         valid = (profile is not None and profile["harness_type"] == harness_id
-                 and profile["archived_at"] is None and profile["credential_id"] is None)
+                 and profile["archived_at"] is None and profile["credential_id"] is None
+                 and profile["account_id"] is None and not profile["recovery_pending"]
+                 and stored.get("configuration") == {}
+                 and runtime.service.sessions.native_profile_identity is not None
+                 and profile["config_object_digest"] ==
+                     runtime.service.sessions.native_profile_identity[2])
         return {
             "mode": "native", "harness": harness_id,
             "profileId": identity if valid else None,

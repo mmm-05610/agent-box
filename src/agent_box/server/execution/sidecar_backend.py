@@ -945,6 +945,14 @@ class CapabilityGateRefusal(SidecarError):
         super().__init__("CAPABILITY_REQUIREMENT_UNSATISFIED", reason)
 
 
+class NativeProjectRefusal(CapabilityGateRefusal):
+    """A typed project refusal proven before any native child can start."""
+
+    def __init__(self, code: str) -> None:
+        super().__init__("selected project is unavailable for native execution")
+        self.code = code
+
+
 class SidecarRunRecoveryFailure(SidecarError):
     """Raised by the run-recovery path when a fresh sidecar cannot be obtained.
 
@@ -980,9 +988,9 @@ def _capability_gate(port: SidecarHarnessPort, turn_id: str) -> None:
         try:
             normalized = LocalEnvironmentProvider().validate(port.directory)
         except ServerError as exc:
-            raise CapabilityGateRefusal(f"selected project unavailable: {exc.code}") from exc
+            raise NativeProjectRefusal(exc.code) from exc
         if normalized != port.directory or normalized != launcher.cwd:
-            raise CapabilityGateRefusal("selected project changed before native launch")
+            raise NativeProjectRefusal("NATIVE_PROJECT_CHANGED")
         return
     documents = getattr(port, "capability_documents", ())
     grants = getattr(port, "capability_grants", ())
@@ -1041,7 +1049,11 @@ def _capability_gate(port: SidecarHarnessPort, turn_id: str) -> None:
 #: owned by the type that raises it, and the same string published from a genuine
 #: pre-start refusal stays correct - that path is an ``ExecutionStartRejected`` and
 #: never reaches the check in ``_safe_code``.
-PRE_START_REFUSAL_CODES = frozenset({"CAPABILITY_REQUIREMENT_UNSATISFIED"})
+PRE_START_REFUSAL_CODES = frozenset({
+    "CAPABILITY_REQUIREMENT_UNSATISFIED", "NATIVE_PROJECT_CHANGED",
+    "LOCAL_PATH_INVALID", "LOCAL_PATH_MISSING", "LOCAL_PATH_NOT_READABLE",
+    "LOCAL_PATH_NOT_DIRECTORY", "LOCAL_PATH_UNAVAILABLE", "LOCAL_PATH_FORBIDDEN",
+})
 
 
 

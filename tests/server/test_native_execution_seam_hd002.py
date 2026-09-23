@@ -23,8 +23,9 @@ def test_native_gate_rechecks_selected_project_before_spawn(tmp_path):
     port = _port(project)
     _capability_gate(port, "turn")
     project.rmdir()
-    with pytest.raises(CapabilityGateRefusal, match="selected project unavailable"):
+    with pytest.raises(CapabilityGateRefusal, match="selected project") as refused:
         _capability_gate(port, "turn")
+    assert refused.value.code == "LOCAL_PATH_MISSING"
 
 
 def test_native_gate_rejects_isolated_material_and_wrong_launcher(tmp_path):

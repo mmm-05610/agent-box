@@ -30,6 +30,8 @@ class SessionService:
         self.on_event = on_event or (lambda: None)
         self.model_configs = None
         self.core_filer = core_filer
+        self.native_profile_identity: tuple[str, str, str] | None = None
+        self.native_workspace_validator = None
         if core_filer is not None:
             # a-3 K2-S': the single filing implementation lives on the records
             # (the queue-adoption successor is filed post-completion there);
@@ -47,7 +49,31 @@ class SessionService:
     def bind_model_configs(self, model_configs) -> None:
         self.model_configs = model_configs
 
+    def bind_native_profile(self, profile_id: str, harness: str, config_digest: str) -> None:
+        """Fix the one internal execution identity for a native Server."""
+        identity = (profile_id, harness, config_digest)
+        if self.native_profile_identity not in (None, identity):
+            raise RuntimeError("NATIVE_PROFILE_ALREADY_BOUND")
+        self.native_profile_identity = identity
+
+    def bind_native_workspace_validator(self, validate) -> None:
+        if self.native_workspace_validator not in (None, validate):
+            raise RuntimeError("NATIVE_WORKSPACE_VALIDATOR_ALREADY_BOUND")
+        self.native_workspace_validator = validate
+
+    def _validate_native_workspace(self, workspace_id: str | None, session_id: str | None = None) -> None:
+        if self.native_workspace_validator is None:
+            return
+        if workspace_id is None and session_id is not None:
+            workspace_id = self.records.get_session(session_id)["workspace_id"]
+        self.native_workspace_validator(workspace_id)
+
     def create_session(self, key: str, body: dict[str, Any]):
+        if self.native_profile_identity is not None:
+            raise ServerError(
+                "NATIVE_FIRST_SEND_REQUIRED", "native sessions start with the first message",
+                status=409,
+            )
         return self.records.create_session(
             key=key, request_digest=digest(body),
             workspace_id=body["workspace_id"], profile_id=body["profile_id"],
@@ -61,6 +87,7 @@ class SessionService:
         Configuration validation happens before acceptance so a rejected send
         leaves no Session and no queued work behind (core-semantics/1 §6).
         """
+        self._validate_native_workspace(kwargs.get("workspace_id"), kwargs.get("session_id"))
         profile_id = kwargs.pop("profile_id")
         overrides = kwargs.pop("overrides", None)
         if overrides:
@@ -123,6 +150,7 @@ class SessionService:
         self, profile_id: str, *, execution: Mapping[str, Any] | None = None,
     ) -> None:
         profile = self.profiles.get(profile_id)
+        self._assert_native_profile(profile_id, profile)
         harness_type = profile["harness_type"]
         if harness_type not in self.harnesses:
             raise unavailable("CAPABILITY_UNSUPPORTED", "Session Harness is not configured")
@@ -136,6 +164,22 @@ class SessionService:
                     "CREDENTIAL_REQUIRED", "Profile has no authorized credential", status=409,
                 )
             self.credentials.get(credential_id, kind=descriptor.credential_kind)
+
+    def _assert_native_profile(self, profile_id: str, profile=None) -> None:
+        if self.native_profile_identity is not None:
+            expected_id, expected_harness, expected_config = self.native_profile_identity
+            if profile is None:
+                profile = self.profiles.get(profile_id)
+            if (profile_id != expected_id or profile["harness_type"] != expected_harness
+                    or profile["archived_at"] is not None
+                    or profile["config_object_digest"] != expected_config
+                    or profile["credential_id"] is not None
+                    or profile["account_id"] is not None
+                    or profile["recovery_pending"]):
+                raise ServerError(
+                    "NATIVE_PROFILE_CONFLICT", "native execution identity changed",
+                    status=409,
+                )
 
     def _validate_overrides_for(self, profile_id: str, overrides: list[dict[str, Any]]) -> None:
         profile = self.profiles.get(profile_id)
@@ -181,6 +225,7 @@ class SessionService:
         prior = self.idempotency.get(scope, key, request_digest)
         if prior:
             return prior
+        self._validate_native_workspace(None, session_id)
         overrides = self._validated_overrides(session_id, body)
         self._assert_session_harness(session_id)
         # b-4/O-B3-1: freeze the effective configuration at acceptance with the
@@ -328,6 +373,7 @@ class SessionService:
 
     def _assert_session_harness(self, session_id: str) -> None:
         _session, profile = self._session_profile(session_id)
+        self._assert_native_profile(profile["id"], profile)
         harness_type = profile["harness_type"]
         if harness_type not in self.harnesses:
             raise unavailable("HARNESS_UNAVAILABLE", "Session Harness is not configured")
