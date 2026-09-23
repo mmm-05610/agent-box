@@ -308,7 +308,8 @@ it('keeps the composed text across a lost connection and a send attempted while 
  *  retention is partitioned by connection and by pane rather than by whatever happens to be on screen. */
 async function openPanes(connectionIds: string[]) {
   interface Pane { snapshot: AgentSnapshot; listeners: Set<() => void>
-    calls: { send: string[]; create: { workspaceId: string; text: string; requestId: string }[]; newSession: number } }
+    calls: { send: string[]; create: { workspaceId: string; text: string; requestId: string }[]; newSession: number }
+    reject?: Error }
   const panes = new Map<string, Pane>()
   for (const id of connectionIds) panes.set(id, {
     calls: { send: [], create: [], newSession: 0 }, listeners: new Set(),
@@ -319,15 +320,18 @@ async function openPanes(connectionIds: string[]) {
       workspaces: { state: 'ready', items: [{ id: 'W1', normalizedPath: `/srv/${id}` }] },
     },
   })
+  // A connector-side snapshot move, from outside the client: FC-0055's subject is the project becoming
+  // invalid after the composer was opened, so the test drives what the Server reports, never gate state.
+  const writePane = (id: string, patch: Partial<AgentSnapshot>) => {
+    const pane = panes.get(id)!
+    pane.snapshot = { ...pane.snapshot, ...patch }
+    for (const listener of [...pane.listeners]) listener()
+  }
   const registryScope = new OwnedResources(), sessionScope = new OwnedResources(), connectorScope = new OwnedResources()
   cleanup.push(async () => { sessionScope.dispose(); connectorScope.dispose(); registryScope.dispose() })
   const registry = createAgentConnections(registryScope)
   for (const id of connectionIds) registry.forScope(connectorScope).add({ id, title: id, connect: async () => {
     const pane = panes.get(id)!
-    const write = (patch: Partial<AgentSnapshot>) => {
-      pane.snapshot = { ...pane.snapshot, ...patch }
-      for (const listener of [...pane.listeners]) listener()
-    }
     const client: AgentClient = {
       get isDisposed() { return false },
       dispose() { pane.listeners.clear() },
@@ -335,16 +339,17 @@ async function openPanes(connectionIds: string[]) {
       subscribe(listener) { pane.listeners.add(listener); return () => { pane.listeners.delete(listener) } },
       async refreshSessions() {},
       async newSession() { pane.calls.newSession++; throw Error('the draft surface must not create a backend session') },
-      async openSession(opened) { write({ selectedSessionId: opened }) },
+      async openSession(opened) { writePane(id, { selectedSessionId: opened }) },
       async send(_sessionId, text) { pane.calls.send.push(text) },
       async stop() {}, async respond() {}, async setOption() {}, async refreshWorkspaces() {},
       async openWorkspace(workspaceId) {
-        write({ workspaces: { ...pane.snapshot.workspaces!, selectedWorkspaceId: workspaceId } })
+        writePane(id, { workspaces: { ...pane.snapshot.workspaces!, selectedWorkspaceId: workspaceId } })
         return { id: workspaceId, normalizedPath: `/srv/${id}` }
       },
       createAndSend: async (workspaceId, text, requestId) => {
         pane.calls.create.push({ workspaceId, text, requestId })
-        write({ sessions: [...pane.snapshot.sessions, { id: 'S9', title: 'Draft run', workspaceId }], selectedSessionId: 'S9' })
+        if (pane.reject) throw pane.reject
+        writePane(id, { sessions: [...pane.snapshot.sessions, { id: 'S9', title: 'Draft run', workspaceId }], selectedSessionId: 'S9' })
         return { sessionId: 'S9' }
       },
     }
@@ -371,6 +376,8 @@ async function openPanes(connectionIds: string[]) {
     startDraft: async () => { await act(async () => { sessions.startDraft?.() }) },
     discardDraft: async () => { await act(async () => { sessions.discardDraft?.() }) },
     selectWorkspace: async (target: string) => { await act(async () => { await sessions.selectWorkspace?.(target) }) },
+    write: async (id: string, patch: Partial<AgentSnapshot>) => { await act(async () => { writePane(id, patch) }) },
+    rejectNextCreate: (id: string, error: Error) => { panes.get(id)!.reject = error },
   }
 }
 
@@ -448,4 +455,53 @@ it('keeps a draft across a connection round trip, and empties it on discard and 
   await h.openSession('S1')
   expect(h.field()).toBe('')
   expect(h.calls('A').send).toEqual([])
+})
+
+/** FC-0055 asks whether the draft composer can still advertise a project that has deterministically
+ *  gone away. This surface holds no project authority of its own — `draft.canSend` is a pure projection
+ *  of what the connector reports — so the two shapes FC-0055 distinguishes are pinned separately. */
+it('blocks a mid-draft invalidation whose stale selection the connector clears, without costing the text (gate 14)', async () => {
+  const h = await openPanes(['A'])
+  await h.startDraft()
+  await h.selectWorkspace('W1')
+  await h.typeText('fix the flaky parser spec')
+  expect(h.container.querySelector('p.agent-compose-block')).toBeNull()
+  // The FC-0055 fix shape: the connector drops the selection it can no longer honour.
+  await h.write('A', { workspaces: { state: 'ready', items: [{ id: 'W1', normalizedPath: '/srv/A' }] } })
+  expect(h.container.querySelector('p[role=status].agent-compose-block')?.textContent).toContain('No project is selected')
+  // Blocking must never cost the composition (FC-0043 / FC-0052), and must reach no client.
+  expect(h.field()).toBe('fix the flaky parser spec')
+  expect(h.container.querySelector<HTMLButtonElement>('.agent-compose button[type=submit]')!.disabled).toBe(true)
+  await h.clickSend()
+  expect(h.calls('A').create).toEqual([])
+  // Positive control: the same preserved text really does go out once a project is re-selected.
+  await h.selectWorkspace('W1')
+  expect(h.container.querySelector('p.agent-compose-block')).toBeNull()
+  expect(h.field()).toBe('fix the flaky parser spec')
+  await h.clickSend()
+  expect(h.calls('A').create.map(call => call.text)).toEqual(['fix the flaky parser spec'])
+  expect(h.field()).toBe('')
+})
+
+it('mirrors an invalidation the connector does not report: the send is offered and the typed refusal keeps the text (gate 15)', async () => {
+  const h = await openPanes(['A'])
+  h.rejectNextCreate('A', Error('LOCAL_PATH_MISSING: the project directory is gone'))
+  await h.startDraft()
+  await h.selectWorkspace('W1')
+  await h.typeText('triage the build failure')
+  // The project leaves the ready list while the connector still reports it selected, and revalidation
+  // runs only on connect and reconnect (plugins/agent/sessions/src/model.ts:101, :102).
+  await h.write('A', { workspaces: { state: 'ready', items: [], selectedWorkspaceId: 'W1' } })
+  // Measured consequence, not an approval: this surface cannot detect that staleness without inventing a
+  // second project authority, so it advertises sendable and the Server's typed refusal is what stops it.
+  expect(h.container.querySelector('p.agent-compose-block')).toBeNull()
+  expect(h.container.querySelector<HTMLButtonElement>('.agent-compose button[type=submit]')!.disabled).toBe(false)
+  await h.clickSend()
+  expect(h.calls('A').create).toHaveLength(1)
+  expect(h.container.querySelector('[role=alert].agent-error')?.textContent).toContain('LOCAL_PATH_MISSING')
+  expect(h.field()).toBe('triage the build failure')
+  // One attempt per explicit press: nothing retried on its own between the two clicks.
+  await h.clickSend()
+  expect(h.calls('A').create).toHaveLength(2)
+  expect(h.calls('A').create[1].requestId).toBe(h.calls('A').create[0].requestId)
 })
