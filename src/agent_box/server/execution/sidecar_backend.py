@@ -23,7 +23,9 @@ from agent_box.extensions.runtime_composition.sandbox_port import SandboxPortUna
 from agent_box.resource_contracts import AgentBoxProfileV1, PromptFragmentV1, WorkspaceV1
 from agent_box.server.errors import ServerError
 from agent_box.server.execution.placement import PlacementUnsupported
-from agent_box.server.execution.sidecar import SidecarError, SidecarHarnessPort
+from agent_box.server.execution.sidecar import (
+    NativeHarnessPort, NativeProcessLauncher, SidecarError, SidecarHarnessPort,
+)
 from agent_box.work_core import (
     ExecutionFinalizationRequest, ExecutionProjection, ExecutionStartReceipt,
     Freshness, Outcome, Phase, ProviderDescriptor, Ref, RefType,
@@ -510,7 +512,7 @@ class SidecarExecutionBackend:
                         "harnessType": self._contexts[run.turn_id]["harness_type"],
                         "nativePlatform": audit["nativePlatform"],
                         "homeLocator": audit["homeLocator"],
-                        "resumable": bool(native_resume_supported and audit["files"]),
+                        "resumable": _resumable(run.port, native_resume_supported, audit),
                         "sourceExecutionId": run.core_execution_id,
                         "audited": audit["audited"],
                         "truncated": audit["truncated"],
@@ -535,7 +537,7 @@ class SidecarExecutionBackend:
             with self._lock:
                 text = "".join(self._message_parts.get(run.turn_id, ()))
             audit, native_resume_supported = _audited_home(run)
-            resumable = bool(native_resume_supported and audit["files"])
+            resumable = _resumable(run.port, native_resume_supported, audit)
             # The manifest is a *record*: it references the home on the machine
             # that ran the turn (platform + locator, never a host path) and
             # fixes what that home looked like when the turn ended. The native
@@ -912,6 +914,12 @@ def _audited_home(run: "_Run") -> tuple[dict[str, Any], bool]:
         raise
 
 
+def _resumable(port: SidecarHarnessPort, supported: bool, audit: Mapping[str, Any]) -> bool:
+    # A native Agent owns its own session store; Server records only the opaque
+    # session id. There is deliberately no file inventory of the user's home.
+    return bool(supported and (isinstance(port, NativeHarnessPort) or audit["files"]))
+
+
 def _credential_hit_disposition(exc: BaseException, port: Any) -> str:
     """What to do with one credential-hit audit failure (order 66 §2.5).
 
@@ -959,6 +967,23 @@ def _capability_gate(port: SidecarHarnessPort, turn_id: str) -> None:
     ``open_execution`` 之前抛出，调用方沿既有 fail_turn 路径持久化，零 spawn。
     """
     launcher = getattr(port, "launcher", None)
+    if isinstance(port, NativeHarnessPort):
+        # Native mode is a distinct, explicit composition. It has no room
+        # mounts, projected credentials, or capability declarations to select.
+        if not isinstance(launcher, NativeProcessLauncher):
+            raise CapabilityGateRefusal("native mode requires the native launcher")
+        if (port.credential_environment is not None or port.subscription is not None
+                or port.capability_documents or port.capability_grants
+                or port.capability_authorized_providers or port.capability_binding):
+            raise CapabilityGateRefusal("native mode received isolated material")
+        from agent_box.server.workspaces.local_environment import LocalEnvironmentProvider
+        try:
+            normalized = LocalEnvironmentProvider().validate(port.directory)
+        except ServerError as exc:
+            raise CapabilityGateRefusal(f"selected project unavailable: {exc.code}") from exc
+        if normalized != port.directory or normalized != launcher.cwd:
+            raise CapabilityGateRefusal("selected project changed before native launch")
+        return
     documents = getattr(port, "capability_documents", ())
     grants = getattr(port, "capability_grants", ())
     authorized = getattr(port, "capability_authorized_providers", ())

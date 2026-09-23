@@ -402,8 +402,10 @@ class WireService:
         hook_triggers=None,
         connectors=None,
         data_root=None,
+        native_execution_provider=None,
     ) -> None:
         self._server_id_provider = server_id_provider
+        self.native_execution_provider = native_execution_provider
         self.artifact_store = artifact_store
         self.usage_aggregator = usage_aggregator
         #: Order 56's managed subscription accounts (records + assets). None
@@ -580,13 +582,21 @@ class WireService:
             if descriptor.model_control_id is not None:
                 entry["modelControlId"] = descriptor.model_control_id
             harnesses.append(entry)
-        return {
+        result = {
             "serverId": self._server_id_provider(),
             "protocolVersion": WIRE_VERSION,
             "capabilities": capabilities,
             "auth": auth,
             "harnesses": harnesses,
         }
+        if self.native_execution_provider is not None:
+            native = self.native_execution_provider()
+            if (not isinstance(native, Mapping) or native.get("mode") != "native"
+                    or native.get("harness") not in self.harnesses.registered()
+                    or not isinstance(native.get("profileId"), str) or not native["profileId"]):
+                raise WireError("SERVER_NATIVE_IDENTITY_INVALID", "native execution identity is unavailable")
+            result["nativeExecution"] = dict(native)
+        return result
 
     def _capability(self, capability_id: str) -> tuple[bool, str | None]:
         """Support state for one id - and an id no rule below covers is supported.

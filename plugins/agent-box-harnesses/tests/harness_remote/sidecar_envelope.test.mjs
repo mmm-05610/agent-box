@@ -112,6 +112,49 @@ test("sidecar refuses to run without the Worker isolation marker", async () => {
   assert.match(output, /SIDECAR_ISOLATION_REQUIRED/)
 })
 
+test("explicit native entry accepts a provenance-only operation without isolation", async () => {
+  const env = { ...process.env }
+  delete env.AGENTBOX_SIDECAR_ISOLATED
+  const processRun = spawn(process.execPath, [entry, "--native"], {
+    env, cwd: "/tmp", stdio: ["pipe", "pipe", "pipe"],
+  })
+  try {
+    const response = await new Promise((resolve, reject) => {
+      let output = ""
+      const timeout = setTimeout(() => reject(new Error("native entry timeout")), 5000)
+      processRun.stdout.setEncoding("utf8")
+      processRun.stdout.on("data", (chunk) => {
+        output += chunk
+        if (output.includes("\n")) {
+          clearTimeout(timeout)
+          resolve(JSON.parse(output.slice(0, output.indexOf("\n"))))
+        }
+      })
+      processRun.stdin.write(`${JSON.stringify({ id: 1, op: "profiles" })}\n`)
+    })
+    assert.equal(response.ok, true, JSON.stringify(response))
+    assert.equal(response.result.provenance.commit, JSON.parse(await readFile(snapshotSource, "utf8")).commit)
+  } finally {
+    processRun.kill()
+  }
+})
+
+test("native entry rejects an isolation marker and unknown execution flags", async () => {
+  for (const [args, environment, code] of [
+    [["--native"], { ...ISOLATED_ENV }, "SIDECAR_MODE_CONFLICT"],
+    [["--unsupported"], { ...ISOLATED_ENV }, "SIDECAR_MODE_INVALID"],
+  ]) {
+    const processRun = spawn(process.execPath, [entry, ...args], {
+      env: environment, cwd: "/tmp", stdio: ["ignore", "pipe", "pipe"],
+    })
+    let output = ""
+    processRun.stdout.setEncoding("utf8")
+    processRun.stdout.on("data", (chunk) => output += chunk)
+    await new Promise((resolve) => processRun.on("close", resolve))
+    assert.match(output, new RegExp(code))
+  }
+})
+
 test("provenance verification rejects a tampered snapshot", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "agentbox-sidecar-tamper-"))
   try {

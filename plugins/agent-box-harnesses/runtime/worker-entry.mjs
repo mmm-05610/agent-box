@@ -6,7 +6,8 @@
  *   2. one generic NDJSON envelope over stdio that drives the upstream-owned
  *      registration (acp-registration.js) — no branded switches, no ACP
  *      reimplementation, no product state;
- *   3. refusal to run outside the isolation the Worker is required to provide.
+ *   3. an explicit execution-mode guard: isolated Worker by default, or a
+ *      Server-selected native process using the user's own Agent environment.
  *
  * Native session ids, streaming payloads, capability contracts, and errors stay
  * opaque projections; Windows owns Profile/Session authority and the Worker owns
@@ -122,7 +123,16 @@ function makePermissionResolver(emit, timeoutMs) {
 }
 
 async function main() {
-  if (process.env.AGENTBOX_SIDECAR_ISOLATED !== "1") {
+  const native = process.argv.length === 3 && process.argv[2] === "--native"
+  if (process.argv.length > (native ? 3 : 2) || (process.argv.length === 3 && !native)) {
+    fail({ code: "SIDECAR_MODE_INVALID" })
+    return
+  }
+  if (native && process.env.AGENTBOX_SIDECAR_ISOLATED === "1") {
+    fail({ code: "SIDECAR_MODE_CONFLICT" })
+    return
+  }
+  if (!native && process.env.AGENTBOX_SIDECAR_ISOLATED !== "1") {
     fail({ code: "SIDECAR_ISOLATION_REQUIRED" })
     return
   }

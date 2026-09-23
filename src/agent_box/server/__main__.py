@@ -9,6 +9,11 @@ def parser() -> argparse.ArgumentParser:
     value = argparse.ArgumentParser(description="Run the independent AgentBox loopback Server")
     value.add_argument("--data-root", type=Path, required=True)
     value.add_argument("--port", type=int, default=8732)
+    value.add_argument("--execution-mode", choices=("isolated", "native"), default="isolated")
+    value.add_argument("--native-harness", help="one registered native Agent Harness id")
+    value.add_argument("--native-adapter-command", help="absolute executable path of its ACP adapter")
+    value.add_argument("--native-adapter-arg", action="append", default=[],
+                       help="one adapter argument (repeatable)")
     value.add_argument(
         "--sidecar-deployment", type=Path,
         help="non-secret Harness sidecar deployment JSON",
@@ -44,17 +49,29 @@ def main(argv: list[str] | None = None) -> int:
         parser().error("--port must be between 1 and 65535")
     from uvicorn import run
     from agent_box.server.bootstrap import build_runtime, build_runtime_from_sidecar_deployment
+    from agent_box.server.bootstrap.runtime import build_runtime_from_native_adapter
     from agent_box.server.transport.http import create_app
 
     if args.sidecar_deployment and args.plugin_root is None:
         parser().error("--plugin-root is required with --sidecar-deployment")
-    runtime = (
-        build_runtime_from_sidecar_deployment(
+    if args.execution_mode == "native":
+        if (args.sidecar_deployment or args.mount or not args.plugin_root
+                or not args.native_harness or not args.native_adapter_command):
+            parser().error("native mode requires --plugin-root, --native-harness and "
+                           "--native-adapter-command, without sidecar deployment or mounts")
+        runtime = build_runtime_from_native_adapter(
+            args.data_root, plugin_root=args.plugin_root,
+            harness_id=args.native_harness,
+            adapter_command=args.native_adapter_command,
+            adapter_args=tuple(args.native_adapter_arg),
+        )
+    else:
+        if args.native_harness or args.native_adapter_command or args.native_adapter_arg:
+            parser().error("native adapter options require --execution-mode native")
+        runtime = (build_runtime_from_sidecar_deployment(
             args.data_root, args.sidecar_deployment,
             plugin_root=args.plugin_root, mount_bindings=mount_bindings(args.mount),
-        )
-        if args.sidecar_deployment else build_runtime(args.data_root)
-    )
+        ) if args.sidecar_deployment else build_runtime(args.data_root))
     # One ASGI worker is an invariant: no CLI knob exposes a multi-worker mode.
     run(create_app(runtime), host="127.0.0.1", port=args.port, workers=1, log_config=None)
     return 0

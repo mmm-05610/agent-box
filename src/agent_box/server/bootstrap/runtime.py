@@ -228,6 +228,8 @@ class ServerRuntime:
     #: Credential declarations from the deployment document, imported on start
     #: (the store and the records table both exist only once the schema is up).
     declared_credentials: tuple[dict[str, str], ...] = ()
+    native_harness_id: str | None = None
+    native_profile_id: str | None = None
     started: bool = False
 
     def start(self) -> None:
@@ -238,6 +240,21 @@ class ServerRuntime:
         try:
             self.database.initialize()
             _import_declared_credentials(self, self.declared_credentials)
+            if self.native_harness_id is not None:
+                profile = self.service.profiles.create_wire(
+                    f"native-agent-profile:{self.native_harness_id}",
+                    display_name=f"Native {self.native_harness_id}",
+                    harness=self.native_harness_id,
+                )
+                stored = json.loads(self.objects.read(profile["config_object_digest"]))
+                if (profile["harness_type"] != self.native_harness_id
+                        or profile["archived_at"] is not None
+                        or profile["credential_id"] is not None
+                        or profile["account_id"] is not None
+                        or stored.get("configuration") != {}):
+                    raise RuntimeError("NATIVE_PROFILE_CONFLICT")
+                self.service.sessions._assert_profile_executable(profile["id"])
+                self.native_profile_id = str(profile["id"])
             self.repository.mark_workspaces_unverified()
             self.repository.recover_interrupted_turns()
             from agent_box.work_core import db as core_db
@@ -311,6 +328,7 @@ def build_runtime(
     home_concurrency: Mapping[str, str] | None = None,
     shared_store_guards: Mapping[str, Any] | None = None,
     subscription_files_for=None,
+    local_workspace_provider=None,
 ) -> ServerRuntime:
     """Assemble a provider-neutral Server runtime.
 
@@ -401,6 +419,7 @@ def build_runtime(
     workspace_service = WorkspaceService(
         workspace_records, idempotency, connector=connector_instance,
         ssh_connector=ssh_instance,
+        **({"local": local_workspace_provider} if local_workspace_provider is not None else {}),
     )
     profile_service = ProfileService(profile_records, idempotency, objects,
                                      harnesses=registry, credentials=credentials)
@@ -474,6 +493,82 @@ def build_runtime(
         execution=execution, registry=registry, data_root=root, objects=objects,
     )
     runtime.delegation_tokens = {}
+    return runtime
+
+
+def build_runtime_from_native_adapter(
+    data_root: Path | str, *, plugin_root: Path | str, harness_id: str,
+    adapter_command: str, adapter_args: tuple[str, ...] = (),
+) -> ServerRuntime:
+    """Compose one current-user ACP Agent in an explicitly native Server.
+
+    The adapter is a launch reference, never a credential or projected home.
+    The worker entry verifies its bundled bridge provenance at launch.
+    """
+    import shutil
+    from agent_box.server.execution import HarnessDescriptor
+    from agent_box.server.execution.sidecar import (
+        NativeHarnessPort, NativeProcessLauncher,
+    )
+    from agent_box.server.workspaces.local_environment import LocalEnvironmentProvider
+
+    if not re.fullmatch(r"[a-z][a-z0-9._-]{0,63}", harness_id):
+        raise RuntimeError("NATIVE_HARNESS_INVALID")
+    if (not Path(adapter_command).is_absolute() or not Path(adapter_command).is_file()
+            or not os.access(adapter_command, os.X_OK)
+            or any(not isinstance(arg, str) or "\x00" in arg for arg in adapter_args)):
+        raise RuntimeError("NATIVE_ADAPTER_INVALID")
+    plugin = Path(plugin_root).resolve()
+    entry = plugin / "runtime" / "worker-entry.mjs"
+    provenance = plugin / "third_party" / "harness_remote" / "SOURCE.json"
+    node = shutil.which("node")
+    if not entry.is_file() or not provenance.is_file() or node is None:
+        raise RuntimeError("NATIVE_HARNESS_ARTIFACT_MISSING")
+    registry = HarnessRegistry()
+    registry.register(HarnessDescriptor(harness_id))
+    root = Path(data_root).resolve()
+    adapter = {"command": adapter_command, "args": list(adapter_args)}
+
+    def factory(records, objects, approvals, notifier, _connectors, _credentials, _secrets):
+        def port_factory(context, on_event):
+            if context.get("env_kind") != "local" or context.get("harness_type") != harness_id:
+                raise RuntimeError("NATIVE_PLACEMENT_UNSUPPORTED")
+            project = context.get("normalized_path")
+            if not isinstance(project, str) or not project:
+                raise RuntimeError("NATIVE_PROJECT_REQUIRED")
+            environment = dict(os.environ)
+            environment.pop("AGENTBOX_SIDECAR_ISOLATED", None)
+            return NativeHarnessPort(
+                NativeProcessLauncher((node, str(entry), "--native"), cwd=project),
+                environment=environment, profile=harness_id, adapter=adapter,
+                directory=project, state_directory=str(root / "native-bridge" / harness_id),
+                resume_native_id=context.get("checkpoint_native_id"),
+                on_event=on_event,
+            )
+
+        return _SidecarBackendCls(
+            records, objects, approvals, port_factory=port_factory,
+            on_event=notifier.notify,
+        )
+
+    runtime = build_runtime(
+        root, harnesses=registry, execution_factory=factory,
+        local_workspace_provider=LocalEnvironmentProvider(execution_mode="native"),
+    )
+    runtime.native_harness_id = harness_id
+    def native_identity():
+        identity = runtime.native_profile_id
+        try:
+            profile = runtime.service.profiles.records.get(identity) if identity else None
+        except Exception:
+            profile = None
+        valid = (profile is not None and profile["harness_type"] == harness_id
+                 and profile["archived_at"] is None and profile["credential_id"] is None)
+        return {
+            "mode": "native", "harness": harness_id,
+            "profileId": identity if valid else None,
+        }
+    runtime.wire.native_execution_provider = native_identity
     return runtime
 
 

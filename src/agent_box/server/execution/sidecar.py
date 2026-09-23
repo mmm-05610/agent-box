@@ -124,6 +124,15 @@ class LocalProcessLauncher:
         return _ProcessChannels(process)
 
 
+class NativeProcessLauncher(LocalProcessLauncher):
+    """Explicit host process for a selected local project, without room mounts."""
+
+    def __init__(self, command: Sequence[str], *, cwd: str) -> None:
+        if not cwd:
+            raise ValueError("NATIVE_PROJECT_REQUIRED")
+        super().__init__(command, cwd=cwd)
+
+
 class _ProcessChannels:
     def __init__(self, process: subprocess.Popen) -> None:
         self.process = process
@@ -1403,6 +1412,7 @@ class SidecarHarnessPort:
             **audit,
         }, resumable
 
+
     @property
     def shared_store(self) -> bool:
         """Whether this execution's audited tree is the shared family library.
@@ -1682,3 +1692,25 @@ class SidecarHarnessPort:
                     "sidecar.operation.permission_request",
                 )
             self.on_event(execution_id, "approval.requested", {"request": data})
+
+
+class NativeHarnessPort(SidecarHarnessPort):
+    """Native Agent port: retain its opaque session id, never inspect its home."""
+
+    native_mode = True
+
+    def capture_execution(self, execution_id: str) -> tuple[dict[str, Any], bool]:
+        envelope = self._require(execution_id)
+        with self._lock:
+            already_closed = execution_id in self._native_closed
+        if not already_closed:
+            envelope.request({"op": "close"}, timeout=10)
+            with self._lock:
+                self._native_closed.add(execution_id)
+        return {
+            "nativePlatform": "local",
+            "homeLocator": "agent-native",
+            "audited": False,
+            "truncated": False,
+            "files": [],
+        }, self._effective_supported(execution_id, "native_continuation")
