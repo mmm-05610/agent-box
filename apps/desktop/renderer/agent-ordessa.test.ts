@@ -6,7 +6,7 @@ import {
   ServerConfigError, parseOrigin, resolveServerTarget, serverInstanceId,
 } from '../../../plugins/connectors/ordessa/src/target'
 import { readRestrictedTokenFile } from '../../../plugins/connectors/ordessa/src/token-file'
-import { selectReadyProfile } from '../../../plugins/connectors/ordessa/src/native'
+import { nativeExecutionProfile } from '../../../plugins/connectors/ordessa/src/native'
 
 const SECRET = 'a'.repeat(64)
 const LOCATOR = '/run/ordessa/data-root/secrets/http-token'
@@ -160,34 +160,56 @@ it('never writes the token or its full locator into a token-file refusal', async
   expect(await readRestrictedTokenFile(tokenFile(`${SECRET}\n`, 0o600).file)).toBe(SECRET)
 })
 
-// FC-0049 / C-0026: createAndSend.profileId is this connection's Harness execution identity. The only
-// offline seam for that rule is the predicate itself, so every refusal below is the pre-request gate.
+// FC-0053 / C-0027: the authenticated hello names this Server combination's exact execution identity,
+// so `profiles.list` may only confirm that id — never pick, rank, or substitute for a missing one.
+// Every refusal below is the pre-request gate: native.ts resolves the identity before a frame goes out.
 const refusal = (run: () => unknown): string => {
   try { run() } catch (error) { return String((error as Error).message) }
-  throw new Error('expected the profile selection to refuse')
+  throw new Error('expected the profile cross-check to refuse')
 }
-const profile = (id: string, harness?: string, extra: Record<string, unknown> = {}) =>
-  ({ id, ...(harness ? { harness } : {}), displayName: `${id} label`, sendability: { state: 'ready' }, ...extra })
+const profile = (id: string, harness = 'pi', extra: Record<string, unknown> = {}) =>
+  ({ id, harness, displayName: `${id} label`, sendability: { state: 'ready' }, ...extra })
+const helloFrom = (nativeExecution: unknown, harnesses: string[] = ['pi']) => ({
+  serverId: 'srv_1', protocolVersion: 'wire/1', capabilities: [],
+  harnesses: harnesses.map(id => ({ id })), ...(nativeExecution === undefined ? {} : { nativeExecution }),
+})
+const native = { mode: 'native', harness: 'pi', profileId: 'p_pi' }
 
-it('selects the one profile whose Harness the authenticated hello offers', () => {
-  const pi = new Set(['pi'])
-  expect(selectReadyProfile(pi, [profile('p_pi', 'pi')])).toEqual({ id: 'p_pi', harness: 'pi', displayName: 'p_pi label' })
-  // A ready profile of another Harness sorts first but is never the execution identity of this connection.
-  expect(selectReadyProfile(pi, [profile('a_other', 'codex'), profile('b_pi', 'pi')])).toEqual({ id: 'b_pi', harness: 'pi', displayName: 'b_pi label' })
-  expect(refusal(() => selectReadyProfile(pi, [profile('a_other', 'codex')]))).toMatch(/no-ready-profile/)
+it('sends under the exact profileId the authenticated hello names', () => {
+  expect(nativeExecutionProfile(helloFrom(native), [profile('p_pi')])).toEqual({ id: 'p_pi', harness: 'pi', displayName: 'p_pi label' })
+  // Other ready profiles cannot change the answer, whichever way the list is ordered.
+  expect(nativeExecutionProfile(helloFrom(native), [profile('a_first'), profile('p_pi'), profile('z_last')]))
+    .toEqual({ id: 'p_pi', harness: 'pi', displayName: 'p_pi label' })
   // displayName is Server-owned; an absent one falls back to the id rather than an invented label.
-  expect(selectReadyProfile(pi, [{ id: 'p_pi', harness: 'pi', sendability: { state: 'ready' } }])).toEqual({ id: 'p_pi', harness: 'pi', displayName: 'p_pi' })
+  expect(nativeExecutionProfile(helloFrom(native), [{ id: 'p_pi', harness: 'pi', sendability: { state: 'ready' } }]))
+    .toEqual({ id: 'p_pi', harness: 'pi', displayName: 'p_pi' })
+  // A reconnect of the same Server must not re-derive the identity from list position.
+  const listed = [profile('a_first'), profile('p_pi')]
+  expect(nativeExecutionProfile(helloFrom(native), [...listed].reverse())).toEqual(nativeExecutionProfile(helloFrom(native), listed))
 })
 
-it('refuses to guess a Harness profile instead of picking a list position', () => {
-  const pi = new Set(['pi'])
-  expect(refusal(() => selectReadyProfile(pi, [profile('p_one', 'pi'), profile('p_two', 'pi')]))).toMatch(/profile-ambiguous/)
-  expect(refusal(() => selectReadyProfile(pi, []))).toMatch(/no-ready-profile/)
-  // Not ready or still recovering cannot accept a turn, so neither counts as a candidate.
-  expect(refusal(() => selectReadyProfile(pi, [profile('p_one', 'pi', { sendability: { state: 'blocked' } }),
-    profile('p_two', 'pi', { recoveryPending: true })]))).toMatch(/no-ready-profile/)
-  // An empty hello gives no Harness to match, which must not widen into "any profile will do".
-  expect(refusal(() => selectReadyProfile(new Set<string>(), [profile('p_pi', 'pi')]))).toMatch(/no-ready-profile/)
-  // A profile the Server never attributed to a Harness is not selectable either.
-  expect(refusal(() => selectReadyProfile(pi, [profile('p_orphan')]))).toMatch(/no-ready-profile/)
+it('refuses a first send whose hello identity the Server does not confirm', () => {
+  // An isolated hello has no nativeExecution and must not fall back to the one ready profile on offer.
+  expect(refusal(() => nativeExecutionProfile(helloFrom(undefined), [profile('p_pi')]))).toMatch(/native-execution-missing/)
+  expect(refusal(() => nativeExecutionProfile(helloFrom(null), [profile('p_pi')]))).toMatch(/native-execution-missing/)
+  expect(refusal(() => nativeExecutionProfile(helloFrom({ mode: 'isolated', harness: 'pi', profileId: 'p_pi' }), [profile('p_pi')]))).toMatch(/native-execution-mode/)
+  for (const incomplete of [{ mode: 'native', profileId: 'p_pi' }, { mode: 'native', harness: 'pi' },
+    { mode: 'native', harness: '', profileId: 'p_pi' }, { mode: 'native', harness: 'pi', profileId: '' },
+    { mode: 'native', harness: 7, profileId: true }]) {
+    expect(`${JSON.stringify(incomplete)}: ${refusal(() => nativeExecutionProfile(helloFrom(incomplete), [profile('p_pi')]))}`)
+      .toMatch(/native-execution-incomplete/)
+  }
+  // A harness the Server never registered is not the harness this connection runs under.
+  expect(refusal(() => nativeExecutionProfile(helloFrom({ mode: 'native', harness: 'codex', profileId: 'p_codex' }), [profile('p_codex', 'codex')]))).toMatch(/native-harness-unregistered/)
+  expect(refusal(() => nativeExecutionProfile(helloFrom(native, []), [profile('p_pi')]))).toMatch(/native-harness-unregistered/)
+  // The named profile must exist, be unarchived, belong to that harness, and be able to accept a turn.
+  expect(refusal(() => nativeExecutionProfile(helloFrom(native), [profile('p_other')]))).toMatch(/native-profile-unlisted/)
+  expect(refusal(() => nativeExecutionProfile(helloFrom(native), []))).toMatch(/native-profile-unlisted/)
+  expect(refusal(() => nativeExecutionProfile(helloFrom(native), [profile('p_pi', 'pi', { archivedAt: '2026-09-01T00:00:00Z' })]))).toMatch(/native-profile-archived/)
+  expect(refusal(() => nativeExecutionProfile(helloFrom(native), [profile('p_pi', 'codex')]))).toMatch(/native-profile-harness-mismatch/)
+  // A Server that cannot read sendability says `unknown`, which is not permission to send.
+  for (const state of ['blocked', 'unknown']) expect(`${state}: ${refusal(() => nativeExecutionProfile(helloFrom(native), [profile('p_pi', 'pi', { sendability: { state } })]))}`)
+    .toMatch(/native-profile-not-ready/)
+  expect(refusal(() => nativeExecutionProfile(helloFrom(native), [{ id: 'p_pi', harness: 'pi' }]))).toMatch(/native-profile-not-ready/)
+  expect(refusal(() => nativeExecutionProfile(helloFrom(native), [profile('p_pi', 'pi', { recoveryPending: true })]))).toMatch(/native-profile-recovery-pending/)
 })

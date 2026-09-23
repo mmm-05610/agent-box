@@ -23,26 +23,33 @@ interface Hello {
   protocolVersion: string
   capabilities: { id: string; supported: boolean; reason?: string }[]
   harnesses: { id: string }[]
+  nativeExecution?: unknown
 }
 
 const supported = (hello: Hello, method: string) => hello.capabilities.some(item => item.id === method && item.supported)
 
 /**
- * FC-0049: `sessions.createAndSend.profileId` is this Server combination's Harness execution identity,
- * not a pick from a list. A profile only counts when the authenticated hello offers its own harness, and
- * anything but exactly one such ready profile fails closed — no Profile UI exists here, so no connection
- * may silently run a turn under a Harness nobody selected.
+ * FC-0053: the authenticated hello names this Server combination's execution identity, and that exact
+ * `profileId` is the only one a first send may use. `profiles.list` never picks and never ranks — it is
+ * cross-checked at that one id, so a second ready profile cannot change the answer and list order cannot
+ * substitute for a choice. An isolated hello carries no `nativeExecution`; it must not fall back to a pick.
  */
-export function selectReadyProfile(harnesses: ReadonlySet<string>, items: readonly unknown[]): { id: string; harness: string; displayName: string } {
-  const candidates = items.map(record).filter((item): item is Record<string, unknown> => !!item &&
-    !!text(item.id) && harnesses.has(text(item.harness) ?? '') &&
-    record(item.sendability)?.state === 'ready' && item.recoveryPending !== true)
-  const [chosen, ...rest] = candidates
-  if (!chosen || rest.length) throw new Error(candidates.length > 1
-    ? 'profile-ambiguous: several Harness profiles are ready and this connection selects none of them'
-    : 'no-ready-profile: the Server has no provisioned profile that can accept a turn')
-  const id = text(chosen.id) ?? ''
-  return { id, harness: text(chosen.harness) ?? '', displayName: text(chosen.displayName) ?? id }
+export function nativeExecutionProfile(hello: Hello, items: readonly unknown[]): { id: string; harness: string; displayName: string } {
+  const declared = record(hello.nativeExecution)
+  if (!declared) throw new Error('native-execution-missing: this Server declares no native execution identity, so no profile may be chosen on its behalf')
+  if (declared.mode !== 'native') throw new Error(`native-execution-mode: hello.nativeExecution.mode is ${JSON.stringify(declared.mode)}, not "native"`)
+  const harness = text(declared.harness), id = text(declared.profileId)
+  if (!harness || !id) throw new Error('native-execution-incomplete: hello.nativeExecution needs a non-empty harness and profileId')
+  if (!hello.harnesses.some(item => item.id === harness)) throw new Error(`native-harness-unregistered: ${harness} is not in this Server's registered harness catalog`)
+  const [match] = items.map(record).filter(item => !!item && text(item.id) === id)
+  if (!match) throw new Error(`native-profile-unlisted: the profile ${id} hello names is not on this Server`)
+  if (match.archivedAt != null) throw new Error(`native-profile-archived: the profile ${id} hello names is archived`)
+  if (text(match.harness) !== harness) throw new Error(`native-profile-harness-mismatch: the profile ${id} belongs to ${text(match.harness) ?? 'an unknown harness'}, not ${harness}`)
+  // `sendability.state === 'ready'` is the Server's own pre-send verdict; it reports anything it could not
+  // read as `unknown`, so a ready state already rules out a pending recovery.
+  if (record(match.sendability)?.state !== 'ready') throw new Error(`native-profile-not-ready: the profile ${id} hello names cannot accept a turn`)
+  if (match.recoveryPending === true) throw new Error(`native-profile-recovery-pending: the profile ${id} hello names is waiting on a recovery`)
+  return { id, harness, displayName: text(match.displayName) ?? id }
 }
 
 /**
@@ -96,15 +103,15 @@ export default function createTransport(): NativeTransport {
       return { id: known.id, normalizedPath: text(workspace?.normalizedPath) ?? known.normalizedPath }
     }
 
-    const readyProfile = async () => {
+    const executionProfile = async () => {
       required('profiles.list')
       const listed = await wire.call<{ items: Record<string, unknown>[] }>('profiles.list', { includeArchived: false })
-      return selectReadyProfile(new Set(hello.harnesses.map(item => item.id)), listed.items ?? [])
+      return nativeExecutionProfile(hello, listed.items ?? [])
     }
 
     /** An accepted first send is only proven by a real session id; an unknown outcome is queried, never re-issued. */
     const firstSend = async (workspaceId: string, message: string, requestId: string) => {
-      const profile = await readyProfile()
+      const profile = await executionProfile()
       const params = {
         requestId, workspaceId, profileId: profile.id, overrides: [],
         message: { text: message, attachments: [] },
@@ -142,8 +149,6 @@ export default function createTransport(): NativeTransport {
       switch (frame.method) {
         case 'identity':
           return { serverInstanceId: instance, protocolVersion: hello.protocolVersion, capabilities: hello.capabilities, harnesses: hello.harnesses }
-        case 'profile':
-          return await readyProfile()
         case 'projects': {
           await loadProjects()
           return [...projects.values()].map(item => ({ id: item.id, normalizedPath: item.normalizedPath }))
