@@ -20,7 +20,7 @@ const events = [
   { time: '1300', type: 7, source: source(3, 3), params: { address_list: ['127.0.0.1:8888'] } },
   { time: '1310', type: 12, source: source(3, 3), params: { byte_count: 8 } },
   { time: '1110', type: 20, source: source(1, 1), params: { url: `${origin}/wire/v1/server.hello`, method: 'POST' } },
-  { time: '1310', type: 20, source: source(1, 2), params: { url: `https://example.invalid/dict/en.bdic`, method: 'GET',
+  { time: '1310', type: 20, source: source(1, 2), params: { url: `https://redirector.gvt1.com/edgedl/chrome/dict/en.bdic`, method: 'GET',
     traffic_annotation: hash('spellcheck_hunspell_dictionary'), source_dependency: source(3, 3) } },
 ]
 const positive = classifyPairNetwork(traces, { constants, events }, origin)
@@ -41,10 +41,20 @@ const unknownRequest = classifyPairNetwork(traces, { constants, events: [...even
   { time: '1330', type: 20, source: source(1, 9), params: { url: 'https://other.invalid/unknown', method: 'GET' } }] }, origin)
 assert.equal(unknownRequest.pass, false)
 assert.equal(unknownRequest.unknownRequests, 1)
+const dictionaryRedirect = classifyPairNetwork(traces, { constants, events: [...events,
+  { time: '1320', type: 20, source: source(1, 2), params: { url: 'https://unreviewed.invalid/dict/en.bdic' } }] }, origin)
+assert.equal(dictionaryRedirect.pass, false)
+assert.equal(dictionaryRedirect.unknownRequests, 1)
+const destinationMissing = classifyPairNetwork(traces, { constants, events: [...events,
+  { time: '1330', type: 20, source: source(1, 10), params: { method: 'GET', traffic_annotation: hash('spellcheck_hunspell_dictionary') } }] }, origin)
+assert.equal(destinationMissing.pass, false)
+assert.equal(destinationMissing.unknownRequests, 1)
 assert.equal(classifyPairNetwork(traces, { constants }, origin).pass, false)
 assert.equal(credentialDestinationAllowed(`${origin}/wire/v1/server.hello`, origin, true), true)
 assert.equal(credentialDestinationAllowed(`https://example.invalid/${fakeSecret}`, origin, true), false)
+assert.equal(credentialDestinationAllowed('http://127.0.0.1:43891/wire/v1/server.hello', 'https://example.invalid', true), false)
 assert.ok(!JSON.stringify({ positive }).includes(fakeSecret))
 console.log(JSON.stringify({ synthetic: 'PASS', udpProbeNotTcp: true, remoteTcpRejected: true,
   remoteSendRejected: true, unknownTypeRejected: true, unknownRequestRejected: true,
-  credentialRemoteRejected: true, truncatedRejected: true, redacted: true }))
+  credentialRemoteRejected: true, dictionaryRedirectRejected: true, missingDestinationRejected: true,
+  truncatedRejected: true, redacted: true }))

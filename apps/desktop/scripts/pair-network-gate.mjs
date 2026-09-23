@@ -3,6 +3,9 @@ import assert from 'node:assert/strict'
 
 const hashAnnotation = value => [...value].reduce((n, c) => (n * 31 + c.charCodeAt(0)) % 138003713, 0)
 const dictionaryAnnotation = hashAnnotation('spellcheck_hunspell_dictionary')
+// Chromium's spellcheck_hunspell_dictionary source declares this initial URL.
+// A redirect to any other host needs a separate reviewed destination decision.
+const dictionaryOrigin = 'https://redirector.gvt1.com'
 const probeAddress = '2001:4860:4860::8888' // Chromium 144 host_resolver_manager.cc kIPv6ProbeAddress.
 const key = source => Number.isInteger(source?.type) && Number.isInteger(source?.id) ? `${source.type}:${source.id}` : null
 const loopback = value => value.startsWith('127.') || value === '::1' || value.startsWith('::ffff:127.')
@@ -107,12 +110,13 @@ export function classifyPairNetwork(files, netlog, serverOrigin) {
   for (const [source, events] of eventsBySource) {
     if (!source.startsWith(`${sourceTypes.URL_REQUEST}:`)) continue
     const urls = events.flatMap(event => typeof event.params?.url === 'string' ? [event.params.url] : [])
-    if (!urls.length) continue
+    if (!urls.length) { unknownRequests.push(source); continue }
     const methods = events.flatMap(event => typeof event.params?.method === 'string' ? [event.params.method] : [])
     const annotation = events.map(event => event.params?.traffic_annotation).find(Number.isInteger)
     const allServer = urls.every(raw => { try { return new URL(raw).origin === server.origin } catch { return false } })
     const dictionary = annotation === dictionaryAnnotation && methods.includes('GET') && methods.every(m => m === 'GET') &&
-      urls.every(raw => { try { const url = new URL(raw); return url.protocol === 'https:' && url.pathname.endsWith('.bdic') } catch { return false } })
+      urls.every(raw => { try { const url = new URL(raw); return url.origin === dictionaryOrigin &&
+        url.username === '' && url.password === '' && url.pathname.endsWith('.bdic') } catch { return false } })
     if (allServer) continue
     if (dictionary) dictionaryRequests.push(source)
     else unknownRequests.push(source)
@@ -158,5 +162,9 @@ export function classifyPairNetwork(files, netlog, serverOrigin) {
 
 export function credentialDestinationAllowed(url, serverOrigin, bearerPresent) {
   if (!bearerPresent) return true
-  try { return new URL(url).origin === new URL(serverOrigin).origin } catch { return false }
+  try {
+    const server = new URL(serverOrigin), destination = new URL(url)
+    return server.protocol === 'http:' && loopback(server.hostname) && !!server.port &&
+      destination.origin === server.origin && !destination.username && !destination.password
+  } catch { return false }
 }

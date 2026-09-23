@@ -56,6 +56,9 @@ export class WireClient {
     try {
       response = await fetch(`${this.target.origin}/wire/v1/${method}`, {
         method: 'POST',
+        // A redirect can replay the JSON body elsewhere, and a same-origin redirect
+        // can replay the bearer too. The Server wire has no redirect contract.
+        redirect: 'error',
         headers: { 'content-type': 'application/json', authorization: `Bearer ${this.target.token}` },
         body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
       })
