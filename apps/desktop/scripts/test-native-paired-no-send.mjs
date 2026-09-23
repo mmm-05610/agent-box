@@ -82,7 +82,7 @@ try {
   })
   child = spawn('strace', ['-f', '-e', 'trace=connect', '-o', tracePath,
     path.resolve(app, '../../node_modules/electron/dist/electron'),
-    '--no-sandbox', '--disable-gpu', '--ozone-platform=x11', '.'],
+    '--no-sandbox', '--disable-gpu', '--ozone-platform=x11', '--disable-background-networking', '.'],
   { cwd: app, env, detached: true, stdio: ['ignore', 'pipe', 'pipe'] })
   let output = ''
   for (const stream of [child.stdout, child.stderr]) stream.on('data', chunk => {
