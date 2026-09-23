@@ -1,0 +1,8 @@
+{
+  "name": "@ordessa/contracts-foundation",
+  "version": "0.1.0",
+  "private": true,
+  "ordessa": {
+    "id": "ordessa.contracts"
+  }
+}
