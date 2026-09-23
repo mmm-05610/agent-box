@@ -26,6 +26,7 @@ function projectClient(id: string, serverInstanceId: string | undefined, options
   const fails = new Set<string>()
   const opens: string[] = []
   const sends: ProjectCall[] = []
+  const continuations: { sessionId: string; text: string }[] = []
   let sendAttempt = 0
   const client: AgentClient = {
     get isDisposed() { return false },
@@ -34,7 +35,7 @@ function projectClient(id: string, serverInstanceId: string | undefined, options
     subscribe(listener) { listeners.add(listener); return () => { listeners.delete(listener) } },
     async refreshSessions() {}, async newSession() { throw Error('CP UI must not call newSession') },
     async openSession(session) { write({ selectedSessionId: session }) },
-    async send(sessionId, text) { write({ messages: { ...snapshot.messages, [sessionId]: [{ id: 'm', role: 'user', text }] } }) },
+    async send(sessionId, text) { continuations.push({ sessionId, text }); write({ messages: { ...snapshot.messages, [sessionId]: [{ id: 'm', role: 'user', text }] } }) },
     async stop() {}, async respond() {}, async setOption() {},
     async refreshWorkspaces() {},
     async openWorkspace(workspaceId) {
@@ -55,7 +56,7 @@ function projectClient(id: string, serverInstanceId: string | undefined, options
       return { sessionId: 'R1' } // the client only resolves with the accepted real id (FC-0031)
     },
   }
-  return { client, fails, calls: { opens, sends }, setWorkspaces: (selected: string | undefined) =>
+  return { client, fails, calls: { opens, sends, continuations }, setWorkspaces: (selected: string | undefined) =>
     write({ workspaces: { ...snapshot.workspaces!, selectedWorkspaceId: selected } }) }
 }
 
@@ -282,12 +283,17 @@ it('draft first send reaches createAndSend exactly once and never the previously
   expect(a.client.getSnapshot().selectedSessionId).toBe('E1') // startDraft deliberately keeps it for discard-restore
   await sessions.send('draft text')
   expect(a.calls.sends).toHaveLength(1)
+  expect(a.calls.continuations).toHaveLength(0) // no call to client.send(E1) while the draft is active
   expect(a.calls.sends[0]).toMatchObject({ workspaceId: '/srv/a', text: 'draft text' })
   expect(a.client.getSnapshot().messages.E1).toBeUndefined() // the old session never captured the draft text
   expect(a.client.getSnapshot()).toMatchObject({ selectedSessionId: 'R1' })
   const draft = sessions.getSnapshot().draft
   expect(draft?.active).toBe(false)
   expect(draft?.endedBy).toBeUndefined() // an accepted send is distinguishable from discard/away
+  await sessions.openSession('E1')
+  await sessions.send('existing follow-up')
+  expect(a.calls.continuations).toEqual([{ sessionId: 'E1', text: 'existing follow-up' }]) // continuation remains available after draft success
+  expect(a.calls.sends).toHaveLength(1)
 })
 
 it('discardDraft restores the previously selected session in place and reports endedBy discarded (恢复定义)', async () => {
