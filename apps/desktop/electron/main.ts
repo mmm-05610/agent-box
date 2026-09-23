@@ -114,6 +114,18 @@ app.whenReady().then(async () => {
         };
       })()`) })
     }
+    if (process.env.MODULAR_STORAGE_RESTART_SMOKE === '1') {
+      // Test-only fixture: non-secret placeholder selection values, namespaced by origin+serverId (FC-0034/0035).
+      Object.assign(result, { storage: await win.webContents.executeJavaScript(`(async () => {
+        const key = serverId => 'ordessa.cp-project|http://127.0.0.1:4471|' + serverId
+        const payload = JSON.stringify({ workspaceId: 'ws-fixture-A', normalizedPath: '/fixture/project-A' })
+        if (${JSON.stringify(process.env.ORDESSA_SMOKE_STORAGE_MODE ?? 'read')} === 'write') {
+          localStorage.setItem(key('srv-A'), payload)
+          return { wrote: key('srv-A'), echo: localStorage.getItem(key('srv-A')) }
+        }
+        return { valueA: localStorage.getItem(key('srv-A')), valueB: localStorage.getItem(key('srv-B')) }
+      })()`) })
+    }
     console.log('MODULAR_LOADER_READY', JSON.stringify(result))
     app.exit(result.ready && result.nodeAbsent ? 0 : 1)
   }

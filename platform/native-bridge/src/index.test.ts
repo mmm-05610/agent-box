@@ -180,6 +180,58 @@ describe('frame validation and lifecycle', () => {
   })
 })
 
+describe('registration-gated identity frames (FC-0034 fixture piece)', () => {
+  it('surfaces a hello ack only after main-side auth ran, preserving adapter frame order', async () => {
+    await fixtureAdapter(`export default () => ({
+      open: onFrame => ({
+        send: async frame => {
+          if (frame?.type === 'server:hello') { onFrame({ seq: 0 }); onFrame({ type: 'hello:ack', serverId: 'srv-A' }); return { accepted: true } }
+          throw Error('Unknown protocol frame')
+        },
+        close: async () => {},
+      }),
+    })`)
+    const w = await install()
+    const instanceId = await invoke('agent-native:open', trusted(w), 'fixture.server') as string
+    expect(w.sent.filter(entry => entry.payload?.frame?.type === 'hello:ack').length).toBe(0)
+    await invoke('agent-native:send', trusted(w), instanceId, { type: 'server:hello' })
+    const acks = w.sent.filter(entry => entry.payload?.frame?.type === 'hello:ack')
+    expect(acks).toEqual([{ channel: 'agent-native:event', payload: { instanceId, frame: { type: 'hello:ack', serverId: 'srv-A' } } }])
+    expect(w.sent.map(entry => entry.payload.frame).filter(Boolean)).toEqual([{ seq: 0 }, { type: 'hello:ack', serverId: 'srv-A' }])
+  })
+
+  it('a failed main-side auth leaves no registerable ack frame in the event stream', async () => {
+    await fixtureAdapter(`export default () => ({
+      open: onFrame => ({
+        send: async frame => {
+          if (frame?.type === 'server:hello') { onFrame({ type: 'hello:error' }); throw Error('401 unauthorized') }
+          throw Error('Unknown protocol frame')
+        },
+        close: async () => {},
+      }),
+    })`)
+    const w = await install()
+    const instanceId = await invoke('agent-native:open', trusted(w), 'fixture.server') as string
+    await expect(invoke('agent-native:send', trusted(w), instanceId, { type: 'server:hello' })).rejects.toThrow('401 unauthorized')
+    expect(w.sent.filter(entry => entry.payload?.frame?.type === 'hello:ack').length).toBe(0)
+  })
+
+  it('keeps per-instance event streams apart across instances of one adapter', async () => {
+    await fixtureAdapter(`export default () => ({
+      open: onFrame => ({
+        send: async frame => { if (frame?.type === 'ping') { onFrame({ pong: frame.tag }); return 'ok' } throw Error('Unknown protocol frame') },
+        close: async () => {},
+      }),
+    })`)
+    const w = await install()
+    const first = await invoke('agent-native:open', trusted(w), 'fixture.server') as string
+    const second = await invoke('agent-native:open', trusted(w), 'fixture.server') as string
+    expect(second).not.toBe(first)
+    await invoke('agent-native:send', trusted(w), second, { type: 'ping', tag: 'B' })
+    expect(w.sent.map(entry => entry.payload).filter(payload => payload.frame)).toEqual([{ instanceId: second, frame: { pong: 'B' } }])
+  })
+})
+
 describe('same-instance loopback handoff shape (zero host change evidence)', () => {
   it('a main-process adapter reads the token file and answers only whitelisted protocol frames', async () => {
     await writeFile(path.join(extensionRoot, 'token.txt'), 'fixture-secret-do-not-leak', 'utf8')
