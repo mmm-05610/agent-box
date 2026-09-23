@@ -111,8 +111,10 @@ export interface AgentClient extends IDisposable {
   /** Project-capable clients only (CP backend connector). Absent members must disable project UI, never fake it. */
   refreshWorkspaces?(): Promise<void>
   openWorkspace?(id: string): Promise<AgentWorkspaceInfo>
-  /** First send of a draft: Server creates and executes under workspaceId with the given idempotency requestId. */
-  createAndSend?(workspaceId: string, text: string, requestId: string): Promise<void>
+  /** First send of a draft: Server creates and executes under workspaceId with the given idempotency requestId.
+   * Resolves only once the same requestId is confirmed accepted and the real non-empty session id is in the
+   * snapshot and selected (FC-0031); an unknown outcome rejects and the caller keeps the requestId. */
+  createAndSend?(workspaceId: string, text: string, requestId: string): Promise<{ sessionId: string }>
 }
 export interface AgentConnector {
   id: string

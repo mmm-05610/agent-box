@@ -11,12 +11,12 @@ interface ProjectCall { workspaceId: string; text: string; requestId: string }
 
 /** Reactive fake backend-capable client; every createAndSend/openWorkspace is recorded and
  * `fails` stays mutable so a project can become invalid after it was remembered. */
-function projectClient(id: string, serverInstanceId: string, options: { rejectFirstSend?: boolean } = {}) {
+function projectClient(id: string, serverInstanceId: string | undefined, options: { rejectFirstSend?: boolean; drop?: string } = {}) {
   let snapshot: AgentSnapshot = {
-    connection: { id, title: id, status: 'connected', serverInstanceId, capabilities },
+    connection: { id, title: id, status: 'connected', ...(serverInstanceId ? { serverInstanceId } : {}), capabilities },
     sessions: [{ id: 'E1', title: 'Existing chat', workspaceId: '/srv/old' }],
     sessionList: 'ready', messages: {}, runs: {}, interactions: [], options: [],
-    workspaces: { state: 'ready', items: [{ id: '/srv/a', normalizedPath: '/srv/a' }, { id: '/srv/b', normalizedPath: '/srv/b' }] },
+    workspaces: { state: 'ready', items: [{ id: '/srv/a', normalizedPath: '/srv/a' }, { id: '/srv/b', normalizedPath: '/srv/b' }].filter(item => item.id !== options.drop) },
   }
   const listeners = new Set<() => void>()
   const write = (patch: Partial<AgentSnapshot>) => {
@@ -51,6 +51,7 @@ function projectClient(id: string, serverInstanceId: string, options: { rejectFi
         selectedSessionId: 'R1',
         sessions: [...snapshot.sessions, { id: 'R1', title: text.slice(0, 12), workspaceId }],
       })
+      return { sessionId: 'R1' } // the client only resolves with the accepted real id (FC-0031)
     },
   }
   return { client, fails, calls: { opens, sends }, setWorkspaces: (selected: string | undefined) =>
@@ -165,4 +166,91 @@ it('continuing an existing session never consults the draft gate or a new create
   await sessions.send('follow-up')
   expect(a.calls.sends).toHaveLength(0)
   expect(a.client.getSnapshot().messages.E1?.at(-1)?.text).toBe('follow-up')
+})
+
+/** A process-independent localStorage double so one identity's record can be observed from a
+ * freshly built facade — the simulated desktop restart the FC-0030 gate demands. */
+function stubStorage() {
+  const entries = new Map<string, string>()
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: {
+    getItem: (key: string) => entries.get(key) ?? null,
+    setItem: (key: string, value: string) => { entries.set(key, value) },
+    removeItem: (key: string) => { entries.delete(key) },
+  } })
+  return { entries, clear: () => Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: undefined }) }
+}
+
+it('the last valid project survives a simulated renderer restart and is revalidated before use (FC-0030)', async () => {
+  const storage = stubStorage()
+  try {
+    const a = projectClient('A', 'https://s1')
+    const first = await harness({ id: 'A', build: () => a.client })
+    await first.selectConnection('A')
+    await first.selectWorkspace!('/srv/a')
+    expect(storage.entries.get('ordessa.agent.project.https://s1')).toBe('/srv/a') // non-secret id→id only
+    const b = projectClient('B', 'https://s1')
+    b.setWorkspaces(undefined)
+    const second = await harness({ id: 'B', build: () => b.client })
+    await second.selectConnection('B')
+    expect(b.calls.opens.at(-1)).toBe('/srv/a') // recalled from storage, then revalidated via open
+    expect(second.getSnapshot().draft).toMatchObject({ workspaceId: '/srv/a', canSend: true })
+  } finally { storage.clear() }
+})
+
+it('a record never restores across Server identities, and storage loss forces manual selection (不串+缺storage)', async () => {
+  const storage = stubStorage()
+  try {
+    const a = projectClient('A', 'https://s1|one')
+    const first = await harness({ id: 'A', build: () => a.client })
+    await first.selectConnection('A')
+    await first.selectWorkspace!('/srv/a')
+    // Same origin but a different serverId: a new Server root must not inherit the choice.
+    const b = projectClient('B', 'https://s1|two')
+    b.setWorkspaces(undefined)
+    const second = await harness({ id: 'B', build: () => b.client })
+    await second.selectConnection('B')
+    expect(b.calls.opens).toHaveLength(0)
+    expect(second.getSnapshot().draft).toMatchObject({ workspaceId: undefined, canSend: false, blockReason: 'no-project' })
+    // Same identity but storage and memory gone: manual selection is required again, sends stay blocked.
+    storage.entries.clear()
+    const c = projectClient('C', 'https://s1|one')
+    c.setWorkspaces(undefined)
+    const third = await harness({ id: 'C', build: () => c.client })
+    await third.selectConnection('C')
+    expect(c.calls.opens).toHaveLength(0)
+    expect(third.getSnapshot().draft?.canSend).toBe(false)
+    await third.selectWorkspace!('/srv/a') // manual recovery works
+    expect(third.getSnapshot().draft).toMatchObject({ canSend: true, workspaceId: '/srv/a' })
+  } finally { storage.clear() }
+})
+
+it('a stored id no longer listed unarchived blocks sends without opening it, and nothing restores without identity', async () => {
+  const storage = stubStorage()
+  try {
+    const a = projectClient('A', 'https://s1')
+    const first = await harness({ id: 'A', build: () => a.client })
+    await first.selectConnection('A')
+    await first.selectWorkspace!('/srv/b')
+    // A Server that no longer lists the archived/removed project must not even be asked to open it.
+    const b = projectClient('B', 'https://s1', { drop: '/srv/b' })
+    b.setWorkspaces(undefined)
+    const second = await harness({ id: 'B', build: () => b.client })
+    await second.selectConnection('B')
+    expect(b.calls.opens).toHaveLength(0)
+    expect(second.getSnapshot().draft).toMatchObject({ canSend: false, blockReason: 'project-invalid' })
+    await second.selectWorkspace!('/srv/a')
+    expect(second.getSnapshot().draft).toMatchObject({ canSend: true, workspaceId: '/srv/a' })
+  } finally { storage.clear() }
+  // Without an authenticated Server identity there is no restore path at all — live selection only.
+  const live = projectClient('L', undefined)
+  const sessions = await harness({ id: 'L', build: () => live.client })
+  await sessions.selectConnection('L')
+  await sessions.selectWorkspace!('/srv/a')
+  expect(sessions.getSnapshot().draft).toMatchObject({ canSend: true, workspaceId: '/srv/a' })
+  const fresh = projectClient('L2', undefined)
+  fresh.setWorkspaces(undefined)
+  const later = await harness({ id: 'L2', build: () => fresh.client })
+  await later.selectConnection('L2')
+  expect(fresh.calls.opens).toHaveLength(0)
+  expect(later.getSnapshot().draft).toMatchObject({ canSend: false, blockReason: 'no-project' })
 })

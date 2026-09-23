@@ -9,12 +9,32 @@ import type { AgentClient, AgentConnections, AgentSessions, AgentSnapshot, Agent
 export function createAgentSessions(lifetime: ResourceScope, connections: AgentConnections): AgentSessions {
   void lifetime // workspace ownership moved to the connections service scope (P2-1)
   const workspace = connections.workspace
-  // Non-secret UI selection: last valid project per Server instance (never per plugin id alone).
-  const lastProject = new Map<string, string>()
   interface ConnState { draftActive: boolean; requestId?: string; restoreFailed: boolean }
   const states = new Map<string, ConnState>()
   const stateFor = (id: string) => { let s = states.get(id); if (!s) states.set(id, s = { draftActive: false, restoreFailed: false }); return s }
-  const instanceKey = (client: AgentClient) => client.getSnapshot().connection.serverInstanceId ?? `conn:${client.getSnapshot().connection.id}`
+  // Non-secret UI selection: last valid project per authenticated Server instance (origin+serverId),
+  // mirrored to renderer localStorage so the choice survives a desktop restart (FC-0030). Never keyed
+  // by plugin id or bare origin; without identity there is no restore path at all.
+  const lastProject = new Map<string, string>()
+  const storageKey = (identity: string) => `ordessa.agent.project.${identity}`
+  const rememberProject = (identity: string, id: string) => {
+    lastProject.set(identity, id)
+    try { globalThis.localStorage?.setItem(storageKey(identity), id) } catch { /* the gate revalidates on open regardless */ }
+  }
+  const forgetProject = (identity: string) => {
+    lastProject.delete(identity)
+    try { globalThis.localStorage?.removeItem(storageKey(identity)) } catch { /* best effort */ }
+  }
+  const recallProject = (identity: string) => {
+    const remembered = lastProject.get(identity)
+    if (remembered) return remembered
+    try {
+      const stored = globalThis.localStorage?.getItem(storageKey(identity))
+      if (stored) { lastProject.set(identity, stored); return stored }
+    } catch { /* storage unavailable: manual selection only */ }
+    return undefined
+  }
+  const identityOf = (client: AgentClient) => client.getSnapshot().connection.serverInstanceId
   const supported = (agent: AgentSnapshot | undefined) => agent?.connection.capabilities.workspaces === 'supported'
 
   async function revalidate(connectionId: string) {
@@ -23,11 +43,22 @@ export function createAgentSessions(lifetime: ResourceScope, connections: AgentC
     let client: AgentClient
     try { client = workspace.selected() } catch { return }
     if (!client.openWorkspace || !supported(client.getSnapshot())) return
-    const key = instanceKey(client)
-    const saved = lastProject.get(key)
-    if (!saved) { const current = client.getSnapshot().workspaces?.selectedWorkspaceId; if (current) lastProject.set(key, current); return }
+    const identity = identityOf(client)
+    if (!identity) return // no authenticated instance identity: require a manual selection, never a stale unlock
+    const snapshot = client.getSnapshot()
+    const saved = recallProject(identity)
+    if (!saved) {
+      const current = snapshot.workspaces?.selectedWorkspaceId
+      if (current) rememberProject(identity, current)
+      return
+    }
+    // The stored id must still be listed unarchived by this Server before it may be opened (FC-0030).
+    if (snapshot.workspaces?.state === 'ready' && !snapshot.workspaces.items.some(item => item.id === saved)) {
+      state.restoreFailed = true; forgetProject(identity)
+      return
+    }
     try { await client.openWorkspace(saved) }
-    catch { state.restoreFailed = true; lastProject.delete(key) } // invalid: clear selection and block sends
+    catch { state.restoreFailed = true; forgetProject(identity) } // invalid: clear the record and block sends
   }
 
   const listeners = new Set<() => void>()
@@ -81,9 +112,19 @@ export function createAgentSessions(lifetime: ResourceScope, connections: AgentC
       if (!state.draftActive) throw Error('No Agent session selected')
       gate() // first send is blocked without a revalidated project — never falls back
       if (!client.createAndSend) throw Error('Agent project gate: unsupported')
+      const workspaceId = client.getSnapshot().workspaces?.selectedWorkspaceId!
       state.requestId ??= globalThis.crypto.randomUUID() // one requestId held across unknown outcomes; no blind second create
       try {
-        await client.createAndSend(client.getSnapshot().workspaces?.selectedWorkspaceId!, text, state.requestId)
+        const accepted = await client.createAndSend(workspaceId, text, state.requestId)
+        // The draft ends only when the accepted real session id is in the snapshot, selected, and bound
+        // to the chosen project (FC-0031); otherwise input and requestId stay held for an idempotent retry.
+        const after = client.getSnapshot()
+        const session = after.sessions.find(item => item.id === accepted?.sessionId)
+        const project = after.workspaces?.items.find(item => item.id === workspaceId)
+        const bound = !!session?.workspaceId
+          && (session.workspaceId === workspaceId || session.workspaceId === project?.normalizedPath)
+        if (!accepted?.sessionId || !bound || after.selectedSessionId !== accepted.sessionId)
+          throw Error('Agent first-send session mismatch')
         state.requestId = undefined
         state.draftActive = false
         notify()
@@ -102,7 +143,8 @@ export function createAgentSessions(lifetime: ResourceScope, connections: AgentC
       const client = workspace.selected()
       if (!client.openWorkspace) throw Error('Agent project gate: unsupported')
       const info = await client.openWorkspace(id)
-      lastProject.set(instanceKey(client), info.id)
+      const identity = identityOf(client)
+      if (identity) rememberProject(identity, info.id) // a selection without identity is live but never persisted
       const connectionId = workspace.getSnapshot().selectedConnectionId
       if (connectionId) stateFor(connectionId).restoreFailed = false
     },
