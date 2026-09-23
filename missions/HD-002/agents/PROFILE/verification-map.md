@@ -4,16 +4,16 @@
 
 | BC-0002 §验收 | BE（58 tests，`python3 -m unittest discover -s tests`） | FE（12 tests，`node --test` 编译副本） |
 | --- | --- | --- |
-| revision 冲突 | `test_store.py#test_update_is_compare_and_set`、`test_resolver.py#test_launch_follows_only_the_pinned_revision` | `model.test.ts:103 「a save names the revision it read, and a stale save is refused」` |
-| 重复注册报冲突 | `test_registry.py#test_duplicate_kind_version_conflicts_without_replacing` | `model.test.ts:87 「editors are claimed per kind@version and released with their scope」`、`:192 contributions…duplicates clash` |
-| 扩展卸载后失效 | `test_registry.py#test_scope_dispose_releases_registrations ＋ :49/:55 「test_disposed_scope_cannot_register_again」/「test_unload_of_one_contributor_leaves_the_other」` | `model.test.ts:87`、`entry.test.ts:74 「disposing the owned resource releases contributions without touching another owner」` |
-| 未知值无损往返 | `test_record.py#test_round_trip_keeps_unknown_selections`、`test_store.py#test_unknown_and_future_versioned_selection_round_trips_unchanged`、`test_resolver.py#test_unknown_kind_is_saved_losslessly_and_refused_at_launch` | `model.test.ts:61 「canonical text keeps what the UI does not understand」` |
-| 路径/秘密负例 | `test_record.py#test_absolute_and_home_paths_are_rejected＋:76/:81/:86/:102 四例同名前缀见 §实名清单` | `model.test.ts:41 「a location or a secret never enters an editable record」` |
+| revision 冲突 | `test_store.py#test_update_is_compare_and_set`、`test_resolver.py#test_launch_follows_only_the_pinned_revision` | `model.test.ts#「a save names the revision it read, and a stale save is refused」` |
+| 重复注册报冲突 | `test_registry.py#test_duplicate_kind_version_conflicts_without_replacing` | `model.test.ts#「editors are claimed per kind@version and released with their scope」`、`:192 contributions…duplicates clash` |
+| 扩展卸载后失效 | `test_registry.py#test_scope_dispose_releases_registrations ＋ :49/:55 「test_disposed_scope_cannot_register_again」/「test_unload_of_one_contributor_leaves_the_other」` | `model.test.ts:87`、`entry.test.ts#「disposing the owned resource releases contributions without touching another owner」` |
+| 未知值无损往返 | `test_record.py#test_round_trip_keeps_unknown_selections`、`test_store.py#test_unknown_and_future_versioned_selection_round_trips_unchanged`、`test_resolver.py#test_unknown_kind_is_saved_losslessly_and_refused_at_launch` | `model.test.ts#「canonical text keeps what the UI does not understand」` |
+| 路径/秘密负例 | `test_record.py#test_absolute_and_home_paths_are_rejected＋:76/:81/:86/:102 四例同名前缀见 §实名清单` | `model.test.ts#「a location or a secret never enters an editable record」` |
 | 同一记录在两种模拟 home 解析、记录字节不变 | `test_resolver.py#test_the_same_record_bytes_resolve_differently_per_home` | —（BE 权威，FE 不替代） |
 | 一项失败无副作用 | `test_resolver.py#test_one_failing_selection_leaves_the_environment_untouched`、`:100 preview_never_reports_applied` | —（同上） |
-| 无插件默认路径不受影响 | `test_isolation.py#test_importing_the_package_registers_nothing ＋ :61 test_a_registry_appears_only_where_a_caller_made_one`、`test_resolver.py#test_an_empty_record_needs_no_registrations` | `entry.test.ts:43 「without a port the plugin contributes nothing it cannot honour」` |
-| FE 无编辑器只读保留 | — | `model.test.ts:208 「read-only, unlaunchable and unsupported stay three different answers」`、`entry.test.ts:50`（真渲染断言画出 `read-only` 与 `<code>` 原文） |
-| FE 连接切换使可用性失效 | — | `model.test.ts:132 「readiness belongs to the connection that measured it」`、`:171 an_in-flight_availability_answer_is_dropped…` |
+| 无插件默认路径不受影响 | `test_isolation.py#test_importing_the_package_registers_nothing ＋ :61 test_a_registry_appears_only_where_a_caller_made_one`、`test_resolver.py#test_an_empty_record_needs_no_registrations` | `entry.test.ts#「without a port the plugin contributes nothing it cannot honour」` |
+| FE 无编辑器只读保留 | — | `model.test.ts#「read-only, unlaunchable and unsupported stay three different answers」`、`entry.test.ts:50`（真渲染断言画出 `read-only` 与 `<code>` 原文） |
+| FE 连接切换使可用性失效 | — | `model.test.ts#「readiness belongs to the connection that measured it」`、`:171 an_in-flight_availability_answer_is_dropped…` |
 
 ## 本表同时固定的三件事实（不外推）
 
@@ -26,6 +26,12 @@
 - BE：在 `f3bcbde9` **现跑** `PYTHONPATH=src python3 -m unittest discover -s tests -p "test_*.py"` → `Ran 58 tests … OK`，跑后 `git status --porcelain` 仍空（无写产物）。
 - FE：在 `e869683469` 现跑于 `/tmp` 镜像（同一借用 TS 6.0.3）→ tsc `--noEmit` exit 0、CJS 出件 exit 0、`node --test` **12 passed / 0 failed**、esbuild 出件 `/tmp/pf-ext/ordessa.profile/entry.js` = **15453 bytes**；产品树 `git status --porcelain` 空。
 
+## 复核时间戳（2026-09-23 08:33，v0.2 四项差量交付后现跑）
+
+BE `96cdc337`（← `58074749` ← `f3bcbde9`）`unittest discover` **73 tests OK**（58→66→73）；FE `a1baa218a2`（← `ba748793e8` ← `e869683469`）在 `/tmp` 镜像＋借用工具链上 tsc `--noEmit` exit 0 → CJS 出件 exit 0 → `node --test` **17/17**（12→15→17）→ esbuild 于规范 cwd 出件 **17152 bytes**。两树 `git status --porcelain` 各 **0** 行、`git branch -r --contains HEAD` 命中 **0**（四提交全未 push）。新增面：`store#clone`、`portable.py`（`export_bundle`/`inspect_bundle`/`import_bundle`＋`store#import_bundle`）、`root.tsx#createProfileRoot`（零 props）、`demo.ts#runDemo`（明标测试端口、不在产物内）。PresetPort 加 `list(connectionId)`，属**本包自有的端口形状**（`contracts/**` 一字未动）。
+
+下面 07:07/04:36 两段是本包写域与门的**历史**证据，数字属当时那次跑，不与今日可比（尤其产物数受 cwd 影响，见配方第 4 条）。
+
 ## 复跑配方（供暂停/接手后不重新摸索，均为本机实测过的形状）
 
 本机事实先记账，否则会白试：这台机器的 Node 构建**没有 TypeScript 支持**（直接跑 `.ts` 报 `ERR_NO_TYPESCRIPT`），没有 `pytest`，`uv` 建的 venv 里没有 `pip`；仓库内**零安装**是本包的边界，所以借用姊妹树 `harness-desktop-002/fc/node_modules`（实测存在 `typescript/bin/tsc` = Version 6.0.3、`.bin/esbuild`）跑门，产品树与被测提交都不因此改动。借用根路径为绝对 `/home/maoqh/projects/ordessa/worktrees/harness-desktop-002/fc/node_modules`，从 `profile/backend/plugins/...` 用 `../../fc` 之类相对路径**够不到**（本轮照错写法实测 `No such file or directory`）。
@@ -33,7 +39,7 @@
 1. 镜像：`mkdir -p /tmp/pf-run/{plugins,platform}` → 拷 `frontend/plugins/profile`、`frontend/platform/extension-api` → `ln -s <上面那个绝对路径> /tmp/pf-run/node_modules`。
 2. 类型门：`node <fc>/node_modules/typescript/bin/tsc -p plugins/profile/tsconfig.json --noEmit` → exit 0（含 `src/*.tsx` 与 tests）。
 3. 为跑 `node --test` 需先出 CJS 副本，**必须以项目 tsconfig 为底**，在镜像根目录跑：`node <fc>/node_modules/typescript/bin/tsc -p plugins/profile/tsconfig.json --noEmit false --outDir cjs --rootDir . --module commonjs --rewriteRelativeImportExtensions --esModuleInterop` → exit 0，产物落在 `cjs/plugins/profile/{src,tests}/*.js`，随后 `cd cjs/plugins/profile && node --test tests/*.test.js` → **12 passed / 0 failed**。两个必踩的坑：(a) 只用命令行文件列表（`tsc plugins/profile/tests/*.ts …`）**过不了**，会报 `TS6142 --jsx is not set` 与 `TS7006`，因为绕开了 tsconfig 的 `jsx/strict/paths`；(b) 不加 `--rootDir .` 会以 `TS5011` 失败（TS 6 要求显式 rootDir 才能定出文件布局）。另**不要**传 `--moduleResolution node10`：TS 6 以 `TS5107` 直接失败（本包两次踩过）。
-4. 产物门：复刻 `tooling/build-extension.mjs` 的选项（bundle/splitting/esm/browser/jsx automatic + 同 externals）用 esbuild 出到 `/tmp/pf-ext/ordessa.profile`，**因为 `buildExtension` 的 `outputRoot` 是 `products/agent-desktop/dist`，属产品装配、在本包写域外**；出件 exit 0、`entry.js` = **15453 bytes**（单文件）、含真实 ProfilePanel（`grep -c ProfilePanel` = 2）。**这一步的脚本必须照抄，不要重新摸索**（`/tmp` 不跨重启，原文如下，跑法 `node /tmp/pf-build-check.mjs`）：
+4. 产物门：复刻 `tooling/build-extension.mjs` 的选项（bundle/splitting/esm/browser/jsx automatic + 同 externals）用 esbuild 出到 `/tmp/pf-ext/ordessa.profile`，**因为 `buildExtension` 的 `outputRoot` 是 `products/agent-desktop/dist`，属产品装配、在本包写域外**；出件 exit 0。**（08:32 新增硬规则，defect ㉕）产物字节数与跑门 cwd 绑定**：同一棵树、同一脚本，`cd` 到 mirror 的 `cjs/plugins/profile` 出 **17638 bytes**、`cd` 到**产品树根**出 **17152 bytes**，各复跑两次均可复现 ⇒ 出件前必须 `cd /home/maoqh/projects/ordessa/worktrees/harness-desktop-002/profile`（本包规范 cwd），记账时把 cwd 与 bytes 同写；历史数字凡未带 cwd 的都属**不可比**，不得据其判"退化/增长"。本包规范形状当前为 `entry.js` = **17152 bytes**（单文件、含 `createProfileRoot`，`grep -c runDemo` = 0 ⇒ 演示不在 shipped 路径）。**这一步的脚本必须照抄，不要重新摸索**（`/tmp` 不跨重启，原文如下，跑法 `node /tmp/pf-build-check.mjs`）：
 
    ```js
    import { build } from '/home/maoqh/projects/ordessa/worktrees/harness-desktop-002/fc/node_modules/esbuild/lib/main.js'

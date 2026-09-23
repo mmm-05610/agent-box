@@ -49,11 +49,11 @@ cursor_defect_5: 04:46 找到并补上收件口径的**第五个漏洞，也是�
 standby_tick_0447: 四命令复跑：inbox 仍 3 件、角色名扫出 **21** 件未变、head 仅 BC 0034→**0037**（新到 BC-0035/0036/0037）；对新 BC 三件同时跑角色名与包标识符两种匹配，**均 0 命中本包** → 无动作、不回信、不发新件。本 tick 唯一产出是 defect ⑤ 的口径修补与 BC-0015 的补读。产品树未动。
 contract_no_drift_0501: 05:01 主动做了一件事前待命轮没做过、但**对将来复工有直接价值**的核对：本包 FE 编译所依赖的那**一个**宿主契约文件 `platform/extension-api/src/index.ts`，是否已被 FC 集成树改动（若已改，0006 §2 的「props 供给者」问题可能已上游解决或形态变化）。实测两侧**字节同源**：我这棵树与 `harness-desktop-002/fc` 同名文件同为 **1797 bytes**、sha256 前缀同为 `3b824a227f1deaf6`、`diff` exit **0**。同时核 `fc/plugins/profile` → 不存在（FC 未装配本包）。有界读数：(a) **PROFILE-0006 §2 不是上游契约漂移造成的**，接缝/装配批若开工不必先做「追平上游」，0006 仍是等 C 另裁的形态选择题；(b) 该结论**只覆盖我这一个 import 面**（`RootView`/`root.mount` 两条线），既不是全仓契约对照，也**不构成任何接缝验证**，四状态仍只有第 1 项成立。本轮收件：inbox 仍 3 件、角色名规则 ② 仍 **21** 件（非零 → 工具体检通过）、head 仅 BC 0038→**0039** 与 C 0030→**0031**；`sed -n '3p'` 逐字回读 BC-0039 头为 `- from: BC; to: C; cc: H, I`、C-0031 为 `- from: C`，两件对角色名与包标识符**均 0 命中** → 无动作、不回信、不发新件，产品树未动。
 defect_7_layout_assumption: 05:02 差点把**自己的路径假设**当成上游缺陷。probe 借 sibling 时写成 `$R/fc/frontend/platform/extension-api/src/index.ts` → 报 MISSING，若就此下结论就会记一条「FC 树没有该契约」的假发现；`ls $R/fc` 立刻证伪：**fc 本身就是前端仓库根**（`apps contracts platform plugins products node_modules`），`frontend/` 这一层只存在于本包工作区（`profile/backend` + `profile/frontend` 双树）。硬规则追加：**任何 `MISSING` / `No such file` 在成为结论前，必须先 `ls` 确认对方布局**；「路径不存在」是**未知**，不是「对方没有」——这与 defect ④⑥ 同源（失败都朝「可以放心」的方向静默发生），只是这一次是文件系统而非正则。
-cursor_defect_8_baseline_count: 05:06 收件体检出现**本包第一次「计数涨了」**：规则 ② 原样复跑返回 **26** 而非长期记录的 21。逐条枚举后证明**无新件**：多出的 5 件全是我**自己**的 `PROFILE/outbox/PROFILE-0003/0004/0005/0006/0008`（我的件本身带 `to/cc` 或正文点名 PROFILE），其余 21 件构成与基线**逐项同号**（BC 8：0002/0007/0008/0009/0013/0014/0019/0026；C 7：0001/0005/0007/0009/0012/0013/0015；FC 2：0002/0007；I 3；S 1：0005）。硬规则两条：(1) 基线是**「他人件集合」**而不是裸数字——裸计数会随我自己发件单调上涨，把它当等式断言必然假告警；(2) 危险方向是反的：若我为了「让数字回到 21」去**收紧**正则，就会重演 defect ④（收紧 ⇒ 掉件 ⇒ 假「全清」）。故以后**只允许**用 `grep -rlE ... */outbox` 后**剔除 `^PROFILE/`** 再比集合，禁止改正则形状。另把游标由四条升为**五条**：⑤ `grep -rlEi 'Profile[^.]{0,12}(仅独立插件|只设计|独立插件)' */outbox/*.md */inbox/*.md`。加它的理由是本轮实测到一类**四条命令全瞎**的件：F3-0014:79 用散文小写 `Profile` 点名本包界线，② 要大写且只在头行、④ 要包标识符，两件都 0 命中。该式噪声可接受（当前 9 件，含我自己 2 件与 inbox 1 件），而朴素 `\bprofile\b` 命中 **110** 件不可用（既有 Server profile 域太密）。
+cursor_defect_8_baseline_count: 05:06 收件体检出现**本包第一次「计数涨了」**：规则 ② 原样复跑返回 **26** 而非长期记录的 21。逐条枚举后证明**无新件**：多出的 5 件全是我**自己**的 `PROFILE/outbox/PROFILE-0003/0004/0005/0006/0008`（我的件本身带 `to/cc` 或正文点名 PROFILE），其余 21 件构成与基线**逐项同号**（BC 8：0002/0007/0008/0009/0013/0014/0019/0026；C 7：0001/0005/0007/0009/0012/0013/0015；FC 2：0002/0007；I 3；S 1：0005）。硬规则两条：(1) 基线是**「他人件集合」**而不是裸数字——裸计数会随我自己发件单调上涨，把它当等式断言必然假告警；(2) 危险方向是反的：若我为了「让数字回到 21」去**收紧**正则，就会重演 defect ④（收紧 ⇒ 掉件 ⇒ 假「全清」）。故以后**只允许**用 `grep -rlE ... */outbox` 后**剔除 `^PROFILE/`** 再比集合，禁止改正则形状。另把游标由四条升为**五条**：⑤ `echo "@5 散文点名:"; grep -rlEi 'Profile[^.]{0,12}(仅独立插件|只设计|独立插件)' */outbox/*.md */inbox/*.md`。加它的理由是本轮实测到一类**四条命令全瞎**的件：F3-0014:79 用散文小写 `Profile` 点名本包界线，② 要大写且只在头行、④ 要包标识符，两件都 0 命中。该式噪声可接受（当前 9 件，含我自己 2 件与 inbox 1 件），而朴素 `\bprofile\b` 命中 **110** 件不可用（既有 Server profile 域太密）。
 boundary_prose_evidence_0509: 05:07 按新规则 ⑤ 补读差集里 4 件此前未读的件，逐字判定**均无本包义务、均不回信**（都不是发给我的：C-0020 `to: FC`、F3-0003/0004/0013 `to: FC` 或 `to: FC, C`）。两条值得登记的**正向证据**：(a) **上级成文**候选清理不涉及本包——C-0020:12 原句「Profile 独立插件和后续实验从未进入此候选」，即 CP 候选窄准入与 `TASKS.md:10`「不进 CP」同向，不必我另行申请排除；(b) 本包界线在**前端执行者侧被独立复述四次**——F3-0003:35「Profile 仅独立插件、Provider/Model 只设计…均延续」、F3-0004:46「Profile 仅独立插件且不进检查点」、F3-0013:90、F3-0014:79「Profile 仅独立插件、Provider/Model 只设计，本批未涉」。第三条与运行事实有关：F3-0013:90 **另一个会话独立报出同一平台事实**——「目标要求的 100000 **不支持**，平台实际仍是 `maxTurns: 100` 自动暂停、只有用户 `/goal resume` 可续」，与本包 0001§2/0002§3/0008 的自报一致，构成对「turn 上限核实」这一条的**外部印证**（不是我自己声明的自证）。本轮 head 另进 F2 0009→**0010**、F3 0013→**0014**：F2-0010 `to: FC, C; cc: F1, F3, F0, BC`、`grep -ci profile`=**0**；F3-0014 见上。两件对 ②④⑤ 判定为无动作。产品树 05:07 复核：BE `f3bcbde9` / FE `e869683469`，`status --porcelain` 各 **0** 行，未动。
 cursor_defect_9_and_10: 05:10 本 tick 我又**手打了规则 ③**（把 `[0-9]{4}` 写成 `[0-9]{4}$`，而文件名以 `.md` 结尾），结果 12 个角色**全返 `none`**。它不像 defect ④ 那样伪装成「干净」，而是伪装成**「世界没有变化」**——若我不看 `none` 这个可疑字样就跳过了，就会连续若干轮认为 head 未动而漏掉全部新件。规则 ③ 的判据补为硬式：**任何一次 tick 里出现全角色同值（全 none/全同号）即视为命令失效**，必须立刻跑阳性对照（`ls BC/outbox | tail -3` 实测确有 `BC-0040.md` ⇒ 证伪「无新件」）。修正形 `grep -oE '[0-9]{4}'` 复跑后 head 为 BC 0040 / C 0033 / FC 0058 / F0 0011 / F1 0010 / F2 0010 / F3 0014 / H 0008 / E 0004 / S 0019 / PROFILE 0008，而 **I 返回 `ERR`＝规则 ⑩**：I 的件用语义后缀（`I-NATIVE-AGENT-001` 等）无四位序号，③ 对 I **永远不会报头**，等于收件游标对**用户本人的指令通道长期失明**。补 **③b**＝`ls I/outbox`，基线 **7 件**（本轮新识别出其中 4 件不在 21 基线内：I-DASHBOARD-UPDATE-NOW-001 / I-NATIVE-AGENT-001 / I-PROJECT-REQUIRED-001 / I-SESSION-FIRST-SEND-001，均已逐条读判）。同 tick 另证一类显示层陷阱：I 的件用**无短横头**（`to: C`、`cc: FC, BC` 不带 `- `），`grep -nE '^(- to|- cc)'` 当场返空、看起来像「无收件人」；实读 I-DASHBOARD-UPDATE-NOW-001 才知头存在。规则 ② 的 `(^|[[:space:]])(to|cc|reply_to):` 形对两种头都成立，故**判定用 ②、显示另行**，不得用短横锚定式作收件证据（defect ⑥ 的具体实证）。
 i_channel_boundary_evidence_0512: 05:12 四条 I 件逐条判定为**对本包无义务、不回信**（收件人分别是 C / C,FC / FC,BE 侧，均不含 PROFILE；②④⑤ 三种匹配对这四件均 0 命中），但三条是**用户指令层对本包界线的直接成文**，价值高于此前 BC/C/F3 的复述：`I-NATIVE-AGENT-001:8` 把「旧sidecar+bwrap+Profile/凭据投影链」明确列为**不再继续验证**的对象；`I-PROJECT-REQUIRED-001:19`「记忆是非秘密UI选择，**不引入Profile/配置管理产品**」；`I-SESSION-FIRST-SEND-001:22`「…不扩配置/Profile产品功能」，同件 `:33`「本指令**不授权额外真实模型调用**、不改变99/10预算，**不扩大Profile/Provider/Model范围**」。据此对本包 objective 的「范围和旧预算不扩大」取得上级原文支撑。一处**不得误引**：I-SESSION-FIRST-SEND-001:33 的「不改变99/10预算」是**较早**指令，其后 `TASKS.md:6` 记 I-DEC-0001 已由用户答复**取消旧 99/10 次数上限/计数手续**（C-0025 入账）；两者按时序取后者为准，且都与本包**零真实模型调用**无关——本包既不引用旧上限、也不把取消计数外推成平台 turn 上限放宽。另记 I-DASHBOARD-UPDATE-NOW-001 的**面板发布义务**收件人是 C（cc FC, BC），要求「每次收件…本轮收尾动作必须包括面板发布」，`decision-queue/**` 不在本包写域内，故本包动作仍是只写自己 status/evidence 两件、由 BC 汇给 C 上面板；该件同时重申「不要为此另造调度器」，与本包「不造控制器」一致。本 tick 五命令+③b 结论：inbox 仍 3 件、他人基线仍 **21** 件、④ 差集仍只 BC-0015、⑤ 六件已读；新到 BC-0040（`to: C; cc: H, FC, I`，C-0031 真实 Pi 无 prompt 握手门：Server 通过、ACP `session/new` 内部错误）、C-0032（`to: FC`）、C-0033（`to: BC`）、FC-0057/0058，五件对 ②④⑤ **均 0 命中**→ 无动作、无回件。BC-0040/C-0033 属上级授权的**受控真实 Agent 门**，本包零真实调用与零 grant 状态不受影响，也未见任何角色把本包 `ProfileRecord.id` 当 `profileId` 用（④ 全包标识符匹配仍只命中 BC-0015 与我自己的件）。产品树 05:10 复核：BE `f3bcbde9` / FE `e869683469`，porcelain 各 **0** 行，未动。
-delivered_claim_audit_0514: 05:14 做了一件此前没做过的事：**审计我自己已发出的件里是否留有已被推翻或含歧的断言**（交接口里最容易漏的一类债）。`grep -rnoE '[0-9]+(\.[0-9]+)?\s?kb' PROFILE/outbox` 命中三处，逐字定味后**不是矛盾而是三个不同对象/两种底数**：`PROFILE-0004:27` 的 **11.7kb** 指**修复前那个不含 `ProfilePanel` 的坏出件**（另一件，本就不该等于 15453）；`PROFILE-0004:55` 的 **15.1kb** 与 `PROFILE-0005:28` 的 **15.4kb** 才同指最终 `entry.js`＝**15453 bytes** 的两种单位读数（二进制 vs 十进制截断）。处置判定：**不改写已发信件、不发勘误件**——(1) outbox 是**已投递的邮件档案**，事后改写等于伪造收发记录（也不符合 BC-0026 已收件闭合的事实）；(2) 两数可调和且 `verification-map.md:62` 已给唯一无歧义值与推导，本条再补**精确指针**（三处 file:line）供任何只读 0004/0005 的人对照。同时明确一条**不可修的历史**：FE 提交 `e869683469` 的 commit message 也写了 15.4kb，而**禁止 amend** 是硬约束，故该数**永久留在提交说明里**，只以 bytes 记录与推导覆盖之——这一点必须留在恢复点上，否则将来有人比对 commit message 与本表会误判成「记录被人改过」。
+delivered_claim_audit_0514: 05:14 做了一件此前没做过的事：**审计我自己已发出的件里是否留有已被推翻或含歧的断言**（交接口里最容易漏的一类债）。`grep -rnoE '[0-9]+(\.[0-9]+)?\s?kb' PROFILE/outbox` 命中三处，逐字定味后**不是矛盾而是三个不同对象/两种底数**：`PROFILE-0004:27` 的 **11.7kb** 指**修复前那个不含 `ProfilePanel` 的坏出件**（另一件，本就不该等于 15453）；`PROFILE-0004:55` 的 **15.1kb** 与 `PROFILE-0005:28` 的 **15.4kb** 才同指最终 `entry.js`＝**15453 bytes** 的两种单位读数（二进制 vs 十进制截断）。处置判定：**不改写已发信件、不发勘误件**——(1) outbox 是**已投递的邮件档案**，事后改写等于伪造收发记录（也不符合 BC-0026 已收件闭合的事实）；(2) 两数可调和且 `verification-map.md#「15.4kb」` 已给唯一无歧义值与推导，本条再补**精确指针**（三处 file:line）供任何只读 0004/0005 的人对照。同时明确一条**不可修的历史**：FE 提交 `e869683469` 的 commit message 也写了 15.4kb，而**禁止 amend** 是硬约束，故该数**永久留在提交说明里**，只以 bytes 记录与推导覆盖之——这一点必须留在恢复点上，否则将来有人比对 commit message 与本表会误判成「记录被人改过」。
 cursor_defect_11_shortcircuit: 05:13 查出收件链里最隐蔽的一条**「检查根本没跑却被读成跑了」**：用 `grep -c … && grep -c … && grep -c …` 串三条匹配式时，**第一条计数为 0 即 exit 1，把后面两条整段短路掉**。当场输出只有一行 `0`，看起来像「三条规则都判 0 命中」，实际 ④⑤ **从未执行**。这与 defect ④/⑥/⑨ 同族（都朝「可以放心」方向静默失败），但更糟：它伪装的是**执行过判据**这件事本身。两条硬规则：(a) 多条判据一律用 `;` 分隔或各自单独跑，**禁止 `&&` 串接任何返回计数/布尔的 grep**；(b) 判**单个新出现的文件**是否涉及本包，用最便宜的**超集前置式** `grep -ci profile <file>`——小写 `profile` 是 ②④⑤ 三式所有可能命中的公共超集，返回 **0 即可一次判定该件不可能点名本包**（本轮 FC-0059 正是这样在短路之后意外用 `grep -niE 'profile'` 拿到**全文零命中**这一**更强**的结论）；返回 >0 才逐行读该处上下文。本 tick 五命令+③b 复跑：inbox 3、② 他人基线 **21** 未变、④ 差集仍只 BC-0015、⑤ 仍 6 件、③b 仍 7 件；唯一 head 变化 FC 0058→**0059**（`to: F3, F2, C; cc: F1, F0, BC`，F2-0010 按 C-0032 暂收 + F3 窄批）→ 全文零 `profile` 命中 ⇒ **无动作、无回件**。
 standby_cursor_canon_0516: 05:16 做一次**指针体检**时发现一个会直接废掉我自己硬规则的缺陷：defect ④ 的硬规则 (a) 写的是「收件命令一律**从 line 17 原样复制**」，但 `sed -n '17p' evidence-log.md` 实测该行**是空行**——该指针是 `status.md` 时代记的，04:50 拆分后编号整体位移 ⇒ **指针悬空**。更根本的原因：权威命令此前**散在叙述里**（写本条时实测分布于 line 37 `cursor_defect_3`、48 `cursor_defect_5`、52 `defect ⑧`、57 `defect ⑪`），从来没有一处可整块复制的地方，所以我实际上一直在**手打**——这正是 defect ④／⑨／⑪ 三次同族失败的**共同根因**。处置两条：(1) **不回改归档正文**（`## 归档正文` 起为 04:50 逐字快照，内含两处「line 17」字样，按「原文未改」保留；本条即其**勘误**：本文件内一切「line 17」指针作废）；(2) 游标**首次整块成文**于下方，以后只准从此块**整段复制**、且**以标签名而非行号**引用（末尾追加不影响标签，行号会变）。以下每条均于 05:13–05:16 实跑通过，cwd 必须是 `…/control/missions/HD-002/agents`：
 
@@ -61,21 +61,23 @@ standby_cursor_canon_0516: 05:16 做一次**指针体检**时发现一个会直�
 # 游标块**自带 cd**（defect ⑯：整块复跑时前序块的 `cd` 会改变 cwd，依赖 glob 的判据会静默输出空）
 cd /home/maoqh/projects/ordessa/control/missions/HD-002/agents || exit 1
 # ① inbox 对照已知集（06:58 实测 **4** 件，全为 I 派达；v1 的"期望恰 3 件"已被 14:30 的 I-PROFILE-BLUEPRINT-002 作废）
-ls PROFILE/inbox/                      # {I-BASELINE-CLOSEOUT-001, I-DECISION-REUSE-001, I-SESSION-CHECKPOINT-001, I-PROFILE-BLUEPRINT-002}
+echo '@1 inbox'; ls PROFILE/inbox/ | grep -c '\.md$' | sed 's/^/@1 count=/'; ls PROFILE/inbox/            # {I-BASELINE-CLOSEOUT-001, I-DECISION-REUSE-001, I-SESSION-CHECKPOINT-001, I-PROFILE-BLUEPRINT-002}
                                        # 第 4 件＝本包 v0.2 授权来源，已亲读并 ACK（outbox/PROFILE-0009）⇒ 无新义务
                                        # 义务史：CHECKPOINT-001:1 要求「读 ../../../SESSION-CHECKPOINT.md，向BC ACK」＝已履行（PROFILE-0003:9 reply_to 含该件）
 # ② 角色名点名（**必须整词匹配**，见 §`defect_17_substring_role`；期望「他人基线」= 22 件，06:37 起含 I-PROFILE-BLUEPRINT-002；未滤 PROFILE/ 的裸数＝22＋本包自己的件数，随发件增长，故基线是集合不是数字）
-grep -rlE "(^|[[:space:]])(to|cc|reply_to):.*([,[:space:]])PROFILE([,[:space:];]|$)" */outbox/*.md | grep -v '^PROFILE/' | sort
+echo "@2 点名件集合:"; grep -rlE "(^|[[:space:]])(to|cc|reply_to):.*([,[:space:]])PROFILE([,[:space:];]|$)" */outbox/*.md | grep -v '^PROFILE/' | sort | sed 's/^/  @2 /'
+echo "@2 count=$(grep -rlE "(^|[[:space:]])(to|cc|reply_to):.*([,[:space:]])PROFILE([,[:space:];]|$)" */outbox/*.md | grep -v '^PROFILE/' | wc -l)"
 # ③ head（严禁写成 '[0-9]{4}$'：文件名以 .md 结尾 ⇒ 全角色同值＝命令失效）
-for d in */outbox; do r=${d%%/outbox}; m=$(ls $d 2>/dev/null | grep -oE '[0-9]{4}' | sort -n | tail -1); echo -n "$r=${m:-ERR} "; done; echo
+echo "@3 head"; for d in */outbox; do r=${d%%/outbox}; m=$(ls $d 2>/dev/null | grep -oE '[0-9]{4}' | sort -n | tail -1); echo -n "$r=${m:-ERR} "; done; echo
 # ③b I 通道（语义文件名，③ 对它永久失明；06:58 实测 **11** 件，与 §5 基线同号；旧"期望 7 件"作废。
 #      成员即证据 ⇒ 先打印集合再打计数，不得只留裸数（defect ⑧/⑭））
-ls I/outbox; ls I/outbox | grep -c '\.md$'
+echo "@3b I通道:"; ls I/outbox | sed 's/^/  @3b /'; echo "@3b count=$(ls I/outbox | grep -c '\.md$')"
 # ④ 包标识符差集（期望只剩 BC-0015＝已读已判）
-comm -13 <(grep -rlE "(^|[[:space:]])(to|cc|reply_to):.*([,[:space:]])PROFILE([,[:space:];]|$)" */outbox/*.md | sort) \
-         <(grep -rlE 'plugins/profile|agent-box-profile-preset|ordessa\.profile|ProfileRecord' */outbox/*.md */inbox/*.md | sort) | grep -v '^PROFILE/'
+echo "@4 包标识符差集:"; comm -13 <(grep -rlE "(^|[[:space:]])(to|cc|reply_to):.*([,[:space:]])PROFILE([,[:space:];]|$)" */outbox/*.md | sort) \
+         <(grep -rlE 'plugins/profile|agent-box-profile-preset|ordessa\.profile|ProfileRecord' */outbox/*.md */inbox/*.md | sort) | grep -v '^PROFILE/' | sed 's/^/  @4 /'
 # ⑤ 散文点名（低噪超集；**成员一律由 §`harvest_gate_0631` 现跑现给，本块不再抄清单**——手抄基线在 06:12–06:31 的 19 分钟内从 17 涨到 22 就已失效，06:58 实测 **24**）
-grep -rlEi 'Profile[^.]{0,12}(仅独立插件|只设计|独立插件)' */outbox/*.md */inbox/*.md | grep -v '^PROFILE/'
+grep -rlEi 'Profile[^.]{0,12}(仅独立插件|只设计|独立插件)' */outbox/*.md */inbox/*.md | grep -v '^PROFILE/' | sed 's/^/  @5 /'
+echo "@5 count=$(grep -rlEi 'Profile[^.]{0,12}(仅独立插件|只设计|独立插件)' */outbox/*.md */inbox/*.md | grep -v '^PROFILE/' | wc -l)"
 # 单个新件的超集前置式（0 ⇒ ②④⑤ 皆不可能命中，一次判定）
 grep -ci profile <新件路径>
 ```
@@ -126,7 +128,7 @@ t CHARTER.md x 9 $A/../HD-001/CHARTER.md '不开发/迁移/扩张 Profile、Prov
 r COORDINATION.md $A/COORDINATION.md 'status限制约40行'
 t SESSION-OWNERSHIP.md x 10 $A/SESSION-OWNERSHIP.md '只有 BC 一个启动负责人'
 t README.md x 17 $A/README.md 'roles/'
-t verification-map.md x 62 $A/agents/PROFILE/verification-map.md '15.4kb'
+r verification-map.md $A/agents/PROFILE/verification-map.md '15.4kb'
 t FC-0061 x 15 $A/agents/FC/outbox/FC-0061.md 'nativeExecution.profileId'
 t BC-0026 x 16 $A/agents/BC/outbox/BC-0026.md '收件为独立插件验证完成'
 t I-PROFILE-BLUEPRINT-002 x 4 $A/agents/I/outbox/I-PROFILE-BLUEPRINT-002.md 'to: C, BC, PROFILE'
@@ -251,6 +253,14 @@ defect_22_snake_test_names: 转换过程中查出 `verification-map.md` 的"具�
 
 defect_23_anchor_ate_label: 07:56 建上面那道门时，我拿 `defect_21_misattributed_mail_site: 07:24` 这段**条目标签当编辑锚**，插入后把标签本身吃掉了——条目正文完好、标签消失，`grep '^[a-z0-9_]+:'` 少一条、按标签抽取的门也会从此看不见它。当场用标签计数与 `grep -n` 定位复原。同族先例是本轮早先那次 `old_string` 截断（留下 `SION-REUSE-001…` 残尾）。规矩补一条：**编辑锚一律选"只属于锚、不会随插入消失"的整行**（例如条目自己的首行须整段包含其后半句），编辑后立刻用标签普查（`grep -oE '^[a-z0-9_]+:' | sort | uniq -c`）确认条目数不减。
 
+defect_24_mixed_run_count_misread: 08:14 游标整块复跑时，我把 07:05 那次读到的"② 由 22 涨到 28"写进了 §5；本轮给每条规则加**数值自带标签**后重测，**② 实为 23**（构成本就自证：BC 8＋C 7＋FC 2＋I 5＋S 1 = 23，07:05 的构成行我抄过、当时没加总）。28 那个数是整块输出里**上一段（⑤）的行数**被读成了下一段的计数。这不是抄错数字，而是**判据没有归属边界时，人眼会在连续输出里挑错行**——与 defect ⑬B（缺行＝没跑）互为反面：那次是"没跑当成跑了"，这次是"跑对了读错了"。根治已落地：游标块六条各打印 `@n …`（集合行带 `@n ` 前缀、计数行写 `@n count=`），任何一次复跑都能逐行归属；今后**引用计数必须连标签一起引**。修正后的本轮实测（08:15）：① 5、② 23、③ head 见 §5、③b 18、④ 只 `BC-0015`、⑤ 31。
+
+defect_25_artifact_bytes_are_cwd_dependent: 08:31–08:32 记账 FE 产物尺寸时，同一棵树、同一 `/tmp/pf-build-check.mjs` 得到 **17638** 与 **17152** 两个字节数。不当噪声放过：受控实验各跑两次，差异**完全可复现**且只随一个变量改变——跑门时的 cwd（mirror 的 `cjs/plugins/profile` 目录 vs 产品树根）。esbuild 会按环境发现 tsconfig 之类配置，所以选项相同的两次调用并不真的相同。后果比"数字难看"严重：(1) 本包历史上所有**未带 cwd** 的产物字节数（含 15453 与被本轮取代的那些）**彼此不可比**，据此判"退化/增长"都是空判；(2) 我 08:25 那次 FE 提交信息里写的 17152 恰好是规范 cwd 的数，侥幸对得上，但这是运气不是方法。处置：`verification-map.md` 复跑配方第 4 条已写死"出件前 `cd` 到产品树根，记账须 cwd 与 bytes 同写"，并把 08:33 复核段与历史段显式分开标注"不可比"。同族规则：报"同一件事两次结果不同"之前，先证明变量只有一个（这次就是靠固定脚本＋只换 cwd 证出来的）。
+
+delivery_v02_all_four_0833: 08:24–08:33 v0.2 §本批功能列出的四项真差量**全部交付**（0009 §3 表原列六项，其中三项经核查本已存在）。(1) `58074749` `store#clone`；(2) `96cdc337` `portable.py`（`export_bundle`/`inspect_bundle`/`import_bundle`＋`store#import_bundle`）；(3) `ba748793e8` `root.tsx#createProfileRoot` 零 props（形参个数由 `api.root.component.length === 0` 断言，不是注释）、`ready`/`reload` 齐，in-flight 显式 loading、端口坏显式 unavailable；同提交 `PresetPort` 加 `list(connectionId)`——**本包自有的测试端口形状**，`contracts/**` 与宿主一字未动（v0.2:29 排除面）。(4) `a1baa218a2` `demo.ts#runDemo`＋`tests/demo.test.ts`：端口自标 test port、断言含"未接线的口不得称生产接缝"，`grep -c runDemo` 在产物 `entry.js` 内 **0** 命中 ⇒ 演示确实不在 shipped 路径。门：BE 73 OK／FE tsc 0 → CJS 0 → **17/17** → 产物 **17152 bytes**（规范 cwd）；演示本体实跑出 536 bytes HTML、四标记全中。两树 porcelain 0、四提交 `branch -r --contains` 命中 0。**四状态未变**：仍只"独立插件验证"成立，接缝/装配/用户验收未做，也不因四项齐了就自称图纸 v0.2 已被宿主接纳。
+
+defect_26_replacement_ate_delimiters: 08:46 一次修文里连犯两个小缺陷、都被自查抓到。(a) **无源队列第二次咬到东西**：`PROFILE-0011` §2 一度把「registry 驱动编辑器与摘要」「缺解释器/引用显式诊断」当引号项呈现，而 0009 从未这样写过——形状与 defect ⑱ 同族（把转述包装成引用），差别只在这次**发件前**就被门拦下（⑱ 是发件后自查才发现）。(b) 修那句时用 `str.replace` 逐段替换，old_string 含顿号而 new_string 不含 ⇒ 三项并列被粘成一串读不通的话；只有把整行打出来看才看得见。两条规矩：**改整句就重写整句，不做局部字符串替换**；替换后必须**把该句整行读出**，不能只信"替换成功"。同轮一次同族好运：发 `revision 4` 时我把 `READY_FOR_USER_REVIEW` 用在**模块级**，工具回「错误: 模块状态非法」且**未半写**（回读仍 `revision 3`）⇒ 模块状态集只有 NOT_STARTED/IN_PROGRESS/BLOCKED/DONE，READY 只属于阶段级；改回 `IN_PROGRESS` 后 rev4 发出并回读核实（三模块状态＝IN_PROGRESS/DONE/NOT_STARTED，与本包四状态口径一致）。
+
 ```python
 # 码面行号门：本包文档里每个 `file:LINE[ token|「题」]` 与 `file#symbol` 引用，
 # 须满足——文件找得到、行号不越界、该行非空；带符号/引文的还须逐字含它。多号形 :77/87 与 :14-16 逐个展开。
@@ -262,8 +272,8 @@ FE = pathlib.Path('/home/maoqh/projects/ordessa/worktrees/harness-desktop-002/pr
 MAP = {}
 for n in ('store.py', 'record.py', 'registry.py', 'resolver.py', 'diagnostics.py', '__init__.py', 'values.py', 'portable.py'):
     MAP[n] = BE / 'src' / 'agent_box_profile_preset' / n
-for n in ('model.ts', 'entry.tsx', 'view.tsx', 'contributions.ts'):
-    MAP[n] = FE / 'src' / n
+for f in list((FE / 'src').rglob('*.ts')) + list((FE / 'src').rglob('*.tsx')):
+    MAP[f.name] = f
 for p in (BE / 'tests').glob('*.py'):
     MAP[p.name] = p
 for p in (FE / 'tests').glob('*.test.ts'):
@@ -279,7 +289,7 @@ for doc in ('verification-map.md', 'v0.2-delta.md', 'status.md', 'evidence-log.m
     MAP[doc] = pathlib.Path('/home/maoqh/projects/ordessa/control/missions/HD-002/agents/PROFILE') / doc
 
 CITE = re.compile(r'`([A-Za-z0-9_.-]+\.(?:py|ts|tsx|md)):([0-9]+(?:[/-][0-9]+)*)((?: [^`]*)?)`')
-SYM = re.compile(r'`([A-Za-z0-9_.-]+\.(?:py|ts|tsx))#([A-Za-z_][A-Za-z0-9_]*)`')
+SYM = re.compile(r'`([A-Za-z0-9_.-]+\.(?:py|ts|tsx|md))#([A-Za-z_][A-Za-z0-9_]*|「[^」]+」)`')
 
 
 def lines_of(spec):
@@ -299,7 +309,10 @@ ALLOW = {'COORDINATION.md:11', 'COORDINATION.md:3', 'COORDINATION.md:17', 'COORD
 
 
 def check(doc):
-    raw = pathlib.Path(doc).read_text(encoding='utf-8')
+    target = pathlib.Path(doc)
+    if not target.is_file() and doc in MAP:
+        target = MAP[doc]  # 门自定位： bare 档名一律解到本包记录目录（defect ⑯ 同族）
+    raw = target.read_text(encoding='utf-8')
     # 门体自身的围栏内容不参与计数（defect ⑲ 同族：别让工具把自己的零件当被测物）
     text = re.sub(r'```.*?```', '', raw, flags=re.S)
     total = bad = 0
@@ -309,7 +322,9 @@ def check(doc):
         if path is None or not path.is_file():
             print(f'NOFILE  {fname}#{sym}'); bad += 1; continue
         src = path.read_text(encoding='utf-8').splitlines()
-        if not any(re.search(rf'\b{sym}\b', line) for line in src):
+        hit = (sym.strip('「」') in '\n'.join(src)) if sym.startswith('「') else any(
+            re.search(rf'\b{sym}\b', line) for line in src)
+        if not hit:
             print(f'NOSYM   {fname}#{sym} (文件 {len(src)} 行，0 命中)'); bad += 1
     for m in CITE.finditer(text):
         fname, spec, rest = m.group(1), m.group(2), m.group(3).strip()
