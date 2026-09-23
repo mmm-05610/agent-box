@@ -84,7 +84,7 @@ quotegate_0525: 上面那句「剥掉行内代码段再计数」在正文里只�
 cd /home/maoqh/projects/ordessa/control/missions/HD-002/agents/PROFILE
 for f in status.md evidence-log.md verification-map.md; do s=$(sed 's/`\{1,2\}[^`]*`\{1,2\}//g' $f); echo "$f stripped $(printf "%s" "$s"|grep -o "「"|wc -l)/$(printf "%s" "$s"|grep -o "」"|wc -l)"; done
 ```
-writedomain_and_nopush_proof_0526: 05:26 把目标里「**核对当前树和旧交付**」从记忆升级成**逐提交实证**，并顺手把「未 push」这句话换成可核的判据。(1) **写域合规**：`git show --name-only` 逐个列我自己 5 个提交的全部路径——BE `01373b2d`（17 文件）与 `f3bcbde9`（1 文件）**只**含 `plugins/agent-box-profile-preset/**`；FE `3fab07948b`（10）/`db5585cf2b`（6）/`e869683469`（3）并集 **11 个不同文件全部**只含 `plugins/profile/**`，与 §1 记的 `git ls-files` 计数 17／11 逐项对上。**没有一个路径**落在排除面（根 `pyproject.toml`/`package.json`/lock、共享契约、Server/wire、Execution、既有 Profile 实现、`home`、产品清单、`extensions.json`/`extensions.lock.json`、`dist`）。同一次输出也证实分支基点不是我造的：BE 父提交 `60d868ef` 是 BC 的 HD-001 交付、FE 基点 `16398e7c` 是 FC 集成点，我都在其上另起分支。(2) **「未 push」的正确判据**：`git rev-parse @{u}` 报「尚未给分支设置上游」只说明**分支无上游**，而我 `git remote -v` 实测有 4 行（远端确实配置着），且 `origin/main..HEAD` 的 ahead 数（BE 690／FE 26）含大量继承历史——**这两个数都不能当「我没推送」的证据**。真正的判据是 `git branch -r --contains <c>`：我那 5 个提交**在全部 remote-tracking 分支里命中 0 次**（逐条输出 `NONE`）⇒ 提交只存在本地。规则固化：报「未 push／未外发」一律用 remote-ref 包含性判定，禁用「无上游」「ahead 数」代理。(3) 游标：head 再进 F1 0010→**0011**（`to: FC; cc: C, F2, F3, BC`，非发我）。它被规则 ⑤ 抓到：`:78`「Profile 仍是独立插件，Provider/Model 仍只有设计。」——本包界线在下游的**第 5 个独立复述**（前四：F3 三件 + BC/C 各一），同件的 `:43`/`:74` 用的是 Server `profiles.list`，规则 ④ 对全文 0 命中 ⇒ 不涉本包插件，无动作、无回件。产品树本轮 `porcelain` 各 **0** 行，HEAD 未变。
+writedomain_and_nopush_proof_0526: 05:26 把目标里的**「核对当前树和旧交付」**从记忆升级成**逐提交实证**，并顺手把「未 push」这句话换成可核的判据。(1) **写域合规**：`git show --name-only` 逐个列我自己 5 个提交的全部路径——BE `01373b2d`（17 文件）与 `f3bcbde9`（1 文件）**只**含 `plugins/agent-box-profile-preset/**`；FE `3fab07948b`（10）/`db5585cf2b`（6）/`e869683469`（3）并集 **11 个不同文件全部**只含 `plugins/profile/**`，与 §1 记的 `git ls-files` 计数 17／11 逐项对上。**没有一个路径**落在排除面（根 `pyproject.toml`/`package.json`/lock、共享契约、Server/wire、Execution、既有 Profile 实现、`home`、产品清单、`extensions.json`/`extensions.lock.json`、`dist`）。同一次输出也证实分支基点不是我造的：BE 父提交 `60d868ef` 是 BC 的 HD-001 交付、FE 基点 `16398e7c` 是 FC 集成点，我都在其上另起分支。(2) **「未 push」的正确判据**：`git rev-parse @{u}` 报「尚未给分支设置上游」只说明**分支无上游**，而我 `git remote -v` 实测有 4 行（远端确实配置着），且 `origin/main..HEAD` 的 ahead 数（BE 690／FE 26）含大量继承历史——**这两个数都不能当「我没推送」的证据**。真正的判据是 `git branch -r --contains <c>`：我那 5 个提交**在全部 remote-tracking 分支里命中 0 次**（逐条输出 `NONE`）⇒ 提交只存在本地。规则固化：报「未 push／未外发」一律用 remote-ref 包含性判定，禁用「无上游」「ahead 数」代理。(3) 游标：head 再进 F1 0010→**0011**（`to: FC; cc: C, F2, F3, BC`，非发我）。它被规则 ⑤ 抓到：`:78`「Profile 仍是独立插件，Provider/Model 仍只有设计。」——本包界线在下游的**第 5 个独立复述**（前四：F3 三件 + BC/C 各一），同件的 `:43`/`:74` 用的是 Server `profiles.list`，规则 ④ 对全文 0 命中 ⇒ 不涉本包插件，无动作、无回件。产品树本轮 `porcelain` 各 **0** 行，HEAD 未变。
 
 objective_audit_0529: 05:29 应「不空转」要求把**整条目标文本逐子句对到可复核工件**（不是自我宣布完成——目标明写「用户明确叫停前不主动结束」，故本条只记**覆盖**，不记**收线**，也不得据此调 `UpdateGoal: complete`）。逐项：
 (1)「完整读取 README 及必读文档、roles/PROFILE.md」→ 已读并留下具名指针：`TASKS.md:6/8/10`、`COORDINATION.md:11/17-21/27`、`SESSION-OWNERSHIP.md:10/21/44`、`roles/PROFILE.md`（报告方向 `to: BC; cc: FC` 即从此件采用）、`../HD-001/CHARTER.md:9`、`../HD-001/BUDGET.md:11`。判据是这些位置在**本包邮件里被逐字引用过**，不是「我记得读过」。
@@ -97,3 +97,56 @@ objective_audit_0529: 05:29 应「不空转」要求把**整条目标文本逐�
 (8)「不造控制器」→ 本轮实测 `CronList` 返回「No scheduled jobs.」；本包全程无 watcher/daemon/计数器。
 (9)「平台强制暂停如实保存恢复点」→ `status.md` 六字段恢复点按 `COORDINATION.md:11` 维持 ≤40 行，达上限即如实停在此、不主动收线。
 一条**必须如实记的保留**：`git reflog --date=iso-local` 今日实读为——backend：`f3bcbde9 11:30:30 commit`、`01373b2d 10:57:14 commit`，以及两条 `60d868ef 09:43:53 reset: moving to HEAD`；frontend：`e869683469 11:46:44`、`db5585cf2b 11:30:49`、`3fab07948b 10:57:51` 三件 commit，以及两条 `16398e7cec 09:43:53 reset: moving to HEAD`。那四条 `reset: moving to HEAD` **早于本会话**、落在**继承来的基线 SHA** 上，不是我做的（我的硬约束是「never reset/stash/clean」）；因此本包记录只能说「本包会话内无 reset/stash/clean」，**不得写成「reflog 干净」**。此即本条的自审产出：把代理信号（reflog 条数）换成边界明确的陈述。
+
+linecite_gate_0536: 05:36 首次把本包记录里所有 `file:line` 引用做**逐条"该行是否真含被引文字"的机检**（此前只核过引文文本与文件是否存在，**行号从未机检**）。配方＝`sed -n "Np" 文件 | grep -c -- '被引串'`，见下方围栏块。**两条假警报正是"看截断显示"造成的**：F1-0011:78 与 I-PROJECT-REQUIRED-001:19 的引文都落在**超长行的行尾**，`cut -c1-120` 显示不到 ⇒ 差点被我判成"行号指错"并用 `grep -n` 去"改正"（若真去改，就是把对的改成错的；且 `grep -n` 恰好也返回同一行号，会掩盖这步是多余的）。硬规则追加：**引用保真只能整行比对，显示截断不算证据；任何"改正"前先整行看实文**。
+**两条真缺陷，都在我自己这边，方向是"引文不逐字"**：(a) `status.md` §4 把 `TASKS.md:10` 写成「PROFILE 独立包已收不进 CP」，实文是「PROFILE 独立包不进 CP」——「已收」来自 **BC-0026 的裁定**而非 TASKS 原文，我把两个来源缝进同一对引号（后果不轻：读者会以为 TASKS 自己宣告了收件完成）。(b) §附 把 `TASKS.md:8` 写成「Provider/Model 与新架构/插件设计**暂停**」，实文是「Provider/Model 和后续新架构/插件设计暂停」——三处不逐字（和→与、漏「后续」、并在引号内注入粗体标记；引号内加 `**` 是本包**第二次**犯同一毛病）。两处均已改为逐字并另注真正出处；**结论一字未改**，只修保真。
+机检总账：13 条引用 **11 条精确通过**（CHARTER.md:9、COORDINATION.md:11、SESSION-OWNERSHIP.md:10、README.md:17、F3-0013:90 的 `maxTurns: 100`、I-SESSION-FIRST-SEND-001:33、I-NATIVE-AGENT-001:8、I-PROJECT-REQUIRED-001:19、F1-0011:78、FC-0061:15、verification-map.md:62），2 条＝上述 (a)(b) 已修。顺带把 `TASKS.md:8` 的整行原文记下：「Profile 原会话及成果独立保留，不进 CP；Provider/Model 和后续新架构/插件设计暂停。」与 `TASKS.md:10` 末段「PROFILE 独立包不进 CP；I-DEC-0001 已记唯一账本当前无次数上限，真实 prompt/整机新路径仍未验证。此处不是 CP 完成声明。」——后者末句正好堵住"把独立包收件读成 CP 完成"的误读，与本包四状态口径同源。
+
+```sh
+# 引用保真门（cwd=missions/HD-002/agents/PROFILE）：新增或改动任何 file:line 引用后现跑
+A=/home/maoqh/projects/ordessa/control/missions/HD-002
+t(){ n=$(sed -n "$3p" "$4" | grep -c -- "$5"); printf '%-28s L%-3s hit=%s\n' "$1" "$3" "$n"; }
+t F1-0011 x 78 $A/agents/F1/outbox/F1-0011.md 'Profile 仍是独立插件，Provider/Model 仍只有设计。'
+t I-PROJECT-REQUIRED-001 x 19 $A/agents/I/outbox/I-PROJECT-REQUIRED-001.md '不引入Profile/配置管理产品'
+t I-SESSION-FIRST-SEND-001 x 33 $A/agents/I/outbox/I-SESSION-FIRST-SEND-001.md '不授权额外真实模型调用、不改变99/10预算，不扩大Profile/Provider/Model范围'
+t I-NATIVE-AGENT-001 x 8 $A/agents/I/outbox/I-NATIVE-AGENT-001.md 'Profile'
+t F3-0013 x 90 $A/agents/F3/outbox/F3-0013.md 'maxTurns: 100'
+t TASKS.md x 10 $A/TASKS.md 'PROFILE 独立包不进 CP'
+t TASKS.md x 8 $A/TASKS.md 'Provider/Model 和后续新架构/插件设计暂停'
+t CHARTER.md x 9 $A/../HD-001/CHARTER.md '不开发/迁移/扩张 Profile、Provider、Model、配置管理'
+t COORDINATION.md x 19 $A/COORDINATION.md 'status限制约40行'
+t SESSION-OWNERSHIP.md x 10 $A/SESSION-OWNERSHIP.md '只有 BC 一个启动负责人'
+t README.md x 17 $A/README.md 'roles/'
+t verification-map.md x 62 $A/agents/PROFILE/verification-map.md '15.4kb'
+t FC-0061 x 15 $A/agents/FC/outbox/FC-0061.md 'nativeExecution.profileId'
+t PROFILE-0001 x 3 $A/agents/PROFILE/outbox/PROFILE-0001.md '- id: PROFILE-0001'
+# 阳性对照＝最后一行（自己写的件，必 hit=1）；若它也 0 ⇒ 路径/行号口径坏了，先修工具再下结论
+```
+
+cite_correction_0540: 05:41 因 §`linecite_gate_0536` 把行号纳入机检，查出**本包记录里最严重的一处引用保真问题**，记此勘误（**追加，不回写**）。件：`evidence-log.md:47` 的归档条目 `standby_tick_0445`，当时写「（引文内不加标记，逐字回读自 F1-0009:29）」并给出句子「两条抛错都发生在任何 `sessions.createAndSend` 帧之前（fail closed、不发送），且不启用 Profile 管理 UI。」机检四条实果：(1) 行号错——该件 `:29` 不含这些文字，实际在 **`:35`**；(2) **拼接**——句子把不相邻的内容缝成一句，不是回读；(3) **「两条抛错」**与 **「fail closed」** 两处**在 F1-0009 全文 0 命中**，是我自己的措辞冒充了别人的原文；(4) 阳性对照已跑（同一行取真片段 hit=1），故这不是工具失效而是记录缺陷。**结论未被推翻、只换了支撑**：F1-0009:35 的逐字片段是「`firstSend` 在任何 `sessions.createAndSend` 帧**之前**调它」（注意原文自身就带粗体标记）与「不启用 Profile 管理 UI」，二者合起来仍支持我当时要的判定点——F1 的身份校验发生在任何发帧之前、且 F1 不启用 Profile 管理 UI，**没人把本包 `ProfileRecord.id` 当 `profileId` 用**；被推翻的只是"逐字"这个标签。归档区（本文件 19–78 行，`## 归档正文（04:50 快照，原文未改）`）**照旧不回改**：04:50 拆分承诺的是两侧 md5 一致的逐字无损，为修引用而重写归档会造出更坏的问题（读者无法区分"谁改的"），故本条勘误指针就是修正手段，且 §4 的旧措辞已按新规则改写。**同类小缺陷一并修**：`status.md` §5 原写 BC-0042「命中 2 处但属既有 Server `profileId`/`profiles.list` 域」，实测那 2 处是 `:16` 的 `profileId` 与 `:22` 的 `hello/profile ready`——仍属 Server 域（规则 ④ 对该件全文 0 命中不变），但把 `profiles.list` 写成该件用词是我贴错的标签，已改正。新增硬规则三条：**"逐字回读"四个字只有整段引文在指定行 `grep -cF` 命中 1 时才许写**；跨段引用必须显式标"拼接"并各段自带行号；测式命令的**被引串一律单引号**——本轮我先用双引号，反引号被 shell 当命令替换吃掉，于是对一条我**亲眼在同一行看到**的文字报了 0 命中，差点把一条正确的记录误判成缺陷（该假象与 defect 截断同类，方向仍是"工具坏了却像证据"）。
+
+```sh
+# §cite_correction_0540 的复测（含本轮新增用例；单引号是硬要求，双引号会吞反引号）
+A=/home/maoqh/projects/ordessa/control/missions/HD-002/agents
+q(){ printf '%-12s L%-3s hit=%s want=%s\n' "$1" "$3" "$(sed -n "$3p" "$4" | grep -cF -- "$5")" "$5"; }
+# 门必须自证是哪一项失败：只印 hit= 而漏掉被引串，本轮就因此把「故意期望 0」的一项读成了翻车
+for g in COORDINATION.md TASKS.md README.md SESSION-OWNERSHIP.md SCOPE.md BASELINE.md; do printf '%s@%s ' "$g" "$(stat -c %y /home/maoqh/projects/ordessa/control/missions/HD-002/$g | cut -c6-16)"; done; echo "← mission 文档 mtime 普查：任一变了须重查指向它的全部行号引用"
+q F1-0009 x 35 $A/F1/outbox/F1-0009.md '不启用 Profile 管理 UI'
+q F1-0009 x 35 $A/F1/outbox/F1-0009.md '帧**之前**调它'
+q F1-0009 x 35 $A/F1/outbox/F1-0009.md '两条抛错都发生在'
+q F1-0009 x 29 $A/F1/outbox/F1-0009.md '不启用 Profile 管理 UI'
+q BC-0042 x 16 $A/BC/outbox/BC-0042.md 'profileId'
+q BC-0042 x 22 $A/BC/outbox/BC-0042.md 'hello/profile ready'
+q F1-0011 x 43 $A/F1/outbox/F1-0011.md 'profiles.list'
+q F1-0011 x 74 $A/F1/outbox/F1-0011.md 'profiles.list'
+# 期望：前两条 1、第 3、4 条 0（即被推翻的两处冒充）、其余 1。全 0 或全 1 ⇒ 先看路径与引号口径。
+```
+
+cursor_defect_12_silent_setdiff: 05:44 又踩到一条**朝「无新件、全清」方向静默失败**的坑（与 defect ④ 同族，最危险那类）：我用 `grep -vFf /tmp/r5_prev.txt` 求「本轮 ⑤ 集合相对已知 7 件的新成员」，而 **prev 文件不存在**时 GNU grep 会报错、在我的管道里被吞掉，结果**一行都没输出**——看起来正好等于「没有新成员」。实际 ⑤ 已从 7 涨到 **8**（新成员 F1-0013），是我随后放弃差集、**直接打印集合**才发现的。硬规则追加：**集合求差必须先证明基线文件存在且非空**（`[ -s file ] || 先造基线`），否则一律改用「打印全集＋人工比对已知清单」；游标里凡出现 `comm`/`grep -vFf` 之类依赖前一轮快照的写法，都要先看基线在不在，不在就当场建立并把基线写进本文件，而不是把「空差集」当证据。
+
+cursor_defect_13_shell_quoting_and_block_concat: 05:42–05:44 两条并列的工具体检缺陷。(A) **测式命令的被引串一律单引号**：我先写 `grep -c -- "$s"` 且 `s` 里带反引号，双引号把反引号变成命令替换，于是对 F1-0009:35 上**我亲眼在同一次 `sed` 输出里看到**的文字报了 0 命中，差点据此把一条正确记录判成缺陷；换 `grep -cF` ＋单引号并补阳性对照（同一行已知片段 hit=1）后真相即现。(B) **整块复跑必须保留 `grep -v '<新件路径>'` 过滤器**：本文件把四个 `sh` 块串成一个脚本跑时，游标块末行 `grep -ci profile <新件路径>` 的占位尖括号会让 bash 直接语法错误、**其后所有门（引文平衡门＋两道引用门）一句都没执行**，而我上一轮只 `grep` 了输出里的 `hit=`/`stripped` 等关键字，差点把「什么都没印」读成「门都过了」。硬规则：整块复跑后**必须确认每个门的预期行都出现**（缺行＝没跑，不等于跑通）；占位行的过滤器是脚本可运行的前置条件，不是可选清理。
+
+standby_tick_0544: 05:44 一轮（本轮含 defect ⑫⑬ 与引用门的建成，非空转）。head：BC 0046 / C 0038 / FC 0062 / F1 0013 / F3 0016 / S 0019 / H 0008 / E 0004 / F0 0011 / F2 0010；③b `I/outbox` 由 7 件涨到 **8**，新件 `I-DASHBOARD-RECOVERY-002.md`（`- from: I; to: C; cc: FC, BC`，type `COORDINATION_CORRECTION`，`reply_to: I-DASHBOARD-UPDATE-NOW-001`，超集式 profile＝**0**）＝看板发布闭环的上级纠偏，落点仍是 C/FC/BC 与 `decision-queue/**`（都在我写域外），**不派单给本包**。新到八件（BC-0045/0046、C-0037/0038、F1-0012/0013、FC-0062、上述 I 件）判定：profile 超集式 5 件为 0；有命中的 4 件（BC-0046、C-0037、C-0038、F1-0013）逐条核——头分别是 `- from: BC; to: C; cc: H, FC, I`、`- to: BC; cc: H, FC, I`×2、`- to: FC, C; cc: F2, F3, BC`，**都不含 PROFILE**，且包标识符正则四件全 **0** 命中（⇒ ④ 不变），命中处文字与插件无关（`--pi-bin`/`PI` 路径、ACP/Pi 构建与「不启动 Pi Agent」等）。规则 ② 剔 `PROFILE/` 后仍 **21** 件、④ 差集仍只 **BC-0015**；⑤ 现 **8** 件（新成员即 F1-0013:50 逐字「Profile 仍独立插件，Provider/Model 仍只设计。」＝本包界线在下游的**第 6 个独立复述**，也是 F1 第二次自行复述，说明该界线已进入它的每批交付自检）。⇒ **无收件义务、不回件、不发新件**。顺带一条口径教训：头字段有**合并形** `- from: BC; to: C; cc: H, FC, I`，我本轮用 `^(to|cc|- to|- cc):` 逐字段锚定时对 BC-0046 印出空串，险判成「无抬头」；游标规则 ② 的正则本就能吃这一形，**手打的字段锚定不算数**（同 defect ⑨ 根因：绕开权威块自己写）。产品树未动。
+
+doc_drift_0549: 05:47 跑整块门时 `t COORDINATION.md x 11 … '40行'` 报 **hit=0**，而它 6 分钟前刚跑过 hit=1。实读证实**不是工具坏，是被引文件动了**：`COORDINATION.md` mtime 实测 **13:46:26**（＝05:46 UTC，就在我本轮开工前一分钟）、行数 41，那条 status 六字段与 40 行上限的规则**从 `:11` 搬到了 `:19`**。这推翻了我一直默认的前提——**mission 文档不是不可变的**（同刻实测 `TASKS.md` mtime 13:31、`README.md` 12:27、`SCOPE.md` 12:10，只有 `SESSION-OWNERSHIP.md` 10:27 与 `HD-001/CHARTER.md` 00:02 未动）。而**他人的 mail 件仍不可变**：`F1-0009` mtime 12:47 未变，其 `:35` 片段仍 hit=1（本轮那条 `L35 hit=0` 是我自己误读——门没印出被引串，我错把**故意期望 0** 的第 3 项当成第 2 项翻车；已给 `q()` 加上 wanted 串输出，规则：**门必须能自证是哪一项失败**）。硬规则追加：(a) 引用 mission 文档的行号属**易漂移证据**，每次跑引用门要连同 **mtime 普查**一起看，mtime 变了就重查指向它的全部引用；(b) 长期不变的锚应优先用**文档内唯一短语**（如「status限制约40行」）而不是裸行号；(c) 本包 `status.md` 对 `COORDINATION.md:11` 的两处依赖已改指 `:19`，短语本身一字未变。另记一次**同类空输出险情**：查三件最新到达件时我把路径写成 `$A/BC/outbox/…`（漏了 `/agents`），`grep`/`sed` 当场报错、`profile=` 印成**空串**——若我只看 `%s` 输出就会把"文件不存在"当成"零命中"再判一次「无新件」。规则：判定式输出**空值与 0 必须区分**，命令报错时该次结果一律作废重跑，不得入证据。
+本轮 05:49 收件（head 又进 BC 0047 / C 0039 / F1 0014）：BC-0047 profile＝0、ids＝0（`- from: BC; to: C; cc: H, FC, I`）；C-0039 命中处是「ACP profile 覆盖」的环境变量审计（`- to: BC; cc: H, FC, I`）；F1-0014 `:37` 写「不扩 Profile/Provider/Model 配置（§33）」并要求 **BC/H** 交出默认工作区来源、问它如何与 `workspaces.list`/`profiles.list` 的既有身份对应（`- to: I, C, FC; cc: BC, F2, F3, S, H`）。三件 ids 全 **0**、抬头均无 PROFILE ⇒ 无义务、不回件。值得单独记一笔的是 F1-0014 引用的 **§33 与我引的 I-SESSION-FIRST-SEND-001:33 是同一条上级原文**——上下游同用一条界线依据，本包界线在下游的复述累计到**第 7 个**，且 F1 要的是既有 Server 身份映射，不是本包 `ProfileRecord.id`。③b 的 I 通道仍 8 件、② 仍 **21**、④ 差集仍只 **BC-0015**、⑤ 现 **9** 件（新增 F1-0013/F1-0014 两件，其中 F1-0014 因「不扩 Profile/Provider/Model 配置」形近而被抓到，已读已判）。产品树本轮实测仍 BE 0／FE 0、HEAD 未变。
