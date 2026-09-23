@@ -7,13 +7,12 @@ import { fileURLToPath } from 'node:url'
 
 process.umask(0o077)
 const app = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const pairRoot = '/tmp/hd002-c0048-pair-834rpsal'
-const readyPath = path.join(pairRoot, 'ready.json')
+const readyPath = path.resolve(process.argv[2] ?? '')
+const pairRoot = path.dirname(readyPath)
 const donePath = path.join(pairRoot, 'fc-done.json')
 const userData = path.join(pairRoot, 'electron-userdata')
 const tracePath = path.join(userData, 'electron-connect.trace')
 const logPath = path.join(userData, 'electron-smoke.log')
-const expectedOrigin = 'http://127.0.0.1:50491'
 const timeoutMs = 25_000
 
 function secureFile(info) {
@@ -33,9 +32,9 @@ function nativeSummary(result) {
   }
   return Object.fromEntries(Object.entries(pair).filter(([, value]) => typeof value === 'boolean'))
 }
-function assertLoopbackOnly(trace) {
+function assertLoopbackOnly(trace, port) {
   const calls = trace.split('\n').filter(line => line.includes('connect(') && /AF_INET6?/.test(line))
-  assert.ok(calls.some(call => call.includes('sin_port=htons(50491)') && call.includes('sin_addr=inet_addr("127.0.0.1")')),
+  assert.ok(calls.some(call => call.includes(`sin_port=htons(${port})`) && call.includes('sin_addr=inet_addr("127.0.0.1")')),
     'No connection to this batch Server was observed')
   for (const call of calls) {
     const ipv4 = call.match(/sin_addr=inet_addr\("([^"]+)"\)/)?.[1]
@@ -54,12 +53,17 @@ async function markStopped() {
 let readyAccepted = false
 let child
 try {
-  assert.equal(process.argv[2], readyPath, 'Expected this batch ready.json path')
+  assert.equal(process.argv[2], readyPath, 'Expected an absolute normalized ready.json path')
+  assert.equal(path.basename(readyPath), 'ready.json')
+  assert.equal(path.dirname(pairRoot), '/tmp')
+  assert.match(path.basename(pairRoot), /^hd002-c0053-pair-[A-Za-z0-9_-]+$/)
   secureDir(await lstat(pairRoot))
   secureFile(await lstat(readyPath))
   const ready = JSON.parse(await readFile(readyPath, 'utf8'))
   assert.equal(ready.schema, 'hd002-c0048/1')
-  assert.equal(ready.origin, expectedOrigin)
+  const origin = typeof ready.origin === 'string' ? ready.origin.match(/^http:\/\/127\.0\.0\.1:([1-9][0-9]{0,4})$/) : null
+  assert.ok(origin && Number(origin[1]) <= 65535, 'Expected this batch exact loopback HTTP origin')
+  const port = Number(origin[1])
   assert.equal(ready.tokenFile, path.join(pairRoot, 'data/secrets/http-token'))
   assert.ok(typeof ready.serverId === 'string' && ready.serverId.length > 0)
   assert.deepEqual(ready.nativeExecution && { mode: ready.nativeExecution.mode, harness: ready.nativeExecution.harness },
@@ -100,14 +104,14 @@ try {
   const line = output.split('\n').find(item => item.startsWith('MODULAR_LOADER_READY '))
   assert.ok(line, 'Electron pair result missing')
   const checks = nativeSummary(JSON.parse(line.slice('MODULAR_LOADER_READY '.length)))
-  const loopbackCalls = assertLoopbackOnly(await readFile(tracePath, 'utf8'))
-  console.log(JSON.stringify({ gate: 'C-0048', pass: true, checks, loopbackCalls, sendsByFC: 0 }))
+  const loopbackCalls = assertLoopbackOnly(await readFile(tracePath, 'utf8'), port)
+  console.log(JSON.stringify({ gate: 'C-0053', pass: true, checks, loopbackCalls, sendsByFC: 0 }))
 } catch (error) {
-  console.error(JSON.stringify({ gate: 'C-0048', pass: false, reason: error instanceof Error ? error.message : 'unknown error' }))
+  console.error(JSON.stringify({ gate: 'C-0053', pass: false, reason: error instanceof Error ? error.message : 'unknown error' }))
   process.exitCode = 1
 } finally {
   if (child?.pid) { try { process.kill(-child.pid, 'SIGKILL') } catch {} }
   if (readyAccepted) {
-    try { await markStopped() } catch { console.error(JSON.stringify({ gate: 'C-0048', doneMarker: false })); process.exitCode = 1 }
+    try { await markStopped() } catch { console.error(JSON.stringify({ gate: 'C-0053', doneMarker: false })); process.exitCode = 1 }
   }
 }
