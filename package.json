@@ -8,7 +8,18 @@
     "platform/extension-api",
     "platform/extension-loader",
     "platform/extension-host",
-    "platform/native-bridge"
+    "platform/native-bridge",
+    "contracts/foundation",
+    "contracts/agent-ui",
+    "plugins/commands",
+    "plugins/workbench",
+    "plugins/settings",
+    "plugins/connections/service",
+    "plugins/agent/sessions",
+    "plugins/agent/conversation",
+    "plugins/agent/interactions",
+    "plugins/connectors/codex",
+    "plugins/connectors/pi"
   ],
   "scripts": {
     "test:agent-ui": "node apps/desktop/scripts/test-agent-ui.mjs",
@@ -27,12 +38,5 @@
   },
   "engines": {
     "node": ">=22.22.0"
-  },
-  "dependencies": {
-    "@earendil-works/pi-coding-agent": "0.86.1",
-    "react-resizable-panels": "4.13.2"
-  },
-  "devDependencies": {
-    "@assistant-ui/react": "0.15.21"
   }
 }

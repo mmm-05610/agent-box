@@ -14,15 +14,15 @@ const natives = {
 for (const [id, folder, files] of [
   ['ordessa.contracts', 'contracts/foundation', { entry: 'entry.ts', contract: 'contract.ts' }],
   ['ordessa.agent-contracts', 'contracts/agent-ui', { entry: 'entry.ts', contract: 'contract.ts' }],
-  ['ordessa.commands', 'extensions/commands', { entry: 'entry.ts' }],
-  ['ordessa.agent-connections', 'extensions/agent-connections', { entry: 'entry.ts' }],
-  ['ordessa.agent-sessions', 'extensions/agent-sessions', { entry: 'entry.ts' }],
-  ['ordessa.agent-codex', 'extensions/agent-codex', { entry: 'entry.ts' }],
-  ['ordessa.agent-pi', 'extensions/agent-pi', { entry: 'entry.ts' }],
-  ['ordessa.agent-conversation', 'extensions/agent-conversation', { entry: 'entry.tsx' }],
-  ['ordessa.agent-interactions', 'extensions/agent-interactions', { entry: 'entry.tsx' }],
-  ['ordessa.workbench', 'extensions/workbench', { entry: 'entry.tsx' }],
-  ['ordessa.settings', 'extensions/settings', { entry: 'entry.tsx' }],
+  ['ordessa.commands', 'plugins/commands', { entry: 'entry.ts' }],
+  ['ordessa.agent-connections', 'plugins/connections/service', { entry: 'entry.ts' }],
+  ['ordessa.agent-sessions', 'plugins/agent/sessions', { entry: 'entry.ts' }],
+  ['ordessa.agent-codex', 'plugins/connectors/codex', { entry: 'entry.ts' }],
+  ['ordessa.agent-pi', 'plugins/connectors/pi', { entry: 'entry.ts' }],
+  ['ordessa.agent-conversation', 'plugins/agent/conversation', { entry: 'entry.tsx' }],
+  ['ordessa.agent-interactions', 'plugins/agent/interactions', { entry: 'entry.tsx' }],
+  ['ordessa.workbench', 'plugins/workbench', { entry: 'entry.tsx' }],
+  ['ordessa.settings', 'plugins/settings', { entry: 'entry.tsx' }],
 ]) {
   const target = path.join(output, 'extensions', id)
   await mkdir(target, { recursive: true })

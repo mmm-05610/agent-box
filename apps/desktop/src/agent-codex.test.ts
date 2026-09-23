@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { CodexClient } from '../../../extensions/agent-codex/src/client'
+import { CodexClient } from '../../../plugins/connectors/codex/src/client'
 import type { AgentNativeBridge } from './agent-native'
 
 class Bridge implements AgentNativeBridge {

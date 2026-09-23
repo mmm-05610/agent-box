@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
 import { OwnedResources } from '@ordessa/extension-api'
-import { createAgentConnections } from '../../../extensions/agent-connections/src/entry'
+import { createAgentConnections } from '../../../plugins/connections/service/src/entry'
 
 it('lets independent adapters register and releases each with its own scope', async () => {
   const serviceScope = new OwnedResources()

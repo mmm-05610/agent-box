@@ -1,0 +1,11 @@
+{
+  "name": "@ordessa/plugin-workbench",
+  "version": "0.1.0",
+  "private": true,
+  "ordessa": {
+    "id": "ordessa.workbench"
+  },
+  "dependencies": {
+    "react-resizable-panels": "4.13.2"
+  }
+}

@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest'
 import { OwnedResources } from '@ordessa/extension-api'
-import { createAgentConnections } from '../../../extensions/agent-connections/src/entry'
-import { createAgentSessions } from '../../../extensions/agent-sessions/src/model'
+import { createAgentConnections } from '../../../plugins/connections/service/src/entry'
+import { createAgentSessions } from '../../../plugins/agent/sessions/src/model'
 import type { AgentClient, AgentSnapshot } from '../../../contracts/agent-ui/src/contract'
 
 function client(id: string) {

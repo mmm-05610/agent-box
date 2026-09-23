@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { PiClient } from '../../../extensions/agent-pi/src/client'
+import { PiClient } from '../../../plugins/connectors/pi/src/client'
 import type { AgentNativeBridge } from './agent-native'
 
 const stateOf = (sessionId: string) => ({ sessionId, sessionFile: `/tmp/${sessionId}.jsonl`,
