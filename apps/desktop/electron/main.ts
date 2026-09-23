@@ -151,24 +151,24 @@ app.whenReady().then(async () => {
           }
           return false;
         };
-        const compose = (value, label) => {
+        const compose = async (value, label) => {
           const field = document.querySelector('.agent-compose textarea');
           if (!field) return false;
           Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(field, value);
           field.dispatchEvent(new Event('input', { bubbles: true }));
-          const button = [...document.querySelectorAll('.agent-compose button')].find(item => item.textContent === label);
-          if (!button || button.disabled) return false;
-          button.click();
+          const button = () => [...document.querySelectorAll('.agent-compose button')].find(item => item.textContent === label);
+          if (!await waitFor(() => !!button() && !button().disabled, 50)) return false;
+          button().click();
           return true;
         };
         const messages = () => [...document.querySelectorAll('.agent-message')];
-        const firstStarted = compose('Reply exactly HD002_FE_OK_1.', 'Start session');
+        const firstStarted = await compose('Reply exactly HD002_FE_OK_1.', 'Start session');
         if (firstStarted) console.log('HD002_FE_ATTEMPT_1');
         const firstOpened = firstStarted && await waitFor(() =>
           document.querySelector('.agent-conversation-head small')?.textContent === 'SESSION', 250);
         const firstReply = firstOpened && await waitFor(() =>
           messages().length >= 2 && messages().at(-1)?.textContent?.includes('HD002_FE_OK_1'));
-        const secondStarted = firstReply && compose('Reply exactly HD002_FE_OK_2.', 'Send');
+        const secondStarted = firstReply && await compose('Reply exactly HD002_FE_OK_2.', 'Send');
         if (secondStarted) console.log('HD002_FE_ATTEMPT_2');
         const secondReply = secondStarted && await waitFor(() =>
           messages().length >= 4 && messages().at(-1)?.textContent?.includes('HD002_FE_OK_2'));
