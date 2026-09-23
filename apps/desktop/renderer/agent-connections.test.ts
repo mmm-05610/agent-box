@@ -87,3 +87,39 @@ it('blocks cross-connector switching while a run is open or an approval awaits, 
   await expect(sessions.selectConnection('codex')).rejects.toThrow('approval awaits')
   registryScope.dispose(); facadeScope.dispose(); connectorScope.dispose()
 })
+
+it('gates reconnect with the same authority as switching and restores it once live work clears', async () => {
+  const registryScope = new OwnedResources(), facadeScope = new OwnedResources(), connectorScope = new OwnedResources()
+  const base = { sessions: [] as never, sessionList: 'ready' as const, messages: {} as never, options: [] as never }
+  const codex = liveClient('codex', { connection: { id: 'codex', title: 'Codex', status: 'connected', capabilities: {
+    history: 'unknown', reasoning: 'unknown', tools: 'unknown', stop: 'supported', interactions: 'unknown', models: 'unknown', modes: 'unknown' } },
+    ...base, runs: {}, interactions: [] })
+  const pi = liveClient('pi', { connection: { id: 'pi', title: 'Pi', status: 'connected', capabilities: {
+    history: 'unknown', reasoning: 'unknown', tools: 'unknown', stop: 'supported', interactions: 'unknown', models: 'unknown', modes: 'unknown' } },
+    ...base, runs: {}, interactions: [] })
+  const registry = createAgentConnections(registryScope)
+  registry.forScope(connectorScope).add({ id: 'codex', title: 'Codex', connect: async () => codex.value })
+  registry.forScope(connectorScope).add({ id: 'pi', title: 'Pi', connect: async () => pi.value })
+  const sessions = createAgentSessions(facadeScope, registry)
+  await sessions.selectConnection('codex')
+  // The selected connection's own open run blocks its reconnect, without cancelling the run.
+  codex.set({ ...codex.value.getSnapshot(), runs: { t: { id: 't', sessionId: 's', status: 'running', stoppable: true } } })
+  await expect(sessions.reconnect('codex')).rejects.toThrow('reconnect is blocked')
+  expect(sessions.getSnapshot().selectedConnectionId).toBe('codex')
+  expect(Object.keys(sessions.getSnapshot().agent?.runs ?? {})).toEqual(['t'])
+  // A reconnect that would move the selection is gated by live work on any connection.
+  pi.set({ ...pi.value.getSnapshot(), interactions: [{ id: 'i', sessionId: 's', kind: 'approval', title: 'Approve', state: 'pending' }] })
+  await expect(sessions.reconnect('pi')).rejects.toThrow('reconnect is blocked')
+  expect(sessions.getSnapshot().selectedConnectionId).toBe('codex')
+  // Clearing live work restores the recovery path, and the reconnected client stays reactive.
+  codex.set({ ...codex.value.getSnapshot(), runs: {} })
+  pi.set({ ...pi.value.getSnapshot(), interactions: [] })
+  await sessions.reconnect('pi')
+  expect(sessions.getSnapshot().selectedConnectionId).toBe('pi')
+  pi.set({ ...pi.value.getSnapshot(), runs: { u: { id: 'u', sessionId: 's', status: 'running', stoppable: true } } })
+  expect(sessions.getSnapshot().agent?.runs.u?.status).toBe('running')
+  // Reconnecting an unregistered id cannot leave the selection pointing at nothing.
+  await expect(sessions.reconnect('stale')).rejects.toThrow('unavailable')
+  expect(sessions.getSnapshot().selectedConnectionId).toBe('pi')
+  registryScope.dispose(); facadeScope.dispose(); connectorScope.dispose()
+})

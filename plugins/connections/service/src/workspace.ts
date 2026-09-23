@@ -70,6 +70,14 @@ export function createConnectionWorkspace(lifetime: ResourceScope, connections: 
       publish()
     },
     async reconnect(id) {
+      if (!connections.getSnapshot().some(item => item.id === id)) throw Error(`Agent connection unavailable: ${id}`)
+      // Reconnect disposes the live client and moves the selection, so it needs the same
+      // authority as selectConnection; otherwise a reconnection silently cancels an open run.
+      const live = clients.get(id)
+      const gated = id !== state.selectedConnectionId ? [...clientSnapshots.values()]
+        : live ? [live.getSnapshot()] : []
+      if (hasOpenRun(gated) || hasAwaitingInteraction(gated))
+        throw Error('Agent reconnect is blocked while a run is open or an approval awaits an answer')
       if (inFlight.has(id)) await inFlight.get(id)
       subscriptions.get(id)?.(); subscriptions.delete(id)
       clients.get(id)?.dispose(); clients.delete(id); clientSnapshots.delete(id)
