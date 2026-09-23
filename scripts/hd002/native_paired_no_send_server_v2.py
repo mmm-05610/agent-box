@@ -98,6 +98,31 @@ def within_window(start: float, limit: float, now: float) -> bool:
     return now - start < limit
 
 
+def wait_for_startup(token_file: Path, tap_file: Path, *, is_alive,
+                     network_probe, now, sleep, start: float) -> str:
+    """Token can precede create_app/tap; require both before first HTTP request."""
+    while within_window(start, 20, now()) and within_window(start, 90, now()):
+        network = network_probe()
+        if network and network['nonLoopback']:
+            raise RuntimeError('NON_LOOPBACK_CONNECT')
+        if not is_alive():
+            raise RuntimeError('SERVER_EXIT_BEFORE_READY')
+        token_seen = token_file.exists() or token_file.is_symlink()
+        tap_seen = tap_file.exists() or tap_file.is_symlink()
+        if token_seen and not private_file(token_file):
+            raise RuntimeError('TOKEN_FILE_INVALID')
+        if tap_seen and not private_file(tap_file):
+            raise RuntimeError('TAP_FILE_INVALID')
+        if token_seen and tap_seen:
+            assert_audit_safe(tap_file)
+            token = token_file.read_text(encoding='ascii').strip()
+            if len(token) < 32:
+                raise RuntimeError('TOKEN_INVALID')
+            return token
+        sleep(0.05)
+    raise RuntimeError('STARTUP_TIMEOUT')
+
+
 def valid_done(value) -> bool:
     return value == {'schema': SCHEMA, 'done': True,
                      'electronStopped': True, 'sendCount': 0}
@@ -263,6 +288,69 @@ def self_test():
             assert owner_lock_released(root / 'data') is False
             fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
         assert not batch_preflight()
+    with tempfile.TemporaryDirectory(prefix='hd002-c0053-pair-', dir='/tmp') as tmp:
+        base = Path(tmp)
+        token_file = base / 'token'
+        tap_file = base / 'tap'
+        clock = [0.0]
+        steps = [0]
+
+        def step(_delay):
+            steps[0] += 1
+            clock[0] += 0.05
+            if steps[0] == 1:
+                token_file.write_text('SYNTHETIC_TOKEN_NOT_SECRET_' + 'x' * 16)
+                os.chmod(token_file, 0o600)
+            elif steps[0] == 2:
+                tap_file.write_text('')
+                os.chmod(tap_file, 0o600)
+
+        returned = wait_for_startup(token_file, tap_file, is_alive=lambda: True,
+            network_probe=lambda: {'nonLoopback': 0}, now=lambda: clock[0],
+            sleep=step, start=0)
+        assert returned.startswith('SYNTHETIC_TOKEN_') and steps[0] == 2
+        tap_file.unlink()
+        clock[0] = 0
+        try:
+            wait_for_startup(token_file, tap_file, is_alive=lambda: True,
+                network_probe=lambda: {'nonLoopback': 0}, now=lambda: clock[0],
+                sleep=lambda delay: clock.__setitem__(0, clock[0] + 1), start=0)
+        except RuntimeError as exc:
+            assert str(exc) == 'STARTUP_TIMEOUT'
+        else:
+            raise AssertionError('missing tap accepted')
+        for alive, network, expected in (
+            (False, {'nonLoopback': 0}, 'SERVER_EXIT_BEFORE_READY'),
+            (True, {'nonLoopback': 1}, 'NON_LOOPBACK_CONNECT'),
+        ):
+            try:
+                wait_for_startup(token_file, tap_file, is_alive=lambda: alive,
+                    network_probe=lambda: network, now=lambda: 0, sleep=lambda _: None,
+                    start=0)
+            except RuntimeError as exc:
+                assert str(exc) == expected
+            else:
+                raise AssertionError('startup stop condition ignored')
+        tap_file.write_text('')
+        os.chmod(tap_file, 0o644)
+        try:
+            wait_for_startup(token_file, tap_file, is_alive=lambda: True,
+                network_probe=lambda: {'nonLoopback': 0}, now=lambda: 0,
+                sleep=lambda _: None, start=0)
+        except RuntimeError as exc:
+            assert str(exc) == 'TAP_FILE_INVALID'
+        else:
+            raise AssertionError('non-private tap accepted')
+        os.chmod(tap_file, 0o600)
+        os.chmod(token_file, 0o644)
+        try:
+            wait_for_startup(token_file, tap_file, is_alive=lambda: True,
+                network_probe=lambda: {'nonLoopback': 0}, now=lambda: 0,
+                sleep=lambda _: None, start=0)
+        except RuntimeError as exc:
+            assert str(exc) == 'TOKEN_FILE_INVALID'
+        else:
+            raise AssertionError('non-private token accepted')
     assert not root.exists()
     print('SELF_TEST_PASS')
 
@@ -300,21 +388,10 @@ def run():
                                    stdin=subprocess.DEVNULL, stdout=stderr_fd,
                                    stderr=stderr_fd, start_new_session=True)
         result['serverStarted'] = True
-        token = None
-        while within_window(start, 20, time.monotonic()):
-            network = connect_counts(trace)
-            if network and network['nonLoopback']:
-                raise RuntimeError('NON_LOOPBACK_CONNECT')
-            if process.poll() is not None:
-                raise RuntimeError('SERVER_EXIT_BEFORE_READY')
-            if private_file(token_file):
-                token = token_file.read_text(encoding='ascii').strip()
-                if len(token) >= 32:
-                    break
-            time.sleep(0.05)
-        if token is None:
-            raise RuntimeError('TOKEN_UNAVAILABLE')
-        assert_audit_safe(ROOT / 'server-methods.jsonl')
+        token = wait_for_startup(token_file, ROOT / 'server-methods.jsonl',
+            is_alive=lambda: process.poll() is None,
+            network_probe=lambda: connect_counts(trace), now=time.monotonic,
+            sleep=time.sleep, start=start)
         for _ in range(80):
             try:
                 hello = wire(token, 'server.hello', {'clientVersions': ['wire/1'],
