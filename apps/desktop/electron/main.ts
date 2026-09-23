@@ -142,6 +142,42 @@ app.whenReady().then(async () => {
         };
       })()`) })
     }
+    if (process.env.MODULAR_FE_TWO_TURN_SMOKE === '1') {
+      Object.assign(result, { twoTurn: await win.webContents.executeJavaScript(`(async () => {
+        const waitFor = async (predicate, limit = 900) => {
+          for (let i = 0; i < limit; i++) {
+            if (predicate()) return true;
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+          return false;
+        };
+        const compose = (value, label) => {
+          const field = document.querySelector('.agent-compose textarea');
+          if (!field) return false;
+          Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(field, value);
+          field.dispatchEvent(new Event('input', { bubbles: true }));
+          const button = [...document.querySelectorAll('.agent-compose button')].find(item => item.textContent === label);
+          if (!button || button.disabled) return false;
+          button.click();
+          return true;
+        };
+        const messages = () => [...document.querySelectorAll('.agent-message')];
+        const firstStarted = compose('Reply exactly HD002_FE_OK_1.', 'Start session');
+        if (firstStarted) console.log('HD002_FE_ATTEMPT_1');
+        const firstOpened = firstStarted && await waitFor(() =>
+          document.querySelector('.agent-conversation-head small')?.textContent === 'SESSION', 250);
+        const firstReply = firstOpened && await waitFor(() =>
+          messages().length >= 2 && messages().at(-1)?.textContent?.includes('HD002_FE_OK_1'));
+        const secondStarted = firstReply && compose('Reply exactly HD002_FE_OK_2.', 'Send');
+        if (secondStarted) console.log('HD002_FE_ATTEMPT_2');
+        const secondReply = secondStarted && await waitFor(() =>
+          messages().length >= 4 && messages().at(-1)?.textContent?.includes('HD002_FE_OK_2'));
+        return { firstStarted, firstOpened, firstReply, secondStarted, secondReply,
+          stillSession: document.querySelector('.agent-conversation-head small')?.textContent === 'SESSION',
+          errorsAbsent: [...document.querySelectorAll('[role="alert"]')].length === 0,
+          attemptedSends: Number(!!firstStarted) + Number(!!secondStarted) };
+      })()`) })
+    }
     if (process.env.MODULAR_STORAGE_RESTART_SMOKE === '1') {
       // Test-only fixture: non-secret placeholder selection values, namespaced by origin+serverId (FC-0034/0035).
       Object.assign(result, { storage: await win.webContents.executeJavaScript(`(async () => {
@@ -156,7 +192,8 @@ app.whenReady().then(async () => {
     }
     console.log('MODULAR_LOADER_READY', JSON.stringify(result))
     // C-0074 paired diagnostic needs the command-line default NetLog to flush on normal quit.
-    if (process.env.MODULAR_PAIR_NETWORK_DIAG === '1' && process.env.MODULAR_NATIVE_PAIR_SMOKE === '1') app.quit()
+    if ((process.env.MODULAR_PAIR_NETWORK_DIAG === '1' && process.env.MODULAR_NATIVE_PAIR_SMOKE === '1') ||
+        process.env.MODULAR_FE_TWO_TURN_SMOKE === '1') app.quit()
     else app.exit(result.ready && result.nodeAbsent ? 0 : 1)
   }
 }).catch(error => { console.error(error); app.exit(1) })
