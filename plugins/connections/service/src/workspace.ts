@@ -42,9 +42,13 @@ export function createConnectionWorkspace(lifetime: ResourceScope, connections: 
         clientSnapshots.set(id, client.getSnapshot())
         if (state.selectedConnectionId === id) publish()
       }))
-      publish({ connectingId: undefined })
+      // A concurrent handshake for another id owns the indicator until it settles; clearing
+      // it here would show the other connection as idle while it is still connecting.
+      if (state.connectingId === id) publish({ connectingId: undefined })
+      else publish()
     }).catch(error => {
-      publish({ connectingId: undefined, error: String(error) })
+      if (state.connectingId === id) publish({ connectingId: undefined, error: String(error) })
+      else publish({ error: String(error) })
       throw error
     }).finally(() => { inFlight.delete(id) })
     inFlight.set(id, task)
@@ -71,6 +75,9 @@ export function createConnectionWorkspace(lifetime: ResourceScope, connections: 
     },
     async reconnect(id) {
       if (!connections.getSnapshot().some(item => item.id === id)) throw Error(`Agent connection unavailable: ${id}`)
+      // Await any pending handshake before gating: the gate must read the state the
+      // teardown is about to destroy, not the state as of before that await.
+      if (inFlight.has(id)) await inFlight.get(id)
       // Reconnect disposes the live client and moves the selection, so it needs the same
       // authority as selectConnection; otherwise a reconnection silently cancels an open run.
       const live = clients.get(id)
@@ -78,7 +85,6 @@ export function createConnectionWorkspace(lifetime: ResourceScope, connections: 
         : live ? [live.getSnapshot()] : []
       if (hasOpenRun(gated) || hasAwaitingInteraction(gated))
         throw Error('Agent reconnect is blocked while a run is open or an approval awaits an answer')
-      if (inFlight.has(id)) await inFlight.get(id)
       subscriptions.get(id)?.(); subscriptions.delete(id)
       clients.get(id)?.dispose(); clients.delete(id); clientSnapshots.delete(id)
       publish({ selectedConnectionId: id })

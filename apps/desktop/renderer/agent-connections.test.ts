@@ -123,3 +123,58 @@ it('gates reconnect with the same authority as switching and restores it once li
   expect(sessions.getSnapshot().selectedConnectionId).toBe('pi')
   registryScope.dispose(); facadeScope.dispose(); connectorScope.dispose()
 })
+
+/** Connector whose handshake is held by the test, so a connection can be mid-flight. */
+function gatedClient(id: string, initial: AgentSnapshot) {
+  const client = liveClient(id, initial)
+  let release!: () => void
+  const handshake = new Promise<void>(resolve => { release = resolve })
+  return { client, connector: { id, title: id, connect: async () => { await handshake; return client.value } },
+    settle() { release() } }
+}
+
+it('re-evaluates the gate once a held handshake lands, so reconnect cannot cancel a run started during it', async () => {
+  const registryScope = new OwnedResources(), facadeScope = new OwnedResources(), connectorScope = new OwnedResources()
+  const base = { sessions: [] as never, sessionList: 'ready' as const, messages: {} as never, options: [] as never }
+  // The connector answers with a client that already has an open run.
+  const pi = gatedClient('pi', { connection: { id: 'pi', title: 'Pi', status: 'connected', capabilities: {
+    history: 'unknown', reasoning: 'unknown', tools: 'unknown', stop: 'supported', interactions: 'unknown', models: 'unknown', modes: 'unknown' } },
+    ...base, runs: { t: { id: 't', sessionId: 's', status: 'running', stoppable: true } }, interactions: [] })
+  const registry = createAgentConnections(registryScope)
+  registry.forScope(connectorScope).add(pi.connector)
+  const sessions = createAgentSessions(facadeScope, registry)
+  const connecting = sessions.selectConnection('pi')
+  // Reconnect starts while the handshake is still held: the client is not in the map yet,
+  // so a gate that reads state only once would wave it through and then dispose the run.
+  const reconnecting = sessions.reconnect('pi')
+  pi.settle()
+  await connecting
+  await expect(reconnecting).rejects.toThrow('reconnect is blocked')
+  // The live run survives the refused reconnect instead of being silently cancelled.
+  expect(sessions.getSnapshot().agent?.runs.t?.status).toBe('running')
+  registryScope.dispose(); facadeScope.dispose(); connectorScope.dispose()
+})
+
+it('leaves the connecting indicator owned by the handshake that is still pending', async () => {
+  const registryScope = new OwnedResources(), facadeScope = new OwnedResources(), connectorScope = new OwnedResources()
+  const base = { sessions: [] as never, sessionList: 'ready' as const, messages: {} as never, options: [] as never }
+  const empty = (id: string) => ({ connection: { id, title: id, status: 'connected', capabilities: {
+    history: 'unknown', reasoning: 'unknown', tools: 'unknown', stop: 'supported', interactions: 'unknown', models: 'unknown', modes: 'unknown' } },
+    ...base, runs: {}, interactions: [] }) as AgentSnapshot
+  const codex = gatedClient('codex', empty('codex')), pi = gatedClient('pi', empty('pi'))
+  const registry = createAgentConnections(registryScope)
+  registry.forScope(connectorScope).add(codex.connector)
+  registry.forScope(connectorScope).add(pi.connector)
+  const sessions = createAgentSessions(facadeScope, registry)
+  const first = sessions.selectConnection('codex')
+  const second = sessions.reconnect('pi')
+  // pi is the connection still handshaking and the one currently selected, so a codex
+  // handshake landing first must not clear pi's indicator or make pi look idle.
+  codex.settle()
+  await first
+  expect(sessions.getSnapshot().connectingId).toBe('pi')
+  pi.settle()
+  await second
+  expect(sessions.getSnapshot().connectingId).toBeUndefined()
+  registryScope.dispose(); facadeScope.dispose(); connectorScope.dispose()
+})
