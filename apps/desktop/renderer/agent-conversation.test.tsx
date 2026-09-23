@@ -256,3 +256,26 @@ it('continues an existing session under its own project while the draft gate is 
   // The draft gate stays closed underneath: the follow-up is not silently unlocking a first send.
   expect(sessions.getSnapshot().draft?.canSend).toBe(false)
 })
+
+it('keeps Enter as send and Shift+Enter as a line break (gate 9)', async () => {
+  const { sessions, calls, typeText, container, field } = await openDraft({ selectedSessionId: 'S1' })
+  const pressEnter = async (shiftKey: boolean) => {
+    let prevented = true
+    await act(async () => {
+      prevented = container.querySelector('textarea[aria-label=Message]')!
+        .dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', shiftKey, bubbles: true, cancelable: true })) === false
+    })
+    return prevented
+  }
+  await typeText('first')
+  expect(await pressEnter(true)).toBe(false)
+  expect(calls.send).toEqual([])
+  // Positive control for the same event path: the plain press that follows really does reach the service.
+  expect(await pressEnter(false)).toBe(true)
+  expect(calls.send).toEqual(['first'])
+  expect(field()).toBe('')
+  await typeText('second line\r\nkept')
+  await pressEnter(false)
+  // The cleared field really is usable again; the textarea normalizes CRLF to the LF it reports.
+  expect(calls.send).toEqual(['first', 'second line\nkept'])
+})

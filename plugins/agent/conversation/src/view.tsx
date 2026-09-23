@@ -89,7 +89,8 @@ function ConversationThread({ service, connectionId, sessionId, draft }: { servi
       {drafting && blocked && <p role="status" className="agent-compose-block">{draftBlockCopy[draft!.blockReason ?? 'no-project']}</p>}
       <form onSubmit={event => { event.preventDefault(); void submit() }}>
         <textarea aria-label="Message" placeholder={drafting ? 'Message the new session' : 'Message this agent'}
-          value={text} onChange={event => setText(event.target.value)} readOnly={sending} />
+          value={text} onChange={event => setText(event.target.value)} readOnly={sending}
+          onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void submit() } }} />
         <button type="submit" disabled={sending || blocked || !text.trim()}>{drafting ? 'Start session' : 'Send'}</button>
       </form>
       {running && <button disabled={run.status === 'stop-requested' || run.status === 'starting'} onClick={() => { setActionError(''); void service.stop(run.id).catch(error => setActionError(errorText(error))) }}>
