@@ -2,6 +2,7 @@ import { expect, it } from 'vitest'
 import { OwnedResources } from '@ordessa/extension-api'
 import { createAgentConnections } from '../../../plugins/connections/service/src/entry'
 import { createAgentSessions } from '../../../plugins/agent/sessions/src/model'
+import { projectSessionGroups, sessionActivity, workspaceLabel } from '../../../plugins/agent/sessions/src/projection'
 import type { AgentClient, AgentSnapshot } from '../../../contracts/agent-ui/src/contract'
 
 function client(id: string) {
@@ -43,4 +44,43 @@ it('keeps separate clients alive on selection changes and disposes them with the
   expect(a.value.isDisposed).toBe(true)
   expect(b.value.isDisposed).toBe(true)
   sessionScope.dispose(); aScope.dispose(); bScope.dispose()
+})
+
+it('projects sessions into ordered workspace groups with the standalone group last (P2-3 projection)', () => {
+  const groups = projectSessionGroups([
+    { id: 'A', title: 'a', workspaceId: '/srv/x/alpha' },
+    { id: 'B', title: 'b' },
+    { id: 'C', title: 'c', workspaceId: '/srv/x/beta/', pinned: true },
+    { id: 'D', title: 'd', workspaceId: '/srv/x/alpha', pinned: true },
+    { id: 'E', title: 'e', workspaceId: '' },
+  ])
+  expect(groups.map(group => group.key)).toEqual(['/srv/x/alpha', '/srv/x/beta', 'standalone'])
+  expect(groups.map(group => group.title)).toEqual(['alpha', 'beta', 'Standalone sessions'])
+  expect(groups[0].sessions.map(session => session.id)).toEqual(['D', 'A'])
+  // Empty-string workspaceId counts as standalone alongside missing ones (wire NULL parity).
+  expect(groups[2].sessions.map(session => session.id)).toEqual(['B', 'E'])
+  expect(projectSessionGroups([])).toEqual([])
+  expect(workspaceLabel('/srv/x/')).toBe('x')
+})
+
+it('derives per-session badge state through the shared gate predicates over all items', () => {
+  const base = { connection: { id: 'A', title: 'A', status: 'connected', capabilities: {
+    history: 'supported', reasoning: 'unknown', tools: 'unknown', stop: 'supported', interactions: 'unknown', models: 'unknown', modes: 'unknown',
+  } }, sessions: [], sessionList: 'ready', messages: {}, runs: {}, interactions: [], options: [] } as const satisfies AgentSnapshot
+  const snapshot: AgentSnapshot = { ...base,
+    runs: {
+      R1: { id: 'R1', sessionId: 'P1', status: 'completed' },
+      R2: { id: 'R2', sessionId: 'P1', status: 'stop-requested' },
+      R3: { id: 'R3', sessionId: 'P1', status: 'failed' },
+      R4: { id: 'R4', sessionId: 'S1', status: 'unknown' },
+    },
+    interactions: [
+      { id: 'I1', sessionId: 'S1', kind: 'approval', title: 't', state: 'responding' },
+      { id: 'I2', sessionId: 'P1', kind: 'input', title: 't', state: 'expired' },
+    ] }
+  // Any open run anywhere for the session badges, regardless of ordering or last-run status.
+  expect(sessionActivity(snapshot, 'P1')).toEqual({ openRun: true, awaiting: false })
+  // Unknown run outcome is never an open run; responding interactions badge without any run.
+  expect(sessionActivity(snapshot, 'S1')).toEqual({ openRun: false, awaiting: true })
+  expect(sessionActivity(snapshot, 'ZZ')).toEqual({ openRun: false, awaiting: false })
 })

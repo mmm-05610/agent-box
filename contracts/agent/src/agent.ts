@@ -25,6 +25,9 @@ export interface AgentSessionInfo {
   title: string
   updatedAt?: string
   detail?: string
+  /** Backend-authoritative project id; absent/null means a standalone session (P2-3, C-023). */
+  workspaceId?: string
+  pinned?: boolean
 }
 export interface AgentToolCall {
   id: string
