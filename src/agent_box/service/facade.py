@@ -50,9 +50,9 @@ class ProductService:
         harnesses: dict[str, Any] = {}
         for harness_type in self.harnesses.registered():
             descriptor = self.harnesses.get(harness_type)
-            credential_registered = bool(
-                descriptor.credential_kind
-                and self.credentials.has(kind=descriptor.credential_kind)
+            credential_registered = (
+                descriptor.credential_kind is None
+                or self.credentials.has(kind=descriptor.credential_kind)
             )
             entry: dict[str, Any] = {
                 "available": self.execution is not None and credential_registered,

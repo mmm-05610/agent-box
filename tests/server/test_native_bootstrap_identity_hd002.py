@@ -35,6 +35,7 @@ def test_native_hello_stable_profile_and_isolated_hello_unchanged(tmp_path):
         assert identity == {
             "mode": "native", "harness": "pi", "profileId": first.native_profile_id,
         }
+        assert first.service.readiness()["capabilities"]["harnesses"]["pi"]["available"] is True
         assert first.service.profiles.records.get(identity["profileId"])["harness_type"] == "pi"
     finally:
         first.stop()
