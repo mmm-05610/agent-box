@@ -244,11 +244,13 @@ it('keeps the rejected text verbatim and resends only on an explicit second pres
 })
 
 it('continues an existing session under its own project while the draft gate is closed (gate 8)', async () => {
-  const { sessions, calls, typeText, clickSend, container } = await openDraft({ selectedSessionId: 'S1' })
+  const { sessions, calls, typeText, clickSend, container, field } = await openDraft({ selectedSessionId: 'S1' })
   await typeText('follow up on this run')
   await clickSend()
   expect(calls.send).toEqual(['follow up on this run'])
   expect(calls.create).toEqual([])
+  // The thread is not remounted here, so this is the case where clearing the composer is real behaviour.
+  expect(field()).toBe('')
   expect(container.querySelector('p.agent-compose-block')).toBeNull()
   expect(container.querySelector('.agent-conversation-head small')?.textContent).toBe('SESSION')
   // The draft gate stays closed underneath: the follow-up is not silently unlocking a first send.
