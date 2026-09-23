@@ -17,6 +17,8 @@ from urllib.request import Request, build_opener, ProxyHandler
 
 REPO = Path(__file__).resolve().parents[2]
 PYTHON = Path('/tmp/hd002-bc-native-uv-cache/archive-v0/2h28R8ktUyTpYaIK/bin/python')
+WSPROTO_SITE = Path('/tmp/hd002-ws-overlay-poBjmt4M/site')
+WSPROTO_SHA = '181783fe40abb8b0cd32ac28fcfe297c6a90e1b1089a004a98dbc01be0cbeef0'
 BRIDGE = Path('/tmp/hd002-bc-go124-pTbe5u/out/acp-adapter')
 BRIDGE_SHA = 'da8deda5f859d8f2b5f304468b09136df8430dd49490446e27088ecd776e1a94'
 PI = Path('/home/maoqh/.pi/agent/install/releases/0.86.1/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js')
@@ -120,6 +122,7 @@ def self_test():
         assert not valid_done(bad)
     assert digest(BRIDGE) == BRIDGE_SHA and digest(PI) == PI_SHA
     assert digest(REPO / 'src/agent_box/server/__main__.py') == CLI_SHA
+    assert digest(WSPROTO_SITE / 'wsproto/__init__.py') == WSPROTO_SHA
     print('SELF_TEST_PASS')
 
 
@@ -140,7 +143,8 @@ def main(root, port):
             not private(root, True) or not private(root / 'project', True) or
             not private(root / 'sessions', True) or data.exists() or
             (root / 'ready.json').exists() or (root / 'fc-done.json').exists() or
-            not PYTHON.is_file() or digest(BRIDGE) != BRIDGE_SHA or
+            not PYTHON.is_file() or digest(WSPROTO_SITE / 'wsproto/__init__.py') != WSPROTO_SHA or
+            digest(BRIDGE) != BRIDGE_SHA or
             digest(PI) != PI_SHA or digest(REPO / 'src/agent_box/server/__main__.py') != CLI_SHA):
             raise RuntimeError('PREFLIGHT_REFUSAL')
         with socket.socket() as sock:
@@ -156,7 +160,7 @@ def main(root, port):
                    f'--native-adapter-arg=--pi-bin={PI}',
                    f'--native-adapter-arg=--pi-session-dir={root / "sessions"}']
         env = os.environ.copy()
-        env['PYTHONPATH'] = str(REPO / 'src')
+        env['PYTHONPATH'] = f'{WSPROTO_SITE}:{REPO / "src"}'
         env['TMPDIR'] = str(root)
         process = subprocess.Popen(command, cwd=root / 'project', env=env,
                                    stdin=subprocess.DEVNULL, stdout=stderr_fd,
