@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import json
+import os
 import time
 import shutil
 
@@ -204,7 +205,7 @@ def test_wire_and_rest_refuse_other_profile_before_execution(tmp_path, monkeypat
         assert runtime.execution._active == {}
 
 
-def test_native_first_send_completes_with_reviewed_fake_acp_peer(tmp_path):
+def test_native_first_send_completes_with_reviewed_fake_acp_peer(tmp_path, monkeypatch):
     node = shutil.which("node")
     fake = PLUGIN / "tests" / "harness_remote" / "fake_acp_peer.mjs"
     runtime = build_runtime_from_native_adapter(
@@ -213,6 +214,12 @@ def test_native_first_send_completes_with_reviewed_fake_acp_peer(tmp_path):
     )
     project = tmp_path / "project"
     project.mkdir()
+    empty_home = tmp_path / "empty-home"
+    empty_home.mkdir()
+    monkeypatch.setattr(os, "environ", {
+        "PATH": os.environ.get("PATH", ""), "HOME": str(empty_home),
+        "TMPDIR": str(tmp_path),
+    })
     with TestClient(create_app(runtime), base_url="http://127.0.0.1") as client:
         headers = {"Authorization": f"Bearer {runtime.token}"}
         _created, workspace = runtime.service.workspaces.open_environment(
