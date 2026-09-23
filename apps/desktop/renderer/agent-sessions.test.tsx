@@ -71,6 +71,10 @@ it('groups sessions by workspace with the standalone group last and pinned first
   const { container } = await openList()
   // Reachability first: the section root and the unconditional list container are in the document.
   expect(container.querySelector('section.agent-sessions')).not.toBeNull()
+  expect(container.querySelector('h2')?.textContent).toBe('Sessions')
+  expect(container.querySelector('.agent-connections')).toBeNull()
+  expect([...container.querySelectorAll('button')].some(button => button.textContent === 'Reconnect')).toBe(false)
+  expect([...container.querySelectorAll('button')].some(button => button.textContent === 'Refresh')).toBe(true)
   expect(container.querySelector('.agent-session-list')).not.toBeNull()
   const groups = [...container.querySelectorAll('.agent-session-group')].map(node => node.textContent)
   expect(groups).toEqual(['proj-a', 'Standalone sessions'])
