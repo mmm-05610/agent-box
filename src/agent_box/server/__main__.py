@@ -14,6 +14,8 @@ def parser() -> argparse.ArgumentParser:
     value.add_argument("--native-adapter-command", help="absolute executable path of its ACP adapter")
     value.add_argument("--native-adapter-arg", action="append", default=[],
                        help="one adapter argument (repeatable)")
+    value.add_argument("--native-continuation", action="store_true",
+                       help="declare adapter resume support; runtime observation is still required")
     value.add_argument(
         "--sidecar-deployment", type=Path,
         help="non-secret Harness sidecar deployment JSON",
@@ -64,9 +66,11 @@ def main(argv: list[str] | None = None) -> int:
             harness_id=args.native_harness,
             adapter_command=args.native_adapter_command,
             adapter_args=tuple(args.native_adapter_arg),
+            native_continuation=args.native_continuation,
         )
     else:
-        if args.native_harness or args.native_adapter_command or args.native_adapter_arg:
+        if (args.native_harness or args.native_adapter_command or args.native_adapter_arg
+                or args.native_continuation):
             parser().error("native adapter options require --execution-mode native")
         runtime = (build_runtime_from_sidecar_deployment(
             args.data_root, args.sidecar_deployment,

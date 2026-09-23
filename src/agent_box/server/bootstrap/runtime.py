@@ -505,6 +505,7 @@ def build_runtime(
 def build_runtime_from_native_adapter(
     data_root: Path | str, *, plugin_root: Path | str, harness_id: str,
     adapter_command: str, adapter_args: tuple[str, ...] = (),
+    native_continuation: bool = False,
 ) -> ServerRuntime:
     """Compose one current-user ACP Agent in an explicitly native Server.
 
@@ -520,6 +521,8 @@ def build_runtime_from_native_adapter(
 
     if not re.fullmatch(r"[a-z][a-z0-9._-]{0,63}", harness_id):
         raise RuntimeError("NATIVE_HARNESS_INVALID")
+    if type(native_continuation) is not bool:
+        raise RuntimeError("NATIVE_CONTINUATION_INVALID")
     if (not Path(adapter_command).is_absolute() or not Path(adapter_command).is_file()
             or not os.access(adapter_command, os.X_OK)
             or any(not isinstance(arg, str) or "\x00" in arg for arg in adapter_args)):
@@ -531,7 +534,11 @@ def build_runtime_from_native_adapter(
     if not entry.is_file() or not provenance.is_file() or node is None:
         raise RuntimeError("NATIVE_HARNESS_ARTIFACT_MISSING")
     registry = HarnessRegistry()
-    registry.register(HarnessDescriptor(harness_id))
+    registry.register(HarnessDescriptor(
+        harness_id, capability_claims=(
+            {"native_continuation": True} if native_continuation else {}
+        ),
+    ))
     root = Path(data_root).resolve()
     adapter = {"command": adapter_command, "args": list(adapter_args)}
 
@@ -560,6 +567,7 @@ def build_runtime_from_native_adapter(
                 environment=environment, profile=harness_id, adapter=adapter,
                 directory=project, state_directory=str(root / "native-bridge" / harness_id),
                 resume_native_id=resume_native_id,
+                declared_capabilities=registry.canonical_claims(harness_id),
                 on_event=on_event,
             )
 
