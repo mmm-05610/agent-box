@@ -1119,6 +1119,10 @@ class SidecarEnvelope:
             return SidecarError(str(reader_error.code), str(getattr(reader_error, "message", reader_error)))
         return SidecarError("SIDECAR_CLOSED", "sidecar exited before answering")
 
+    @property
+    def closed(self) -> bool:
+        return self._closed.is_set()
+
     def close(self) -> None:
         try:
             self._channels.close()
@@ -1653,11 +1657,22 @@ class SidecarHarnessPort:
             elif update.get("sessionUpdate") in {"tool_call", "tool_call_update"}:
                 status = str(update.get("status") or "in_progress")
                 tool_name = update.get("_meta", {}).get("toolName") if isinstance(update.get("_meta"), dict) else None
+                output = update.get("rawOutput")
+                if output is None and isinstance(update.get("content"), list):
+                    output = "\n".join(
+                        item["content"]["text"] for item in update["content"]
+                        if isinstance(item, dict) and item.get("type") == "content"
+                        and isinstance(item.get("content"), dict)
+                        and isinstance(item["content"].get("text"), str)
+                    )
+                if output is not None and not isinstance(output, str):
+                    output = json.dumps(output, ensure_ascii=False, default=str)
                 self.on_event(execution_id, "tool.update", {
                     "tool_call_id": str(update.get("toolCallId") or "tool"),
                     "tool": tool_name if tool_name is not None else update.get("title"),
                     "state": {"in_progress": "running", "failed": "failed"}.get(status, status),
                     **({"summary": str(update["title"])} if update.get("title") else {}),
+                    **({"result_excerpt": output[:4096]} if output else {}),
                 })
             elif update.get("sessionUpdate") == "plan":
                 entries = update.get("entries")
@@ -1699,14 +1714,40 @@ class NativeHarnessPort(SidecarHarnessPort):
 
     native_mode = True
 
-    def capture_execution(self, execution_id: str) -> tuple[dict[str, Any], bool]:
-        envelope = self._require(execution_id)
+    def open_execution(self, execution_id: str) -> str:
+        # A Server session may contain many turns.  Rebind each new turn to the
+        # same live ACP channel instead of issuing session/new every time.
         with self._lock:
-            already_closed = execution_id in self._native_closed
-        if not already_closed:
-            envelope.request({"op": "close"}, timeout=10)
-            with self._lock:
-                self._native_closed.add(execution_id)
+            live = getattr(self, "_live_envelope", None)
+            native = getattr(self, "_live_native_id", None)
+            if live is not None:
+                if live.closed:
+                    raise SidecarError("NATIVE_SESSION_LOST", "native ACP channel exited")
+                self._sessions[execution_id] = live
+                self._native_sessions[execution_id] = native
+                self._current = execution_id
+                self._record_observation(execution_id, "start", True, "sidecar.channel.live")
+                self._record_observation(execution_id, "observe", True, "sidecar.session.live")
+                for capability_id, (value, evidence) in getattr(
+                    self, "_live_session_capabilities", {},
+                ).items():
+                    self._record_observation(execution_id, capability_id, value, evidence)
+                return native
+        native = super().open_execution(execution_id)
+        with self._lock:
+            self._live_envelope = self._sessions[execution_id]
+            self._live_native_id = native
+            self._live_session_capabilities = {
+                key: (self._observed[execution_id][key], self._evidence[execution_id].get(key))
+                for key in ("native_continuation", "attach")
+                if key in self._observed.get(execution_id, {})
+            }
+        return native
+
+    def capture_execution(self, execution_id: str) -> tuple[dict[str, Any], bool]:
+        self._require(execution_id)
+        # session/close would destroy the live conversation.  Native homes are
+        # agent-owned; this checkpoint records identity, not a copied home.
         return {
             "nativePlatform": "local",
             "homeLocator": "agent-native",
@@ -1714,3 +1755,28 @@ class NativeHarnessPort(SidecarHarnessPort):
             "truncated": False,
             "files": [],
         }, self._effective_supported(execution_id, "native_continuation")
+
+    def close_execution(self, execution_id: str) -> None:
+        # End the Server turn, not its ACP session.  The channel is closed only
+        # when the Server backend shuts down or the native process exits.
+        with self._lock:
+            self._sessions.pop(execution_id, None)
+            self._native_sessions.pop(execution_id, None)
+            self._observed.pop(execution_id, None)
+            self._evidence.pop(execution_id, None)
+            self._prompted.discard(execution_id)
+            self._replayed.pop(execution_id, None)
+            self._native_closed.discard(execution_id)
+            self._approvals = {
+                key: value for key, value in self._approvals.items() if value[0] != execution_id
+            }
+
+    def stop(self) -> bool:
+        with self._lock:
+            live = getattr(self, "_live_envelope", None)
+            self._live_envelope = None
+            self._live_native_id = None
+        stopped = super().stop()
+        if live is not None and not live.closed:
+            live.close()
+        return stopped

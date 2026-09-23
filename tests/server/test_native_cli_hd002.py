@@ -131,7 +131,9 @@ def test_native_cli_project_cwd_first_send_and_followup(tmp_path, advertise_resu
                     "message": {"text": f"first-{label}", "attachments": []},
                     "overrides": [],
                 })
+                assert "result" in sent, (label, sent)
                 assert sent["result"]["outcome"] == "accepted", sent
+                assert sent["result"]["session"]["displayName"] == f"first-{label}"
                 session_id = sent["result"]["session"]["id"]
                 row = _settled(port, token, session_id, 1)
                 assert row["turns"][-1]["state"] == "completed", row["turns"][-1]
@@ -148,14 +150,14 @@ def test_native_cli_project_cwd_first_send_and_followup(tmp_path, advertise_resu
                     assert followed["result"]["outcome"] == "accepted", followed
                     row = _settled(port, token, session_id, 2)
                     assert row["turns"][-1]["state"] == "completed", row["turns"][-1]
+                    second_manifest = json.loads(ObjectStore(data).read(row["checkpoint"]["object_digest"]))
+                    assert second_manifest["resumable"] is advertise_resume
                     assert f"cwd={project_a} input=follow-a" in json.dumps(row), row
                     assert "old-answer-replay" not in json.dumps(row), row
-                    # Explicit declaration plus observed ACP resume keeps the
-                    # exact fake native session id through session/load.
-                    if advertise_resume:
-                        assert row["checkpoint"]["native_id"] == first_native_id
-                    else:
-                        assert row["checkpoint"]["native_id"] != first_native_id
+                    # A live Server session keeps one ACP channel regardless
+                    # of whether durable session/load was advertised.
+                    assert row["checkpoint"]["native_id"] == first_native_id
+                    assert len(json.loads((tmp_path / "fake-sessions.json").read_text())) == 1
                     permission_send = _call(port, token, "sessions.send", {
                         "requestId": "permission-project-a", "sessionId": session_id,
                         "message": {"text": "needs-permission", "attachments": []},
@@ -194,6 +196,27 @@ def test_native_cli_project_cwd_first_send_and_followup(tmp_path, advertise_resu
                     assert stopped["result"]["outcome"] in {"stop_requested", "already_finished"}, stopped
                     row = _settled(port, token, session_id, 4)
                     assert row["turns"][-1]["state"] == "cancelled", row["turns"][-1]
+                    tooled = _call(port, token, "sessions.send", {
+                        "requestId": "tool-project-a", "sessionId": session_id,
+                        "message": {"text": "simulate-tool", "attachments": []},
+                        "overrides": [],
+                    })
+                    assert tooled["result"]["outcome"] == "accepted", tooled
+                    row = _settled(port, token, session_id, 5)
+                    assert row["turns"][-1]["state"] == "completed", row["turns"][-1]
+                    history = _call(port, token, "history.snapshot", {"sessionId": session_id})
+                    tools = [frame["event"] for frame in history["result"]["frames"]
+                             if frame["event"]["kind"] == "tool.update"]
+                    assert any(item.get("resultExcerpt") == "file contents from native tool"
+                               for item in tools), tools
+                    agent_cancel = _call(port, token, "sessions.send", {
+                        "requestId": "agent-cancel-project-a", "sessionId": session_id,
+                        "message": {"text": "simulate-agent-cancel", "attachments": []},
+                        "overrides": [],
+                    })
+                    assert agent_cancel["result"]["outcome"] == "accepted", agent_cancel
+                    row = _settled(port, token, session_id, 6)
+                    assert row["turns"][-1]["state"] == "cancelled", row["turns"][-1]
         finally:
             server.terminate()
             try:
@@ -219,6 +242,16 @@ def test_native_cli_project_cwd_first_send_and_followup(tmp_path, advertise_resu
             else:
                 raise AssertionError("restarted native Server did not become ready")
             assert restarted == identity
+            errored = _call(port, token, "sessions.createAndSend", {
+                "requestId": "native-error-project-b", "workspaceId": workspace_id,
+                "profileId": identity["profileId"],
+                "message": {"text": "simulate-native-error", "attachments": []},
+                "overrides": [],
+            })
+            assert errored["result"]["outcome"] == "accepted", errored
+            row = _settled(port, token, errored["result"]["session"]["id"], 1)
+            assert row["turns"][-1]["state"] == "failed", row["turns"][-1]
+            assert row["turns"][-1]["error_code"] == "HARNESS_RUN_FAILED"
         finally:
             server.terminate()
             try:

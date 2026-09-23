@@ -2043,6 +2043,11 @@ class WireService:
             request_id=request_id, request_digest=digest_value,
             message_object_digest=self._publish_message(message),
             public_message=public_message, overrides=overrides,
+            # The first accepted user message is a deterministic fallback
+            # title, not a claim that the Agent generated a summary.  Native
+            # clients otherwise receive only an opaque Server session id.
+            display_name=(" ".join(public_message["text"].split())[:72]
+                          if self.sessions.native_profile_identity is not None else None),
         )
         if outcome == "accepted" and body.get("executionId"):
             self.sessions.file_core_records(body["executionId"])

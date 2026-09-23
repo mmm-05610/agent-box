@@ -215,6 +215,10 @@ class SidecarExecutionBackend:
         self._completion_threads: set[threading.Thread] = set()
         self._approval_ports: dict[str, SidecarHarnessPort] = {}
         self._message_parts: dict[str, list[str]] = {}
+        # Native ACP sessions are session-scoped, not turn-scoped.  Only native
+        # ports enter this table; isolated execution sidecars keep their old
+        # one-process-per-turn lifecycle.
+        self._native_ports: dict[str, NativeHarnessPort] = {}
         #: Neutral-verb state (C-EXEC@v1 block1, E-INC1a) lives once in the
         #: tracker (MB-E2b equal-move); the attributes below are aliases onto
         #: the SAME ledger objects and lock - never copies - so business runs
@@ -312,9 +316,32 @@ class SidecarExecutionBackend:
         with self._lock:
             turn_id = self._turn_by_core[core_execution_id]
             context = self._contexts[turn_id]
-        port = self.port_factory(context, lambda execution_id, kind, data: self._native_event(
-            execution_id, kind, data, port,
-        ))
+        # Legacy unit providers may supply a turn-only context; real Session
+        # acceptance always supplies session_id, which is the reuse key.
+        session_id = str(context.get("session_id") or f"execution:{turn_id}")
+        with self._lock:
+            port = self._native_ports.get(session_id)
+        reusing_native_port = port is not None
+        if port is None:
+            port = self.port_factory(context, lambda execution_id, kind, data: self._native_event(
+                execution_id, kind, data, port,
+            ))
+            # A native session that has a checkpoint but no live channel may
+            # only be reopened when it really promises durable continuation.
+            if (isinstance(port, NativeHarnessPort)
+                    and context.get("checkpoint_object_digest")
+                    and context.get("checkpoint_native_id")):
+                try:
+                    checkpoint = json.loads(self.objects.read(context["checkpoint_object_digest"]))
+                except (ValueError, KeyError, TypeError):
+                    checkpoint = None
+                if not isinstance(checkpoint, dict) or checkpoint.get("resumable") is not True:
+                    raise NativeSessionUnavailable()
+        elif (isinstance(port, NativeHarnessPort)
+              and context.get("normalized_path") != port.directory):
+            # A session's project can be edited while idle.  The live native
+            # process cannot silently keep working in the previous cwd.
+            raise NativeProjectRefusal("NATIVE_PROJECT_CHANGED")
         # 附件先投影出来（有界对象读取），再打开执行：有效 attach=false 时必须在派发前
         # 类型化拒绝，而不是打开一个原生会话再静默丢弃附件。
         stored = json.loads(self.objects.read(context["input_object_digest"]))
@@ -332,10 +359,19 @@ class SidecarExecutionBackend:
                 f"{port.native_platform or 'local'}:{port.profile}")
         try:
             native_id = port.open_execution(turn_id)
+            if isinstance(port, NativeHarnessPort):
+                with self._lock:
+                    self._native_ports[session_id] = port
             if attachments and not _effective_attachment_support(port, turn_id):
                 # 拒绝时不留一个没有归属的原生会话（否则 _complete 永远不会回收它）。
                 try:
-                    port.close_execution(turn_id)
+                    if isinstance(port, NativeHarnessPort) and not reusing_native_port:
+                        with self._lock:
+                            if self._native_ports.get(session_id) is port:
+                                self._native_ports.pop(session_id, None)
+                        port.stop()
+                    else:
+                        port.close_execution(turn_id)
                 except BaseException:
                     pass
                 raise SidecarError(
@@ -456,14 +492,16 @@ class SidecarExecutionBackend:
             if text:
                 self.records.append_turn_event(turn_id, "thought.delta", {"text": text})
         elif kind == "tool.update":
-            # The real tool lifecycle from the harness (Order 52): recorded as
-            # facts, arguments and outputs trimmed and scanned by the same
-            # rules that guard every stored event.
+            # Keep the existing wire/1 tool fact and a bounded native output
+            # excerpt. This is not a lossless ACP event stream: raw arguments,
+            # images, and custom updates require a separate reviewed contract.
             self.records.append_turn_event(turn_id, "tool.update", {
                 "tool_call_id": str(data.get("tool_call_id") or "tool"),
                 "tool": data.get("tool"),
                 "state": str(data.get("state") or "requested"),
                 **({"summary": str(data["summary"])[:512]} if data.get("summary") else {}),
+                **({"result_excerpt": str(data["result_excerpt"])[:4096]}
+                   if data.get("result_excerpt") else {}),
             })
         elif kind == "plan.updated":
             self.records.append_turn_event(turn_id, "plan.updated", {
@@ -491,6 +529,11 @@ class SidecarExecutionBackend:
             # persisted as a successful completion.
             with run.cancel_lock:
                 cancelled = run.cancel_confirmed
+            # A native ACP terminal cancellation is confirmation even when
+            # Server did not initiate it; route it through the same Core and
+            # Session finalization as an acknowledged stop request.
+            if run.error is None and _terminal_reason_from_result(run.result) == "cancelled":
+                cancelled = True
             if cancelled:
                 self.execution_service.apply_finalization(ExecutionFinalizationRequest(
                     run.core_execution_id, f"turn-terminal:{run.turn_id}",
@@ -534,6 +577,12 @@ class SidecarExecutionBackend:
                 return
             if run.error is not None:
                 raise run.error
+            # ACP session/prompt can return successfully at the transport layer
+            # while the agent itself reports an error.  That is not a completed
+            # turn; in particular an empty answer must not look successful.
+            stop_reason = _terminal_reason_from_result(run.result)
+            if stop_reason == "error":
+                raise SidecarError("HARNESS_RUN_FAILED", "native agent reported an error")
             with self._lock:
                 text = "".join(self._message_parts.get(run.turn_id, ()))
             audit, native_resume_supported = _audited_home(run)
@@ -764,6 +813,11 @@ class SidecarExecutionBackend:
         # interpreter inside SQLite. Wait for it, bounded, and report honestly.
         for thread in list(self._completion_threads):
             thread.join(max(0, deadline - time.monotonic()))
+        with self._lock:
+            native_ports = tuple(self._native_ports.values())
+            self._native_ports.clear()
+        for port in native_ports:
+            port.stop()
         prompts_done = all(run.done.is_set() for run in runs)
         # Order 80: a run that never reached its terminal must not keep its
         # library's first-run lock (a later runtime in this process, or a
@@ -951,6 +1005,14 @@ class NativeProjectRefusal(CapabilityGateRefusal):
     def __init__(self, code: str) -> None:
         super().__init__("selected project is unavailable for native execution")
         self.code = code
+
+
+class NativeSessionUnavailable(CapabilityGateRefusal):
+    """A previous native conversation cannot be reopened without its channel."""
+
+    def __init__(self) -> None:
+        super().__init__("native session is no longer available; start a new session")
+        self.code = "NATIVE_SESSION_UNAVAILABLE"
 
 
 class SidecarRunRecoveryFailure(SidecarError):

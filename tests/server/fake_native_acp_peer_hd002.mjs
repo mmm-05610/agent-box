@@ -62,6 +62,17 @@ for await (const line of lines) {
       } })
     } else if (text.includes("wait-for-cancel")) {
       pendingCancel = id
+    } else if (text.includes("simulate-native-error")) {
+      send({ jsonrpc: "2.0", id, result: { stopReason: "error" } })
+    } else if (text.includes("simulate-agent-cancel")) {
+      send({ jsonrpc: "2.0", id, result: { stopReason: "cancelled" } })
+    } else if (text.includes("simulate-tool")) {
+      send({ jsonrpc: "2.0", method: "session/update", params: { sessionId: params.sessionId,
+        update: { sessionUpdate: "tool_call", toolCallId: "fake-tool-1", title: "read file", status: "in_progress" } } })
+      send({ jsonrpc: "2.0", method: "session/update", params: { sessionId: params.sessionId,
+        update: { sessionUpdate: "tool_call_update", toolCallId: "fake-tool-1", status: "completed",
+          rawOutput: "file contents from native tool" } } })
+      send({ jsonrpc: "2.0", id, result: { stopReason: "end_turn" } })
     } else {
       send({ jsonrpc: "2.0", id, result: { stopReason: "end_turn" } })
     }

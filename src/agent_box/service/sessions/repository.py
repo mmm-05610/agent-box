@@ -132,6 +132,7 @@ class SessionRecords:
         self, *, session_id: str | None, workspace_id: str | None, profile_id: str,
         request_id: str, request_digest: str, message_object_digest: str,
         public_message: Mapping[str, Any],
+        display_name: str | None = None,
         overrides: list[dict[str, Any]] | None = None,
         expected_version: int | None = None, queue_records=None,
         resolve_config_version=None,
@@ -163,7 +164,7 @@ class SessionRecords:
                 conn.execute(
                     "INSERT INTO server_sessions(id,workspace_id,profile_id,status,display_name,version,created_at,updated_at) "
                     "VALUES (?,?,?,?,?,?,?,?)",
-                    (session_id, workspace_id, profile_id, "ready", None, 1, timestamp, timestamp),
+                    (session_id, workspace_id, profile_id, "ready", display_name, 1, timestamp, timestamp),
                 )
             else:
                 session = conn.execute(
