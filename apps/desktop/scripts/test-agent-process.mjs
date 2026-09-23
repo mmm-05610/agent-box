@@ -16,7 +16,7 @@ process.env.PI_CODING_AGENT_DIR = path.join(home, 'pi')
 process.env.CODEX_HOME = path.join(home, 'codex')
 await mkdir(process.env.PI_CODING_AGENT_DIR, { recursive: true })
 await mkdir(process.env.CODEX_HOME, { recursive: true }) // Codex exits when CODEX_HOME is missing.
-const loadNative = id => import(pathToFileURL(path.join(root, `extensions/dist/extensions/${id}/native.js`)).href)
+const loadNative = id => import(pathToFileURL(path.join(root, `products/agent-desktop/dist/extensions/${id}/native.js`)).href)
   .then(module => { assert.equal(typeof module.default, 'function', `${id} native entry`); return module.default() })
 
 const results = {}

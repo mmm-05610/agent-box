@@ -8,7 +8,7 @@ import { launchSmoke } from './launch-smoke.mjs'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
 const home = await mkdtemp(path.join(tmpdir(), 'ordessa-agent-shell-'))
 try {
-  await writeFile(path.join(home, 'extensions.json'), await readFile(path.join(root, 'extensions/agent-preview.json')))
+  await writeFile(path.join(home, 'extensions.json'), await readFile(path.join(root, 'products/agent-desktop/extensions.json')))
   const result = await launchSmoke(home, { ORDESSA_EMPTY_HOST: '0', MODULAR_AGENT_SHELL_SMOKE: '1' })
   assert.equal(result.ready, true)
   assert.equal(result.rootMounted, true)

@@ -13,7 +13,7 @@ const smoke = process.env.MODULAR_SMOKE === '1'
 if (smoke) app.disableHardwareAcceleration()
 protocol.registerSchemesAsPrivileged([{ scheme: 'ordessa', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }])
 app.whenReady().then(async () => {
-  const bundled = process.env.ORDESSA_EMPTY_HOST === '1' ? undefined : path.resolve(__dirname, '../../../extensions/dist')
+  const bundled = process.env.ORDESSA_EMPTY_HOST === '1' ? undefined : path.resolve(__dirname, '../../../products/agent-desktop/dist')
   const discovery = await discover(process.env.ORDESSA_EXTENSION_HOME ?? app.getPath('userData'), bundled)
   protocol.handle('ordessa', protocolHandler(path.join(__dirname, 'renderer'), discovery))
   session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false))

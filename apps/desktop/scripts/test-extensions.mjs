@@ -37,7 +37,7 @@ async function check(name, expected, verify = () => {}) {
 }
 try {
   await mkdir(extensions)
-  for (const id of foundations) await cp(path.join(root, 'extensions/dist/extensions', id), path.join(extensions, id), { recursive: true })
+  for (const id of foundations) await cp(path.join(root, 'products/agent-desktop/dist/extensions', id), path.join(extensions, id), { recursive: true })
   await check('empty', [], r => assert.deepEqual(r.errors, []))
   await install('example.hello')
   await check('discovered but not approved', [], r => assert.deepEqual(r.errors, []))

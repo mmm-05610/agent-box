@@ -1,0 +1,33 @@
+{
+  "base": "3938272cf0e9c2bf9cfba49008712569ffab73af",
+  "files": {
+    "extensions/ordessa.agent-codex/entry.js": "ab25366a4325fca1c364eb793b86b04b52d766502a953c4a0429f731e3f6c569",
+    "extensions/ordessa.agent-codex/manifest.json": "63de8cdb11e94fceb356aaee070909b64fb37f75a093f0e5b54f45a93ffb26d1",
+    "extensions/ordessa.agent-codex/native.js": "f929677b79f7af42fe55486f704132eb46e085240ded98a9ec8201537c8e3ea9",
+    "extensions/ordessa.agent-connections/entry.js": "001efe1faa24747ea1b720b66c87d2c857708c26fb4d5dbcef217362c5f747d3",
+    "extensions/ordessa.agent-connections/manifest.json": "ff47baf6c3e151e16ecdd0784b104036cb4023ece4892ec143ff84b45d248a86",
+    "extensions/ordessa.agent-contracts/contract.js": "8151d2932b5bba058d9dc9ec0247c0f2eaf076ab7f8d0167ba698f97a0cd13c3",
+    "extensions/ordessa.agent-contracts/entry.js": "4c8fc95050ff14452dd957f9cdd7f9519b16ccf3043f337857d9c06cffe8abfb",
+    "extensions/ordessa.agent-contracts/manifest.json": "177efca1046b05e058e82c193e40baff9be8a219074c638e8a62b094cb8ac708",
+    "extensions/ordessa.agent-conversation/assistant-ui-LICENSE": "71fd4b7b76d27a09af2e8b2bedf14e51f4c229e32b59654d327cc24dc63e60d7",
+    "extensions/ordessa.agent-conversation/entry.js": "12d616ce8066e8e1da3dd16d5fd5e3703df7ccf1fe34435c15fe284ab9baacf1",
+    "extensions/ordessa.agent-conversation/manifest.json": "0ea0e4217d9160320674195fedcaa8d488a62f35ff2af2b5f1846d8dae4e02c2",
+    "extensions/ordessa.agent-interactions/entry.js": "62b8c745f3f4826472f12cc0f61d9ecd6aa780502061fb3d807bddba49d51c21",
+    "extensions/ordessa.agent-interactions/manifest.json": "3bdbbd5d62e11a2f17af54b8b29f9eca213e2f88a8725a8014b3b71551826576",
+    "extensions/ordessa.agent-pi/entry.js": "6f15edabea30febf158b48fedff54c567e463533a4915ae8d7bb84a4de1dcaa2",
+    "extensions/ordessa.agent-pi/manifest.json": "f598c18d30ef7030d0dcfbaaf472c7ad5d774037f7cfc136cc8d26db4bf5e445",
+    "extensions/ordessa.agent-pi/native.js": "48ba137b6cbc6eae868fd70cd696107aeb5599c9ec8d74e8373698cc99a0ef09",
+    "extensions/ordessa.agent-sessions/entry.js": "1d7cf9e23c0f8ef607b4e6fc28777495b78479cf2086b289ec24d4687a8c4254",
+    "extensions/ordessa.agent-sessions/manifest.json": "388cb60e6390898a419e2e55f3ef28b9948d1e755210c4d0e342b2a43b486066",
+    "extensions/ordessa.commands/entry.js": "5753e6e0802627ebf4ac4f1d65e6fc6e536ccd4cd7d1a831781da3d1c5215381",
+    "extensions/ordessa.commands/manifest.json": "5598761bd6bbe85ae9b208a88333d04e69a7aade49becececdfcb2272dd0e4a6",
+    "extensions/ordessa.contracts/contract.js": "34ab2b784c66ab101bfb8052b0efcda99787f9ea755136968bb2202588ac3bc9",
+    "extensions/ordessa.contracts/entry.js": "5aa2d47c8b3b87641af250b417791778fb1fa70a1db3ccbfe0ae3f5cd9be6328",
+    "extensions/ordessa.contracts/manifest.json": "2560da90e55589ff2b761754bcc09688087e465d30e616d81b9d79bdf41c64a8",
+    "extensions/ordessa.settings/entry.js": "136fe97ae977ed8aa98546bcf881b49b6a73454e5d9d028513fa5900b65f5533",
+    "extensions/ordessa.settings/manifest.json": "f23b6f7e406546eedc119ec1ac98339f26ab0078fef0cf6a26c3e930f5fbef50",
+    "extensions/ordessa.workbench/entry.js": "98bd161eccb42c3d608ff867bdd4c56770cc5829ac4c83d4dfc56e467bc5663f",
+    "extensions/ordessa.workbench/manifest.json": "7e79b54a52cd6b0837ac431d71bb17860c4bbf133e9b5fa00ac6f42849936884",
+    "extensions/ordessa.workbench/react-resizable-panels-LICENSE.md": "a8f1e0280bf14adcf5d017547db85eb5c3bac0feb1690ca98650874002eaa8ea"
+  }
+}
