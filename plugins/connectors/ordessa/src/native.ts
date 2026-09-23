@@ -12,6 +12,23 @@ const number = (value: unknown): number | undefined => typeof value === 'number'
 /** A project the Server will not run in; the upper layer must block send and ask for a new pick. */
 const PROJECT_INVALID = 'project-invalid'
 
+/**
+ * The only error families whose first send might already have been accepted, so only these may settle a
+ * draft by querying `sendOutcome.query`. Every other family is a refusal the Server has already answered,
+ * and turning one into an unknown outcome invites a resend of a turn that never existed.
+ */
+const UNDECIDED_CODES = new Set(['UNAVAILABLE', 'WORKER_UNREACHABLE', 'OUTCOME_UNKNOWN'])
+
+/** The Server's typed codes for a project that is gone; they share `NOT_FOUND` with unrelated causes. */
+const PROJECT_LOST_CODES = new Set(['LOCAL_PATH_MISSING', 'NATIVE_PROJECT_CHANGED'])
+
+/** `wire.ts` has already narrowed both of these to the closed family set and a code-shaped token, so
+ * naming them is safe where a Server-authored message — which may quote a host path — is not. */
+const projectLoss = (error: WireError) => error.internalCode !== undefined && PROJECT_LOST_CODES.has(error.internalCode)
+const projectLossError = (error: unknown) => new Error(`${PROJECT_INVALID}: the Server will not run in the selected project (${
+  error instanceof WireError ? [error.code, error.internalCode].filter(Boolean).join('/') : 'revalidation refused'})`)
+const lossNamed = (error: unknown) => error instanceof Error && error.message.startsWith(`${PROJECT_INVALID}:`)
+
 interface ProjectRecord {
   id: string
   normalizedPath: string
@@ -109,21 +126,35 @@ export default function createTransport(): NativeTransport {
       return nativeExecutionProfile(hello, listed.items ?? [])
     }
 
-    /** An accepted first send is only proven by a real session id; an unknown outcome is queried, never re-issued. */
+    /**
+     * An accepted first send is only proven by a real session id; an unknown outcome is queried, never
+     * re-issued. FC-0057 splits the two refusals this used to collapse into one: a deterministic project
+     * loss must not be dressed up as an uncertain send, and an uncertain send must not be re-issued.
+     */
     const firstSend = async (workspaceId: string, message: string, requestId: string) => {
       const profile = await executionProfile()
+      required('sessions.createAndSend')
       const params = {
         requestId, workspaceId, profileId: profile.id, overrides: [],
         message: { text: message, attachments: [] },
       }
+      // Nothing has left this client yet, so the caller's request id is untouched: a refusal here answers
+      // with zero `sessions.createAndSend` frames and zero outcome queries, whatever its family was.
+      try { await revalidateProject(workspaceId) }
+      catch (error) {
+        if (lossNamed(error)) throw error
+        if (error instanceof WireError && (projectLoss(error) || error.code === 'NOT_FOUND')) throw projectLossError(error)
+        throw error
+      }
       let sessionId: string | undefined
       try {
-        required('sessions.createAndSend')
-        await revalidateProject(workspaceId)
         const sent = await wire.call<Record<string, unknown>>('sessions.createAndSend', params)
         sessionId = text(record(sent.session)?.id)
       } catch (error) {
-        if (!(error instanceof WireError) || error.code === 'INVALID_REQUEST' || error.code === 'CAPABILITY_UNSUPPORTED') throw error
+        if (!(error instanceof WireError)) throw error
+        // The frame went out, so only a family that could still have been accepted may be queried; every
+        // other refusal is the Server's settled answer and stays exactly that visible.
+        if (!UNDECIDED_CODES.has(error.code)) throw projectLoss(error) ? projectLossError(error) : error
       }
       if (!sessionId) {
         const queried = await wire.call<Record<string, unknown>>('sendOutcome.query', { requestId }).catch(() => undefined)

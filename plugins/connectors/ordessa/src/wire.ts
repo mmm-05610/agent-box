@@ -9,10 +9,15 @@ const ERROR_CODES = new Set(['UNAVAILABLE', 'UNAUTHENTICATED', 'FORBIDDEN', 'NOT
   'WORKER_UNREACHABLE', 'APPROVAL_INVALID'])
 
 export class WireError extends Error {
-  constructor(readonly code: string, message: string, readonly current?: unknown) {
+  constructor(readonly code: string, message: string, readonly current?: unknown, readonly internalCode?: string) {
     super(message)
   }
 }
+
+/** The Server's typed reason, kept only as a gate input: it is never joined into a message the renderer
+ * could display, and anything that is not code-shaped is dropped rather than passed through. */
+const typedReason = (value: unknown): string | undefined =>
+  typeof value === 'string' && /^[A-Z][A-Z0-9_]{0,63}$/.test(value) ? value : undefined
 
 export interface EventFrame {
   eventId: string
@@ -26,7 +31,7 @@ export interface EventFrame {
 interface Envelope<Result> {
   id?: string | number | null
   result?: Result
-  error?: { code?: string; message?: string; details?: { internalCode?: string }; current?: unknown }
+  error?: { code?: unknown; message?: unknown; details?: { internalCode?: unknown }; current?: unknown }
 }
 
 const statusRefusal = (status: number): string =>
@@ -59,13 +64,14 @@ export class WireClient {
       throw new WireError('UNAVAILABLE', `${method} did not reach the Server at ${this.target.origin}`)
     }
     const envelope = await response.json().catch(() => undefined) as Envelope<Result> | undefined
+    const refusal = typeof envelope?.error?.message === 'string' && envelope.error.message ? envelope.error.message : undefined
     if (!response.ok) {
-      throw new WireError(statusRefusal(response.status), envelope?.error?.message ?? `${method} was refused with HTTP ${response.status}`)
+      throw new WireError(statusRefusal(response.status), refusal ?? `${method} was refused with HTTP ${response.status}`)
     }
     if (!envelope || (envelope.id != null && envelope.id !== id)) throw new WireError('UNAVAILABLE', `${method} returned an unmatched response`)
     if (envelope.error) {
-      const code = envelope.error.code && ERROR_CODES.has(envelope.error.code) ? envelope.error.code : 'UNAVAILABLE'
-      throw new WireError(code, envelope.error.message ?? `${method} failed`, envelope.error.current)
+      const code = typeof envelope.error.code === 'string' && ERROR_CODES.has(envelope.error.code) ? envelope.error.code : 'UNAVAILABLE'
+      throw new WireError(code, refusal ?? `${method} failed`, envelope.error.current, typedReason(envelope.error.details?.internalCode))
     }
     return envelope.result as Result
   }

@@ -16,6 +16,10 @@ const errorText = (error: unknown): string => error instanceof Error ? error.mes
 /** Strips only the IPC wrapper Electron adds around a native rejection; the message itself is already secret-free. */
 export const unwrapBridgeError = (error: unknown): string =>
   errorText(error).replace(/^Error invoking remote method '[^']+':\s*(?:Error:\s*)?/, '')
+/** The native half's prefix for a project the Server will not run in. Spelled rather than imported: the
+ * renderer half must never reach the privileged module, which is the only holder of the Server token. */
+const PROJECT_INVALID = 'project-invalid'
+const isProjectLoss = (error: unknown) => unwrapBridgeError(error).startsWith(`${PROJECT_INVALID}:`)
 
 export interface DeclaredCapability { id: string; supported: boolean; reason?: string }
 /** What the authenticated `server.hello` proved before this connector was registered. */
@@ -381,7 +385,22 @@ export class OrdessaClient implements AgentClient {
 
   async createAndSend(workspaceId: string, text: string, requestId: string): Promise<{ sessionId: string }> {
     // The native half resolves only after an accepted turn with a real session id, so nothing below runs on a guess.
-    const sent = await this.request<Value>('createAndSend', { workspaceId, text, requestId })
+    let sent: Value
+    try {
+      sent = await this.request<Value>('createAndSend', { workspaceId, text, requestId })
+    } catch (error) {
+      // FC-0057: a project the Server had already dropped cannot take this turn, and leaving it selected keeps
+      // the composer advertising a sendable draft. The text and request id belong to the upper layer, which
+      // holds both; only the stale pick is this half's to clear.
+      if (isProjectLoss(error)) {
+        const previous = this.state.workspaces
+        // A pick the user changed while this send was in flight is not the stale one this refusal names.
+        if (previous?.selectedWorkspaceId === workspaceId) {
+          this.publish({ workspaces: { state: 'ready', items: previous.items }, diagnostic: unwrapBridgeError(error) })
+        }
+      }
+      throw error
+    }
     const sessionId = str(sent.sessionId)
     if (!sessionId) throw new Error('Ordessa first send returned no session identity')
     const listed = await this.request<AgentSessionInfo[]>('sessions').catch(() => undefined)

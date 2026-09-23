@@ -1,12 +1,12 @@
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
 import {
   ServerConfigError, parseOrigin, resolveServerTarget, serverInstanceId,
 } from '../../../plugins/connectors/ordessa/src/target'
 import { readRestrictedTokenFile } from '../../../plugins/connectors/ordessa/src/token-file'
-import { nativeExecutionProfile } from '../../../plugins/connectors/ordessa/src/native'
+import createTransport, { nativeExecutionProfile } from '../../../plugins/connectors/ordessa/src/native'
 
 const SECRET = 'a'.repeat(64)
 const LOCATOR = '/run/ordessa/data-root/secrets/http-token'
@@ -212,4 +212,138 @@ it('refuses a first send whose hello identity the Server does not confirm', () =
     .toMatch(/native-profile-not-ready/)
   expect(refusal(() => nativeExecutionProfile(helloFrom(native), [{ id: 'p_pi', harness: 'pi' }]))).toMatch(/native-profile-not-ready/)
   expect(refusal(() => nativeExecutionProfile(helloFrom(native), [profile('p_pi', 'pi', { recoveryPending: true })]))).toMatch(/native-profile-recovery-pending/)
+})
+
+// ---------------------------------------------------------------------------
+// FC-0055 and FC-0057: a deterministic project loss and a provably unsettled send are different answers.
+// These drive the real half through its own frames, so the ledger — not a unit call — proves that a
+// refusal before the send never reaches `sessions.createAndSend` and never queries an outcome for it.
+
+const REQUEST_ID = 'draft_11111111-1111-4111-8111-111111111111'
+const HELLO_FRAME = {
+  serverId: 'server_1', protocolVersion: 'wire/1',
+  capabilities: ['workspaces.list', 'workspaces.open', 'profiles.list', 'sessions.createAndSend', 'sessions.send', 'sendOutcome.query']
+    .map(id => ({ id, supported: true })),
+  harnesses: [{ id: 'pi' }], nativeExecution: { mode: 'native', harness: 'pi', profileId: 'p_pi' },
+}
+const DEFAULT_RESULTS: Record<string, Record<string, unknown>> = {
+  'server.hello': HELLO_FRAME,
+  'workspaces.list': { items: [{ id: 'W1', normalizedPath: '/repo/app', environment: { kind: 'local' }, archivedAt: null }] },
+  'workspaces.open': { workspace: { id: 'W1', normalizedPath: '/repo/app', archivedAt: null } },
+  'profiles.list': { items: [{ id: 'p_pi', harness: 'pi', displayName: 'Pi', sendability: { state: 'ready' }, recoveryPending: false }] },
+  'sessions.createAndSend': { session: { id: 'session_7' }, outcome: 'accepted' },
+  'sendOutcome.query': { outcome: 'unknown' },
+}
+/** A Server refusal, or `down` for a request that never reached the Server at all. */
+type Reply = { result?: Record<string, unknown> } | { refuse: Record<string, unknown> } | 'down'
+const refuse = (code: string, message: string, internalCode?: string): Reply =>
+  ({ refuse: { code, message, ...(internalCode === undefined ? {} : { details: { internalCode } }) } })
+
+const stubbed: string[] = []
+afterEach(() => {
+  for (const key of stubbed.splice(0)) delete process.env[key]
+  vi.unstubAllGlobals()
+})
+
+const nativeHalf = async (replies: Record<string, Reply> = {}) => {
+  const calls: { method: string; params: Record<string, unknown> }[] = []
+  const fetchImpl = async (url: string, init: { body: string }) => {
+    const method = url.slice(url.lastIndexOf('/') + 1)
+    const body = JSON.parse(init.body) as { id: string; params: Record<string, unknown> }
+    calls.push({ method, params: body.params })
+    const reply: Reply = replies[method] ?? { result: DEFAULT_RESULTS[method] ?? {} }
+    if (reply === 'down') throw new TypeError('connection refused')
+    const envelope = 'refuse' in reply ? { id: body.id, error: reply.refuse } : { id: body.id, result: reply.result }
+    return { ok: true, status: 200, json: async () => envelope } as unknown as Response
+  }
+  process.env.ORDESSA_SERVER_ORIGIN = 'http://127.0.0.1:41207'
+  process.env.ORDESSA_SERVER_TOKEN_FILE = tokenFile().file
+  stubbed.push('ORDESSA_SERVER_ORIGIN', 'ORDESSA_SERVER_TOKEN_FILE')
+  vi.stubGlobal('fetch', fetchImpl)
+  const connection = await createTransport().open(() => {})
+  const failureOf = async (run: Promise<unknown>) => await run.then(() => undefined, error => error)
+  const firstSend = () => connection.send({ method: 'createAndSend', params: { workspaceId: 'W1', text: 'fix the flaky parser spec', requestId: REQUEST_ID } })
+  return { connection, calls, firstSend, failureOf, methods: () => calls.map(call => call.method) }
+}
+
+it('stops a first send whose project is already gone, before any send frame exists', async () => {
+  const half = await nativeHalf({ 'workspaces.open': refuse('NOT_FOUND', 'the directory /home/maoqh/private/app is missing', 'LOCAL_PATH_MISSING') })
+  const failure = await half.failureOf(half.firstSend())
+  expect((failure as Error).message).toMatch(/^project-invalid: /)
+  // The refusal carries the closed family and the typed code, never the Server text that quoted a host path.
+  expect((failure as Error).message).toContain('LOCAL_PATH_MISSING')
+  expect((failure as Error).message).not.toMatch(/home|private/)
+  expect(half.methods()).toEqual(['server.hello', 'profiles.list', 'workspaces.list', 'workspaces.open'])
+  await half.connection.close()
+})
+
+it('keeps a typed send-period project loss deterministic instead of asking the Server what it accepted', async () => {
+  const half = await nativeHalf({ 'sessions.createAndSend': refuse('NOT_FOUND', 'the workspace is gone', 'NATIVE_PROJECT_CHANGED') })
+  const failure = await half.failureOf(half.firstSend())
+  expect((failure as Error).message).toMatch(/^project-invalid: /)
+  expect(half.methods()).toEqual(['server.hello', 'profiles.list', 'workspaces.list', 'workspaces.open', 'sessions.createAndSend'])
+  expect(half.calls.some(call => call.method === 'sendOutcome.query')).toBe(false)
+  await half.connection.close()
+})
+
+it('leaves a settled send refusal exactly as the Server answered it', async () => {
+  for (const code of ['NOT_FOUND', 'FORBIDDEN', 'CONFLICT_VERSION', 'INVALID_REQUEST', 'APPROVAL_INVALID']) {
+    const half = await nativeHalf({ 'sessions.createAndSend': refuse(code, `${code} from the Server`) })
+    const failure = await half.failureOf(half.firstSend()) as { code?: string; message?: string }
+    expect(`${code}: ${failure?.code}`).toBe(`${code}: ${code}`)
+    expect(`${code}: ${failure?.message}`).toContain(`${code} from the Server`)
+    // One send frame, no outcome query: an answered refusal has no unknown to reserve.
+    expect(`${code}: ${half.methods().filter(method => method === 'sessions.createAndSend').length}`).toBe(`${code}: 1`)
+    expect(`${code}: ${half.methods().filter(method => method === 'sendOutcome.query').length}`).toBe(`${code}: 0`)
+    await half.connection.close()
+  }
+})
+
+it('queries only a genuinely unsettled send, and settles it under the caller’s own request id', async () => {
+  const half = await nativeHalf({ 'sessions.createAndSend': refuse('UNAVAILABLE', 'the worker did not answer') })
+  const failure = await half.failureOf(half.firstSend()) as { code?: string; message?: string }
+  expect(failure?.code).toBe('OUTCOME_UNKNOWN')
+  expect(failure?.message).toMatch(/stays reserved/)
+  const sent = half.calls.filter(call => call.method === 'sessions.createAndSend')
+  const queried = half.calls.filter(call => call.method === 'sendOutcome.query')
+  expect(sent).toHaveLength(1)
+  expect(queried).toHaveLength(1)
+  // No second identity: the query is about the request the Server may already hold.
+  expect(sent[0].params.requestId).toBe(REQUEST_ID)
+  expect(queried[0].params.requestId).toBe(REQUEST_ID)
+  await half.connection.close()
+})
+
+it('takes a real session from the outcome query when the accepted response was lost', async () => {
+  const half = await nativeHalf({ 'sessions.createAndSend': 'down', 'sendOutcome.query': { result: { outcome: 'accepted', sessionId: 'session_7' } } })
+  expect(await half.firstSend()).toEqual({ sessionId: 'session_7', profileId: 'p_pi' })
+  expect(half.calls.filter(call => call.method === 'sessions.createAndSend')[0].params.requestId).toBe(REQUEST_ID)
+  expect(half.calls.filter(call => call.method === 'sendOutcome.query')[0].params.requestId).toBe(REQUEST_ID)
+  await half.connection.close()
+})
+
+it('never spends an outcome query on a first send the Server answered directly', async () => {
+  const half = await nativeHalf()
+  expect(await half.firstSend()).toEqual({ sessionId: 'session_7', profileId: 'p_pi' })
+  expect(half.methods()).not.toContain('sendOutcome.query')
+  await half.connection.close()
+})
+
+it('does not call a lost conversation with the Server a lost project', async () => {
+  const half = await nativeHalf({ 'workspaces.list': 'down' })
+  const failure = await half.failureOf(half.firstSend()) as { code?: string; message?: string }
+  // Availability proves nothing about the pick, so the selection stays and no re-selection is demanded.
+  expect(failure?.code).toBe('UNAVAILABLE')
+  expect(failure?.message).not.toMatch(/project-invalid/)
+  expect(half.methods()).toEqual(['server.hello', 'profiles.list', 'workspaces.list'])
+  await half.connection.close()
+})
+
+it('keeps a server-authored reason out of both the code and the message', async () => {
+  const half = await nativeHalf({ 'sessions.createAndSend': refuse('NOT_FOUND', 'refused', '/home/maoqh/.config/secret') })
+  const failure = await half.failureOf(half.firstSend()) as { code?: string; internalCode?: string; message?: string }
+  expect(failure?.code).toBe('NOT_FOUND')
+  expect(failure?.internalCode).toBeUndefined()
+  expect(`${failure?.message}`).not.toMatch(/home|secret/)
+  await half.connection.close()
 })

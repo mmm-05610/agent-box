@@ -342,6 +342,31 @@ it('keeps the project selection scoped to what the Server actually offers', asyn
   client.dispose()
 })
 
+it('clears the pick behind a first send the Server refused for a lost project, and only that one', async () => {
+  const bridge = new Bridge()
+  const client = await connect(bridge)
+  await client.refreshWorkspaces()
+  await client.openWorkspace('ws_1')
+  expect(client.getSnapshot().workspaces?.selectedWorkspaceId).toBe('ws_1')
+  // FC-0057: this is the Electron-shaped rejection, so the marker is only readable past the IPC wrapper,
+  // and what reaches the renderer stays a stale-pick prompt rather than a channel complaint.
+  bridge.errors.set('createAndSend', new Error("Error invoking remote method 'agent-native': Error: project-invalid: the Server will not run in the selected project (NOT_FOUND/LOCAL_PATH_MISSING)"))
+  expect(await client.createAndSend('ws_1', 'text', 'req_abc123').catch((error: unknown) => String(error)))
+    .toMatch(/LOCAL_PATH_MISSING/)
+  expect(client.getSnapshot().workspaces?.selectedWorkspaceId).toBeUndefined()
+  expect(client.getSnapshot().workspaces?.state).toBe('ready')
+  expect(client.getSnapshot().workspaces?.items).toHaveLength(1)
+  expect(client.getSnapshot().diagnostic).toMatch(/^project-invalid: /)
+  expect(client.getSnapshot().sessions).toEqual([])
+  expect(bridge.frames('createAndSend')).toHaveLength(1)
+  // A refusal that says nothing about the project keeps the pick: re-selecting cannot answer it.
+  await client.openWorkspace('ws_1')
+  bridge.errors.set('createAndSend', new Error('Ordessa operation timed out: createAndSend'))
+  expect(await client.createAndSend('ws_1', 'text', 'req_abc123').catch((error: unknown) => String(error))).toMatch(/timed out/)
+  expect(client.getSnapshot().workspaces?.selectedWorkspaceId).toBe('ws_1')
+  client.dispose()
+})
+
 it('opens a session from its log and refuses the operations this product has no route for', async () => {
   const bridge = new Bridge()
   const client = await connect(bridge)
