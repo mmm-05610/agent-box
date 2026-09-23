@@ -1,8 +1,0 @@
-{
-  "name": "@ordessa/plugin-agent-interactions",
-  "version": "0.1.0",
-  "private": true,
-  "ordessa": {
-    "id": "ordessa.agent-interactions"
-  }
-}

@@ -13,18 +13,14 @@
     "contracts/agent-ui",
     "plugins/commands",
     "plugins/workbench",
-    "plugins/settings",
     "plugins/connections/service",
     "plugins/agent/sessions",
     "plugins/agent/conversation",
-    "plugins/agent/interactions",
-    "plugins/connectors/codex",
-    "plugins/connectors/pi"
+    "plugins/connectors/ordessa"
   ],
   "scripts": {
     "test:agent-ui": "node apps/desktop/scripts/test-agent-ui.mjs",
     "test:agent-shell": "node apps/desktop/scripts/test-agent-shell.mjs",
-    "test:agent-process": "node apps/desktop/scripts/test-agent-process.mjs",
     "build:foundations": "node tooling/build-all.mjs",
     "dev": "npm run --workspace apps/desktop dev",
     "build": "npm run --workspace apps/desktop build",
@@ -33,7 +29,6 @@
     "test:electron": "npm run --workspace apps/desktop test:electron",
     "build:examples": "node tooling/build-examples.mjs",
     "test:extensions": "node apps/desktop/scripts/test-extensions.mjs",
-    "test:foundations": "node apps/desktop/scripts/test-foundations.mjs",
     "start": "npm run --workspace apps/desktop start"
   },
   "engines": {

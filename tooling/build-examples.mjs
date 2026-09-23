@@ -5,7 +5,6 @@ const repoRoot = path.resolve(import.meta.dirname, '..')
 const root = path.join(repoRoot, 'examples')
 for (const [folder, id, entries] of [
   ['agent-ui-probe', 'example.agent-ui', { entry: 'entry.tsx' }],
-  ['foundation-demo', 'example.foundation', { entry: 'entry.tsx' }],
   ['hello-extension', 'example.hello', { entry: 'entry.tsx' }],
   ['service-contract', 'example.contracts', { entry: 'entry.ts', contract: 'contract.ts' }],
   ['service-provider', 'example.provider', { entry: 'entry.ts' }],

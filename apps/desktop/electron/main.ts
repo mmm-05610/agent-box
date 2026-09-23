@@ -3,7 +3,6 @@ import path from 'node:path'
 import { writeFile } from 'node:fs/promises'
 import { discover } from '@ordessa/extension-host/main'
 import { protocolHandler } from '@ordessa/extension-host/main'
-import { verifyLayout } from './smoke-layout'
 import { verifyAgentUI } from './smoke-agent'
 import { installNativeBridge } from '@ordessa/native-bridge'
 
@@ -49,7 +48,6 @@ app.whenReady().then(async () => {
       return {
         ready: document.documentElement.dataset.ready === 'true', pages, views,
         rootMounted: !!document.querySelector('[data-testid="workspace"]'),
-        settingsEntry: [...document.querySelectorAll('nav button')].some(b => b.getAttribute('aria-label') === '设置'),
         emptyHost: !!document.querySelector('[data-testid="empty"]'),
         errors: [...document.querySelectorAll('[role="alert"]')].map(p => p.textContent),
         starting: [...document.querySelectorAll('[role="status"]')].map(p => p.textContent),
@@ -57,38 +55,6 @@ app.whenReady().then(async () => {
         bridgeKeys: Object.keys(window.extensionCatalog ?? {}),
       };
     })()`)
-    if (process.env.MODULAR_FOUNDATION_SMOKE === '1') {
-      Object.assign(result, await win.webContents.executeJavaScript(`(async () => {
-        const wait = () => new Promise(r => setTimeout(r, 60));
-        const click = async selector => { const el = document.querySelector(selector); if (!el) throw Error('Missing '+selector); el.focus(); el.click(); await wait(); };
-        await click('[data-testid="demo-counter"]');
-        const entry = [...document.querySelectorAll('nav button')].find(b => b.getAttribute('aria-label') === '设置');
-        entry.focus(); entry.click(); await wait();
-        const inert = document.querySelector('[data-testid="workspace"]').inert;
-        const focusOnReturn = document.activeElement.textContent === '← 返回工作区';
-        const field = document.querySelector('[data-setting="demo.text"] input');
-        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(field, '桌面输入');
-        field.dispatchEvent(new Event('input', {bubbles:true})); await wait();
-        await click('[data-setting="demo.text"] button');
-        const saved = field.value === '桌面输入' && document.querySelector('[data-setting="demo.text"]').textContent.includes('已保存并重新读取');
-        await click('[data-testid="external-update"]');
-        const externalUpdate = field.value === '外部更新';
-        await click('[data-setting="demo.fail"] button');
-        const failureVisible = document.querySelector('[data-setting="demo.fail"] [role="alert"]').textContent.includes('演示保存失败');
-        await click('[data-testid="full-page"] header button');
-        const preserved = document.querySelector('[data-testid="demo-counter"]').textContent === '计数 1';
-        const focusRestored = document.activeElement === entry;
-        return { foundation: { inert, focusOnReturn, saved, externalUpdate, failureVisible, preserved, focusRestored } };
-      })()`))
-      if (process.env.MODULAR_LAYOUT_SMOKE === '1') Object.assign(result, { layout: await verifyLayout(win) })
-      if (process.env.MODULAR_SCREENSHOT) {
-        win.showInactive() // Test-only Xvfb window: force a painted frame before capture.
-        await new Promise(resolve => setTimeout(resolve, 150))
-        await writeFile(process.env.MODULAR_SCREENSHOT, (await win.webContents.capturePage()).toPNG())
-        await win.webContents.executeJavaScript(`(async()=>{ [...document.querySelectorAll('nav button')].find(b=>b.getAttribute('aria-label')==='设置').click(); await new Promise(r=>setTimeout(r,100)); })()`)
-        await writeFile(process.env.MODULAR_SCREENSHOT + '.settings.png', (await win.webContents.capturePage()).toPNG())
-      }
-    }
     if (process.env.MODULAR_AGENT_SMOKE === '1') {
       Object.assign(result, { agent: await verifyAgentUI(win) })
       if (process.env.MODULAR_SCREENSHOT) {
@@ -115,6 +81,7 @@ app.whenReady().then(async () => {
           navigation: !!entry, statusbarToggle: !!toggle, popover: !!popover,
           codexVisible: connectorButtons.some(button => button.textContent.includes('Codex')),
           piVisible: connectorButtons.some(button => button.textContent.includes('Pi')),
+          serverVisible: connectorButtons.some(button => button.textContent.includes('Ordessa Server')),
           emptyConversation,
           newSessionEntry: panelButtons.some(button => button.textContent === 'New session'),
           panelOwnConnectionUi: !!panel?.querySelector('.conn-status') || panelButtons.some(button => ['Reconnect', 'Connect'].includes(button.textContent)),

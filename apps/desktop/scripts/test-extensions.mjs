@@ -23,7 +23,7 @@ const before = await digest(build)
 const home = await mkdtemp(path.join(tmpdir(), 'ordessa-extension-smoke-'))
 const reports = []
 const extensions = path.join(home, 'extensions')
-const foundations = ['ordessa.contracts', 'ordessa.commands', 'ordessa.workbench', 'ordessa.settings']
+const foundations = ['ordessa.contracts', 'ordessa.commands', 'ordessa.workbench']
 async function enable(ids) { await writeFile(path.join(home, 'extensions.json'), JSON.stringify({ enabled: ids.length ? [...foundations, ...ids] : [] })) }
 async function install(id, folder = id) { await cp(path.join(root, 'examples/dist', id), path.join(extensions, folder), { recursive: true }) }
 async function check(name, expected, verify = () => {}) {

@@ -1,9 +1,0 @@
-{
-  "name": "@ordessa/plugin-agent-codex",
-  "version": "0.1.0",
-  "private": true,
-  "ordessa": {
-    "id": "ordessa.agent-codex",
-    "native": "src/native.ts"
-  }
-}
