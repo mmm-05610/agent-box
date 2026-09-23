@@ -64,6 +64,7 @@ def _native_identity(port, token):
     matches = [row for row in listed if row["id"] == identity["profileId"]]
     assert len(matches) == 1, listed
     assert matches[0]["harness"] == identity["harness"]
+    assert matches[0]["archivedAt"] is None
     assert matches[0]["sendability"]["state"] == "ready", matches[0]
     return identity
 
@@ -148,6 +149,7 @@ def test_native_cli_project_cwd_first_send_and_followup(tmp_path, advertise_resu
                     row = _settled(port, token, session_id, 2)
                     assert row["turns"][-1]["state"] == "completed", row["turns"][-1]
                     assert f"cwd={project_a} input=follow-a" in json.dumps(row), row
+                    assert "old-answer-replay" not in json.dumps(row), row
                     # Explicit declaration plus observed ACP resume keeps the
                     # exact fake native session id through session/load.
                     if advertise_resume:

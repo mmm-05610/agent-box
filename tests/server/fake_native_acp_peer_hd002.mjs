@@ -38,6 +38,10 @@ for await (const line of lines) {
   } else if (method === "session/list") {
     send({ jsonrpc: "2.0", id, result: { sessions: sessions() } })
   } else if (method === "session/load") {
+    send({ jsonrpc: "2.0", method: "session/update", params: {
+      sessionId: params.sessionId,
+      update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "old-answer-replay" } },
+    } })
     send({ jsonrpc: "2.0", id, result: { sessionId: params.sessionId, configOptions: [] } })
   } else if (method === "session/prompt") {
     const text = params.prompt.find((item) => item.type === "text")?.text ?? ""
