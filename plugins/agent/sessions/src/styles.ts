@@ -24,4 +24,8 @@ export const styles = `
 .agent-session-state[data-status=running] { color:#376a58; }
 .agent-empty,.agent-notice,.agent-error { margin:8px 12px; line-height:1.45; font-size:11px; }
 .agent-empty { color:var(--agent-muted); }.agent-notice { color:var(--agent-wait); }.agent-error { color:#9b3e3e; }
+.agent-project-picker { display:flex; flex-direction:column; padding:2px 6px; gap:2px; }
+.agent-project-picker button { width:100%; border:0; border-radius:4px; text-align:left; background:transparent; padding:6px 8px; font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.agent-project-picker button:hover { background:#eaf0f6; }
+.agent-project-picker button[aria-pressed=true] { background:#e0eaf4; color:#254e7b; }
 `

@@ -1,0 +1,168 @@
+import { afterEach, expect, it } from 'vitest'
+import { OwnedResources } from '@ordessa/extension-api'
+import { createAgentConnections } from '../../../plugins/connections/service/src/entry'
+import { createAgentSessions } from '../../../plugins/agent/sessions/src/model'
+import type { AgentClient, AgentSnapshot } from '../../../contracts/agent-ui/src/contract'
+
+const capabilities = { history: 'supported', reasoning: 'unknown', tools: 'unknown', stop: 'supported',
+  interactions: 'unknown', models: 'unknown', modes: 'unknown', workspaces: 'supported' } as const
+
+interface ProjectCall { workspaceId: string; text: string; requestId: string }
+
+/** Reactive fake backend-capable client; every createAndSend/openWorkspace is recorded and
+ * `fails` stays mutable so a project can become invalid after it was remembered. */
+function projectClient(id: string, serverInstanceId: string, options: { rejectFirstSend?: boolean } = {}) {
+  let snapshot: AgentSnapshot = {
+    connection: { id, title: id, status: 'connected', serverInstanceId, capabilities },
+    sessions: [{ id: 'E1', title: 'Existing chat', workspaceId: '/srv/old' }],
+    sessionList: 'ready', messages: {}, runs: {}, interactions: [], options: [],
+    workspaces: { state: 'ready', items: [{ id: '/srv/a', normalizedPath: '/srv/a' }, { id: '/srv/b', normalizedPath: '/srv/b' }] },
+  }
+  const listeners = new Set<() => void>()
+  const write = (patch: Partial<AgentSnapshot>) => {
+    snapshot = { ...snapshot, ...patch }
+    for (const listener of [...listeners]) listener()
+  }
+  const fails = new Set<string>()
+  const opens: string[] = []
+  const sends: ProjectCall[] = []
+  let sendAttempt = 0
+  const client: AgentClient = {
+    get isDisposed() { return false },
+    dispose() { listeners.clear() },
+    getSnapshot: () => snapshot,
+    subscribe(listener) { listeners.add(listener); return () => { listeners.delete(listener) } },
+    async refreshSessions() {}, async newSession() { throw Error('CP UI must not call newSession') },
+    async openSession(session) { write({ selectedSessionId: session }) },
+    async send(sessionId, text) { write({ messages: { ...snapshot.messages, [sessionId]: [{ id: 'm', role: 'user', text }] } }) },
+    async stop() {}, async respond() {}, async setOption() {},
+    async refreshWorkspaces() {},
+    async openWorkspace(workspaceId) {
+      opens.push(workspaceId)
+      if (fails.has(workspaceId)) throw Error(`project unavailable: ${workspaceId}`)
+      write({ workspaces: { ...snapshot.workspaces!, selectedWorkspaceId: workspaceId } })
+      return { id: workspaceId, normalizedPath: workspaceId }
+    },
+    async createAndSend(workspaceId, text, requestId) {
+      sends.push({ workspaceId, text, requestId })
+      sendAttempt += 1
+      if (options.rejectFirstSend && sendAttempt === 1) throw Error('outcome unknown after disconnect')
+      write({
+        selectedSessionId: 'R1',
+        sessions: [...snapshot.sessions, { id: 'R1', title: text.slice(0, 12), workspaceId }],
+      })
+    },
+  }
+  return { client, fails, calls: { opens, sends }, setWorkspaces: (selected: string | undefined) =>
+    write({ workspaces: { ...snapshot.workspaces!, selectedWorkspaceId: selected } }) }
+}
+
+const cleanup: (() => Promise<void>)[] = []
+afterEach(async () => { for (const fn of cleanup.splice(0).reverse()) await fn() })
+
+async function harness(...connectors: { id: string; build: () => AgentClient }[]) {
+  const scopes = { registry: new OwnedResources(), sessions: new OwnedResources(), connectors: new OwnedResources() }
+  cleanup.push(async () => { scopes.sessions.dispose(); scopes.connectors.dispose(); scopes.registry.dispose() })
+  const registry = createAgentConnections(scopes.registry)
+  for (const connector of connectors)
+    registry.forScope(scopes.connectors).add({ id: connector.id, title: connector.id, connect: async () => connector.build() })
+  return createAgentSessions(scopes.sessions, registry)
+}
+
+it('New session and Discard produce zero backend calls and never a temporary session (FC-0021)', async () => {
+  const a = projectClient('A', 'https://s1')
+  const sessions = await harness({ id: 'A', build: () => a.client })
+  await sessions.selectConnection('A')
+  expect(sessions.getSnapshot().draft).toMatchObject({ active: false, canSend: false, blockReason: 'no-project', workspaceId: undefined })
+  sessions.startDraft!()
+  expect(sessions.getSnapshot().draft).toMatchObject({ active: true })
+  expect(a.calls.sends).toEqual([]) // positive control: no createAndSend yet
+  sessions.discardDraft!()
+  expect(sessions.getSnapshot().draft?.active).toBe(false)
+  expect(a.calls.sends).toHaveLength(0)
+  expect(a.calls.opens).toHaveLength(0)
+})
+
+it('first send is blocked without a valid project and reaches no client create (拦截反例)', async () => {
+  const a = projectClient('A', 'https://s1')
+  const sessions = await harness({ id: 'A', build: () => a.client })
+  await sessions.selectConnection('A')
+  sessions.startDraft!()
+  expect(sessions.getSnapshot().draft).toMatchObject({ active: true, canSend: false, blockReason: 'no-project' })
+  await expect(sessions.send('hello')).rejects.toThrow('project gate: no-project')
+  expect(a.calls.sends).toHaveLength(0)
+})
+
+it('restores the last valid project for the same Server instance and revalidates it on selection', async () => {
+  const a = projectClient('A', 'https://s1')
+  a.setWorkspaces(undefined)
+  const sessions = await harness({ id: 'A', build: () => a.client })
+  await sessions.selectConnection('A')
+  await sessions.selectWorkspace!('/srv/a')
+  expect(sessions.getSnapshot().draft).toMatchObject({ workspaceId: '/srv/a', canSend: true })
+  sessions.startDraft!()
+  await sessions.send('keep me') // accepted first send ends the draft
+  expect(a.calls.sends).toHaveLength(1)
+  expect(a.calls.sends[0]).toMatchObject({ workspaceId: '/srv/a', text: 'keep me' })
+  expect(sessions.getSnapshot().draft?.active).toBe(false)
+  // Re-selection triggers a revalidation open, not a fresh project state.
+  a.setWorkspaces(undefined)
+  await sessions.selectConnection('A')
+  expect(a.calls.opens.at(-1)).toBe('/srv/a')
+  expect(sessions.getSnapshot().draft).toMatchObject({ workspaceId: '/srv/a', canSend: true })
+})
+
+it('an invalid restored project clears the selection and blocks sends until reselect', async () => {
+  const a = projectClient('A', 'https://s1')
+  const sessions = await harness({ id: 'A', build: () => a.client })
+  await sessions.selectConnection('A')
+  await sessions.selectWorkspace!('/srv/a') // valid at first, so it is remembered per instance
+  a.fails.add('/srv/a') // the Server no longer honors it
+  await sessions.selectConnection('A') // revalidation on selection detects that
+  expect(sessions.getSnapshot().draft).toMatchObject({ canSend: false, blockReason: 'project-invalid' })
+  sessions.startDraft!()
+  await expect(sessions.send('x')).rejects.toThrow('project gate: project-invalid')
+  expect(a.calls.sends.filter(call => call.text === 'x')).toHaveLength(0)
+  // Recovery: a valid reselection re-opens the gate and forgets the invalid record.
+  await sessions.selectWorkspace!('/srv/b')
+  expect(sessions.getSnapshot().draft).toMatchObject({ canSend: true, workspaceId: '/srv/b' })
+})
+
+it('project records are isolated per Server instance, never shared across connections (跨连接不串)', async () => {
+  const a1 = projectClient('A1', 'https://shared')
+  const a2 = projectClient('A2', 'https://other')
+  a2.setWorkspaces(undefined)
+  const sessions = await harness({ id: 'A1', build: () => a1.client }, { id: 'A2', build: () => a2.client })
+  await sessions.selectConnection('A1')
+  await sessions.selectWorkspace!('/srv/a')
+  await sessions.selectConnection('A2')
+  expect(a2.calls.opens).toHaveLength(0) // no restore aimed at the other Server
+  expect(sessions.getSnapshot().draft).toMatchObject({ workspaceId: undefined, canSend: false, blockReason: 'no-project' })
+})
+
+it('an unknown first-send outcome keeps one requestId and never creates a second session id', async () => {
+  const a = projectClient('A', 'https://s1', { rejectFirstSend: true })
+  const sessions = await harness({ id: 'A', build: () => a.client })
+  await sessions.selectConnection('A')
+  await sessions.selectWorkspace!('/srv/a')
+  sessions.startDraft!()
+  await expect(sessions.send('hi')).rejects.toThrow('outcome unknown')
+  expect(sessions.getSnapshot().draft?.active).toBe(true) // draft survives the failure; F3 keeps the text
+  await sessions.send('hi')
+  expect(a.calls.sends).toHaveLength(2)
+  expect(a.calls.sends[0]!.requestId).toBe(a.calls.sends[1]!.requestId)
+  expect(a.calls.sends[1]).toMatchObject({ workspaceId: '/srv/a', text: 'hi' })
+  expect(sessions.getSnapshot().draft?.active).toBe(false)
+  expect(a.client.getSnapshot().sessions.filter(s => s.id === 'R1')).toHaveLength(1) // one real id entered history
+})
+
+it('continuing an existing session never consults the draft gate or a new create (续聊沿原项目)', async () => {
+  const a = projectClient('A', 'https://s1')
+  const sessions = await harness({ id: 'A', build: () => a.client })
+  await sessions.selectConnection('A')
+  await sessions.openSession('E1')
+  await sessions.selectWorkspace!('/srv/elsewhere') // a global selection change must not migrate the binding
+  await sessions.send('follow-up')
+  expect(a.calls.sends).toHaveLength(0)
+  expect(a.client.getSnapshot().messages.E1?.at(-1)?.text).toBe('follow-up')
+})

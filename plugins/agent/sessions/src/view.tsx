@@ -16,7 +16,19 @@ export function SessionBrowser({ service }: { service: AgentSessions }) {
     {!state.selectedConnectionId && <p className="agent-empty">Choose a connection from the status bar.</p>}
     {actionError && <p role="alert" className="agent-error">{actionError}</p>}
     <div className="agent-section-head agent-session-heading"><h2>Sessions</h2><button disabled={!agent || agent.connection.status !== 'connected'}
-      onClick={() => perform(() => service.newSession())}>New session</button></div>
+      onClick={() => service.startDraft?.()}>New session</button></div>
+    {state.draft?.active && <div className="agent-draft">
+      <div className="agent-actions"><button disabled={!agent || agent.connection.status !== 'connected'}
+        onClick={() => perform(() => Promise.resolve(service.refreshWorkspaces?.()))}>Refresh projects</button>
+        <button onClick={() => service.discardDraft?.()}>Discard draft</button></div>
+      {agent?.workspaces?.state === 'loading' && <p role="status" className="agent-empty">Loading projects…</p>}
+      {agent?.workspaces?.state === 'error' && <p role="alert" className="agent-error">Project list failed. Refresh projects to try again.</p>}
+      {agent?.workspaces && agent.workspaces.state !== 'loading' && <div className="agent-project-picker">{agent.workspaces.items.map(project => <button key={project.id}
+        aria-pressed={state.draft?.workspaceId === project.id}
+        onClick={() => perform(async () => { await service.selectWorkspace?.(project.id) })}>
+        <span>{project.normalizedPath}</span></button>)}</div>}
+      {state.draft.blockReason && <p className="agent-notice">Send is blocked until a valid project is selected.</p>}
+    </div>}
     {state.selectedConnectionId && <div className="agent-actions"><button disabled={!agent || agent.connection.status !== 'connected'}
       onClick={() => perform(() => service.refreshSessions())}>Refresh</button></div>}
     {agent?.sessionList === 'loading' && <p role="status" className="agent-empty">Loading sessions…</p>}

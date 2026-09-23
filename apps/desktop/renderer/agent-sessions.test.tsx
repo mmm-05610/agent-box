@@ -152,6 +152,55 @@ it('keeps exactly one selection marker, moved by clicks and restored on a fresh 
   expect(again.querySelectorAll('.agent-session-list button[aria-current=true]')).toHaveLength(1)
 })
 
+it('draft UI: New session opens the picker with zero backend calls, picking clears the block, Discard closes it (FC-0021)', async () => {
+  const cpCapabilities = { ...capabilities, workspaces: 'supported' } as const
+  let snapshot: AgentSnapshot = {
+    connection: { id: 'A', title: 'A', status: 'connected', serverInstanceId: 'https://s1', capabilities: cpCapabilities },
+    sessions: [], sessionList: 'ready', messages: {}, runs: {}, interactions: [], options: [],
+    workspaces: { state: 'ready', items: [{ id: '/srv/a', normalizedPath: '/srv/a' }, { id: '/srv/b', normalizedPath: '/srv/b' }] },
+  }
+  const listeners = new Set<() => void>()
+  const write = (patch: Partial<AgentSnapshot>) => {
+    snapshot = { ...snapshot, ...patch }
+    for (const listener of [...listeners]) listener()
+  }
+  const backend: string[] = []
+  const client: AgentClient = {
+    get isDisposed() { return false },
+    dispose() { listeners.clear() },
+    getSnapshot: () => snapshot,
+    subscribe(listener) { listeners.add(listener); return () => { listeners.delete(listener) } },
+    async refreshSessions() {}, async newSession() { backend.push('newSession'); return 'S' },
+    async openSession(id) { write({ selectedSessionId: id }) }, async send() { backend.push('send') },
+    async stop() {}, async respond() {}, async setOption() {},
+    async refreshWorkspaces() { backend.push('refreshWorkspaces') },
+    async openWorkspace(id) { write({ workspaces: { ...snapshot.workspaces!, selectedWorkspaceId: id } }); return { id, normalizedPath: id } },
+    async createAndSend(workspaceId) { backend.push(`createAndSend:${workspaceId}`) },
+  }
+  const registryScope = new OwnedResources(), sessionScope = new OwnedResources(), connectorScope = new OwnedResources()
+  cleanup.push(async () => { sessionScope.dispose(); connectorScope.dispose(); registryScope.dispose() })
+  const registry = createAgentConnections(registryScope)
+  registry.forScope(connectorScope).add({ id: 'A', title: 'A', connect: async () => client })
+  const sessions = createAgentSessions(sessionScope, registry)
+  await sessions.selectConnection('A')
+  const container = await mount(<SessionBrowser service={sessions} />)
+  const newButton = [...container.querySelectorAll('button')].find(node => node.textContent === 'New session')!
+  await act(async () => { newButton.click() })
+  // The FE-only draft: picker and block notice render while the client sees no session operation.
+  expect(container.querySelector('.agent-draft')).not.toBeNull()
+  expect(container.querySelector('p.agent-notice')?.textContent).toBe('Send is blocked until a valid project is selected.')
+  expect(container.querySelectorAll('.agent-project-picker button')).toHaveLength(2)
+  expect(backend).toEqual([]) // positive control: still zero backend calls after opening the draft
+  const project = [...container.querySelectorAll('.agent-project-picker button')].find(node => node.textContent === '/srv/a')!
+  await act(async () => { project.click() })
+  expect(project.getAttribute('aria-pressed')).toBe('true')
+  expect(container.querySelector('p.agent-notice')).toBeNull()
+  const discard = [...container.querySelectorAll('button')].find(node => node.textContent === 'Discard draft')!
+  await act(async () => { discard.click() })
+  expect(container.querySelector('.agent-draft')).toBeNull()
+  expect(backend).toEqual([]) // newSession/send/createAndSend are never reached through the draft UI
+})
+
 function fakeWorkbench() {
   const views: { id: string }[] = [], uis: { id: string }[] = [], opened: string[] = []
   const value = {
