@@ -33,7 +33,25 @@
 1. 镜像：`mkdir -p /tmp/pf-run/{plugins,platform}` → 拷 `frontend/plugins/profile`、`frontend/platform/extension-api` → `ln -s <上面那个绝对路径> /tmp/pf-run/node_modules`。
 2. 类型门：`node <fc>/node_modules/typescript/bin/tsc -p plugins/profile/tsconfig.json --noEmit` → exit 0（含 `src/*.tsx` 与 tests）。
 3. 为跑 `node --test` 需先出 CJS 副本，**必须以项目 tsconfig 为底**，在镜像根目录跑：`node <fc>/node_modules/typescript/bin/tsc -p plugins/profile/tsconfig.json --noEmit false --outDir cjs --rootDir . --module commonjs --rewriteRelativeImportExtensions --esModuleInterop` → exit 0，产物落在 `cjs/plugins/profile/{src,tests}/*.js`，随后 `cd cjs/plugins/profile && node --test tests/*.test.js` → **12 passed / 0 failed**。两个必踩的坑：(a) 只用命令行文件列表（`tsc plugins/profile/tests/*.ts …`）**过不了**，会报 `TS6142 --jsx is not set` 与 `TS7006`，因为绕开了 tsconfig 的 `jsx/strict/paths`；(b) 不加 `--rootDir .` 会以 `TS5011` 失败（TS 6 要求显式 rootDir 才能定出文件布局）。另**不要**传 `--moduleResolution node10`：TS 6 以 `TS5107` 直接失败（本包两次踩过）。
-4. 产物门：复刻 `tooling/build-extension.mjs` 的选项（bundle/splitting/esm/browser/jsx automatic + 同 externals）用 esbuild 出到 `/tmp/pf-ext/ordessa.profile`，**因为 `buildExtension` 的 `outputRoot` 是 `products/agent-desktop/dist`，属产品装配、在本包写域外**；出件 exit 0、`entry.js` = **15453 bytes**（单文件）、含真实 ProfilePanel（`grep -c ProfilePanel` = 2）。
+4. 产物门：复刻 `tooling/build-extension.mjs` 的选项（bundle/splitting/esm/browser/jsx automatic + 同 externals）用 esbuild 出到 `/tmp/pf-ext/ordessa.profile`，**因为 `buildExtension` 的 `outputRoot` 是 `products/agent-desktop/dist`，属产品装配、在本包写域外**；出件 exit 0、`entry.js` = **15453 bytes**（单文件）、含真实 ProfilePanel（`grep -c ProfilePanel` = 2）。**这一步的脚本必须照抄，不要重新摸索**（`/tmp` 不跨重启，原文如下，跑法 `node /tmp/pf-build-check.mjs`）：
+
+   ```js
+   import { build } from '/home/maoqh/projects/ordessa/worktrees/harness-desktop-002/fc/node_modules/esbuild/lib/main.js'
+   import { mkdir } from 'node:fs/promises'
+   const dir = '/home/maoqh/projects/ordessa/worktrees/harness-desktop-002/profile/frontend/plugins/profile'
+   const target = '/tmp/pf-ext/ordessa.profile'
+   await mkdir(target, { recursive: true })
+   await build({
+     entryPoints: { entry: `${dir}/src/entry.tsx` },
+     outdir: target, bundle: true, splitting: true, format: 'esm', platform: 'browser',
+     jsx: 'automatic',
+     external: ['react', 'react/*', 'react-dom', 'react-dom/*', '@ordessa/extension-api', '@extensions/*'],
+     metafile: true, logLevel: 'info',
+   })
+   ```
+
+   两点注意：`dir` 直接指**产品树**（esbuild 只读它、不写），所以第 1 步的 `/tmp` 镜像对本步不是必需；`target` 必须在 `/tmp`，理由同上不写产品装配目录。
+
 5. BE：`PYTHONPATH=src python3 -m unittest discover -s tests -p "test_*.py"` → `Ran 58 tests … OK`（系统解释器 3.14，无安装）。**必须 `cd` 到 `profile/backend/plugins/agent-box-profile-preset/` 再跑**：在 backend 仓库根跑会命中主线自己的 `src/` 与 `tests/`，本轮实测得到误导性的 `Ran 9 tests … FAILED (errors=9)`，那不是本包回归。加 `PYTHONDONTWRITEBYTECODE=1` 可保证跑后 `git status --porcelain` 仍空。分发级隔离证明另有 `python3 -m pip wheel --no-deps --no-build-isolation --no-index -w /tmp/pfwheel .`，其 11 条目无 `entry_points.txt`、`METADATA` 无 `Requires-Dist`。
 6. **绝不跑** `tooling/build-all.mjs`：它自动发现带 `ordessa.id` 的 `plugins/**/package.json` 并重写已提交的 `products/agent-desktop/extensions.lock.json`（该风险仍是活的，处置权在 FC/C，见 status 的 `synced_facts`）。
 
