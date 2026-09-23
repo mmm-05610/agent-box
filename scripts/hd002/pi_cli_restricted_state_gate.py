@@ -74,6 +74,19 @@ def network_counts(trace: Path):
     return {'loopback': loopback, 'nonLoopback': len(inet) - loopback}
 
 
+def stderr_category(content: bytes) -> str:
+    if not content:
+        return 'EMPTY'
+    lower = content.lower()
+    if (b'failed to load extension' in lower or
+            b'extension does not export a valid factory' in lower or
+            (b'extension' in lower and b'failed to load' in lower)):
+        return 'EXTENSION_LOAD_ERROR'
+    if any(marker in lower for marker in (b'error:', b'exception', b'traceback')):
+        return 'GENERAL_ERROR'
+    return 'UNKNOWN_OUTPUT'
+
+
 def self_test():
     secret = 'FAKE_SECRET_NEVER_EMIT'
     path = '/fake/private/config.json'
@@ -106,6 +119,11 @@ def self_test():
         long.write_bytes(b'x' * 65537)
         assert truncate_stderr(long) == (65537, True)
         assert long.stat().st_size == 65536
+    assert stderr_category(b'') == 'EMPTY'
+    assert stderr_category(f'Failed to load extension "{path}": {secret}'.encode()) == 'EXTENSION_LOAD_ERROR'
+    assert stderr_category(f'Extension does not export a valid factory function: {path}'.encode()) == 'EXTENSION_LOAD_ERROR'
+    assert stderr_category(f'Error: {secret}'.encode()) == 'GENERAL_ERROR'
+    assert stderr_category(f'ordinary output {secret} {path}'.encode()) == 'UNKNOWN_OUTPUT'
     print('SELF_TEST_PASS')
 
 
@@ -226,7 +244,7 @@ def run():
             stderr_bytes = stderr.read_bytes()
             result['stderr'] = {'length': len(stderr_bytes),
                                 'sha256': hashlib.sha256(stderr_bytes).hexdigest(),
-                                'category': 'UNCLASSIFIED',
+                                'category': stderr_category(stderr_bytes),
                                 'originalLength': original_stderr_bytes,
                                 'truncated': stderr_truncated}
             result['projectEntryCount'] = len(list(project.iterdir()))
@@ -238,7 +256,16 @@ def run():
             elif result['status'] == 'RESPONSE_RECEIVED':
                 good = (result['response']['success'] and result['response']['modelPresent']
                         and count is not None and count['activeToolCount'] == 0)
-                result['status'] = 'PASS' if good else 'GATE_FAIL'
+                if not good:
+                    result['status'] = 'GATE_FAIL'
+                elif result['stderr']['category'] == 'EXTENSION_LOAD_ERROR':
+                    result['status'] = 'EXTENSION_LOAD_ERROR'
+                elif result['stderr']['category'] == 'GENERAL_ERROR':
+                    result['status'] = 'GENERAL_ERROR'
+                elif result['stderr']['category'] != 'EMPTY' or stderr_truncated:
+                    result['status'] = 'INCONCLUSIVE_STDERR'
+                else:
+                    result['status'] = 'PASS'
     print(json.dumps(result, sort_keys=True))
 
 
