@@ -1,4 +1,4 @@
-import { Token, type IDisposable, type ResourceScope } from '@ordessa/extension-api'
+import { Token, type IDisposable } from '@ordessa/extension-api'
 
 export type Availability = 'supported' | 'unsupported' | 'unknown' | 'unavailable'
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error'
@@ -94,13 +94,6 @@ export interface AgentConnector {
   title: string
   connect(): Promise<AgentClient>
 }
-export interface AgentConnections {
-  getSnapshot(): readonly Pick<AgentConnector, 'id' | 'title'>[]
-  subscribe(listener: () => void): () => void
-  forScope(scope: ResourceScope): { add(connector: AgentConnector): IDisposable }
-  connect(id: string): Promise<AgentClient>
-}
-export const AgentConnectionsToken = new Token<AgentConnections>('ordessa.agent.connections.v1')
 
 export interface AgentWorkspaceSnapshot {
   available: readonly Pick<AgentConnector, 'id' | 'title'>[]

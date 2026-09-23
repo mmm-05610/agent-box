@@ -3,7 +3,7 @@
 This is the clean Lumino desktop skeleton, not the historical Hermes client.
 Host API v2 is intentionally small: lifecycle, scope, one root UI. No pages/layout in host.
 Product foundation extensions are commands, workbench and settings, loaded from files.
-Their shared Token contracts are built separately from packages/foundation-contracts.
+Their shared Token contracts are built separately from contracts/foundation and contracts/agent-ui.
 Product defaults live in extensions/product.json, never business imports in app.tsx.
 User extensions.json is a complete explicit override, including an empty list; never overwrite it.
 All service registration APIs bind to the caller's ResourceScope and auto-release on exit.

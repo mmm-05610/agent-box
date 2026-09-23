@@ -10,8 +10,8 @@
     "jsx": "react-jsx",
     "strict": true,
     "paths": {
-      "@extensions/ordessa.contracts/contract.js": ["../../packages/foundation-contracts/src/contract.ts"],
-      "@extensions/ordessa.agent-contracts/contract.js": ["../../packages/agent-ui-contracts/src/contract.ts"],
+      "@extensions/ordessa.contracts/contract.js": ["../../contracts/foundation/src/contract.ts"],
+      "@extensions/ordessa.agent-contracts/contract.js": ["../../contracts/agent-ui/src/contract.ts"],
       "@extensions/example.contracts/contract.js": ["../../examples/service-contract/src/contract.ts"]
     },
     "skipLibCheck": true,
@@ -24,6 +24,7 @@
     "src",
     "electron",
     "../../platform/*/src",
+    "../../contracts/*/src",
     "../../extensions/*/src",
     "../../examples/*/src"
   ]

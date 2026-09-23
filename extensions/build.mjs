@@ -12,8 +12,8 @@ const natives = {
   'ordessa.agent-pi': ['@earendil-works/pi-coding-agent'],
 }
 for (const [id, folder, files] of [
-  ['ordessa.contracts', 'packages/foundation-contracts', { entry: 'entry.ts', contract: 'contract.ts' }],
-  ['ordessa.agent-contracts', 'packages/agent-ui-contracts', { entry: 'entry.ts', contract: 'contract.ts' }],
+  ['ordessa.contracts', 'contracts/foundation', { entry: 'entry.ts', contract: 'contract.ts' }],
+  ['ordessa.agent-contracts', 'contracts/agent-ui', { entry: 'entry.ts', contract: 'contract.ts' }],
   ['ordessa.commands', 'extensions/commands', { entry: 'entry.ts' }],
   ['ordessa.agent-connections', 'extensions/agent-connections', { entry: 'entry.ts' }],
   ['ordessa.agent-sessions', 'extensions/agent-sessions', { entry: 'entry.ts' }],

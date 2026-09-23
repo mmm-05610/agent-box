@@ -11,11 +11,19 @@ apps/desktop/
   electron/                    窗口、受限清单 IPC、文件协议、发现
   src/                         启动、最小诊断、React 入口、测试
   scripts/                     构建、启动、Electron 验收
-packages/
+platform/
   extension-api/               Token、PluginContext、资源作用域、根贡献
   extension-loader/            清单、模块/工厂加载、失败隔离
-  desktop-host/                Lumino 生命周期、根挂载与根错误边界
-  foundation-contracts/        独立 Commands/Workbench/Settings Token 契约
+  extension-host/              Lumino 生命周期、根挂载与根错误边界（./main = Electron 主侧发现与文件协议）
+  native-bridge/               Electron 主侧安全传输桥
+contracts/
+  foundation/                  运行时工件 ordessa.contracts（re-export 下列三域）
+  commands/                    Commands Token 契约
+  workbench/                   Workbench Token 契约
+  settings/                    Settings Token 契约
+  agent-ui/                    运行时工件 ordessa.agent-contracts（re-export 下列两域）
+  connections/                 AgentConnections 服务 Token 契约
+  agent/                       共享 Agent 语义契约与 AgentSessions Token
 extensions/
   commands/src/entry.ts        命令服务（不是按钮）
   workbench/src/
@@ -32,8 +40,8 @@ extensions/
   product.json                 产品默认启用名单
   build.mjs                   单独构建基础扩展及契约工件
 examples/                      独立样例，不默认安装/启用
-packages/agent-ui-contracts/   共享 Agent 语义契约与服务 Token
-packages/foundation-contracts/ 独立 Commands/Workbench/Settings Token 契约
+contracts/agent-ui/            共享 Agent 语义契约与服务 Token（域：contracts/connections + contracts/agent）
+contracts/foundation/          独立 Commands/Workbench/Settings Token 契约（域：contracts/{commands,workbench,settings}）
 extensions/
   agent-connections/           接入登记与连接服务（两适配器注册同一服务）
   agent-sessions/              连接/会话所有权，独立于挂载视图
