@@ -36,6 +36,15 @@ FORBIDDEN_ROOTS = frozenset({"/"})
 _DIRECTORY = "directory"
 _FILE = "file"
 
+#: The explicit Server-composition modes this placement knows. `isolated` is
+#: the default and the historic one: opening a Workspace requires that this
+#: host can run the sandbox room. `native` is chosen once at Server startup by
+#: the composition, where the room does not run at all - so the open asks the
+#: project's own validity and nothing else. The mode is never derived from a
+#: probe answer and never from an environment variable: a sandbox failure
+#: must not silently become a native run.
+EXECUTION_MODES = frozenset({"isolated", "native"})
+
 
 def _refuse(code: str, message: str, status: int, *, retryable: bool = False) -> ServerError:
     return ServerError(code, message, status=status, retryable=retryable)
@@ -47,10 +56,19 @@ class LocalEnvironmentProvider:
     `sandbox_probe` answers whether this host can run the room the sandbox layer
     composes. It is injectable so the refusal can be exercised without a host
     that genuinely lacks it, and it is asked only where it matters: browsing a
-    directory needs no sandbox, opening a Workspace does.
+    directory needs no sandbox, and opening a Workspace does - but only in the
+    `isolated` composition. A `native` Server chose that mode at startup and
+    never asks the probe, so a sandbox failure can only ever refuse the old
+    path, never flip the mode.
     """
 
-    def __init__(self, *, sandbox_probe: Callable[[], Mapping[str, Any]] | None = None) -> None:
+    def __init__(self, *, sandbox_probe: Callable[[], Mapping[str, Any]] | None = None,
+                 execution_mode: str = "isolated") -> None:
+        if execution_mode not in EXECUTION_MODES:
+            # A composition that names no known mode is a programming error at
+            # the assembly boundary, refused loudly rather than defaulted.
+            raise ValueError(f"local execution mode is not supported: {execution_mode!r}")
+        self.execution_mode = execution_mode
         self._sandbox_probe = sandbox_probe or _host_sandbox_probe
         self._sandbox_answer: bool | None = None
 
@@ -73,6 +91,14 @@ class LocalEnvironmentProvider:
         return self._sandbox_answer
 
     def readiness_blockers(self) -> list[dict[str, Any]]:
+        """Why this Server could not open a local Workspace, if that is so.
+
+        A native composition honestly declares it needs no Ordessa sandbox;
+        that is not a claim that the Agent's own permissions or the backend
+        execution gates have passed - those answer through their own faces.
+        """
+        if self.execution_mode == "native":
+            return []
         if self.sandbox_available():
             return []
         return [{"code": "LOCAL_SANDBOX_UNAVAILABLE", "retryable": True}]
@@ -114,9 +140,15 @@ class LocalEnvironmentProvider:
         return os.path.realpath(path)
 
     def open_workspace(self, path: Any) -> dict[str, Any]:
-        """Validate one location for opening; the caller records the result."""
+        """Validate one location for opening; the caller records the result.
+
+        Project validity is every mode's own requirement - native weakens none
+        of it. Only the sandbox demand is mode-keyed, and only `isolated`
+        keeps the historic refusal.
+        """
         normalized = self.validate(path)
-        self.require_sandbox()
+        if self.execution_mode == "isolated":
+            self.require_sandbox()
         return {"path": normalized}
 
     def require_sandbox(self) -> None:
@@ -226,4 +258,4 @@ def _host_sandbox_probe() -> Mapping[str, Any]:
         return {"status": "unavailable", "code": "sandbox_provider_unresolved"}
 
 
-__all__ = ["FORBIDDEN_ROOTS", "LocalEnvironmentProvider"]
+__all__ = ["EXECUTION_MODES", "FORBIDDEN_ROOTS", "LocalEnvironmentProvider"]
