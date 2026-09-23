@@ -1,7 +1,7 @@
 # PROFILE 验收映射（BC-0002 §验收 → 具名测试）
 本包 SHA：BE `f3bcbde9` / FE `e869683469`。BC-0026 已裁**独立插件验证收件完成**且未代跑门，故本表把「哪条验收项由哪个具名测试负责」固定下来，供接缝批与后续复现对照；不新造结论，只列现有证据位置。
 
-| BC-0002 §验收 | BE（58 tests，`python3 -m unittest discover -s tests`） | FE（12 tests，`node --test` 编译副本） |
+| BC-0002 §验收 | BE（下表各行是 58-tests 期钉下的具名门；08:33 起套件为 **73 tests**） | FE（下表为 12-tests 期；08:33 起为 **17/17**） |
 | --- | --- | --- |
 | revision 冲突 | `test_store.py#test_update_is_compare_and_set`、`test_resolver.py#test_launch_follows_only_the_pinned_revision` | `model.test.ts#「a save names the revision it read, and a stale save is refused」` |
 | 重复注册报冲突 | `test_registry.py#test_duplicate_kind_version_conflicts_without_replacing` | `model.test.ts#「editors are claimed per kind@version and released with their scope」`、`:192 contributions…duplicates clash` |
