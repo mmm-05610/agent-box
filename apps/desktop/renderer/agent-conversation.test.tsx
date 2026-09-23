@@ -564,3 +564,21 @@ it('resumes a stepped-away draft and routes its first send to createAndSend, nev
   expect(h.paneTitle()).toBe('Draft run')
   expect(h.field()).toBe('')
 })
+
+it('keeps both unsent buffers when opening the same session that was selected before the draft (gate 18)', async () => {
+  const h = await openPanes(['A'])
+  await h.openSession('S1')
+  await h.typeText('S1 unfinished text')
+  await h.startDraft()
+  expect(h.field()).toBe('')
+  await h.typeText('draft unfinished text')
+  // F2 reports opened even when the target is the original S1. Selection equality must not
+  // turn this step-away into a discard, or overwrite S1's own unsent composer buffer.
+  await h.openSession('S1')
+  expect(h.paneLabel()).toBe('SESSION')
+  expect(h.field()).toBe('S1 unfinished text')
+  await h.startDraft()
+  expect(h.paneLabel()).toBe('NEW SESSION')
+  expect(h.field()).toBe('draft unfinished text')
+  expect(h.calls('A')).toEqual({ send: [], create: [], newSession: 0 })
+})
