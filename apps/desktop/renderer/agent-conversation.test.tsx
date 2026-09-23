@@ -314,7 +314,7 @@ async function openPanes(connectionIds: string[]) {
     calls: { send: [], create: [], newSession: 0 }, listeners: new Set(),
     snapshot: {
       connection: { id, title: id, status: 'connected', capabilities: { ...capabilities, workspaces: 'supported' } },
-      sessions: [{ id: 'S1', title: 'Session one' }, { id: 'S2', title: 'Session two' }],
+      sessions: [{ id: 'S1', title: 'Session one' }, { id: 'S2', title: 'Session two' }, { id: 'draft', title: 'A session named like the draft marker' }],
       sessionList: 'ready', messages: {}, runs: {}, interactions: [], options: [],
       workspaces: { state: 'ready', items: [{ id: 'W1', normalizedPath: `/srv/${id}` }] },
     },
@@ -376,6 +376,12 @@ async function openPanes(connectionIds: string[]) {
 
 it('gives every session its own unsent text across switching and sends nothing on a switch (gate 11)', async () => {
   const h = await openPanes(['A'])
+  // A session whose id happens to be the draft marker must not inherit the draft's buffer: the two pane
+  // identities are prefixed, not merely distinct strings (FC-0052).
+  await h.startDraft()
+  await h.typeText('draft text')
+  await h.openSession('draft')
+  expect(h.field()).toBe('')
   await h.openSession('S1')
   await h.typeText('half-typed in S1')
   await h.openSession('S2')

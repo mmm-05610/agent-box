@@ -139,5 +139,7 @@ export function Conversation({ service }: { service: AgentSessions }) {
   if (!connectionId) return <div className="agent-panel agent-placeholder"><style>{styles}</style><h2>Choose a connection</h2><p>Select an enabled agent from the left panel.</p></div>
   if (!agent) return <div className="agent-panel agent-placeholder"><style>{styles}</style><h2>Connecting</h2><p>{state.error ?? 'Waiting for the agent connection.'}</p></div>
   if (!active && !sessionId) return <div className="agent-panel agent-placeholder"><style>{styles}</style><h2>Choose a session</h2><p>Open a previous session or start a new one.</p></div>
-  return <ConversationThread key={`${connectionId}:${sessionId ?? 'draft'}`} service={service} connectionId={connectionId} sessionId={sessionId ?? ''} draft={state.draft} compositions={store} />
+  // The key is the same identity the composer's buffer is keyed by: a session that happens to be called
+  // `draft` must still remount out of the draft pane rather than inherit it.
+  return <ConversationThread key={`${connectionId}:${sessionId ? sessionPane(sessionId) : draftPane}`} service={service} connectionId={connectionId} sessionId={sessionId ?? ''} draft={state.draft} compositions={store} />
 }
