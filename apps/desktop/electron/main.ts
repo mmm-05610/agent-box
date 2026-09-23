@@ -101,10 +101,14 @@ app.whenReady().then(async () => {
       Object.assign(result, { agentShell: await win.webContents.executeJavaScript(`(async () => {
         const entry = [...document.querySelectorAll('nav button')].find(button => button.getAttribute('aria-label') === 'Agents');
         entry?.click(); await new Promise(resolve => setTimeout(resolve, 100));
+        const statusToggle = document.querySelector('.conn-status-toggle');
+        statusToggle?.click(); await new Promise(resolve => setTimeout(resolve, 100));
+        const popover = document.querySelector('[role="group"][aria-label="Agent connections"]');
+        const connectorButtons = popover ? [...popover.querySelectorAll('button')] : [];
         return {
           navigation: !!entry,
-          codexVisible: !![...document.querySelectorAll('.agent-connections button')].find(button => button.textContent.includes('Codex')),
-          piVisible: !![...document.querySelectorAll('.agent-connections button')].find(button => button.textContent.includes('Pi')),
+          codexVisible: connectorButtons.some(button => button.textContent.includes('Codex')),
+          piVisible: connectorButtons.some(button => button.textContent.includes('Pi')),
           emptyConversation: !!document.querySelector('.agent-placeholder')?.textContent.includes('Choose a connection'),
           requestsView: [...document.querySelectorAll('[data-region="right"] [role="group"] button')].some(button => button.textContent === 'Requests'),
         };
