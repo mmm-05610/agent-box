@@ -37,6 +37,7 @@ EXPECTED_STATUS = {
     "native_id.capture": "PASS",
     "native_id.reopen_frame": "PASS",
     "replay.history_exclusion": "PASS",
+    "replay.arrival_boundary": "PASS",
     "mcp.tool_projection_mock": "PASS",
     "capability.advertisement_negative": "PASS",
     "typed_refusal.startup_frame": "PASS",
@@ -63,7 +64,7 @@ def test_gate_report_items_match_the_pinned_map(tmp_path):
     report = _run_gate(tmp_path / "report.json")
     items = {item["id"]: item["status"] for item in report["items"]}
     assert items == EXPECTED_STATUS
-    assert report["totals"] == {"PASS": 17, "UNTESTED": 6, "UNSUPPORTED": 1}
+    assert report["totals"] == {"PASS": 18, "UNTESTED": 6, "UNSUPPORTED": 1}
 
 
 def test_gate_never_claims_native_agent_success(tmp_path):

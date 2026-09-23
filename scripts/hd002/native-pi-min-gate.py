@@ -61,8 +61,13 @@ records = {"pidCwd": os.getcwd(), "envKeys": sorted(os.environ),
            "frames": [], "eventsSent": 0}
 
 def save():
-    with open(records_path, "w", encoding="utf-8") as fh:
+    # Atomic replace: a reader either sees the previous complete snapshot or
+    # the new one, never a truncated mid-write file (BC-0036 rerun evidence:
+    # the plain "w" rewrite tore 2 reads in 20 on the H tree).
+    tmp = records_path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
         json.dump(records, fh, ensure_ascii=False)
+    os.replace(tmp, records_path)
 
 def send(message):
     sys.stdout.write(json.dumps(message, ensure_ascii=False,
@@ -90,6 +95,10 @@ for line in sys.stdin:
     except ValueError:
         continue
     records["frames"].append(frame)
+    # Journal BEFORE answering: whatever the gate reads after a response is
+    # guaranteed to contain that response's request frame (the old end-of-loop
+    # save let a read-after-response see a journal that lagged behind the wire).
+    save()
     op, rid = frame.get("op"), frame.get("id")
     if op == "register":
         if scenario.get("refuseRegister"):
@@ -121,6 +130,12 @@ for line in sys.stdin:
             send({"event": "permission_request", "data": {
                 "requestId": "fake-perm-1", "toolName": "fake.write",
                 "title": "allow fake write?", "kind": "tool.call"}})
+        # Counterexample material: history the peer withholds until the prompt
+        # frame has arrived. Under the product's arrival rule these chunks are
+        # LIVE output - the gate must characterize them, not pretend otherwise.
+        for chunk in scenario.get("postPromptChunks", []):
+            send(acp_chunk(chunk))
+            records["eventsSent"] += 1
         for chunk in scenario.get("liveChunks", []):
             send(acp_chunk(chunk))
             records["eventsSent"] += 1
@@ -141,6 +156,7 @@ for line in sys.stdin:
                 except ValueError:
                     continue
                 records["frames"].append(decision)
+                save()
                 if decision.get("op") == "permission_decision":
                     send({"id": decision.get("id"), "ok": True, "result": {}})
                     break
@@ -222,7 +238,18 @@ def _port(work: _Work, scenario: dict, *, project: Path, name: str,
 
 
 def _read_records(records_path: Path) -> dict:
-    return json.loads(records_path.read_text(encoding="utf-8"))
+    # With the peer journalling atomically, every visible file is a complete
+    # snapshot; the wait only covers the spawn->first-save startup window
+    # (BC-0036: a bare read here caught the old truncating rewrite empty).
+    box: dict = {}
+    def _load() -> bool:
+        try:
+            box["value"] = json.loads(records_path.read_text(encoding="utf-8"))
+        except (FileNotFoundError, json.JSONDecodeError):
+            return False
+        return True
+    assert _wait(_load), f"journal never became readable: {records_path}"
+    return box["value"]
 
 
 def _frames(records: dict, op: str) -> list[dict]:
@@ -486,9 +513,14 @@ def scenario_reopen_resume(work: _Work, items: list) -> None:
           "claim, not this gate's",
           "open.sessionId==fake-native-1; no create frame in records")
     box: dict = {}
-    # The live/replay rule reads the ledger at arrival time, so the prompt may
-    # only be issued once the replayed history has actually been accounted.
-    assert _wait(lambda: port2.replayed_history_chars("exec-reopen-2") > 0)
+    # The live/replay rule reads the ledger at arrival time. Waiting for the
+    # FIRST replayed chunk was not enough - BC-0036 reproduced the flake where
+    # a second chunk landed after the prompt and became live output. The
+    # prompt may only be issued once the WHOLE pre-prompt replay has been
+    # accounted; the boundary itself is pinned by the deterministic
+    # counterexample below (replay.arrival_boundary).
+    replay_total = len("old-answer-part-1 ") + len("old-answer-part-2 ")
+    assert _wait(lambda: port2.replayed_history_chars("exec-reopen-2") == replay_total)
     thread = threading.Thread(
         target=lambda: box.update(value=port2.prompt("exec-reopen-2", "next turn")))
     thread.start()
@@ -497,12 +529,14 @@ def scenario_reopen_resume(work: _Work, items: list) -> None:
     assert box.get("value") == {"stopReason": "end_turn"}
     deltas = [data["text"] for _e, kind, data in events2 if kind == "message.delta"]
     assert deltas == ["fresh-answer"], deltas
-    assert port2.replayed_history_chars("exec-reopen-2") == len("old-answer-part-1 ") + len("old-answer-part-2 ")
+    assert port2.replayed_history_chars("exec-reopen-2") == replay_total
     _item(items, "replay.history_exclusion", "PASS",
           "chunks the fake peer replayed before the prompt were excluded from the "
           "delivered answer and only counted in replayed_history_chars; the live "
-          "post-prompt chunk arrived (real _forward live/replay rule)",
-          f"message.delta texts {deltas!r}; replayed chars counted exactly")
+          "post-prompt chunk arrived (real _forward live/replay rule). BC-0036 fix: "
+          "the gate waits for the FULL replay total before the prompt, so no chunk "
+          "can straddle the boundary",
+          f"message.delta texts {deltas!r}; replayed chars == {replay_total}")
     tools = [data for _e, kind, data in events2 if kind == "tool.update"]
     assert tools and tools[0]["tool_call_id"] == "tc-1" and tools[0]["state"] == "running"
     _item(items, "mcp.tool_projection_mock", "PASS",
@@ -511,6 +545,30 @@ def scenario_reopen_resume(work: _Work, items: list) -> None:
           "inside a real Pi session are run-gate territory)",
           "tool.update carried toolCallId/state mapped brand-neutrally")
     port2.stop()
+
+    # Deterministic counterexample for the BC-0036 race class: a peer that
+    # withholds part of its history until the prompt frame has arrived. The
+    # withheld chunk must then be DELIVERED as live output (arrival rule), so
+    # the exclusion is provably boundary-driven - and the exact-total wait
+    # above is provably load-bearing, not decoration.
+    events4: list = []
+    port4, _records4 = _port(
+        work, {"replayChunks": ["early-history "],
+               "postPromptChunks": ["late-history "]},
+        project=project, name="reopen-4", resume=native, events=events4)
+    assert port4.open_execution("exec-reopen-4") == native
+    assert _wait(lambda: port4.replayed_history_chars("exec-reopen-4") == len("early-history "))
+    port4.prompt("exec-reopen-4", "boundary turn")
+    deltas4 = [data["text"] for _e, kind, data in events4 if kind == "message.delta"]
+    assert deltas4 == ["late-history "], deltas4
+    assert port4.replayed_history_chars("exec-reopen-4") == len("early-history ")
+    port4.stop()
+    _item(items, "replay.arrival_boundary", "PASS",
+          "counterexample (BC-0036): history withheld by the peer until the prompt "
+          "frame is counted as LIVE answer, pre-prompt history as replay - the "
+          "boundary is arrival order, proven in both directions; this is exactly "
+          "the straddle the main scenario's exact-total wait must exclude",
+          f"post-prompt chunk delivered {deltas4!r}; replayed stays at the pre-prompt total")
 
     # Honest-negative advertisement: resume explicitly false must NOT become
     # resumable even though declared.
