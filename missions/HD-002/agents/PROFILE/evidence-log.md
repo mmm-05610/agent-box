@@ -88,7 +88,7 @@ quotegate_0525: 上面那句「剥掉行内代码段再计数」在正文里只�
 # 引文平衡门 v2（06:56 改版，见 §`defect_19_quotegate_fence_outbox`）：commit 前跑，差值须全为 0。
 # v1 的两处口径缺陷：(a) 只剥行内码、不剥围栏块 ⇒ 门体自身含「「」」的正文（如 §defect_18 的 `'「[^」]{6,}」'`，天然 1 开 2 闭）会被计入，造出假警报；(b) 不测 outbox ⇒ defect ⑱ 那四处非逐字恰好发生在门没看的邮件里。
 cd /home/maoqh/projects/ordessa/control/missions/HD-002/agents/PROFILE
-for f in status.md evidence-log.md verification-map.md outbox/*.md; do s=$(awk '/^```/{p=!p; next} !p' $f | sed 's/`\{1,2\}[^`]*`\{1,2\}//g'); echo "$f prose $(printf "%s" "$s"|grep -o "「"|wc -l)/$(printf "%s" "$s"|grep -o "」"|wc -l)"; done
+for f in status.md evidence-log.md verification-map.md v0.2-delta.md outbox/*.md; do s=$(awk '/^```/{p=!p; next} !p' $f | sed 's/`\{1,2\}[^`]*`\{1,2\}//g'); echo "$f prose $(printf "%s" "$s"|grep -o "「"|wc -l)/$(printf "%s" "$s"|grep -o "」"|wc -l)"; done
 ```
 writedomain_and_nopush_proof_0526: 05:26 把目标里的**「核对当前树和旧交付」**从记忆升级成**逐提交实证**，并顺手把「未 push」这句话换成可核的判据。(1) **写域合规**：`git show --name-only` 逐个列我自己 5 个提交的全部路径——BE `01373b2d`（17 文件）与 `f3bcbde9`（1 文件）**只**含 `plugins/agent-box-profile-preset/**`；FE `3fab07948b`（10）/`db5585cf2b`（6）/`e869683469`（3）并集 **11 个不同文件全部**只含 `plugins/profile/**`，与 §1 记的 `git ls-files` 计数 17／11 逐项对上。**没有一个路径**落在排除面（根 `pyproject.toml`/`package.json`/lock、共享契约、Server/wire、Execution、既有 Profile 实现、`home`、产品清单、`extensions.json`/`extensions.lock.json`、`dist`）。同一次输出也证实分支基点不是我造的：BE 父提交 `60d868ef` 是 BC 的 HD-001 交付、FE 基点 `16398e7c` 是 FC 集成点，我都在其上另起分支。(2) **「未 push」的正确判据**：`git rev-parse @{u}` 报「尚未给分支设置上游」只说明**分支无上游**，而我 `git remote -v` 实测有 4 行（远端确实配置着），且 `origin/main..HEAD` 的 ahead 数（BE 690／FE 26）含大量继承历史——**这两个数都不能当「我没推送」的证据**。真正的判据是 `git branch -r --contains <c>`：我那 5 个提交**在全部 remote-tracking 分支里命中 0 次**（逐条输出 `NONE`）⇒ 提交只存在本地。规则固化：报「未 push／未外发」一律用 remote-ref 包含性判定，禁用「无上游」「ahead 数」代理。(3) 游标：head 再进 F1 0010→**0011**（`to: FC; cc: C, F2, F3, BC`，非发我）。它被规则 ⑤ 抓到：`:78`「Profile 仍是独立插件，Provider/Model 仍只有设计。」——本包界线在下游的**第 5 个独立复述**（前四：F3 三件 + BC/C 各一），同件的 `:43`/`:74` 用的是 Server `profiles.list`，规则 ④ 对全文 0 命中 ⇒ 不涉本包插件，无动作、无回件。产品树本轮 `porcelain` 各 **0** 行，HEAD 未变。
 
@@ -112,6 +112,8 @@ linecite_gate_0536: 05:36 首次把本包记录里所有 `file:line` 引用做**
 # 引用保真门（cwd=missions/HD-002/agents/PROFILE）：新增或改动任何 file:line 引用后现跑
 A=/home/maoqh/projects/ordessa/control/missions/HD-002
 t(){ n=$(sed -n "$3p" "$4" | grep -c -- "$5"); printf '%-28s L%-3s hit=%s\n' "$1" "$3" "$n"; }
+# r＝行号自解形（用于**被上级频繁重排**的 mission 文档：只锁逐字短语，行号由门现算 ⇒ 不会因漂移报假警）
+r(){ ln=$(grep -nF -- "$3" "$2" | head -1 | cut -d: -f1); printf '%-28s L%-4s hit=%s 行号自解\n' "$1" "${ln:-NONE}" "$([ -n "$ln" ] && echo 1 || echo 0)"; }
 t F1-0011 x 78 $A/agents/F1/outbox/F1-0011.md 'Profile 仍是独立插件，Provider/Model 仍只有设计。'
 t I-PROJECT-REQUIRED-001 x 19 $A/agents/I/outbox/I-PROJECT-REQUIRED-001.md '不引入Profile/配置管理产品'
 t I-SESSION-FIRST-SEND-001 x 33 $A/agents/I/outbox/I-SESSION-FIRST-SEND-001.md '不授权额外真实模型调用、不改变99/10预算，不扩大Profile/Provider/Model范围'
@@ -121,7 +123,7 @@ t TASKS.md x 10 $A/TASKS.md 'PROFILE 独立包不进 CP'
 t TASKS.md x 8 $A/TASKS.md 'Provider/Model 和后续新架构/插件设计暂停'
 t TASKS.md x 5 $A/TASKS.md 'I-DEC-0001 取消旧 99/10 次数上限/计数手续'
 t CHARTER.md x 9 $A/../HD-001/CHARTER.md '不开发/迁移/扩张 Profile、Provider、Model、配置管理'
-t COORDINATION.md x 23 $A/COORDINATION.md 'status限制约40行'
+r COORDINATION.md $A/COORDINATION.md 'status限制约40行'
 t SESSION-OWNERSHIP.md x 10 $A/SESSION-OWNERSHIP.md '只有 BC 一个启动负责人'
 t README.md x 17 $A/README.md 'roles/'
 t verification-map.md x 62 $A/agents/PROFILE/verification-map.md '15.4kb'
@@ -136,8 +138,8 @@ t blueprint-v0.2 x 20 /home/maoqh/projects/ordessa/control/product/profile-bluep
 t blueprint-v0.2 x 31 /home/maoqh/projects/ordessa/control/product/profile-blueprint-v0.2.md '先核现场HEAD/dirty及P0/P1已交能力，写短差量方案和复用记录'
 t blueprint-v0.2 x 33 /home/maoqh/projects/ordessa/control/product/profile-blueprint-v0.2.md '执行者若已停或到平台上限，回报I，禁止重复启动同域写者'
 t F1-0013 x 52 $A/agents/F1/outbox/F1-0013.md '实际生效 `maxTurns: 100`'
-t COORDINATION.md x 23 $A/COORDINATION.md '阶段变化+约15分钟实质进展更新status'
-t COORDINATION.md x 33 $A/COORDINATION.md 'Profile优先轻量工作，不抢主线重资源'
+r COORDINATION.md $A/COORDINATION.md '阶段变化+约15分钟实质进展更新status'
+r COORDINATION.md $A/COORDINATION.md 'Profile优先轻量工作，不抢主线重资源'
 t decision-queue-README x 7 $A/decision-queue/README.md '先回读'
 t decision-queue-README x 13 $A/decision-queue/README.md '未启动不写成执行中'
 t I-PROVIDER-RESEARCH-001 x 7 $A/agents/I/outbox/I-PROVIDER-RESEARCH-001.md '以自身现测事实更新'
@@ -239,5 +241,101 @@ doc_drift_0712: 07:12 `linecite_gate_0536` 把 28 项全跑，唯一 `hit=0` 是
 
 defect_20_turn_selfcount: 07:20 平台进度行实读 `Progress: 48/100 turns used`，而本包同期两处记录写的是 49（`PROFILE-0009` §6）与 50（`status.md` §6 旧文）⇒ **我在自计轮次，且偏高 1–2**。同一族缺陷本包已登记过别的形态（把代理信号当证据），这次中招的是最容易被当作硬数的那个字段。修法：turn 数只准引平台进度行原文并附实读时刻；`status.md` §6 已改为 `48/100（07:20Z 实读）`。后果核量：本包的"到上限即回报 I"（v0.2:33）与"达上限即冻结在恢复点"两条都按平台数触发，自计偏高会**提前**误判接近上限（更保守，不致越权），但也会让「剩余预算」被少算约 2 turn ⇒ 分配「优先做到可交接」时失真；已发的 0009 不 amend（同 FE 提交 message 的 15.4kb 处置：旧件留原文、勘误走新条目）。这条同时是 defect ⑦/⑭ 家族的第 20 次复现——**凡"我自己数的"都必须换成"现跑的＋带时刻的"**。
 
-defect_21_misattributed_mail_site: 07:24 **无源队列 v2 第一次真正咬到东西**——它把 `status.md` §5 的「Qoder turn 上限本机实测 100」列成 NO-SRC（全语料 0 命中）。查出的是本包记录里性质最坏的一类保真缺陷：**不是不逐字，而是整句归错了人**。旧文写「外部印证：F1-0015 独立测得…」，实读：`F1-0015.md` 全文 `grep -n turn` 只有 `:47` 一行且讲零真实调用/零预算，**没有任何 turn 上限表述**；F1 侧的真实落点是 `F1-0001:22`＋`:26`、`F1-0004:38`＋`:40`、`F1-0011:82`、`F1-0013:52` 四处（六条断言已逐条整行机检 hit=1，并被引文字符串 `实际生效 \`maxTurns: 100\`` 入 §`linecite_gate_0536`；测式串用单引号包住 ⇒ 内层反引号不会被命令替换，defect ⑬A）。两处判断订正：(1) 引号内那句**在任何人的信里都不存在**，是我把结论缝成"他人原话"的形状；(2) 结论方向不变、且证据其实**更强**（F1 一条链报了四次，另加 F3-0013:90），但"更强"也不许用引号代替出处。为何此前所有门都没抓到：`linecite_gate_0536` 只检"该行是否含被引文字"，而这条引用**没有行号**（写成「F1-0015 独立测得」这种**只到件、不到行**的形状），门无从下手；故规则补一条：**凡归给他方的陈述必须落到 `件:行`，无行号即视为未核**。§5 已按此改写并保留"旧文误归属"的字样，不改写历史条目本体。
+codesite_gate_0754: 07:54 建成**码面行号门**（第三个"由抽取生成、不手抄"的机械门）。跑法 `python3 /tmp/pf-codesite.py <本包任一文档>`；脚本原文见下方围栏（/tmp 不跨重启）。
+
+## 码面行号门（07:54 建成；跑法 `python3 /tmp/pf-codesite.py <本包任一文档>`）
+
+defect_21_misattributed_mail_site 之后，同一族里更狠的一类被这道门自己挖了出来：**我自己两次 BE 提交把 `store.py`/`test_store.py` 的行号推移了**，于是本包记录里 07:32 写的 `store.py:82 create`、`test_store.py:38/87` 当场失效（门报 5 处异常）。这不是"上游漂移"（defect ㉑ 那种），是**本包写者自己造成引用腐烂**——只要还用行号引代码，每提交一次就可能坏一片。处置＝改引用形状：代码面一律写 `` `文件#符号` ``，由门去 `grep` 解行号；文档/邮件面保留 `件:行`＋逐字「题」并交给 §`linecite_gate_0536`。转换量：`verification-map.md` 16 处、`v0.2-delta.md` 4 处，跑完 19＋44＝**63 处码面引用异常 0**。
+
+defect_22_snake_test_names: 转换过程中查出 `verification-map.md` 的"具名测试"**有一批既不是 Python 实名、也不是 node:test 原题**——我把标题 snake_case 化（`canonical_text_keeps_what_the_UI_does_not_understand` 实为 `test('canonical text keeps what the UI does not understand'`），又给 BE 名字省掉 `test_` 前缀（`\b` 边界 ⇒ 门直接判 0 命中）。更要紧的是 `test_registry.py:37/49/55 a / b / c` 这种**行号串对名字串**的写法：位置对应读起来像映射，实测 `:49` 落在 `test_disposed_scope_cannot_register_again`、与我原先排的 `scope_dispose_releases_registrations` 差一位。全部按真实文件逐一改正（BE → `#test_实名`，FE → `:行 「原题」`）。限度照实记：**门只保证"该号处非空且含此串"，不保证行号在下次提交后仍有效**——代码面之所以改用 `#符号`，正是为了让"有效性"这件事不再依赖行号不漂。
+
+defect_23_anchor_ate_label: 07:56 建上面那道门时，我拿 `defect_21_misattributed_mail_site: 07:24` 这段**条目标签当编辑锚**，插入后把标签本身吃掉了——条目正文完好、标签消失，`grep '^[a-z0-9_]+:'` 少一条、按标签抽取的门也会从此看不见它。当场用标签计数与 `grep -n` 定位复原。同族先例是本轮早先那次 `old_string` 截断（留下 `SION-REUSE-001…` 残尾）。规矩补一条：**编辑锚一律选"只属于锚、不会随插入消失"的整行**（例如条目自己的首行须整段包含其后半句），编辑后立刻用标签普查（`grep -oE '^[a-z0-9_]+:' | sort | uniq -c`）确认条目数不减。
+
+```python
+# 码面行号门：本包文档里每个 `file:LINE[ token|「题」]` 与 `file#symbol` 引用，
+# 须满足——文件找得到、行号不越界、该行非空；带符号/引文的还须逐字含它。多号形 :77/87 与 :14-16 逐个展开。
+# 落盘位置固定 /tmp/pf-codesite.py（/tmp 不跨重启 ⇒ 原文在此，可整段抄回）。双向对照见 §codesite_gate_0754 上文。
+import re, sys, pathlib
+
+BE = pathlib.Path('/home/maoqh/projects/ordessa/worktrees/harness-desktop-002/profile/backend/plugins/agent-box-profile-preset')
+FE = pathlib.Path('/home/maoqh/projects/ordessa/worktrees/harness-desktop-002/profile/frontend/plugins/profile')
+MAP = {}
+for n in ('store.py', 'record.py', 'registry.py', 'resolver.py', 'diagnostics.py', '__init__.py', 'values.py', 'portable.py'):
+    MAP[n] = BE / 'src' / 'agent_box_profile_preset' / n
+for n in ('model.ts', 'entry.tsx', 'view.tsx', 'contributions.ts'):
+    MAP[n] = FE / 'src' / n
+for p in (BE / 'tests').glob('*.py'):
+    MAP[p.name] = p
+for p in (FE / 'tests').glob('*.test.ts'):
+    MAP[p.name] = p
+ROOT = pathlib.Path('/home/maoqh/projects/ordessa/control')
+MAP['profile-blueprint-v0.2.md'] = ROOT / 'product' / 'profile-blueprint-v0.2.md'
+HD2 = ROOT / 'missions' / 'HD-002'
+for n in ('README.md', 'COORDINATION.md', 'SCOPE.md', 'BASELINE.md', 'TASKS.md', 'SESSION-OWNERSHIP.md', 'USER-DECISIONS.md'):
+    MAP[n] = HD2 / n
+for n in ('CHARTER.md', 'BUDGET.md'):
+    MAP[n] = HD2.parent / 'HD-001' / n
+for doc in ('verification-map.md', 'v0.2-delta.md', 'status.md', 'evidence-log.md'):
+    MAP[doc] = pathlib.Path('/home/maoqh/projects/ordessa/control/missions/HD-002/agents/PROFILE') / doc
+
+CITE = re.compile(r'`([A-Za-z0-9_.-]+\.(?:py|ts|tsx|md)):([0-9]+(?:[/-][0-9]+)*)((?: [^`]*)?)`')
+SYM = re.compile(r'`([A-Za-z0-9_.-]+\.(?:py|ts|tsx))#([A-Za-z_][A-Za-z0-9_]*)`')
+
+
+def lines_of(spec):
+    # 支持 77 / 77/87 / 14-16 以及混排 11/17-21/27（逐段展开，绝不把整串当一个数）
+    out = []
+    for part in re.split(r'[/,]', spec):
+        if '-' in part:
+            a, b = part.split('-', 1)
+            out.extend(range(int(a), int(b) + 1))
+        else:
+            out.append(int(part))
+    return out
+
+
+# 归档区里的历史指针（写当时为真，上游重排后行号变空）＝明示豁免，新的破损仍会显形
+ALLOW = {'COORDINATION.md:11', 'COORDINATION.md:3', 'COORDINATION.md:17', 'COORDINATION.md:21'}
+
+
+def check(doc):
+    raw = pathlib.Path(doc).read_text(encoding='utf-8')
+    # 门体自身的围栏内容不参与计数（defect ⑲ 同族：别让工具把自己的零件当被测物）
+    text = re.sub(r'```.*?```', '', raw, flags=re.S)
+    total = bad = 0
+    for fname, sym in SYM.findall(text):
+        total += 1
+        path = MAP.get(fname)
+        if path is None or not path.is_file():
+            print(f'NOFILE  {fname}#{sym}'); bad += 1; continue
+        src = path.read_text(encoding='utf-8').splitlines()
+        if not any(re.search(rf'\b{sym}\b', line) for line in src):
+            print(f'NOSYM   {fname}#{sym} (文件 {len(src)} 行，0 命中)'); bad += 1
+    for m in CITE.finditer(text):
+        fname, spec, rest = m.group(1), m.group(2), m.group(3).strip()
+        for ln in lines_of(spec):
+            total += 1
+            path = MAP.get(fname)
+            if path is None or not path.is_file():
+                print(f'NOFILE  {fname}:{ln}'); bad += 1; continue
+            src = path.read_text(encoding='utf-8').splitlines()
+            if ln > len(src):
+                print(f'OVERRUN {fname}:{ln} file has {len(src)} lines'); bad += 1; continue
+            line = src[ln - 1]
+            if not line.strip():
+                if f'{fname}:{ln}' in ALLOW: continue
+                print(f'EMPTY   {fname}:{ln}'); bad += 1; continue
+            if rest:
+                quoted = re.search(r'「([^」]+)」', rest)
+                tok = re.match(r'[A-Za-z_][A-Za-z0-9_]*', rest)
+                want = quoted.group(1) if quoted else (tok.group(0) if tok else rest[:14])
+                if want not in line:
+                    print(f'MISSING {fname}:{ln} want={want!r} got={line.strip()[:70]!r}'); bad += 1
+    print(f'{doc}: {total} 处行号检查，异常 {bad}')
+    return bad
+
+
+sys.exit(1 if check(sys.argv[1]) else 0)
+```
+ defect_21_misattributed_mail_site: 07:24 **无源队列 v2 第一次真正咬到东西**——它把 `status.md` §5 的「Qoder turn 上限本机实测 100」列成 NO-SRC（全语料 0 命中）。查出的是本包记录里性质最坏的一类保真缺陷：**不是不逐字，而是整句归错了人**。旧文写「外部印证：F1-0015 独立测得…」，实读：`F1-0015.md` 全文 `grep -n turn` 只有 `:47` 一行且讲零真实调用/零预算，**没有任何 turn 上限表述**；F1 侧的真实落点是 `F1-0001:22`＋`:26`、`F1-0004:38`＋`:40`、`F1-0011:82`、`F1-0013:52` 四处（六条断言已逐条整行机检 hit=1，并被引文字符串 `实际生效 \`maxTurns: 100\`` 入 §`linecite_gate_0536`；测式串用单引号包住 ⇒ 内层反引号不会被命令替换，defect ⑬A）。两处判断订正：(1) 引号内那句**在任何人的信里都不存在**，是我把结论缝成"他人原话"的形状；(2) 结论方向不变、且证据其实**更强**（F1 一条链报了四次，另加 F3-0013:90），但"更强"也不许用引号代替出处。为何此前所有门都没抓到：`linecite_gate_0536` 只检"该行是否含被引文字"，而这条引用**没有行号**（写成「F1-0015 独立测得」这种**只到件、不到行**的形状），门无从下手；故规则补一条：**凡归给他方的陈述必须落到 `件:行`，无行号即视为未核**。§5 已按此改写并保留"旧文误归属"的字样，不改写历史条目本体。
 

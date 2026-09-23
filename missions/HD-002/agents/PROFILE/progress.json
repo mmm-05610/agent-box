@@ -1,35 +1,35 @@
 {
   "id": "profile",
-  "revision": 2,
+  "revision": 3,
   "status": "IN_PROGRESS",
-  "summary": "v0.2 逻辑蓝图已 ACK，现处码面差量核查阶段；P0/P1 独立包已获 BC 收件，v0.2 实施码为 0，宿主接缝与产品装配未做，不进 CP-SESSION-001 基线。",
-  "next": "核 ProfileRecord/store/registry 对 v0.2 条款的符合度并写短差量方案，再对无条目面（复制/删除/导入导出、能力解释器接口、registry 驱动编辑器、无 props 根视图、独立示例）先补测试锚。",
-  "evidence": "agents/PROFILE/status.md；agents/PROFILE/evidence-log.md；agents/PROFILE/verification-map.md；agents/PROFILE/outbox/PROFILE-0009.md",
+  "summary": "v0.2 差量核查已成交（真差量 4 项，非 0009 表所列 6 项），前两项 BE 已实施并跑绿：图纸复制与导出/导入校验预览；FE 两项未动，四状态仍只有独立插件验证一项成立。",
+  "next": "做余下两项 FE 差量：零 props 的 ProfileRoot 根视图（闭包绑定注入端口）与包内独立演示；每阶段先收件再同步。",
+  "evidence": "agents/PROFILE/v0.2-delta.md；agents/PROFILE/status.md；BE 58074749／96cdc337；agents/PROFILE/outbox/PROFILE-0010.md",
   "try_it": "产品内暂无入口。本包自跑门：BE 在 backend/plugins/agent-box-profile-preset 下 PYTHONPATH=src python3 -m unittest discover -s tests -p 'test_*.py' → 58 OK；FE 需借工具链，复跑配方见 verification-map.md。",
   "modules": [
     {
       "name": "Profile 逻辑蓝图",
       "owner": "PROFILE",
       "status": "IN_PROGRESS",
-      "summary": "已亲读 v0.2 全文并发出 ACK＋差量计划（PROFILE-0009），差量项已列成 6 条；但码面符合度核查尚未开始，故蓝图落地进度为 0。",
-      "done": "v0.2 权威件 33 行全文亲读；ACK 与差量计划成文；0006 §2（宿主传 records 还是插件自带 port）已按 v0.2:18 裁定为「插件自带数据接入层」，宿主 root.mount 零改动。",
-      "doing": "整理本包写域与禁面，准备对既有 BE/FE 码逐条核 v0.2 模型条款。",
-      "next": "写短差量方案与复用记录，然后按无条目面先补测试锚（锚红→绿）。",
+      "summary": "码面符合度核查完成并落成文档：逐条对到 文件#符号，纠正了 0009 差量表过头的三项；四项真差量已交两项（BE），两项未开始（FE）。",
+      "done": "v0.2 全文亲读＋ACK（PROFILE-0009）；0006 §2 按 v0.2:18 裁为插件自带数据接入层、宿主零改动；差量核查与复用记录成文（v0.2-delta.md，44 处码面引用过门）；store.clone 与 portable 导出/导入（含校验预览）已提交。",
+      "doing": "无（本轮结束时停在 FE 两项之前；BE 门 73 tests OK，两树 porcelain 0）。",
+      "next": "实现零 props 根视图 ProfileRoot，再做包内独立演示（假 PresetPort、明标测试端口）。",
       "blockers": "无；不影响 CP-SESSION-001。",
       "evidence": "control/product/profile-blueprint-v0.2.md:18/20/31；agents/PROFILE/outbox/PROFILE-0009.md；agents/PROFILE/evidence-log.md §approval_v02_0637",
-      "observed_at": "2026-09-23T07:07:48Z"
+      "observed_at": "2026-09-23T08:08:00Z"
     },
     {
       "name": "Profile 独立插件包（P0/P1，仅独立验证）",
       "owner": "PROFILE",
       "status": "DONE",
-      "summary": "既有两树独立包的门于本轮现跑复现全绿，BC 已按独立插件验证收件；「收件」仅覆盖独立验证这一状态。",
-      "done": "BE 58 unittest OK 与零 entry_points/零 Requires-Dist wheel（15296 bytes）；FE tsc --noEmit 0 → CJS 出件 0 → node --test 12/12 → esbuild entry.js 15453 bytes；两树 HEAD 未变且 git status --porcelain 各 0 行（本轮 07:07 实测）。",
+      "summary": "既有独立包的门本轮现跑复现全绿，且本批 v0.2 两项新增使包内 BE 测试 58→73；「收件」仍只覆盖独立插件验证。",
+      "done": "BE 58 unittest OK 与零 entry_points/零 Requires-Dist wheel（15296 bytes）；FE tsc --noEmit 0 → CJS 出件 0 → node --test 12/12 → esbuild entry.js 15453 bytes；两树 HEAD 未变且 git status --porcelain 各 0 行（本轮 07:07 实测）。 v0.2 增量：store.clone（副本从 revision 1 起、可指名被复制修订）与 portable.py（只导图纸、坏件整包拒收零写入、不覆盖同名），BE unittest 73 OK。",
       "doing": "无（该阶段已交，保持不返工）。",
       "next": "若 v0.2 差量触及既有码，改动一律另起提交并在 verification-map 补验收映射。",
       "blockers": "无。已登记而不由本包自修的缺口：app vitest include 不含本包测试；跑 build-all 会重写已提交 extensions.lock.json（本包不跑，处置权在 FC/C）。",
-      "evidence": "agents/PROFILE/verification-map.md（含复跑配方与 07:07 复核）；BC-0026:16；BE f3bcbde9／FE e869683469",
-      "observed_at": "2026-09-23T07:07:48Z"
+      "evidence": "agents/PROFILE/verification-map.md；BC-0026:16；BE 58074749／96cdc337（父 f3bcbde9）／FE e869683469",
+      "observed_at": "2026-09-23T08:08:00Z"
     },
     {
       "name": "Profile 宿主接缝与产品装配",

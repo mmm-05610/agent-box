@@ -4,16 +4,16 @@
 
 | BC-0002 §验收 | BE（58 tests，`python3 -m unittest discover -s tests`） | FE（12 tests，`node --test` 编译副本） |
 | --- | --- | --- |
-| revision 冲突 | `test_store.py:38 update_is_compare_and_set`、`test_resolver.py:169 launch_follows_only_the_pinned_revision` | `model.test.ts:103 a save names the revision it read, and a stale save is refused` |
-| 重复注册报冲突 | `test_registry.py:19 duplicate_kind_version_conflicts_without_replacing` | `model.test.ts:87 editors_are_claimed_per_kind@version…`、`:192 contributions…duplicates clash` |
-| 扩展卸载后失效 | `test_registry.py:37/49/55 scope_dispose_releases_registrations / disposed_scope_cannot_register_again / unload_of_one_contributor_leaves_the_other` | `model.test.ts:87`、`entry.test.ts:74 disposing_the_owned_resource_releases_contributions_without_touching_another_owner` |
-| 未知值无损往返 | `test_record.py:37`、`test_store.py:59`、`test_resolver.py:108 unknown_kind_is_saved_losslessly_and_refused_at_launch` | `model.test.ts:61 canonical_text_keeps_what_the_UI_does_not_understand` |
-| 路径/秘密负例 | `test_record.py:71/76/81/86/102` | `model.test.ts:41 a_location_or_a_secret_never_enters_an_editable_record` |
-| 同一记录在两种模拟 home 解析、记录字节不变 | `test_resolver.py:48 the_same_record_bytes_resolve_differently_per_home` | —（BE 权威，FE 不替代） |
-| 一项失败无副作用 | `test_resolver.py:76 one_failing_selection_leaves_the_environment_untouched`、`:100 preview_never_reports_applied` | —（同上） |
-| 无插件默认路径不受影响 | `test_isolation.py:49/61 importing_registers_nothing / a_registry_appears_only_where_a_caller_made_one`、`test_resolver.py:177` | `entry.test.ts:43 without_a_port_the_plugin_contributes_nothing_it_cannot_honour` |
-| FE 无编辑器只读保留 | — | `model.test.ts:208 read-only/unlaunchable/unsupported`、`entry.test.ts:50`（真渲染断言画出 `read-only` 与 `<code>` 原文） |
-| FE 连接切换使可用性失效 | — | `model.test.ts:132 readiness_belongs_to_the_connection…`、`:171 an_in-flight_availability_answer_is_dropped…` |
+| revision 冲突 | `test_store.py#test_update_is_compare_and_set`、`test_resolver.py#test_launch_follows_only_the_pinned_revision` | `model.test.ts:103 「a save names the revision it read, and a stale save is refused」` |
+| 重复注册报冲突 | `test_registry.py#test_duplicate_kind_version_conflicts_without_replacing` | `model.test.ts:87 「editors are claimed per kind@version and released with their scope」`、`:192 contributions…duplicates clash` |
+| 扩展卸载后失效 | `test_registry.py#test_scope_dispose_releases_registrations ＋ :49/:55 「test_disposed_scope_cannot_register_again」/「test_unload_of_one_contributor_leaves_the_other」` | `model.test.ts:87`、`entry.test.ts:74 「disposing the owned resource releases contributions without touching another owner」` |
+| 未知值无损往返 | `test_record.py#test_round_trip_keeps_unknown_selections`、`test_store.py#test_unknown_and_future_versioned_selection_round_trips_unchanged`、`test_resolver.py#test_unknown_kind_is_saved_losslessly_and_refused_at_launch` | `model.test.ts:61 「canonical text keeps what the UI does not understand」` |
+| 路径/秘密负例 | `test_record.py#test_absolute_and_home_paths_are_rejected＋:76/:81/:86/:102 四例同名前缀见 §实名清单` | `model.test.ts:41 「a location or a secret never enters an editable record」` |
+| 同一记录在两种模拟 home 解析、记录字节不变 | `test_resolver.py#test_the_same_record_bytes_resolve_differently_per_home` | —（BE 权威，FE 不替代） |
+| 一项失败无副作用 | `test_resolver.py#test_one_failing_selection_leaves_the_environment_untouched`、`:100 preview_never_reports_applied` | —（同上） |
+| 无插件默认路径不受影响 | `test_isolation.py#test_importing_the_package_registers_nothing ＋ :61 test_a_registry_appears_only_where_a_caller_made_one`、`test_resolver.py#test_an_empty_record_needs_no_registrations` | `entry.test.ts:43 「without a port the plugin contributes nothing it cannot honour」` |
+| FE 无编辑器只读保留 | — | `model.test.ts:208 「read-only, unlaunchable and unsupported stay three different answers」`、`entry.test.ts:50`（真渲染断言画出 `read-only` 与 `<code>` 原文） |
+| FE 连接切换使可用性失效 | — | `model.test.ts:132 「readiness belongs to the connection that measured it」`、`:171 an_in-flight_availability_answer_is_dropped…` |
 
 ## 本表同时固定的三件事实（不外推）
 
