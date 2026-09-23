@@ -82,7 +82,7 @@ function ConversationThread({ service, connectionId, sessionId }: { service: Age
     {run?.status === 'stop-requested' && <p role="status" className="agent-notice">Stop requested. Waiting for the agent to confirm.</p>}
     {run?.status === 'unknown' && <p role="status" className="agent-notice">Run outcome unknown after disconnect.</p>}
     {agent.diagnostic && <p role="status" className="agent-notice">{agent.diagnostic}</p>}
-    {agent.options.length > 0 && <div className="agent-options">{agent.options.filter(option => option.availability === 'supported' && option.values?.length).map(option =>
+    {agent.options.length > 0 && <div className="agent-options">{agent.options.filter(option => option.id !== 'model' && option.availability === 'supported' && option.values?.length).map(option =>
       <label key={option.id}>{option.title}<select value={option.value ?? ''} onChange={event => { setActionError(''); void service.setOption(option.id, event.target.value).catch(error => setActionError(errorText(error))) }}>
         {option.values!.map(value => <option key={value.id} value={value.id}>{value.title}</option>)}
       </select></label>)}</div>}

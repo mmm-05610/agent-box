@@ -49,7 +49,7 @@ function InteractionCard({ item, service }: { item: AgentInteraction; service: A
 }
 export function InteractionPanel({ service }: { service: AgentSessions }) {
   const state = useSyncExternalStore(service.subscribe, service.getSnapshot)
-  const items = state.agent?.interactions ?? []
+  const items = (state.agent?.interactions ?? []).filter(item => item.sessionId === state.agent?.selectedSessionId)
   return <section className="agent-interactions"><style>{styles}</style><h2>Requests</h2>
     {!items.length ? <p className="muted">No requests need a response.</p> : items.map(item => <InteractionCard key={item.id} item={item} service={service} />)}
   </section>
