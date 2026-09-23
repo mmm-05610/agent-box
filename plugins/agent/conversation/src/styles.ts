@@ -55,7 +55,8 @@ export const styles = `
 .agent-interaction button { margin:5px 5px 0 0; border:1px solid #bfcddd; border-radius:4px; background:#edf3fa; color:var(--agent-blue); padding:6px 9px; font-size:11px; }
 .agent-interaction button:hover:not(:disabled) { background:#dceaf7; }
 .agent-interaction-error { color:#9b3e3e; }.agent-interaction-muted { color:var(--agent-muted); }
-.agent-compose { display:flex; align-items:flex-end; gap:8px; border-top:1px solid var(--agent-line); padding:10px 14px; }
+.agent-compose { display:flex; align-items:flex-end; flex-wrap:wrap; gap:8px; border-top:1px solid var(--agent-line); padding:10px 14px; }
+.agent-compose-block { flex:1 0 100%; margin:0; color:var(--agent-wait); font-size:11px; line-height:1.45; }
 .agent-compose form { display:flex; align-items:flex-end; flex:1; gap:8px; }.agent-compose textarea { flex:1; min-height:58px; max-height:180px; resize:vertical; border:1px solid #cbd6e1; border-radius:4px; padding:9px; font:13px system-ui,sans-serif; }
 .agent-compose button { flex:none; border:1px solid #bfcddd; background:#edf3fa; color:#315f92; border-radius:4px; padding:8px 11px; font-size:11px; }
 .agent-compose button:hover:not(:disabled) { background:#dceaf7; }

@@ -1,9 +1,18 @@
 import { useState, useSyncExternalStore } from 'react'
-import { AssistantRuntimeProvider, useExternalStoreRuntime, ThreadPrimitive, MessagePrimitive, MessagePartPrimitive, ComposerPrimitive,
+import { AssistantRuntimeProvider, useExternalStoreRuntime, ThreadPrimitive, MessagePrimitive, MessagePartPrimitive,
   type AppendMessage, type ThreadMessageLike, type ToolCallMessagePartProps } from '@assistant-ui/react'
-import type { AgentMessage, AgentSessions, AgentToolCall } from '@extensions/ordessa.agent-contracts/contract.js'
+import type { AgentMessage, AgentSessions, AgentToolCall, AgentWorkspaceSnapshot } from '@extensions/ordessa.agent-contracts/contract.js'
 import { styles } from './styles'
 import { SessionInteractions } from './interaction-card'
+
+type Draft = NonNullable<AgentWorkspaceSnapshot['draft']>
+
+// The project gate is decided by the Sessions facade; this surface only names the reason and points there (FC-0043 Q2).
+const draftBlockCopy: Record<NonNullable<Draft['blockReason']>, string> = {
+  unsupported: 'This connection cannot open a session in a project. Pick the project in Sessions before sending.',
+  'no-project': 'No project is selected for the new session. Choose it in Sessions first.',
+  'project-invalid': 'The selected project is no longer valid on this Server. Re-select it in Sessions first.',
+}
 
 function useWorkspace(service: AgentSessions) { return useSyncExternalStore(service.subscribe, service.getSnapshot) }
 const errorText = (error: unknown) => error instanceof Error ? error.message : String(error)
@@ -40,21 +49,29 @@ function ToolPart({ toolName, argsText, result, artifact }: ToolCallMessagePartP
 function ChatMessage() {
   return <MessagePrimitive.Root className="agent-message"><MessagePrimitive.Parts components={{ Text: TextPart, Reasoning: ReasoningPart, tools: { Fallback: ToolPart } }} /></MessagePrimitive.Root>
 }
-function ConversationThread({ service, connectionId, sessionId }: { service: AgentSessions; connectionId: string; sessionId: string }) {
+function ConversationThread({ service, connectionId, sessionId, draft }: { service: AgentSessions; connectionId: string; sessionId: string; draft: Draft | undefined }) {
   const state = useWorkspace(service), agent = state.agent!
   const [actionError, setActionError] = useState('')
+  // Held in this component so a rejected send cannot silently empty the field (FC-0043 Q3).
+  const [text, setText] = useState(''), [sending, setSending] = useState(false)
+  const drafting = !sessionId && draft?.active === true
+  const blocked = drafting && draft?.canSend === false
   const messages = agent.messages[sessionId] ?? []
   const run = Object.values(agent.runs).filter(item => item.sessionId === sessionId).at(-1)
   const running = run?.status === 'starting' || run?.status === 'running' || run?.status === 'stop-requested'
+  const deliver = async (value: string) => {
+    if (sending || blocked || !value.trim()) return
+    setSending(true); setActionError('')
+    // The facade only resolves once the real session id is confirmed in the snapshot; anything else keeps the text.
+    try { await service.send(value); setText('') } catch (error) { setActionError(errorText(error)) }
+    finally { setSending(false) }
+  }
   const runtime = useExternalStoreRuntime({ messages, isRunning: running, convertMessage,
-    onNew: async (message: AppendMessage) => {
-      const text = message.content.filter(part => part.type === 'text').map(part => part.text).join('\n')
-      setActionError('')
-      try { await service.send(text) } catch (error) { setActionError(errorText(error)); throw error }
-    },
+    onNew: async (message: AppendMessage) => { await deliver(message.content.filter(part => part.type === 'text').map(part => part.text).join('\n')) },
   })
+  const submit = async () => { await deliver(text) }
   return <AssistantRuntimeProvider runtime={runtime}><section className="agent-panel agent-conversation"><style>{styles}</style>
-    <header className="agent-conversation-head"><div><small>SESSION</small><h2>{agent.sessions.find(item => item.id === sessionId)?.title ?? sessionId}</h2></div>
+    <header className="agent-conversation-head"><div><small>{drafting ? 'NEW SESSION' : 'SESSION'}</small><h2>{agent.sessions.find(item => item.id === sessionId)?.title ?? (drafting ? 'New session' : sessionId)}</h2></div>
       <div className="agent-run-state" data-status={run?.status ?? 'idle'}>{run?.status ?? 'idle'}</div></header>
     {agent.connection.status !== 'connected' && <p role="alert" className="agent-error">Connection lost. The result of an active run is unknown. Reconnect from Connections.</p>}
     {run?.status === 'stop-requested' && <p role="status" className="agent-notice">Stop requested. Waiting for the agent to confirm.</p>}
@@ -67,9 +84,14 @@ function ConversationThread({ service, connectionId, sessionId }: { service: Age
       </select></label>)}</div>}
     <ThreadPrimitive.Root className="agent-thread"><ThreadPrimitive.Viewport className="agent-viewport">
       <ThreadPrimitive.Messages components={{ Message: ChatMessage }} />
+      {!messages.length && <p className="agent-empty">{drafting ? 'Nothing has been sent yet. Your first message opens the session in the selected project.' : 'No messages in this session yet.'}</p>}
     </ThreadPrimitive.Viewport><div className="agent-compose">
-      <ComposerPrimitive.Root><ComposerPrimitive.Input aria-label="Message" placeholder="Message this agent" />
-        <ComposerPrimitive.Send>Send</ComposerPrimitive.Send></ComposerPrimitive.Root>
+      {drafting && blocked && <p role="status" className="agent-compose-block">{draftBlockCopy[draft!.blockReason ?? 'no-project']}</p>}
+      <form onSubmit={event => { event.preventDefault(); void submit() }}>
+        <textarea aria-label="Message" placeholder={drafting ? 'Message the new session' : 'Message this agent'}
+          value={text} onChange={event => setText(event.target.value)} readOnly={sending} />
+        <button type="submit" disabled={sending || blocked || !text.trim()}>{drafting ? 'Start session' : 'Send'}</button>
+      </form>
       {running && <button disabled={run.status === 'stop-requested' || run.status === 'starting'} onClick={() => { setActionError(''); void service.stop(run.id).catch(error => setActionError(errorText(error))) }}>
         {run.status === 'stop-requested' ? 'Stop requested' : 'Request stop'}</button>}
     </div></ThreadPrimitive.Root>
@@ -78,8 +100,9 @@ function ConversationThread({ service, connectionId, sessionId }: { service: Age
 }
 export function Conversation({ service }: { service: AgentSessions }) {
   const state = useWorkspace(service), agent = state.agent, sessionId = agent?.selectedSessionId
+  // A draft has no backend session yet, so the absence of a selection is the new-session case, not an empty pane (FC-0030).
   if (!state.selectedConnectionId) return <div className="agent-panel agent-placeholder"><style>{styles}</style><h2>Choose a connection</h2><p>Select an enabled agent from the left panel.</p></div>
   if (!agent) return <div className="agent-panel agent-placeholder"><style>{styles}</style><h2>Connecting</h2><p>{state.error ?? 'Waiting for the agent connection.'}</p></div>
-  if (!sessionId) return <div className="agent-panel agent-placeholder"><style>{styles}</style><h2>Choose a session</h2><p>Open a previous session or start a new one.</p></div>
-  return <ConversationThread key={`${state.selectedConnectionId}:${sessionId}`} service={service} connectionId={state.selectedConnectionId} sessionId={sessionId} />
+  if (!sessionId && !state.draft?.active) return <div className="agent-panel agent-placeholder"><style>{styles}</style><h2>Choose a session</h2><p>Open a previous session or start a new one.</p></div>
+  return <ConversationThread key={`${state.selectedConnectionId}:${sessionId ?? 'draft'}`} service={service} connectionId={state.selectedConnectionId} sessionId={sessionId ?? ''} draft={state.draft} />
 }
