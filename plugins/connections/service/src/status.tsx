@@ -22,7 +22,7 @@ export function ConnectionStatus({ workspace }: { workspace: AgentConnectionWork
     </button>
     {open && <div className="conn-popover" role="group" aria-label="Agent connections">
       {state.available.length
-        ? state.available.map(item => <button key={item.id}
+        ? state.available.map(item => <button key={item.id} data-connection-id={item.id}
             className={selected === item.id ? 'conn-selected' : ''}
             aria-pressed={selected === item.id}
             onClick={() => perform(async () => { await workspace.selectConnection(item.id) })}>

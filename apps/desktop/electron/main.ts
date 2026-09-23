@@ -91,6 +91,57 @@ app.whenReady().then(async () => {
         };
       })()`) })
     }
+    if (process.env.MODULAR_NATIVE_PAIR_SMOKE === '1') {
+      // C-0048: UI-only paired gate. The script may refresh/open a project but has no Send action.
+      const expectedConnection = `ordessa:${process.env.ORDESSA_SERVER_ORIGIN}|${process.env.ORDESSA_PAIR_SERVER_ID}`
+      const projectPath = process.env.ORDESSA_PAIR_PROJECT_PATH ?? ''
+      Object.assign(result, { nativePair: await win.webContents.executeJavaScript(`(async () => {
+        const waitFor = async predicate => {
+          for (let i = 0; i < 80; i++) {
+            if (predicate()) return true;
+            await new Promise(resolve => setTimeout(resolve, 50));
+          }
+          return false;
+        };
+        const tab = label => [...document.querySelectorAll('[data-region] header [role="group"] button')].find(button => button.textContent === label);
+        const agents = [...document.querySelectorAll('nav button')].find(button => button.getAttribute('aria-label') === 'Agents');
+        agents?.click();
+        await waitFor(() => !!document.querySelector('.conn-status-toggle'));
+        document.querySelector('.conn-status-toggle')?.click();
+        await waitFor(() => !!document.querySelector('[role="group"][aria-label="Agent connections"]'));
+        const buttons = [...document.querySelectorAll('[role="group"][aria-label="Agent connections"] button[data-connection-id]')];
+        const server = buttons.find(button => button.textContent.includes('Ordessa Server'));
+        const oneServer = buttons.length === 1 && !!server;
+        const connectionIdMatches = server?.getAttribute('data-connection-id') === ${JSON.stringify(expectedConnection)};
+        server?.click();
+        const connected = await waitFor(() => !!document.querySelector('.conn-dot-connected'));
+        tab('Sessions')?.click();
+        await waitFor(() => !!document.querySelector('.agent-sessions'));
+        const newSession = [...document.querySelectorAll('.agent-sessions button')].find(button => button.textContent === 'New session');
+        newSession?.click();
+        await waitFor(() => !!document.querySelector('.agent-project-picker'));
+        const refresh = [...document.querySelectorAll('.agent-sessions button')].find(button => button.textContent === 'Refresh projects');
+        refresh?.click();
+        const listed = await waitFor(() => [...document.querySelectorAll('.agent-project-picker button')]
+          .some(button => button.textContent.trim() === ${JSON.stringify(projectPath)}));
+        const project = [...document.querySelectorAll('.agent-project-picker button')]
+          .find(button => button.textContent.trim() === ${JSON.stringify(projectPath)});
+        project?.click();
+        const selected = await waitFor(() => [...document.querySelectorAll('.agent-project-picker button')]
+          .some(button => button.textContent.trim() === ${JSON.stringify(projectPath)} && button.getAttribute('aria-pressed') === 'true'));
+        tab('Conversation')?.click();
+        await waitFor(() => !!document.querySelector('.agent-compose'));
+        const start = [...document.querySelectorAll('.agent-compose button')].find(button => button.textContent === 'Start session');
+        return {
+          oneServer, connectionIdMatches, connected, listed, selected,
+          draftVisible: !!document.querySelector('.agent-conversation-head')?.textContent.includes('NEW SESSION'),
+          projectGateOpen: !document.querySelector('.agent-compose-block'),
+          emptyComposerCannotSend: !!start && start.disabled && !document.querySelector('.agent-compose textarea')?.value,
+          directConnectorsAbsent: !buttons.some(button => /Codex|Pi/.test(button.textContent)),
+          errorsAbsent: [...document.querySelectorAll('[role="alert"]')].length === 0,
+        };
+      })()`) })
+    }
     if (process.env.MODULAR_STORAGE_RESTART_SMOKE === '1') {
       // Test-only fixture: non-secret placeholder selection values, namespaced by origin+serverId (FC-0034/0035).
       Object.assign(result, { storage: await win.webContents.executeJavaScript(`(async () => {

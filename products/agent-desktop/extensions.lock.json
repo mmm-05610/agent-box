@@ -10,7 +10,7 @@
     "ordessa.agent-conversation"
   ],
   "files": {
-    "extensions/ordessa.agent-connections/entry.js": "0a4539af65d1cf4e1043e9d70d93c2a479fa37b7fc5d0f33c9ceaf1d36d3e604",
+    "extensions/ordessa.agent-connections/entry.js": "db7bb61f791a62ca118e64c10d959605ea9ecb488bb5b4aa31afd10c10e04a12",
     "extensions/ordessa.agent-connections/manifest.json": "ff47baf6c3e151e16ecdd0784b104036cb4023ece4892ec143ff84b45d248a86",
     "extensions/ordessa.agent-contracts/contract.js": "432789df7f5206d760a6a450a5ad8faa02506bc8af674f2f21718a219b40e655",
     "extensions/ordessa.agent-contracts/entry.js": "4c8fc95050ff14452dd957f9cdd7f9519b16ccf3043f337857d9c06cffe8abfb",
