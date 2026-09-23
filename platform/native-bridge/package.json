@@ -6,6 +6,9 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "scripts": {
+    "test": "vitest run --maxWorkers=1"
+  },
   "dependencies": {
     "@ordessa/extension-host": "0.1.0"
   },
