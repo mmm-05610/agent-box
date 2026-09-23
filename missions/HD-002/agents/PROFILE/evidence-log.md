@@ -58,18 +58,23 @@ cursor_defect_11_shortcircuit: 05:13 查出收件链里最隐蔽的一条**「�
 standby_cursor_canon_0516: 05:16 做一次**指针体检**时发现一个会直接废掉我自己硬规则的缺陷：defect ④ 的硬规则 (a) 写的是「收件命令一律**从 line 17 原样复制**」，但 `sed -n '17p' evidence-log.md` 实测该行**是空行**——该指针是 `status.md` 时代记的，04:50 拆分后编号整体位移 ⇒ **指针悬空**。更根本的原因：权威命令此前**散在叙述里**（写本条时实测分布于 line 37 `cursor_defect_3`、48 `cursor_defect_5`、52 `defect ⑧`、57 `defect ⑪`），从来没有一处可整块复制的地方，所以我实际上一直在**手打**——这正是 defect ④／⑨／⑪ 三次同族失败的**共同根因**。处置两条：(1) **不回改归档正文**（`## 归档正文` 起为 04:50 逐字快照，内含两处「line 17」字样，按「原文未改」保留；本条即其**勘误**：本文件内一切「line 17」指针作废）；(2) 游标**首次整块成文**于下方，以后只准从此块**整段复制**、且**以标签名而非行号**引用（末尾追加不影响标签，行号会变）。以下每条均于 05:13–05:16 实跑通过，cwd 必须是 `…/control/missions/HD-002/agents`：
 
 ```sh
-# ① inbox 对照已知集（期望恰 3 件，全为 I 派达）
-ls PROFILE/inbox/                      # {I-BASELINE-CLOSEOUT-001, I-DECISION-REUSE-001, I-SESSION-CHECKPOINT-001}
-# ② 角色名点名（期望「他人基线」= 21 件；裸数 26 含我自己 5 件 ⇒ 基线是集合不是数字）
-grep -rlE "(^|[[:space:]])(to|cc|reply_to):.*PROFILE" */outbox/*.md | grep -v '^PROFILE/' | sort
+# 游标块**自带 cd**（defect ⑯：整块复跑时前序块的 `cd` 会改变 cwd，依赖 glob 的判据会静默输出空）
+cd /home/maoqh/projects/ordessa/control/missions/HD-002/agents || exit 1
+# ① inbox 对照已知集（06:58 实测 **4** 件，全为 I 派达；v1 的"期望恰 3 件"已被 14:30 的 I-PROFILE-BLUEPRINT-002 作废）
+ls PROFILE/inbox/                      # {I-BASELINE-CLOSEOUT-001, I-DECISION-REUSE-001, I-SESSION-CHECKPOINT-001, I-PROFILE-BLUEPRINT-002}
+                                       # 第 4 件＝本包 v0.2 授权来源，已亲读并 ACK（outbox/PROFILE-0009）⇒ 无新义务
+                                       # 义务史：CHECKPOINT-001:1 要求「读 ../../../SESSION-CHECKPOINT.md，向BC ACK」＝已履行（PROFILE-0003:9 reply_to 含该件）
+# ② 角色名点名（**必须整词匹配**，见 §`defect_17_substring_role`；期望「他人基线」= 22 件，06:37 起含 I-PROFILE-BLUEPRINT-002；未滤 PROFILE/ 的裸数＝22＋本包自己的件数，随发件增长，故基线是集合不是数字）
+grep -rlE "(^|[[:space:]])(to|cc|reply_to):.*([,[:space:]])PROFILE([,[:space:];]|$)" */outbox/*.md | grep -v '^PROFILE/' | sort
 # ③ head（严禁写成 '[0-9]{4}$'：文件名以 .md 结尾 ⇒ 全角色同值＝命令失效）
 for d in */outbox; do r=${d%%/outbox}; m=$(ls $d 2>/dev/null | grep -oE '[0-9]{4}' | sort -n | tail -1); echo -n "$r=${m:-ERR} "; done; echo
-# ③b I 通道（语义文件名，③ 对它永久失明；期望 7 件）
-ls I/outbox
+# ③b I 通道（语义文件名，③ 对它永久失明；06:58 实测 **11** 件，与 §5 基线同号；旧"期望 7 件"作废。
+#      成员即证据 ⇒ 先打印集合再打计数，不得只留裸数（defect ⑧/⑭））
+ls I/outbox; ls I/outbox | grep -c '\.md$'
 # ④ 包标识符差集（期望只剩 BC-0015＝已读已判）
-comm -13 <(grep -rlE "(^|[[:space:]])(to|cc|reply_to):.*PROFILE" */outbox/*.md | sort) \
+comm -13 <(grep -rlE "(^|[[:space:]])(to|cc|reply_to):.*([,[:space:]])PROFILE([,[:space:];]|$)" */outbox/*.md | sort) \
          <(grep -rlE 'plugins/profile|agent-box-profile-preset|ordessa\.profile|ProfileRecord' */outbox/*.md */inbox/*.md | sort) | grep -v '^PROFILE/'
-# ⑤ 散文点名（低噪超集；期望 6 件，均已读）
+# ⑤ 散文点名（低噪超集；**成员一律由 §`harvest_gate_0631` 现跑现给，本块不再抄清单**——手抄基线在 06:12–06:31 的 19 分钟内从 17 涨到 22 就已失效，06:58 实测 **24**）
 grep -rlEi 'Profile[^.]{0,12}(仅独立插件|只设计|独立插件)' */outbox/*.md */inbox/*.md | grep -v '^PROFILE/'
 # 单个新件的超集前置式（0 ⇒ ②④⑤ 皆不可能命中，一次判定）
 grep -ci profile <新件路径>
@@ -80,14 +85,15 @@ refintegrity_checker_selftrap_0521: 05:21 按新规则跑游标（从 §`standby
 bc0042_profileid_evidence_0521: 05:21 游标见 head 再进 **BC 0041→0042**、**F3 0014→0015**。F3-0015 超集式 `grep -ci profile`=**0** ⇒ 三条匹配式皆不可能命中，一次判定无义务（该件用无短横头 `from: F3`，再次印证判定式不能锚定 `- `）。BC-0042（`to: C; cc: H, FC, I`，非发我）超集式命中 2 处，逐行读后确认**属既有 Server profile 域、不涉本包**：`:16`「实际 Server CLI 已认证 hello `nativeExecution` 为 native/pi，精确 `profileId` 在 `profiles.list` 唯一且 `sendability=ready`，空项目 `workspaces.open` 路径匹配」，`:22` 记另一空目录下「hello/profile ready/workspace open 均通过」而 ACP `session/new` 仍返 opaque native 错误。规则 ④ 对全文 **0 命中**（不含 `ProfileRecord`／包路径），故与本包插件无关。价值在于它是本包界线在下游的**第三个独立实例**：F1-0009 取自 `profiles.list.items[]`、H-0007 声明不造第二身份、BC-0042 在真实门日志里同样只用 Server 的 `profileId`——**至今没有任何角色把本包 `ProfileRecord.id` 当 `profileId` 用**，PROFILE-0007 钉的界线在受控真实链推进中仍未被越界。若将来 BC/C 改用本包记录 ID，才是对本包的派单。本 tick 无动作、无回件、产品树未动。
 quotegate_0525: 上面那句「剥掉行内代码段再计数」在正文里只能近似写（命令本身含反引号，写在行内码里会互相打断），故把**实测用过的那一条**整块成文如下，与 §`standby_cursor_canon_0516` 同理——只准整段复制、按标签引用：
 ```sh
-# 引文平衡门：commit 前跑，三个记录文件的 stripped 差值须全为 0
+# 引文平衡门 v2（06:56 改版，见 §`defect_19_quotegate_fence_outbox`）：commit 前跑，差值须全为 0。
+# v1 的两处口径缺陷：(a) 只剥行内码、不剥围栏块 ⇒ 门体自身含「「」」的正文（如 §defect_18 的 `'「[^」]{6,}」'`，天然 1 开 2 闭）会被计入，造出假警报；(b) 不测 outbox ⇒ defect ⑱ 那四处非逐字恰好发生在门没看的邮件里。
 cd /home/maoqh/projects/ordessa/control/missions/HD-002/agents/PROFILE
-for f in status.md evidence-log.md verification-map.md; do s=$(sed 's/`\{1,2\}[^`]*`\{1,2\}//g' $f); echo "$f stripped $(printf "%s" "$s"|grep -o "「"|wc -l)/$(printf "%s" "$s"|grep -o "」"|wc -l)"; done
+for f in status.md evidence-log.md verification-map.md outbox/*.md; do s=$(awk '/^```/{p=!p; next} !p' $f | sed 's/`\{1,2\}[^`]*`\{1,2\}//g'); echo "$f prose $(printf "%s" "$s"|grep -o "「"|wc -l)/$(printf "%s" "$s"|grep -o "」"|wc -l)"; done
 ```
 writedomain_and_nopush_proof_0526: 05:26 把目标里的**「核对当前树和旧交付」**从记忆升级成**逐提交实证**，并顺手把「未 push」这句话换成可核的判据。(1) **写域合规**：`git show --name-only` 逐个列我自己 5 个提交的全部路径——BE `01373b2d`（17 文件）与 `f3bcbde9`（1 文件）**只**含 `plugins/agent-box-profile-preset/**`；FE `3fab07948b`（10）/`db5585cf2b`（6）/`e869683469`（3）并集 **11 个不同文件全部**只含 `plugins/profile/**`，与 §1 记的 `git ls-files` 计数 17／11 逐项对上。**没有一个路径**落在排除面（根 `pyproject.toml`/`package.json`/lock、共享契约、Server/wire、Execution、既有 Profile 实现、`home`、产品清单、`extensions.json`/`extensions.lock.json`、`dist`）。同一次输出也证实分支基点不是我造的：BE 父提交 `60d868ef` 是 BC 的 HD-001 交付、FE 基点 `16398e7c` 是 FC 集成点，我都在其上另起分支。(2) **「未 push」的正确判据**：`git rev-parse @{u}` 报「尚未给分支设置上游」只说明**分支无上游**，而我 `git remote -v` 实测有 4 行（远端确实配置着），且 `origin/main..HEAD` 的 ahead 数（BE 690／FE 26）含大量继承历史——**这两个数都不能当「我没推送」的证据**。真正的判据是 `git branch -r --contains <c>`：我那 5 个提交**在全部 remote-tracking 分支里命中 0 次**（逐条输出 `NONE`）⇒ 提交只存在本地。规则固化：报「未 push／未外发」一律用 remote-ref 包含性判定，禁用「无上游」「ahead 数」代理。(3) 游标：head 再进 F1 0010→**0011**（`to: FC; cc: C, F2, F3, BC`，非发我）。它被规则 ⑤ 抓到：`:78`「Profile 仍是独立插件，Provider/Model 仍只有设计。」——本包界线在下游的**第 5 个独立复述**（前四：F3 三件 + BC/C 各一），同件的 `:43`/`:74` 用的是 Server `profiles.list`，规则 ④ 对全文 0 命中 ⇒ 不涉本包插件，无动作、无回件。产品树本轮 `porcelain` 各 **0** 行，HEAD 未变。
 
 objective_audit_0529: 05:29 应「不空转」要求把**整条目标文本逐子句对到可复核工件**（不是自我宣布完成——目标明写「用户明确叫停前不主动结束」，故本条只记**覆盖**，不记**收线**，也不得据此调 `UpdateGoal: complete`）。逐项：
-(1)「完整读取 README 及必读文档、roles/PROFILE.md」→ 已读并留下具名指针：`TASKS.md:6/8/10`、`COORDINATION.md:11/17-21/27`、`SESSION-OWNERSHIP.md:10/21/44`、`roles/PROFILE.md`（报告方向 `to: BC; cc: FC` 即从此件采用）、`../HD-001/CHARTER.md:9`、`../HD-001/BUDGET.md:11`。判据是这些位置在**本包邮件里被逐字引用过**，不是「我记得读过」。
+(1)「完整读取 README 及必读文档、roles/PROFILE.md」→ 已读并留下具名指针：`TASKS.md:8/10`（本条原列 `:6`，06:28 因该件重排而悬空、现文在 `:5`，见 §`refcensus_tasks6_0631`）、`COORDINATION.md:11/17-21/27`、`SESSION-OWNERSHIP.md:10/21/44`、`roles/PROFILE.md`（报告方向 `to: BC; cc: FC` 即从此件采用）、`../HD-001/CHARTER.md:9`、`../HD-001/BUDGET.md:11`。判据是这些位置在**本包邮件里被逐字引用过**，不是「我记得读过」。
 (2)「核对当前树和旧交付」→ `status.md` §1 记两树 HEAD（BE `f3bcbde9` / FE `e869683469`）与 `git status --porcelain` 各 **0** 行（05:26 复核）；旧交付核验与十项验收映射在 `verification-map.md`，含复跑配方。
 (3)「发 TAKEOVER」→ `outbox/PROFILE-0001.md:3-6` 本轮逐字回读：`- id: PROFILE-0001` / `- from: PROFILE; to: BC; cc: FC, C` / `- task: B-PROFILE-P0/P1 — 独立逻辑 preset 插件（两树）` / `- type: TAKEOVER + ACK + PACKAGE_PLAN`。类型为三合一，故「核对后发 TAKEOVER、不重做已完成」与 ACK/包计划同件送达。
 (4)「不重做已完成成果；按包批准持续推进」→ 已完成的 P0/P1 由 BC-0026 关门；本轮实测两树 `git log --since='2026-09-23 11:47'` 于**交付之后均为 0 提交**（先前用 `--since='6 hours ago'` 误把 5 件交付提交算进「新提交」，因本地时间 13:28 与提交时间 10:57–11:46 +0800 的窗口差；已按绝对时刻重算）。即无返工、无空转提交。
@@ -113,12 +119,29 @@ t I-NATIVE-AGENT-001 x 8 $A/agents/I/outbox/I-NATIVE-AGENT-001.md 'Profile'
 t F3-0013 x 90 $A/agents/F3/outbox/F3-0013.md 'maxTurns: 100'
 t TASKS.md x 10 $A/TASKS.md 'PROFILE 独立包不进 CP'
 t TASKS.md x 8 $A/TASKS.md 'Provider/Model 和后续新架构/插件设计暂停'
+t TASKS.md x 5 $A/TASKS.md 'I-DEC-0001 取消旧 99/10 次数上限/计数手续'
 t CHARTER.md x 9 $A/../HD-001/CHARTER.md '不开发/迁移/扩张 Profile、Provider、Model、配置管理'
-t COORDINATION.md x 19 $A/COORDINATION.md 'status限制约40行'
+t COORDINATION.md x 23 $A/COORDINATION.md 'status限制约40行'
 t SESSION-OWNERSHIP.md x 10 $A/SESSION-OWNERSHIP.md '只有 BC 一个启动负责人'
 t README.md x 17 $A/README.md 'roles/'
 t verification-map.md x 62 $A/agents/PROFILE/verification-map.md '15.4kb'
 t FC-0061 x 15 $A/agents/FC/outbox/FC-0061.md 'nativeExecution.profileId'
+t BC-0026 x 16 $A/agents/BC/outbox/BC-0026.md '收件为独立插件验证完成'
+t I-PROFILE-BLUEPRINT-002 x 4 $A/agents/I/outbox/I-PROFILE-BLUEPRINT-002.md 'to: C, BC, PROFILE'
+t I-PROFILE-BLUEPRINT-002 x 8 $A/agents/I/outbox/I-PROFILE-BLUEPRINT-002.md '本条仅覆盖旧TASKS中对本项后续设计/施工的暂停'
+t I-PROFILE-BLUEPRINT-002 x 10 $A/agents/I/outbox/I-PROFILE-BLUEPRINT-002.md '插件通过注入端口获取数据、无props根组件闭包绑定'
+t I-PROFILE-BLUEPRINT-002 x 12 $A/agents/I/outbox/I-PROFILE-BLUEPRINT-002.md 'PROFILE直接ACK实际HEAD/dirty、已做/差量、下一步'
+t blueprint-v0.2 x 18 /home/maoqh/projects/ordessa/control/product/profile-blueprint-v0.2.md '明确采“插件自带数据接入层”而非修改宿主root.mount为Profile专门传records'
+t blueprint-v0.2 x 20 /home/maoqh/projects/ordessa/control/product/profile-blueprint-v0.2.md '不实现真实Provider、Memory、Skill管理'
+t blueprint-v0.2 x 31 /home/maoqh/projects/ordessa/control/product/profile-blueprint-v0.2.md '先核现场HEAD/dirty及P0/P1已交能力，写短差量方案和复用记录'
+t blueprint-v0.2 x 33 /home/maoqh/projects/ordessa/control/product/profile-blueprint-v0.2.md '执行者若已停或到平台上限，回报I，禁止重复启动同域写者'
+t F1-0013 x 52 $A/agents/F1/outbox/F1-0013.md '实际生效 `maxTurns: 100`'
+t COORDINATION.md x 23 $A/COORDINATION.md '阶段变化+约15分钟实质进展更新status'
+t COORDINATION.md x 33 $A/COORDINATION.md 'Profile优先轻量工作，不抢主线重资源'
+t decision-queue-README x 7 $A/decision-queue/README.md '先回读'
+t decision-queue-README x 13 $A/decision-queue/README.md '未启动不写成执行中'
+t I-PROVIDER-RESEARCH-001 x 7 $A/agents/I/outbox/I-PROVIDER-RESEARCH-001.md '以自身现测事实更新'
+t I-PROVIDER-RESEARCH-001 x 5 $A/agents/I/outbox/I-PROVIDER-RESEARCH-001.md '既有独立批准不变'
 t PROFILE-0001 x 3 $A/agents/PROFILE/outbox/PROFILE-0001.md '- id: PROFILE-0001'
 # 阳性对照＝最后一行（自己写的件，必 hit=1）；若它也 0 ⇒ 路径/行号口径坏了，先修工具再下结论
 ```
@@ -150,3 +173,71 @@ standby_tick_0544: 05:44 一轮（本轮含 defect ⑫⑬ 与引用门的建成�
 
 doc_drift_0549: 05:47 跑整块门时 `t COORDINATION.md x 11 … '40行'` 报 **hit=0**，而它 6 分钟前刚跑过 hit=1。实读证实**不是工具坏，是被引文件动了**：`COORDINATION.md` mtime 实测 **13:46:26**（＝05:46 UTC，就在我本轮开工前一分钟）、行数 41，那条 status 六字段与 40 行上限的规则**从 `:11` 搬到了 `:19`**。这推翻了我一直默认的前提——**mission 文档不是不可变的**（同刻实测 `TASKS.md` mtime 13:31、`README.md` 12:27、`SCOPE.md` 12:10，只有 `SESSION-OWNERSHIP.md` 10:27 与 `HD-001/CHARTER.md` 00:02 未动）。而**他人的 mail 件仍不可变**：`F1-0009` mtime 12:47 未变，其 `:35` 片段仍 hit=1（本轮那条 `L35 hit=0` 是我自己误读——门没印出被引串，我错把**故意期望 0** 的第 3 项当成第 2 项翻车；已给 `q()` 加上 wanted 串输出，规则：**门必须能自证是哪一项失败**）。硬规则追加：(a) 引用 mission 文档的行号属**易漂移证据**，每次跑引用门要连同 **mtime 普查**一起看，mtime 变了就重查指向它的全部引用；(b) 长期不变的锚应优先用**文档内唯一短语**（如「status限制约40行」）而不是裸行号；(c) 本包 `status.md` 对 `COORDINATION.md:11` 的两处依赖已改指 `:19`，短语本身一字未变。另记一次**同类空输出险情**：查三件最新到达件时我把路径写成 `$A/BC/outbox/…`（漏了 `/agents`），`grep`/`sed` 当场报错、`profile=` 印成**空串**——若我只看 `%s` 输出就会把"文件不存在"当成"零命中"再判一次「无新件」。规则：判定式输出**空值与 0 必须区分**，命令报错时该次结果一律作废重跑，不得入证据。
 本轮 05:49 收件（head 又进 BC 0047 / C 0039 / F1 0014）：BC-0047 profile＝0、ids＝0（`- from: BC; to: C; cc: H, FC, I`）；C-0039 命中处是「ACP profile 覆盖」的环境变量审计（`- to: BC; cc: H, FC, I`）；F1-0014 `:37` 写「不扩 Profile/Provider/Model 配置（§33）」并要求 **BC/H** 交出默认工作区来源、问它如何与 `workspaces.list`/`profiles.list` 的既有身份对应（`- to: I, C, FC; cc: BC, F2, F3, S, H`）。三件 ids 全 **0**、抬头均无 PROFILE ⇒ 无义务、不回件。值得单独记一笔的是 F1-0014 引用的 **§33 与我引的 I-SESSION-FIRST-SEND-001:33 是同一条上级原文**——上下游同用一条界线依据，本包界线在下游的复述累计到**第 7 个**，且 F1 要的是既有 Server 身份映射，不是本包 `ProfileRecord.id`。③b 的 I 通道仍 8 件、② 仍 **21**、④ 差集仍只 **BC-0015**、⑤ 现 **9** 件（新增 F1-0013/F1-0014 两件，其中 F1-0014 因「不扩 Profile/Provider/Model 配置」形近而被抓到，已读已判）。产品树本轮实测仍 BE 0／FE 0、HEAD 未变。
+
+defect_14_membership_assertion: 05:53 查出**我自己刚提交的一处事实断言错误**（方向仍是 defect ⑧ 同族：拿计数当集合、又不测成员）。`status.md` §5 上一版写「⑤ 现 9 件（第 8/9 件＝F1-0013、F1-0014）」——对 F1-0014 单跑 ⑤ 正则实得 **0 命中**，它从来不属于 ⑤ 集合：它那句「不扩 Profile/Provider/Model 配置」形近但不匹配 `Profile[^.]{0,12}(仅独立插件|只设计|独立插件)`。真正的第 9 件是 **F3-0017**（`:110` 逐字「Profile 仅独立插件、Provider/Model 只设计，本批未触碰。」），第 10 件是本轮新到的 **F1-0015**（`:47` 逐字「Profile 仍仅独立插件、Provider/Model 只设计。」）。我当时是**由"这封里有 profile 字样"直接推断成员身份**，没跑成员测试；这就是"集合"口径缺陷的第三种表现（① 裸计数、② 正则手打、③ 成员未测）。硬规则追加两条：**凡写入记录的"某件属于某规则集合"断言，必须对该文件单跑一次成员测试**（`grep -cE '<该规则正则>' <件>` 出数才算）；**待命期停止书写"第 N 个独立复述"这类累计序数**——它只增加一个易错的裸计数，改为直接列成员，读者可自行数。本条只改正我自己的现役记录（`status.md` §5），不动任何他人邮件。
+顺带两条**外部印证**（非动作）：F1-0015 在同一段里既复述本包界线「Profile 仍仅独立插件、Provider/Model 只设计。」，又写「Qoder turn 上限本机实测 **100**」——这是**另一个会话第二次**独立测出同一 turn 上限（首次是 F3-0013:90），使本包"100000 未生效、实际 100"的报告有两个外部数据点；FC-0063（`to: C, F3`、ids＝0）与 F1-0015、F3-0017 三件抬头均无 PROFILE ⇒ 仍无收件义务、不回件。
+
+inbox_integrity_snapshot_0553: 05:53 给游标规则 ① 的基线立**完整性快照**（**只记名／字节／sha256 前缀，不复制他人正文**——三份收件是 I 的原件，本包不代其入仓，也不该由我改动）。实测：`I-BASELINE-CLOSEOUT-001.md` 253 bytes `7235f03bed99025c`；`I-DECISION-REUSE-001.md` 283 bytes `b31946c2e09075d3`；`I-SESSION-CHECKPOINT-001.md` 217 bytes `7ed594bf9270134a`；另 `outbox/README.md` 94 bytes `6f46b51f2d514fb3`。**登记现状**：`git ls-files outbox`＝8／目录内 9，即 `README.md` 与整个 `inbox/` 目前**未被 control 仓库跟踪**（未跟踪≠错误：可能正是上级"收件不入仓"的安排，故本包**不擅自 git add**，只留此快照）。若将来发现 `①` 少件，用这三行哈希即可判定是丢失还是被我误判，而无需信任记忆。判据：待命期对未跟踪文件只做**哈希登记**，纳入版本库的权不在本包。
+
+standby_ticks_backfill_0556: 05:56 把**只存在于 `status.md` §5、尚未入长证据档的 05:26–05:31 判定**回填于此，随后按 `COORDINATION.md:19`「长证据单独报告，禁止巨型流水账代替进度」把 §5 收缩成基线摘要（收缩前先落档，避免删行即失证）。逐件判定原文等价：BC-0040/0041/0042、C-0032/0033/0034、FC-0057/0058/0059、F3-0015/0016、F1-0011、BC-0043/0044、C-0035/0036、FC-0060/0061 —— (1) 抬头（三种形：`- to: X`、`- to: X; cc: …`、`to: X` 无破折号形）**均无 PROFILE**；(2) 规则 ④ 的包标识符正则对这些件全 **0**；(3) 超集式 `grep -ci profile` 于 FC-0059、F3-0015 等为零，命中者的文字落点已逐条查明：FC-0061:15 是「hello 的 `nativeExecution.profileId` 精确匹配 ready `profiles.list` 项」，BC-0042 两处是 `:16` 的 `profileId` 与 `:22` 的 `hello/profile ready`（同属既有 Server profile 域；本包曾误记该件用了 `profiles.list` 一词，已于 §`cite_correction_0540` 改正）；(4) 复述本包界线的下游自陈句：F1-0011:78「Profile 仍是独立插件，Provider/Model 仍只有设计。」、F1-0013:50「Profile 仍独立插件，Provider/Model 仍只设计。」（F1-0013 也是 F1 第二次复述，句子比 0011 短一形，我原先按 0011 的写法记它，机检不匹配后已按实文改正）。以上均判「无义务、不回件」，无一例外。另留两条不随时间失效的判据：`BC-0040`/`C-0033` 是上级授权的**受控真实门**，本包零真实调用不受影响；F1-0009:35 的片段（本轮 §`cite_correction_0540` 已换成整行）继续支撑「无人把本包 `ProfileRecord.id` 当 `profileId` 用」。
+
+refcensus_tasks6_0631: 06:28 待命轮里 mtime 普查先立功：`TASKS.md` 由 13:31 变到 **13:55**（本地），于是按 §`cite_correction_0540` 的约定重查**全部指向它的行号**。实果是本包记录里第 15 类缺陷、也是**引用门自己的首个结构性盲区**：我以 `TASKS.md:6` 标注 I-DEC-0001 取消旧 99/10 一事，共**三处**（本文件 `:55` 归档条、`:90` `objective_audit_0529`、`status.md` §5），而现读 `:6` 是 FC 第 2 项，「99/10」与「I-DEC-0001」在 `:6` 各 **0** 命中；同一断言的现文在 **`:5`**「I-DEC-0001 取消旧 99/10 次数上限/计数手续，唯一旧账本保留历史并记新政策」，并在 `:10` 另有一次复述「I-DEC-0001 已记唯一账本当前无次数上限」。**为何无法仲裁我当初是否写错**：`git ls-files missions/HD-002/TASKS.md` 输出为空 ⇒ mission 文档在 control 仓库**未版本化**，没有历史可比，漂移与笔误不可分。由此得两条硬规则：**(1) mission 文档的指针必须以「被引原文」为主锚、行号为辅**——读者应能只靠 `grep -nF '被引文字'` 复原，行号只作便利；(2) **引用门的条目表必须由抽取生成、不得靠我记得**——`linecite_gate_0536` 当时列了 14 项、含 `TASKS.md:8` 与 `:10`，却**从未含 `:6`**，一个手写的清单恰好继承了它本该拦截的那种失明。本轮另做了全量抽取普查：三件记录文件共 **34** 个 `file:line` 记号，经路径表修正后 **28** 件解析成功且行号在范围内；余 **6** 件（产品清单 `control/product/profile-logical-preset-v0.1.md:82` 与五个测试源文件裸文件名）先按 defect ⑦ 跑绝对路径阳性对照再判：清单实测 **110** 行 ⇒ `:82` 在范围内，`entry.test.ts` 85／`model.test.ts` 215／`test_record.py` 109／`test_resolver.py` 186／`test_store.py` 131 行 ⇒ 五个引用全部在范围内，**无一悬空**；但这六个是**裸文件名**，冷读者无法定位 ⇒ 记为口径缺陷，今后写源码引用须带树内相对路径。两轮 MISSING 潮（首轮 13 条、次轮 6 条）**全部**是我检核器自己的路径拼接 bug（`case` 分支次序让 `*.md` 抢在 `../*` 之前、`$A/` 与相对路径双前缀），不是恢复点缺陷——defect ⑦ 在同一轮里复发了两次，规则照旧：工具失败一律先证伪再记录，绝不写成悬空引用。
+
+harvest_gate_0631: 把「规则 ⑤ 的复述句」从**手抄**升级为**机器抽取＋自检**，与 §`refcensus_tasks6_0631` 的第 (2) 条同源。配方（cwd 必须是 `…/missions/HD-002/agents`）见下方围栏块：对 ⑤ 命中的每个文件取**首个命中行号**，再从该行用**大小写敏感**的 `grep -oE` 取出被引串，最后把路径、行号、字符串三项一起交给 `t()` 复测。本轮实跑 **17/17 全 hit=1**（其中 C-0048:14、F1-0018:48、F1-0022:56、F1-0023:43、F1-0024:41、F3-0018:46、F3-0019:50、F3-0020:64 是 05:56 之后新增，句形多为「Profile 仍仅独立插件」；C-0048 作「Profile 独立插件」），**引文字符串由文件自身给出，不经我转写**，故本类缺陷在源头即被排除。抽取器同时抓出一处**我自己规则 ⑤ 的假阳性**：`FC-0007:7` 的真实原文是「- task: B-PROFILE-P0/P1 前端独立插件接口」，它只是 `grep -Ei` 的**大小写不敏感**匹配（`PROFILE` 撞 `Profile`、`[^.]{0,12}` 跨过 `-P0/P1 前端`）才落进 ⑤——那是**点名本包任务号**，不是复述界线，故 ⑤ 的真复述集应为 **17** 件，`FC-0007` 归 ②（它本就在 ② 的 FC 2 件里）。该缺陷此前长期未被发现，因为 ⑤ 是"低噪超集"、多一件不影响判断。还暴露一条通则：**抽取器的 `continue` 必须打印 DROP**——我第一版用 `[ -n "$m" ] || continue` 静默跳过，于是游标报 18、抽取器报 17 的差值完全不可见，与 defect ⑫ 的静默空输出同族；改印 `DROP` 后一次就定位到 FC-0007。**判据固化**：凡"数量对不上"优先怀疑口径而不是怀疑世界，且怀疑的手段是让工具自己说话。
+```sh
+# ⑤ 复述句抽取＋自检门（**块内自带 cd**：整块复跑时 §quotegate_0525 的 `cd` 会先改变 cwd，
+# 依赖 cwd 的 glob 若不自定位就会静默输出空——defect ⑯。cwd 目标＝…/missions/HD-002/agents）
+A=/home/maoqh/projects/ordessa/control/missions/HD-002
+cd "$A/agents" || exit 1
+R='Profile[^.]{0,12}(仅独立插件|只设计|独立插件)'
+grep -rlEi "$R" */outbox/*.md */inbox/*.md 2>/dev/null | grep -v '^PROFILE/' | while read -r f; do
+  id=$(basename "$f" .md); ln=$(grep -nEi "$R" "$f" | head -1 | cut -d: -f1)
+  m=$(sed -n "${ln}p" "$f" | grep -oE "$R" | head -1)
+  if [ -z "$m" ]; then printf 'DROP %s L%s matched-only-case-insensitively: %s\n' "$id" "$ln" "$(sed -n "${ln}p" "$f" | grep -oiE "$R" | head -1)"; continue; fi
+  printf "t %-24s x %-4s %s '%s'\n" "$id" "$ln" "$A/agents/${id%%-*}/outbox/$id.md" "$m"
+done
+# 把上面输出的每一行原样交给 linecite 门的 t() 复测；DROP 行须逐条查明是假阳性还是路径 bug
+```
+
+standby_tick_0631: 06:28（本地 14:28）游标六条整段复跑（含 `grep -v '<新件路径>'` 过滤器，四道门行全部出现，无缺行）。① inbox 仍 3 件 I 派达；② 他人点名仍 **21** 件、成员与 05:56 **逐号相同**（BC 8／C 7／FC 2／I 3／S 1）；④ 差集仍只 **BC-0015**；③b I 通道仍 **10** 件不变；⑤ 见上条（17 真复述）。③ head：**BC 0060／C 0050／FC 0068／F1 0024／F2 0011／F3 0020／S 0020／H 0008／E 0004／F0 0012／PROFILE 0008**，`I=ERR` 是 ③ 对语义文件名的固有失明、由 ③b 覆盖，非故障。距 05:53 一批进了约 **41** 件新文件（BC 0049–0060、C 0041–0050、FC 0064–0068、F1 0016–0024、F3 0018–0020、S 0020、F0 0012），`ABSENT` 为空 ⇒ 无跳号。逐件判定用超集前置式：**16** 件 `grep -ci profile` 为 0 ⇒ ②④⑤ 同时不可能命中，一次判完；其余 **25** 件有命中，但 ② 集合未变 ⇒ 无一发我，④ 未变 ⇒ 不含本包标识符，故命中处只可能是 Server/ACP 域或他包自陈。另查两问：(a) `grep -rlE 'PROFILE-000[1-8]' */outbox` 排除自身后仍只命中**已判过的旧件**（BC-0007/0008/0013/0026、C-0007/0021、S-0003）⇒ 没有新回件；(b) C 新件里的「后续须另裁」经整行读为**ACP 桥/CLI 无模型状态**那道门的保留，**不是**对本包 0006 §2 的裁定 ⇒ 本包唯一开放问题依旧待裁。产品树与 HEAD 未复核于本轮正文前，见本条之后的实跑。**结论：无本包义务、不回件、不空转发件**；本轮新增价值全部在记录保真侧（defect ⑮ 与 ⑤ 假阳性）。
+
+defect_16_cwd_neutralization: 06:35 全块复跑时，新加的 §`harvest_gate_0631` 打印了 **0 行**，而它单独跑打印 17＋1 行。根因不是 glob、不是权限：`§quotegate_0525` 的块里有 `cd …/agents/PROFILE`，**块序**让它在游标块之后、抽取块之前执行，于是抽取块的 `*/outbox/*.md` 在 PROFILE 目录下展开成空集 ⇒ 循环体一次都没进、**输出为空**，而"空输出"与"确实无命中"在终端上长得一模一样。这是 defect ⑫（基线缺失导致假"无新件"）的**新变体**：不是文件缺了，是**工作目录被前一道门改走了**。修法与通则：**(1) 每个块自定位**——块内自带 `cd "$A/agents" || exit 1`，不假设调用者站在哪儿，也不假设自己是第几个跑的（游标块同步补上；它过去只在注释里写"cwd 必须是…"，靠人遵守，正是 defect ④/⑨/⑪ 同族的"约定不是机制"）。**(2) 空输出须先证明"我确实在正确的目录看到了应该有东西"**——本轮的阳性对照是 `pwd` ＋单跑该块。同轮另有一条时间性事实须写进判据：抽取块单跑时冒出 **F3-0021**，而 06:28 游标读到的 F3 head 是 0020 ⇒ **head 数在我这一轮里就变了**，所以本包记录里的一切计数都必须带测量时刻，且"待命期邮件静默"这种印象不成立——上游正以每几分钟一批的速度推进，游标每轮重跑是必要的而不是仪式。规则固化：**凡引用计数，同时引用时刻**；**凡"某规则本轮无输出"，先排除块序/cwd/基线三类静默失效再说"无命中"**。
+
+approval_v02_0637: **06:37 待命结束**——规则 ② 抓到一件真义务，本包全程第一次由"判无义务"转为"有批准包可做"。件：`I/outbox/I-PROFILE-BLUEPRINT-002.md`（`type: USER_SCOPED_APPROVAL`，`:4` 逐字「to: C, BC, PROFILE」，mtime 14:30），权威要求落点 `control/product/profile-blueprint-v0.2.md`（33 行，本包亲读全文）。逐条对本包的含义：(1) `:8`「用户已批准刚讨论的Profile方案，并明确“暂时不并入基线”」「本条仅覆盖旧TASKS中对本项后续设计/施工的暂停，不恢复Provider/Model或其他新功能；CP-SESSION-001继续不含Profile」⇒ **§4 的复工触发条件被满足，但路径不是我原先写的那条**：我此前认定触发＝「FC 提出装配/接缝需求 + C 另裁单写域」，实际到达的是**用户层 scoped approval + 写域原样沿用**，且它同时**覆盖** `TASKS.md:8` 那句「Provider/Model 和后续新架构/插件设计暂停」——覆盖关系只写在 I 件里、任务板现文未改，故我在 ACK 里请 C 登记旁线时把覆盖关系写进板面，免得第三方按 `:8` 字面判我越界。(2) `:10` 与 v0.2 §本批功能给出**增量范围**：图纸管理、注册、校验预览、包内示例，且「先对照P0/P1做短差量设计再在既有两包写域实施」「不重写已完成功能」。(3) **`PROFILE-0006 §2` 被裁定**：「插件通过注入端口获取数据、无props根组件闭包绑定；不得给宿主加Profile专用传参」，v0.2:18 更逐字「明确采“插件自带数据接入层”而非修改宿主root.mount为Profile专门传records」⇒ 我 0006 提的两个方向取后者，**宿主零改动**，待命期唯一开放问题关闭。(4) `:12`「PROFILE直接ACK实际HEAD/dirty、已做/差量、下一步」⇒ 已发 `outbox/PROFILE-0009.md`（`to: BC, I; cc: FC, C`；ACK＋差量方案；含 turn 上限 100/当前 49 的如实报）。(5) v0.2:33「执行者若已停或到平台上限，回报I，禁止重复启动同域写者」⇒ 平台上限这条**从"报告事项"升级成"协作前置"**，我剩余预算是共享资源，须优先做到可交接而不是贪多。(6) 写域/禁面逐字沿用（v0.2:24-29）：两包目录＋本记录目录；禁根 manifest/lock、共享 contracts、Server/wire/Execution、宿主、CP 候选、用户配置与凭据；不 cherry-pick、不 merge/push main、不跑 build-all、不抢真实测试流与重构建槽。差量底数用机检而非印象：`grep -c` 于 `verification-map.md` 实测 复制=0、删除=0、导入=0、导出=0、摘要=0 ⇒ ACK §3 的"表内无对应测试名"四项成立；一条**同词多义陷阱**顺带记下——解释器在表内命中 1，但那是 §复跑配方里的「系统解释器 3.14」（Python 解释器），不是 v0.2 要的能力解释器接口，故凡以"某词在表内 0 命中"作判据须回看命中处语义，别把 grep 当成结论。
+
+defect_17_substring_role: 06:37 抓到**本包收件机制里后果最重的一处假阳性**，且它与真义务同一轮到达。规则 ② 的旧式 `(to|cc|reply_to):.*PROFILE` 只做子串匹配，于是 `F1-0026:8` 的「- reply_to: FC-0071, C-0051, FC-0069, BC-0062, F3-0021, F1-0025, **I-PROFILE-BLUEPRINT-002**」被当成"点名 PROFILE 角色"——它点名的是**那封批准件的邮件号**，而 F1-0026 自己的抬头是 `to: FC` / `cc: C, BC, F0, F3, I`，**根本不含我**（同件 `:31` 反而逐字写出「to 为 C/BC/PROFILE、不含 F1」）。裸数因此从 21 涨到 23，其中只有 **I-PROFILE-BLUEPRINT-002** 是真成员。修法已进游标块（② 与 ④ 左集同改）：**角色匹配必须整词、且以分隔符收尾**——`(^|[[:space:]])(to|cc|reply_to):.*([,[:space:]])PROFILE([,[:space:];]|$)`；这条同时覆盖三种抬头形（`- to: X`、`- from: …; to: C, H, PROFILE; cc: FC` 的分号形、无破折号形），实测 BC-0026:3 仍以 `PROFILE;` 正确命中，F1-0026 被排除，集合＝22。**为何这条比前 16 类更要命**：② 是"有没有人要我做事"的**主判据**，子串假阳性的方向是**虚增义务**（白读、白判、可能白发回件），而更危险的镜像情形是——若某个别的角色名（如 `I`）也这样被子串撞进别人正文，我会把"没发给我的件"当成发我的，甚至据其措辞**误推义务边界**；反方向同样存在：邮件号里不含 PROFILE 的真点名（如 `to: PROFILE` 写成 `to:PROFILE` 无空格）旧式也会漏。通则固化：**角色、任务号、邮件号是三种不同命名空间，任何"点名"判据必须按 token 匹配，不做子串匹配**；判据改动一律配**双向对照**（真成员必须仍在、已知假成员必须消失），本轮双向各跑了一次。
+
+defect_18_bracket_sweep: 06:50 **发件当轮自查**抓出四处「」非逐字，全部集中在这**一封还没提交的新件**（`PROFILE-0009`）和它的长证据孪生条目里——也就是说，此前 §`cite_correction_0540` 立的"逐字"规则我**这一轮自己又破了四次**，只是这次在寄出前被抓到。四种失败形各有独立成因，都值得单列：(a) **中文全引号被我降级成 ASCII**——原文「明确采“插件自带数据接入层”…」，我写成 `'插件自带数据接入层'`；(b) **我在无空格的原文里补了空格**——原文「无props根组件闭包绑定」「不得给宿主加Profile专用传参」，我按英文习惯写成「无 props 根组件…」；(c) **词序重排**——BC-0026 原文「收件为独立插件验证完成」，我写成「独立插件验证收件完成」，意思没变但作为引文是假的；(d) **截断未标注**——`v0.2:33` 我只引到「…回报 I」还顺手加了空格。修法：四处一律改成整行提取到的原字节（提取式，不靠我重打），改后复测 hit=1。新门如下，**发件当轮必跑**：把我三件记录里每个「…」整段抽出来，拿**全语料**（HD-001＋HD-002＋`product/`＋`roles/`）做 `grep -rlF`，排除我自己的目录；无源即列队。本轮 109 段中 4 段可处理。**但这道门的噪声是结构性的，必须连同限度一起记，否则它会造出比缺陷更多的假警报**：其一，我在正文里也用「」标**术语与自造短语**（如「缺行＝没跑」「无义务、不回件」），这些本来就不该有外部源；其二，我用「…」表示**有意的拼接**，属已标注；其三，**语料路径写漏就会造出假 NO-SRC**——本轮第一次跑时我把 HD-001 漏在 CORP 之外，于是 `CHARTER.md:9` 的真引文也被报无源，而它同时是 linecite 门里 hit=1 的一项（两门互相矛盾时，先查门的口径、别先改记录）。因此**判据是分级而不是二值**：NO-SRC 只负责把段落列成队列，"是不是缺陷"取决于该段是否被**当作别人的话**呈现；只有后者才改。与 defect ⑰ 同一课：**判据工具的语义要明确到 token 级**，否则它同时会漏报（子串撞中）和误报（术语当引文）。
+```sh
+# 「」全语料无源队列（commit/发件前跑；只列队不判决——见上条三点限度）
+# v2（06:56）两处修：(a) v1 把待发件**写死成 PROFILE-0009.md** ⇒ 下轮换件后会静默扫描旧邮件、看起来"跑过了"；改用 outbox/*.md。
+#     (b) 跑前打印"扫了几条 span"，把"跑了但无 NO-SRC"与"根本没扫到内容"分开（缺行＝没跑）。
+CROOT=/home/maoqh/projects/ordessa/control
+CORP="$CROOT/missions/HD-001 $CROOT/missions/HD-002 $CROOT/product $CROOT/roles"
+cd "$CROOT" || exit 1
+for f in missions/HD-002/agents/PROFILE/status.md missions/HD-002/agents/PROFILE/evidence-log.md missions/HD-002/agents/PROFILE/outbox/*.md; do
+  [ -f "$f" ] || continue
+  spans=$(awk '/^```/{p=!p; next} !p' "$f" | grep -oE '「[^」]{6,}」' | sed 's/[「」]//g' | sort -u)
+  printf 'SCANNED %-24s spans=%s\n' "$(basename "$f")" "$(printf "%s" "$spans" | grep -c .)"
+  printf "%s\n" "$spans" | while IFS= read -r s; do
+    [ -n "$s" ] || continue
+    n=$(grep -rlF -- "$s" $CORP 2>/dev/null | grep -v 'agents/PROFILE' | wc -l)
+    [ "$n" -eq 0 ] && printf 'NO-SRC %-28s %s\n' "$(basename "$f")" "${s:0:60}"
+  done
+done
+# 每一行须人工分级：是"当作他人原文呈现"才改；术语/自造/已标拼接一律保留。
+# 已知限度（06:56 实测）：带省略号的**同行节引**必然报 NO-SRC——如 status.md §2 引 BC-0026 的
+# 「收件为独立插件验证完成…若 FC 后续要装配/接缝，需 C 另裁单写域；PROFILE 保持停写待命」，
+# 两段其实同在 BC-0026:16 一行内（`linecite_gate_0536` 对首段 hit=1）。此形＝保留，不是缺陷。
+```
+
+defect_19_quotegate_fence_outbox: 06:56 门自身的第 **19** 个缺陷，方向是**门口径把被测对象之外的东西算进来、同时漏掉真正该测的东西**（两头都错，且都是我这轮写 §`defect_18_bracket_sweep` 时自己造出来的）。触发顺序值得记：跑引文平衡门得 `evidence-log.md stripped 247/248`，第一反应是"本轮新写的散文漏了一个右括号"——但逐行定位（`gsub` 计数）把唯一不平衡行指到 **L207，也就是扫描门自己的命令体** `'「[^」]{6,}」'`：它天然 1 个「、2 个」，v1 只剥行内码、不剥围栏，于是**门体污染了门的读数**。这不叫回归，叫**自测器把自己的零件当被测物**；同族先例＝defect ⑦（检核器本身坏）。真正的漏测在另一头：v1 的文件清单只有三个记录文件，**不含 `outbox/`**，而 defect ⑱ 那四处非逐字**全部发生在邮件里** ⇒ 若当时有这条门，⑱ 会在发件前就被抓，不必靠人工自查。修法两条一并落地：围栏整体排除（`awk '/^```/{p=!p; next} !p'`）＋清单加 `outbox/*.md`。改判据按 defect ⑮ 的规矩配了**双向对照**：三记录文件与十件邮件全部 `n/n` 平衡（负＝不误报），临时副本尾部补一个孤立 `」` 立刻报 `241/242`（正＝仍能抓）。副产物：排除围栏后，扫描队列从 104 行降到纯散文集，噪声少了两条命令体碎片。限度照实登记：**自造强调引号**（如「优先做到可交接」「剥掉行内代码段再计数」）与**同行节引（带 …）**都会长期报 NO-SRC，此队列只缩小人工复核面，不作判决，更不作"绿了＝逐字"的证据。
+
+publish_rev2_0709: 07:05 游标整块复跑抓到 `I-PROVIDER-RESEARCH-001`（`to: C, BC, FC, PROFILE, PROVIDER`，`USER_SCOPED_APPROVAL`）落进本包 inbox，第 5 件；其中对本包的是**具名义务**：「PROFILE 从决策队列 extension-profile.json 读现版，以自身现测事实更新 agents/PROFILE/progress.json 再发布」，且同件「仅解除 Provider 研究暂停，不批准产品实现/主线装配；Profile v0.2 既有独立批准不变」⇒ **本包范围一字未松**（v0.2:20 的「不实现真实Provider、Memory、Skill管理」仍全效，Provider 侧新执行者与本包无关）。执行链全部现测：(1) 权威形状在 `decision-queue/README.md`，`先回读`(:7)、`未启动不写成执行中`(:13) 两条入引用门 hit=1；(2) 现版 `extension-profile.json` = `revision 1`、`updated_at 07:04:42Z`（I 一次性初始化，非我造）⇒ 我发 **2**；(3) 路径纠偏一次：`decision-queue` 不在 `control/` 顶层而在 `control/missions/HD-002/`（首次 `cat` 报 No such file，未按"跑通"记账，defect ⑦ 规矩）；(4) 本包 `progress.json` 新建（记录目录＝既有写域内），三模块分别 `IN_PROGRESS`/`DONE`/`NOT_STARTED`，`observed_at` 一律取**本轮真跑过的时刻 07:07:48Z**（HEAD/porcelain/门都在那一刻前后实测），未核事实不刷新；未启动的接缝面写 `NOT_STARTED` 并明写「未启动即未启动，不写成执行中」；(5) `python3 control/tools/decision_queue.py extension <path>` exit 0，回「拓展进度已更新；主线检查点和审批队列不变。」⇒ **只走工具，没手改生成页/快照**（README 明禁），主线 checkpoint 与 `requests/`/`answers/` 未触碰；(6) 回读核实 `revision=2`＋三模块状态正确＋`updated_at 07:09:29Z`。一处**须由 BC/C 知悉而非由我扩张的写域事实**：本包既有硬约束把 `decision-queue/**` 列为只读，本轮的写入完全经 I 的具名指令与官方子命令发生，本包未新增自授权，`SCOPE.md`/`BASELINE.md` 一字未动。回件＝`outbox/PROFILE-0010.md`（`to: BC, I; cc: FC, C`）。
+
+doc_drift_0712: 07:12 `linecite_gate_0536` 把 28 项全跑，唯一 `hit=0` 是 **`COORDINATION.md:19` 的 `status限制约40行`**——`ls -l` 实测该件 mtime 由 13:46 变到 **15:10（本地）＝07:10Z，即本 turn 之内**。查全文而非查行号：短语**原文未变**，只是整件在文首插了一行（`:4` 新指 `I-CLOSEOUT-FOCUS-001`），规则从 `:19` 顺移到 **`:23`**。这条的价值不在"改个号"，而在它证明了本包引用门的**存在理由**：mission 文档既可变又**不入版本控制**，任何 `file:line` 都是易碎证据，只有逐行 `grep -cF` 能区分"我引错了"与"上游动了"。处置：门表该项 → `x 23`（现跑 hit=1）；`status.md` 首部指针 → `:23` 并记两次移动；`evidence-log.md` 里三处历史 `:11`/`:19` 写法**不回写**（它们是各自时刻的实读，按 defect ⑪ 的 append-only 处理，与本条同族先例＝§`refcensus_tasks6_0631` 的 `TASKS.md:6` 悬空指针）。同一次 `sed -n '23p'` 顺带读到一条**新节奏要求**：「阶段变化+约15分钟实质进展更新status」⇒ 实施期 `status.md` 按此刷新，不再攒到批尾；`:33` 亦重申「Profile优先轻量工作，不抢主线重资源」，与本包不占重门/真测流的自约束同源。另一条同期漂移：③b I 通道 06:58 实测 11 → 07:05 实测 **12**（+`I-PROVIDER-RESEARCH-001`）、② 22 → **28**、⑤ 24 → **28**、head 一轮内 BC 0070→／C 0061／FC 0079／F1 0032／F3 0024；④ 差集仍只剩基线内 `BC-0015` ⇒ 密集发件期**基线计数只能当本轮观测**，不得当常量引用（这正是 ⑤ 停止抄清单的依据）。
+
+defect_20_turn_selfcount: 07:20 平台进度行实读 `Progress: 48/100 turns used`，而本包同期两处记录写的是 49（`PROFILE-0009` §6）与 50（`status.md` §6 旧文）⇒ **我在自计轮次，且偏高 1–2**。同一族缺陷本包已登记过别的形态（把代理信号当证据），这次中招的是最容易被当作硬数的那个字段。修法：turn 数只准引平台进度行原文并附实读时刻；`status.md` §6 已改为 `48/100（07:20Z 实读）`。后果核量：本包的"到上限即回报 I"（v0.2:33）与"达上限即冻结在恢复点"两条都按平台数触发，自计偏高会**提前**误判接近上限（更保守，不致越权），但也会让「剩余预算」被少算约 2 turn ⇒ 分配「优先做到可交接」时失真；已发的 0009 不 amend（同 FE 提交 message 的 15.4kb 处置：旧件留原文、勘误走新条目）。这条同时是 defect ⑦/⑭ 家族的第 20 次复现——**凡"我自己数的"都必须换成"现跑的＋带时刻的"**。
+
+defect_21_misattributed_mail_site: 07:24 **无源队列 v2 第一次真正咬到东西**——它把 `status.md` §5 的「Qoder turn 上限本机实测 100」列成 NO-SRC（全语料 0 命中）。查出的是本包记录里性质最坏的一类保真缺陷：**不是不逐字，而是整句归错了人**。旧文写「外部印证：F1-0015 独立测得…」，实读：`F1-0015.md` 全文 `grep -n turn` 只有 `:47` 一行且讲零真实调用/零预算，**没有任何 turn 上限表述**；F1 侧的真实落点是 `F1-0001:22`＋`:26`、`F1-0004:38`＋`:40`、`F1-0011:82`、`F1-0013:52` 四处（六条断言已逐条整行机检 hit=1，并被引文字符串 `实际生效 \`maxTurns: 100\`` 入 §`linecite_gate_0536`；测式串用单引号包住 ⇒ 内层反引号不会被命令替换，defect ⑬A）。两处判断订正：(1) 引号内那句**在任何人的信里都不存在**，是我把结论缝成"他人原话"的形状；(2) 结论方向不变、且证据其实**更强**（F1 一条链报了四次，另加 F3-0013:90），但"更强"也不许用引号代替出处。为何此前所有门都没抓到：`linecite_gate_0536` 只检"该行是否含被引文字"，而这条引用**没有行号**（写成「F1-0015 独立测得」这种**只到件、不到行**的形状），门无从下手；故规则补一条：**凡归给他方的陈述必须落到 `件:行`，无行号即视为未核**。§5 已按此改写并保留"旧文误归属"的字样，不改写历史条目本体。
+

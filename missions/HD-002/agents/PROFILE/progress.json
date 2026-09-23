@@ -1,0 +1,47 @@
+{
+  "id": "profile",
+  "revision": 2,
+  "status": "IN_PROGRESS",
+  "summary": "v0.2 逻辑蓝图已 ACK，现处码面差量核查阶段；P0/P1 独立包已获 BC 收件，v0.2 实施码为 0，宿主接缝与产品装配未做，不进 CP-SESSION-001 基线。",
+  "next": "核 ProfileRecord/store/registry 对 v0.2 条款的符合度并写短差量方案，再对无条目面（复制/删除/导入导出、能力解释器接口、registry 驱动编辑器、无 props 根视图、独立示例）先补测试锚。",
+  "evidence": "agents/PROFILE/status.md；agents/PROFILE/evidence-log.md；agents/PROFILE/verification-map.md；agents/PROFILE/outbox/PROFILE-0009.md",
+  "try_it": "产品内暂无入口。本包自跑门：BE 在 backend/plugins/agent-box-profile-preset 下 PYTHONPATH=src python3 -m unittest discover -s tests -p 'test_*.py' → 58 OK；FE 需借工具链，复跑配方见 verification-map.md。",
+  "modules": [
+    {
+      "name": "Profile 逻辑蓝图",
+      "owner": "PROFILE",
+      "status": "IN_PROGRESS",
+      "summary": "已亲读 v0.2 全文并发出 ACK＋差量计划（PROFILE-0009），差量项已列成 6 条；但码面符合度核查尚未开始，故蓝图落地进度为 0。",
+      "done": "v0.2 权威件 33 行全文亲读；ACK 与差量计划成文；0006 §2（宿主传 records 还是插件自带 port）已按 v0.2:18 裁定为「插件自带数据接入层」，宿主 root.mount 零改动。",
+      "doing": "整理本包写域与禁面，准备对既有 BE/FE 码逐条核 v0.2 模型条款。",
+      "next": "写短差量方案与复用记录，然后按无条目面先补测试锚（锚红→绿）。",
+      "blockers": "无；不影响 CP-SESSION-001。",
+      "evidence": "control/product/profile-blueprint-v0.2.md:18/20/31；agents/PROFILE/outbox/PROFILE-0009.md；agents/PROFILE/evidence-log.md §approval_v02_0637",
+      "observed_at": "2026-09-23T07:07:48Z"
+    },
+    {
+      "name": "Profile 独立插件包（P0/P1，仅独立验证）",
+      "owner": "PROFILE",
+      "status": "DONE",
+      "summary": "既有两树独立包的门于本轮现跑复现全绿，BC 已按独立插件验证收件；「收件」仅覆盖独立验证这一状态。",
+      "done": "BE 58 unittest OK 与零 entry_points/零 Requires-Dist wheel（15296 bytes）；FE tsc --noEmit 0 → CJS 出件 0 → node --test 12/12 → esbuild entry.js 15453 bytes；两树 HEAD 未变且 git status --porcelain 各 0 行（本轮 07:07 实测）。",
+      "doing": "无（该阶段已交，保持不返工）。",
+      "next": "若 v0.2 差量触及既有码，改动一律另起提交并在 verification-map 补验收映射。",
+      "blockers": "无。已登记而不由本包自修的缺口：app vitest include 不含本包测试；跑 build-all 会重写已提交 extensions.lock.json（本包不跑，处置权在 FC/C）。",
+      "evidence": "agents/PROFILE/verification-map.md（含复跑配方与 07:07 复核）；BC-0026:16；BE f3bcbde9／FE e869683469",
+      "observed_at": "2026-09-23T07:07:48Z"
+    },
+    {
+      "name": "Profile 宿主接缝与产品装配",
+      "owner": "PROFILE",
+      "status": "NOT_STARTED",
+      "summary": "未做，且明确不在本包授权内：v0.2:20 只要求独立插件面，装配/接缝若要做需 C 另裁单写域。",
+      "done": "无。唯一已核事实：本包依赖的宿主契约 platform/extension-api/src/index.ts 与 FC 集成树字节同源（1797 bytes），故接缝批不必先追平上游。",
+      "doing": "无。",
+      "next": "等 FC/C 对装配或接缝另裁；本包不自行进入，不把 Profile 列为 CP-SESSION-001 前置。",
+      "blockers": "无（未启动即未启动，不写成执行中）。",
+      "evidence": "agents/PROFILE/outbox/PROFILE-0006.md §2；BC-0026:16；control/product/profile-blueprint-v0.2.md:20",
+      "observed_at": "2026-09-23T07:07:48Z"
+    }
+  ]
+}
