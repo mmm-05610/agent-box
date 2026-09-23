@@ -246,10 +246,21 @@ def main(root, port):
         if db_path.is_file():
             try:
                 db = sqlite3.connect(f'file:{db_path}?mode=ro', uri=True)
-                result['serverSessionCount'] = db.execute('select count(*) from server_sessions').fetchone()[0]
+                sessions = db.execute('select workspace_id,profile_id from server_sessions').fetchall()
+                result['serverSessionCount'] = len(sessions)
+                if result['ready']:
+                    result['sessionIdentityMatchesReady'] = (len(sessions) == 1 and
+                        sessions[0] == (workspace['id'], identity['profileId']))
+                completed = set()
+                for turn_id, data_json in db.execute(
+                    "select turn_id,data_json from server_session_events where kind='turn.state'"):
+                    if turn_id and json.loads(data_json).get('state') == 'completed':
+                        completed.add(turn_id)
+                result['completedTurnCount'] = len(completed)
                 db.close()
-            except sqlite3.Error:
+            except (sqlite3.Error, ValueError, TypeError):
                 result['serverSessionCount'] = None
+                result['completedTurnCount'] = None
         result['projectEntryCount'] = sum(1 for _ in (root / 'project').iterdir()) if (root / 'project').is_dir() else None
         result['piSessionFileCount'] = sum(p.is_file() for p in (root / 'sessions').rglob('*')) if (root / 'sessions').is_dir() else None
     print(json.dumps(result, sort_keys=True))
