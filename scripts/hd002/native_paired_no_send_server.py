@@ -175,12 +175,13 @@ def run():
             'environment': {'kind': 'local', 'host': None, 'user': None},
             'path': str(ROOT / 'project')}, result['httpMethodsBC'])
         workspace = opened.get('workspace')
-        if not isinstance(workspace, dict) or not isinstance(workspace.get('id'), str):
+        if (not isinstance(workspace, dict) or not isinstance(workspace.get('id'), str) or
+            workspace.get('normalizedPath') != str(ROOT / 'project')):
             raise RuntimeError('PROJECT_OPEN_FAILED')
         result['projectOpened'] = True
         ready = {'schema': SCHEMA, 'origin': ORIGIN, 'tokenFile': str(token_file),
                  'serverId': server_id, 'nativeExecution': identity,
-                 'project': {'normalizedPath': str(ROOT / 'project'),
+                 'project': {'normalizedPath': workspace['normalizedPath'],
                              'workspaceId': workspace['id']},
                  'bcProfileUniqueReady': True}
         atomic_private_json(ROOT / 'ready.json', ready)
