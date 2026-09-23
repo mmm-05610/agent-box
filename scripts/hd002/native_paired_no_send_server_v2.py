@@ -31,6 +31,8 @@ ORIGIN = None
 SCHEMA = 'hd002-c0048/1'
 OLD_ROOT = Path('/tmp/hd002-c0048-pair-834rpsal')
 OLD_PORT = 50491
+BLOCKED_ROOT = Path('/tmp/hd002-c0053-pair-xqz00ugq')
+BLOCKED_PORT = 52839
 TAP = Path(__file__).with_name('paired_server_method_tap.py')
 METHODS = frozenset(('server.hello', 'profiles.list', 'workspaces.list',
                      'workspaces.open', 'sessions.list', 'sessions.createAndSend',
@@ -41,9 +43,9 @@ FORBIDDEN = frozenset(('sessions.createAndSend', 'sessions.send',
 
 def set_batch(root: Path, port: int):
     global ROOT, PORT, ORIGIN
-    if (not root.is_absolute() or root.parent != Path('/tmp') or root == OLD_ROOT or
+    if (not root.is_absolute() or root.parent != Path('/tmp') or root in (OLD_ROOT, BLOCKED_ROOT) or
         not re.fullmatch(r'hd002-c0053-pair-[A-Za-z0-9_-]{6,32}', root.name) or
-        type(port) is not int or not 1024 <= port <= 65535 or port == OLD_PORT):
+        type(port) is not int or not 1024 <= port <= 65535 or port in (OLD_PORT, BLOCKED_PORT)):
         raise ValueError('BATCH_ID_INVALID')
     ROOT, PORT, ORIGIN = root, port, f'http://127.0.0.1:{port}'
 
@@ -214,14 +216,16 @@ def wire(token: str, method: str, params: dict, counts: dict):
 
 def self_test():
     assert connect_counts(Path('/does/not/exist')) is None
-    for root, port in ((OLD_ROOT, 51492), (Path('/tmp/hd002-c0053-pair-synthetic'), OLD_PORT),
+    for root, port in ((OLD_ROOT, 51492), (BLOCKED_ROOT, 51492),
+                       (Path('/tmp/hd002-c0053-pair-synthetic'), OLD_PORT),
+                       (Path('/tmp/hd002-c0053-pair-synthetic'), BLOCKED_PORT),
                        (Path('/home/hd002-c0053-pair-synthetic'), 51492)):
         try:
             set_batch(root, port)
         except ValueError:
             pass
         else:
-            raise AssertionError('old root/port or non-/tmp root accepted')
+            raise AssertionError('prior root/port or non-/tmp root accepted')
     assert within_window(0, 90, 89.99) and not within_window(0, 90, 90)
     assert valid_done({'schema': SCHEMA, 'done': True, 'electronStopped': True, 'sendCount': 0})
     assert not valid_done({'schema': SCHEMA, 'done': True, 'electronStopped': True, 'sendCount': 1})
