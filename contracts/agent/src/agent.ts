@@ -12,6 +12,8 @@ export interface AgentCapabilities {
   interactions: Availability
   models: Availability
   modes: Availability
+  /** Server-authoritative project targeting (CP-SESSION-001); absent ≠ supported — never fall back silently. */
+  workspaces?: Availability
 }
 export interface AgentConnectionInfo {
   id: string
@@ -19,6 +21,14 @@ export interface AgentConnectionInfo {
   status: ConnectionStatus
   error?: string
   capabilities: AgentCapabilities
+  /** Real Server instance identity behind this connection; project selections are scoped by it, never by plugin id alone. */
+  serverInstanceId?: string
+}
+/** One Server-authoritative project workspace record (FE never invents or reuses paths across servers). */
+export interface AgentWorkspaceInfo {
+  id: string
+  normalizedPath: string
+  environment?: string
 }
 export interface AgentSessionInfo {
   id: string
@@ -71,6 +81,13 @@ export interface AgentSnapshot {
   runs: Readonly<Record<string, { id: string; sessionId: string; status: RunStatus; stoppable?: boolean }>>
   interactions: readonly AgentInteraction[]
   options: readonly AgentOption[]
+  /** Server project table projection; present only when the client supports project targeting. */
+  workspaces?: {
+    state: 'unknown' | 'loading' | 'ready' | 'error'
+    items: readonly AgentWorkspaceInfo[]
+    /** Last selection revalidated against this Server; invalid or absent means sends are blocked. */
+    selectedWorkspaceId?: string
+  }
   diagnostic?: string
 }
 export type InteractionAnswer =
@@ -91,6 +108,11 @@ export interface AgentClient extends IDisposable {
   stop(sessionId: string, runId: string): Promise<void>
   respond(interactionId: string, answer: InteractionAnswer): Promise<void>
   setOption(id: string, value: string): Promise<void>
+  /** Project-capable clients only (CP backend connector). Absent members must disable project UI, never fake it. */
+  refreshWorkspaces?(): Promise<void>
+  openWorkspace?(id: string): Promise<AgentWorkspaceInfo>
+  /** First send of a draft: Server creates and executes under workspaceId with the given idempotency requestId. */
+  createAndSend?(workspaceId: string, text: string, requestId: string): Promise<void>
 }
 export interface AgentConnector {
   id: string
@@ -104,6 +126,14 @@ export interface AgentWorkspaceSnapshot {
   connectingId?: string
   error?: string
   agent?: AgentSnapshot
+  /** Front-end-only new-session draft; never a backend session until first send is accepted. */
+  draft?: {
+    active: boolean
+    /** Draft inherits the revalidated per-connection project selection; absence blocks send. */
+    workspaceId?: string
+    canSend: boolean
+    blockReason?: 'unsupported' | 'no-project' | 'project-invalid'
+  }
 }
 /** Owns connected instances independently of mounted Workbench views. */
 export interface AgentSessions {
@@ -118,5 +148,10 @@ export interface AgentSessions {
   stop(runId: string): Promise<void>
   respond(interactionId: string, answer: InteractionAnswer): Promise<void>
   setOption(id: string, value: string): Promise<void>
+  /** CP draft/project members are implemented by this facade (F2); optional here so pre-CP consumers keep compiling. */
+  startDraft?(): void
+  discardDraft?(): void
+  selectWorkspace?(id: string): Promise<void>
+  refreshWorkspaces?(): Promise<void>
 }
 export const AgentSessionsToken = new Token<AgentSessions>('ordessa.agent.sessions.v1')
