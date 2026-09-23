@@ -153,7 +153,11 @@ async function openDraft(initial: Partial<AgentSnapshot> = {}, create?: Create) 
     async refreshSessions() {},
     async newSession() { calls.newSession++; throw Error('the draft surface must not create a backend session') },
     async openSession(id) { write({ selectedSessionId: id }) },
-    async send(_sessionId, text) { calls.send.push(text) },
+    async send(_sessionId, text) {
+      // A disconnected instance rejects in its own client; the surface must not swallow the text over that.
+      if (snapshot.connection.status !== 'connected') throw Error('connection lost before the message was accepted')
+      calls.send.push(text)
+    },
     async stop() {},
     async respond() {},
     async setOption() {},
@@ -278,4 +282,24 @@ it('keeps Enter as send and Shift+Enter as a line break (gate 9)', async () => {
   await pressEnter(false)
   // The cleared field really is usable again; the textarea normalizes CRLF to the LF it reports.
   expect(calls.send).toEqual(['first', 'second line\nkept'])
+})
+
+it('keeps the composed text across a lost connection and a send attempted while disconnected (gate 10)', async () => {
+  const { container, write, calls, typeText, clickSend, field } = await openDraft({ selectedSessionId: 'S1' })
+  // The thread renders two independent alerts once a send fails while disconnected, so match on all of them.
+  const alerts = () => [...container.querySelectorAll('[role=alert].agent-error')].map(node => node.textContent).join('|')
+  await typeText('half-written\r\nmessage')
+  await act(async () => { write({ connection: { id: 'A', title: 'A', status: 'error', error: 'socket closed', capabilities: { ...capabilities, workspaces: 'supported' } } }) })
+  // The loss alert re-renders the thread; a re-render is not allowed to cost the user their text.
+  expect(alerts()).toContain('The result of an active run is unknown.')
+  expect(field()).toBe('half-written\nmessage')
+  await clickSend()
+  expect(calls.send).toEqual([])
+  expect(field()).toBe('half-written\nmessage')
+  expect(alerts()).toContain('connection lost before the message was accepted')
+  // Positive control: the same composer really does work again once the connection returns.
+  await act(async () => { write({ connection: { id: 'A', title: 'A', status: 'connected', capabilities: { ...capabilities, workspaces: 'supported' } } }) })
+  await clickSend()
+  expect(calls.send).toEqual(['half-written\nmessage'])
+  expect(field()).toBe('')
 })
