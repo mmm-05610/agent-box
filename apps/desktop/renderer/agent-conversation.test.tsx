@@ -371,6 +371,8 @@ async function openPanes(connectionIds: string[]) {
   return {
     container, field, typeText, clickSend, calls: (id: string) => panes.get(id)!.calls,
     paneTitle: () => container.querySelector('.agent-conversation-head h2')?.textContent,
+    paneLabel: () => container.querySelector('.agent-conversation-head small')?.textContent,
+    threadText: () => container.querySelector('.agent-thread')?.textContent ?? '',
     openSession: async (target: string) => { await act(async () => { await sessions.openSession(target) }) },
     selectConnection: async (target: string) => { await act(async () => { await sessions.selectConnection(target) }) },
     startDraft: async () => { await act(async () => { sessions.startDraft?.() }) },
@@ -504,4 +506,61 @@ it('mirrors an invalidation the connector does not report: the send is offered a
   await h.clickSend()
   expect(h.calls('A').create).toHaveLength(2)
   expect(h.calls('A').create[1].requestId).toBe(h.calls('A').create[0].requestId)
+})
+
+it('gives the pane, the key and the session identity to a draft that overlaps a live selection (gate 16)', async () => {
+  const h = await openPanes(['A'])
+  // FC-0060's counterexample. The facade now keeps the previous selection live through a draft and leans
+  // on draft-first routing (F2-0010), so "draft active while S1 is selected" is the ordinary case — the
+  // exact shape a split patch leaked, where the draft composer opened with S1's text and then wrote its
+  // own text back over S1's buffer.
+  await h.write('A', {
+    messages: { S1: [{ id: 'm1', role: 'user', text: 'history that belongs to S1 only', status: 'completed' }] },
+    runs: { R1: { id: 'R1', sessionId: 'S1', status: 'running' } },
+    interactions: [{ id: 'I1', sessionId: 'S1', kind: 'approval', title: 'Approval owed to S1 only', state: 'pending' }],
+  })
+  await h.openSession('S1')
+  await h.typeText('half-written work belonging to S1')
+  await h.startDraft()
+  expect(h.paneLabel()).toBe('NEW SESSION')
+  expect(h.field()).toBe('')
+  // S1 keeps its own thread: no history, no run, no pending card follows the draft pane.
+  expect(h.threadText()).not.toContain('history that belongs to S1 only')
+  expect(h.container.querySelector('.agent-interaction')).toBeNull()
+  expect(h.container.querySelector('.agent-run-state')?.textContent).toBe('idle')
+  expect(h.calls('A')).toEqual({ send: [], create: [], newSession: 0 })
+  await h.typeText('a sentence that belongs to the new session')
+  expect(h.calls('A')).toEqual({ send: [], create: [], newSession: 0 })
+  // Discard is final: S1 comes back with S1's text, and the draft sentence never crosses into it.
+  await h.discardDraft()
+  expect(h.paneLabel()).toBe('SESSION')
+  expect(h.field()).toBe('half-written work belonging to S1')
+  expect(h.threadText()).toContain('history that belongs to S1 only')
+  expect(h.container.querySelector('.agent-interaction')?.textContent).toContain('Approval owed to S1 only')
+  expect(h.container.querySelector('.agent-run-state')?.textContent).toBe('running')
+  // A second New session starts empty, because 'discarded' cleared the draft buffer.
+  await h.startDraft()
+  expect(h.field()).toBe('')
+  await h.discardDraft()
+})
+
+it('resumes a stepped-away draft and routes its first send to createAndSend, never the selected session (gate 17)', async () => {
+  const h = await openPanes(['A'])
+  await h.openSession('S1')
+  await h.startDraft()
+  await h.selectWorkspace('W1')
+  await h.typeText('draft text stepped away from')
+  // Ending a draft by opening another session is a step-away (endedBy: 'opened'), not a discard.
+  await h.openSession('S2')
+  expect(h.paneLabel()).toBe('SESSION')
+  expect(h.field()).toBe('')
+  await h.startDraft()
+  expect(h.field()).toBe('draft text stepped away from')
+  // Resumed from the original S2 selection, the first send still goes to createAndSend exactly once.
+  await h.clickSend()
+  expect(h.calls('A').create).toHaveLength(1)
+  expect(h.calls('A').create[0]).toMatchObject({ workspaceId: 'W1', text: 'draft text stepped away from' })
+  expect(h.calls('A').send).toEqual([])
+  expect(h.paneTitle()).toBe('Draft run')
+  expect(h.field()).toBe('')
 })

@@ -54,13 +54,12 @@ function ToolPart({ toolName, argsText, result, artifact }: ToolCallMessagePartP
 function ChatMessage() {
   return <MessagePrimitive.Root className="agent-message"><MessagePrimitive.Parts components={{ Text: TextPart, Reasoning: ReasoningPart, tools: { Fallback: ToolPart } }} /></MessagePrimitive.Root>
 }
-function ConversationThread({ service, connectionId, sessionId, draft, compositions }: { service: AgentSessions; connectionId: string; sessionId: string; draft: Draft | undefined; compositions: Compositions }) {
+function ConversationThread({ service, connectionId, drafting, pane, sessionId, draft, compositions }: { service: AgentSessions; connectionId: string; drafting: boolean; pane: string; sessionId: string; draft: Draft | undefined; compositions: Compositions }) {
   const state = useWorkspace(service), agent = state.agent!
   const [actionError, setActionError] = useState('')
-  // FC-0043's rule, kept deliberately: a draft is the pane only while nothing is selected, because the
-  // facade routes a send by `selectedSessionId` first (plugins/agent/sessions/src/model.ts:110).
-  const drafting = !sessionId && draft?.active === true
-  const pane = drafting ? draftPane : sessionPane(sessionId)
+  // `drafting`, `pane`, the remount key and the session identity below all come from the one predicate
+  // in `Conversation` (FC-0060). The facade deliberately keeps the old selection live during a draft and
+  // relies on draft-first routing, so deriving any of these separately re-imports the FC-0052 leak.
   // Held above the keyed remount so switching panes costs the user nothing, and a rejected send cannot
   // silently empty the field (FC-0043 Q3).
   const [text, setText] = useState(() => compositions.read(connectionId, pane)), [sending, setSending] = useState(false)
@@ -113,7 +112,6 @@ export function Conversation({ service }: { service: AgentSessions }) {
   const state = useWorkspace(service), agent = state.agent, sessionId = agent?.selectedSessionId, connectionId = state.selectedConnectionId
   // Unsent text lives here, not in the thread: the thread remounts on every pane change (FC-0052).
   const compositions = useState(() => new Map<string, Map<string, string>>())[0]
-  const lastDraftState = useState(() => new Map<string, { active: boolean; sessionId: string }>())[0]
   const store = useMemo<Compositions>(() => ({
     read(connection, pane) { return compositions.get(connection)?.get(pane) ?? '' },
     write(connection, pane, value) {
@@ -122,24 +120,24 @@ export function Conversation({ service }: { service: AgentSessions }) {
       panes.set(pane, value)
     },
   }), [compositions])
-  // The Sessions facade ends a draft both on discard and on opening another session
-  // (plugins/agent/sessions/src/model.ts:106, :141), and only this surface can tell them apart:
-  // a draft that ends while the selection stays exactly as it was was discarded, so it must not
-  // come back. A draft that ends because the selection moved is only being waited on.
-  const active = state.draft?.active === true
+  // The one source of pane identity (FC-0060). The facade deliberately leaves the previous selection
+  // live while a draft runs and relies on draft-first routing, so the composer pane, the remount key and
+  // the session identity handed to the thread all have to come from this single predicate.
+  const drafting = state.draft?.active === true
+  const pane = drafting ? draftPane : sessionPane(sessionId ?? '')
+  const endedBy = state.draft?.endedBy
   useEffect(() => {
-    if (!connectionId) return
-    const current = { active, sessionId: sessionId ?? '' }
-    const previous = lastDraftState.get(connectionId)
-    lastDraftState.set(connectionId, current)
-    if (previous?.active && !active && previous.sessionId === current.sessionId)
-      compositions.get(connectionId)?.delete(draftPane)
-  })
+    if (!connectionId || !endedBy) return
+    // `endedBy` is authoritative (F2-0010), replacing the guess from "the draft ended while the
+    // selection stayed exactly as it was". A discard is final: its text must not greet the next
+    // New session. Opening another session is only a step-away, so its text waits there to be resumed.
+    if (endedBy === 'discarded') compositions.get(connectionId)?.delete(draftPane)
+  }, [connectionId, endedBy, compositions])
   // A draft has no backend session yet, so the absence of a selection is the new-session case, not an empty pane (FC-0030).
   if (!connectionId) return <div className="agent-panel agent-placeholder"><style>{styles}</style><h2>Choose a connection</h2><p>Select an enabled agent from the left panel.</p></div>
   if (!agent) return <div className="agent-panel agent-placeholder"><style>{styles}</style><h2>Connecting</h2><p>{state.error ?? 'Waiting for the agent connection.'}</p></div>
-  if (!active && !sessionId) return <div className="agent-panel agent-placeholder"><style>{styles}</style><h2>Choose a session</h2><p>Open a previous session or start a new one.</p></div>
-  // The key is the same identity the composer's buffer is keyed by: a session that happens to be called
-  // `draft` must still remount out of the draft pane rather than inherit it.
-  return <ConversationThread key={`${connectionId}:${sessionId ? sessionPane(sessionId) : draftPane}`} service={service} connectionId={connectionId} sessionId={sessionId ?? ''} draft={state.draft} compositions={store} />
+  if (!drafting && !sessionId) return <div className="agent-panel agent-placeholder"><style>{styles}</style><h2>Choose a session</h2><p>Open a previous session or start a new one.</p></div>
+  // The key is literally the pane the buffer is keyed by, so any pane change remounts and the composer
+  // cannot initialise from the previous pane's text; a session actually called `draft` still gets its own.
+  return <ConversationThread key={`${connectionId}:${pane}`} service={service} connectionId={connectionId} drafting={drafting} pane={pane} sessionId={drafting ? '' : sessionId ?? ''} draft={state.draft} compositions={store} />
 }
