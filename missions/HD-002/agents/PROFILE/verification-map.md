@@ -24,7 +24,7 @@
 ## 复核时间戳（2026-09-23）
 
 - BE：在 `f3bcbde9` **现跑** `PYTHONPATH=src python3 -m unittest discover -s tests -p "test_*.py"` → `Ran 58 tests … OK`，跑后 `git status --porcelain` 仍空（无写产物）。
-- FE：在 `e869683469` 现跑于 `/tmp` 镜像（同一借用 TS 6.0.3）→ tsc `--noEmit` exit 0、CJS 出件 exit 0、`node --test` **12 passed / 0 failed**、esbuild `/tmp` 15.4kb；产品树 `git status --porcelain` 空。
+- FE：在 `e869683469` 现跑于 `/tmp` 镜像（同一借用 TS 6.0.3）→ tsc `--noEmit` exit 0、CJS 出件 exit 0、`node --test` **12 passed / 0 failed**、esbuild 出件 `/tmp/pf-ext/ordessa.profile/entry.js` = **15453 bytes**；产品树 `git status --porcelain` 空。
 
 ## 复跑配方（供暂停/接手后不重新摸索，均为本机实测过的形状）
 
@@ -33,8 +33,12 @@
 1. 镜像：`mkdir -p /tmp/pf-run/{plugins,platform}` → 拷 `frontend/plugins/profile`、`frontend/platform/extension-api` → `ln -s <上面那个绝对路径> /tmp/pf-run/node_modules`。
 2. 类型门：`node <fc>/node_modules/typescript/bin/tsc -p plugins/profile/tsconfig.json --noEmit` → exit 0（含 `src/*.tsx` 与 tests）。
 3. 为跑 `node --test` 需先出 CJS 副本，**必须以项目 tsconfig 为底**，在镜像根目录跑：`node <fc>/node_modules/typescript/bin/tsc -p plugins/profile/tsconfig.json --noEmit false --outDir cjs --rootDir . --module commonjs --rewriteRelativeImportExtensions --esModuleInterop` → exit 0，产物落在 `cjs/plugins/profile/{src,tests}/*.js`，随后 `cd cjs/plugins/profile && node --test tests/*.test.js` → **12 passed / 0 failed**。两个必踩的坑：(a) 只用命令行文件列表（`tsc plugins/profile/tests/*.ts …`）**过不了**，会报 `TS6142 --jsx is not set` 与 `TS7006`，因为绕开了 tsconfig 的 `jsx/strict/paths`；(b) 不加 `--rootDir .` 会以 `TS5011` 失败（TS 6 要求显式 rootDir 才能定出文件布局）。另**不要**传 `--moduleResolution node10`：TS 6 以 `TS5107` 直接失败（本包两次踩过）。
-4. 产物门：复刻 `tooling/build-extension.mjs` 的选项（bundle/splitting/esm/browser/jsx automatic + 同 externals）用 esbuild 出到 `/tmp/pf-ext/ordessa.profile`，**因为 `buildExtension` 的 `outputRoot` 是 `products/agent-desktop/dist`，属产品装配、在本包写域外**；出件 exit 0、15.4kb、含真实 ProfilePanel。
+4. 产物门：复刻 `tooling/build-extension.mjs` 的选项（bundle/splitting/esm/browser/jsx automatic + 同 externals）用 esbuild 出到 `/tmp/pf-ext/ordessa.profile`，**因为 `buildExtension` 的 `outputRoot` 是 `products/agent-desktop/dist`，属产品装配、在本包写域外**；出件 exit 0、`entry.js` = **15453 bytes**（单文件）、含真实 ProfilePanel（`grep -c ProfilePanel` = 2）。
 5. BE：`PYTHONPATH=src python3 -m unittest discover -s tests -p "test_*.py"` → `Ran 58 tests … OK`（系统解释器 3.14，无安装）。**必须 `cd` 到 `profile/backend/plugins/agent-box-profile-preset/` 再跑**：在 backend 仓库根跑会命中主线自己的 `src/` 与 `tests/`，本轮实测得到误导性的 `Ran 9 tests … FAILED (errors=9)`，那不是本包回归。加 `PYTHONDONTWRITEBYTECODE=1` 可保证跑后 `git status --porcelain` 仍空。分发级隔离证明另有 `python3 -m pip wheel --no-deps --no-build-isolation --no-index -w /tmp/pfwheel .`，其 11 条目无 `entry_points.txt`、`METADATA` 无 `Requires-Dist`。
 6. **绝不跑** `tooling/build-all.mjs`：它自动发现带 `ordessa.id` 的 `plugins/**/package.json` 并重写已提交的 `products/agent-desktop/extensions.lock.json`（该风险仍是活的，处置权在 FC/C，见 status 的 `synced_facts`）。
 
-本配方**四步全部于 04:36 当场实测通过**（BE 58 tests OK；FE 在 `e869683469` 的镜像上 tsc `--noEmit` exit 0 → CJS 出件 exit 0 → `node --test` 12 passed / 0 failed → esbuild exit 0、`entry.js` 15.4kb 且 `grep -c ProfilePanel` = 2），跑后两树 `git status --porcelain` 仍全空、零安装、零网络、零真实模型调用。第 3 步的命令行形状是这次跑出来的**修正版**：上一版记的「只用命令行文件列表 + `--types node`」实测不能通过。若将来复跑与此处不符，以现跑输出为准并把差异登记进 status。本表只声明「独立插件验证」，复跑全绿也不构成接缝验证、产品装配或用户验收。
+本配方**四步全部于 04:36 当场实测通过**（BE 58 tests OK；FE 在 `e869683469` 的镜像上 tsc `--noEmit` exit 0 → CJS 出件 exit 0 → `node --test` 12 passed / 0 failed → esbuild exit 0、`entry.js` 15453 bytes 且 `grep -c ProfilePanel` = 2），跑后两树 `git status --porcelain` 仍全空、零安装、零网络、零真实模型调用。第 3 步的命令行形状是这次跑出来的**修正版**：上一版记的「只用命令行文件列表 + `--types node`」实测不能通过。若将来复跑与此处不符，以现跑输出为准并把差异登记进 status。本表只声明「独立插件验证」，复跑全绿也不构成接缝验证、产品装配或用户验收。
+
+## 口径更正（2026-09-23 04:42，字节数为准）
+
+本表此前把产物大小写成「15.4kb」，而同一提交（FE `e869683469`）的 commit message 也沿用了这个数；esbuild 自己打印的是 15.1kb。现核对到唯一无歧义的事实：**该产物只有一个文件 `entry.js`，15453 bytes**（`wc -c` 实测）。15453/1024 = 15.09 → esbuild 按二进制单位打印 **15.1kb**；15453/1000 = 15.453 → 十进制单位**截断**读作 15.4（若四舍五入则是 15.5，所以「15.4」连十进制口径下也不是四舍五入得来的）。**两个读数指向同一件、同一提交，不是矛盾也不是重跑退化**，但「kb」这个词在本包记录里有两种底数，后续一律写 bytes。这纯粹是本表自身的表述缺陷，与被验对象无关；产品树未因此改动（两树 `git status --porcelain` 仍空）。
