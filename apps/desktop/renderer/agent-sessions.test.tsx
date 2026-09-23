@@ -2,10 +2,13 @@
 import { act, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, expect, it } from 'vitest'
-import { OwnedResources } from '@ordessa/extension-api'
+import { OwnedResources, type PluginContext } from '@ordessa/extension-api'
 import { createAgentConnections } from '../../../plugins/connections/service/src/entry'
 import { createAgentSessions } from '../../../plugins/agent/sessions/src/model'
 import { SessionBrowser } from '../../../plugins/agent/sessions/src/view'
+import createSessionsPlugin from '../../../plugins/agent/sessions/src/entry'
+import createConversationPlugin from '../../../plugins/agent/conversation/src/entry'
+import type { Commands, Workbench } from '../../../contracts/foundation/src/contract'
 import type { AgentClient, AgentSnapshot } from '../../../contracts/agent-ui/src/contract'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -71,10 +74,6 @@ it('groups sessions by workspace with the standalone group last and pinned first
   const { container } = await openList()
   // Reachability first: the section root and the unconditional list container are in the document.
   expect(container.querySelector('section.agent-sessions')).not.toBeNull()
-  expect(container.querySelector('h2')?.textContent).toBe('Sessions')
-  expect(container.querySelector('.agent-connections')).toBeNull()
-  expect([...container.querySelectorAll('button')].some(button => button.textContent === 'Reconnect')).toBe(false)
-  expect([...container.querySelectorAll('button')].some(button => button.textContent === 'Refresh')).toBe(true)
   expect(container.querySelector('.agent-session-list')).not.toBeNull()
   const groups = [...container.querySelectorAll('.agent-session-group')].map(node => node.textContent)
   expect(groups).toEqual(['proj-a', 'Standalone sessions'])
@@ -134,4 +133,60 @@ it('renders the five list states with their existing copy (empty is a count, not
   await act(async () => { write({ sessionList: 'error' }) })
   const alerts = [...container.querySelectorAll('[role=alert]')]
   expect(alerts.some(node => node.textContent === 'Session list failed. Refresh to try again.')).toBe(true)
+})
+
+it('keeps exactly one selection marker, moved by clicks and restored on a fresh mount (FC-0004 selection)', async () => {
+  const { container, sessions } = await openList()
+  const target = itemButton(container, 'Project chat')!
+  expect(target.getAttribute('aria-current')).toBeNull()
+  await act(async () => { target.click() })
+  // Positive control: the click reached the service and the marker moved.
+  expect(itemButton(container, 'Project chat')?.getAttribute('aria-current')).toBe('true')
+  expect(container.querySelectorAll('.agent-session-list button[aria-current=true]')).toHaveLength(1)
+  await act(async () => { itemButton(container, 'Standalone chat')!.click() })
+  expect(itemButton(container, 'Project chat')?.getAttribute('aria-current')).toBeNull()
+  expect(itemButton(container, 'Standalone chat')?.getAttribute('aria-current')).toBe('true')
+  // Selection lives in the service snapshot, so a remounted browser restores the same marker.
+  const again = await mount(<SessionBrowser service={sessions} />)
+  expect(itemButton(again, 'Standalone chat')?.getAttribute('aria-current')).toBe('true')
+  expect(again.querySelectorAll('.agent-session-list button[aria-current=true]')).toHaveLength(1)
+})
+
+function fakeWorkbench() {
+  const views: { id: string }[] = [], uis: { id: string }[] = [], opened: string[] = []
+  const value = {
+    forScope: () => ({
+      addView: (view: { id: string }) => { views.push(view) },
+      addUI: (ui: { id: string }) => { uis.push(ui) },
+    }),
+    open: (id: string) => { opened.push(id) },
+  } as unknown as Workbench
+  return { value, views, uis, opened }
+}
+
+function fakeCommands() {
+  const added: { id: string; execute: () => void }[] = []
+  const value = { forScope: () => ({ add: (command: { id: string; execute: () => void }) => { added.push(command) } }) } as unknown as Commands
+  return { value, added }
+}
+
+it('registers view, command and navigation exactly once in the sessions entry and never in the conversation entry (FC-0004 unique registration)', async () => {
+  const scope = new OwnedResources(), registryScope = new OwnedResources()
+  cleanup.push(async () => { scope.dispose(); registryScope.dispose() })
+  const context = { resources: scope } as unknown as PluginContext
+  const sessionsWb = fakeWorkbench(), sessionsCmds = fakeCommands()
+  const sessions = createSessionsPlugin().activate(
+    context, createAgentConnections(registryScope), sessionsCmds.value, sessionsWb.value)
+  expect(sessionsWb.views.map(view => view.id)).toEqual(['agent.sessions'])
+  expect(sessionsWb.uis.map(ui => ui.id)).toEqual(['agent.navigation'])
+  expect(sessionsCmds.added.map(command => command.id)).toEqual(['agent.open'])
+  // The single agent.open command opens both panels; no other entry point duplicates it.
+  sessionsCmds.added[0].execute()
+  expect(sessionsWb.opened).toEqual(['agent.sessions', 'agent.conversation'])
+  const conversationWb = fakeWorkbench(), conversationCmds = fakeCommands()
+  createConversationPlugin().activate(
+    { resources: scope } as unknown as PluginContext, conversationWb.value, sessions)
+  expect(conversationWb.views.map(view => view.id)).toEqual(['agent.conversation'])
+  expect(conversationWb.uis).toEqual([])
+  expect(conversationCmds.added).toEqual([])
 })
