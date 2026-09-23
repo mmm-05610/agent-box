@@ -6,6 +6,7 @@ const dictionaryAnnotation = hashAnnotation('spellcheck_hunspell_dictionary')
 // Chromium's spellcheck_hunspell_dictionary source declares this initial URL.
 // A redirect to any other host needs a separate reviewed destination decision.
 const dictionaryOrigin = 'https://redirector.gvt1.com'
+const dictionaryPath = /^\/edgedl\/chrome\/dict\/[^/]+\.bdic$/
 const probeAddress = '2001:4860:4860::8888' // Chromium 144 host_resolver_manager.cc kIPv6ProbeAddress.
 const key = source => Number.isInteger(source?.type) && Number.isInteger(source?.id) ? `${source.type}:${source.id}` : null
 const loopback = value => value.startsWith('127.') || value === '::1' || value.startsWith('::ffff:127.')
@@ -92,7 +93,8 @@ export function classifyPairNetwork(files, netlog, serverOrigin) {
   assert.ok(loopback(server.hostname), 'Server origin must be loopback')
   const types = netlog.constants.logEventTypes ?? {}, sourceTypes = netlog.constants.logSourceType ?? {}
   if (![types.TCP_CONNECT, types.UDP_CONNECT, types.UDP_BYTES_SENT, types.SOCKET_BYTES_SENT,
-    types.HOST_RESOLVER_MANAGER_IPV6_REACHABILITY_CHECK, sourceTypes.URL_REQUEST].every(Number.isInteger))
+    types.HOST_RESOLVER_MANAGER_IPV6_REACHABILITY_CHECK, types.URL_REQUEST_REDIRECTED,
+    sourceTypes.URL_REQUEST].every(Number.isInteger))
     return { pass: false, reason: 'NETLOG_CONSTANTS_MISSING' }
   const eventsBySource = new Map(), edges = new Map()
   for (const event of netlog.events) {
@@ -115,8 +117,10 @@ export function classifyPairNetwork(files, netlog, serverOrigin) {
     const annotation = events.map(event => event.params?.traffic_annotation).find(Number.isInteger)
     const allServer = urls.every(raw => { try { return new URL(raw).origin === server.origin } catch { return false } })
     const dictionary = annotation === dictionaryAnnotation && methods.includes('GET') && methods.every(m => m === 'GET') &&
+      !events.some(event => event.type === types.URL_REQUEST_REDIRECTED) &&
       urls.every(raw => { try { const url = new URL(raw); return url.origin === dictionaryOrigin &&
-        url.username === '' && url.password === '' && url.pathname.endsWith('.bdic') } catch { return false } })
+        url.username === '' && url.password === '' && dictionaryPath.test(url.pathname) &&
+        !url.search && !url.hash } catch { return false } })
     if (allServer) continue
     if (dictionary) dictionaryRequests.push(source)
     else unknownRequests.push(source)

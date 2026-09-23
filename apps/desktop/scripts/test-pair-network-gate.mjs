@@ -11,7 +11,8 @@ const traces = {
   'electron-connect.trace.101': `${base}.190000 socket(AF_INET6, SOCK_DGRAM, IPPROTO_IP) = 4\n${base}.200000 connect(4, {sa_family=AF_INET6, sin6_port=htons(443), inet_pton(AF_INET6, "2001:4860:4860::8888", &sin6_addr)}, 28) = 0\n${base}.210000 getsockname(4, 0x123, 0x456) = 0\n`,
 }
 const constants = { timeTickOffset: 1699999999000,
-  logEventTypes: { TCP_CONNECT: 7, UDP_CONNECT: 9, UDP_BYTES_SENT: 10, HOST_RESOLVER_MANAGER_IPV6_REACHABILITY_CHECK: 11, SOCKET_BYTES_SENT: 12 },
+  logEventTypes: { TCP_CONNECT: 7, UDP_CONNECT: 9, UDP_BYTES_SENT: 10, HOST_RESOLVER_MANAGER_IPV6_REACHABILITY_CHECK: 11, SOCKET_BYTES_SENT: 12,
+    URL_REQUEST_REDIRECTED: 13 },
   logSourceType: { URL_REQUEST: 1, SOCKET: 3, UDP_SOCKET: 4 } }
 const events = [
   { time: '1100', type: 7, source: source(3, 1), params: { address_list: ['127.0.0.1:43891'] } },
@@ -45,6 +46,15 @@ const dictionaryRedirect = classifyPairNetwork(traces, { constants, events: [...
   { time: '1320', type: 20, source: source(1, 2), params: { url: 'https://unreviewed.invalid/dict/en.bdic' } }] }, origin)
 assert.equal(dictionaryRedirect.pass, false)
 assert.equal(dictionaryRedirect.unknownRequests, 1)
+const sameOriginRedirect = classifyPairNetwork(traces, { constants, events: [...events,
+  { time: '1320', type: 13, source: source(1, 2), params: { url: 'https://redirector.gvt1.com/edgedl/chrome/dict/en.bdic' } }] }, origin)
+assert.equal(sameOriginRedirect.pass, false)
+assert.equal(sameOriginRedirect.unknownRequests, 1)
+const wrongDictionaryPath = classifyPairNetwork(traces, { constants, events: events.map(event =>
+  event.source?.type === 1 && event.source?.id === 2 ? { ...event, params: { ...event.params,
+    url: 'https://redirector.gvt1.com/unrelated/en.bdic' } } : event) }, origin)
+assert.equal(wrongDictionaryPath.pass, false)
+assert.equal(wrongDictionaryPath.unknownRequests, 1)
 const destinationMissing = classifyPairNetwork(traces, { constants, events: [...events,
   { time: '1330', type: 20, source: source(1, 10), params: { method: 'GET', traffic_annotation: hash('spellcheck_hunspell_dictionary') } }] }, origin)
 assert.equal(destinationMissing.pass, false)
@@ -56,5 +66,6 @@ assert.equal(credentialDestinationAllowed('http://127.0.0.1:43891/wire/v1/server
 assert.ok(!JSON.stringify({ positive }).includes(fakeSecret))
 console.log(JSON.stringify({ synthetic: 'PASS', udpProbeNotTcp: true, remoteTcpRejected: true,
   remoteSendRejected: true, unknownTypeRejected: true, unknownRequestRejected: true,
-  credentialRemoteRejected: true, dictionaryRedirectRejected: true, missingDestinationRejected: true,
+  credentialRemoteRejected: true, dictionaryRedirectRejected: true, sameOriginRedirectRejected: true,
+  wrongDictionaryPathRejected: true, missingDestinationRejected: true,
   truncatedRejected: true, redacted: true }))
