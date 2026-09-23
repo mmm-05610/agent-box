@@ -65,7 +65,7 @@ export interface AgentSnapshot {
   sessionList: 'unknown' | 'loading' | 'ready' | 'partial' | 'error'
   selectedSessionId?: string
   messages: Readonly<Record<string, readonly AgentMessage[]>>
-  runs: Readonly<Record<string, { id: string; sessionId: string; status: RunStatus }>>
+  runs: Readonly<Record<string, { id: string; sessionId: string; status: RunStatus; stoppable?: boolean }>>
   interactions: readonly AgentInteraction[]
   options: readonly AgentOption[]
   diagnostic?: string

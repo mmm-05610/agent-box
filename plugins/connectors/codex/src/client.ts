@@ -123,7 +123,7 @@ export class CodexClient implements AgentClient {
     if (method === 'turn/started' && sessionId && turn && string(turn.id)) {
       const id = turn.id as string
       if (!this.snapshot.runs[id] || this.snapshot.runs[id].status === 'running')
-        this.publish({ runs: { ...this.snapshot.runs, [id]: { id, sessionId, status: 'running' } } })
+        this.publish({ runs: { ...this.snapshot.runs, [id]: { id, sessionId, status: 'running', stoppable: true } } })
       return
     }
     if (method === 'turn/completed' && sessionId && turn && string(turn.id)) {
@@ -246,14 +246,14 @@ export class CodexClient implements AgentClient {
     })
     const id = result.turn.id
     const previous = this.snapshot.runs[id]
-    if (!previous || previous.status === 'running') this.publish({ runs: { ...this.snapshot.runs, [id]: { id, sessionId, status: 'running' } } })
+    if (!previous || previous.status === 'running') this.publish({ runs: { ...this.snapshot.runs, [id]: { id, sessionId, status: 'running', stoppable: true } } })
   }
   async stop(sessionId: string, runId: string) {
     const run = this.snapshot.runs[runId]
     if (!run || run.sessionId !== sessionId || run.status !== 'running') throw Error('Run unavailable for stop')
-    this.publish({ runs: { ...this.snapshot.runs, [runId]: { ...run, status: 'stop-requested' } } })
+    this.publish({ runs: { ...this.snapshot.runs, [runId]: { ...run, status: 'stop-requested', stoppable: false } } })
     try { await this.request('turn/interrupt', { threadId: sessionId, turnId: runId }) }
-    catch (error) { this.publish({ runs: { ...this.snapshot.runs, [runId]: { ...run, status: 'unknown' } } }); throw error }
+    catch (error) { this.publish({ runs: { ...this.snapshot.runs, [runId]: { ...run, status: 'unknown', stoppable: false } } }); throw error }
   }
   async respond(interactionId: string, answer: InteractionAnswer) {
     const route = this.interactions.get(interactionId)

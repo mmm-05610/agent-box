@@ -215,7 +215,9 @@ export class PiClient implements AgentClient {
   private updateRun(id: string, sessionId: string, status: RunStatus) {
     const previous = this.state.runs[id]
     if (previous && !['starting', 'running', 'stop-requested'].includes(previous.status)) return
-    this.publish({ runs: { ...this.state.runs, [id]: { id, sessionId, status } } })
+    // Pi can abort 'starting' too (the prompt ack may precede agent_start).
+    const stoppable = status === 'running' || status === 'starting'
+    this.publish({ runs: { ...this.state.runs, [id]: { id, sessionId, status, stoppable } } })
   }
   private uiRequest(sessionId: string, event: Value) {
     const requestId = str(event.id), method = str(event.method)

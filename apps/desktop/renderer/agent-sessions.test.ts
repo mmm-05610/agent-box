@@ -23,7 +23,7 @@ function client(id: string) {
   return { value, calls }
 }
 
-it('keeps separate clients alive on selection changes and disposes them with the service scope', async () => {
+it('keeps separate clients alive on selection changes and disposes them with the connections service scope', async () => {
   const registryScope = new OwnedResources(), sessionScope = new OwnedResources()
   const aScope = new OwnedResources(), bScope = new OwnedResources()
   const registry = createAgentConnections(registryScope)
@@ -38,8 +38,9 @@ it('keeps separate clients alive on selection changes and disposes them with the
   await sessions.selectConnection('A'); await sessions.send('hello')
   expect(a.calls).toEqual(['open:one', 'send:one:hello'])
   expect(sessions.getSnapshot().agent?.selectedSessionId).toBe('one')
-  sessionScope.dispose()
+  // P2-1: client holding moved to the connections service workspace — its scope now owns client teardown.
+  registryScope.dispose()
   expect(a.value.isDisposed).toBe(true)
   expect(b.value.isDisposed).toBe(true)
-  aScope.dispose(); bScope.dispose(); registryScope.dispose()
+  sessionScope.dispose(); aScope.dispose(); bScope.dispose()
 })

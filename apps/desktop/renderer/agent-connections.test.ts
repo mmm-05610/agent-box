@@ -22,3 +22,68 @@ it('lets independent adapters register and releases each with its own scope', as
   expect(service.getSnapshot()).toEqual([])
   expect(() => service.forScope(b).add({ id: 'late', title: 'Late', connect: async () => { throw Error() } })).toThrow('closed')
 })
+
+import { hasAwaitingInteraction, hasOpenRun } from '../../../contracts/connections/src/connections'
+import { createAgentSessions } from '../../../plugins/agent/sessions/src/model'
+import type { AgentClient, AgentSnapshot } from '../../../contracts/agent-ui/src/contract'
+
+function snapshotWith(overrides: Partial<AgentSnapshot>): AgentSnapshot {
+  return { connection: { id: 'A', title: 'A', status: 'connected', capabilities: {
+    history: 'unknown', reasoning: 'unknown', tools: 'unknown', stop: 'supported', interactions: 'unknown', models: 'unknown', modes: 'unknown',
+  } }, sessions: [], sessionList: 'ready', messages: {}, runs: {}, interactions: [], options: [], ...overrides }
+}
+
+it('gate predicates match run/interaction state only, across every connection', () => {
+  expect(hasOpenRun([])).toBe(false)
+  expect(hasOpenRun([snapshotWith({})])).toBe(false)
+  for (const status of ['starting', 'running', 'stop-requested'] as const)
+    expect(hasOpenRun([snapshotWith({ runs: { r: { id: 'r', sessionId: 's', status } } })])).toBe(true)
+  for (const status of ['completed', 'cancelled', 'failed', 'unknown'] as const)
+    expect(hasOpenRun([snapshotWith({ runs: { r: { id: 'r', sessionId: 's', status } } })])).toBe(false)
+  expect(hasAwaitingInteraction([])).toBe(false)
+  for (const state of ['pending', 'responding'] as const)
+    expect(hasAwaitingInteraction([snapshotWith({ interactions: [{ id: 'i', sessionId: 's', kind: 'approval', title: 't', state }] })])).toBe(true)
+  for (const state of ['resolved', 'expired', 'unknown'] as const)
+    expect(hasAwaitingInteraction([snapshotWith({ interactions: [{ id: 'i', sessionId: 's', kind: 'approval', title: 't', state }] })])).toBe(false)
+})
+
+/** Reactive mock: workspace clientSnapshots track it only through its subscribe channel. */
+function liveClient(id: string, initial: AgentSnapshot) {
+  const box = { current: initial }
+  const listeners = new Set<() => void>()
+  const value: AgentClient = {
+    isDisposed: false, dispose() { listeners.clear() },
+    getSnapshot: () => box.current, subscribe(listener) { listeners.add(listener); return () => { listeners.delete(listener) } },
+    refreshSessions: async () => {}, newSession: async () => 's', openSession: async () => {},
+    send: async () => {}, stop: async () => {}, respond: async () => {}, setOption: async () => {},
+  }
+  return { value, set(next: AgentSnapshot) { box.current = next; listeners.forEach(fn => fn()) } }
+}
+
+it('blocks cross-connector switching while a run is open or an approval awaits, and re-opens when cleared', async () => {
+  const registryScope = new OwnedResources(), facadeScope = new OwnedResources(), connectorScope = new OwnedResources()
+  const base = { sessions: [] as never, sessionList: 'ready' as const, messages: {} as never, options: [] as never }
+  const codex = liveClient('codex', { connection: { id: 'codex', title: 'Codex', status: 'connected', capabilities: {
+    history: 'unknown', reasoning: 'unknown', tools: 'unknown', stop: 'supported', interactions: 'unknown', models: 'unknown', modes: 'unknown' } },
+    ...base, runs: {}, interactions: [] })
+  const pi = liveClient('pi', { connection: { id: 'pi', title: 'Pi', status: 'connected', capabilities: {
+    history: 'unknown', reasoning: 'unknown', tools: 'unknown', stop: 'supported', interactions: 'unknown', models: 'unknown', modes: 'unknown' } },
+    ...base, runs: {}, interactions: [] })
+  const registry = createAgentConnections(registryScope)
+  registry.forScope(connectorScope).add({ id: 'codex', title: 'Codex', connect: async () => codex.value })
+  registry.forScope(connectorScope).add({ id: 'pi', title: 'Pi', connect: async () => pi.value })
+  const sessions = createAgentSessions(facadeScope, registry)
+  await sessions.selectConnection('codex')
+  codex.set({ ...codex.value.getSnapshot(), runs: { t: { id: 't', sessionId: 's', status: 'running', stoppable: true } } })
+  await expect(sessions.selectConnection('pi')).rejects.toThrow('blocked while a run is open')
+  // A same-connector reselect is not a harness switch and stays available.
+  await sessions.selectConnection('codex')
+  // Clearing the run re-opens the switch.
+  codex.set({ ...codex.value.getSnapshot(), runs: {} })
+  await sessions.selectConnection('pi')
+  expect(sessions.getSnapshot().selectedConnectionId).toBe('pi')
+  // An awaiting approval on any connection gates again.
+  pi.set({ ...pi.value.getSnapshot(), interactions: [{ id: 'i', sessionId: 's', kind: 'approval', title: 'Approve', state: 'pending' }] })
+  await expect(sessions.selectConnection('codex')).rejects.toThrow('approval awaits')
+  registryScope.dispose(); facadeScope.dispose(); connectorScope.dispose()
+})
