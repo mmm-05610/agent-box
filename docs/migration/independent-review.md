@@ -55,6 +55,12 @@ dated history docs registered by the desktop table §4.
 
 ## 4. Claim verification — PASS (1 composition correction)
 
+Evidence-scope note (2026-09-26): `verify-clean.sh` is a **count** gate; run6's 17/0
+proves clean-env executability + ledger-count equality. The "zero unexplained new red
+**IDs**" claim below rests on the separate per-ID normalized diffs (migration-time
+`new-only.txt` analysis + `run6-server-red-ids.txt` dumped in the run6 environment),
+not on run6. The two evidences are cited separately throughout the docs.
+
 - Red-ledger independence check from raw logs (not the agent's summary):
   baseline 117 normalized red ids; new-tree server suite 66 red ids; 59 in
   the baseline set + 7 scope-missing (placement ×4, asset_hubs probe ×1,

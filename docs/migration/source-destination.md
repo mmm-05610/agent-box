@@ -36,7 +36,7 @@
 | 21 | `.c1-001-runtime/`（686M，含 64B token 600） | C1-001 运行材料+凭据 | **定案：原位不动**（凭据与运行材料永不进仓），新根环境例外（.gitignore 忽略） | 原位（环境例外） |
 | 22 | `.c1-001-secrets/`（drwx------） | 凭据目录 | **原位不动**，永不读取/复制/进仓 | 原位 |
 | 23 | `.mimocode/`、`.qoder/` | 会话工具 | **定案：原位**，新根环境例外；随服务结束的清理另批 | 原位（环境例外） |
-| 24 | 新 `main` 源码树 | — | 由 `/home/maoqh/projects/ordessa-monorepo-candidate` 检出为新的根内容 | 切换（见 §3） |
+| 24 | 新 `main` 源码树 | — | 候选仓经 §3 v3 父目录换名落位为 `/home/maoqh/projects/ordessa`（对象库原样，不重建） | 换名落位（§3 步骤 8） |
 
 ## 2. 根外路径（不动 / 仅登记）
 
@@ -50,38 +50,82 @@
 | `/home/maoqh/projects/ordessa-monorepo-candidate` | 候选仓；切换后其对象库成为正式根 `.git` |
 | `/home/maoqh/projects/ordessa-migration/` | 迁移工作区（契约、子代理产物、SWITCH 文档）；可归档至 `ordessa-legacy/` |
 
-## 3. 切换步骤（唯一方案，确认后执行）
+## 3. 切换步骤（唯一方案 v3：父目录换名 + 环境例外搬回，确认后执行）
 
-每步一条命令路径，无备选分支。执行者=本会话主代理；标注 **[USER GATE]** 的步骤必须先获用户明确答复。
+设计要点（回应阻塞审查）：**绝不向非空目录 mv 候选仓**。落位方式 = 先把整个旧根
+换名让出 `ordessa` 这个名字，再换入候选仓，然后把环境例外目录逐个**搬回新根原路径**
+（同文件系统 rename，瞬时完成；不使用符号链接，终态零间接层）。由此：
 
-前置条件：用户对本表无异议；后端集成与验证门全过；审阅发现已闭环。
+- 活动目录（`worktrees/`、`runtime/` 等）**终态物理路径与切换前完全一致**；
+- 旧根中**任何**未登记条目（包括任何时候出现/重现的 `.git`、`.agents`、`.codex`
+  存根）自动随旧根进入 `ordessa-old-root/`，不丢失、不冲突、不阻塞流程；
+- 每一步都是单条 rename，可逐步反向回滚。
 
-1. 冻结候选：记录 `git rev-parse main` 与 tag `baseline/cp-monorepo-0`（二者同 SHA）；`git fsck` 留证据。
+已知隐藏目录实测（2026-09-26 00:20）：`/home/maoqh/projects/ordessa/` 内
+`.git`/`.agents`/`.codex` **不存在**；存在的是 `/home/maoqh/projects/.git`
+（mimocode 存根，9-21）、`~/.agents`、`~/.codex`（HOME 级，`.codex` 活跃）——
+后三者在本流程交换范围之外，**一律不动**。若切换预检时发现旧根内出现任何隐藏
+目录/未知条目，按"随旧根进 `ordessa-old-root/`"处理并在 GATE A 清单中列明。
+
+每步一条命令路径。执行者=本会话主代理；**[USER GATE]** 步骤必须先获用户明确答复。
+
+前置条件：用户对本表无异议；验证门全过（数量门禁 run6 + 逐 ID 账本，分别见
+`docs/migration/README.md`）；审阅发现闭环。
+
+**阶段一：旧根瘦身（可在 GATE A 前执行，全部可逆 mv）**
+
+1. 冻结候选：记录 `git -C candidate rev-parse main`（= tag `baseline/cp-monorepo-0`）；`git fsck` 留证据；确认 `git status` 干净。
 2. 建立接收目录：`mkdir -p /home/maoqh/projects/ordessa-legacy/{repos,workspace-root}`。
-3. 搬迁旧工作区容器（§1 中 disposition="搬 ordessa-legacy" 的全部条目，逐条 `mv`，保持原名）：
-   `mv ordessa/control ordessa-legacy/control`；
-   `mv ordessa/repos/harness-{profile,provider,workboard} ordessa-legacy/repos/`；
-   `mv ordessa/archive ordessa-legacy/archive-20260920`（2026-09-20 清理轮产物整体保留）；
-   `mv ordessa/backups ordessa-legacy/backups`；
-   `mv ordessa/releases ordessa-legacy/releases`；
-   `mv ordessa/tools ordessa-legacy/tools`；
-   `mv ordessa-migration ordessa-legacy/migration`（契约、子代理产物、验证脚本与全部日志）。
-4. 删除根内符号链接（只删链接，链接目标一律不动）：`repos/backend`、`repos/desktop`、`repos/studio-legacy`，及 `worktrees/` 下 11 个符号链接（§1 条目 15）。
-5. 让位旧根文档：`mv ordessa/{AGENTS.md,README.md,cleanup-report.md} ordessa-legacy/workspace-root/`（新根同名文件取代它们，原文留档）。
-6. **[USER GATE A]** 停点：报告将移动的完整清单（逐条 src→dst）；用户答复后才继续。不移动（定案=原位保留，成为新根环境例外，已列新根 `.gitignore` environment-exceptions 段）：`worktrees/` 实体树（57411 服务腿与 4 个 qoder 会话驻留）、`.c1-001-runtime/`、`.c1-001-secrets/`、`.mimocode/`、`.qoder/`、`runtime/`。
-7. 候选仓落位（唯一方法 = `mv`，对象库原样）：`mv /home/maoqh/projects/ordessa-monorepo-candidate /home/maoqh/projects/ordessa`。此步必须在第 3–5 步之后（目标非空则中止并回滚）。
-8. 切换后验证（在正式根执行）：`git status`（预期：environment-exceptions 之外干净）；`git fsck`；`npm ci && npm run typecheck && npm test`；`python3.12 -m venv .venv && pip install -r apps/server/lockfiles/server-linux-py312.txt && pip install -e packages/pacthold -e apps/server -e 'plugins/harness[dev]' -e 'apps/server[dev]' -e 'packages/pacthold[dev]'` + 四套件严格对账（verify-clean.sh v2 门禁参数）；`bash plugins/harness/packaging/acp-adapter/build-acp-adapter-round-h.sh /tmp/x` 比对 sha256。
-9. 回报 `BASELINE_ESTABLISHED_WITH_KNOWN_ISSUES`（或未完成项清单）。worktree/服务腿退役 = **[USER GATE B]**：用户确认会话结束后另批执行。
+3. 搬迁旧工作区容器（§1 中 disposition="搬 ordessa-legacy" 的条目，逐条 `mv` 原名）：`control`、`repos/harness-{profile,provider,workboard}`、`archive`→`archive-20260920`、`backups`、`releases`、`tools`；`ordessa-migration`→`ordessa-legacy/migration`。
+4. 删除符号链接（只删链接，目标一律不动）：`repos/{backend,desktop,studio-legacy}` 与 `worktrees/` 下 11 个指向 `/home/maoqh/projects/agent-box*` 的链接。
+5. 让位旧根文档：`mv ordessa/{AGENTS.md,README.md,cleanup-report.md} ordessa-legacy/workspace-root/`。
 
-## 4. 回滚步骤（任一步失败即停，按序回退）
+**阶段二：[USER GATE A] 换名落位（单脚本顺序执行，见下方窗口说明）**
 
-1. 第 7 步前失败：一切保持原状，第 2–5 步的每条 `mv` 原路反向 `mv` 回 `/home/maoqh/projects/ordessa/`（src→dst 一一对应，无覆盖）。
-2. 第 7 步后失败：`mv /home/maoqh/projects/ordessa /home/maoqh/projects/ordessa-switched-<date>` 留证；旧根从 `ordessa-legacy/` 原路 `mv` 回；候选仓留在 `ordessa-switched-<date>` 待用户处置。
-3. 历史恢复（任何时点）：`docs/reference-index.md` §How to restore——普通 clone + fetch archive/reference（已验证 +603 refs 全部可达）、bundle 克隆、workspace-backup tar（MANIFEST sha256 逐文件校验）、control checkpoint `4fc80571`（双路字节核验）。
-4. 57411 服务腿：全程未触碰；若其工作树日后被移动，从 `refs/archive/agent-box/heads/work/hd002-bc-native` 于原路径重检出即可（agent-box 对象库未动）。
+6. **[USER GATE A]** 停点：报告 (a) 阶段一实际执行清单逐条 src→dst；(b) 预检输出（见步骤 7）；(c) 环境例外清单与隐藏目录实测。用户答复后才执行步骤 8。
+7. 预检（脚本自动，全部通过才继续）：候选仓存在且 HEAD=tag 且 status 干净；`ordessa-old-root` 不存在；`ls -A ordessa` 盘点存档；活动进程清点（57411 腿 pid 与 4 个 qoder 会话 pid 的 `/proc/<pid>/cwd` 记录——rename 不影响已打开句柄与 cwd inode，此记录用于事后核对字符串不变）。
+8. 换名落位（四条同文件系统 rename，连续执行，总耗时亚秒级）：
+   ```
+   mv /home/maoqh/projects/ordessa                     /home/maoqh/projects/ordessa-old-root
+   mv /home/maoqh/projects/ordessa-monorepo-candidate  /home/maoqh/projects/ordessa
+   for d in worktrees runtime .c1-001-runtime .c1-001-secrets .mimocode .qoder; do
+     [ -e /home/maoqh/projects/ordessa-old-root/$d ] && \
+       mv /home/maoqh/projects/ordessa-old-root/$d /home/maoqh/projects/ordessa/$d
+   done
+   ```
+   `.git`/`.agents`/`.codex` 等任何其他旧根条目**刻意不搬回**（`.git` 存根若进入
+   新根会遮蔽真 `.git`），留在 `ordessa-old-root/`，去向在 GATE A 清单列明。
+9. 事后核对：`git -C ordessa rev-parse HEAD` = 步骤 1 记录值；`git -C ordessa status`（预期仅环境例外被忽略，无其他脏项）；活动进程 `/proc/<pid>/cwd` 字符串与步骤 7 记录一致；`ls ordessa/worktrees/harness-desktop-002/bc-native` 路径可解析；不重启、不触碰任何服务进程。
+
+**窗口说明（诚实登记）**：步骤 8 第一条与最后一条 rename 之间存在亚秒级窗口，
+期间 `/home/maoqh/projects/ordessa/worktrees/...` 等绝对路径暂不可解析。运行中
+进程的 cwd inode 与已打开句柄**不受影响**（rename 语义）；仅当某进程恰在窗口内
+发起**新的**绝对路径访问才会失败一次。57411 腿与 qoder 会话均空闲；GATE A 时
+用户可指定执行时刻进一步压低风险。
+
+**阶段三：切换后验证与回报**
+
+10. 在正式根按 `docs/baseline.md` 完整重跑：npm 侧（ci/typecheck/test/build）；Python 侧（venv + lockfile + editable 安装 + 四套件，`scripts/verify-clean.sh` 已版本化可直接以其门禁参数对账）；桥重建 sha256 比对。
+11. 回报 `BASELINE_ESTABLISHED_WITH_KNOWN_ISSUES`（或未完成项）。worktree/服务腿退役 = **[USER GATE B]**；`runtime/` 等运行数据迁移 = **[USER GATE C]**。
+
+## 4. 回滚步骤（任一步失败即停，逐步反向；全部为同文件系统 rename，无覆盖）
+
+| 失败时点 | 回滚动作（按序） |
+| --- | --- |
+| 阶段一任一步（步骤 2–5） | 对已执行的每条 `mv` 原路反向 `mv` 回 `/home/maoqh/projects/ordessa/`；删除的符号链接按 §1 条目 15 清单重建（`ln -s <target> <link>`） |
+| 步骤 8 第 1 条后（旧根已换名） | `mv /home/maoqh/projects/ordessa-old-root /home/maoqh/projects/ordessa` |
+| 步骤 8 第 2 条后（候选已落位） | `mv /home/maoqh/projects/ordessa /home/maoqh/projects/ordessa-monorepo-candidate`，再执行上一行 |
+| 步骤 8 搬回段中途 | 对已搬回的例外目录逐条 `mv /home/maoqh/projects/ordessa/<d> /home/maoqh/projects/ordessa-old-root/<d>`，再依上两行还原 |
+| 步骤 9–10 验证失败 | 同上整段反向还原（候选回原名、旧根回原名），验证失败证据留档；阶段一条目最后逆序还原 |
+| 任何时点的历史恢复 | `docs/reference-index.md` §How to restore（普通 clone + fetch archive/reference；bundle；tar；checkpoint）——与根目录状态无关 |
+
+隐藏目录去向（显式）：切换后旧根全部残余（含任何 `.git`/`.agents`/`.codex` 存根、
+`repos/` 空壳等）位于 `/home/maoqh/projects/ordessa-old-root/`；回滚时随旧根整目录
+还原，无需逐个处理。`/home/maoqh/projects/.git`（projects 级存根）与 `~/.agents`、
+`~/.codex` 全程不动。
 
 ## 5. 服务影响
 
-- **无服务被停止/重启。** 57411 腿（pid 381142 等）继续以 `ordessa-legacy` 之前的原路径运行；其工作树条目 6 已列"保留原位"，若用户选择搬迁 worktrees 群，则 57411 腿的路径会失效——**定案：bc-native 与运行例外原位不动，新根以 environment-exceptions 与旧树共存**（§1 条目 6、19、21、22、23；§3 步骤 6），会话与服务腿结束后再清理（[USER GATE B] 另批）。
+- **无服务被停止/重启。** 57411 腿（pid 381142 等）继续以 `ordessa-legacy` 之前的原路径运行；其工作树条目 6 定案为原位保留：§3 v3 的换名落位后，`worktrees/` 等环境例外目录被搬回新根**原物理路径**（§3 步骤 8 搬回段），服务腿的路径解析不受影响；仅存在亚秒级换名窗口（§3 窗口说明，GATE A 时可指定执行时刻）。会话与服务腿结束后再清理（[USER GATE B] 另批）。
 - 4 个 qoder 会话（bc-native×2、fc-functional、desktop-ui-codex）的 cwd 在旧树；原位不动则不受影响。
 - 18790/18810 试验服务器已在此前停止（2026-09-25 实测无监听），与本次切换无关。

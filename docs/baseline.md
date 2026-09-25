@@ -41,10 +41,13 @@ bash scripts/start-server.sh 8931             # loopback smoke, throwaway data r
 bash plugins/harness/packaging/acp-adapter/build-acp-adapter-round-h.sh  # reproducible bridge (never committed)
 ```
 
-Suite expectations: pacthold green; harness carries 2 inherited npm-closure
+Suite expectations (verified by two separate evidence kinds — see
+`docs/migration/README.md` §verification gates: run6 count gate + per-ID
+ledger diff): pacthold green; harness carries 2 inherited npm-closure
 failures; the server suite carries the classified inherited-red ledger from
 the bc-native baseline (the frozen baseline itself was 97 failed + 25 errors /
-1755 passed — classification in `docs/migration/backend-build-test.md`).
+1755 passed; migrated: 783P/43F/10S/25E = 59 inherited same-id + 6 ruled
+scope-reds, per-item rulings in `docs/known-issues.md`).
 `tests/acp_orchestration` reds are the worker-entry retirement ruling — do
 not revive compat chains to green them.
 

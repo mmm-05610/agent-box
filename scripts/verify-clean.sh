@@ -18,10 +18,12 @@ bad()  { echo "FAIL: $1"; FAIL=$((FAIL+1)); }
 
 # run_suite <label> <pytest target> [expected k=v ...]
 # expected keys: passed failed skipped errors (missing key defaults to 0)
+LOGDIR=${ORDESSA_VERIFY_LOGDIR:-$(dirname "$CLEAN")/verify-logs}  # outside the repo on purpose
 run_suite() {
   local label="$1" target="$2"; shift 2
   local out rc
   out=$(cd "$CLEAN" && python3 -m pytest -q "$target" 2>&1); rc=$?
+  mkdir -p "$LOGDIR"; printf '%s' "$out" > "$LOGDIR/suite-$label.log"
   echo "$out" | tail -2 | sed 's/^/  /'
   if echo "$out" | grep -qE "Interrupted|error during collection|no tests ran"; then
     bad "$label: did not run cleanly (collection interruption)"; return
@@ -82,6 +84,7 @@ echo "  starlette resolved: $star"
 [ "$star" = "1.7.0" ] && ok "starlette pinned at verified 1.7.0" || bad "starlette drifted to $star"
 
 step "backend suites (strict ledger gates; python -m pytest from repo root)"
+# every run_suite call tees full output to $LOGDIR/suite-<label>.log (per-ID evidence)
 run_suite "pacthold" packages/pacthold passed=238
 run_suite "harness" plugins/harness passed=308 failed=2 skipped=3
 run_suite "server" apps/server passed=783 failed=43 skipped=10 errors=25
