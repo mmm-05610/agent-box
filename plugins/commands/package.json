@@ -1,0 +1,8 @@
+{
+  "name": "@ordessa/plugin-commands",
+  "version": "0.1.0",
+  "private": true,
+  "ordessa": {
+    "id": "ordessa.commands"
+  }
+}

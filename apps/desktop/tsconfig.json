@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "paths": {
+      "@extensions/ordessa.contracts/contract.js": ["../../packages/desktop-platform/contracts/foundation/src/contract.ts"],
+      "@extensions/ordessa.agent-contracts/contract.js": ["../../packages/desktop-platform/contracts/agent-ui/src/contract.ts"],
+      "@extensions/example.contracts/contract.js": ["../../examples/service-contract/src/contract.ts"]
+    },
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": [
+      "node"
+    ]
+  },
+  "include": [
+    "renderer",
+    "electron",
+    "../../packages/desktop-platform/*/src",
+    "../../packages/desktop-platform/contracts/*/src",
+    "../../plugins/**/src",
+    "../../examples/*/src"
+  ]
+}

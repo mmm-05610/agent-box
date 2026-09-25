@@ -1,0 +1,30 @@
+{
+  "name": "ordessa",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/desktop-platform/*",
+    "packages/desktop-platform/contracts/*",
+    "plugins/**",
+    "products/*"
+  ],
+  "scripts": {
+    "test:agent-ui": "node apps/desktop/scripts/test-agent-ui.mjs",
+    "test:ui-preview": "node apps/desktop/scripts/test-ui-preview.mjs",
+    "test:agent-shell": "node apps/desktop/scripts/test-agent-shell.mjs",
+    "build:foundations": "node tooling/build-all.mjs",
+    "dev": "npm run --workspace apps/desktop dev",
+    "build": "npm run --workspace apps/desktop build",
+    "typecheck": "npm run --workspace apps/desktop typecheck",
+    "test": "npm run --workspace apps/desktop test",
+    "test:electron": "npm run --workspace apps/desktop test:electron",
+    "build:examples": "node tooling/build-examples.mjs",
+    "test:extensions": "node apps/desktop/scripts/test-extensions.mjs",
+    "start": "npm run --workspace apps/desktop start"
+  },
+  "engines": {
+    "node": ">=22.22.0"
+  }
+}

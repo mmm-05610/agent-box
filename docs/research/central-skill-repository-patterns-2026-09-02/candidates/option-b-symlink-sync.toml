@@ -1,6 +1,0 @@
-name = "option-b-symlink-sync"
-architecture = "central-directory-symlink-sync"
-authority = "central-editable-source"
-projection = "symlink-junction-or-declared-copy-fallback"
-reversible = true
-requires_human_decision = true

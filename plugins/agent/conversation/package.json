@@ -1,0 +1,11 @@
+{
+  "name": "@ordessa/plugin-agent-conversation",
+  "version": "0.1.0",
+  "private": true,
+  "ordessa": {
+    "id": "ordessa.agent-conversation"
+  },
+  "dependencies": {
+    "@assistant-ui/react": "0.15.21"
+  }
+}

@@ -1,55 +1,30 @@
-# Agent-Box 2.0.0a1 Developer Preview
+# Ordessa Desktop CP candidate
 
-Agent-Box is an execution governance layer for AI coding agents. It resolves
-exact external resources, freezes them into an Execution Binding, dispatches a
-native Harness, and preserves outputs and evidence across executions.
+This branch is an isolated HD-002 candidate based on FC integration commit `d14ac6e0e6`. It preserves the original FC and F0–F3 trees. It has not been merged into `main` and is not ready for user review.
 
-This is a Developer Preview with an experimental API. It is not a production
-stable release, complete Agent Workflow platform, built-in workflow engine,
-scheduler, router, retry system, or production sandbox.
+## Installed product
 
-## Install
+`products/desktop/extensions.json` is the product admission list. Its eight extensions are foundation contracts, Agent contracts, commands, workbench, connections, sessions, the Ordessa Server connector, and conversation. The connector authenticates to one local Server instance before registration. Its token stays in Electron's native process; the renderer receives a non-secret instance identity.
 
-### GitHub wheelhouse
+The candidate excludes the old direct Pi and Codex desktop connectors, the empty Settings provider, and the empty interactions extension. Conversation still renders Server-backed approval cards. The source for excluded prototypes remains in the original FC and executor branch history.
 
-Download all release assets into one directory, then run:
+`tooling/build-all.mjs` builds only admitted extensions and checks their `@extensions/` dependency closure. It clears the previous extension output first. `products/desktop/extensions.lock.json` records SHA-256 digests of that clean output; the runtime uses `extensions.json` as its enabled list. User `extensions.json` is a complete override and is never rewritten by the host.
 
-```bash
-pip install --pre --find-links . "agent-box-cli[preview]==2.0.0a1"
+## Local verification
 
-The preview bundle includes the official `agent-box-skills` immutable local
-Agent Skills provider. Import is explicit and local; no HOME scan or remote
-fetch is performed.
-agent-box doctor --json
-agent-box plugins list --json
-agent-box launch
+```sh
+npm ci
+npm run typecheck
+npm test
+npm run build
+npm run test:agent-shell
+npm run test:electron
 ```
 
-### Source checkout
+The shell test uses a loopback fake that answers authenticated `server.hello` without creating a session or contacting a model. It checks both a visible failure when the host handoff is missing and registration of the sole Server connector when a valid handoff exists. A real Server and native Agent are outside that test.
 
-Clone this repository and install the preview packages from the checkout;
-ordinary PyPI installation is not available for this preview.
+## Remaining acceptance
 
-Root-only installs remain valid for `plugins list`, `doctor`, and version/help;
-`web` and `launch` return an actionable install message when the Web plugin is
-absent. Contributor installs use `pip install -e .` plus editable official
-plugins.
+The candidate still needs a paired Desktop and native Server run with the same origin, token locator, and Server identity; a valid project; first send returning the real session ID; continuation in that session; and the agreed application gates. No real model request has been made by the candidate assembly work. Keep the CP ready decision with the HD-002 central record under `control/missions/HD-002`.
 
-## Product path
-
-Quick Launch prepares a Work, accountable Execution, exact repository/revision,
-immutable Profile revision, fresh/continuation input, and managed or observed
-tmux target. The user reviews the Binding, freezes and dispatches explicitly,
-opens or copies the provider-owned terminal attach command, and finishes
-explicitly. A terminal output becomes a WorkspaceRef for a new Execution.
-
-## Preview limits and migration
-
-Preview is local-only and uses one official Harness registry for Codex, Claude Code,
-OpenCode, Hermes, and Pi. Native provider/model access,
-tmux, Git, and terminal presentation depend on the host platform. No legacy
-Profile/session database, 1.x fixed workflow, TUI, PyWebView, or browser shell
-is part of the supported path. See [docs/README.md](docs/README.md), the
-[migration record](docs/plans/archive/PHASE_6_LEGACY_DELETION_LEDGER.md), and
-the [current release evidence](docs/validation/current/REPOSITORY_RESTRUCTURE_PHASE_6_RELEASE_CANDIDATE.md),
-and the [five-Harness consolidation report](docs/validation/current/FIVE_HARNESS_REGISTRY_CONSOLIDATION.md).
+The previous modular host and direct connector development guide remains available in Git history at `d14ac6e0e6:README.md`.

@@ -1,0 +1,9 @@
+{
+  "name": "@ordessa/plugin-agent-sessions",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": { "radix-ui": "^1.6.7" },
+  "ordessa": {
+    "id": "ordessa.agent-sessions"
+  }
+}

@@ -1,9 +1,0 @@
-{
-  "packages": {
-    ".": {
-      "release-type": "python",
-      "package-name": "agent-box-cli",
-      "include-component-in-tag": false
-    }
-  }
-}
