@@ -22,6 +22,9 @@ claude = "ordessa_harness.entrypoints:create_claude"
 opencode = "ordessa_harness.entrypoints:create_opencode"
 hermes = "ordessa_harness.entrypoints:create_hermes"
 pi = "ordessa_harness.entrypoints:create_pi"
+[project.optional-dependencies]
+dev = ["pytest>=7", "pyyaml>=6"]
+
 [tool.setuptools.package-data]
 ordessa_harness = ["harnesses.toml", "codex/*.json", "codex/*.toml"]
 [tool.setuptools.packages.find]

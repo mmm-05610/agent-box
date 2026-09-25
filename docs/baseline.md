@@ -31,13 +31,14 @@ npm run test:agent-shell && npm run test:electron      # headless smokes (xvfb)
 
 ```sh
 python3.12 -m venv .venv && . .venv/bin/activate
-pip install -e packages/pacthold -e apps/server -e plugins/harness
+pip install -r apps/server/lockfiles/server-linux-py312.txt   # verified closure (starlette pinned 1.7.0)
+pip install -e packages/pacthold -e apps/server -e 'plugins/harness[dev]' -e 'apps/server[dev]' -e 'packages/pacthold[dev]'
 python -c "import pacthold, ordessa_server, ordessa_harness"
-pytest packages/pacthold                    # 238 passed (GREEN_NO_SKIPS verdict)
-pytest plugins/harness                      # 308 passed / 3 skipped / 2 failed (inherited)
-pytest apps/server                          # inherited-red ledger: docs/migration/backend-build-test.md
-sh scripts/start-server.sh 8931             # loopback smoke, throwaway data root
-sh plugins/harness/packaging/acp-adapter/build-acp-adapter-round-h.sh  # reproducible bridge (never committed)
+python -m pytest packages/pacthold              # 238 passed (run from repo root: cwd must be on sys.path)
+python -m pytest plugins/harness                # 308 passed / 3 skipped / 2 failed (inherited)
+python -m pytest apps/server                    # inherited-red ledger: docs/migration/backend-build-test.md
+bash scripts/start-server.sh 8931             # loopback smoke, throwaway data root
+bash plugins/harness/packaging/acp-adapter/build-acp-adapter-round-h.sh  # reproducible bridge (never committed)
 ```
 
 Suite expectations: pacthold green; harness carries 2 inherited npm-closure

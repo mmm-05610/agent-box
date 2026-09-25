@@ -1,0 +1,54 @@
+{
+  "bridgeAbs": "/tmp/bridge-mc",
+  "bridgeIsFile": true,
+  "bridgeIsExecutable": true,
+  "bridgeSha256": "5fd6a37b127274eef5c2f27fe731a720e32e9bd64efd6df23e61fe739bbc61ea",
+  "piBinAbs": "/home/maoqh/.pi/agent/install/releases/0.86.1/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js",
+  "piBinIsFile": true,
+  "piBinSha256": "e79626f2dd6f94aa45d30f3fa63cd84319a6eefcd150b353cfaf274366926774",
+  "piOverlaysAbsent": true,
+  "modelCallPolicy": "initialize only; no session/new, no session/prompt",
+  "answeredWithin": "20s",
+  "response": {
+    "jsonrpc": "2.0",
+    "id": 0,
+    "result": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": true,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {},
+        "sessionCapabilities": {
+          "list": {}
+        },
+        "sessions": true,
+        "images": true,
+        "toolCalls": true,
+        "slashCommands": true,
+        "permissions": true
+      },
+      "authMethods": [
+        {
+          "id": "pi",
+          "name": "Pi credentials",
+          "description": "Authenticate with configured Pi provider credentials or existing login state.",
+          "type": "pi",
+          "label": "Pi credentials"
+        }
+      ],
+      "agentInfo": {
+        "name": "acp-adapter",
+        "version": "dev",
+        "title": "ACP Adapter"
+      },
+      "activeAuthMethod": "pi"
+    }
+  },
+  "piChildrenAtHandshake": [],
+  "verdict": "HANDSHAKE_OK_NO_MODEL_CALL",
+  "exitCode": 0,
+  "bridgeStderr": ""
+}

@@ -35,11 +35,37 @@ restore evidence live outside this repo in
 
 ## How to restore anything
 
-- **Any branch of any source repo**: `git checkout refs/archive/<repo-key>/heads/<branch>` in this repo, or clone the matching bundle:
+**Important clone semantics.** A plain `git clone` of this repository carries
+**only `main` + tags** — the `refs/archive/*` and `refs/reference/*` refs are
+local to the candidate repository and are NOT auto-cloned (a local-path clone
+hardlinks objects, but a `--no-local` or network clone does not even carry the
+archive objects). The restore loop below is the supported path; the
+preservation bundles are the off-machine durable source.
+
+**Standard restore loop (verified 2026-09-25 from a plain clone):**
+
+```sh
+git clone <candidate-or-post-switch-root> work            # main + tags only
+cd work
+git fetch <candidate-or-post-switch-root> \
+    '+refs/archive/*:refs/archive/*' \
+    '+refs/reference/*:refs/reference/*'                  # +603 refs → all
+git cat-file -e a0b343e0^{commit}                          # any archive SHA reachable
+```
+
+- **Any branch of any source repo**: `git checkout refs/archive/<repo-key>/heads/<branch>`,
+  or clone the matching bundle from the preservation batch:
   `git clone /home/maoqh/projects/ordessa-preservation/20260925/bundles/<repo-key>.bundle <dir>`
-- **Uncommitted work**: `workspace-backups/<label>/files.tar.gz` (+ `MANIFEST.tsv`, `changes.patch`, `status.txt`, `META.txt`) in the preservation batch.
-- **Control's full dirty state**: clone `checkpoints/control/control-checkpoint.bundle`, checkout `checkpoint/2026-09-25` (`4fc80571`).
-- Byte-compare restore tests passed 5/5 (see `inventory/restore-evidence.txt` in the preservation batch).
+- **Uncommitted work**: `workspace-backups/<label>/files.tar.gz` (+ `MANIFEST.tsv`
+  with per-file sha256, `changes.patch`, `status.txt`, `META.txt`).
+- **Control's full dirty state**: `git clone
+  .../checkpoints/control/control-checkpoint.bundle`, checkout
+  `checkpoint/2026-09-25` (`4fc80571`). Restore-loop evidence 2026-09-25: the
+  checkpoint restore and the `control__main` tar snapshot agree byte-for-byte
+  on README.md, missions/HD-002/BASELINE.md,
+  product/ordessa-monorepo-baseline-plan.md (two independent preservation
+  artifacts cross-verified); a backend dirty snapshot (`agent-box__hd002-bc`)
+  restored byte-identical per its MANIFEST sha256.
 
 ## Known history gaps (registered, not hidden)
 

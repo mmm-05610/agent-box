@@ -90,8 +90,17 @@ dated history docs registered by the desktop table §4.
 
 ## Verdict
 
-**Ready for the user-confirmation stage** (root switch, old-tree retirement,
-remote publishing remain user-gated). Clean-checkout verification gate:
-first run found a real integration defect (npm workspace lockfile desync —
-fixed in `db5ac119b0e4`) plus verification-harness bugs; rerun from the
-fixed HEAD in flight at review time; see `../verify-clean-run3.log`.
+**Superseded verdict — external review corrections (2026-09-25 late).** The
+user-side reviewer accepted the fsck/repack/ignore/clean-status items but
+correctly rejected the "no open items" claim: (1) run3's backend suites
+other than pacthold never executed (collection interruptions) yet the script
+counted 9/0 — fake green; (2) plain clones do not carry archive/reference
+refs; (3) the switch plan still had either/or wording; (4) /live is not a
+controlled ACP main-chain; the 7 scope reds needed per-item rulings; (5)
+docs/ignores gaps. Dispositions: verify script rewritten strict (v2) and
+rerun (`verify-clean-run4.log` — authoritative); restore loop demonstrated
+and documented in `docs/reference-index.md`; switch plan §3/§4 rewritten as a
+single deterministic procedure with USER GATEs; per-item rulings in
+`docs/known-issues.md`; lockfile + dev extras + env-exception ignores + bash
+invocations fixed; no-model handshake evidence added. Switch and publish
+remain gated on user confirmation.

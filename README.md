@@ -30,10 +30,11 @@ Backend ( Python ≥ 3.9, Go toolchain pinned — see `docs/baseline.md`):
 
 ```sh
 python3.12 -m venv .venv && . .venv/bin/activate
-pip install -e packages/pacthold -e apps/server -e plugins/harness
+pip install -r apps/server/lockfiles/server-linux-py312.txt   # verified closure
+pip install -e packages/pacthold -e apps/server -e 'plugins/harness[dev]' -e 'apps/server[dev]' -e 'packages/pacthold[dev]'
 python -m ordessa_server --help
-pytest packages/pacthold plugins/harness        # suites + known-red ledger
-sh plugins/harness/packaging/acp-adapter/build-acp-adapter-round-h.sh   # reproducible bridge
+python -m pytest packages/pacthold apps/server plugins/harness tests/acp_orchestration   # run from repo root; known-red ledger in docs/baseline.md
+bash plugins/harness/packaging/acp-adapter/build-acp-adapter-round-h.sh   # reproducible bridge
 ```
 
 Docs: [`docs/baseline.md`](docs/baseline.md) (versions, gates, how to verify),

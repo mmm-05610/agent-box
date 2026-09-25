@@ -30,7 +30,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=7"]
+dev = ["pytest>=7", "httpx>=0.28"]
 
 [project.scripts]
 ordessa-server = "ordessa_server.__main__:main"
