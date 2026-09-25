@@ -5,7 +5,7 @@
 
 ## 0. 候选仓最终状态（2026-09-25 实测）
 
-- 候选 main HEAD：`af31e92dc5eb`（tag `baseline/cp-monorepo-0`），祖先链 = 旧远端 main `6c14ea8d` → 8 个迁移提交（cd24ddd8 桌面 / 974e643a 后端 / b6a08cec 根文档 / db5ac119 workspaces 修复 / f70829f 文档与红账本裁定 / df632757 补 2 文件 / c0ff0479 移除桥二进制 / fa461219+573d5c15+af31e92d 记录）。
+- 候选 main HEAD：`f8309c33f4a8`（tag `baseline/cp-monorepo-0`，已随收尾提交前移），祖先链 = 旧远端 main `6c14ea8d` → 8 个迁移提交（cd24ddd8 桌面 / 974e643a 后端 / b6a08cec 根文档 / db5ac119 workspaces 修复 / f70829f 文档与红账本裁定 / df632757 补 2 文件 / c0ff0479 移除桥二进制 / fa461219+573d5c15+af31e92d 记录）。
 - 干净检出门 9/0 全过（verify-clean-run3.log）；独立审阅 docs/migration/independent-review.md。
 - 历史 refs：594 archive + 3 reference + 基线 tag；`git fsck` 干净。
 
