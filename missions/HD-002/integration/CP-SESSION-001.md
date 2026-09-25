@@ -65,8 +65,9 @@ round-h 帧 trace（`~/ordessa-acceptance/round-h/state-logs/pi-acp-frames.jsonl
 `session/request_permission ×1`（桥审批门：bash `pwd && ls -la`，选项 allow_once/allow_always/reject_once）
 + `confirm` 应答、`session/update ×261`（含中文流式思考）。
 Pi 会话文件 2 个（16:04/16:06）；Server 状态在 `round-h/data/state/agentbox.sqlite`。
-**注意**：该会话项目目录误选 `round-h/app-profile`（Electron 配置目录）；正确测试项目
-`round-h/project/` 为空、未被使用。该会话共 3 次发送，不满足 HD004 §6.4 的"新根首发计数=1"受控门，
+**目录说明（2026-09-25 用户澄清）**：该会话的项目目录 `round-h/app-profile` 是**用户自选**，不是缺陷；
+`round-h/project/` 仍按用户简报作为后续受控验收的测试项目目录（当前为空、未被使用）。
+该会话共 3 次发送，不满足 HD004 §6.4 的"新根首发计数=1"受控门，
 不能充当受控验收，只证明主路径。
 
 桌面已知 UI 待办（用户裁定留待后续优化，不入本基线范围）：已解决审批卡继续置顶；输入框随内容滚走。
