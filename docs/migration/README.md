@@ -36,7 +36,7 @@ require explicit user confirmation with concrete evidence.
 | Desktop: install/typecheck/tests/build/smoke | reproduced by lead on the integrated candidate: `npm ci` 277 pkgs, typecheck OK, 146+13+79 = 238 tests green, 9-extension assembly, electron/agent-shell/extension smokes exit 0 |
 | Backend: install/imports/suites | see `backend-build-test.md` (inherited-red ledger discipline; pacthold suite green; harness suite 308 passed / 2 inherited failures) |
 | Bridge rebuild | lead reproduced byte-identical artifact `5fd6a37b…bbc61ea` from the migrated tree with pinned go1.24.13 + recorded flags |
-| Clean-checkout install & build | performed on a fresh clone at switch time (recorded in `baseline.md`) |
+| Clean-checkout install & build | fresh clone of `c0ff0479e07b`: 9/0 gates green (npm ci, typecheck, 146 unit tests, 9-extension assembly, electron build, pip×3+imports, pacthold 238P, harness/server/acp suites per ledger, bridge sha256 byte-identical, /live smoke) — log `ordessa-migration/verify-clean-run3.log` |
 | Naming | exact `agent_box` imports = 0 in active code; exceptions ledger in `docs/naming.md` |
 | Dependency boundaries | `pacthold` imports nothing above it; server composes via plugin root; product never wires bridge internals — boundary test suites kept green |
 
