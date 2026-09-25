@@ -11,7 +11,7 @@ Known issues are registered, not blocking: `docs/known-issues.md`.
 
 | Tool | Version |
 | --- | --- |
-| Python | 3.12.14 (suite-verified; package floor is 3.9 per pyproject) |
+|  Python | 3.12.14 (suite-verified; package floor is 3.9 per pyproject) |
 | Go | 1.24.13 linux-amd64 (`/home/maoqh/ordessa-builds/go1.24.13`, tarball sha256 `1fc94b57…` — build record in `plugins/harness/adapters/` docs) |
 | Node / npm | 22.22.1 / 9.2.0 (frozen `package-lock.json`; npm-free-resolution has a known arborist crash — always install from the lock) |
 | Bridge build | `CGO_ENABLED=0 go build -buildvcs=false -trimpath -ldflags "-buildid=" ./cmd/acp` — reproduces sha256 `5fd6a37b127274eef5c2f27fe731a720e32e9bd64efd6df23e61fe739bbc61ea` byte-for-byte |
@@ -30,7 +30,7 @@ npm run test:agent-shell && npm run test:electron      # headless smokes (xvfb)
 ## Backend
 
 ```sh
-python3 -m venv .venv && . .venv/bin/activate
+python3.12 -m venv .venv && . .venv/bin/activate
 pip install -e packages/pacthold -e apps/server -e plugins/harness
 python -c "import pacthold, ordessa_server, ordessa_harness"
 pytest packages/pacthold                    # 238 passed (GREEN_NO_SKIPS verdict)

@@ -26,10 +26,10 @@ npm run build       # builds extensions + electron app
 npm run test:agent-shell && npm run test:electron   # smoke (headless)
 ```
 
-Backend (Python ≥ 3.9, Go toolchain pinned — see `docs/baseline.md`):
+Backend ( Python ≥ 3.9, Go toolchain pinned — see `docs/baseline.md`):
 
 ```sh
-python3 -m venv .venv && . .venv/bin/activate
+python3.12 -m venv .venv && . .venv/bin/activate
 pip install -e packages/pacthold -e apps/server -e plugins/harness
 python -m ordessa_server --help
 pytest packages/pacthold plugins/harness        # suites + known-red ledger
