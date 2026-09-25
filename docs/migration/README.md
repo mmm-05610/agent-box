@@ -20,14 +20,19 @@ require explicit user confirmation with concrete evidence.
 | # | SHA | Content |
 | --- | --- | --- |
 | 1 | `cd24ddd87da556cf0df544d9611490e967df0dba` | desktop scaffold graft: tree of fc-functional@450944bd re-rooted (platform/ + contracts/ → packages/desktop-platform/, products/agent-desktop → products/desktop, root pkg `ordessa`); replaces the legacy agent-box main tree, parent `6c14ea8d` |
-| 2 | (recorded at switch) | backend split: packages/pacthold + apps/server (ordessa_server) + plugins/harness (ordessa_harness + adapters/acp-adapter@41d9d94 + packaging) from bc-native@a0b343e0 |
-| 3 | (recorded at switch) | root docs: README, AGENTS, architecture, baseline, known-issues, naming, reference-index, migration records |
+| 2 | `974e643a1067a56fcaf584ccd2bfb99bdccf3d3f` | backend split: packages/pacthold + apps/server (ordessa_server) + plugins/harness (ordessa_harness + adapters/acp-adapter@41d9d94 + packaging) from bc-native@a0b343e0 |
+| 3 | `b6a08cec3f85` | root docs: README, AGENTS, architecture, baseline, known-issues, naming, reference-index, migration records |
 
 ## Verification gates (evidence files under `docs/migration/`)
 
 | Gate | Result |
 | --- | --- |
 | History preservation | 9 bundles (verify OK), 12 dirty-tree snapshots, control git checkpoint `4fc80571`; restore tests 5/5 byte-identical — batch: `/home/maoqh/projects/ordessa-preservation/20260925/` |
+| 4 | `db5ac119b0e4` | workspaces: exclude plugins/harness from npm discovery (found by clean-checkout gate: packaging closures desynced the root lockfile) |
+| 5 | `f70829f84b32` | python3.12 pin in docs + backend red-ledger rulings |
+| 6 | `df6327574d03` | restore 2 files missed by migration (server-windows lockfile record, native CLI fixture) — found by the independent file-integrity sweep |
+| 7 | `c0ff0479e07b` | drop the vendored 7.4MB bridge binary from the tree (kept in archive, byte-reproducible) |
+
 | Desktop: install/typecheck/tests/build/smoke | reproduced by lead on the integrated candidate: `npm ci` 277 pkgs, typecheck OK, 146+13+79 = 238 tests green, 9-extension assembly, electron/agent-shell/extension smokes exit 0 |
 | Backend: install/imports/suites | see `backend-build-test.md` (inherited-red ledger discipline; pacthold suite green; harness suite 308 passed / 2 inherited failures) |
 | Bridge rebuild | lead reproduced byte-identical artifact `5fd6a37b…bbc61ea` from the migrated tree with pinned go1.24.13 + recorded flags |
