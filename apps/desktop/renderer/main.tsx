@@ -2,14 +2,16 @@ import { useSyncExternalStore } from 'react'
 import { createRoot } from 'react-dom/client'
 import { runtime } from '@ordessa/extension-host'
 import { App } from './app'
+import { WindowChrome } from './window-chrome'
 import { installedExtensions } from './extensions'
 import './host.css'
 const root = createRoot(document.getElementById('root')!)
 const empty = runtime([])
-root.render(<App host={empty.host} />)
+root.render(<><WindowChrome /><App host={empty.host} /></>)
 function Desktop({ desktop, failures }: { desktop: ReturnType<typeof runtime>; failures: {id: string; error: string}[] }) {
   const states = useSyncExternalStore(desktop.subscribe, desktop.getSnapshot)
   return <>
+    <WindowChrome />
     {failures.map((failure, index) => <p role="alert" key={index}>{failure.id}: {failure.error}</p>)}
     {states.filter(s => s.phase === 'failed').map(s => <p role="alert" key={s.id}>{s.id}: {s.error}</p>)}
     {states.filter(s => s.phase === 'starting').map(s => <p role="status" key={s.id}>{s.id}: 启动中</p>)}

@@ -16,12 +16,27 @@ app.whenReady().then(async () => {
   const discovery = await discover(process.env.ORDESSA_EXTENSION_HOME ?? app.getPath('userData'), bundled)
   protocol.handle('ordessa', protocolHandler(path.join(__dirname, 'renderer'), discovery))
   session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false))
+  // Frameless on Windows/Linux (renderer draws window controls); macOS keeps the native title bar.
+  const frameless = process.platform !== 'darwin'
   const win = new BrowserWindow({
-    width: 1220, height: 800, minWidth: 760, minHeight: 520, show: !smoke,
+    width: 1220, height: 800, minWidth: 760, minHeight: 520, show: !smoke, frame: !frameless,
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true },
   })
   win.setMenuBarVisibility(false)
   win.setAutoHideMenuBar(true)
+  if (frameless) {
+    const trusted = (event: Electron.IpcMainInvokeEvent) => {
+      if (event.sender !== win.webContents || event.senderFrame !== win.webContents.mainFrame ||
+          event.senderFrame.url !== 'ordessa://desktop/index.html') throw Error('Untrusted window caller')
+    }
+    ipcMain.handle('window:minimize', event => { trusted(event); win.minimize() })
+    ipcMain.handle('window:toggle-maximize', event => { trusted(event); if (win.isMaximized()) win.unmaximize(); else win.maximize(); return win.isMaximized() })
+    ipcMain.handle('window:close', event => { trusted(event); win.close() })
+    ipcMain.handle('window:is-maximized', event => { trusted(event); return win.isMaximized() })
+    const pushChromeState = () => { if (!win.isDestroyed()) win.webContents.send('window:chrome-state', win.isMaximized()) }
+    win.on('maximize', pushChromeState)
+    win.on('unmaximize', pushChromeState)
+  }
   installNativeBridge(win, discovery)
   ipcMain.handle('extensions:catalog', event => {
     if (event.sender !== win.webContents || event.senderFrame !== win.webContents.mainFrame ||

@@ -73,21 +73,26 @@ export function WorkbenchShell({ model, commands }: { model: WorkbenchModel; com
   const region = (name: Region) => {
     const list = entries(name), active = list.find(v => v.id === selection[name])
     return <section className={`wb-region wb-${name}`} data-region={name} aria-label={labels[name]} inert={name !== 'main' && (!has[name] || !!layout.collapsed[name])}>
-      <header><div role="group" aria-label={`${name}视图`}>{list.map(v => <button key={v.id} draggable aria-pressed={v.id === active?.id}
-        onDragStart={e => {
-          e.dataTransfer.setData('application/x-ordessa-view', v.id); e.dataTransfer.setData('text/plain', v.title); e.dataTransfer.effectAllowed = 'move'
-          dragSession.current = v.id
-          // Let Chromium capture its drag image before adding an overlay over the source.
-          setTimeout(() => { if (dragSession.current === v.id) setDragged(v.id) }, 0)
-        }}
-        onDragEnd={() => { dragSession.current = null; setDragged(null) }} onClick={() => model.service.open(v.id)} title={`${v.title} · 拖动以移动`}>{v.title}</button>)}
-        {!list.length && <span className="wb-region-label">{labels[name]}</span>}</div>
+      <header>{name === 'left' && <><strong className="wb-brand">Ordessa</strong><nav className="wb-nav" aria-label="导航">{slot('navigation', 'primary')}</nav></>}
+        <div role="group" aria-label={`${name}视图`}>{list.map(v => <button key={v.id} draggable aria-pressed={v.id === active?.id}
+          onDragStart={e => {
+            e.dataTransfer.setData('application/x-ordessa-view', v.id); e.dataTransfer.setData('text/plain', v.title); e.dataTransfer.effectAllowed = 'move'
+            dragSession.current = v.id
+            // Let Chromium capture its drag image before adding an overlay over the source.
+            setTimeout(() => { if (dragSession.current === v.id) setDragged(v.id) }, 0)
+          }}
+          onDragEnd={() => { dragSession.current = null; setDragged(null) }} onClick={() => model.service.open(v.id)} title={`${v.title} · 拖动以移动`}>{v.title}</button>)}
+          {!list.length && <span className="wb-region-label">{labels[name]}</span>}</div>
         <div className="wb-region-actions">{active && <>
           <select aria-label={`移动 ${active.title} 到`} value="" onChange={e => { if (e.target.value) move(active.id, e.target.value as Region) }}>
             <option value="">移动…</option>{regions.filter(r => r !== name).map(r => <option key={r} value={r}>{labels[r]}</option>)}
           </select>
           <button aria-label={`关闭${active.title}`} title="关闭视图" onClick={() => model.service.close(active.id)}>×</button>
         </>}{name !== 'main' && <button aria-label={`收起${labels[name]}`} title={`收起${labels[name]}`} onClick={() => model.collapse(name, true)}>−</button>}</div>
+        {name === 'main' && <><div className="wb-actions">{slot('toolbar')}</div><div className="wb-layout-actions">
+          {auxiliary.map(r => <button key={r} disabled={!has[r]} aria-label={`${layout.collapsed[r] ? '展开' : '收起'}${labels[r]}`} title={`${labels[r]}${has[r] ? '' : '（无视图）'}`} aria-pressed={has[r] && !layout.collapsed[r]} onClick={() => model.collapse(r, !layout.collapsed[r])}><RegionIcon region={r} /></button>)}
+          <button title="恢复默认位置和尺寸" aria-label="重置布局" onClick={reset}>↺</button>
+        </div></>}
       </header>
       <div className="wb-content" ref={node => { hosts.current[name] = node }} />
       {!active && name === 'main' && <div className="wb-empty"><span className="wb-empty-mark" aria-hidden="true">O</span><h1>工作区已就绪</h1><p>从左侧打开扩展，或选择一个视图。</p><small>拖动视图标题可移动位置 · 拖动分隔线可调整大小</small></div>}
@@ -117,12 +122,7 @@ export function WorkbenchShell({ model, commands }: { model: WorkbenchModel; com
   const activeViews = views.filter(v => v.presentation === 'region' && selection[model.regionOf(v)!] === v.id)
   return <div className="wb"><style>{styles}</style>
     <div ref={workspace} tabIndex={-1} hidden={!!full} inert={!!full} aria-hidden={!!full} data-testid="workspace">
-      <header className="wb-bar"><strong>Ordessa <small>WORKSPACE</small></strong><div className="wb-actions">{slot('toolbar')}</div><div className="wb-layout-actions">
-        {auxiliary.map(r => <button key={r} disabled={!has[r]} aria-label={`${layout.collapsed[r] ? '展开' : '收起'}${labels[r]}`} title={`${labels[r]}${has[r] ? '' : '（无视图）'}`} aria-pressed={has[r] && !layout.collapsed[r]} onClick={() => model.collapse(r, !layout.collapsed[r])}><RegionIcon region={r} /></button>)}
-        <button title="恢复默认位置和尺寸" aria-label="重置布局" onClick={reset}>↺</button>
-      </div></header>
       <div className="wb-body">
-        <nav className="wb-navigation" aria-label="导航"><div>{slot('navigation', 'primary')}</div><div className="wb-nav-utility">{slot('navigation', 'utility')}</div></nav>
         <div className="wb-layout">
           <Group id="wb-vertical" orientation="vertical" className="wb-group" onLayoutChanged={resized(['top', 'bottom'])}>
             {panel('top')}{separator('top')}
@@ -140,7 +140,7 @@ export function WorkbenchShell({ model, commands }: { model: WorkbenchModel; com
           </div>}
         </div>
       </div>
-      <footer className="wb-status"><span className="wb-status-dot" />{slot('statusbar')}<span className="wb-status-end">本地工作台</span></footer>
+      <footer className="wb-status"><span className="wb-status-dot" />{slot('navigation', 'utility')}{slot('statusbar')}<span className="wb-status-end">本地工作台</span></footer>
     </div>
     {activeViews.map(v => <ViewSurface key={v.id} view={v} region={model.regionOf(v)!} hosts={hosts} />)}
     {Full && <section className="wb-full" data-testid="full-page" aria-label={full.title}>
