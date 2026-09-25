@@ -46,7 +46,7 @@ MOVED_MODULES = (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-LEGACY_SRC = REPO_ROOT / "plugins" / "agent-box-harnesses" / "src" / "agent_box_harnesses"
+CANONICAL_SRC = REPO_ROOT / "plugins" / "agent-box-harness" / "src" / "agent_box_harness"
 
 
 @pytest.mark.parametrize("dotted", MOVED_MODULES)
@@ -106,7 +106,7 @@ def test_the_registry_content_is_the_declaration_file_unchanged() -> None:
     registry = load_builtin_registry()
     assert registry.digest == "sha256:" + __import__("hashlib").sha256(text.encode()).hexdigest()
     assert len(tomllib.loads(text)["harness"]) == len(registry.all()) == 8
-    assert resource.is_relative_to(LEGACY_SRC)
+    assert resource.is_relative_to(CANONICAL_SRC)
 
 
 def test_the_entry_point_facade_still_builds_a_registration() -> None:

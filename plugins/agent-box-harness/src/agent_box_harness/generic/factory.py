@@ -2,11 +2,8 @@ from __future__ import annotations
 from agent_box.extensions import PluginDescriptor, PluginRegistration, ProviderHostControl, ProfileEnvelopeManager
 from agent_box.resource_contracts import AgentBoxProfileV1
 from ..registry import load_builtin_registry
-#: Transitional seam (M1-P-A①): the brand adapter map still lives in the legacy
-#: package because the eight per-family adapter modules did not move. P-B moves
-#: each adapter into `agent-box-harness-<agent>/` and replaces this import with
-#: registration. The map object is the legacy one and is not copied here.
-from agent_box_harnesses.adapters import ADAPTERS
+# One adapter map, owned inside this distribution.
+from agent_box_harness.adapters import ADAPTERS
 from .profile_store import ProfileStore
 from .profile_selector import GenericProfileSelector
 from .profile_manager import GenericProfileManager

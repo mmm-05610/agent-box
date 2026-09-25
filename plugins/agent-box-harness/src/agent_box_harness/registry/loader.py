@@ -35,20 +35,8 @@ def load_registry(text: str) -> HarnessRegistry:
     return HarnessRegistry(tuple(defs), digest)
 
 def _builtin_registry_resource() -> Path:
-    """Locate the declarative registry, which batch P-A① left in the legacy package.
-
-    The data file (`harnesses.toml`) is a declaration, not code, and the approval
-    moved only code, so the one copy of it still lives in `agent_box_harnesses`.
-    It is located from that package's *spec*: `importlib.util.find_spec` does not
-    execute the package, and that matters here. Every legacy module name is a
-    facade that imports this package, so executing the legacy package while this
-    module is still initialising re-enters the core and raises
-    `ImportError: cannot import name 'create_plugin' from partially initialized
-    module 'agent_box_harness.plugin'` (reproduced on a core-first import before
-    this fix). Reading the same file by path keeps the two import orders
-    equivalent and reads byte-identical text, so the registry digest is unchanged.
-    """
-    spec = importlib.util.find_spec("agent_box_harnesses")
+    """Read the one canonical declaration without re-entering plugin imports."""
+    spec = importlib.util.find_spec("agent_box_harness")
     locations = list(getattr(spec, "submodule_search_locations", None) or ())
     if not locations:
         raise RuntimeError("HARNESS_REGISTRY_RESOURCE_NOT_FOUND")
