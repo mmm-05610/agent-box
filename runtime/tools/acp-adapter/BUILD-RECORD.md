@@ -97,3 +97,21 @@ scripts/hd004b/start-pi-desktop.sh 57411     # real Electron, paired by env only
 `~/ordessa-acceptance/hd004b/state-logs/pi-acp-frames.jsonl` is the bridge's raw
 frame trace; after the **first** send, `grep -c '"session/prompt"' <file>` must
 be `1` — see the report's remaining-issues note on the unreproduced duplicate.
+
+## Addendum — Round H artifact (2026-09-25)
+
+`acp-adapter-round-h` (this directory, untracked by the `acp-adapter*`
+ignore above) is the CURRENT bridge of the Round H acceptance chain:
+
+- sha256 `5fd6a37b127274eef5c2f27fe731a720e32e9bd64efd6df23e61fe739bbc61ea`
+- source: `~/ordessa-builds/acp-adapter` branch `work/round-h`
+  (Round H changes over v0.3.8, committed locally; never pushed)
+- rebuild: that repo's `scripts/build-round-h.sh` — verified 2026-09-25 to
+  reproduce the artifact **byte-for-byte**
+  (`CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags "-buildid=" ./cmd/acp`)
+- launcher: `scripts/hd004b/start-pi-server-round-h.sh` (port 57415,
+  ACCEPT_ROOT default `~/ordessa-acceptance/round-h-cp`)
+
+The earlier `acp-adapter` (`7a727bdb…`, hd004b leg) and `acp-adapter-r11`
+(`00c48c3a…`) predate the Round H source changes and are kept only as
+evidence of those rounds; they are NOT reproducible from work/round-h.
