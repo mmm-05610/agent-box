@@ -323,8 +323,14 @@ func runContractScriptEmbedded(
 
 func contractInitializeStandalone(t *testing.T, h *adapterHarness) contractInitializeSnapshot {
 	t.Helper()
+	// The contract observes lifecycle sequences, so it participates as a client that
+	// advertises clientCapabilities.session.notices (benign status updates are only on
+	// the wire for advertising connections).
 	h.sendRequest("contract-init", "initialize", map[string]any{
 		"protocolVersion": 1,
+		"clientCapabilities": map[string]any{
+			"session": map[string]any{"notices": map[string]any{}},
+		},
 	})
 	initResp := h.waitResponse("contract-init", responseTimeout)
 	return decodeInitializeSnapshot(t, "standalone initialize", initResp.Result, initResp.Error)
@@ -338,6 +344,9 @@ func contractInitializeEmbedded(
 	t.Helper()
 	initResp := embeddedRequest(t, ctx, runtime, "contract-init", "initialize", map[string]any{
 		"protocolVersion": 1,
+		"clientCapabilities": map[string]any{
+			"session": map[string]any{"notices": map[string]any{}},
+		},
 	})
 	return decodeInitializeSnapshot(t, "embedded initialize", initResp.Result, initResp.Error)
 }

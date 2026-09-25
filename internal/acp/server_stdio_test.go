@@ -145,7 +145,7 @@ func TestBuildSessionUpdatePayloadPlan(t *testing.T) {
 				Status:   "pending",
 			},
 		},
-	})
+	}, false)
 
 	update, ok := payload["update"].(map[string]any)
 	if !ok {
@@ -189,7 +189,7 @@ func TestBuildSessionUpdatePayloadAvailableCommands(t *testing.T) {
 				},
 			},
 		},
-	})
+	}, false)
 
 	update, ok := payload["update"].(map[string]any)
 	if !ok {
@@ -225,7 +225,7 @@ func TestBuildSessionUpdatePayloadUsageUpdate(t *testing.T) {
 		Type:      sessionUpdateTypeUsage,
 		Used:      &used,
 		Size:      &size,
-	})
+	}, false)
 
 	update, ok := payload["update"].(map[string]any)
 	if !ok {
@@ -274,6 +274,155 @@ func TestUsageUpdateUsedTokensUsesLatestInputTokens(t *testing.T) {
 	}
 }
 
+func TestBuildSessionUpdatePayloadTurnLifecycleStatusIsNoticeNotThought(t *testing.T) {
+	t.Parallel()
+
+	// A client that advertised clientCapabilities.session.notices (r4 lifecycle harnesses do).
+	payload := buildSessionUpdatePayload(SessionUpdateParams{
+		SessionID: "session-1",
+		TurnID:    "turn-1",
+		Type:      sessionUpdateTypeStatus,
+		Phase:     string(turnPhaseStarted),
+		Status:    "turn_started",
+	}, true)
+
+	update, ok := payload["update"].(map[string]any)
+	if !ok {
+		t.Fatalf("payload missing update envelope: %+v", payload)
+	}
+	if got, _ := update["sessionUpdate"].(string); got != sessionUpdateNotice {
+		t.Fatalf("update.sessionUpdate=%q, want %s: a lifecycle marker must never masquerade as content", got, sessionUpdateNotice)
+	}
+	if got, _ := update["severity"].(string); got != "info" {
+		t.Fatalf("update.severity=%q, want info", got)
+	}
+	if got, _ := update["title"].(string); got != "turn_started" {
+		t.Fatalf("update.title=%q, want turn_started", got)
+	}
+	if got, _ := payload["status"].(string); got != "turn_started" {
+		t.Fatalf("payload.status=%q, want turn_started: the raw lifecycle field must stay on the wire", got)
+	}
+	raw, err := json.Marshal(update)
+	if err != nil || strings.Contains(string(raw), sessionUpdateChunkAgentThought) {
+		t.Fatalf("lifecycle status leaked a thought-chunk mapping: %s", raw)
+	}
+}
+
+func TestBuildSessionUpdatePayloadTurnErrorStatusKeepsDiagnostic(t *testing.T) {
+	t.Parallel()
+
+	// Notices-capable client: the diagnostic rides a severity=error notice with the real
+	// failure message as description.
+	payload := buildSessionUpdatePayload(SessionUpdateParams{
+		SessionID: "session-1",
+		TurnID:    "turn-1",
+		Type:      sessionUpdateTypeStatus,
+		Phase:     string(turnPhaseError),
+		Status:    "turn_error",
+		Message:   "backend exploded mid-turn",
+	}, true)
+
+	update, ok := payload["update"].(map[string]any)
+	if !ok {
+		t.Fatalf("payload missing update envelope: %+v", payload)
+	}
+	if got, _ := update["sessionUpdate"].(string); got != sessionUpdateNotice {
+		t.Fatalf("update.sessionUpdate=%q, want %s", got, sessionUpdateNotice)
+	}
+	if got, _ := update["severity"].(string); got != "error" {
+		t.Fatalf("update.severity=%q, want error", got)
+	}
+	if got, _ := update["description"].(string); got != "backend exploded mid-turn" {
+		t.Fatalf("update.description=%q, want the real failure message", got)
+	}
+}
+
+func TestEmitGateLifecycleStatusDroppedWithoutNoticesCapability(t *testing.T) {
+	t.Parallel()
+
+	// Negotiation counterexample: a client that sent `clientCapabilities: {}` must never be
+	// sent a notice, and plain lifecycle markers must not be disguised as thought text —
+	// they are simply not emitted.
+	for _, status := range []string{"turn_started", "turn_completed", "turn_cancelled", "item_started", "item_completed"} {
+		update := SessionUpdateParams{
+			SessionID: "session-1",
+			TurnID:    "turn-1",
+			Type:      sessionUpdateTypeStatus,
+			Status:    status,
+		}
+		if !shouldSuppressLifecycleStatus(update, false) {
+			t.Fatalf("%s must not be sent to a client without notices capability", status)
+		}
+		if shouldSuppressLifecycleStatus(update, true) {
+			t.Fatalf("%s must be delivered (as notice) to a notices-capable client", status)
+		}
+	}
+}
+
+func TestEmitGateTurnErrorStaysVisibleWithoutNoticesCapability(t *testing.T) {
+	t.Parallel()
+
+	// Error counterexample (no silent loss): a non-notices client still receives the failed
+	// turn through a visible channel — the update is NOT suppressed, and its envelope is the
+	// thought fallback carrying the real failure message.
+	update := SessionUpdateParams{
+		SessionID: "session-1",
+		TurnID:    "turn-1",
+		Type:      sessionUpdateTypeStatus,
+		Phase:     string(turnPhaseError),
+		Status:    "turn_error",
+		Message:   "backend exploded mid-turn",
+	}
+	if shouldSuppressLifecycleStatus(update, false) {
+		t.Fatal("turn_error must never be silently dropped")
+	}
+
+	payload := buildSessionUpdatePayload(update, false)
+	mapped, ok := payload["update"].(map[string]any)
+	if !ok {
+		t.Fatalf("payload missing update envelope: %+v", payload)
+	}
+	if got, _ := mapped["sessionUpdate"].(string); got != sessionUpdateChunkAgentThought {
+		t.Fatalf("update.sessionUpdate=%q, want %s", got, sessionUpdateChunkAgentThought)
+	}
+	if got, _ := mapped["sessionUpdate"].(string); got == sessionUpdateNotice {
+		t.Fatal("a notice must never be sent to a client that did not advertise notices")
+	}
+	content, ok := mapped["content"].(map[string]any)
+	if !ok {
+		t.Fatalf("update.content has unexpected type %T", mapped["content"])
+	}
+	if got, _ := content["text"].(string); got != "backend exploded mid-turn" {
+		t.Fatalf("update.content.text=%q, want the real failure message to stay visible", got)
+	}
+}
+
+func TestDetectSessionNoticesCapability(t *testing.T) {
+	t.Parallel()
+
+	if detectSessionNoticesCapability(map[string]any{
+		"clientCapabilities": map[string]any{},
+	}) {
+		t.Fatal("empty clientCapabilities must not count as an advertisement")
+	}
+	if detectSessionNoticesCapability(map[string]any{
+		"clientCapabilities": map[string]any{
+			"session": map[string]any{},
+		},
+	}) {
+		t.Fatal("session capabilities without `notices` must not count as an advertisement")
+	}
+	if !detectSessionNoticesCapability(map[string]any{
+		"clientCapabilities": map[string]any{
+			"session": map[string]any{
+				"notices": map[string]any{},
+			},
+		},
+	}) {
+		t.Fatal("advertising session.notices (open record, presence-based) must be honoured")
+	}
+}
+
 func TestBuildSessionUpdatePayloadToolCallContent(t *testing.T) {
 	t.Parallel()
 
@@ -299,7 +448,7 @@ func TestBuildSessionUpdatePayloadToolCallContent(t *testing.T) {
 				NewText: "new line\n",
 			},
 		},
-	})
+	}, false)
 
 	update, ok := payload["update"].(map[string]any)
 	if !ok {

@@ -929,3 +929,18 @@
   - `internal/codex/types` 新增 `ToolRequestUserInput*` 与 `DynamicToolCall*` 类型。
 - C. 验证:
   - `go test ./...` 通过。
+
+### 2026-09-24 — `session/update` status 生命周期按 notices 协商处理（KI-0021 status 家族）
+- A. 范围与目标:
+  - 修复严格 ACP 客户端把 `type="status"` 生命周期更新（`turn_started`/`turn_completed`/`turn_error` 等）当作 `agent_thought_chunk` 思考文本渲染的问题。
+  - 同时满足 notices 协商：`notice` 为 UNSTABLE 能力，仅可发送给广告了 `clientCapabilities.session.notices` 的客户端；错误诊断任何客户端都不得静默丢失；不在客户端按字符串过滤、不虚假声明能力。
+- B. 实现:
+  - `captureClientCapabilities` 解析并保存 `clientCapabilities.session.notices`（键存在即广告）；`clientAdvertisesNotices()` 读取。
+  - `emitUpdates` 发送门 `shouldSuppressLifecycleStatus`：未广告客户端整条不发送普通生命周期 status；`isDiagnosticStatus`（turn_error/review_apply_failed/backend_error/backend_error_retrying/backend_restarted_retrying）永不抑制。
+  - `mapACPUpdateForClient` 的 `case sessionUpdateTypeStatus` 增加 notices 分支：广告方→标准 `notice`（severity=error/warning/info，description=真实消息）；未广告方诊断→既有 thought fallback 可见通路携带失败消息。
+  - `types.go` 新增 `sessionUpdateTypeStatus`、`sessionUpdateNotice` 常量；默认回退分支保留给其余未知类型（KI-0021 剩余）。
+  - 依赖旧扁平 status 的测试同步修订为如实广告：`r4_contract_test.go` standalone/embedded initialize、`e2e_test.go` 生命周期观察用例（A1–A5/B1、E1、E2、G2G3、G6）声明 `session.notices`（新增 `initializeNoticesClient` harness helper）；ADR-0057/KI-0021 记录修订理由。
+- C. 验证:
+  - 新增/更新单测：`TestBuildSessionUpdatePayloadTurnLifecycleStatusIsNoticeNotThought`、`TestBuildSessionUpdatePayloadTurnErrorStatusKeepsDiagnostic`、`TestEmitGateLifecycleStatusDroppedWithoutNoticesCapability`（未广告不发）、`TestEmitGateTurnErrorStaysVisibleWithoutNoticesCapability`（错误反例：不静默丢失）、`TestDetectSessionNoticesCapability`。
+  - `go test ./...` 全绿。
+  - 真实链路（重编译二进制验收，未替换运行中安装、未启停服务）：未广告方 raw-NDJSON 协商探针（真实 Pi）零 status 帧、零 notice、end_turn 正常；无条件 notice 前版二进制同探针精确复现 3 条未协商 notice（负对照）；生产桌面客户端 ↔ 修复后桥 ↔ 真实 Pi 0.86.1 两轮对话，正文/思考无任何生命周期字符串。

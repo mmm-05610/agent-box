@@ -397,10 +397,13 @@ const (
 	sessionUpdateTypeReasoning         = "reasoning"
 	sessionUpdateTypeAvailableCommands = "available_commands_update"
 	sessionUpdateTypeUsage             = "usage_update"
+	sessionUpdateTypeStatus            = "status"
 
 	sessionUpdateChunkAgentMessage = "agent_message_chunk"
 	sessionUpdateChunkUserMessage  = "user_message_chunk"
 	sessionUpdateChunkAgentThought = "agent_thought_chunk"
+
+	sessionUpdateNotice = "notice"
 
 	sessionConfigCategoryReasoning = "reasoning"
 	sessionItemTypePlan            = "plan"

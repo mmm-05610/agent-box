@@ -1545,3 +1545,42 @@
   - `TestTurnStreamCoalescesHighFrequencyDeltas`
   - `TestE2EACPPlanUpdateMappedFromPlanDeltaFallback`
   - `go test ./...`
+
+### ADR-0057：`type="status"` 生命周期更新按 notices 协商处理：广告方收 `notice`，未广告方不发送；错误诊断任何客户端都不静默丢失
+- 日期：2026-09-24
+- 状态：Accepted（同日曾先落地"无条件映射为 notice"版本，被评审批评"未经协商发送 notice"后修订为本方案）
+- 背景：
+  - `mapACPUpdateForClient` 对 `SessionUpdateParams{Type:"status"}`（`turn_started`/`turn_completed`/`turn_cancelled`/`turn_error`/`item_started`/`item_completed`/review mode/auth/backend restart 等）走默认回退分支，包装成 `agent_thought_chunk` 文本。
+  - 桌面端（严格 ACP 客户端，仅消费标准 envelope）把 `turn_started` 等生命周期标记渲染进助手思考文本，UI 出现"turn_startedturn_started…"污染（KI-0021 的 `status` 家族实例）。
+  - 前版方案无条件把 status 映射为 `notice`，被评审否决：`notice` 在钉版 SDK 中标注 **UNSTABLE**，协议要求 "Agents MUST only send notices when the Client advertised `ClientSessionCapabilities::notices`"（ACP RFD: Session Notices）；桌面 initialize 发送 `clientCapabilities: {}`，桥不得向其发送 notice。
+  - 同时不得倒退为伪装：普通生命周期状态不得再作为思考文本发送；不得为保住旧扁平 status 断言而强造协议事件；错误诊断不允许任何静默丢失。
+- 决策：
+  - 能力捕获：`captureClientCapabilities` 解析 `clientCapabilities.session.notices`（开放式 record，键存在即视为广告），存入 `adapterCapabilities.sessionNotices`，经 `clientAdvertisesNotices()` 读取。
+  - 发送门（`emitUpdates` → `shouldSuppressLifecycleStatus`）：客户端未广告 notices 时，普通生命周期 status（`turn_started`/`turn_completed`/`turn_cancelled`/`item_*`/`review_mode_*`/`review_apply_applied`/`auth_logged_out` 等）整条不发送（扁平与 envelope 都不发）。
+  - 诊断永不静默丢失：`turn_error`/`review_apply_failed`/`backend_error`/`backend_error_retrying`/`backend_restarted_retrying` 属错误诊断（`isDiagnosticStatus`），任何客户端都发送 —— 未广告方走既有可见通路（thought fallback 携带真实失败消息），广告方以 `severity=error`（retry 类 `warning`）的 `notice` 携带 `description`（延续"never lose turn error detail"决策）。
+  - 广告方连接：全部 status 以标准 `notice` 发送（`title`=status 值，缺省回退 `"status"`；severity 按上；有 `Message` 时作为 `description` 透传）。
+  - 依赖旧扁平 status 的测试改为如实协商：`r4_contract_test.go` 两侧 initialize、e2e 中观察生命周期的用例（A1–A5/B1、E1、E2、G2G3、G6）声明 `clientCapabilities.session.notices`，以合法广告方身份参与，而非让桥为旧断言强造事件。
+  - 客户端侧（桌面）不按字符串隐藏/过滤任何内容，也不虚假声明能力、不新建通知系统。
+  - `types.go` 新增 `sessionUpdateTypeStatus` 与 `sessionUpdateNotice` 常量；默认回退分支保持不变，继续承接其余未知类型（KI-0021 剩余范围）。
+- 备选方案：
+  - 方案A：无条件发送 `notice`。（拒绝：违反 notices 协商，前版即因此被否决）
+  - 方案B：普通 status 继续 thought 回退。（拒绝：伪装成模型内容）
+  - 方案C：连错误诊断一并对未广告方静默丢弃。（拒绝：违反"never lose turn error detail"）
+  - 方案D：前端按字符串过滤 `turn_started` 等文本。（拒绝：症状处掩盖，语义仍错）
+  - 方案E：能力门 + 诊断保底可见通路。（采用）
+- 取舍（Pros/Cons）：
+  - Pros：严格遵守 notices 协商；未广告客户端获得干净的消息/工具流；错误诊断在所有连接上可见；广告客户端得到完整结构化生命周期。
+  - Cons：未广告客户端失去普通生命周期进度可见性（其本就无法渲染 notice，属协议内应得行为）；thought fallback 仍承接诊断文本（其泛化回退范围保留在 KI-0021）。
+- 影响范围（文件/模块）：
+  - `internal/acp/types.go`
+  - `internal/acp/server.go`（`adapterCapabilities`、`captureClientCapabilities`、`emitUpdates`、`buildSessionUpdatePayload`/`mapACPUpdateForClient` 增加 notices 参数）
+  - `internal/acp/server_stdio_test.go`
+  - `test/integration/e2e_test.go`、`test/integration/r4_contract_test.go`
+- 验证方式（测试/验收项）：
+  - `TestBuildSessionUpdatePayloadTurnLifecycleStatusIsNoticeNotThought`（广告方：notice，无 thought 泄漏）
+  - `TestBuildSessionUpdatePayloadTurnErrorStatusKeepsDiagnostic`（广告方：severity=error + description）
+  - `TestEmitGateLifecycleStatusDroppedWithoutNoticesCapability`（未广告方：普通生命周期整条不发）
+  - `TestEmitGateTurnErrorStaysVisibleWithoutNoticesCapability`（错误反例：未广告方 turn_error 不静默丢失，可见通路携带真实消息）
+  - `TestDetectSessionNoticesCapability`
+  - `go test ./...`
+  - 真实链路（重编译二进制验收，未替换稳定安装）：未广告方 raw-NDJSON 协商探针（真实 Pi）零 status 帧、零 notice、end_turn 正常；无条件 notice 前版二进制同探针精确复现未协商 notice 违例（负对照）；生产桌面客户端 ↔ 真实 Pi 两轮对话无生命周期文本。

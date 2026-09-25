@@ -59,6 +59,7 @@
 - KI-0053：Codex 高级 approval policy amendment 选项尚未完整桥接到 ACP permission UI
 - KI-0054：Pi `acceptForSession` 当前仅为 adapter-managed exact-match cache
 - KI-0055：Codex turn stream 背压已缓解，但高频非关键事件仍可能被合并或淘汰
+- KI-0056：取消未确认时返回的错误，不代表会话可复用
 
 ---
 
@@ -399,6 +400,8 @@
 - 现象：
   - 适配器已支持“扁平字段 + 标准 envelope”双输出，并保证每条 `session/update` 都带 `update.sessionUpdate`。
   - 已补齐 `plan` 标准映射，但对部分非 message/tool 的低频更新，当前仍用 `agent_thought_chunk` 文本回退承载。
+- 更新（2026-09-24）：
+  - `type="status"` 生命周期家族已按 notices 协商处理：广告 `clientCapabilities.session.notices` 的客户端收到标准 `notice`，未广告客户端不再收到普通生命周期状态（也不再伪装为 thought 文本），错误诊断经可见保底通路传递，见 ADR-0057。本 KI 剩余范围为其余未知低频类型（usage/mode/permission 生命周期等的泛化回退）。
 - 影响：
   - 严格 ACP 客户端可稳定反序列化，但在 thought/模式切换等低频更新上仍可能出现“语义被弱化”的展示差异。
 - 复现：
@@ -819,3 +822,22 @@
 - 后续计划：
   - 增加 turn stream 队列深度、事件合并次数、非关键淘汰次数等观测指标。
   - 视真实运行情况决定是否把部分 update 类型进一步改造成显式 snapshot 模式或可配置策略。
+
+## KI-0056：取消未确认时返回的错误，不代表会话可复用
+- 现象：
+  - 一个轮次结束时有两把彼此独立的锁：Bridge 的 session active turn 槽位，与后端自己持有的 run（Pi RPC 的 `rpcSession.active`）。
+  - Bridge 在写出终态回复之前释放自己的槽位；但后端是否已经放手由后端决定。取消未确认（后端在 `cancelTerminalWaitBudget` 内没有退役该 run）时，Bridge 仍会释放轮槽并回一条错误。
+  - 此时续发会被后端如实拒绝：`turn/start failed` / `pi rpc session already has an active run`。
+  - 另外，`session/cancel` 的 `{cancelled:true}` 只表示取消请求被受理，不表示轮次结束；轮次结束以该轮 `session/prompt` 的回复为准。
+- 影响：
+  - 只有“带 `stopReason` 的正常终态 result”才既是轮次结束、又是可续发信号。
+  - 取消未确认的 error 不是终态：会话确实仍然忙，这是诚实状态而不是竞态。
+- 复现：
+  - `PI_FAKE_ABORT_NEVER_ENDS=1` 下发起一个待审批轮次，`session/cancel` → 收到 `turn/interrupt did not complete` 与 `turn cancellation not confirmed` 两条错误 → 立即再发 `session/prompt`，可见 `turn/start failed`。
+  - 对应回归：`test/integration/pi_approval_routing_test.go` 的 `TestPiUnconfirmedCancelIsNotReportedAsCancelled`。
+- Workaround：
+  - 客户端把该错误上报或等待用户决定，不要用延时或盲重试掩盖：重试只会重复撞在同一个仍在运行的 turn 上。
+  - 需要真正腾出会话时，等待或核实后端运行已结束，再由用户决定如何恢复；当前没有自动确认恢复的通路。该轮 `session/prompt` 已经以错误回复结束，不会再收到它的正常终态回复。
+- 后续计划：
+  - 未修的同类终态点：`internal/pi/client.go` 的 `onReadLoopError`（先发 Error 帧、再释放 run 槽），以及辅助/斜杠命令路径 `internal/acp/server.go` 中 `defer EndTurn` 与 `turn_cancelled` 收尾；两者都还不在“终态写出前释放”的口径内。
+  - 细节限制（本轮刻意保留）：后端 Error 之后若跟着一条 Completed，Error 的非空 `Message` 会被保留并原样上报，该 Completed 既不改变终态也不覆盖错误文本；只有当 Error 自身没有给出 `Message` 时，才采用随后 Completed 携带的文本。

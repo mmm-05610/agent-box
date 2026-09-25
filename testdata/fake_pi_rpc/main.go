@@ -116,6 +116,19 @@ type fakeServer struct {
 	nextTool    int
 	nextPrompt  int
 	active      *activePrompt
+
+	// gateIgnoresAbort models a permission gate that keeps waiting for its own
+	// extension_ui_response even after the turn was aborted.
+	gateIgnoresAbort bool
+
+	// abortNeverEnds models a gate that answers neither abort nor the bridge's own cancelled
+	// response, so the turn never reaches agent_end. It pins what the bridge may claim when the
+	// cancellation cannot be confirmed.
+	abortNeverEnds bool
+
+	// approvedHold keeps an already-granted tool running for a while, so a cancel that arrives during
+	// it loses the race to a normal end_turn.
+	approvedHold time.Duration
 }
 
 func main() {
@@ -159,6 +172,14 @@ func main() {
 		models:     models,
 		model:      resolveInitialModel(models, strings.TrimSpace(*provider), strings.TrimSpace(*modelID)),
 		thinking:   "medium",
+		// sessionName models Pi's opt-in display name (--name / /name / pi.setSessionName).
+		// Real Pi reports no name at all until one is set, so the fixture keeps it empty by default.
+		sessionName:      strings.TrimSpace(os.Getenv("PI_FAKE_SESSION_NAME")),
+		gateIgnoresAbort: strings.TrimSpace(os.Getenv("PI_FAKE_GATE_IGNORES_ABORT")) == "1",
+		abortNeverEnds:   strings.TrimSpace(os.Getenv("PI_FAKE_ABORT_NEVER_ENDS")) == "1",
+	}
+	if hold, err := time.ParseDuration(strings.TrimSpace(os.Getenv("PI_FAKE_APPROVED_HOLD"))); err == nil {
+		server.approvedHold = hold
 	}
 
 	if err := server.serve(os.Stdin); err != nil && err != io.EOF {
@@ -231,16 +252,17 @@ func (s *fakeServer) handleNewSession(input rpcInput) error {
 	}
 
 	sessionPath, sessionID := s.newSessionPath()
-	title := "Pi Session " + sessionID
 	header := sessionHeader{
 		Type:      "session",
 		ID:        sessionID,
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
 		CWD:       s.cwd,
 	}
-	info := sessionInfo{
-		Type: "session_info",
-		Name: title,
+	// Real Pi writes no session_info entry unless the user named the session (/name, --name,
+	// pi.setSessionName), so the fixture stays unnamed unless PI_FAKE_SESSION_NAME asks for one.
+	info := sessionInfo{}
+	if s.sessionName != "" {
+		info = sessionInfo{Type: "session_info", Name: s.sessionName}
 	}
 	if err := writeSessionFile(sessionPath, header, info, nil); err != nil {
 		return err
@@ -249,7 +271,6 @@ func (s *fakeServer) handleNewSession(input rpcInput) error {
 	s.mu.Lock()
 	s.sessionPath = sessionPath
 	s.sessionID = sessionID
-	s.sessionName = title
 	s.mu.Unlock()
 
 	s.respondSuccess(input.ID, input.Type, map[string]any{"cancelled": false})
@@ -269,7 +290,7 @@ func (s *fakeServer) handleSwitchSession(input rpcInput) error {
 	s.mu.Lock()
 	s.sessionPath = path
 	s.sessionID = firstNonEmpty(strings.TrimSpace(snapshot.Header.ID), strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)))
-	s.sessionName = firstNonEmpty(strings.TrimSpace(snapshot.Title), "Loaded Pi Session")
+	s.sessionName = strings.TrimSpace(snapshot.Title)
 	if strings.TrimSpace(snapshot.Header.CWD) != "" {
 		s.cwd = strings.TrimSpace(snapshot.Header.CWD)
 	}
@@ -286,7 +307,10 @@ func (s *fakeServer) handleGetState(input rpcInput) error {
 		"thinkingLevel": s.thinking,
 		"sessionFile":   s.sessionPath,
 		"sessionId":     s.sessionID,
-		"sessionName":   s.sessionName,
+	}
+	// Real Pi omits sessionName entirely while the session is unnamed.
+	if strings.TrimSpace(s.sessionName) != "" {
+		state["sessionName"] = s.sessionName
 	}
 	s.mu.Unlock()
 
@@ -389,7 +413,7 @@ func (s *fakeServer) handleAbort(input rpcInput) error {
 	s.mu.Lock()
 	active := s.active
 	s.mu.Unlock()
-	if active != nil {
+	if active != nil && !s.abortNeverEnds {
 		active.cancelOnce.Do(func() {
 			close(active.cancel)
 		})
@@ -549,6 +573,13 @@ func (s *fakeServer) runApprovalPrompt(active *activePrompt) {
 		return
 	}
 
+	if s.approvedHold > 0 {
+		// Controlled counterexample shape: a tool that was already granted keeps running despite the
+		// later abort, so the turn really ends normally. Used to check that the bridge reports that
+		// terminal state instead of claiming a cancellation.
+		time.Sleep(s.approvedHold)
+	}
+
 	s.emit(map[string]any{
 		"type":       "tool_execution_update",
 		"toolCallId": toolCallID,
@@ -625,6 +656,29 @@ func (s *fakeServer) waitOrCancelled(active *activePrompt, delay time.Duration) 
 }
 
 func (s *fakeServer) waitApprovalOrCancel(active *activePrompt) (approvalDecision, bool) {
+	if s.abortNeverEnds {
+		// Controlled counterexample shape: the gate answers neither the abort nor the bridge's own
+		// cancelled response, so no agent_end ever follows the cancellation. Only a real approve/deny
+		// would let the turn proceed.
+		for decision := range active.approvalDecision {
+			if decision.Confirmed != nil {
+				return decision, true
+			}
+		}
+	}
+	if s.gateIgnoresAbort {
+		// Controlled counterexample shape: a gate extension whose UI promise is not released by an
+		// abort, so only a real extension_ui_response can end the wait. Used to check whether the
+		// bridge ends a pending approval on its own way out of a cancelled turn.
+		return <-active.approvalDecision, true
+	}
+	select {
+	case decision := <-active.approvalDecision:
+		// A decision that already arrived resolves the promise; a later abort cannot take it back.
+		// This mirrors a real gate, where the await simply returns the user's answer.
+		return decision, true
+	default:
+	}
 	select {
 	case <-active.cancel:
 		return approvalDecision{}, false
@@ -664,9 +718,9 @@ func (s *fakeServer) appendSessionMessage(message storedMessage) error {
 		return err
 	}
 	snapshot.Messages = append(snapshot.Messages, message)
-	info := sessionInfo{
-		Type: "session_info",
-		Name: firstNonEmpty(strings.TrimSpace(snapshot.Title), s.sessionName),
+	info := sessionInfo{}
+	if name := firstNonEmpty(strings.TrimSpace(snapshot.Title), s.sessionName); name != "" {
+		info = sessionInfo{Type: "session_info", Name: name}
 	}
 	return writeSessionFile(path, snapshot.Header, info, snapshot.Messages)
 }
@@ -763,11 +817,15 @@ func writeSessionFile(path string, header sessionHeader, info sessionInfo, messa
 	}
 	lines = append(lines, string(headerLine))
 
-	infoLine, err := json.Marshal(info)
-	if err != nil {
-		return err
+	// Real Pi only writes a session_info line once the session has been named; an unnamed session
+	// file has exactly one header line and message lines.
+	if strings.TrimSpace(info.Type) != "" {
+		infoLine, err := json.Marshal(info)
+		if err != nil {
+			return err
+		}
+		lines = append(lines, string(infoLine))
 	}
-	lines = append(lines, string(infoLine))
 
 	for idx, message := range messages {
 		entryLine, err := json.Marshal(sessionMessage{

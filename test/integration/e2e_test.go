@@ -462,11 +462,25 @@ func (h *adapterHarness) assertStdoutPureJSONRPC() {
 	}
 }
 
+// initializeNoticesClient sends initialize as a client that advertises
+// clientCapabilities.session.notices. Lifecycle-observing e2e assertions are written against
+// such a client: benign status updates (turn_started, review_mode_*, auth_logged_out, ...)
+// only reach the wire on connections that advertised notices (ACP session-notices
+// negotiation); error diagnostics travel regardless.
+func (h *adapterHarness) initializeNoticesClient() {
+	h.t.Helper()
+	h.sendRequest("1", "initialize", map[string]any{
+		"clientCapabilities": map[string]any{
+			"session": map[string]any{"notices": map[string]any{}},
+		},
+	})
+}
+
 func TestE2EAcceptanceA1ToA5AndB1(t *testing.T) {
 	h := startAdapter(t)
 
 	// A2 initialize
-	h.sendRequest("1", "initialize", map[string]any{})
+	h.initializeNoticesClient()
 	initResp := h.waitResponse("1", responseTimeout)
 	var initResult struct {
 		AgentCapabilities struct {
@@ -2747,7 +2761,7 @@ func TestE2ETurnDiffUpdatedMappedToToolCallDiffs(t *testing.T) {
 func TestE2EAcceptanceE1ReviewWorkflow(t *testing.T) {
 	h := startAdapter(t)
 
-	h.sendRequest("1", "initialize", map[string]any{})
+	h.initializeNoticesClient()
 	_ = h.waitResponse("1", responseTimeout)
 
 	h.sendRequest("2", "session/new", map[string]any{})
@@ -2877,7 +2891,7 @@ func TestE2EAcceptanceE2PatchModeAAppServer(t *testing.T) {
 func TestE2EAcceptanceE2PatchModeBACPFS(t *testing.T) {
 	h := startAdapter(t, "PATCH_APPLY_MODE=acp_fs")
 
-	h.sendRequest("1", "initialize", map[string]any{})
+	h.initializeNoticesClient()
 	_ = h.waitResponse("1", responseTimeout)
 
 	h.sendRequest("2", "session/new", map[string]any{})
@@ -3001,7 +3015,7 @@ func TestE2EReviewPatchConflictVisibleModeB(t *testing.T) {
 func TestE2EAcceptanceG2G3ReviewBranchAndCommit(t *testing.T) {
 	h := startAdapter(t)
 
-	h.sendRequest("1", "initialize", map[string]any{})
+	h.initializeNoticesClient()
 	_ = h.waitResponse("1", responseTimeout)
 
 	h.sendRequest("2", "session/new", map[string]any{})
@@ -3178,7 +3192,7 @@ func TestE2EAcceptanceG5Compact(t *testing.T) {
 func TestE2EAcceptanceG6LogoutRequiresReauth(t *testing.T) {
 	h := startAdapter(t)
 
-	h.sendRequest("1", "initialize", map[string]any{})
+	h.initializeNoticesClient()
 	_ = h.waitResponse("1", responseTimeout)
 
 	h.sendRequest("2", "session/new", map[string]any{})

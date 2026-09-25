@@ -107,13 +107,13 @@ type fsReadTextFileResult struct {
 
 type adapterCapabilities struct {
 	canReadTextFile bool
+	sessionNotices  bool
 }
 
 type turnLifecycle struct {
 	sessionID             string
 	turnID                string
 	phase                 turnPhase
-	cancelRequested       bool
 	lastUsage             *promptUsageSnapshot
 	messageBuffer         strings.Builder
 	toolCallStatus        map[string]string
@@ -899,6 +899,18 @@ func (s *Server) handleSessionPrompt(ctx context.Context, id json.RawMessage, pa
 	}()
 
 	lifecycle := newTurnLifecycle(params.SessionID, turnID)
+
+	// Releasing the session's turn slot belongs to writing the terminal state, not to unwinding the
+	// handler: a reply that leaves while the slot is still held is answered by "begin turn failed" for as
+	// long as the goroutine has not returned. What the reply says about the session being reusable is a
+	// separate question — this only frees the bridge's own slot, and a backend that is still tearing the
+	// turn down (an unconfirmed cancellation, say) keeps refusing the next message on its own terms. The
+	// defer above stays as the backstop for every path that ends without a terminal reply.
+	replyTerminal := func(stopReason string) {
+		s.sessions.EndTurn(params.SessionID, activeTurnID)
+		s.writePromptResultWithUsage(id, stopReason, lifecycle.lastUsage)
+	}
+
 	s.emitUpdates(lifecycle.startedUpdate())
 	s.emitUpdates(warningUpdates(params.SessionID, lifecycle.turnID, prepWarnings))
 
@@ -908,13 +920,23 @@ func (s *Server) handleSessionPrompt(ctx context.Context, id json.RawMessage, pa
 	for {
 		select {
 		case <-turnCtx.Done():
-			lifecycle.markCancelRequested()
-			s.emitUpdates(lifecycle.cancelledUpdate())
-			s.writePromptResultWithUsage(id, "cancelled", lifecycle.lastUsage)
+			s.finishCancelledTurn(id, params.SessionID, threadID, activeTurnID, lifecycle, events)
 			return
 		case event, ok := <-events:
+			// The cancellation and this frame can be ready at the same instant, and the select then
+			// picks either. Ask the context, not the lifecycle: the cancellation path is what retires
+			// the turn, and a frame taken here — an approval request or a closed stream included — must
+			// not talk its way past that wait.
+			if turnCtx.Err() != nil {
+				if ok {
+					s.finishCancelledTurn(id, params.SessionID, threadID, activeTurnID, lifecycle, events, event)
+				} else {
+					s.finishCancelledTurn(id, params.SessionID, threadID, activeTurnID, lifecycle, events)
+				}
+				return
+			}
 			if !ok {
-				s.writePromptResultWithUsage(id, lifecycle.fallbackStopReason(), lifecycle.lastUsage)
+				replyTerminal(lifecycle.fallbackStopReason())
 				return
 			}
 			if event.Type == codex.TurnEventTypeError {
@@ -964,7 +986,7 @@ func (s *Server) handleSessionPrompt(ctx context.Context, id json.RawMessage, pa
 							},
 						})
 						s.clearTurnTodosOnFailure(params.SessionID, "error")
-						s.writePromptResultWithUsage(id, "error", lifecycle.lastUsage)
+						replyTerminal("error")
 						return
 					}
 					if _, replaceErr := s.sessions.ReplaceTurn(params.SessionID, activeTurnID, retryTurnID, cancel); replaceErr != nil {
@@ -984,7 +1006,7 @@ func (s *Server) handleSessionPrompt(ctx context.Context, id json.RawMessage, pa
 							},
 						})
 						s.clearTurnTodosOnFailure(params.SessionID, "error")
-						s.writePromptResultWithUsage(id, "error", lifecycle.lastUsage)
+						replyTerminal("error")
 						return
 					}
 
@@ -1005,7 +1027,7 @@ func (s *Server) handleSessionPrompt(ctx context.Context, id json.RawMessage, pa
 						},
 					})
 					s.clearTurnTodosOnFailure(params.SessionID, "error")
-					s.writePromptResultWithUsage(id, "error", lifecycle.lastUsage)
+					replyTerminal("error")
 					return
 				}
 			}
@@ -1014,7 +1036,7 @@ func (s *Server) handleSessionPrompt(ctx context.Context, id json.RawMessage, pa
 				updates, done, stopReason := s.handleApprovalEvent(turnCtx, lifecycle, event)
 				s.emitUpdates(updates)
 				if done {
-					s.writePromptResultWithUsage(id, stopReason, lifecycle.lastUsage)
+					replyTerminal(stopReason)
 					return
 				}
 				continue
@@ -1032,7 +1054,7 @@ func (s *Server) handleSessionPrompt(ctx context.Context, id json.RawMessage, pa
 			s.emitUpdates(updates)
 			if done {
 				s.clearTurnTodosOnFailure(params.SessionID, stopReason)
-				s.writePromptResultWithUsage(id, stopReason, lifecycle.lastUsage)
+				replyTerminal(stopReason)
 				return
 			}
 		}
@@ -1094,6 +1116,153 @@ func (s *Server) startPromptTurn(
 	}
 }
 
+// cancelTerminalWaitBudget bounds how long a cancelled turn waits for the backend to retire its run
+// before the cancellation is given up on. Retiring closes the event stream, so a healthy turn returns
+// from the wait as soon as it is really over.
+const cancelTerminalWaitBudget = 2 * time.Second
+
+// cancelTerminal is the evidence a cancelled turn's teardown produced. The bridge may confirm a
+// cancellation only on that evidence, so the backend's own terminal reason travels with the retirement,
+// together with every frame that arrived before it.
+type cancelTerminal struct {
+	retired    bool
+	seen       bool
+	stopReason string
+	failed     bool
+	failure    string
+	pending    []codex.TurnEvent
+}
+
+// waitForCancelTerminal collects the backend's teardown evidence. Events before the terminal one are
+// kept so the caller can still project the text and tool frames that arrived after the cancellation;
+// early holds a frame the caller already took off the stream.
+func waitForCancelTerminal(events <-chan codex.TurnEvent, early ...codex.TurnEvent) cancelTerminal {
+	deadline := time.NewTimer(cancelTerminalWaitBudget)
+	defer deadline.Stop()
+	terminal := cancelTerminal{}
+	record := func(event codex.TurnEvent) {
+		switch event.Type {
+		case codex.TurnEventTypeCompleted:
+			terminal.seen = true
+			reason := normalizeStopReason(event.StopReason)
+			if terminal.failed {
+				// The backend already said the turn failed, and how it then chose to close that turn —
+				// Claude reports a failed turn as a cancelled completion — is not a terminal state the
+				// bridge may hand out in place of the error. Only a message is taken from the completion,
+				// and only to describe an error that arrived without one.
+				if terminal.failure == "" {
+					terminal.failure = strings.TrimSpace(event.Message)
+				}
+				break
+			}
+			terminal.stopReason = reason
+			terminal.failed = reason == "error"
+			terminal.failure = strings.TrimSpace(event.Message)
+		case codex.TurnEventTypeError:
+			// An error is an error even when the backend sent no text with it.
+			terminal.seen = true
+			terminal.stopReason = "error"
+			terminal.failed = true
+			if message := strings.TrimSpace(event.Message); message != "" {
+				terminal.failure = message
+			}
+		default:
+			terminal.pending = append(terminal.pending, event)
+		}
+	}
+	for _, event := range early {
+		record(event)
+	}
+	for {
+		select {
+		case event, ok := <-events:
+			if !ok {
+				terminal.retired = true
+				return terminal
+			}
+			record(event)
+		case <-deadline.C:
+			return terminal
+		}
+	}
+}
+
+// cancelTerminalResult decides what a cancelled turn may report. The empty failure means a stopReason
+// was earned: either the backend's own cancellation, or a terminal state it reached first.
+func cancelTerminalResult(terminal cancelTerminal) (reason string, failure string) {
+	switch {
+	case !terminal.retired:
+		return "", fmt.Sprintf("backend did not stop the turn within %s", cancelTerminalWaitBudget)
+	case terminal.failed:
+		if strings.TrimSpace(terminal.failure) == "" {
+			return "", "backend ended the turn with an error that carried no message"
+		}
+		return "", terminal.failure
+	case !terminal.seen:
+		return "", "backend closed the turn without reporting how it ended"
+	default:
+		return terminal.stopReason, ""
+	}
+}
+
+// finishCancelledTurn is the only way a cancelled prompt turn ends. It waits for the backend to retire
+// the run, delivers every frame that arrived while it was tearing down, and may claim only the terminal
+// state the backend itself reported. early is a frame the caller took off the stream before noticing the
+// cancellation.
+func (s *Server) finishCancelledTurn(
+	id json.RawMessage,
+	sessionID string,
+	threadID string,
+	turnID string,
+	lifecycle *turnLifecycle,
+	events <-chan codex.TurnEvent,
+	early ...codex.TurnEvent,
+) {
+	terminal := waitForCancelTerminal(events, early...)
+
+	// Late content still belongs to this turn, so it is projected before the reply. Approval and diff
+	// frames are deliberately not replayed here: a cancelled turn must not ask the client again, and
+	// diff content resolution needs a context that is no longer live.
+	s.emitUpdates(cancelTerminalUpdates(lifecycle, terminal.pending))
+
+	reason, failure := cancelTerminalResult(terminal)
+	// The prompt goroutine is about to answer, so the bridge's own slot goes with the reply rather than
+	// with the unwinding handler. That says nothing about the backend: in the failure arm the run may well
+	// still be live, and the next message is refused by the backend for that reason, not by this slot.
+	s.sessions.EndTurn(sessionID, turnID)
+	switch {
+	case failure != "":
+		s.writeInternalError(id, "turn cancellation not confirmed", map[string]any{
+			"sessionId": sessionID,
+			"threadId":  threadID,
+			"turnId":    turnID,
+			"error":     failure,
+		})
+	case reason == "cancelled":
+		s.emitUpdates(lifecycle.cancelledUpdate())
+		s.writePromptResultWithUsage(id, "cancelled", lifecycle.lastUsage)
+	default:
+		// The backend ended the turn some other way, so that is the terminal state to report — and the
+		// client still gets the same closing status frame the uncancelled path would have sent.
+		s.emitUpdates(lifecycle.earnedTerminalUpdate())
+		s.writePromptResultWithUsage(id, reason, lifecycle.lastUsage)
+	}
+}
+
+// cancelTerminalUpdates projects the frames a cancellation wait consumed before the terminal one. The
+// turn start is excluded: it was already announced when the turn began.
+func cancelTerminalUpdates(lifecycle *turnLifecycle, pending []codex.TurnEvent) []SessionUpdateParams {
+	var updates []SessionUpdateParams
+	for _, event := range pending {
+		if event.Type == codex.TurnEventTypeStarted {
+			continue
+		}
+		eventUpdates, _, _ := lifecycle.apply(event)
+		updates = append(updates, eventUpdates...)
+	}
+	return updates
+}
+
 func (s *Server) handleSessionCancel(ctx context.Context, id json.RawMessage, paramsRaw json.RawMessage) {
 	var params SessionCancelParams
 	if err := decodeParams(paramsRaw, &params); err != nil {
@@ -1123,7 +1292,7 @@ func (s *Server) handleSessionCancel(ctx context.Context, id json.RawMessage, pa
 	interruptCtx, interruptCancel := context.WithTimeout(ctx, 2*time.Second)
 	defer interruptCancel()
 	if err := s.app.TurnInterrupt(interruptCtx, threadID, turnID); err != nil {
-		s.writeInternalError(id, "turn/interrupt failed", map[string]any{
+		s.writeInternalError(id, "turn/interrupt did not complete", map[string]any{
 			"error":     err.Error(),
 			"sessionId": params.SessionID,
 			"threadId":  threadID,
@@ -1232,6 +1401,11 @@ func (s *Server) sessionInfosFromThreads(threads []codex.Thread, archived bool) 
 		}
 		if modelProvider := strings.TrimSpace(thread.ModelProvider); modelProvider != "" {
 			meta["modelProvider"] = modelProvider
+		}
+		// Thread.Name only ever carries a name the backend itself assigned; the field is absent for
+		// unnamed sessions so a client never has to guess whether Title is native or preview-derived.
+		if nativeName := strings.TrimSpace(thread.Name); nativeName != "" {
+			meta["sessionName"] = nativeName
 		}
 		if preview := strings.TrimSpace(thread.Preview); preview != "" {
 			meta["preview"] = preview
@@ -1710,9 +1884,17 @@ func (s *Server) writeError(id json.RawMessage, code int, message string, data m
 }
 
 func (s *Server) emitUpdates(updates []SessionUpdateParams) {
+	notices := s.clientAdvertisesNotices()
 	for _, update := range updates {
+		// ACP session-notices negotiation: clients that did not advertise
+		// clientCapabilities.session.notices must not receive notices at all, and plain
+		// lifecycle markers must not be disguised as thought text — they are simply not
+		// sent. Error diagnostics still travel to a visible channel (thought fallback).
+		if shouldSuppressLifecycleStatus(update, notices) {
+			continue
+		}
 		update = s.attachSessionTodos(update)
-		payload := buildSessionUpdatePayload(update)
+		payload := buildSessionUpdatePayload(update, notices)
 		if err := s.codec.WriteNotification(methodSessionUpdate, payload); err != nil {
 			s.logger.Warn("failed to write session/update", slog.String("error", err.Error()))
 			return
@@ -1720,7 +1902,26 @@ func (s *Server) emitUpdates(updates []SessionUpdateParams) {
 	}
 }
 
-func buildSessionUpdatePayload(update SessionUpdateParams) map[string]any {
+// shouldSuppressLifecycleStatus is the emission gate for status updates under notices
+// negotiation: benign lifecycle markers drop for non-advertising clients, while error
+// diagnostics (turn_error, review_apply_failed) keep flowing through the visible fallback.
+func shouldSuppressLifecycleStatus(update SessionUpdateParams, notices bool) bool {
+	return update.Type == sessionUpdateTypeStatus && !notices && !isDiagnosticStatus(update.Status)
+}
+
+// isDiagnosticStatus guards the second half of "never lose turn error detail": these
+// statuses carry real failure messages, so they are never silently dropped — even for
+// clients that did not advertise notices they travel through the visible fallback.
+func isDiagnosticStatus(status string) bool {
+	switch status {
+	case "turn_error", "review_apply_failed", "backend_error", "backend_error_retrying", "backend_restarted_retrying":
+		return true
+	default:
+		return false
+	}
+}
+
+func buildSessionUpdatePayload(update SessionUpdateParams, notices bool) map[string]any {
 	payload := map[string]any{
 		"sessionId": update.SessionID,
 	}
@@ -1786,14 +1987,14 @@ func buildSessionUpdatePayload(update SessionUpdateParams) map[string]any {
 		}
 	}
 
-	if mapped := mapACPUpdateForClient(update); mapped != nil {
+	if mapped := mapACPUpdateForClient(update, notices); mapped != nil {
 		payload["update"] = mapped
 	}
 
 	return payload
 }
 
-func mapACPUpdateForClient(update SessionUpdateParams) map[string]any {
+func mapACPUpdateForClient(update SessionUpdateParams, notices bool) map[string]any {
 	switch update.Type {
 	case sessionUpdateTypeMessage:
 		sessionUpdate := sessionUpdateChunkAgentMessage
@@ -1868,27 +2069,61 @@ func mapACPUpdateForClient(update SessionUpdateParams) map[string]any {
 			mapped["cost"] = cloneSessionUsageCost(update.Cost)
 		}
 		return mapped
+	case sessionUpdateTypeStatus:
+		// `notice` is only negotiable: the pinned SDK marks it UNSTABLE and requires the
+		// client to have advertised clientCapabilities.session.notices before an agent may
+		// send one. Non-advertising clients never see notices; benign lifecycle markers are
+		// dropped upstream in emitUpdates. A diagnostic that still travels (only error
+		// statuses pass that gate) rides the existing thought fallback so the real failure
+		// message stays visible (docs/DECISIONS.md: never lose turn error detail).
+		if !notices {
+			return agentThoughtTextFallback(update)
+		}
+		title := strings.TrimSpace(update.Status)
+		if title == "" {
+			title = sessionUpdateTypeStatus
+		}
+		severity := "info"
+		switch update.Status {
+		case "turn_error", "review_apply_failed", "backend_error":
+			severity = "error"
+		case "backend_error_retrying", "backend_restarted_retrying":
+			severity = "warning"
+		}
+		mapped := map[string]any{
+			"sessionUpdate": sessionUpdateNotice,
+			"severity":      severity,
+			"title":         title,
+		}
+		if message := strings.TrimSpace(update.Message); message != "" {
+			mapped["description"] = message
+		}
+		return mapped
 	default:
-		text := strings.TrimSpace(update.Delta)
-		if text == "" {
-			text = strings.TrimSpace(update.Message)
-		}
-		if text == "" {
-			text = strings.TrimSpace(update.Status)
-		}
-		if text == "" {
-			text = strings.TrimSpace(update.Type)
-		}
-		if text == "" {
-			text = "status"
-		}
-		return map[string]any{
-			"sessionUpdate": sessionUpdateChunkAgentThought,
-			"content": map[string]any{
-				"type": "text",
-				"text": text,
-			},
-		}
+		return agentThoughtTextFallback(update)
+	}
+}
+
+func agentThoughtTextFallback(update SessionUpdateParams) map[string]any {
+	text := strings.TrimSpace(update.Delta)
+	if text == "" {
+		text = strings.TrimSpace(update.Message)
+	}
+	if text == "" {
+		text = strings.TrimSpace(update.Status)
+	}
+	if text == "" {
+		text = strings.TrimSpace(update.Type)
+	}
+	if text == "" {
+		text = "status"
+	}
+	return map[string]any{
+		"sessionUpdate": sessionUpdateChunkAgentThought,
+		"content": map[string]any{
+			"type": "text",
+			"text": text,
+		},
 	}
 }
 
@@ -2549,6 +2784,12 @@ func (s *Server) canReadTextFile() bool {
 	return s.capabilities.canReadTextFile
 }
 
+func (s *Server) clientAdvertisesNotices() bool {
+	s.capabilitiesMu.RLock()
+	defer s.capabilitiesMu.RUnlock()
+	return s.capabilities.sessionNotices
+}
+
 func (s *Server) readTextFile(ctx context.Context, sessionID string, path string) (string, error) {
 	callCtx, cancel := context.WithTimeout(ctx, defaultFSWriteTimeout)
 	defer cancel()
@@ -2916,7 +3157,27 @@ func (s *Server) captureClientCapabilities(paramsRaw json.RawMessage) {
 	enabled := detectReadTextCapability(payload)
 	s.capabilitiesMu.Lock()
 	s.capabilities.canReadTextFile = enabled
+	s.capabilities.sessionNotices = detectSessionNoticesCapability(payload)
 	s.capabilitiesMu.Unlock()
+}
+
+// detectSessionNoticesCapability reports whether the client advertised
+// clientCapabilities.session.notices. The capability value is an open record, so presence
+// (non-null `notices` key) is the advertisement.
+func detectSessionNoticesCapability(payload map[string]any) bool {
+	if payload == nil {
+		return false
+	}
+	caps, ok := payload["clientCapabilities"].(map[string]any)
+	if !ok {
+		return false
+	}
+	session, ok := caps["session"].(map[string]any)
+	if !ok {
+		return false
+	}
+	notices, ok := session["notices"]
+	return ok && notices != nil
 }
 
 func detectReadTextCapability(payload map[string]any) bool {
@@ -4221,10 +4482,6 @@ func newTurnLifecycle(sessionID, turnID string) *turnLifecycle {
 	}
 }
 
-func (t *turnLifecycle) markCancelRequested() {
-	t.cancelRequested = true
-}
-
 func (t *turnLifecycle) resetForRetry() {
 	t.phase = turnPhaseStarted
 	t.lastUsage = nil
@@ -4256,6 +4513,20 @@ func (t *turnLifecycle) cancelledUpdate() []SessionUpdateParams {
 			Type:      "status",
 			Phase:     string(t.phase),
 			Status:    "turn_cancelled",
+		},
+	}
+}
+
+// earnedTerminalUpdate closes a turn whose cancellation lost to the state the backend really reached.
+func (t *turnLifecycle) earnedTerminalUpdate() []SessionUpdateParams {
+	t.phase = turnPhaseCompleted
+	return []SessionUpdateParams{
+		{
+			SessionID: t.sessionID,
+			TurnID:    t.turnID,
+			Type:      "status",
+			Phase:     string(t.phase),
+			Status:    "turn_completed",
 		},
 	}
 }
@@ -4562,10 +4833,10 @@ func (t *turnLifecycle) apply(event codex.TurnEvent) ([]SessionUpdateParams, boo
 			},
 		}, false, ""
 	case codex.TurnEventTypeCompleted:
+		// The backend's own reason is what a completed turn reports, even for a turn the client asked
+		// to cancel: a cancelled turn ends through the cancellation path, which decides its reply from
+		// the terminal evidence instead of overwriting it here.
 		stopReason := normalizeStopReason(event.StopReason)
-		if t.cancelRequested {
-			stopReason = "cancelled"
-		}
 		switch stopReason {
 		case "cancelled":
 			t.phase = turnPhaseCancelled
@@ -5164,10 +5435,9 @@ func toolCallContentText(text string) string {
 	return truncated + "\n[truncated]"
 }
 
+// fallbackStopReason closes a turn whose stream ended without a terminal event on the uncancelled path.
+// A cancelled turn never reaches this: its ending is decided from the cancellation evidence.
 func (t *turnLifecycle) fallbackStopReason() string {
-	if t.cancelRequested {
-		return "cancelled"
-	}
 	switch t.phase {
 	case turnPhaseCompleted:
 		return "end_turn"

@@ -168,6 +168,9 @@ type rpcSession struct {
 type piPendingApproval struct {
 	sess     *rpcSession
 	approval codex.ApprovalRequest
+	// requestID is the Pi-side extension_ui_request id, which is only unique inside one Pi process.
+	// The registry key adds the owning thread, so answering one session can never reach another.
+	requestID string
 }
 
 type sessionApprovalRule struct {
@@ -200,12 +203,20 @@ func (s *rpcSession) beginRun(turnID string, kind string, reviewMode bool) (<-ch
 	return run.events, nil
 }
 
-func (s *rpcSession) finishRun(run *activeRun) {
+// releaseRun frees the session's active-run slot without touching the event stream. The slot is what makes
+// Pi refuse a second run, so it has to be let go before the frame that ends the turn becomes visible: a
+// client that sends its next message the instant it reads that frame would otherwise be turned away by a
+// slot whose turn was already reported as over.
+func (s *rpcSession) releaseRun(run *activeRun) {
 	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.active == run {
 		s.active = nil
 	}
-	s.mu.Unlock()
+}
+
+func (s *rpcSession) finishRun(run *activeRun) {
+	s.releaseRun(run)
 	run.close()
 }
 
@@ -621,6 +632,11 @@ func (s *rpcSession) completeRun(run *activeRun, stopReason string, message stri
 	if run.reviewMode {
 		run.reviewExit(s.threadID)
 	}
+	// The terminal frame is the frame the bridge answers the turn with, so Pi's own run slot has to be gone
+	// before that frame can be read: releasing it after the send leaves an instant in which a client that
+	// obeyed the reply is turned away by "already has an active run". The stream is still closed last, since
+	// the bridge reads the close as the proof that the backend retired the run.
+	s.releaseRun(run)
 	run.send(codex.TurnEvent{
 		Type:       codex.TurnEventTypeCompleted,
 		ThreadID:   s.threadID,
@@ -628,7 +644,7 @@ func (s *rpcSession) completeRun(run *activeRun, stopReason string, message stri
 		StopReason: stopReason,
 		Message:    message,
 	})
-	s.finishRun(run)
+	run.close()
 }
 
 func (s *rpcSession) handleExtensionUIRequest(line []byte) {
@@ -652,7 +668,7 @@ func (s *rpcSession) handleExtensionUIRequest(line []byte) {
 		var payload gateRequestPayload
 		if err := json.Unmarshal([]byte(request.Message), &payload); err == nil && payload.Gate == "acp-adapter" {
 			approval := approvalFromGatePayload(payload)
-			approval.ApprovalID = request.ID
+			approval.ApprovalID = approvalKey(s.threadID, request.ID)
 			approval.ThreadID = s.threadID
 			if s.client.shouldAutoApprove(s.threadID, approval) {
 				confirmed := true
@@ -911,12 +927,20 @@ func (c *Client) removeSession(threadID string) {
 	delete(c.approvalCache, threadID)
 }
 
-func (c *Client) registerApproval(approvalID string, sess *rpcSession, approval codex.ApprovalRequest) {
+// approvalKey namespaces a Pi extension_ui_request id by the thread that owns it. Pi restarts its
+// id counter per process, and one Pi process is spawned per session thread, so the raw ids collide
+// across sessions.
+func approvalKey(threadID, requestID string) string {
+	return threadID + "\x00" + requestID
+}
+
+func (c *Client) registerApproval(requestID string, sess *rpcSession, approval codex.ApprovalRequest) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.approvals[approvalID] = piPendingApproval{
-		sess:     sess,
-		approval: approval,
+	c.approvals[approvalKey(sess.threadID, requestID)] = piPendingApproval{
+		sess:      sess,
+		approval:  approval,
+		requestID: requestID,
 	}
 }
 
@@ -1316,7 +1340,27 @@ func (c *Client) TurnInterrupt(ctx context.Context, threadID, _ string) error {
 	if !ok {
 		return fmt.Errorf("pi rpc: unknown thread %q", threadID)
 	}
-	return sess.abort(ctx)
+	if err := sess.abort(ctx); err != nil {
+		return err
+	}
+	// Pi retires the run when the aborted turn's terminal event arrives. Until then the turn may still
+	// run, so the cancellation is unconfirmed and this call says so instead of reporting success.
+	return sess.waitForRunIdle(ctx)
+}
+
+// waitForRunIdle waits for the session's active run to be retired, bounded by ctx. A timeout is an
+// error: the abort reached Pi but the turn did not stop, which is not the same fact as "cancelled".
+func (s *rpcSession) waitForRunIdle(ctx context.Context) error {
+	ticker := time.NewTicker(5 * time.Millisecond)
+	defer ticker.Stop()
+	for s.currentRun() != nil {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("pi rpc: aborted turn is still running; cancellation is not confirmed")
+		case <-ticker.C:
+		}
+	}
+	return nil
 }
 
 // ModelsList returns selectable Pi models.
@@ -1374,16 +1418,16 @@ func (c *Client) ApprovalRespond(ctx context.Context, approvalID string, decisio
 	switch decision {
 	case codex.ApprovalDecisionApproved:
 		confirmed := true
-		return pending.sess.respondExtensionUI(approvalID, &confirmed, false)
+		return pending.sess.respondExtensionUI(pending.requestID, &confirmed, false)
 	case codex.ApprovalDecisionApprovedForSession:
 		c.rememberSessionApproval(pending.sess.threadID, pending.approval)
 		confirmed := true
-		return pending.sess.respondExtensionUI(approvalID, &confirmed, false)
+		return pending.sess.respondExtensionUI(pending.requestID, &confirmed, false)
 	case codex.ApprovalDecisionDeclined:
 		confirmed := false
-		return pending.sess.respondExtensionUI(approvalID, &confirmed, false)
+		return pending.sess.respondExtensionUI(pending.requestID, &confirmed, false)
 	default:
-		return pending.sess.respondExtensionUI(approvalID, nil, true)
+		return pending.sess.respondExtensionUI(pending.requestID, nil, true)
 	}
 }
 
@@ -1588,6 +1632,8 @@ func parseDiskSession(path string) (listedSession, error) {
 		}
 		switch typed.Type {
 		case "session_info":
+			// Pi never auto-names: a session_info entry exists only after /name, --name or
+			// pi.setSessionName(). Name therefore stays empty unless the user named the session.
 			var entry diskSessionInfoEntry
 			if err := json.Unmarshal([]byte(raw), &entry); err == nil && strings.TrimSpace(entry.Name) != "" {
 				info.Name = strings.TrimSpace(entry.Name)
@@ -1604,13 +1650,7 @@ func parseDiskSession(path string) (listedSession, error) {
 			if ts := messageTimestamp(entry.Message); !ts.IsZero() && ts.After(info.UpdatedAt) {
 				info.UpdatedAt = ts
 			}
-			if info.Name == "" && text != "" {
-				info.Name = trimPreview(text)
-			}
 		}
-	}
-	if info.Name == "" {
-		info.Name = trimPreview(info.FirstMessage)
 	}
 	stat, err := os.Stat(path)
 	if err == nil && info.UpdatedAt.IsZero() {

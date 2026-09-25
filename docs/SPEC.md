@@ -359,6 +359,9 @@ acp-adapter/
 
 ### 7.3 并发与背压
 - 每个 ACP session 同时最多 1 个 active turn（与大多数 client 期待一致），并支持 `session/cancel` 中断。  
+- 轮槽的释放时刻：Bridge 在写出 `session/prompt` 的**正常终态回复**（带 `stopReason` 的 result）之前释放该 session 的 active turn 槽位，因此客户端读到该回复即可直接发送下一条 `session/prompt`，不需要延时或重试。两点限定：
+  - `session/cancel` 的 `{cancelled:true}` 回执只表示取消请求已被受理，不表示轮次结束；轮次结束以该轮 `session/prompt` 的回复为准。
+  - **取消未确认时返回的错误不代表会话可复用**：此时 Bridge 已释放自己的轮槽，但后端（如 Pi RPC）仍可能占用该 run，续发会被后端如实拒绝（`turn/start failed` / `pi rpc session already has an active run`）。客户端不得把该错误当作可复用信号，也不得用重试或延时掩盖。
 - App Server notifications 读取单 goroutine → 解码 → 分发到 turn-specific channel。  
 - 若 websocket 模式将来启用：处理 `-32001` overload 的重试策略（指数退避+抖动）。  
 
