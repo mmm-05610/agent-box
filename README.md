@@ -1,30 +1,52 @@
-# Ordessa Desktop CP candidate
+# Ordessa
 
-This branch is an isolated HD-002 candidate based on FC integration commit `d14ac6e0e6`. It preserves the original FC and F0–F3 trees. It has not been merged into `main` and is not ready for user review.
+Ordessa is the agent-desktop product monorepo: one repository holding the
+Electron desktop app, the Ordessa Server, the Pacthold governance kernel and
+the plugin set that composes the product.
 
-## Installed product
+```text
+apps/desktop              Electron shell + extension host boot
+apps/server               Ordessa Server (ordessa_server)
+packages/pacthold         governance kernel (pacthold) + plugin contracts
+packages/desktop-platform extension api/loader/host, native bridge, contracts
+plugins/harness           harness lifecycle, ACP adaptation, Go ACP bridge
+plugins/…                 commands, workbench, connections, agent, connectors
+products/desktop          default product assembly manifest
+```
 
-`products/desktop/extensions.json` is the product admission list. Its eight extensions are foundation contracts, Agent contracts, commands, workbench, connections, sessions, the Ordessa Server connector, and conversation. The connector authenticates to one local Server instance before registration. Its token stays in Electron's native process; the renderer receives a non-secret instance identity.
+## Quick start
 
-The candidate excludes the old direct Pi and Codex desktop connectors, the empty Settings provider, and the empty interactions extension. Conversation still renders Server-backed approval cards. The source for excluded prototypes remains in the original FC and executor branch history.
-
-`tooling/build-all.mjs` builds only admitted extensions and checks their `@extensions/` dependency closure. It clears the previous extension output first. `products/desktop/extensions.lock.json` records SHA-256 digests of that clean output; the runtime uses `extensions.json` as its enabled list. User `extensions.json` is a complete override and is never rewritten by the host.
-
-## Local verification
+Desktop (Node ≥ 22, npm ≥ 9):
 
 ```sh
 npm ci
 npm run typecheck
-npm test
-npm run build
-npm run test:agent-shell
-npm run test:electron
+npm test            # 146 tests
+npm run build       # builds extensions + electron app
+npm run test:agent-shell && npm run test:electron   # smoke (headless)
 ```
 
-The shell test uses a loopback fake that answers authenticated `server.hello` without creating a session or contacting a model. It checks both a visible failure when the host handoff is missing and registration of the sole Server connector when a valid handoff exists. A real Server and native Agent are outside that test.
+Backend (Python ≥ 3.9, Go toolchain pinned — see `docs/baseline.md`):
 
-## Remaining acceptance
+```sh
+python3 -m venv .venv && . .venv/bin/activate
+pip install -e packages/pacthold -e apps/server -e plugins/harness
+python -m ordessa_server --help
+pytest packages/pacthold plugins/harness        # suites + known-red ledger
+sh plugins/harness/packaging/acp-adapter/build-acp-adapter-round-h.sh   # reproducible bridge
+```
 
-The candidate still needs a paired Desktop and native Server run with the same origin, token locator, and Server identity; a valid project; first send returning the real session ID; continuation in that session; and the agreed application gates. No real model request has been made by the candidate assembly work. Keep the CP ready decision with the HD-002 central record under `control/missions/HD-002`.
+Docs: [`docs/baseline.md`](docs/baseline.md) (versions, gates, how to verify),
+[`docs/architecture.md`](docs/architecture.md) (components and dependency
+direction), [`docs/known-issues.md`](docs/known-issues.md) (registered debts
+and untested scope), [`docs/reference-index.md`](docs/reference-index.md)
+(where the pre-monorepo history lives and how to restore it).
 
-The previous modular host and direct connector development guide remains available in Git history at `d14ac6e0e6:README.md`.
+## Status
+
+Development baseline established from the HD-002 candidates
+(backend `a0b343e0`, desktop `450944bd`, ACP bridge `41d9d94`) with known
+issues registered — see `docs/baseline.md` and `docs/known-issues.md`.
+Real-model end-to-end acceptance is **not** part of this baseline (untested
+scope listed there). The pre-migration repositories remain restorable from
+archive refs and the preservation batch.
