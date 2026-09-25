@@ -165,6 +165,15 @@ export function createAgentSessions(lifetime: ResourceScope, connections: AgentC
       const connectionId = workspace.getSnapshot().selectedConnectionId
       if (connectionId) stateFor(connectionId).restoreFailed = false
     },
+    addWorkspace: async path => {
+      const client = workspace.selected()
+      if (!client.addWorkspace) throw Error('Agent project registration: unsupported')
+      const info = await client.addWorkspace(path)
+      const identity = identityOf(client)
+      if (identity) rememberProject(identity, info.id)
+      const connectionId = workspace.getSnapshot().selectedConnectionId
+      if (connectionId) stateFor(connectionId).restoreFailed = false
+    },
     refreshWorkspaces: async () => { await workspace.selected().refreshWorkspaces?.() },
   }
 }

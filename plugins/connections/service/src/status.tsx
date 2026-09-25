@@ -11,6 +11,7 @@ export function ConnectionStatus({ workspace }: { workspace: AgentConnectionWork
   const [actionError, setActionError] = useState('')
   const perform = (action: () => Promise<void>) => { setActionError(''); void action().catch(error => setActionError(errorText(error))) }
   const selected = state.selectedConnectionId
+  const pending = workspace.releaseCleanup?.() ?? state.pendingReleases ?? []
   const status = !selected ? 'disconnected'
     : state.connectingId === selected ? 'connecting'
     : state.agent?.connection.status ?? 'disconnected'
@@ -31,6 +32,15 @@ export function ConnectionStatus({ workspace }: { workspace: AgentConnectionWork
           </button>)
         : <p className="conn-empty">No agent connector is enabled.</p>}
       {selected && <button onClick={() => perform(() => workspace.reconnect(selected))}>Reconnect</button>}
+      {/* Evicted clients whose backend stand-down is outstanding, in its explicitly announced
+          state: in-flight never looks confirmed, and a failure shows its reason. The workspace
+          re-publishes on every transition, so this line appears without any user action; the
+          retry is an explicit action through the same perform channel as every other operation. */}
+      {pending.length > 0 && <p role="alert" className="conn-error">
+        Backend release pending: {pending.map(item => `${item.connectionId}: ${item.status === 'failed' ? item.reason : item.status}`).join('; ')}
+      </p>}
+      {pending.length > 0 && workspace.retryReleaseCleanup &&
+        <button onClick={() => perform(() => workspace.retryReleaseCleanup!())}>Retry backend release</button>}
       {(actionError || state.error) && <p role="alert" className="conn-error">{actionError || state.error}</p>}
     </div>}
   </div>

@@ -175,6 +175,12 @@ it('draft UI: New session opens the picker with zero backend calls, picking clea
     async stop() {}, async respond() {}, async setOption() {},
     async refreshWorkspaces() { backend.push('refreshWorkspaces') },
     async openWorkspace(id) { write({ workspaces: { ...snapshot.workspaces!, selectedWorkspaceId: id } }); return { id, normalizedPath: id } },
+    async addWorkspace(path) {
+      backend.push(`addWorkspace:${path}`)
+      const added = { id: path, normalizedPath: path }
+      write({ workspaces: { state: 'ready', items: [...snapshot.workspaces!.items, added], selectedWorkspaceId: path } })
+      return added
+    },
     async createAndSend(workspaceId) { backend.push(`createAndSend:${workspaceId}`) },
   }
   const registryScope = new OwnedResources(), sessionScope = new OwnedResources(), connectorScope = new OwnedResources()
@@ -206,6 +212,11 @@ it('draft UI: New session opens the picker with zero backend calls, picking clea
   await act(async () => { discard.click() })
   expect(container.querySelector('.agent-draft')).toBeNull()
   expect(backend).toEqual([]) // newSession/send/createAndSend are never reached through the draft UI
+  window.projectDirectory = { choose: async () => '/srv/new' }
+  await act(async () => { [...container.querySelectorAll('button')].find(node => node.textContent?.includes('Add project'))!.click() })
+  expect(backend).toEqual(['addWorkspace:/srv/new'])
+  expect(container.querySelector('.agent-project-name[title="/srv/new"]')).not.toBeNull()
+  delete window.projectDirectory
 })
 
 function fakeWorkbench() {

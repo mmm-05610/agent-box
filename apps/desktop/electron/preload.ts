@@ -2,6 +2,9 @@ import { contextBridge, ipcRenderer } from 'electron'
 contextBridge.exposeInMainWorld('extensionCatalog', {
   read: () => ipcRenderer.invoke('extensions:catalog'),
 })
+contextBridge.exposeInMainWorld('projectDirectory', {
+  choose: (): Promise<string | undefined> => ipcRenderer.invoke('projects:choose-directory'),
+})
 contextBridge.exposeInMainWorld('agentNative', {
   open: (adapterId: string) => ipcRenderer.invoke('agent-native:open', adapterId),
   send: (instanceId: string, frame: unknown) => ipcRenderer.invoke('agent-native:send', instanceId, frame),

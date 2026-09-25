@@ -97,6 +97,17 @@ export type InteractionAnswer =
   | { kind: 'answers'; answers: Readonly<Record<string, readonly string[]>> }
   | { kind: 'cancel' }
 
+/** Explicit lifecycle of a managed channel's backend release. In-flight exists as a state of its
+ * own so an unanswered attempt is NEVER inferable as confirmed: an empty failure record only ever
+ * means "nothing failed", not "nothing outstanding". A confirmation is announced and then leaves
+ * the live view — its absence is evidence only because the states were complete before it. */
+export type AgentReleaseStatus = 'in-flight' | 'failed' | 'confirmed'
+export interface AgentReleaseState {
+  readonly connectionId: string
+  readonly status: AgentReleaseStatus
+  readonly reason?: string
+}
+
 /** A live, authoritative adapter instance. Operations never imply a terminal run state. */
 export interface AgentClient extends IDisposable {
   getSnapshot(): AgentSnapshot
@@ -111,6 +122,32 @@ export interface AgentClient extends IDisposable {
   /** Project-capable clients only (CP backend connector). Absent members must disable project UI, never fake it. */
   refreshWorkspaces?(): Promise<void>
   openWorkspace?(id: string): Promise<AgentWorkspaceInfo>
+  /** Register a user-picked local directory with this Server, then select its authoritative project id. */
+  addWorkspace?(path: string): Promise<AgentWorkspaceInfo>
+  /** Channel-capable clients only (ACP connector): backend releases that failed, as host-readable
+   * diagnostics. The host observes them here and retries through `retryReleases()`; absent or
+   * empty means nothing stands retryable (in-flight answers live in `releaseStates()`). */
+  readonly releaseFailures?: { readonly connectionId: string; readonly reason: string }[]
+  /** Live view of every release the backend has not confirmed yet — in-flight or failed. A host
+   * taking over observation must read this synchronously when it subscribes: a release that
+   * answered before the subscription exists is outstanding here, and an absent subscription is
+   * not an absence of history. */
+  releaseStates?(): AgentReleaseState[]
+  /** Subscribe to every release-state transition. Delivered after `dispose()` too: an evicted
+   * client's asynchronous answers are precisely what the host must keep receiving, and this
+   * notification — not polling — is how a state change reaches the host's published surface. */
+  subscribeReleaseStates?(listener: (state: AgentReleaseState) => void): () => void
+  /** The client's own attestation that it can NEVER announce another release state: it is
+   * disposed, every in-flight acquire/initialize has finished standing its handle down, and
+   * every stand-down it ever started is confirmed. Until this settles the host must not forget
+   * the client — a live view that is empty RIGHT NOW is not evidence, because a handle still
+   * being acquired can fail its release later. Resolves (never rejects); absent means the
+   * client attests nothing, so there is nothing to forget. */
+  readonly releasesSettled?: Promise<void>
+  /** The host's explicit pass over outstanding releases: in-flight attempts are JOINED (never
+   * doubled), failed ones get one further attempt, and a refusal propagates to the caller —
+   * nothing is booked as confirmed except the backend's own answer. Works after dispose(). */
+  retryReleases?(): Promise<void>
   /** First send of a draft: Server creates and executes under workspaceId with the given idempotency requestId.
    * Resolves only once the same requestId is confirmed accepted and the real non-empty session id is in the
    * snapshot and selected (FC-0031); an unknown outcome rejects and the caller keeps the requestId. */
@@ -127,6 +164,11 @@ export interface AgentWorkspaceSnapshot {
   selectedConnectionId?: string
   connectingId?: string
   error?: string
+  /** Backend releases of evicted clients the Server has not confirmed yet — in-flight or failed —
+   * with their explicit states: the connections workspace holds those lifecycle references, a
+   * release-state notification re-publishes this surface the moment it changes, and a confirmed
+   * answer is what removes an entry. */
+  pendingReleases?: AgentReleaseState[]
   agent?: AgentSnapshot
   /** Front-end-only new-session draft; never a backend session until first send is accepted. */
   draft?: {
@@ -159,6 +201,7 @@ export interface AgentSessions {
   startDraft?(): void
   discardDraft?(): void
   selectWorkspace?(id: string): Promise<void>
+  addWorkspace?(path: string): Promise<void>
   refreshWorkspaces?(): Promise<void>
 }
 export const AgentSessionsToken = new Token<AgentSessions>('ordessa.agent.sessions.v1')

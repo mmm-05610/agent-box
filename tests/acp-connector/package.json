@@ -1,0 +1,10 @@
+{
+  "name": "ordessa-tests-acp-connector",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Isolated target-test workspace for the ACP connector; its lockfile pins the official ACP client SDK used as the protocol schema authority. Not part of the app build.",
+  "dependencies": {
+    "@agentclientprotocol/sdk": "1.5.0"
+  }
+}

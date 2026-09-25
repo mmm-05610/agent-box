@@ -383,6 +383,12 @@ export class OrdessaClient implements AgentClient {
     }
   }
 
+  async addWorkspace(path: string): Promise<AgentWorkspaceInfo> {
+    const added = await this.request<AgentWorkspaceInfo>('addProject', { path })
+    await this.refreshWorkspaces()
+    return this.openWorkspace(added.id)
+  }
+
   async createAndSend(workspaceId: string, text: string, requestId: string): Promise<{ sessionId: string }> {
     // The native half resolves only after an accepted turn with a real session id, so nothing below runs on a guess.
     let sent: Value

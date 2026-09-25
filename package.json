@@ -16,7 +16,8 @@
     "plugins/connections/service",
     "plugins/agent/sessions",
     "plugins/agent/conversation",
-    "plugins/connectors/ordessa"
+    "plugins/connectors/ordessa",
+    "plugins/connectors/acp"
   ],
   "scripts": {
     "test:agent-ui": "node apps/desktop/scripts/test-agent-ui.mjs",

@@ -59,7 +59,10 @@ try {
     assert.equal(connected.agentShell.serverVisible, true)
     assert.equal(connected.agentShell.codexVisible, false)
     assert.equal(connected.agentShell.piVisible, false)
-    assert.deepEqual(calls, ['server.hello'])
+    // Both native entries prove their own hello exactly once: the Server connector registers the
+  // pair behind it, and the ACP connector reads its (here: absent) acp.* capabilities and stays
+  // honestly unregistered. No other wire traffic may happen against this hello-only fake.
+  assert.deepEqual(calls, ['server.hello', 'server.hello'])
     console.log(JSON.stringify({ noHandoff: result.agentShell, authenticatedHello: connected.agentShell,
       calls, nodeAbsent: connected.nodeAbsent }))
   } finally { await new Promise(resolve => server.close(resolve)) }

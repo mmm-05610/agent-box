@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, protocol, session } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, protocol, session } from 'electron'
 import path from 'node:path'
 import { writeFile } from 'node:fs/promises'
 import { discover } from '@ordessa/extension-host/main'
@@ -27,6 +27,12 @@ app.whenReady().then(async () => {
     if (event.sender !== win.webContents || event.senderFrame !== win.webContents.mainFrame ||
         event.senderFrame.url !== 'ordessa://desktop/index.html') throw Error('Untrusted catalog caller')
     return discovery.catalog // No file paths, credentials, write API, or raw IPC.
+  })
+  ipcMain.handle('projects:choose-directory', async event => {
+    if (event.sender !== win.webContents || event.senderFrame !== win.webContents.mainFrame ||
+        event.senderFrame.url !== 'ordessa://desktop/index.html') throw Error('Untrusted project picker caller')
+    const result = await dialog.showOpenDialog(win, { properties: ['openDirectory'] })
+    return result.canceled ? undefined : result.filePaths[0]
   })
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
   if (smoke) win.webContents.on('console-message', details => console.error('RENDERER', details.message))

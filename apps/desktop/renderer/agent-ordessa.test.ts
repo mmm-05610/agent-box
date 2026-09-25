@@ -277,6 +277,17 @@ it('stops a first send whose project is already gone, before any send frame exis
   await half.connection.close()
 })
 
+it('registers a picked local folder through the Server and requires it in the returned project list', async () => {
+  const half = await nativeHalf()
+  expect(await half.connection.send({ method: 'addProject', params: { path: '/repo/app' } }))
+    .toEqual({ id: 'W1', normalizedPath: '/repo/app' })
+  const opened = half.calls.find(call => call.method === 'workspaces.open')!
+  expect(opened.params.path).toBe('/repo/app')
+  expect(opened.params.environment).toEqual({ kind: 'local', host: null, user: null })
+  expect(half.methods().slice(-2)).toEqual(['workspaces.open', 'workspaces.list'])
+  await half.connection.close()
+})
+
 it('keeps a typed send-period project loss deterministic instead of asking the Server what it accepted', async () => {
   const half = await nativeHalf({ 'sessions.createAndSend': refuse('NOT_FOUND', 'the workspace is gone', 'NATIVE_PROJECT_CHANGED') })
   const failure = await half.failureOf(half.firstSend())

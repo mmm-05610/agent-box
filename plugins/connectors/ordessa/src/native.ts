@@ -189,6 +189,21 @@ export default function createTransport(): NativeTransport {
           if (!id) throw new Error(`${PROJECT_INVALID}: no project selected`)
           return await revalidateProject(id)
         }
+        case 'addProject': {
+          required('workspaces.open')
+          const path = text(params.path)
+          if (!path || !path.startsWith('/') || path.includes('\0')) throw new Error(`${PROJECT_INVALID}: choose an absolute local directory`)
+          const opened = await wire.call<{ workspace?: Record<string, unknown> }>('workspaces.open', {
+            requestId: wire.newRequestId('workspace'), path,
+            environment: { kind: 'local', host: null, user: null },
+          })
+          const workspace = record(opened.workspace), id = text(workspace?.id)
+          if (!id || workspace?.archivedAt != null) throw new Error(`${PROJECT_INVALID}: the Server did not accept this project`)
+          await loadProjects()
+          const known = projects.get(id)
+          if (!known) throw new Error(`${PROJECT_INVALID}: the new project is not in the Server list`)
+          return { id, normalizedPath: known.normalizedPath }
+        }
         case 'sessions': {
           required('sessions.list')
           // The list is filtered by project, so a session id in this frame would silently widen the query.

@@ -1,5 +1,5 @@
 import { Token, type ResourceScope, type IDisposable } from '@ordessa/extension-api'
-import type { AgentClient, AgentConnector, AgentSnapshot, AgentWorkspaceSnapshot } from '../../agent/src/agent'
+import type { AgentClient, AgentConnector, AgentReleaseState, AgentSnapshot, AgentWorkspaceSnapshot } from '../../agent/src/agent'
 
 export interface AgentConnections {
   getSnapshot(): readonly Pick<AgentConnector, 'id' | 'title'>[]
@@ -22,6 +22,19 @@ export interface AgentConnectionWorkspace {
   selected(): AgentClient
   /** Live snapshot of every connected client — the input of the gate predicates. */
   clientSnapshots(): readonly AgentSnapshot[]
+  /** Live read (never a cache) of the backend releases left behind by evicted clients that are
+   * still outstanding — in-flight or failed — with their explicit states: the workspace takes
+   * over the client's live view when it retains the reference (seeded synchronously, then kept
+   * current by the client's release-state notifications, each of which re-publishes the
+   * snapshot), and only the backend's own confirmation removes an entry.
+   * Optional: workspaces whose connectors own no managed channels report nothing to confirm. */
+  releaseCleanup?(): AgentReleaseState[]
+  /** The host's explicit pass over the retained evicted clients (each one's `retryReleases()`,
+   * which JOINS in-flight attempts instead of booking them as clean). A refusal propagates and
+   * everything stays retryable — never automatic. The reference itself is dropped only on the
+   * client's `releasesSettled` attestation that it can never announce another release; an empty
+   * live view is not that proof, because a still-acquiring handle can fail its release later. */
+  retryReleaseCleanup?(): Promise<void>
 }
 
 /** Layer-1 switch gate: any run still open on any connection. */
