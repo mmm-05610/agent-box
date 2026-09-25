@@ -28,7 +28,7 @@ import threading
 import time
 
 REPO = Path(__file__).resolve().parents[2]
-PLUGIN = REPO / "plugins" / "agent-box-harnesses"
+PLUGIN = REPO / "plugins" / "agent-box-harness"
 SCRIPT = "scripts/server-round1/host-substitution-gate.py"
 
 FAKE_TOKEN = "host-gate-fake-token-2f1c07aa-non-secret"

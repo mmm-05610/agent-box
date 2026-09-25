@@ -15,7 +15,7 @@ paths=(
   docs/validation/current/FIVE_HARNESS_REGISTRY_CONSOLIDATION_CLOSURE.md
   docs/validation/current/FIVE_HARNESS_REGISTRY_CONSOLIDATION_CHECKPOINT_LEDGER.md
   tools/stage-five-harness-registry-checkpoint.sh
-  plugins/agent-box-harnesses
+  plugins/agent-box-harness
   plugins/agent-box-harness-claude plugins/agent-box-harness-opencode
   plugins/agent-box-harness-hermes plugins/agent-box-pi
   tests/test_execution_runtime_composition_native_bwrap.py

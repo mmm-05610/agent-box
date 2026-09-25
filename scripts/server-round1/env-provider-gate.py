@@ -33,7 +33,7 @@ import tempfile
 import time
 
 REPO = Path(__file__).resolve().parents[2]
-PLUGIN = REPO / "plugins" / "agent-box-harnesses"
+PLUGIN = REPO / "plugins" / "agent-box-harness"
 PEER_SOURCE = "tests/harness_remote/fake_acp_peer.mjs"
 SCRIPT = "scripts/server-round1/env-provider-gate.py"
 NONCE = "ENV-PROVIDER-NONCE-44F3"

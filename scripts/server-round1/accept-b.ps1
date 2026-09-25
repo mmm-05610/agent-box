@@ -33,7 +33,7 @@ $unicodeChild = "$WorkspaceLinuxPath/中文 空格"
 if ($LASTEXITCODE -ne 0) { throw "Could not create the Unicode acceptance directory" }
 
 $env:PYTHONPATH = (Join-Path $SourceRoot "src") + ";" + `
-    (Join-Path $SourceRoot "plugins/agent-box-harnesses/src") + ";" + `
+    (Join-Path $SourceRoot "plugins/agent-box-harness/src") + ";" + `
     (Join-Path $SourceRoot "plugins/agent-box-runtime-wsl/src") + ";" + `
     (Join-Path $SourceRoot "plugins/agent-box-sandbox-bwrap/src")
 $env:AGENT_BOX_WSL_WORKER_MANIFEST = $ManifestPath

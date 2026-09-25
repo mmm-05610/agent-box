@@ -17,7 +17,7 @@
  *      build machine's libc (from `process.report`) selects one, exactly the
  *      rule npm itself applies.
  *
- * The source root is `runtime-claude/`, deliberately separate from the shared
+ * The source root is `packaging/claude/`, deliberately separate from the shared
  * `runtime/`: the adapter needs `@agentclientprotocol/sdk` 1.4.x and the shared
  * root pins 1.3.0 for the four integrated families.
  *
@@ -41,7 +41,7 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..")
-const DEFAULT_SOURCE = path.join(REPO, "plugins", "agent-box-harnesses", "runtime-claude")
+const DEFAULT_SOURCE = path.join(REPO, "plugins", "agent-box-harness", "packaging", "claude")
 const DIGEST_PLUGIN = path.join(REPO, "plugins", "agent-box-sandbox-bwrap", "src")
 
 export const MARKER_NAME = ".agentbox-claude-runtime-artifact"

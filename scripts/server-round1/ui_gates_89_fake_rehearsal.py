@@ -39,7 +39,7 @@ import tempfile
 import time
 
 REPO = Path(__file__).resolve().parents[2]
-PLUGIN = REPO / "plugins" / "agent-box-harnesses"
+PLUGIN = REPO / "plugins" / "agent-box-harness"
 ECHO_PEER = PLUGIN / "tests" / "harness_remote" / "fake_acp_peer.mjs"
 DEFAULT_REPORT = REPO / "docs/server-round1/fullstack/ui-gates-89-rehearsal.json"
 

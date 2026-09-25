@@ -253,7 +253,7 @@ if ($LASTEXITCODE -ne 0) { throw "Could not create the isolated WSL workspace" }
 & wsl.exe --distribution $Distribution --exec /usr/bin/touch -- $workspaceMarker
 if ($LASTEXITCODE -ne 0) { throw "Could not mark the isolated WSL workspace" }
 & wsl.exe --distribution $Distribution --exec /usr/bin/cp -- `
-    "$SourceLinuxPath/plugins/agent-box-harnesses/tests/harness_remote/fake_acp_peer.mjs" `
+    "$SourceLinuxPath/plugins/agent-box-harness/tests/harness_remote/fake_acp_peer.mjs" `
     "$WorkspaceLinuxPath/fake_acp_peer.mjs"
 if ($LASTEXITCODE -ne 0) { throw "Could not project the explicit no-model ACP fixture" }
 & wsl.exe --distribution $Distribution --exec /usr/bin/cp -- `
@@ -265,14 +265,14 @@ if ($LASTEXITCODE -ne 0) { throw "Could not project the stateful native-state fi
 if ($LASTEXITCODE -ne 0) { throw "Could not project the attachment fixture" }
 
 $env:PYTHONPATH = (Join-Path $SourceRoot "src") + ";" + `
-    (Join-Path $SourceRoot "plugins/agent-box-harnesses/src") + ";" + `
+    (Join-Path $SourceRoot "plugins/agent-box-harness/src") + ";" + `
     (Join-Path $SourceRoot "plugins/agent-box-runtime-wsl/src") + ";" + `
     (Join-Path $SourceRoot "plugins/agent-box-sandbox-bwrap/src")
 $env:AGENT_BOX_WSL_WORKER_MANIFEST = $ManifestPath
 $env:AGENT_BOX_WSL_WORKER_LINUX_PATH = $LinuxWorkerPath
 $env:AGENT_BOX_WIRE_SCHEMA = $WireSchemaPath
 
-$pluginRoot = Join-Path $SourceRoot "plugins/agent-box-harnesses"
+$pluginRoot = Join-Path $SourceRoot "plugins/agent-box-harness"
 $deploymentPath = Join-Path ([IO.Path]::GetTempPath()) `
     ("agentbox-sidecar-e-" + [guid]::NewGuid().ToString("N") + ".json")
 $deployment = [ordered]@{
@@ -1006,7 +1006,7 @@ try {
         workspace = $WorkspaceLinuxPath
         fixture = "explicit no-model ACP peer"
         lease_silence = [ordered]@{
-            fixture = "plugins/agent-box-harnesses/tests/harness_remote/fake_acp_peer.mjs"
+            fixture = "plugins/agent-box-harness/tests/harness_remote/fake_acp_peer.mjs"
             harness = "kilo"
             declared_silence_ms = 8000
             lease_ms = 5000

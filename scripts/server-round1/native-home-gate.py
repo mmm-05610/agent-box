@@ -31,7 +31,7 @@ import threading
 import time
 
 REPO = Path(__file__).resolve().parents[2]
-PLUGIN = REPO / "plugins" / "agent-box-harnesses"
+PLUGIN = REPO / "plugins" / "agent-box-harness"
 # The stateful peer lives under tests/server/fixtures, outside the plugin
 # root the deployment loader reads from; the gate substitutes its bytes for
 # the declared plugin-relative name exactly as the four family gates

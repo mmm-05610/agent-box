@@ -154,7 +154,7 @@ def main(root, port):
                    str(PYTHON), str(TAP), '--count-file', str(tap),
                    '--data-root', str(data), '--port', str(port),
                    '--execution-mode', 'native', '--native-harness', 'pi',
-                   '--plugin-root', str(REPO / 'plugins/agent-box-harnesses'),
+                   '--plugin-root', str(REPO / 'plugins/agent-box-harness'),
                    '--native-adapter-command', str(BRIDGE),
                    '--native-adapter-arg=--adapter=pi',
                    f'--native-adapter-arg=--pi-bin={PI}',

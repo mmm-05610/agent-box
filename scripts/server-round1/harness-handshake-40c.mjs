@@ -23,8 +23,14 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..")
-const runtime = path.join(repoRoot, "plugins", "agent-box-harnesses", "runtime")
-const bridgeSrc = path.join(repoRoot, "plugins", "agent-box-harnesses", "third_party", "harness_remote", "bridge", "src")
+// The offline lock's on-disk result, one npm root per family since the shared
+// Codex/Pi lock was split. This is a packaging-chain read only: the installer,
+// not the run chain, owns these directories.
+const npmRoots = {
+  codex: path.join(repoRoot, "plugins", "agent-box-harness", "packaging", "codex"),
+  pi: path.join(repoRoot, "plugins", "agent-box-harness", "packaging", "pi"),
+}
+const bridgeSrc = path.join(repoRoot, "plugins", "agent-box-harness", "third_party", "harness_remote", "bridge", "src")
 const { AcpClient } = await import(`file://${path.join(bridgeSrc, "acp-client.js")}`)
 
 const CREDENTIAL_ENV_VARS = [
@@ -124,12 +130,12 @@ const results = { generatedAt: new Date().toISOString(), note: "no credential pr
 
 // --- artifact presence and identity (the offline lock's on-disk result) ------
 const artifacts = {}
-for (const [name, rel] of [
-  ["codex-acp", "node_modules/@agentclientprotocol/codex-acp/package.json"],
-  ["pi-acp", "node_modules/@automatalabs/pi-acp/package.json"],
-  ["codex-binary", "node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/bin/codex"],
+for (const [name, family, rel] of [
+  ["codex-acp", "codex", "node_modules/@agentclientprotocol/codex-acp/package.json"],
+  ["pi-acp", "pi", "node_modules/@automatalabs/pi-acp/package.json"],
+  ["codex-binary", "codex", "node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/bin/codex"],
 ]) {
-  const full = path.join(runtime, rel)
+  const full = path.join(npmRoots[family], rel)
   if (!existsSync(full)) { artifacts[name] = { present: false }; continue }
   if (rel.endsWith("package.json")) {
     const meta = JSON.parse(readFileSync(full, "utf8"))
@@ -144,19 +150,19 @@ results.artifacts = artifacts
 {
   const env = isolatedEnv()
   const codexVersion = await toolVersion(
-    path.join(runtime, "node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/bin/codex"),
+    path.join(npmRoots.codex, "node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/bin/codex"),
     ["--version"], env,
   )
   const adapter = await handshake({
     label: "codex",
     command: process.execPath,
-    args: [path.join(runtime, "node_modules/@agentclientprotocol/codex-acp/dist/index.js")],
+    args: [path.join(npmRoots.codex, "node_modules/@agentclientprotocol/codex-acp/dist/index.js")],
     env,
   })
   results.codex = { ...adapter, bundledCodexVersion: codexVersion }
   // app-server evidence: the adapter launches `codex app-server` and never an
   // `exec`/JSONL path. Recorded from the pinned artifact itself.
-  const dist = readFileSync(path.join(runtime, "node_modules/@agentclientprotocol/codex-acp/dist/index.js"), "utf8")
+  const dist = readFileSync(path.join(npmRoots.codex, "node_modules/@agentclientprotocol/codex-acp/dist/index.js"), "utf8")
   results.codex.appServerSpawnSites = (dist.match(/"app-server"/g) ?? []).length
   results.codex.execJsonlSites = (dist.match(/exec.*--json|--experimental-json|jsonl/gi) ?? []).length
 }
@@ -165,7 +171,7 @@ results.artifacts = artifacts
 results.pi = await handshake({
   label: "pi",
   command: process.execPath,
-  args: [path.join(runtime, "node_modules/@automatalabs/pi-acp/dist/index.js")],
+  args: [path.join(npmRoots.pi, "node_modules/@automatalabs/pi-acp/dist/index.js")],
   env: isolatedEnv(),
 })
 

@@ -19,7 +19,7 @@ if (Test-Path -LiteralPath $DataRoot) {
 }
 
 $env:PYTHONPATH = (Join-Path $SourceRoot "src") + ";" + `
-    (Join-Path $SourceRoot "plugins/agent-box-harnesses/src") + ";" + `
+    (Join-Path $SourceRoot "plugins/agent-box-harness/src") + ";" + `
     (Join-Path $SourceRoot "plugins/agent-box-runtime-wsl/src") + ";" + `
     (Join-Path $SourceRoot "plugins/agent-box-sandbox-bwrap/src")
 $baseUrl = "http://127.0.0.1:$Port"

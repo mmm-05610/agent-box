@@ -33,7 +33,9 @@
  *   5. Nothing unrelated may ride along: the builder computes the codex closure
  *      from the same runtime root and refuses any package that is reachable only
  *      from codex, plus the explicit exclusions `@openai/codex`,
- *      `@agentprotocol/codex-acp` and OpenCode.
+ *      `@agentprotocol/codex-acp` and OpenCode. Codex now owns its own npm root,
+ *      so that closure is usually absent here; the absence is not a failure, and
+ *      the name-based exclusions are asserted either way.
  *   6. The tree is verified through the reviewed Python digest implementation,
  *      then made read-only and published atomically. A failed build leaves the
  *      output path untouched.
@@ -60,7 +62,7 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..")
-const DEFAULT_SOURCE = path.join(REPO, "plugins", "agent-box-harnesses", "runtime")
+const DEFAULT_SOURCE = path.join(REPO, "plugins", "agent-box-harness", "packaging", "pi")
 const DIGEST_PLUGIN = path.join(REPO, "plugins", "agent-box-sandbox-bwrap", "src")
 
 export const MARKER_NAME = ".agentbox-pi-runtime-artifact"
@@ -374,12 +376,21 @@ function copyTree(root, selected, sourceRoot, counters) {
 
 function codexOnlyPackages(sourceRoot, piDirectories) {
   const fail = (code, message) => { throw new BuildError(code, message) }
-  const codex = resolveClosure({ sourceRoot, entry: "@agentclientprotocol/codex-acp", fail })
+  let closure
+  try {
+    closure = resolveClosure({ sourceRoot, entry: "@agentclientprotocol/codex-acp", fail })
+  } catch (error) {
+    // Codex owns its own npm root now, so its closure is simply not installed
+    // here; an absence cannot leak into this tree. The name-based
+    // `EXCLUDED_PACKAGES` assertion below still runs either way, and the Codex
+    // builder applies the same tolerance to the Pi closure.
+    return { unrelated: [], available: false }
+  }
   const unrelated = []
-  for (const directory of codex.selected.keys()) {
+  for (const directory of closure.selected.keys()) {
     if (!piDirectories.has(directory)) unrelated.push(path.relative(sourceRoot, directory))
   }
-  return unrelated
+  return { unrelated, available: true }
 }
 
 export function build({ output, source = DEFAULT_SOURCE, replace = false }) {
@@ -426,7 +437,7 @@ export function build({ output, source = DEFAULT_SOURCE, replace = false }) {
   }
 
   // (5) nothing unrelated may ride along
-  const unrelated = codexOnlyPackages(sourceRoot, new Set(selected.keys()))
+  const { unrelated } = codexOnlyPackages(sourceRoot, new Set(selected.keys()))
   for (const excluded of EXCLUDED_PACKAGES) {
     if (packages.some((item) => item.name === excluded)) {
       throw new BuildError("PI_ARTIFACT_UNRELATED_PACKAGE", `${excluded} must not be in the Pi artifact`)

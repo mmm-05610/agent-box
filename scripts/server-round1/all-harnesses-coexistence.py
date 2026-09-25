@@ -40,7 +40,7 @@ with TestClient(create_app(rt), base_url="http://127.0.0.1") as client:
                           {"clientVersions": ["wire/1"], "clientPresentationSupports": []})
     print("hello ok, protocol:", hello["protocolVersion"])
     install = json.load(open("/home/maoqh/.agentbox-all-harnesses/install-set.json"))
-    sys.path.insert(0, "plugins/agent-box-harnesses/src")
+    sys.path.insert(0, "plugins/agent-box-harness/src")
     mods = {f: importlib.import_module(f"agent_box_harnesses.{m}.production")
             for f, m in (("codex", "codex"), ("claude-code", "claude"),
                          ("opencode", "opencode"), ("hermes", "hermes"),

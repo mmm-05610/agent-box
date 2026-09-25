@@ -70,7 +70,7 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..")
-const DEFAULT_SOURCE = path.join(REPO, "plugins", "agent-box-harnesses", "runtime")
+const DEFAULT_SOURCE = path.join(REPO, "plugins", "agent-box-harness", "packaging", "codex")
 const DIGEST_PLUGIN = path.join(REPO, "plugins", "agent-box-sandbox-bwrap", "src")
 
 export const MARKER_NAME = ".agentbox-codex-runtime-artifact"

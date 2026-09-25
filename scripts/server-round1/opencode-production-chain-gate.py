@@ -67,7 +67,7 @@ def _gate_sandbox_port():
 
     return resolve_sandbox_port("sandbox-bwrap")
 
-PLUGIN = REPO / "plugins" / "agent-box-harnesses"
+PLUGIN = REPO / "plugins" / "agent-box-harness"
 AUTHORIZER = REPO / "scripts" / "server-round1" / "build-opencode-authorization.mjs"
 SCRIPT = "scripts/server-round1/opencode-production-chain-gate.py"
 

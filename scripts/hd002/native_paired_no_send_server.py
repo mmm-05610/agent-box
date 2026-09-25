@@ -120,7 +120,7 @@ def run():
         command = ['/usr/bin/strace', '-f', '-e', 'trace=connect', '-o', str(trace),
                    str(PYTHON), '-m', 'agent_box.server', '--data-root', str(data),
                    '--port', str(PORT), '--execution-mode', 'native', '--native-harness', 'pi',
-                   '--plugin-root', str(REPO / 'plugins/agent-box-harnesses'),
+                   '--plugin-root', str(REPO / 'plugins/agent-box-harness'),
                    '--native-adapter-command', str(BRIDGE),
                    '--native-adapter-arg=--adapter=pi',
                    f'--native-adapter-arg=--pi-bin={PI}',

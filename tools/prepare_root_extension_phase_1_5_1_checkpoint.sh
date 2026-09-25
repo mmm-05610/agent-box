@@ -24,12 +24,12 @@ git add -- \
   tests/test_resource_contracts.py tests/test_runtime_composition_protocol.py \
   tests/test_sandbox_contract_authority.py tests/test_transport_registration.py \
   plugins/agent-box-artifacts/src/agent_box_artifacts/selector.py plugins/agent-box-git/src/agent_box_git/inputs.py \
-  plugins/agent-box-harnesses/README.md plugins/agent-box-harnesses/pyproject.toml plugins/agent-box-harnesses/src \
-  plugins/agent-box-harnesses/tests/test_codex_plugin.py plugins/agent-box-harnesses/tests/test_codex_provider.py \
-  plugins/agent-box-harnesses/tests/test_codex_wiring.py plugins/agent-box-harnesses/tests/test_credentials.py \
-  plugins/agent-box-harnesses/tests/test_profiles.py plugins/agent-box-harnesses/tests/test_codex_composition_adapter.py \
-  plugins/agent-box-harnesses/tests/test_codex_credential_binding_p0.py plugins/agent-box-harnesses/tests/test_codex_diagnostics.py \
-  plugins/agent-box-harnesses/tests/test_codex_executable_bundle.py \
+  plugins/agent-box-harness/README.md plugins/agent-box-harness/pyproject.toml plugins/agent-box-harness/src \
+  plugins/agent-box-harness/tests/test_codex_plugin.py plugins/agent-box-harness/tests/test_codex_provider.py \
+  plugins/agent-box-harness/tests/test_codex_wiring.py plugins/agent-box-harness/tests/test_credentials.py \
+  plugins/agent-box-harness/tests/test_profiles.py plugins/agent-box-harness/tests/test_codex_composition_adapter.py \
+  plugins/agent-box-harness/tests/test_codex_credential_binding_p0.py plugins/agent-box-harness/tests/test_codex_diagnostics.py \
+  plugins/agent-box-harness/tests/test_codex_executable_bundle.py \
   plugins/agent-box-harness-claude plugins/agent-box-harness-hermes plugins/agent-box-harness-opencode \
   plugins/agent-box-pi plugins/agent-box-runtime-local plugins/agent-box-sandbox-bwrap \
   plugins/agent-box-terminal-session \

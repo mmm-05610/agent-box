@@ -45,7 +45,7 @@ allowlist=(
   docs
   src/agent_box
   plugins/agent-box-web
-  plugins/agent-box-harnesses
+  plugins/agent-box-harness
   plugins/agent-box-git
   plugins/agent-box-tmux
   plugins/agent-box-artifacts

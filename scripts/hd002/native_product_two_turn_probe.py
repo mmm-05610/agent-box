@@ -71,7 +71,7 @@ def run(root, adapter, adapter_args):
             server_main.main([
                 '--data-root', str(data), '--port', str(port),
                 '--execution-mode', 'native', '--native-harness', 'pi',
-                '--plugin-root', str(REPO / 'plugins/agent-box-harnesses'),
+                '--plugin-root', str(REPO / 'plugins/agent-box-harness'),
                 '--native-adapter-command', str(adapter),
                 *[f'--native-adapter-arg={arg}' for arg in adapter_args],
             ])

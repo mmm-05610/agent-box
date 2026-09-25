@@ -16,9 +16,11 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..")
-const runtime = path.join(root, "plugins", "agent-box-harnesses", "runtime")
-const bridge = path.join(root, "plugins", "agent-box-harnesses", "third_party", "harness_remote", "bridge", "src")
-const piAdapter = path.join(runtime, "node_modules", "@automatalabs", "pi-acp", "dist", "index.js")
+// Pi's adapter is installed into Pi's own packaging npm root; the plugin's
+// `runtime/` carries no dependency closure and never did hold one.
+const npmRoot = path.join(root, "plugins", "agent-box-harness", "packaging", "pi")
+const bridge = path.join(root, "plugins", "agent-box-harness", "third_party", "harness_remote", "bridge", "src")
+const piAdapter = path.join(npmRoot, "node_modules", "@automatalabs", "pi-acp", "dist", "index.js")
 const hermes = "/home/maoqh/.local/bin/hermes"
 const openCode = "/home/maoqh/.npm-global/bin/opencode"
 const pythonSite = "/home/maoqh/.local/lib/python3.12/site-packages"

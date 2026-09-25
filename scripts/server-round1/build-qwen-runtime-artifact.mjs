@@ -7,7 +7,7 @@
  *
  * Work Order 43 clone of the reviewed dsh/Pi builders; only the pinned entry,
  * the exclusion set, and the typed codes differ. The source root is
- * `runtime-qwen/`, separate per the family convention.
+ * `packaging/qwen/`, separate per the family convention.
  *
  * usage: build-qwen-runtime-artifact.mjs --output ABSOLUTE_DIR [--source RUNTIME_DIR]
  *                                      [--replace] [--json]
@@ -23,7 +23,7 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..")
-const DEFAULT_SOURCE = path.join(REPO, "plugins", "agent-box-harnesses", "runtime-qwen")
+const DEFAULT_SOURCE = path.join(REPO, "plugins", "agent-box-harness", "packaging", "qwen")
 const DIGEST_PLUGIN = path.join(REPO, "plugins", "agent-box-sandbox-bwrap", "src")
 
 export const MARKER_NAME = ".agentbox-qwen-runtime-artifact"

@@ -93,7 +93,7 @@ def _gate_sandbox_port():
 
     return resolve_sandbox_port("sandbox-bwrap")
 
-PLUGIN = REPO / "plugins" / "agent-box-harnesses"
+PLUGIN = REPO / "plugins" / "agent-box-harness"
 
 # The three source roots this gate imports from. They are added here rather than
 # assumed from the caller: the gate must behave the same whether it is run bare

@@ -137,7 +137,7 @@ def exempted() -> dict[str, str]:
         return {}
     rows = {}
     for line in EXEMPT_FILE.read_text(encoding="utf-8").splitlines():
-        match = re.match(r"^\|\s*([a-zA-Z]+\.[a-zA-Z]+)\s*\|\s*(.+?)\s*\|", line)
+        match = re.match(r"^\|\s*((?:[a-zA-Z]+\.)+[a-zA-Z]+)\s*\|\s*(.+?)\s*\|", line)
         if match:
             rows[match.group(1)] = match.group(2)
     return rows

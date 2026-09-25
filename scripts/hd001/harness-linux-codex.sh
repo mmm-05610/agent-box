@@ -10,7 +10,7 @@
 # (the --artifact-token surface fixed by this batch's G3 amendment); the
 # server flags mirror the gate's reviewed loader: --sidecar-deployment
 # REQUIRES --plugin-root (agent_box/server/__main__.py), plugin sources are
-# read from plugins/agent-box-harnesses, and the artifact rides a --mount
+# read from plugins/agent-box-harness, and the artifact rides a --mount
 # token binding (codex-runtime), never a host path in the document.
 #
 # usage: harness-linux-codex.sh --run-dir DIR [--port N] [--artifact PATH]
@@ -98,7 +98,7 @@ trap '[ "$KEEP" = 1 ] || stop_server' EXIT
 "$PY" -m agent_box.server \
   --data-root "$RUN/data" --port "$PORT" \
   --sidecar-deployment "$RUN/deployment.json" \
-  --plugin-root "$REPO/plugins/agent-box-harnesses" \
+  --plugin-root "$REPO/plugins/agent-box-harness" \
   --mount "codex-runtime=$ARTIFACT" \
   > "$RUN/server.log" 2>&1 &
 SERVER_PID=$!
@@ -117,7 +117,7 @@ run, port, pid, digest, artifact = sys.argv[1:6]
 pathlib.Path(run, "server-registration.json").write_text(json.dumps({
     "port": int(port), "pid": int(pid), "dataRoot": str(pathlib.Path(run, "data")),
     "deployment": str(pathlib.Path(run, "deployment.json")),
-    "pluginRoot": "plugins/agent-box-harnesses", "mountToken": "codex-runtime",
+    "pluginRoot": "plugins/agent-box-harness", "mountToken": "codex-runtime",
     "artifact": artifact, "treeDigest": digest,
     "startedAt": datetime.datetime.now(datetime.timezone.utc).isoformat(),
 }, indent=1, sort_keys=True) + "\n", encoding="utf-8")

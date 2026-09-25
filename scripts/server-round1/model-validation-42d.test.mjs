@@ -8,8 +8,8 @@ import { fileURLToPath } from "node:url"
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const script = path.join(here, "model-validation-42d.mjs")
-const fakePeer = path.resolve(here, "../../plugins/agent-box-harnesses/tests/harness_remote/fake_acp_peer.mjs")
-const bridge = path.resolve(here, "../../plugins/agent-box-harnesses/third_party/harness_remote/bridge/src/acp-client.js")
+const fakePeer = path.resolve(here, "../../plugins/agent-box-harness/tests/harness_remote/fake_acp_peer.mjs")
+const bridge = path.resolve(here, "../../plugins/agent-box-harness/third_party/harness_remote/bridge/src/acp-client.js")
 
 function dryRun(family) {
   const dir = mkdtempSync(path.join(tmpdir(), "agentbox-42d-test-"))

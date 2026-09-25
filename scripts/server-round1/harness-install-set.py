@@ -31,7 +31,7 @@ import sys
 import time
 
 REPO = Path(__file__).resolve().parents[2]
-PLUGIN = REPO / "plugins" / "agent-box-harnesses"
+PLUGIN = REPO / "plugins" / "agent-box-harness"
 SCRIPT = "scripts/server-round1/harness-install-set.py"
 
 #: Every family the install set must cover, in registry order.
@@ -54,6 +54,18 @@ BUILDERS = {
     "qwen": "build-qwen-runtime-artifact.mjs",
     "kilo": "build-kilo-runtime-artifact.mjs",
     "pi": "build-pi-runtime-artifact.mjs",
+}
+
+#: Which `packaging/` directory holds the npm root a family's builder installs
+#: from. The key is the *family* id, the value the *directory* name, and the two
+#: are not the same string: `claude-code` owns `packaging/claude/` (the name the
+#: builders and artifact gates already use). Every family with an npm root now
+#: owns exactly one, because the shared Codex/Pi lock was split; a family
+#: missing here (hermes, opencode) has no npm root at all.
+NPM_ROOTS = {
+    "codex": "codex", "pi": "pi",
+    "claude-code": "claude",
+    "dsh": "dsh", "qwen": "qwen", "kilo": "kilo",
 }
 
 REPORT: dict = {"script": SCRIPT}
@@ -99,12 +111,13 @@ def verify_binary(path: Path) -> str:
 def build_closure(family: str, builder: str, output: Path,
                   previous_digest: str | None = None) -> Path:
     # The closure builders require the family's npm dependencies to be
-    # installed in its runtime directory first.
-    # codex's closure lives in the plugin's shared `runtime/` directory; the
-    # other families each own a `runtime-<family>/`.
-    runtime_dir = PLUGIN / "runtime" if family == "codex" else PLUGIN / ("runtime-" + family)
-    if runtime_dir.is_dir() and not (runtime_dir / "node_modules").is_dir():
-        ci = subprocess.run(["npm", "ci", "--no-audit", "--no-fund"], cwd=runtime_dir,
+    # installed in its packaging npm root first; `NPM_ROOTS` is the one place
+    # that says which, so no family silently skips `npm ci` on a name mismatch.
+    # None of these is read by the run chain.
+    npm_directory = NPM_ROOTS.get(family)
+    npm_root = PLUGIN / "packaging" / npm_directory if npm_directory is not None else None
+    if npm_root is not None and npm_root.is_dir() and not (npm_root / "node_modules").is_dir():
+        ci = subprocess.run(["npm", "ci", "--no-audit", "--no-fund"], cwd=npm_root,
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             timeout=1800)
         if ci.returncode != 0:

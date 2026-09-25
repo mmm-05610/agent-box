@@ -7,7 +7,7 @@
  * This is Work Order 43's faithful clone of the reviewed Pi builder: same
  * closure rules, same lock authority, same copy filters, same digest, same
  * read-only publication - only the pinned entry, the exclusion set, and the
- * typed codes differ. The source root is `runtime-dsh/`, deliberately separate
+ * typed codes differ. The source root is `packaging/dsh/`, deliberately separate
  * from the shared `runtime/`: dsh needs `@agentclientprotocol/sdk` 1.4.x and
  * the shared root pins 1.3.0 for the four integrated families, so one lock
  * cannot hold both without moving pins that are already production evidence.
@@ -26,7 +26,7 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..")
-const DEFAULT_SOURCE = path.join(REPO, "plugins", "agent-box-harnesses", "runtime-dsh")
+const DEFAULT_SOURCE = path.join(REPO, "plugins", "agent-box-harness", "packaging", "dsh")
 const DIGEST_PLUGIN = path.join(REPO, "plugins", "agent-box-sandbox-bwrap", "src")
 
 export const MARKER_NAME = ".agentbox-dsh-runtime-artifact"

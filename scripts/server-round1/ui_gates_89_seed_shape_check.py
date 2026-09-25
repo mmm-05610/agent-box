@@ -84,7 +84,7 @@ def main() -> int:
     from agent_box.storage import MemorySecretStore
     from fastapi.testclient import TestClient
     # Order 117's fixture registry, with the kind production descriptors declare
-    # (`plugins/agent-box-harnesses/**/production.py`: CREDENTIAL_KIND = "api-key"),
+    # (`plugins/agent-box-harness/**/production.py`: CREDENTIAL_KIND = "api-key"),
     # so the shape checked here is the shape the real Server accepts.
     from test_profiles_list_sendability_117 import _registry
 

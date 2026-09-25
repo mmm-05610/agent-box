@@ -14,7 +14,7 @@
  * `npm --ignore-scripts` installs the platform package, whose binary is the
  * payload, and the launcher's own `findBinary` resolves it from node_modules.
  *
- * The source root is `runtime-kilo/`, separate per the family convention.
+ * The source root is `packaging/kilo/`, separate per the family convention.
  *
  * usage: build-kilo-runtime-artifact.mjs --output ABSOLUTE_DIR [--source RUNTIME_DIR]
  *                                      [--replace] [--json]
@@ -30,7 +30,7 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..")
-const DEFAULT_SOURCE = path.join(REPO, "plugins", "agent-box-harnesses", "runtime-kilo")
+const DEFAULT_SOURCE = path.join(REPO, "plugins", "agent-box-harness", "packaging", "kilo")
 const DIGEST_PLUGIN = path.join(REPO, "plugins", "agent-box-sandbox-bwrap", "src")
 
 export const MARKER_NAME = ".agentbox-kilo-runtime-artifact"

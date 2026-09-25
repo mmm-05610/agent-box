@@ -58,7 +58,7 @@ def _gate_sandbox_port():
 
     return resolve_sandbox_port("sandbox-bwrap")
 
-PLUGIN = REPO / "plugins" / "agent-box-harnesses"
+PLUGIN = REPO / "plugins" / "agent-box-harness"
 BUILDER = REPO / "scripts" / "server-round1" / "build-dsh-runtime-artifact.mjs"
 SCRIPT = "scripts/server-round1/dsh-production-chain-gate.py"
 

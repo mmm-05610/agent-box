@@ -129,7 +129,7 @@ def assemble(tmp_path: Path, worker: Path, tree: Path, digest: str):
         if relative == str(PROBE.relative_to(REPO)) else original(root, relative)
     )
     return build_runtime_from_sidecar_deployment(
-        tmp_path / "server", deployment, plugin_root=REPO / "plugins" / "agent-box-harnesses",
+        tmp_path / "server", deployment, plugin_root=REPO / "plugins" / "agent-box-harness",
         mount_bindings={"artifact": str(tree)},
     )
 

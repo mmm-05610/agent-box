@@ -46,8 +46,8 @@ ARTIFACT_PATHS = {
     "worker-debug": "workers/agent-box-worker/target/debug/agent-box-worker",
     "worker-release": "workers/agent-box-worker/target/release/agent-box-worker",
     "worker-musl-dir": "workers/agent-box-worker/target/x86_64-unknown-linux-musl",
-    "sidecar-entry": "plugins/agent-box-harnesses/runtime/worker-entry.mjs",
-    "acp-npm-closure": ("plugins/agent-box-harnesses/runtime-claude/node_modules"
+    "sidecar-entry": "plugins/agent-box-harness/runtime/worker-entry.mjs",
+    "acp-npm-closure": ("plugins/agent-box-harness/packaging/claude/node_modules"
                         "/@agentclientprotocol/claude-agent-acp"),
 }
 
@@ -66,7 +66,7 @@ PREPARATION_GAPS = {
     "worker-debug": "cargo build (debug) has not been run in workers/agent-box-worker in this tree",
     "worker-release": "cargo build --release has not been run in this tree",
     "worker-musl-dir": "no x86_64-unknown-linux-musl cross-build exists in this tree",
-    "acp-npm-closure": ("plugins/agent-box-harnesses/runtime-claude has not been npm-installed, "
+    "acp-npm-closure": ("plugins/agent-box-harness/packaging/claude has not been npm-installed, "
                         "so the ACP client closure is absent"),
 }
 

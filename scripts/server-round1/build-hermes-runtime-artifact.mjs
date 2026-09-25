@@ -79,7 +79,7 @@ export const DEFAULT_SOURCE = "/home/maoqh/.local/lib/python3.12/site-packages"
 //: none of which are installed in the per-user directory on this machine.
 export const DEFAULT_FALLBACK_SOURCES = ["/usr/lib/python3/dist-packages"]
 const DIGEST_PLUGIN = path.join(REPO, "plugins", "agent-box-sandbox-bwrap", "src")
-const OVERLAY_DIRECTORY = path.join(REPO, "plugins", "agent-box-harnesses", "deploy", "hermes")
+const OVERLAY_DIRECTORY = path.join(REPO, "plugins", "agent-box-harness", "deploy", "hermes")
 
 export const MARKER_NAME = ".agentbox-hermes-runtime-artifact"
 export const MARKER_CONTENT = "agentbox-hermes-runtime-artifact-r1\n"

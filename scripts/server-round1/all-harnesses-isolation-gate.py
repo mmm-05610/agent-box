@@ -31,7 +31,7 @@ import time
 import tempfile
 
 REPO = Path(__file__).resolve().parents[2]
-PLUGIN = REPO / "plugins" / "agent-box-harnesses"
+PLUGIN = REPO / "plugins" / "agent-box-harness"
 STATEFUL_SOURCE = "tests/fixtures/stateful_acp_peer.mjs"
 STATEFUL_BYTES_FROM = REPO / "tests" / "server" / "fixtures" / "isolation_acp_peer.mjs"
 SCRIPT = "scripts/server-round1/all-harnesses-isolation-gate.py"
