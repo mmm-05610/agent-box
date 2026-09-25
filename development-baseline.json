@@ -1,0 +1,26 @@
+{
+  "id": "linux-native-dev-0",
+  "date": "2026-09-21",
+  "status": "development-source-baseline-with-known-gaps",
+  "backend": {
+    "worktree": "worktrees/integration-linux/backend",
+    "branch": "integration/linux-native-0",
+    "commit": "b067c5718556c8efa93b054e6573ad3d186b3cf6"
+  },
+  "desktop": {
+    "worktree": "worktrees/integration-linux/desktop",
+    "branch": "integration/linux-native-0",
+    "commit": "80872f556c001b42217d43bf5f73ab08029bfcb9"
+  },
+  "wire_artifact_sha256": "b1eb4762b2a8e13e873967b770854e5e73a948488d4d066da07bc584e693dcd1",
+  "verification": {
+    "head_cleanliness_ancestry_and_artifact": "verified by I",
+    "backend_suite": "executor reports 1259 passed, 21 failed, 33 skipped, 0 xfailed",
+    "independent_review": "pending; not a prerequisite for workspace organisation",
+    "native_linux_end_to_end": "not accepted",
+    "user_acceptance": "not granted"
+  },
+  "excluded": ["backend main additional plugin lineage", "legacy Studio", "old user data"],
+  "known_gaps": ["Linux persistent SecretStore", "tool/artifact preparation", "two reported pre-existing backend failures", "remote PNG media", "real-harness truncation verification", "live cancellation verification"],
+  "evidence": "reports/LNX-002/"
+}

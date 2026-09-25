@@ -1,0 +1,72 @@
+I'm judging both counterexamples as the verifier, anchoring every verdict on candidate text I can point at, flagging fabricated quotes, and adding one new ledger row plus a model.
+
+<<<FE-OUT-START>>>
+
+## Verdicts (one row per counterexample, incl. the two already OPEN in the ledger)
+
+**FE-CE-001 — `holds` (major, D12).** The sequence is possible under A as written and contradicts the invariant A actually states. A.1: "The host's only authority is identity, namespace isolation, subscription routing, and per-resource event ordering." A.2: `directory.lookup(...) → descriptor` and content arrives only as `Envelope` on `stream.subscribe(resource_id, from_cursor?)`; there is **no** `read-value`/`snapshot` op anywhere in §A.2. So for a passive snapshot (S05 `config.tree`/`git.diff`), the *only* content representation the core offers is an append-only, monotonic-`seq`, cursor-resumable envelope log. The return-later replay (§A.5-S03 step 4) is the log's intended behavior. The break: A claims "Content authority is the producing adapter" (A.2), i.e. no core content model, yet the core commits *every* observable to a "produced-over-time-and-resumable" shape — the same shape a chat/agent run requires — and the brief (authoritative) forbids pre-designating session/task as core and holds that "resource kinds are adapter types, host has no content authority." A cannot represent a snapshot except as a message-log; the log is the smuggled content assumption. **Scope of the hold, stated precisely so it can be rejected:** the sequence does **not** materialise an object literally named session/assistant/turn (A.9 removes `host-turn/role-envelope-field`); the held break is the *implicit content model* contradicting A.2's "no content authority." The user-visible stale-as-live consequence overlaps D01/D09; the D12 finding stands on its own.
+
+**FE-CE-002 — `holds` (minor, D12).** Possible under A as written and contradicts A.1's "no interpretation." Evidence it fails to prevent it: §A.4 renders "kind, capability set, declared actions and a last-envelope summary"; §A.2 defines `CapSet` as a fixed union `{cancel, history, resume}` — the exact recovery features of an interactive agent run; §A.9 declares both `capability-declaration` and `generic-fallback-view` as **core**. Together a read-only config is *interpreted by the core* as "thing with outputs you can invoke/resume." Minor is correct: it is the no-resolver default and breaks no required scenario's function (S07/S05 still work). The run reading is not required by S07; it is baked in.
+
+**Candidate B — D12 `holds` = no counterexample; concur with attacker.** B.2: "the host does not assign seq, dedup, reorder, or retain history"; B.5-S04 uses three typed ports with no chat-shaped type; B.5-S11 absence is structural (no `*.cancel.request` port). The `builtin-default-view-provider` in B.4 is in core but B names it as "a mild materialisation B would rather not carry" — an *admitted* core concept, not smuggled-as-neutral. B's resident-offering-module / adapter-rebuilt-cursor cost (B.8) is relocation to adapters, correctly left to D06/D01/D02. No D12 break in B.
+
+<<<FE-LEDGER-START>>>
+FE-CE-001|R001|major|OPEN|core represents all observable content only as an append-only seq-ordered cursor-resumable envelope log (no value/snapshot op), committing a produced-over-time content model into the host while §A.1/§A.2 claim host owns no content authority|A core has no value/snapshot primitive: passive/snapshot content can only be a message-log shape|cand-A §A.1; §A.2 (lookup returns descriptor only; content only via stream.subscribe; no read-value op); §A.5-S03 step4; §A.5-S05|-|-
+FE-CE-002|R001|minor|OPEN|§A.1/§A.2 host ships no content interpretation, yet core-declared capability-declaration + generic-fallback-view (§A.9) render a fixed cancel/history/resume strip and a last-envelope summary, i.e. a run/agent reading in core|A core smuggles run/agent reading via fixed CapSet and generic last-envelope view|cand-A §A.2 (CapSet fixed union); §A.4 (last-envelope summary); §A.9|-|-
+FE-CE-003|R001|minor|OPEN|A's own core-type claim is self-inconsistent: §A.2 fixes CapSet to {cancel,history,resume} but §A.5-S05 announces CapSet{read} and §A.5-S08 registers action execute — either the recovery vocabulary is a core hardcode (CE-002) or §A.2 is false and caps are adapter-opaque; A cannot hold both|A CapSet domain contradicts its own S05/S08 examples|cand-A §A.2 vs §A.5-S05, §A.5-S08|-|-
+<<<FE-LEDGER-END>>>
+
+## 1. Fabrication check
+Two quoted strings are **not verbatim in the candidate or in the authoritative materials I was given**: (a) the invariant clause "a resource has its own identity and lifecycle independent of any view or conversation," and (b) "the plan's neutrality test: 'Any step that materialises an assistant message, a session object, or a workspace to satisfy the core is a major counterexample.'" The brief's closest text is "不预先把 Agent、会话、任务或插件宿主指定为核心答案," which supports the *substance* but is not that English sentence. I therefore **re-anchored CE-001 and CE-002 solely on A.1/§A.2/§A.4 text that is genuinely present** and held them on that; the fabricated sentences change no verdict. CE-002's quotes (§A.4 last-envelope summary, §A.2 fixed CapSet) are verbatim — no fabrication there. The S05→S03 event sequence and the B-vs-A contrast are faithful to the candidate text.
+
+## 2. Missed-check (in D12)
+I added **FE-CE-003**: the attacker used the fixed-union reading of `CapSet`, but A's own examples §A.5-S05 (`CapSet{read}`) and §A.5-S08 (action `execute`) are not members of that union. So A's core type is inconsistent about whether capability vocabulary is hardcoded (→ CE-002 holds) or adapter-opaque (→ §A.2 wrong). Either way there is a defect, and the attacker left it unfilled. Beyond that I found no *new* D12 break in A (cursor/resume naming reinforces CE-001 rather than adding one) and none in B.
+
+## 3. Self-contradiction check
+Yes — A contradicts itself. §A.1 says the host owns **only** directory, subscription, namespacing, event ordering and has no content authority, but §A.5-S05's own config-browse trajectory depends on the core log *plus* the core capability strip *plus* the core fallback "last-envelope summary" to render anything. The core therefore interprets content while the prose claims it does not. This is the same defect as CE-001/CE-002, recorded as a contradiction the designer's revision must resolve, not a new row.
+
+## 4. Experiment
+The disputed mechanism is representable as a small executable model of A's stream contract: append-only monotonic `seq`, `from_cursor` replay in order, and no value/snapshot/invalidate op — checking whether a returning subscriber can distinguish current from superseded from core fields.
+
+EXPERIMENT:
+```python
+# Models ONLY A's disputed content-plane (cand-A §A.2, §A.5-S03 step4):
+# observable content = append-only, per-resource seq-ordered envelope log with
+# from_cursor replay and NO value/snapshot/invalidate op. Proves the model only.
+class CoreStream:
+    def __init__(self):
+        self.env = {}; self.seq = {}
+    def ingest(self, rid, kind, payload):      # NO is_current/superseded field
+        s = self.seq.get(rid, 0) + 1; self.seq[rid] = s
+        self.env.setdefault(rid, []).append(
+            {"resource_id": rid, "seq": s, "kind": kind, "payload": payload})
+    def replay(self, rid, from_cursor):        # host guarantees order only
+        return [e for e in self.env.get(rid, []) if e["seq"] >= from_cursor]
+
+c = CoreStream()
+c.ingest("git.diff", "snapshot", {"tree": "A"})   # seq=1 old value
+c.ingest("git.diff", "snapshot", {"tree": "B"})   # seq=2 current value
+got = c.replay("git.diff", 1)                     # page returns at seq 2
+stale   = [e for e in got if e["payload"]["tree"] == "A"]
+marked  = [e for e in got if "is_current" in e or "superseded" in e]
+print("count returned:", len(got), "->", len(got))
+print("stale-as-live replayed at return:", len(stale) == 1)
+print("core marked any supersession:", len(marked) > 0)   # -> False
+
+class Snap:                                        # attacker's minimal fix, in model form
+    def __init__(self): self.v = {}
+    def write(self, rid, p): self.v[rid] = p       # overwrite = invalidate
+    def read(self, rid): return self.v.get(rid)    # only current
+s = Snap(); s.write("git.diff", {"tree": "A"}); s.write("git.diff", {"tree": "B"})
+print("snapshot-fix current:", s.read("git.diff"))
+print("snapshot-fix shows stale:", "A" in str(s.read("git.diff")))  # -> False
+```
+
+Model result (the model only, not the product): under an append-only seq-replay plane with no snapshot op, a return-later replay of a twice-updated snapshot resource returns both values, and **no core field distinguishes current from superseded**; a snapshot/invalidate store returns only the current value. This is consistent with the CE-001 mechanism but does not verify A.
+
+## Rotation note
+Dimension used: **D12-authority-boundary**. A took two majors/minors plus one new minor; **B was taken up and held** (no D12 row against B). Out-of-dimension findings the attacker correctly deferred, which the controller may rotate into: A §A.5-S09 "host-assigned `(namespace_id, action_seq)`" that the adapter must know (D06/D01); A §A.5-S12 only removes *adapters/resolvers*, never a *core domain module*, so S12's "core module that claims to be optional" premise is met by redefinition — a scenario-fidelity/D08 question, not D12.
+
+Round digest: verdicts — CE-001 holds, CE-002 holds, CE-003 (new) holds, B clean on D12; fabrications — two invented quotes, substance survives on real text; self-contradiction — confirmed (A.1 vs A.2/A.4); experiment — model of the stream/replay contract supports the CE-001 mechanism.
+
+<<<FE-OUT-END>>>

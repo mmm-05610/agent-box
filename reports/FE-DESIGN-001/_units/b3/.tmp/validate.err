@@ -1,0 +1,2 @@
+  invalid: no ledger block at all (<<<FE-LEDGER-START>>> ... <<<FE-LEDGER-END>>>)
+  invalid: ledger block present but contained no valid rows

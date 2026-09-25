@@ -1,0 +1,54 @@
+# BE-LOOP-001 self-test evidence
+PASS  ISO-write-outbox
+PASS  ISO-write-reports
+PASS  ISO-ro-source
+PASS  ISO-ro-inbox
+PASS  ISO-ro-controller
+PASS  ISO-ro-budget
+PASS  ISO-abs-othergrp
+PASS  ISO-abs-hosthome
+PASS  ISO-abs-qoder
+PASS  ISO-abs-docker
+PASS  ISO-nosol-entry
+PASS  ISO-net-hidden
+PASS  ISO-symlink-deny
+PASS  ISO-nested-deny
+PASS  IMP-open-allowed
+PASS  IMP-ro-sibling
+PASS  BUD-total
+PASS  BUD-E-reserve-not-flex
+PASS  BUD-H-cap4
+PASS  BUD-wrong-model
+PASS  BUD-fail-counts
+PASS  BUD-dedup
+PASS  BUD-restart-persist
+PASS  BUD-flex-drained-used8
+PASS  BUD-Eslots-held
+PASS  BUD-9th-flex-denied
+PASS  BUD-E-still-works
+PASS  BUD-corrupt-refuse
+PASS  BUD-concurrent-cap
+PASS  BUD-concurrent-E
+PASS  CTL-dedup
+PASS  CTL-dup-nocall
+PASS  CTL-dup-used1
+PASS  D3-wrong-sha
+PASS  D3-wrong-ver
+PASS  D3-nonzero
+PASS  D3-malformed
+PASS  D3-valid-reject
+PASS  D3-valid-accept
+PASS  D2-deny-wire
+PASS  D2-abs-host
+PASS  D2-traversal
+PASS  D2-crossgroup
+PASS  D2-valid
+PASS  D2-mismatch
+PASS  D4-stop-identity
+PASS  D4-resume-nodowngrade
+PASS  D4-single-record
+PASS  CTL-no-tick-spin
+
+TALLY  PASS=49  FAIL=0
+checks detail: /home/maoqh/projects/ordessa/control/backend-loop/../reports/BE-LOOP-001/bootstrap/selftest/checks.md ; raw isolation: /home/maoqh/projects/ordessa/control/backend-loop/../reports/BE-LOOP-001/bootstrap/selftest/isolation-research.log
+ALL PASS

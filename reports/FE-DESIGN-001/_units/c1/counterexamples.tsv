@@ -1,0 +1,3 @@
+id|raised_round|severity|status|invariant|title|evidence|targets|replayed|subject|subject_note
+FE-CE-001|R001|major|CLOSED|invariant A|first|ev1 ; ev2|-|-
+FE-CE-002|R001|minor|OPEN|invariant B|second|ev3|FE-CE-001|-

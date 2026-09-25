@@ -1,0 +1,65 @@
+I ruled each R003 counterexample against the current candidate bytes (cand-A R003, e71bd…), the attack report, and the ledger. All four new reduction counterexamples hold; FE-CE-007 does not survive against the integrated candidate A.
+
+<<<FE-OUT-START>>>
+VERIFICATION — R003, dimension D08-reduction (recorded; a real attack round, not a clean round).
+
+Scope judged: the four counterexamples raised this round (recorded in the ledger as FE-CE-008..011) plus the carried FE-CE-007. The attack report numbers the same four arguments FE-CE-010..013; this is a numbering drift between attack.md and the ledger. The ledger's FE-CE-NNN are authoritative and I use them: attack 010→ledger FE-CE-008 (payload descriptor store), attack 011→FE-CE-009 (spawned set), attack 012→FE-CE-010 (invoke_id), attack 013→FE-CE-011 (live-default). No scenario or counterexample was altered or softened; I renumbered only, and the substantive arguments are reproduced faithfully.
+
+1. Fabrication check — none. Every quoted candidate string is present: the §R003.5-S08 foreign-id justification, the §R003.2 same-namespace guarantee, §R003.8 "spawned set grows unbounded", §R003.2 removing replay_policy, §R003.5-S09 (ns,resource,seq) dedup keys, and §R003.4 the host-minted pair gesture. The attacker did not invent a requirement; it did not reopen FE-CE-006/003/004/005 (it states their fixes are outlived, not that they were wrong).
+
+2. Missed-check — none added. The remaining load-bearing core (namespaces, resource-directory, ordered-replayable-stream, open capability map, typed-action, generic-fallback-view, and the action param/result RegisteredType store) each have a named failing scenario the attacker tested and confirmed. The action param/result store is genuinely load-bearing for typed-action; the attacker's own carve-out of it is correct. I could not construct an additional D08 break it missed, so I add none.
+
+3. Self-contradiction check — CONFIRMED, and it is what makes the four verdicts hold rather than merely plausible:
+   - §R003.5-S06 claims "remove ns-scoped type registration → FE-CE-006 reopens" while §R003.5-S06 note + §R003.8 assert removing the delivery gate "does not affect S06". Both cannot be true; the payload-store justification is internally contradicted (FE-CE-008).
+   - §R003.5-S08 justifies the spawned set by a foreign-id leak the §R003.2 same-namespace guarantee makes impossible (FE-CE-009).
+   - §R003.6 lists spawned-grant and live-default-subscribe as "retained because a scenario fails without them"; §R003.5-S08 itself shows the same pair/same-ns alternatives satisfy S08, so that retention claim is contradicted by the candidate's own trajectory (FE-CE-009, FE-CE-011).
+   - §R003.1 "No smaller core exists" is contradicted by §R003.2 still minting invoke_id after removing its only reader (FE-CE-010).
+
+4. Consequence for the ledger and scenarios: none of these four fails a required user outcome (all correctly minor). They fail the minimality test: the candidate retains core mechanisms with no delete-it-breaks-a-scenario argument. The designer must repair, not re-justify with the contradicted text. FE-CE-007 (candidate B): ruled does_not_hold against A — A has no edges/list/relay; its §R003.2/§R003.4 isolation (user-gated handle_for, spawned same-ns only) has no path that returns a foreign id into a scoped handle. B's §R003.B.5 demotion does not itself repair the isolation invariant; it only removes B from the active set, so FE-CE-007 is history against B, not a live A defect.
+
+Caveat on FE-CE-009 (kept for the designer, not a new row): the smaller same-namespace subscription rule that makes the set non-load-bearing also lets a runner-namespace handle subscribe any same-ns id — an enumeration exposure no S01–S12 currently tests. The experiment below models only this distinction.
+
+EXPERIMENT:
+```python3
+# Model of the D08 dispute for FE-CE-009 only. Proves the model, not the product.
+# Question: is the per-handle accumulated spawned SET load-bearing for any
+# required S01-S12 outcome, or is "subscribe same-namespace" sufficient?
+# S08 user outcome checked: the job spawned by h_R's own invoke is observable
+# (FE-CE-004 stays closed). job2 is a same-ns resource h_R never spawned and no
+# required scenario asserts it must stay hidden.
+def scope_spawned_set(primary, spawned):          # candidate R003.2
+    return {primary} | set(spawned)
+def scope_same_ns(primary, requested, handle_ns): # smaller alternative
+    return requested if requested == primary or requested[0] == handle_ns else None
+ns, runner, job1, job2 = "ns_R", "runner", "job-1", "job-2"
+h_ns, h_primary = ns, (ns, runner)
+spawned = [(ns, job1)]                            # from Result.spawned_resource_id
+for label in ("spawned-set", "same-ns-rule"):
+    def reach(req):
+        if label == "spawned-set":
+            return req in scope_spawned_set(h_primary, spawned)
+        return scope_same_ns(h_primary, req, h_ns) == req
+    print(f"{label:13} job1(spawned, S08)={reach((ns,job1))}  "
+          f"job2(same-ns, no scenario)={reach((ns,job2))}")
+# printed: both rules -> job1=True (S08 observable => FE-CE-004 closed);
+# they differ ONLY on job2, which no S01-S12 asserts hidden.
+# model conclusion: the accumulated set is not required by any tested scenario;
+# the same-ns rule satisfies S08 too. Proves the model only.
+```
+<<<FE-OUT-END>>>
+
+<<<FE-VERDICT-START>>>
+FE-CE-008|holds|§R003.2 keeps register_type's payload descriptor store "core" only for the deleted delivery-gate plus FE-CE-006; §R003.5-S06 note/§R003.8 then say removing the gate "does not affect S06"; resolver-match, fallback label and typed action all read the envelope string or the action store, never this store, so no host consumer remains and §R003.1's "No smaller core exists" is unsupported|§R003.2 must give a delete-it-breaks-scenario argument for the payload descriptor store distinct from typed-action
+FE-CE-009|holds|§R003.5-S08 justifies the spawned set against a foreign-id leak the §R003.2 same-namespace guarantee makes impossible; a subscribe-same-ns rule satisfies S08 steps 5-6 with FE-CE-004 closed; §R003.6's "retained because a scenario fails without it" is false for the set form and §R003.8 admits it grows unbounded|§R003.6 must show a required scenario that fails without the accumulated set specifically; the model shows same-ns passes all
+FE-CE-010|holds|§R003.2 removed replay_policy and applies a fixed never-auto-resubmit invariant, so the host no longer re-sends a stable invoke_id; §R003.5-S09 dedup keys are (ns,resource,seq); invoke_id is minted on OutcomeUnknown with no host reader, contradicting §R003.1's minimality claim|§R003.2 must name a host consumer of invoke_id that survives the removed auto-resubmit path; none exists
+FE-CE-011|holds|§R003.4 already makes the pair gesture a host operation minting h_R, so it can supply an explicit current-cursor argument directly; §R003.6 lists live-default-subscribe as "retained because a scenario fails without it" but S08 passes with from_cursor explicit + host-supplied cursor.resolve, keeping FE-CE-005 closed|§R003.6 must justify the implicit default as distinct from an explicit-cursor parameter, not a scenario failure (there is none)
+FE-CE-007|does_not_hold|against integrated candidate A: cand-A has no edges/list/relay mechanism, so the reported sequence cannot execute; §R003.2/§R003.4 isolation (user-gated handle_for, spawned ids same-namespace only, no enumerateNamespace) returns no foreign id into a scoped handle|carry against demoted B only as history; B's §R003.B.5 demotion withdraws the carrier without repairing the isolation invariant, so it is not a live A defect
+<<<FE-VERDICT-END>>>
+
+<<<FE-LEDGER-START>>>
+FE-CE-008|R003|minor|OPEN|every core mechanism must have a delete-it-breaks-a-required-scenario argument; the ns-scoped payload_schema_id descriptor store has no host consumer after the delivery-gate removal, so it is non-load-bearing|payload-type registry outlived its reader|rounds/R003/verify.md FE-CE-008 (holds) ; §R003.2 vs §R003.5-S06 note/§R003.8 self-contradiction|-|-
+FE-CE-009|R003|minor|OPEN|spawned-resource-grant's per-handle accessible-set is not minimal; a same-namespace subscription-scope rule passes S08 without accumulating a set, and removes the R003.8-admitted unbounded-growth weakness|spawned-set bookkeeping over-built for a same-ns guarantee|rounds/R003/verify.md FE-CE-009 (holds) ; §R003.5-S08 justification invokes a foreign-id leak §R003.2 makes impossible ; experiment models same-ns passes S08, differs only on untested job2|FE-CE-004|-
+FE-CE-010|R003|minor|OPEN|invoke_id on OutcomeUnknown has no surviving host consumer after replay_policy/auto-resubmit removal; call-site return correlation is sufficient, so the token is residual non-load-bearing state|invoke_id orphaned by the fixed no-auto-replay invariant|rounds/R003/verify.md FE-CE-010 (holds) ; §R003.2 vs §R003.5-S09 dedup keys (ns,resource,seq)|FE-CE-009|-
+FE-CE-011|R003|minor|OPEN|live-default-subscribe is only a parameter default; making from_cursor explicit and having the host pair-gesture supply cursor.resolve(id) preserves S08/FE-CE-005 without an implicit-default primitive|implicit-subscribe-default is not a load-bearing mechanism|rounds/R003/verify.md FE-CE-011 (holds) ; §R003.4 pair gesture mints h_R (host), so default is redundant|FE-CE-005|-
+FE-CE-007|R002|major|REJECTED|edges.list leaks foreign namespace ids into a scoped handle; but the integrated candidate A has no edges mechanism, so the sequence cannot execute against A; isolation invariant holds structurally|edges.list leaks foreign namespace ids into scoped handle|rounds/R003/verify.md FE-CE-007 (does_not_hold vs A) ; cand-A has no edges ; §R003.2/§R003.4 user-gated mint, spawned same-ns only ; B demoted §R003.B.5 (history, not repaired)|-|-
+<<<FE-LEDGER-END>>>

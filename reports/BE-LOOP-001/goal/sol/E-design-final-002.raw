@@ -1,0 +1,899 @@
+Reading additional input from stdin...
+OpenAI Codex v0.155.1
+--------
+workdir: /home/maoqh/projects/ordessa/worktrees/backend-loop/execution
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: medium
+reasoning summaries: none
+session id: 01a0c51b-e582-7110-a91f-6b319881e293
+--------
+user
+Design-final re-review (round 2) after the first review REJECTED v0. Read workspace-relative: reports/E-D2-design-v1.md (v1.2), reports/E-INC1a-path-request-draft.md.
+First review required closing 6 items: (1) typed provider compensation obligations + register-before-mutate (not relying on unconfirmed zero-side-effect); (2) assign sidecar bundle/view layout owner, remove provider-path assumptions from E; (3) neutral internal ExecutionRequest + Session-Turn adapter in S, E must not read product repos or fabricate product state; (4) no second E-owned process manager / retract Job SPI, use HostTransport; (5) explicit state/transition matrix separating timeout-observation vs unknown vs definite-refusal vs definite-completion, cleanup never upgrades certainty; (6) inventory = sourced projection of Work Core facts, not an E fact source.
+Judge whether v1.2 + the INC1a per-path request ADEQUATELY close these for an E-domain-only increment (bool cancel kept; resolve_all read deferred to INC1c; public wire frozen; S lock-test as permanent regression). 
+Output ONLY JSON: {"verdict":"accept|reject","residual_gates":[{"item":"","blocks":"impl|later-increment"}],"notes":""}. If a real blocker remains for INC1a specifically, say which; otherwise accept for INC1a with tracked later gates.
+codex
+I’m reading the workspace guidance and the two review documents, then I’ll map each of the six required closures to the INC1a path scope.
+exec
+/bin/bash -lc 'cat README.md && cat control/README.md' in /home/maoqh/projects/ordessa/worktrees/backend-loop/execution
+ exited 1 in 0ms:
+cat: README.md: No such file or directory
+
+exec
+/bin/bash -lc 'cat reports/E-D2-design-v1.md && cat reports/E-INC1a-path-request-draft.md' in /home/maoqh/projects/ordessa/worktrees/backend-loop/execution
+ succeeded in 0ms:
+# E-D2 · 执行组合边界 design **v1.2 / DESIGN-FINAL 声明稿** — 逐条闭环 Sol#1 六反例（替代 E-P1/E-D1 v0 的对应章节）
+
+- 组：execution (E) · 基线 `b067c571` · 候选线已含 P-T1 `4674a2a` · 契约引用：`C-EXEC@v1(block1)`、IFR-04(H)/IFR-05(P)
+- **v1.2 = design-final 声明**：C 已在 `acks/ack-E.md`（17:49 更新段）亲审接受 v1、裁定 E-INC0 接受、并逐条解阻外依赖。本节列出 C 裁定与本文的对应（全部已在 v1.1 折入，无差量，仅声明对齐）：
+  - C 裁 sidecar/bundle **运行时内容布局归 H**、物理挂载根归 P、E 只传不透明 `bundle_ref`、E 删全部 `agentbox-sidecar/runtime/` 字面量（INC1a）→ 即 #2 三分，**一致**。
+  - C 裁 `release/terminate` 动词进 Protocol、`RoomProcessSpec` 改名（P-4）、`C-HARNESS` bundle 内容节 = **C 发布**，次序先于 E-INC2 → 即 #1③/#4③ 与依赖表两行 `[待C]`，**一致**。
+  - P-5 分级答采「先行登记兜底 + 可执行零副作用契约发布后降级；**E 不建失败登记路径**」→ 即 #1①–④，**一致**（先行登记属 coordinator 公共区，仍候 C 单写者发布，E 不自改）。
+  - P-1 terminate 经 `HostTransport.submit(transport_kind="terminate@1")` 加性、无新 SPI → 即 #4①，**一致**（Job 缝已正式撤回）。
+- **E 现声明 design-final（milestone=design-final）**，候 C 按 ack 中承诺从**机动额度**花一次真 Sol 复核；通过即候 E-INC1a 逐路径批准（纯 E 文件：中立 `ExecutionRequest`+三态端口+词禁断言）。E impl-accept 预留 **Sol#2** 语义不动。在 Sol 通过前**不写产品码**。
+- v1.1 修订依据（17:45 后到手）：中央指令 `decisions/E-design-v1-inputs.md`、P 答复 `platform/reports/07-ifr05-p-answers.md`（§1 逐条、§3 交付形状）、H `goal-H-002`（DESIGN_READY + D4/D5 对 E 项）。改正记录见文末「v1.0→v1.1 差量」。
+- 性质：设计修订稿（文档，非产品码）。Sol#1 原文决定见 `goal/sol/E-design-final-001-decision.md`；本文按 raw 审阅的 6 条 `must_fix_before_impl` 逐条闭环，并显式标注每条的**自治部分**（E 可定稿）与**外依赖部分**（待 H/P 证据，标注 `[待X]`）。
+- v0 中被本文推翻的表述以本文为准（尤其：K9"事实来源"措辞、§5.3 临时 Job 注册缝提案、K2"run 任何异常一律 AMBIGUOUS"）。
+
+---
+
+## 闭环 #3（最重，C 指定优先）：中立内部执行请求 + Session-Turn 适配器
+
+**问题回读**：冻结的 `TurnExecutionPort.accept(turn_id,…)` 之下，`SidecarExecutionBackend.accept` 直读 S 仓储（`records.get_turn_context`）、直 import 产品域（`profiles.permissions.resolve_all`，:228）、并铸造 Session-Turn 专属 Core 记录（objective="AgentBox Session Turn"、`workspace-{turn_id}` 绑定名、responsibility_intent 含产品语汇）——非 Session 调度器接入必须伪造产品状态，违"实现不知调用者产品身份"。
+
+**v1 形状（E 域自治定稿）**：
+1. E 域新增**中立内部请求对象**（非公开协议，随 O-3 加性进 `TurnExecutionPort` 载体）：
+   ```
+   ExecutionRequest(execution_key: str,            # 幂等键，E 只当不透明字符串
+                    bundle_ref: str,               # 内容寻址对象摘要（S 受理期已发布）
+                    resource_bindings: tuple[NeutralBinding, ...],  # (contract_id, object_digest, mount_token)
+                    capability_demand: CapabilitySet,               # 声明式，非产品推断
+                    deadline_policy: DeadlinePolicy | None,
+                    correlation: Mapping[str, str])                 # 调用方自有的透传字符串，E 不解析
+   ```
+   E 端口**不得**出现 `session`/`turn`/`profile` 词汇（公开形状锁测可加结构性词禁断言，E-INC0 已铺 xfail 同类）。
+2. 端口加性新方法：`submit(request) -> ExecutionReceipt`、`cancel_execution(execution_key) -> CancelOutcome(三态)`、`observe_execution(execution_key)`。既有 `accept/cancel/pid` 暂留为兼容壳（O-3），切换后删除。
+3. **Session-Turn 适配器归 S 域**：`accept(turn_id)` 的读仓储、posture 解析（S-2：`resolve_all` 在受理事务内完成并冻结进有效配置对象）、Core 记录铸造（objective 由调用方给中性串、metadata=correlation 原样）全部移到 S 侧适配器，随后调 E 的中立 `submit`。E 对"这是不是一个 Session Turn"永久不可知。
+4. 公开 Wire/REST 不变（M-1）；S 四处调用点切换 = S-block1 流程（E 检查点经 C 集成后批）。
+**E-INC1 路径分解**（供逐路径批准）：INC1a E 中立对象+三态端口+词禁断言（E 文件）；INC1b S 适配器与受理事务（S 文件、S 批准）；INC1c 删 `resolve_all` 直 import 与 bool 壳（双侧、切换判据=S 适配器就位证据）。
+
+## 闭环 #5：显式状态迁移矩阵（timeout 是观测，不是迁移）
+
+**问题回读**：coordinator `except StartAmbiguous` 与 `except Exception` 同落 AMBIGUOUS（coordinator.py:133-140），超时/未知启停/确定拒绝/确定完成无分离表。
+
+**v1 矩阵**（单次 dispatch 的 attempt 态；权威载体=Work Core 账本事件，内存态仅投影）：
+
+| 现态 \ 事件 | 类型化启动前拒绝 | RUN_INTENT 后应答丢失/超时/通道断 | 肯定观测（pid/事件上报） | 终局结果事实抵达 | 取消下发且应答确认停 | 取消下发但应答丢失 | 对账（observe）成功 | 清理成功 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `PENDING` | →`REFUSED_DEFINITE`（可新键重试） | →`AMBIGUOUS_DISPATCH` | — | — | — | — | 保持 | — |
+| `REFUSED_DEFINITE` | （幂等重放同回执） | — | — | — | — | — | 可撤销至`PENDING_RECONCILED` | — |
+| `AMBIGUOUS_DISPATCH` | — | （仅记录观测，不换态） | →`OBSERVED_RUNNING` | →`TERMINAL_SEALED` | — | — | →`REFUSED_DEFINITE` **仅当**证明未启动 | 不改变 |
+| `OBSERVED_RUNNING` | — | （记观测） | （幂等） | →`TERMINAL_SEALED` | →`STOPPED_CONFIRMED` | →`STOP_UNCONFIRMED` | 保持 | 不改变 |
+| `STOP_UNCONFIRMED` | — | — | 仍见活→保持 | 迟到终局→`TERMINAL_SEALED` | →`STOPPED_CONFIRMED` | （同键重放原回执，不再下发） | 观测定谳→相应确定态 | **不改变** |
+| `TERMINAL_SEALED` / `STOPPED_CONFIRMED` | 终态 absorbing；一切后续事件=观测/留痕 | 同左 | 同左 | 拒绝改写 | 同左 | 同左 | 同左 | 不改变 |
+
+铁律（全部写进矩阵脚注并各有钉）：**清理成功绝不升级确定度**；`unknown≠refused` 双向禁压（block-1）；timeout/断链只产生观测事件，态迁移只能由类型化事实或对账证明触发；同键重放永不二下发（start 禁重放=既有，cancel 禁重放=E-INC0 钉）。E-INC0 五攻击钉即本矩阵回归网；INC1 补"对账撤销 AMBIGUOUS 需未启动证明"的钉。
+
+## 闭环 #1：释放回执采用 P 形状；E 不建失败登记路径（v1.1 按 P §3/指令改正）
+
+**问题回读**：coordinator 用 `getattr(component, method, None)` 静默跳过缺失方法（:156-171）；`_cleanup[key]` 在 `sandbox.wrap`+`terminal.allocate` **之后**才登记，安全性系于未确认的零副作用承诺（=P-5 悬项）。
+
+**v1.1 决议（与 P-5 分级答、C 指令对齐）**：
+1. **P-5 分级承诺采纳**：① 目标进程零创建=成立（bwrap `observe` 恒 `target_creation_count:0`）；② provider 自有登记不原子=**不成立**（D6 tmux / D7 bwrap，P 已在插件内自纠方案、批于 P-T2）。**E 撤销 v1.0 草案自提的 `composition.compensation@1` 能力名与"E 加失败登记"悬案**——补偿细节属 provider 内部语义，E 不解析。
+2. **E 消费形状（P §3 交付，无需契约发布即对接）**：释放回执保持两族现状——`{"released","destroyed","managed"}` 与 `{"status":"cleaned"|"already_cleaned"|{"error":…}}`；E 判定只到**"异常=补偿面失败且已被记录"**，不读取 provider 内部字段做产品推断。
+3. **coordinator 侧 register-before-mutate**（`coordinator.py:126-129` 登记先行 + 缺动词禁止静默跳过→类型化拒绝）定性为**公共区变更、单列待 C 发布**（与 P-7 动词进 Protocol 同一发布包处理）；E v1 提供期望消费形状（见 #4 段），不自行改冻结 Protocol。
+4. **E-INC0 pin4 处置**：pin4 钉的是 **coordinator 层现状**（allocate 抛错→无登记无补偿），P-T2（插件内自补偿）落地后该钉**仍真**（fake terminal 非真插件）；待 C 发布 coordinator register-before-mutate 后，pin4 反转为"先行登记+零未登记残留"义务断言——反转时点以 C 发布件为据，**不提前弱化**。P 所提"pin4 改断言零残留"的真插件面由 P 测试面持有，E 不代钉。
+
+## 闭环 #2：sidecar 捆绑视图布局指派（v1.1 按 H/P 输入落定建议）
+
+**问题回读**：`sidecar.py:220-255` 硬编码 `agentbox-sidecar/runtime/…`（含 `subagent-bridge.mjs`）视图布局；v0 攻击2 自认残余 (c) 未指派。
+
+**v1.1 决议（E 的指派建议，随 C-HARNESS/C-RUNTIME 由 C 发布）**：
+- **ACP 帧层与 Harness 语义 = H**（H2/H5 已证：帧层在 vendored `harness_remote` bridge 内、H 的增量 2 迁官方 SDK——bridge 及其视图内文件属 H 的插件内重构面）；
+- **捆绑的物理挂载与 provider 内部布局 = P**（P 已明示"插件内布局归 provider"，bwrap 强校验点已在 P 插件内）；
+- **E 只保留传输事实**：`SidecarRoomRequest` 收 `bundle_artifact`（内容寻址摘要 + 挂载令牌），捆绑内部路径对 E 不透明——**E 侧删除全部 `agentbox-sidecar/runtime/` 字面量与 `subagent-bridge.mjs` 等文件名假设**（E 自治动作，入 INC1a；被删面由 H/P 的声明形状承接）。
+- **对 H-D4 的 E 表态**：`sidecar_backend.py:1020 _CLEAN_STOP_REASONS` 词表（含自造 `stop`/`complete`）的**判定归 H（语义）+ S（投影）**，E 只保传输；若 C-HARNESS 定稿删自造值，E-INC0 攻击4 的 clean 家族参数化随发布件同步反转（`stop`/`complete` 从 None 组移入逐字透传组）——同 #1-pin4 规则：以 C 发布件为时点，不提前改。
+- **对 H-D5 的 E 确认（E↔H 直接生效）**：`C-EXEC` 的**"取消 ≠ 已停"语义成立且已契约化**——即 `C-EXEC@v1(block1)` 三态（`confirmed_stopped`/`refused_no_active_run`/`unknown`），H 侧用户停止在 ACP 面上对应官方 `cancelled`，E 纯透传不发明值。fs/terminal/elicitation 三回调通道（H 实测"空义务"）：E 立场=属组合边界**未来需求**，进 v1 需求清单（块 3+），在 H 的 C-HARNESS 声明消费形状之前 E/S/P 不预先建设。
+
+## 闭环 #4：撤销临时 Job 注册缝；终止走 HostTransport 封闭通道（v1.1 按 P-1 改正）
+
+**问题回读**：v0 §5.3 提议仿 `register_sandbox_port_factory` 建进程内 Job 注册缝，与 P-D1 的 RuntimeHost/TerminalSession 收敛（P-T1 已集成 `4674a2a`）冲突，制度化第二套进程管理。
+
+**v1.1 决议（采纳 P-1 裁定）**：
+1. **正式撤回** Job 注册缝提案；**E 零新增进程 SPI**。终止操作**无需新通道**：走既有封闭类型 `HostTransport.submit(HostTransportOperation)`，加性 `transport_kind="terminate@1"`（字段 `transport_kind/sealed_payload/spawn_token` 实测已在 protocol.py:384-391 内封闭）；kill 阶梯语义归 provider（POSIX 组 TERM→宽限→KILL / Windows Job 由该插件持有）。
+2. **E 给 C 的中立消费形状（P-7 发布包所依据）**：三 Protocol 加性声明 `release(request: object|None) -> Mapping[str,bool]` 族与 `cleanup(...) -> Mapping[str,str|Mapping]` 族（回执= P §3 两形状）；coordinator 改为**调声明动词**，废弃 `getattr`+`callable` 鸭子探测，缺声明=类型化拒绝（发布前由 C 单写者落）。E 侧只消费"回执或异常"，不解析细节。
+3. **次序门（采 P 建议）**：C **先发**动词/terminate@1 契约，**后**批 E-INC2 生产链上端口；在此之前 `local_channel` 继续承载生产进程面，**无任何过渡壳**（v1.0 的"迁移门"表述被此取代）。windows Job 直 import（`local_channel.py:740-756`，含 `AGENT_BOX_SANDBOX_WINDOWS_PATH` 塞 sys.path）定性=**E-INC2 同 PR 删除的存量遗留**，不扩展、不加 Linux 同类物。E-INC1 明确不含任何进程/终止通道改动。
+
+## 闭环 #6：inventory = Work Core 的带来源派生投影
+
+**问题回读**：K9 把 inventory 描述为"E 事实来源（删之→S/Wire 无执行面事实）"，与"唯一权威=Work Core 账本"冲突。
+
+**v1 定义**（措辞替换，实现路径不变）：
+```
+InventorySnapshot = project(core_ledger_rows, live_observations, now)
+  · core_ledger_rows：唯一事实源（list_works/list_executions 只读查询）
+  · live_observations：进程自报（pid 等），逐条带 observed_at 与来源标注，永不改写 ledger 事实
+  · 对账规则：ledger 在跑而无观测 → 标注 STALE_PENDING（不推断死亡）；
+    有观测而无 ledger 记录 → 标注 ORPHAN_OBSERVATION 并告警（不建影子记录）
+  · 陈旧策略：投影 TTL 由消费方（S/wire）决定，E 不裁剪事实
+```
+K9 改写为"删除 inventory 投影 → S/Wire 失去**展示面**，执行事实仍可由 Core 重建"。`_Run` 内存态=投影非权威（R3 不变，与 #6 一致化）。
+
+---
+
+## 与 block-1 / E-INC0 的接缝
+三态取消是矩阵 STOP 行；`C-EXEC@v1(block1)` 文本不改（矩阵是其上位细化，块 2+ 再并入 C-EXEC@v2 全文）。E-INC0 21 绿 + 5 strict-xfail 全部映射到矩阵行；xfail 集合即 INC1a 验收单。
+
+## 外依赖汇总（v1.1 更新：两项已到手，余项定稿门）
+| 依赖 | 内容 | 状态（17:47Z）|
+| --- | --- | --- |
+| ~~`[待P]` IFR-05 P-5~~ | 零副作用分级答 + D6/D7 归 P-T2 | **已到手**（07-ifr05 §1）→ 并入 #1 |
+| ~~`[待P]` IFR-05 P-1~~ | terminate 经 HostTransport 加性表达、无新 SPI | **已到手** → 并入 #4 |
+| `[待C]` P-7 发布包 | 释放/终止动词进 Protocol（C 单写者；E 消费形状见 #4②；次序=先发布后 E-INC2）| 形状已由 E 提交，候 C 发布 |
+| `[待C]` P-4 发布 | 改名消歧 `RoomProcessSpec`（sandbox_port 侧降局部名）——属公共区，E 不擅改 | 候 C；影响 E 的 import 名，INC1a 前定稿即可 |
+| `[待H]` C-HARNESS 定稿 | bundle 内容协议、stopReason 5 值口径（H-D1）、词表删自造值时点 | H 已 DESIGN_READY（H1–H5），候 C 审发 |
+
+**E 声明**：#3/#5/#6 全文自治闭环；#1/#2/#4 已按 P-1/P-5 裁定与 H-D4/D5 表态改正对齐，剩余悬置**只剩发布动作（C）与 C-HARNESS 审发（H 已提交）**，无未答请求。design-final 定稿门 = C 采纳 v1.1 + 发布包落定；E impl-accept 预留 Sol#2 语义不动。E-INC1 维持不批、不实施。
+
+## v1.0→v1.1 差量（诚实记账）
+1. #1 撤销 E 自提 `composition.compensation@1` 与 E 侧先行登记设计（越权公共区）；改采 P §3 回执形状 + coordinator 变更单列待 C；补 pin4 处置规则。
+2. #4 由"撤回+泛迁移门"改为**具体通道**：`HostTransport.submit(terminate@1)`；windows 遗留删除时点精确到 E-INC2 同 PR；明确无过渡壳。
+3. #2 布局指派从单归 H 改为**帧层 H / 物理布局 P / E 只剩传输**三分，并新增对 H-D4（词表归属与时点）、H-D5（取消≠已停确认、回调空义务处置）的 E 表态。
+4. 外依赖表由 3 项悬置更新为 2 项已到手 + 3 项待发布/待审。
+# E-INC1a 逐路径实施申请（草案）— 候 design-final Sol 通过后即此批准
+
+- 组：execution (E) · 绑定：方案版本 **E-D2 v1.2（design-final 声明稿，sha 8bce7d88…）** · 契约 `C-EXEC@v1(block1)` + E-D2 #3/#4/#5 · 基线 `b067c571` · 分支 `work/be-goal-execution-0` · Sol：E impl-accept 预留 **#2**（实施验收时申请，非本草案）
+- 性质：草案文档（等待期工作，**未获批准、不写产品码**）；批准格式按 GOAL-START 真实批准要件预填，C 可在 Sol 通过后直接对表逐路径批/驳。
+- 范围红线：全部为 **E 域文件**（`src/agent_box/server/execution/**`）+ 本组 `/tests`；不触 bootstrap/work_core/`execution/protocols.py`/`extensions/api.py`/`runtime_composition/**` 冻结签名（O-3）；公开 Wire/REST 形状不动（M-1）；不改 S/H/P 域文件（INC1b=后批 S 适配器，INC1c=删壳双侧各走各批）。
+
+## 逐路径清单
+
+| # | 路径 | 改动 | 不改动（防越界） | 验收 |
+| --- | --- | --- | --- | --- |
+| a-1 | **新文件** `execution/execution_contract.py` | `ExecutionRequest`/`NeutralBinding`/`DeadlinePolicy`/`CancelOutcome`（三值枚举 `CONFIRMED_STOPPED/REFUSED_NO_ACTIVE_RUN/UNKNOWN`，拼写=契约 §block1）+ `ExecutionReceipt`；frozen dataclasses，无 IO | 任何既有 import 方 | 类型可导入即绿；词禁：模块正文无 session/turn/profile 字面 |
+| a-2 | `execution/__init__.py` | `TurnExecutionPort` **协议声明加性新方法**：`submit/cancel_execution/observe_execution`（plain Protocol、无 `runtime_checkable`——已核实执行域/work_core 零处使用，鸭子 fake 实现者如 `tests/server/test_delegation.py:23 FakeExecution` 不受新成员影响，**无需 mixin 默认体**）；**既有 bool `cancel` 签名原样保留** | bool `cancel`、`accept`、协议名 | E-004 xfail `public_return_is_not_a_bare_bool` 转绿 |
+| a-3 | `execution/sidecar_backend.py` | 实现三新方法：`cancel_execution`＝no-active→REFUSED、端口应答确认→CONFIRMED、异常/超时→**捕获归 UNKNOWN 且不重下发**（run 级 cancel 回执登记：同键重放返回原回执）；`submit(ExecutionRequest)`＝不读 S 仓储的中立启动——**组合方式（源码复核后定）**：E 内部把 request 字段转换为 sidecar `port_factory(Mapping, on_event)` 既有约定键的 context 映射（工厂签名不动 ⇒ bootstrap 冻结区零触碰；该组约定键属 **E↔H sidecar 缝**，随 C-HARNESS 正规化）；Core 记录 objective 用请求内中性串、correlation 不透明进 metadata；既有 `accept/cancel` 路径**字节兼容**（内部转调新实现）；**S 侧证据交付**：回执 `accepted` 由三态派生（CONFIRMED→true，REFUSED/UNKNOWN→false+可分辨投影），对齐 `sessions/service.py:237` 现流程（S 先判业务终态、E 只管在飞） | `:228 resolve_all` 直读**保留**（INC1c 删，S-2 冻结输入通道先由 S 上移）；`_CLEAN_STOP_REASONS` 词表（**C 已裁转 S 自管**，ack-S 17:51）；credential disposition（P-2 成文不改码） | xfail tristate×2+replay×2 转绿；S 公开形状锁测（`test_block1_cancel_public_shape_s.py` 4/4）**仍绿**（永久回归锁）|
+| a-4 | 本组 `/tests`（新文件 `test_e_inc1a_matrix_pins.py`） | E-R3 缺口 5 钉（R4/R5/R8/R9/R11/R12 观测腿）+ 既有 26 钉保持 | 产品码 | INC1a 交付 CHECKPOINT 同批：全量 `pytest ../tests/` 0 failed、xfail 仅剩 INC1b/1c 归属项 |
+| a-5 | （后续单列，非本批）仓内 `tests/server/**` 移植 | 把组钉移入仓测试面 | — | 随集成申请，届时另批路径 |
+
+## 兼容/回退/失败登记
+- 切换判据保持：S 的四处调用点在 **E-INC1a 经 C 集成验证后**才由 S-block1 批切；壳方法在 S 切换证据到手前不删。
+- 回退=a-2/a-3 纯加性 revert（无 schema、无公开面）；a-3 转调若引发字节兼容回归，S 锁测立即红→C 差量核对回退。
+- 实施验收 Sol：a-1..a-4 全绿交 CHECKPOINT 后，E 申请 **Sol#2（impl-accept，预留语义）** 由 C 花用；本草案不构成调用授权。
+
+## 反例自查（对齐 Sol#1）
+- a-3 若把 timeout 记成 REFUSED 或让重放二下发 → a-4 矩阵钉炸（R7/R10）；
+- submit 若读业务 ledger 判终态 → 攻击3 结构钉炸；
+- 新方法若抛无类型 Exception（未归三态/未归既有类型化拒绝族）→ 违反 block1「可分辨」，E-R3 R1/R5 钉炸。
+
+## 草案自查记录（17:55，对照源码，未获批前持续有效）
+1. a-2 由"mixin 默认拒绝体"改**纯协议声明**：实测执行域/work_core 无 `runtime_checkable`，结构型 Protocol 加成员不伤存量鸭子实现（仓测试 FakeExecution 核读）。
+2. a-3 `submit` 组合路径定稿为**E 内 request→factory context 映射转换**（port_factory 签名 `(Mapping, Callable)` 不动）：因后端工厂在 **bootstrap 冻结区**接线，任何工厂形状变更都会越界——映射键属 E↔H sidecar 缝，候 C-HARNESS 正规化；此消掉了 v 草案隐含的"改工厂"风险。
+3. 与 S 现流程对表：`sessions/service.py:237` 已先判业务终态（`TERMINAL_TURN_STATES`）再调 E——印证"终局留 S、E 管在飞"的三态派生形状，回执 `accepted` 字段兼容映射已写入 a-3 交付项。
+
+exec
+/bin/bash -lc "pwd; rg --files -g 'README.md' -g 'control/README.md' -g 'ack-E.md' -g 'E-design-final-001-decision.md' -g 'E-R3*' | head -80" in /home/maoqh/projects/ordessa/worktrees/backend-loop/execution
+ succeeded in 0ms:
+/home/maoqh/projects/ordessa/worktrees/backend-loop/execution
+reports/E-R3-matrix-pin-crosswalk.md
+source/README.md
+source/docs/specs/archive/README.md
+source/docs/validation/archive/README.md
+source/docs/validation/current/README.md
+source/docs/archive/README.md
+source/protocols/worker/README.md
+source/plugins/agent-box-web/README.md
+source/docs/troubleshooting/archive/README.md
+source/docs/research/archive/README.md
+source/docs/README.md
+source/docs/superpowers/archive/README.md
+source/plugins/agent-box-git/README.md
+source/docs/demos/README.md
+source/docs/adr/README.md
+source/docs/architecture/archive/README.md
+source/docs/server-round1/harness-selection/README.md
+source/plugins/agent-box-sandbox-bwrap/README.md
+source/docs/plans/archive/README.md
+source/plugins/agent-box-artifacts/README.md
+source/docs/product/archive/README.md
+source/docs/server-round1/fullstack/generated/README.md
+source/plugins/agent-box-harnesses/README.md
+
+exec
+/bin/bash -lc 'rg -n "agentbox-sidecar/runtime|subagent-bridge|resolve_all|objective|class SidecarExecutionBackend|def accept|TurnExecutionPort" src tests ../tests 2>/dev/null | head -240' in /home/maoqh/projects/ordessa/worktrees/backend-loop/execution
+ succeeded in 0ms:
+tests/test_e_inc0_block1_pins.py:133:    # the new tristate method must exist additively on TurnExecutionPort.
+tests/test_e_inc0_block1_pins.py:134:    from agent_box.server.execution import TurnExecutionPort
+tests/test_e_inc0_block1_pins.py:136:        m for m in dir(TurnExecutionPort)
+tests/test_e_inc0_block1_pins.py:139:    assert tristate, "TurnExecutionPort must expose an additive tristate cancel"
+tests/test_e_inc0_block1_pins.py:140:    sig = inspect.signature(getattr(TurnExecutionPort, tristate[0]))
+
+exec
+/bin/bash -lc "find .. -maxdepth 3 -path '*/control/README.md' -o -path '*/README.md' | head -60" in /home/maoqh/projects/ordessa/worktrees/backend-loop/execution
+ succeeded in 0ms:
+../harness/source/README.md
+../platform/source/README.md
+../execution/.pytest_cache/README.md
+../execution/source/README.md
+../server/source/README.md
+
+exec
+/bin/bash -lc 'cat reports/E-R3-matrix-pin-crosswalk.md' in /home/maoqh/projects/ordessa/worktrees/backend-loop/execution
+ succeeded in 0ms:
+# E-R3 · 状态迁移矩阵（E-D2 #5）→ 钉住测试核对表 — 等待期组内工作
+
+- 组：execution (E) · 基线 `b067c571` · 用途：design-final 核验材料 + E-INC1a 验收清单前身；纯文档，不改 `/tests`（既有 26 例即现状清单）
+- 记号：✅=已有绿钉 · 🔒=已有 strict-xfail（转绿=INC1a 义务）· ⬜=缺口（INC1a 须新增，列此即"补强清单"）
+
+| # | 矩阵行（现态×事件→次态） | 现有钉 | 缺口处置 |
+| --- | --- | --- | --- |
+| R1 | PENDING×类型化启动前拒绝→REFUSED_DEFINITE（可新键重试） | ✅ boundary-pin2（CAPABILITY_UNSUPPORTED+零副作用）| — |
+| R2 | PENDING×RUN_INTENT 后应答丢失→AMBIGUOUS_DISPATCH | ✅ boundary-pin1（lose_response→AMBIGUOUS）| — |
+| R3 | AMBIGUOUS×同键重放→**不重发 start**，态不变 | ✅ boundary-pin1 后半（sentinel.count/allocations 不变）| — |
+| R4 | AMBIGUOUS×肯定观测→OBSERVED_RUNNING | ⬜ | coordinator 现无 observe→态推进路径；INC1a 加 fake-observation 注入钉（对应 block1"抬到接口面"）|
+| R5 | AMBIGUOUS×对账证明未启动→REFUSED_DEFINITE（**仅此**可撤销） | ⬜ | 新钉：对账成功但无"未启动证明"时**禁**降级为 refused（防 unknown 洗白）|
+| R6 | OBSERVED_RUNNING×cancel 应答确认→STOPPED_CONFIRMED | 🔒 block1-tristate + 绿 no-touch | INC1a 转绿 |
+| R7 | OBSERVED_RUNNING×cancel 应答丢失→STOP_UNCONFIRMED | 🔒 同上（unknown 类）+ replay 双钉 | INC1a 转绿；同键重放=原回执已有 🔒 |
+| R8 | STOP_UNCONFIRMED×迟到终局→TERMINAL_SEALED | ⬜ | 新钉：终局事实可覆盖 unconfirmed 停留（观测不丢终局）|
+| R9 | 清理成功×任何态→**不升级确定度** | ⬜（部分=boundary-pin3 幂等/续偿）| 新钉：cleanup 返回 cleaned 后 AMBIGUOUS 仍 AMBIGUOUS（现测试未断"态不升"）|
+| R10 | refused↔unknown 双向禁压 | 🔒 tristate 三判 | INC1a 转绿 |
+| R11 | TERMINAL_SEALED/STOPPED_CONFIRMED absorbing | ⬜ | 新钉：终态后事件只留痕不改写（Work Core 终局封印面，E 侧用 fake dispatch 断）|
+| R12 | timeout/断链=观测事件不迁移 | 部分=🔒（cancel 路径）；start 路径=✅R2 | start 路径"连续 timeout 观测不换态"随 R4/R5 一并补 |
+
+## 结论
+- 矩阵 12 行中 **5 行已有钉、4 行由 INC1a xfail 集合承接（即验收单）、5 行缺口（R4/R5/R8/R9/R11）**——INC1a 申请文本将把 5 缺口列为新增钉义务，与"xfail 转绿"同批验收，防止"实现了但没钉"。
+- 本表同时是 #6 投影对账（STALE_PENDING/ORPHAN_OBSERVATION 属观测腿，不在 attempt 矩阵）与 #1 回执形状（补偿失败=已记录，不触 attempt 态）的边界说明：两族各自有界，互不升级确定度。
+- 等待期动作边界：仅本文档；`/tests` 两文件维持 E-INC0 已批验收态（21+5 不变），缺口钉在 INC1a 获批时一并落（同文件、登记 CHECKPOINT）。
+
+exec
+/bin/bash -lc 'rg -n "agentbox-sidecar/runtime|subagent-bridge|resolve_all|objective|class SidecarExecutionBackend|def accept|class TurnExecutionPort|TurnExecutionPort" source/src source/tests tests 2>/dev/null | head -280' in /home/maoqh/projects/ordessa/worktrees/backend-loop/execution
+ succeeded in 0ms:
+tests/test_e_inc0_block1_pins.py:133:    # the new tristate method must exist additively on TurnExecutionPort.
+tests/test_e_inc0_block1_pins.py:134:    from agent_box.server.execution import TurnExecutionPort
+tests/test_e_inc0_block1_pins.py:136:        m for m in dir(TurnExecutionPort)
+tests/test_e_inc0_block1_pins.py:139:    assert tristate, "TurnExecutionPort must expose an additive tristate cancel"
+tests/test_e_inc0_block1_pins.py:140:    sig = inspect.signature(getattr(TurnExecutionPort, tristate[0]))
+source/tests/test_work_core_responsibility.py:18:    assert not hasattr(execution, "objective")
+source/tests/test_work_core_responsibility.py:37:    work = WorkService(repo).create_work("work objective must not be inherited")
+source/tests/test_work_core_responsibility.py:66:    assert repo.get_work(work.id).objective == "build the plugin"
+source/src/agent_box/extensions/runtime_composition/sandbox_port.py:127:    entrypoint: str = "/runtime/view/agentbox-sidecar/runtime/worker-entry.mjs"
+source/tests/server/test_harness_sidecar.py:2013:    bundle = {"agentbox-sidecar/runtime/worker-entry.mjs": content,
+source/src/agent_box/work_core/repository.py:131:                "INSERT INTO core_works (id, objective, lifecycle, closure_reason, metadata_json, created_at, updated_at, version) "
+source/src/agent_box/work_core/repository.py:133:                (work.id, work.objective, work.lifecycle.value, work.closure_reason, _dump(work.metadata), _time(work.created_at), _time(work.updated_at), work.version),
+source/src/agent_box/work_core/repository.py:140:        return tuple(Work(r["id"], r["objective"], WorkLifecycle(r["lifecycle"]), _parse_time(r["created_at"]), _parse_time(r["updated_at"]), r["closure_reason"], _load(r["metadata_json"]), r["version"]) for r in rows)
+source/src/agent_box/work_core/repository.py:146:        return Work(row["id"], row["objective"], WorkLifecycle(row["lifecycle"]), _parse_time(row["created_at"]), _parse_time(row["updated_at"]), row["closure_reason"], _load(row["metadata_json"]), row["version"])
+source/tests/server/test_subagent_rule_liveness_086.py:81:    def accept(self, turn_id: str, *, overrides=None) -> None:
+source/tests/server/test_subagent_rule_liveness_086.py:135:        def accept(self, turn_id: str, *, overrides=None) -> None:
+source/src/agent_box/work_core/models.py:60:    objective: str
+source/src/agent_box/work_core/models.py:69:        if not self.id or not self.objective:
+source/src/agent_box/work_core/models.py:70:            raise ValueError("work id and objective are required")
+source/tests/server/test_workspace_connection_reserved_145.py:57:    def accept(self, execution_id, *, overrides=None):
+source/src/agent_box/work_core/services.py:96:    def create_work(self, objective: str, *, metadata: dict[str, str] | None = None) -> Work:
+source/src/agent_box/work_core/services.py:98:        work = Work(work_id, objective, WorkLifecycle.OPEN, now, now, metadata=metadata or {})
+source/src/agent_box/work_core/services.py:99:        return self.repository.create_work(work, CoreEvent(_id("evt"), EventType.WORK_CREATED, work_id, now, {"objective": objective}))
+source/tests/server/test_sidecar_native_driver.py:328:    assert "agentbox-sidecar/runtime/native-driver.mjs" in files
+source/tests/server/test_wire_v1.py:68:    def accept(self, execution_id, *, overrides=None):
+source/tests/server/test_task_continuation_ownership_139.py:33:    def accept(self, turn_id, *, overrides=None) -> None:
+source/tests/server/test_delegation_recovery_and_read_146.py:38:    def accept(self, turn_id, *, overrides=None) -> None:
+source/tests/server/test_delegation_recovery_and_read_146.py:174:    def accept(self, turn_id, *, overrides=None) -> None:
+source/tests/server/test_posture_config_write.py:15:from agent_box.server.profiles.permissions import resolve_all
+source/tests/server/test_posture_config_write.py:42:    return resolve_all(rules, preset=preset)
+source/tests/server/test_profile_permissions.py:18:    resolve_all,
+source/tests/server/test_profile_permissions.py:79:    posture = resolve_all(rules, preset="default", targets={"bash": ("git status", "rm -rf /")})
+source/tests/server/test_profile_permissions.py:90:    posture_reversed = resolve_all(rules_reversed, targets={"bash": ("git status",)})
+source/tests/server/test_profile_permissions.py:133:    # The frozen posture: resolve_all over the stored rules, preset `plan`.
+source/tests/server/test_profile_permissions.py:134:    posture = resolve_all(rules, preset="plan")
+source/tests/server/test_delegation_workspace_dimension_138.py:35:    def accept(self, turn_id: str, *, overrides=None) -> None:
+source/src/agent_box/server/services.py:12:from agent_box.server.execution import HarnessRegistry, TurnExecutionPort
+source/src/agent_box/server/services.py:24:        execution: TurnExecutionPort | None, notifier: EventNotifier,
+source/tests/server/test_server_boundaries.py:36:    def accept(self, turn_id, *, overrides=None):
+source/tests/server/test_shared_session_store.py:224:        def accept(self, turn_id, *, overrides=None):
+source/tests/server/test_subagent_timeout_stops_141.py:42:    def accept(self, turn_id: str, *, overrides=None) -> None:
+source/tests/server/test_subagent_timeout_stops_141.py:58:    def accept(self, turn_id: str, *, overrides=None) -> None:
+source/tests/server/test_posture_translation.py:11:from agent_box.server.profiles.permissions import resolve_all
+source/tests/server/test_posture_translation.py:19:    return resolve_all(rules, preset=preset)
+source/tests/server/test_work_core_migration_equivalence_121.py:67:    conn.execute("INSERT INTO core_works(id,objective,lifecycle,metadata_json,created_at,"
+source/tests/server/test_subagent_harness_round_086.py:190:    assert entry["args"][0].endswith("subagent-bridge.mjs")
+source/tests/server/test_child_limits_production_path_136.py:37:    def accept(self, turn_id: str, *, overrides=None) -> None:
+source/src/agent_box/server/profiles/permissions.py:164:def resolve_all(
+source/tests/server/test_wire_seq_numbering_spaces_128.py:57:    def accept(self, execution_id, *, overrides=None):
+source/src/agent_box/server/execution/delegation.py:85:        self.execution = execution        # TurnExecutionPort (may be None)
+source/src/agent_box/server/execution/delegation.py:387:        from agent_box.server.profiles.permissions import resolve_all
+source/src/agent_box/server/execution/delegation.py:392:            return resolve_all(rules, preset=str(row.get("permission_preset") or "default"))
+source/src/agent_box/server/bootstrap/runtime.py:28:from agent_box.server.execution import HarnessRegistry, TurnExecutionPort
+source/src/agent_box/server/bootstrap/runtime.py:222:    execution: TurnExecutionPort | None = None
+source/src/agent_box/server/bootstrap/runtime.py:287:    execution: TurnExecutionPort | None = None,
+source/src/agent_box/server/bootstrap/runtime.py:992:                            "/runtime/view/agentbox-sidecar/runtime/subagent-bridge.mjs",
+source/src/agent_box/server/execution/__init__.py:50:class TurnExecutionPort(Protocol):
+source/src/agent_box/server/execution/__init__.py:53:    def accept(self, turn_id: str, *, overrides: Mapping[str, Any] | None = None) -> None: ...
+source/src/agent_box/server/execution/__init__.py:156:    "HarnessDescriptor", "HarnessRegistry", "SidecarExecutionBackend", "TurnExecutionPort",
+source/src/agent_box/server/sessions/repository.py:128:    def accept_intent(
+source/src/agent_box/server/execution/sidecar_backend.py:168:class SidecarExecutionBackend:
+source/src/agent_box/server/execution/sidecar_backend.py:169:    """TurnExecutionPort using Core dispatch and a sidecar factory.
+source/src/agent_box/server/execution/sidecar_backend.py:210:    def accept(self, turn_id: str, *, overrides: Mapping[str, Any] | None = None) -> None:
+source/src/agent_box/server/execution/sidecar_backend.py:228:            from agent_box.server.profiles.permissions import resolve_all
+source/src/agent_box/server/execution/sidecar_backend.py:231:            effective_value["permissions"] = resolve_all(
+source/src/agent_box/migrations/003_work_core.sql:9:    objective TEXT NOT NULL,
+source/src/agent_box/server/sessions/service.py:9:from agent_box.server.execution import HarnessRegistry, TurnExecutionPort
+source/src/agent_box/server/sessions/service.py:18:                 execution: TurnExecutionPort | None = None,
+source/src/agent_box/server/sessions/service.py:43:    def accept_intent(self, **kwargs: Any):
+source/src/agent_box/migrations/004_minimal_work_core.sql:6:    objective TEXT NOT NULL,
+source/src/agent_box/server/execution/sidecar.py:227:        "agentbox-sidecar/runtime/worker-entry.mjs": (runtime / "worker-entry.mjs").read_bytes(),
+source/src/agent_box/server/execution/sidecar.py:228:        "agentbox-sidecar/runtime/native-driver.mjs": (runtime / "native-driver.mjs").read_bytes(),
+source/src/agent_box/server/execution/sidecar.py:231:        "agentbox-sidecar/runtime/capability_declarations.json": (
+source/src/agent_box/server/execution/sidecar.py:234:        "agentbox-sidecar/runtime/profile_extensions.mjs": (
+source/src/agent_box/server/execution/sidecar.py:239:        "agentbox-sidecar/runtime/subagent-bridge.mjs": (
+source/src/agent_box/server/execution/sidecar.py:240:            runtime / "subagent-bridge.mjs"
+source/src/agent_box/server/execution/sidecar.py:1171:    """TurnExecutionPort implemented over one sidecar per execution.
+source/src/agent_box/server/execution/sidecar.py:1418:    def accept(self, execution_id: str, *, overrides: Mapping[str, Any] | None = None) -> None:
+source/tests/server/test_delegation.py:31:    def accept(self, turn_id: str, *, overrides=None) -> None:
+source/tests/server/test_delegation.py:366:            assert entry["args"][0].endswith("subagent-bridge.mjs")
+source/tests/server/test_delegation.py:512:    A real `subagent-bridge.mjs` process speaks stdio MCP to this test, dials
+source/tests/server/test_delegation.py:620:        bridge = REPO / "plugins" / "agent-box-harnesses" / "runtime" / "subagent-bridge.mjs"
+
+exec
+/bin/bash -lc "sed -n '1,190p' source/src/agent_box/server/execution/__init__.py; sed -n '160,380p' source/src/agent_box/server/execution/sidecar_backend.py" in /home/maoqh/projects/ordessa/worktrees/backend-loop/execution
+ succeeded in 0ms:
+"""Neutral execution and Harness capability contracts.
+
+Server composes extensions through these types only; concrete Harness
+implementations are selected in `server/bootstrap` and owned by plugins.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any, Callable, Mapping, Protocol
+
+from agent_box.resource_contracts.harness_capabilities import (
+    CapabilityDeclaration,
+    capability_view as _capability_view,
+    merge_capabilities,
+    validate_claims,
+)
+from agent_box.server.execution.protocols import (
+    CANONICAL_PROTOCOLS, CANONICAL_PROTOCOL_SET, MAX_WIRE_PROTOCOLS,
+)
+
+
+class HarnessDescriptorError(ValueError):
+    """A deployment seat declared a field the assembly refuses (typed)."""
+
+
+def _validate_wire_protocols(value: Mapping[str, str]) -> dict[str, str]:
+    """Freeze a seat's protocol map to canonical keys in canonical order.
+
+    Every key must be one of the four canonical protocols, every value a
+    non-empty native-dialect string, and the map may not exceed the vocabulary.
+    A violation is a typed ``HarnessDescriptorError`` the bootstrap turns into
+    ``SIDECAR_DEPLOYMENT_INVALID`` - so a production template cannot smuggle a
+    second, unchecked protocol dictionary the compatibility derivation would
+    silently trust.
+    """
+    if not isinstance(value, Mapping):
+        raise HarnessDescriptorError("wire_protocols must be an object")
+    if len(value) > MAX_WIRE_PROTOCOLS:
+        raise HarnessDescriptorError("too many wire_protocols declared")
+    normalized: dict[str, str] = {}
+    for key, dialect in value.items():
+        if key not in CANONICAL_PROTOCOL_SET:
+            raise HarnessDescriptorError(f"wire_protocols key {key!r} is not canonical")
+        if not isinstance(dialect, str) or not dialect:
+            raise HarnessDescriptorError(f"wire_protocols value for {key!r} must be non-empty")
+        normalized[key] = dialect
+    return {name: normalized[name] for name in CANONICAL_PROTOCOLS if name in normalized}
+
+
+class TurnExecutionPort(Protocol):
+    """Product-facing dispatch surface; plugins own the native semantics."""
+
+    def accept(self, turn_id: str, *, overrides: Mapping[str, Any] | None = None) -> None: ...
+    def cancel(self, turn_id: str) -> bool: ...
+
+
+@dataclass(frozen=True)
+class HarnessDescriptor:
+    """One registered Harness extension as the Server may describe it.
+
+    `capability_claims` is the *static ceiling*: it is validated against the
+    versioned canonical contract at construction time, so a production template
+    cannot smuggle in a second, unchecked dictionary. Unverified abilities stay
+    false rather than defaulting to true.
+    """
+
+    harness_type: str
+    credential_kind: str | None = None
+    # A Harness deployment may declare which provider/model reference control
+    # selects the native model.  The Server resolves and freezes that reference
+    # generically; the plugin still owns what the native control means.
+    model_control_id: str | None = None
+    # Optional, declarative adapter environment key.  Credential bytes are
+    # never stored in this descriptor or in a configuration object.
+    credential_environment: str | None = None
+    configuration_validator: Callable[[Any], None] | None = None
+    capability_claims: Mapping[str, bool] = field(default_factory=dict)
+    # Optional-value controls this Harness declares, in declaration order; the
+    # first entry is the access-layer default. Only declared controls are
+    # offered, so a client never sees an invented option.
+    control_options: Mapping[str, tuple[Any, ...]] = field(default_factory=dict)
+    # Controls a security rule pins; they are reported as locked and cannot be
+    # overridden by a Profile default or a temporary override.
+    security_locked_controls: tuple[str, ...] = ()
+    # Work Order 092: the canonical protocols this Harness can speak, mapped to
+    # that family's own native dialect value (e.g. a family whose "openai-chat"
+    # is spelled "chat"). Declared only for families whose dialect is pinned in
+    # this repo; a family that declares none is *undeclared*, not incompatible.
+    wire_protocols: Mapping[str, str] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        # 声明只能是 canonical id + 真 bool；装配期就失败，而不是等到某次执行
+        # 才把漂移写法当成“支持”。校验后按 canonical 次序冻结为普通字典快照。
+        object.__setattr__(
+            self, "capability_claims", validate_claims(self.capability_claims),
+        )
+        object.__setattr__(self, "wire_protocols", _validate_wire_protocols(self.wire_protocols))
+
+
+class HarnessRegistry:
+    """Registration state assembled at bootstrap; never brand-switched on."""
+
+    def __init__(self) -> None:
+        self._descriptors: dict[str, HarnessDescriptor] = {}
+
+    def register(self, descriptor: HarnessDescriptor) -> None:
+        if descriptor.harness_type in self._descriptors:
+            raise ValueError(f"harness already registered: {descriptor.harness_type}")
+        self._descriptors[descriptor.harness_type] = descriptor
+
+    def get(self, harness_type: str) -> HarnessDescriptor:
+        try:
+            return self._descriptors[harness_type]
+        except KeyError:
+            raise KeyError("HARNESS_NOT_REGISTERED") from None
+
+    def registered(self) -> tuple[str, ...]:
+        return tuple(sorted(self._descriptors))
+
+    def wire_protocols(self, harness_type: str) -> dict[str, str]:
+        """The canonical→native protocol map one Harness seat declared (092).
+
+        Empty means the seat declares none: an *undeclared* family is not
+        incompatible, it is unknown, and the Server never blocks on unknown.
+        """
+        descriptor = self._descriptors.get(harness_type)
+        return dict(descriptor.wire_protocols) if descriptor else {}
+
+    def claims_for(self, harness_type: str) -> dict[str, bool]:
+        """External-compatible shape: {canonical id: declared}; unknown → {}."""
+        return self.canonical_claims(harness_type)
+
+    def canonical_claims(self, harness_type: str) -> dict[str, bool]:
+        """registry 派生的 canonical 静态声明（Profile 视图的唯一来源）。"""
+        descriptor = self._descriptors.get(harness_type)
+        return dict(descriptor.capability_claims) if descriptor else {}
+
+    def capability_declarations(self, harness_type: str) -> tuple[CapabilityDeclaration, ...]:
+        """静态 canonical 视图（无任何运行时观测；未注册 → 空）。"""
+        descriptor = self._descriptors.get(harness_type)
+        if descriptor is None:
+            return ()
+        return merge_capabilities(descriptor.capability_claims, {})
+
+    def capability_view(self, harness_type: str) -> dict[str, Any]:
+        """静态 canonical 视图字典，形状与运行时视图一致。"""
+        return _capability_view(harness_type, self.capability_declarations(harness_type))
+
+    def __contains__(self, harness_type: str) -> bool:
+        return harness_type in self._descriptors
+
+
+from .sidecar_backend import SidecarExecutionBackend  # noqa: E402
+
+__all__ = [
+    "HarnessDescriptor", "HarnessRegistry", "SidecarExecutionBackend", "TurnExecutionPort",
+]
+    def release_handle(self, dispatch_id: str) -> None:
+        self._handles.pop(dispatch_id, None)
+
+    def observe(self, native_ref):
+        del native_ref
+        return None
+
+
+class SidecarExecutionBackend:
+    """TurnExecutionPort using Core dispatch and a sidecar factory.
+
+    The factory is the deployment composition seam. It receives a stored,
+    provider-neutral Turn context and an event callback, and returns a port
+    whose Node sidecar owns all native Harness semantics.
+    """
+
+    def __init__(
+        self, records, objects, approvals, *,
+        port_factory: Callable[[Mapping[str, Any], Callable[..., None]], SidecarHarnessPort],
+        on_event: Callable[[], None] | None = None,
+    ) -> None:
+        self.records = records
+        self.objects = objects
+        self.approvals = approvals
+        self.port_factory = port_factory
+        self.on_event = on_event or (lambda: None)
+        self.core_repository = CoreRepository()
+        self.work_service = WorkService(self.core_repository)
+        self.execution_service = ExecutionService(self.core_repository)
+        self.resources = _BoundResources()
+        self.provider = _CoreSidecarProvider(self)
+        self.registry = ExtensionRegistry()
+        self.registry.register_resource_provider(self.resources.provider_id, self.resources)
+        self.registry.register_execution_provider(self.provider)
+        self._turn_by_core: dict[str, str] = {}
+        self._contexts: dict[str, Mapping[str, Any]] = {}
+        self._active: dict[str, _Run] = {}
+        #: Completion workers still running. A run is retired from `_active` when
+        #: its durable result is written, but the worker itself may still be
+        #: finishing; stopping must wait for every live one, so they are tracked
+        #: here rather than only on the run.
+        self._completion_threads: set[threading.Thread] = set()
+        self._approval_ports: dict[str, SidecarHarnessPort] = {}
+        self._message_parts: dict[str, list[str]] = {}
+        self._lock = threading.RLock()
+        self.queue = None
+
+    def bind_queue(self, queue) -> None:
+        self.queue = queue
+
+    def accept(self, turn_id: str, *, overrides: Mapping[str, Any] | None = None) -> None:
+        context = self.records.get_turn_context(turn_id)
+        stored = json.loads(self.objects.read(context["input_object_digest"]))
+        message = stored.get("message") or stored
+        profile_value = json.loads(self.objects.read(context["config_object_digest"]))
+        configuration = dict(profile_value.get("configuration") or {})
+        configuration.update(dict(overrides or {}))
+        effective_value = {
+            "schema_version": 1, "harness_type": context["harness_type"],
+            "configuration": configuration,
+        }
+        # Order 60 A/B: the profile's permission posture is part of what this
+        # turn freezes - the next turn picks up an edited rule set.
+        rules_json = context.get("permission_rules_json")
+        preset = context.get("permission_preset")
+        if rules_json or preset:
+            import json as _json
+
+            from agent_box.server.profiles.permissions import resolve_all
+
+            rules = _json.loads(rules_json) if rules_json else []
+            effective_value["permissions"] = resolve_all(
+                rules, preset=preset or "default")
+        if profile_value.get("execution") is not None:
+            effective_value["execution"] = profile_value["execution"]
+        effective = self.objects.publish(json.dumps(
+            effective_value, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+        ).encode())
+        work = self.work_service.create_work(
+            "AgentBox Session Turn", metadata={"session_id": context["session_id"], "turn_id": turn_id},
+        )
+        core_execution = self.execution_service.create_execution(
+            work.id, self.provider.provider_id,
+            responsibility_intent="execute one accepted Session Turn through its Harness extension",
+            provenance={"session_id": context["session_id"], "turn_id": turn_id},
+        )
+        inputs = (
+            (WorkspaceV1.contract_id, self.resources.bind(
+                WorkspaceV1.contract_id, f"workspace-{turn_id}",
+                WorkspaceV1(PurePosixPath(context["remote_path"]), "remote-live"),
+            )),
+            (PromptFragmentV1.contract_id, self.resources.bind(
+                PromptFragmentV1.contract_id, f"prompt-{turn_id}",
+                PromptFragmentV1("User Turn", str(message["text"]), context["input_object_digest"]),
+            )),
+            (AgentBoxProfileV1.contract_id, self.resources.bind(
+                AgentBoxProfileV1.contract_id, f"profile-{turn_id}",
+                AgentBoxProfileV1(
+                    context["profile_id"], context["harness_type"], effective.digest,
+                    int(context["profile_revision"]),
+                ),
+            )),
+        )
+        with self._lock:
+            self._turn_by_core[core_execution.id] = turn_id
+            self._contexts[turn_id] = context
+            self._message_parts[turn_id] = []
+        try:
+            receipt = self.execution_service.dispatch_execution(
+                core_execution.id, inputs, self.registry, f"turn-dispatch:{turn_id}",
+            )
+            run = self.provider.get_handle(receipt.dispatch_id)
+            run.work_id = work.id
+            self.records.set_turn_dispatch(
+                turn_id, work_id=work.id, execution_id=core_execution.id,
+                dispatch_id=receipt.dispatch_id, state="running",
+            )
+            with self._lock:
+                self._active[turn_id] = run
+            self.on_event()
+            run.completion_thread = threading.Thread(
+                target=self._complete_then_retire, args=(run,), daemon=True,
+            )
+            with self._lock:
+                self._completion_threads.add(run.completion_thread)
+            run.completion_thread.start()
+        except BaseException as exc:
+            self.records.fail_turn(turn_id, _safe_code(exc), queue_records=self.queue)
+            self.resources.release(turn_id)
+            self.on_event()
+            raise
+
+    def _start_run(self, core_execution_id, dispatch_id, workspace, prompt, profile) -> _Run:
+        del workspace, profile
+        with self._lock:
+            turn_id = self._turn_by_core[core_execution_id]
+            context = self._contexts[turn_id]
+        port = self.port_factory(context, lambda execution_id, kind, data: self._native_event(
+            execution_id, kind, data, port,
+        ))
+        # 附件先投影出来（有界对象读取），再打开执行：有效 attach=false 时必须在派发前
+        # 类型化拒绝，而不是打开一个原生会话再静默丢弃附件。
+        stored = json.loads(self.objects.read(context["input_object_digest"]))
+        attachments, file_refs = _sidecar_attachments(self.objects, stored)
+        # 实际副作用（client.start()/spawn）前的唯一强制门：需求来自 launcher 当前
+        # 计划，授权/声明/绑定来自装配边界注入；不满足即类型化拒绝，零 launcher/spawn。
+        _capability_gate(port, turn_id)
+        # Order 80: the first run on a fresh whole-db library is exclusive; a
+        # concurrent first run waits for it (bounded, typed on timeout) and
+        # every later run passes straight through. The gate is taken before the
+        # room exists, because the race is in the harness's own initialisation.
+        hold = None
+        if getattr(port, "whole_db_store", False):
+            hold = first_run_gate().acquire(
+                f"{port.native_platform or 'local'}:{port.profile}")
+        try:
+            native_id = port.open_execution(turn_id)
+            if attachments and not _effective_attachment_support(port, turn_id):
+                # 拒绝时不留一个没有归属的原生会话（否则 _complete 永远不会回收它）。
+                try:
+                    port.close_execution(turn_id)
+                except BaseException:
+                    pass
+                raise SidecarError(
+                    "ATTACHMENT_UNSUPPORTED",
+                    "this execution has no effective 'attach' capability",
+                )
+        except BaseException:
+            # An acquisition that never produced a run must not hold the
+            # library hostage (the attachment refusal above is one such path).
+            if hold is not None:
+                hold.release()
+            raise
+        run = _Run(turn_id, "", core_execution_id, dispatch_id, port, native_id, threading.Event())
+        run.first_run_hold = hold
+        prompt_content = prompt.content
+        if file_refs:
+            prompt_content += "\n\nWorkspace attachments (validated):\n" + "\n".join(
+                f"- {path}" for path in file_refs
+            )
+
+        def prompt_worker() -> None:
+            try:
+                run.result = self._prompt_with_rebuild(port, turn_id, prompt_content, attachments)
+            except BaseException as exc:  # surfaced by the completion owner
+                run.error = exc
+            finally:
+                run.done.set()
+
+        threading.Thread(target=prompt_worker, daemon=True).start()
+        return run
+
+    #: How many times a freshly-opened sidecar may be rebuilt when a prompt
+    #: finds it already closed (the drain the same second a prior sidecar exits,
+    #: ACC-R2-1). Bounded on purpose: recovery is not an infinite retry.
+    PROMPT_REBUILD_LIMIT = 2
+    #: Upper bound on the total backoff spent waiting out an in-flight teardown
+    #: across those rebuilds; the wait is bounded, never open-ended.
+    PROMPT_REBUILD_BACKOFF_SECONDS = 0.2
+
+    def _prompt_with_rebuild(self, port, turn_id, prompt_content, attachments):
+        """Prompt the execution's sidecar, rebuilding it if it is already closed.
+
+        Order 106: the queue drain starts in the same second the previous turn
+        reaches *completed*, and that previous sidecar is mid-teardown. The
+        successor turn gets its own fresh sidecar, but the overlap still surfaces
+        as ``SIDECAR_CLOSED`` at the prompt boundary - a queued message the user
+        sees die in a second. Here the drained (and any) turn ensures a live
+        sidecar before it gives up: on ``SIDECAR_CLOSED`` it drops the dead
+        envelope, reopens a fresh sidecar on the SAME execution, and re-prompts -
+        bounded by ``PROMPT_REBUILD_LIMIT`` and a bounded backoff. If every
+        rebuild still finds a closed sidecar, the failure is typed
+        (``SIDECAR_REBUILD_FAILED``) rather than left as an ambiguous close.
+
+        It reuses the new-turn open path (``open_execution``) rather than a second
+        dispatch path, so it never re-dispatches the turn and touches no queue,
+        idempotency or wire semantics.
+        """
+        deadline = time.monotonic() + self.PROMPT_REBUILD_BACKOFF_SECONDS
+        last: SidecarError | None = None
+        for attempt in range(self.PROMPT_REBUILD_LIMIT + 1):
+
+exec
+/bin/bash -lc 'rg -n "class .*Coordinator|AMBIGUOUS|cleanup|Inventory|inventory|REFUSED|STOP_UNCONFIRMED|TERMINAL_SEALED" source/src/agent_box/server/execution source/src/agent_box/work_core tests | head -320' in /home/maoqh/projects/ordessa/worktrees/backend-loop/execution
+ succeeded in 0ms:
+source/src/agent_box/server/execution/inventory.py:1:"""Order 64: the running-execution inventory - our own runs, nothing else.
+source/src/agent_box/server/execution/inventory.py:30:class InventoryError(RuntimeError):
+source/src/agent_box/server/execution/inventory.py:31:    """A typed refusal of one inventory read."""
+source/src/agent_box/server/execution/inventory.py:44:        raise InventoryError("INVENTORY_LIMIT_INVALID", f"limit must be 1..{MAX_EXECUTIONS}")
+source/src/agent_box/server/execution/inventory.py:60:        raise InventoryError(
+tests/test_e_inc0_boundary_pins.py:68:    assert coord.ledger[key].state == "AMBIGUOUS"
+tests/test_e_inc0_boundary_pins.py:90:# --- pin 3: cleanup is idempotent, inner-to-outer, and partial failure continues
+tests/test_e_inc0_boundary_pins.py:94:    sandbox/host via `cleanup` (coordinator.py:163) — different verbs."""
+tests/test_e_inc0_boundary_pins.py:95:    def __init__(self, name, sink, *, fail=False, verb="cleanup"):
+tests/test_e_inc0_boundary_pins.py:106:def test_cleanup_double_call_is_already_cleaned_and_errors_do_not_stop_compensation():
+tests/test_e_inc0_boundary_pins.py:112:    coord._cleanup[key] = (
+tests/test_e_inc0_boundary_pins.py:115:    results = coord.cleanup(key)
+tests/test_e_inc0_boundary_pins.py:119:    assert coord.cleanup(key) == {"status": "already_cleaned"}
+tests/test_e_inc0_boundary_pins.py:131:def test_allocate_failure_after_wrap_leaves_no_ledger_or_cleanup_entry():
+tests/test_e_inc0_boundary_pins.py:138:    assert coord._cleanup == {}       # nothing to compensate
+source/src/agent_box/server/execution/delegation.py:447:                    "native_generation,state,capture_state,cleanup_state,input_object_digest,"
+source/src/agent_box/work_core/repository.py:520:                    EventType.EXECUTION_DISPATCH_AMBIGUOUS,
+source/src/agent_box/work_core/events.py:24:    EXECUTION_DISPATCH_AMBIGUOUS = "ExecutionDispatchAmbiguous"
+source/src/agent_box/server/execution/local_channel.py:634:                # is deliberately not part of this cleanup: it is the Profile's
+source/src/agent_box/server/execution/sidecar_backend.py:591:            approval_cleanup_failed = False
+source/src/agent_box/server/execution/sidecar_backend.py:596:                # visible failed-cleanup fact and never turn it into a grant.
+source/src/agent_box/server/execution/sidecar_backend.py:597:                approval_cleanup_failed = True
+source/src/agent_box/server/execution/sidecar_backend.py:602:                    # Teardown of the native channel failed; that is a cleanup
+source/src/agent_box/server/execution/sidecar_backend.py:604:                    approval_cleanup_failed = True
+source/src/agent_box/server/execution/sidecar_backend.py:605:                self.records.mark_turn_cleanup(
+source/src/agent_box/server/execution/sidecar_backend.py:606:                    run.turn_id, "failed" if approval_cleanup_failed else "cleaned",
+source/src/agent_box/server/execution/sidecar_backend.py:615:                    "turn %s: cleanup record failed", run.turn_id)
+source/src/agent_box/server/execution/sidecar_backend.py:617:                    self.records.mark_turn_cleanup(run.turn_id, "failed")
+source/src/agent_box/server/execution/sidecar_backend.py:620:                        "turn %s: cleanup failed-record also could not be written",
+source/src/agent_box/server/execution/sidecar_backend.py:677:        inventory shows null rather than a guess.
+source/src/agent_box/server/execution/sidecar.py:560:                    client.request("secret.cleanup", {
+source/src/agent_box/server/execution/sidecar.py:566:                client.request("view.cleanup", {"viewId": view_id}, timeout=2)
+source/src/agent_box/server/execution/sidecar.py:979:                    operations.append(("secret.cleanup", {
+source/src/agent_box/server/execution/sidecar.py:983:                    ("view.cleanup", {"viewId": self.view_id}, False),
+source/src/agent_box/server/execution/sidecar.py:984:                    ("attempt.cleanup", {}, True),
+
+exec
+/bin/bash -lc 'rg -n "class .*Coordinator|class Coordinator|def dispatch|StartAmbiguous" source/src/agent_box | head -120' in /home/maoqh/projects/ordessa/worktrees/backend-loop/execution
+ succeeded in 0ms:
+source/src/agent_box/extensions/runtime_composition/coordinator.py:15:    HarnessCommandSpec, RuntimeBinding, RuntimeBundle, StartAmbiguous,
+source/src/agent_box/extensions/runtime_composition/coordinator.py:27:class RuntimeCompositionCoordinator:
+source/src/agent_box/extensions/runtime_composition/coordinator.py:123:                raise StartAmbiguous("replay remains START_AMBIGUOUS")
+source/src/agent_box/extensions/runtime_composition/coordinator.py:133:        except StartAmbiguous:
+source/src/agent_box/extensions/runtime_composition/fake.py:10:    TerminalSession, TerminalSessionRef, attempt_key, digest, StartAmbiguous,
+source/src/agent_box/extensions/runtime_composition/fake.py:42:            raise StartAmbiguous("native response lost")
+source/src/agent_box/extensions/runtime_composition/fake.py:85:class FakeCompositionCoordinator:
+source/src/agent_box/extensions/runtime_composition/fake.py:111:                raise StartAmbiguous("replay remains ambiguous")
+source/src/agent_box/extensions/runtime_composition/fake.py:118:        except StartAmbiguous:
+source/src/agent_box/extensions/runtime_composition/protocol.py:77:class StartAmbiguous(CompositionError):
+source/src/agent_box/extensions/runtime_composition/protocol.py:577:class CompositionCoordinator(Protocol):
+source/src/agent_box/extensions/finalization.py:11:class HostFinalizationCoordinator:
+source/src/agent_box/work_core/services.py:136:    def dispatch_execution(
+source/src/agent_box/server/wire/handlers.py:509:    def dispatch(self, method: str, params: Mapping[str, Any]) -> Any:
+
+exec
+/bin/bash -lc "cat source/src/agent_box/server/execution/inventory.py; sed -n '120,180p' tests/test_e_inc0_boundary_pins.py" in /home/maoqh/projects/ordessa/worktrees/backend-loop/execution
+ succeeded in 0ms:
+"""Order 64: the running-execution inventory - our own runs, nothing else.
+
+The card answers "what is running *from us*", never "what is running on this
+machine": every row is explained by our own ledger (a turn in an active state
+or a queued item), and the fields we cannot obtain stay `null` with a reason -
+a pid is the only such field in practice, and it is `null` unless the side
+that runs the turn actually reported it.
+
+Bound and read-only by construction: one keyset-free bounded query, no
+cancellation surface, no machine-level process walk, and no host path in any
+row (the workspace is named by its record id and display name).
+"""
+from __future__ import annotations
+
+from typing import Any, Mapping
+
+from agent_box.storage import Database
+
+#: Turn states that mean "an execution of ours is in flight", mapped to the
+#: three states the product card shows.
+STATE_MAP = {
+    "accepted": "queued",
+    "dispatching": "running",
+    "running": "running",
+    "capturing": "running",
+}
+MAX_EXECUTIONS = 200
+
+
+class InventoryError(RuntimeError):
+    """A typed refusal of one inventory read."""
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(f"{code}: {message}")
+        self.code = code
+        self.message = message
+
+
+def list_executions(
+    database: Database, *, execution_port: Any = None, limit: int = MAX_EXECUTIONS,
+) -> list[dict[str, Any]]:
+    """Read the in-flight executions from the ledger, pid included if known."""
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= MAX_EXECUTIONS:
+        raise InventoryError("INVENTORY_LIMIT_INVALID", f"limit must be 1..{MAX_EXECUTIONS}")
+    with database.read() as conn:
+        rows = conn.execute(
+            "SELECT t.id AS turn_id,t.session_id,t.state,t.created_at,t.stop_requested_at,"
+            "t.profile_id,p.name AS profile_name,p.harness_type,"
+            "w.id AS workspace_id,w.display_name AS workspace_name,w.env_kind,"
+            "q.id AS queue_item_id "
+            "FROM server_turns t "
+            "JOIN server_sessions s ON s.id=t.session_id "
+            "JOIN server_profiles p ON p.id=t.profile_id "
+            "JOIN server_workspaces w ON w.id=s.workspace_id "
+            "LEFT JOIN server_queue_items q ON q.session_id=t.session_id AND q.state='pending' "
+            "WHERE t.state IN ('accepted','dispatching','running','capturing') "
+            "ORDER BY t.created_at, t.id",
+        ).fetchall()
+    if len(rows) > limit:
+        raise InventoryError(
+            "INVENTORY_LIMIT_EXCEEDED",
+            f"more than {limit} executions are in flight; refusing a partial list",
+        )
+    executions: list[dict[str, Any]] = []
+    for row in rows:
+        state = STATE_MAP.get(str(row["state"]), "running")
+        if row["stop_requested_at"]:
+            state = "stopping"
+        pid: int | None = None
+        pid_reason = "PID_NOT_REPORTED"
+        read_pid = getattr(execution_port, "pid_for", None)
+        if callable(read_pid):
+            pid = read_pid(str(row["turn_id"]))
+            if pid is not None:
+                pid_reason = None  # type: ignore[assignment]
+        executions.append({
+            "executionId": row["turn_id"],
+            "turnId": row["turn_id"],
+            "sessionId": row["session_id"],
+            "profileId": row["profile_id"],
+            "profile": row["profile_name"],
+            "harness": row["harness_type"],
+            "placement": str(row["env_kind"] or "wsl"),
+            "state": state,
+            "startedAt": row["created_at"],
+            "workspaceId": row["workspace_id"],
+            "workspace": row["workspace_name"] or row["workspace_id"],
+            "queueItemId": row["queue_item_id"],
+            "pid": pid,
+            "pidReason": pid_reason,
+            # The order's rule for the rest: only what we actually have.
+            "adapterPid": None,
+            "adapterPidReason": "ADAPTER_PID_NOT_REPORTED",
+        })
+    return executions
+
+
+# --- pin 4: KNOWN GAP (P-5 question to P): wrap/allocate failures have no
+# compensation registration. This pins current behaviour; E-INC1 will either
+# document the zero-side-effect promise or add registration — then update it.
+
+class _AllocFailTerminal(FakeTerminal):
+    def allocate(self):
+        raise RuntimeError("allocate refused after wrap")
+
+
+def test_allocate_failure_after_wrap_leaves_no_ledger_or_cleanup_entry():
+    binding, host, sandbox, _t, sentinel = _binding()
+    terminal = _AllocFailTerminal(binding.terminal_session_ref, host)
+    coord = _coordinator(binding, host, sandbox, terminal)
+    with pytest.raises(RuntimeError, match="allocate refused"):
+        coord.start(binding, _command(), execution_id="e4", dispatch_id="d1")
+    assert coord.ledger == {}          # no attempt recorded
+    assert coord._cleanup == {}       # nothing to compensate
+    assert sentinel.count == 0        # no native target created
+
+codex
+{"verdict":"reject","residual_gates":[{"item":"#2 INC1a omits execution/sidecar.py, so the E-owned agentbox-sidecar/runtime and subagent-bridge.mjs path assumptions are not removed.","blocks":"impl"},{"item":"#3 a-3 still assigns Core record creation to E and references an objective absent from ExecutionRequest. This contradicts the required S-owned record creation and would force E to fabricate or infer state.","blocks":"impl"},{"item":"#5 observe_execution has no specified implementation or proof-bearing reconciliation behavior, although INC1a claims the R4/R5 matrix transitions.","blocks":"impl"},{"item":"#1 Provider compensation and coordinator register-before-mutate remain gated on P-T2 and the C protocol/coordinator publication.","blocks":"later-increment"},{"item":"#3 The S adapter, resolve_all removal, and compatibility-shell removal remain INC1b/INC1c gates; the permanent S wire lock test is appropriate.","blocks":"later-increment"},{"item":"#4 Protocol release/terminate declarations and HostTransport terminate@1 remain prerequisites for INC2.","blocks":"later-increment"},{"item":"#6 Inventory implementation still reads Session/Turn tables rather than projecting Work Core facts; a concrete later path and acceptance test are required.","blocks":"later-increment"}],"notes":"The conceptual ownership and transition rules are substantially improved, and keeping bool cancel plus deferring resolve_all is acceptable. INC1a itself is not implementable as requested until the sidecar path deletion, S-owned Core fact boundary, and observe/reconciliation contract are made explicit in its per-path scope."}
+tokens used
+33,248
+{"verdict":"reject","residual_gates":[{"item":"#2 INC1a omits execution/sidecar.py, so the E-owned agentbox-sidecar/runtime and subagent-bridge.mjs path assumptions are not removed.","blocks":"impl"},{"item":"#3 a-3 still assigns Core record creation to E and references an objective absent from ExecutionRequest. This contradicts the required S-owned record creation and would force E to fabricate or infer state.","blocks":"impl"},{"item":"#5 observe_execution has no specified implementation or proof-bearing reconciliation behavior, although INC1a claims the R4/R5 matrix transitions.","blocks":"impl"},{"item":"#1 Provider compensation and coordinator register-before-mutate remain gated on P-T2 and the C protocol/coordinator publication.","blocks":"later-increment"},{"item":"#3 The S adapter, resolve_all removal, and compatibility-shell removal remain INC1b/INC1c gates; the permanent S wire lock test is appropriate.","blocks":"later-increment"},{"item":"#4 Protocol release/terminate declarations and HostTransport terminate@1 remain prerequisites for INC2.","blocks":"later-increment"},{"item":"#6 Inventory implementation still reads Session/Turn tables rather than projecting Work Core facts; a concrete later path and acceptance test are required.","blocks":"later-increment"}],"notes":"The conceptual ownership and transition rules are substantially improved, and keeping bool cancel plus deferring resolve_all is acceptable. INC1a itself is not implementable as requested until the sidecar path deletion, S-owned Core fact boundary, and observe/reconciliation contract are made explicit in its per-path scope."}

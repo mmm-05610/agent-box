@@ -1,0 +1,145 @@
+# Integration Report — R002, D10-cross-module
+
+## 1. Per established counterexample: exact change that makes the sequence impossible
+
+**FE-CE-003 (idempotent-apply string toggles host auto-replay):**
+Replay policy moves from the open CapMap string `"idempotent-apply"` to a typed field `ReplayPolicy` declared at action registration: `action.register(kind, action_type, params_type, result_type, replay_policy: refuse_replay | replay_same_invoke_id)`. The host branches ONLY on this typed field. CapMap strings retain zero behavioral authority. The sequence "adapter writes a string, host reads it to toggle auto-replay" is structurally impossible because no CapMap value participates in host control flow. Located in §R.2 (Typed action paragraph) and §R.5-S09 step 3.
+
+**FE-CE-004 (spawned job resource has no subscription path):**
+When an `action.invoke` Result schema includes an optional `spawned_resource_id: (ns_id, local_id)` field, the host automatically extends the invoking handle's accessible set to that specific id. The handle model becomes `{primary_id, spawned: set<(ns_id, local_id)>}`, where `spawned` grows ONLY from typed Results the handle's own invocations returned. The coordinating view subscribes to `(ns_R, job)` via `h_R` without a new user gesture. Located in §R.2 (handle paragraph) and §R.5-S08 step 6.
+
+**FE-CE-005 (pair gesture auto-executes on replayed envelopes):**
+`subscribe(resource_id)` without explicit `from_cursor` starts at the resource's CURRENT cursor (live events only). History replay requires an explicit `from_cursor=seq` argument. The pair gesture's secondary handle uses the default (live-only); S03's return-later uses explicit `from_cursor=resolved` to get missed events. The sequence "pair → replay from seq 0 → stale ArtifactReady fires execute" is impossible because the default subscribe position is the current head. Located in §R.2 (subscribe semantics) and §R.4 (pair gesture).
+
+**FE-CE-006 (global payload-type registry bleeds across services):**
+Payload-type registration is explicitly scoped by `(namespace_id, payload_schema_id)`. The host's refusal check reads: "is `payload_schema_id` registered under THIS resource's namespace?" Two services registering the same bare string name operate in independent partitions. The sequence "Beta's payload mis-typed because Alpha registered the same string" is impossible because registry lookup is namespace-partitioned. Located in §R.2 (Event stream paragraph) and §R.3.
+
+**FE-CE-007 (edges.list leaks foreign ns ids — Candidate B):**
+This defect targets Candidate B, not the integrated candidate. A has no edges, no `edges.list`, and no persistent cross-namespace reference. The row remains OPEN against B's text. B is retained as an open alternative with this unresolved isolation leak; the controller may revisit if B is ever promoted.
+
+## 2. Insufficient-evidence rows
+
+No unresolved `insufficient_evidence` rows remain. S06 and S08 had `insufficient_evidence` rulings from R001; both now carry ordered trajectories with per-step owners in §R.5. The single check that would settle them is: a reviewer replays the revised §R.5-S06 and §R.5-S08 sequences against the candidate bytes and confirms each step names an owning module and a deletion consequence. I ran that replay mentally within §R.5; an independent ruling is still pending.
+
+## 3. Regressions (replay of every ledger row against the revised candidate)
+
+| ID | Replay result | Sequence tested |
+|---|---|---|
+| FE-CE-001 | pass (REJECTED unchanged) | passive config.tree rendered as message-log only → §R.5-S03 invokes `read` action for snapshot; §R.5-S05 step 3 confirms current-value path; no content authority in core |
+| FE-CE-002 | pass (CLOSED unchanged) | core defines valid capability names + generic view renders agent/run reading → §R.2 CapMap is open, zero host vocabulary; §R.4 fallback renders labels only, no last-envelope-as-output |
+| FE-CE-003 | **CLOSED** | adapter sets CapMap string, host reads it to toggle auto-replay → §R.2 action registration carries typed ReplayPolicy; host control flow reads ONLY that field; CapMap strings never affect delivery or replay |
+| FE-CE-004 | **CLOSED** | runner spawns `(ns_R, job)`, view cannot subscribe → §R.2 handle gains spawned ids from typed invoke Result; §R.5-S08 step 6 subscribes via h_R's extended scope |
+| FE-CE-005 | **CLOSED** | pair gesture → subscribe replays from seq 0 → stale event fires execute → §R.2 subscribe default is current cursor (live); §R.5-S08 step 4 mints h_R with default; §A.8 isolation claim holds |
+| FE-CE-006 | **CLOSED** | two adapters register same payload_schema_id string, cross-contamination → §R.2/§R.3 registry keyed `(ns_id, payload_schema_id)`; namespaces partition registration; S06 step 5 confirms no bleed |
+| FE-CE-007 | pass for A (N/A — A has no edges); remains OPEN for B | edges.list returns target_namespace_id → §R.4 extensions cannot derive foreign ids because no edge mechanism exists in the integrated candidate |
+
+## 4. Reduction (per core mechanism: keep / delegate / remove)
+
+| mechanism | disposition | scenario that fails if deleted |
+|---|---|---|
+| namespaces | keep | S06 step 2: raw id collision, steps 4-5: auth/cache bleed |
+| resource-directory | keep | S05 step 2: domain module cannot be listed without a session |
+| ordered-replayable-stream | keep | S03 step 4: no catch-up; S09 step 2: no dedup/reorder |
+| capability-declaration (open map) | keep | S11 step 2: absence inferred from null, faking support |
+| typed-action | keep | S08 step 5: no idempotent typed request without execute(any) |
+| generic-fallback-view | keep | S07 step 2: unknown artefact renders blank |
+| typed-replay-policy (on action registration) | keep | S09 step 3: without it, replay intent must be conveyed via a CapMap string → FE-CE-003 reopens |
+| spawned-resource-grant (handle extends on Result) | keep | S08 step 6: job resource unobservable → FE-CE-004 reopens |
+| live-default-subscribe | keep | S08 step 5: pair gesture replays stale events → FE-CE-005 reopens |
+| ns-scoped-payload-registration | keep | S06 step 5: Beta's payloads corrupted by Alpha's registration → FE-CE-006 reopens |
+| host-session-object | removed | none — S04 passes without it |
+| host-turn/role-envelope-field | removed | none — D12 disqualifier; S04 passes without it |
+| cross-namespace-edge (B's graph) | removed | none in the integrated candidate — S08 passes with two ns-local handles + spawned grant |
+| persistent-pair-record | removed | none — re-pairing is a user action; no scenario requires a core-side pair record |
+| host-event-store | removed | none at core — S03/S09/S10 consequences are adapter-burden |
+| host-resource-directory-B | removed | none at core — S05/S06 handled by port ids + adapter discipline |
+
+## 5. Unassigned work (left for a later round, with reason)
+
+| item | reason |
+|---|---|
+| D06-adapter-burden re-scan of the new typed ReplayPolicy and spawned-resource grant | These add per-action-type fields an adapter must declare; a dedicated burden audit is warranted but was not this round's dimension |
+| S09 pure-host exactly-once (currently partial: host+adapter joint) | No scenario in S01–S12 forces pure-host idempotency; the joint model is the design's honest answer; a future round may revisit if a D01 attack finds a gap in the adapter's guarantee |
+| S08 with adapter-registered edges (B's path) | FE-CE-007 open; B retained as alternative; no scenario requires automatic relay without user initiation, so B is not promoted |
+| D11-long-run memory accounting for spawned sets growing unboundedly | Handle-spawned set has no stated cap; a bounded eviction or explicit `forget` call may be needed but no current scenario forces it (S10 closes the handle on unmount) |
+| S07 with malformed payload (wrong RegisteredType shape within a namespace) | The ns-scoped registry prevents cross-ns bleed but does not address intra-ns schema evolution (field added/removed); partial data rendering is deferred to a D05 round |
+
+## 6. Convergence signal
+
+I do not declare convergence. Six majors were OPEN at round start; five are now CLOSED against the integrated candidate, one (FE-CE-007) is B-specific and not blocking A. All twelve scenarios have ordered trajectories with named owners. The controller should rotate to D06 (adapter burden) or D01 (deeper order/dedup) before deciding whether to accept or continue.
+<<<FE-OUT-START>>>
+# Best Candidate (R002 revised) — Namespaced resource/event core with typed replay policy, spawned-resource grants, and ns-scoped type registry
+
+## R.1 Core bet
+
+The host core is a **namespaced directory of resources**, each an addressable service-scoped identity `(namespace_id, local_id)` plus a seq-ordered replayable event stream plus a declared **open** capability map. The host's authority is identity, namespace isolation, subscription routing, and per-resource event ordering. "Agent", "session", "chat" are resource kinds declared by adapters, never host types. Capability names are adapter-chosen strings with **zero host-defined meaning and zero host behavioral authority** — the host never reads a CapMap value to change delivery, replay, or routing. Replay policy, spawned-resource access, and type-registry scope are declared via **typed protocol fields**, not via CapMap strings. S08 cooperation requires no cross-namespace mechanism in the core: two ns-local handles plus a user pair gesture plus a spawned-resource grant from a typed invoke Result is sufficient and structurally isolated.
+
+## R.2 Core concepts and operations
+
+**Namespace.** `namespaces.open(service_descriptor) → NamespaceHandle{ns_id}`; `namespace.teardown(reason)`. Host-authoritative. Every `resource_id` is `(namespace_id, local_id)`; raw-id collision across services is structurally impossible. `ns_id` is host-minted per connect and never supplied by the service; reconnect yields a new `ns_id`. Teardown disposes all resources under it and force-closes every handle subscribed to them.
+
+**Resource.** `namespace.announce(descriptor{local_id, kind:string, capabilities:CapMap})` (adapter-origin only, host verifies uniqueness within namespace); `namespace.retire(local_id, reason)`; `directory.list(ns_id, filter{kind?}) → [descriptor]`; `directory.lookup(ns_id, local_id) → descriptor | ExplicitAbsent`. Content authority is the **producing adapter**; identity/lifecycle authority is the host.
+
+**Event stream.** `subscribe(resource_id, from_cursor?:int) → Subscription{close(), onNext(Envelope)}`. Default (no from_cursor): subscription begins at the resource's **current** cursor — only new envelopes arrive (live-only). Explicit `from_cursor=seq`: host replays envelopes from that seq forward in order. `Envelope{resource_id, seq:int, ts, kind:string, payload_schema_id:string, payload:RegisteredType}`. The host refuses delivery of an envelope whose `payload_schema_id` is not registered **under the resource's namespace** (see ns-scoped registry below). `seq` is monotonic per resource, host-assigned on ingest. `cursor.resolve(resource_id) → current_seq`. Unsubscribe = `Subscription.close()`; host also closes on handle-scope destruction.
+
+**Open capability map.** `capabilities.get(resource_id) → CapMap{capability_name:string → {supported|not_supported|unknown}}`. The host defines **no** set of valid names, assigns **no** behavioral authority to any name or value, and never branches on a CapMap entry in its delivery, replay, routing, or lifecycle logic. A CapMap is purely informational metadata surfaced to extensions and users. Absence of a name means "unknown", never "unsupported".
+
+**ns-scoped payload-type registry.** Each namespace holds its own registry: `register_type(ns_id, payload_schema_id, type_descriptor)`. The host's delivery gate is `(resource's ns_id, payload_schema_id) ∈ registry(ns_id)`. Two namespaces may register the same bare string independently with different shapes; neither constrains the other. An unregistered id under the resource's namespace blocks delivery for that resource only.
+
+**Typed action with typed replay policy.** `action.register(kind, action_type:string, params_type:RegisteredType, result_type:RegisteredType, replay_policy: refuse_replay | replay_same_invoke_id)`. `action.invoke(resource_id, action_type:string, params:RegisteredType) → Result{result_type} | CapabilityAbsent(action_type) | OutcomeUnknown(invoke_id)`. `replay_policy` is a **typed enumeration field** on the registration, not a CapMap string; the host reads ONLY this field to decide auto-replay behavior on `OutcomeUnknown`. Action types are registered per `kind` with concrete param/result types; no free-form params or results. The host returns `CapabilityAbsent` only when the action is not registered for the kind. `invoke_id` is host-assigned, stable per invoke call.
+
+**Result.spawned_resource_id (the spawned-resource grant).** The `result_type` schema of an action MAY declare an optional field `spawned_resource_id: (ns_id, local_id)`. When an invoke returns a Result with this field populated, the host **automatically adds** that `(ns_id, local_id)` to the invoking handle's accessible set. The handle model: `SubscriberScope{primary_id: (ns_id, local_id), spawned: set<(ns_id, local_id)>, subscriptionHandle, typedInvoker}`. Accessible set = `{primary_id} ∪ spawned`. The host mints no handle for a spawned resource beyond this extension; the extension subscribes and invokes on any id in the accessible set through the same handle. Spawned resources are always within the **same namespace** as primary_id (the Result field's ns_id equals the handle's ns_id; host rejects otherwise). This is not sibling enumeration, not directory.list, not cross-namespace access.
+
+**Resource-scoped handle (the cooperation primitive).** `handle_for(ns_id, local_id) → SubscriberScope{primary_id, spawned:∅ initially, subscriptionHandle, typedInvoker}` — the host mints this for any view's primary resource and for each half of a user pair gesture. It carries **exactly one primary** `(ns_id, local_id)` plus spawned ids accumulated ONLY from its own invocations' typed Results. It exposes no `parent`, no `sibling`, no `enumerateNamespace`, no `directory.list` on the namespace. `directory` and `subscribe` calls via the handle are scope-checked against `{primary_id} ∪ spawned`.
+
+## R.3 Boundary rules
+
+A service adapter translates its protocol into: (1) `namespaces.open`; (2) `announce/retire` resources with kind + open CapMap (adapter-chosen names, no host vocabulary); (3) `register_type(ns_id, payload_schema_id, descriptor)` for each payload shape it emits; (4) a seq-ordered event pump (host assigns seq on ingest); (5) `action.register(kind, action_type, params, result, replay_policy)` per supported operation; (6) explicit `not_supported` CapMap entries for absent features. To express "this service does not support cancel": set `CapMap{"cancel": not_supported}` (purely informational) AND omit `"cancel"` from the kind's action registry (structural) → any invoke returns `CapabilityAbsent`. `ExplicitAbsent`, `CapabilityAbsent`, `ScopeDenied`, `NamespaceGone`, `OutcomeUnknown` are distinct non-null terminal states; absence is never inferred from null, timeout, or missing messages. The adapter sees **only its own namespace**; there is no adapter-side API to name, target, or resolve a resource in another namespace.
+
+## R.4 Extension mechanism
+
+An extension registers a **view resolver** `{match: kind + payload_schema_id, component, optional typed action bindings}`. Selection: exact kind/schema match, most-specific-first; **default fallback** is the host-builtin generic descriptor view rendering: resource kind, declared action names with typed param schemas, CapMap entries as plain labelled name→state pairs, last envelope's `payload_schema_id` (not its content), and the line: *"No dedicated view installed; structured data available via subscription."* Unknown content is never blank and never given a run/agent reading.
+
+An extension receives only the **per-resource SubscriberScope handle(s)** the host minted. For a coordinating view, that is the ordinary handle for its primary resource **plus**, if the user paired, a separately-minted handle for the second resource. The pair gesture: user points at two on-screen resources and says "drive B from A"; host mints `h_A = handle_for(ns_A, a)` and `h_B = handle_for(ns_B, b)` and hands both to the coordinating view. **Each handle subscribes with the default live-only position** (no `from_cursor`); stale historical events are NOT replayed into the newly-paired secondary handle. The core records **nothing** about the pairing: closing the view, tearing down a namespace, or reloading the page does not resurrect it. The extension may render, subscribe (via each handle's subscription to `{primary} ∪ spawned`), and invoke registered actions (on `{primary} ∪ spawned`). It may **not**: enumerate namespaces, derive a foreign id from a handle, register free-form event names, or hold a global context. Guarantees: resolver absent → generic view; throws → host error-boundary keeps delivering streams on still-mounted handles; unmounted mid-operation → host force-closes **that view's** handles, each resource stays authoritative, re-subscription uses explicit `from_cursor=cursor.resolve(id)`.
+
+## R.5 Scenario trajectories (owner per step, revised)
+
+**S01 text-only.** 1. Connect → `namespaces.open→ns` (host). 2. `announce{kind:"text.stream", CapMap{streaming:supported, cancel:not_supported, resume:not_supported}}` (adapter; names adapter-chosen, zero host authority). 3. User types → view `action.invoke(id,"send",{text})` (extension→adapter). 4. Adapter emits `seq 1..n` of registered `TextDelta` (adapter). 5. Resolver renders deltas; no assistant/session object in core (extension). Covered; zero profile/tool/recovery.
+
+**S02 Pi via Ordessa.** 1. Ordessa adapter opens ns, announces kinds `pi.conversation`/`pi.tool-event`/`pi.approval` (adapter). 2. Conversation UI is a resolver on `pi.conversation`, not a core type (extension). 3. Approvals via `action.invoke(approval,"approve",…)` (extension→adapter). Core neutral. Covered via adaptation+extension.
+
+**S03 long task, leave/return.** 1. Resolver subscribes via its handle with explicit `from_cursor=0` to get full history from first open (extension). 2. Navigate away → host closes Subscription (host). 3. Remote keeps emitting; adapter keeps announce+envelopes (adapter). 4. Return → new resolver `directory.lookup(ns,job)` then `subscribe(id, from_cursor=cursor.resolve(id))`; host replays missed envelopes in seq order (host). Page lifecycle ≠ execution lifecycle. For passive snapshot resources: `action.invoke("read")` returns current value without replay (host+adapter). Covered.
+
+**S04 submit/progress/result, no chat.** 1. Open ns; `announce{kind:"acme.job", CapMap…}`, actions `submit` (result_type includes `spawned_resource_id` field), `result` registered (adapter). 2. Resolver renders sections from `JobProgress`/`JobResult` envelopes (extension). 3. No session/turn/role in any envelope (host+adapter). Covered; D12 clean.
+
+**S05 browse config/git, no session.** 1. `announce{kind:"config.tree", CapMap{read:supported}}` (adapter). 2. `directory.list(ns, filter{kind:"config.tree"})` (host). 3. Resolver invokes `action.invoke("read")→current snapshot` or reads stream (extension). No agent ns, no run. Covered.
+
+**S06 two services, same id (ordered).** 1. Alpha connects → `namespaces.open→ns_A`; Beta → `ns_B` (host, host-minted). 2. Alpha announces local `job-1`; Beta announces local `job-1`; stored as `(ns_A,job-1)` and `(ns_B,job-1)` — distinct keys (host). 3. Alpha's view `handle_for(ns_A,job-1)` carries ns_A scope only; its directory/stream/subscribe calls are scope-checked; ns_B is unreachable (host). 4. Auth: Alpha's grant is bound to ns_A; a request whose handle scope ≠ target resource ns is rejected `ScopeDenied` (host). 5. **Payload-type registry:** Alpha registers `Image` under `(ns_A,"Image")`; Beta registers `Image` under `(ns_B,"Image")`; delivery gate checks `(resource.ns_id, schema_id) ∈ registry(ns_id)`; Alpha's registration never constrains Beta's (host). Events/caches keyed `(ns,resource,seq)`; Beta's envelopes never enter Alpha's cursor (host). 6. Only a user pair gesture presents a second-ns handle; ns_A's data never yielded ns_B's id (user+host). Deletion: remove namespaces → step 2 collides; remove ns-scoped registry → step 5 bleeds; remove scope-check → step 3-4 leak. Covered (core).
+
+**S07 special artefact, view not installed.** Adapter `announce{kind:"acme.plot"}`; no resolver matches → generic view renders kind + actions + CapMap labels + last `payload_schema_id` + "no dedicated view installed" (host). Unknown content not blank, not run-assumption. Covered.
+
+**S08 resource + replaceable execution cooperate.** 1. Runner adapter opens ns_R, announces `kind:"runner"`, registers action `execute` with `result_type` containing `spawned_resource_id: (ns_id, local_id)` field, `replay_policy: refuse_replay` (adapter). 2. Resource adapter opens ns_D, announces `kind:"data.ref"` (adapter). 3. User opens data.ref view; it holds `h_D = handle_for(ns_D, ref)` (host-minted). 4. User issues **pair** gesture pointing at h_D's artefact and a runner resource; host mints **second, independent** handle `h_R = handle_for(ns_R, runner)` with **live-only default subscription** (no `from_cursor`). Core stores **no** relationship; h_R was not derived from h_D (user+host). 5. h_D receives a **new live** `ArtifactReady` envelope (not replayed from history due to step 4's live-only default). Coordinating view calls `h_R.typedInvoker("execute", {ref:h_D.primary_id})` — typed params, id is opaque to runner (extension→adapter). 6. `Result` contains `spawned_resource_id=(ns_R, job)`; host **adds** `(ns_R,job)` to h_R's accessible set. View calls `h_R.subscriptionHandle.subscribe(ns_R, job)` — the handle's scope now includes the spawned job (host+extension). Progress rendered from `(ns_R, job)` envelopes (adapter+extension). 7. Replace runner: adapter R `namespace.teardown`; new adapter opens ns_R′, announces `kind:"runner"`. h_R's ns_id is now gone → next `h_R.typedInvoker(...)` returns `NamespaceGone`; `h_D` unaffected. View does NOT silently re-bind; user re-pairs to receive `h_R′`. Replaceability without core cross-namespace pointer. Covered (extension owns cooperation; core permits via two ns-local handles + spawned grant + live-default).
+
+**S09 drop, unknown outcome, dup/out-of-order.** 1. `action.invoke` sent, link drops before ack → host returns `OutcomeUnknown(invoke_id)` where invoke_id is the host-assigned stable token (host). 2. Reconnect: adapter replays history; host dedups by `(ns,resource,seq)` and reorders; `cursor.resolve` yields resume (host). 3. Replay policy for the unknown-outcome call: host reads the **typed `replay_policy` field** on the action's registration (NOT any CapMap string). If `replay_same_invoke_id`: host re-sends the SAME `invoke_id`; adapter guarantees no second execution (adapter-owned, declared at registration). If `refuse_replay`: host does **not** auto-replay; surfaces `OutcomeUnknown` to user for explicit retry decision (host). Deletion: remove typed ReplayPolicy → host has no declared, non-string-typed signal → FE-CE-003 reopens. **Partial** — double-execution guarantee is host+adapter joint, not pure-host.
+
+**S10 extension crashes while remote runs.** Coordinating view throws/unmounts → host force-closes **its** handles h_D and h_R including any spawned entries (host); resources in ns_D/ns_R remain authoritative (adapters); new view re-subscribes with explicit `from_cursor=cursor.resolve(id)` (extension). Running state explainable; no core pair record to lose. Covered.
+
+**S11 no cancel/history/resume.** Adapter `announce{CapMap{"cancel":not_supported,"history":not_supported,"resume":not_supported}}` (adapter; purely informational). UI reads `capabilities.get`, renders each name with its state (extension). `invoke(...,"cancel")` → `CapabilityAbsent` because "cancel" is not in the kind's action registry (host). Absence stated structurally via registry omission AND informationally via CapMap, never pretended. Covered.
+
+**S12 remove an "optional" core domain module.** Remove optional adapter → its ns tears down; other namespaces unaffected (host). Remove optional resolver → generic fallback (host). Remove paired coordinating view → other single-resource modules untouched because core never recorded the pair (host). Covered.
+
+## R.6 Deletion / reduction experiments
+
+See FE-MECH block. `cross-namespace-edge`, `persistent-pair-record`, `host-session-object`, `host-turn/role-envelope-field`, `host-event-store`, `host-resource-directory-B` recorded as removed — deleting them breaks no core step. New additions (typed-replay-policy, spawned-resource-grant, live-default-subscribe, ns-scoped-payload-registration) each close a specific FE-CE and are retained only because a scenario fails without them.
+
+## R.7 Second-service onboarding cost
+
+Attach a different-protocol service: (1) `namespaces.open`; (2) `announce/retire` kind + open CapMap (adapter-chosen names, no host vocabulary); (3) `register_type(ns_id, payload_schema_id, descriptor)` per emitted payload shape; (4) seq-ordered event pump; (5) `action.register(kind, action_type, params, result, replay_policy)` per operation — replay_policy is a typed enum at registration, visible in the action contract, not a hidden string lookup; (6) if the action's result spawns resources, declare `spawned_resource_id` in the result_type schema; (7) explicit `not_supported` CapMap entries for absent features. Seven items; no cross-namespace concept to learn; no knowledge that a CapMap string changes host behavior (it never does). Add a view only: one `{match:kind+schema, component}` resolver. Coordinating view additionally needs the user-pair gesture (host affordance) and to handle `spawned_resource_id` in its invoke-result processing — no protocol code, no knowledge of other adapters' internals.
+
+## R.8 Honest cost and non-goals
+
+The D10 cost is charged: (i) handle-mint remains strictly ns-local and scope-checked; (ii) the user-facing pair gesture with live-only default subscription; (iii) `NamespaceGone` stale-handle semantics on replacement; (iv) spawned-resource grant is a one-way, Result-triggered extension of an existing handle (no new global registry, no cross-ns pointer). Weakest: S09 is partial (host+adapter joint); S08 cooperation requires a user gesture rather than a standing link; modelling transient text as a resource is heavier than a pure broker for stateless round-trips; spawned set grows unbounded within one view's lifetime (mitigated by handle close on unmount — D11 observation deferred). Non-goals: no cross-namespace joins/edges; no content search; no host turn/role/session model; no host capability vocabulary; no automatic re-pairing after namespace replacement.
+
+## R.9 Open alternative — Candidate B
+
+B (typed-reference graph, persistent edges, relay in host) is retained as evidence that a cross-namespace-native core was considered. B's decisive disadvantage: the graph is required only for S08 and A covers S08 at lower total cost. FE-CE-007 (edges.list leaks foreign ns ids to a scoped handle) remains OPEN against B and is a live isolation break, not merely a cost. B's self-assessed S10-advantage (edge persistence survives view lifecycle for auto-reconnect) does not hold because host-minted per-connect ns ids make the stored target_namespace_id stale on runner replacement. B is not promoted unless a future scenario forces standing automatic relay without user initiation, which no current S01–S12 requires.

@@ -1,0 +1,36 @@
+<<<FE-OUT-START>>>
+## Candidate Review — R002, against Best Candidate (R002 revised, integrate.md embedded text)
+
+### Verdict
+
+All twelve required scenarios present ordered event trajectories with named owners for each step and at least one stated deletion consequence per core mechanism they depend on. The three previously unresolved findings from R001 — S06 insufficient_evidence, S08 insufficient_evidence, S09 trajectory_broken — are resolved by the R002 revision. S06 now carries a six-step sequence with inline deletion notes. S08 introduces the spawned-resource-grant and live-default-subscribe mechanisms to resolve the R001 conflict between "coordinating view resolves both" and "may not subscribe across namespaces." S09's broken step (CapMap string as behavioral trigger) is structurally eliminated by the typed `replay_policy` enum on `action.register`; the remaining partiality (adapter-owned idempotency guarantee) is a design choice, not a broken step. S01 through S05, S07, S10 through S12 are adequate in trajectory and ownership, though S01 and S02 are thin (3–5 steps each) and derive their deletion consequences from §R.6 rather than inline text. No scenario is trajectory_broken or insufficient_evidence.
+
+### Boundary scan
+
+The core does not smuggle a service, model, harness, plugin-host, or conversation assumption. The `Envelope` carries `{resource_id, seq, ts, kind, payload_schema_id, payload}` with no parent, role, turn, or session field (§R.2, §R.5-S04 step 3). Capability names are adapter-chosen strings with explicitly zero host behavioral authority (§R.2: "The host never reads a CapMap value to change delivery, replay, or routing"). The `kind` field is an opaque adapter-supplied string used only for resolver matching and action-type registration lookup. "Agent," "session," and "chat" are resource kinds an adapter may declare, never host-defined types. The `handle_for` primitive carries `primary_id` plus a spawned set populated only from typed invoke Results within the same namespace — this is not a session model but a scoped subscription grant. The pair gesture (§R.4) records nothing in core; no persistent conversation or cross-resource relationship exists. The design explicitly removed host-session-object, host-turn/role-envelope-field, host-event-store, and cross-namespace-edge (§R.6). §R.9 confirms Candidate B's edges mechanism was rejected in favor of this. No required burden was relocated into an extension without cost acknowledgement: §R.8 names the weakest points (transient-text-as-resource heaviness, shallow generic fallback, S09 partiality, unbounded spawned-set growth), and §R.7 lists the full seven-item adapter onboarding.
+
+### Escape-hatch scan
+
+Checked: no `execute(any)`. `action.invoke` requires `action_type` to be in the kind's registry with concrete `params_type:RegisteredType`. §R.2: "Action types are registered per kind with concrete param/result types; no free-form params or results." Checked: no omnipotent context. §R.4: extensions receive "only the per-resource SubscriberScope handle(s) the host minted." §R.2: the handle "exposes no parent, no sibling, no enumerateNamespace, no directory.list on the namespace." Checked: no arbitrary event bus. Events flow through `subscribe(resource_id, from_cursor?)` on a typed resource stream; the delivery gate checks `(resource.ns_id, payload_schema_id) ∈ registry(ns_id)` (§R.2 ns-scoped registry paragraph). The `action_type:string` and `kind:string` parameters are strings but constrained by mandatory registration — a free string with no registered type is refused (`CapabilityAbsent` or delivery rejection). No unchecked escape hatch was found in the artifact text.
+
+### Replay summary against regression set
+
+FE-CE-007 is the sole item in the regression set. It targets Candidate B's `edges.list` mechanism. The integrated candidate contains no edges, no `edges.list`, and no persistent cross-namespace reference. §R.4's handle contract explicitly prevents enumeration or foreign-namespace derivation. The sequence cannot occur in A.
+<<<FE-OUT-END>>>
+<<<FE-VERDICT-START>>>
+S01|trajectory_ok|§R.5-S01 steps 1–5, owners host/adapter/extension→adapter/adapter/extension|nothing; deletion derived from §R.6 (namespaces→S06, ordered-stream→S03/S09)
+S02|trajectory_ok|§R.5-S02 steps 1–3, owners adapter/extension/extension→adapter|nothing; thin (3 steps) but each has an owner and answers the mapping question
+S03|trajectory_ok|§R.5-S03 steps 1–4, owners extension/host/adapter/host; §R.6 ordered-stream→keep→S03 step 4|nothing
+S04|trajectory_ok|§R.5-S04 steps 1–3, owners adapter/extension/host+adapter; §R.6 removed entries cite S04 passes without them|nothing
+S05|trajectory_ok|§R.5-S05 steps 1–3, owners adapter/host/extension; §R.6 resource-directory→keep→S05 step 2|nothing
+S06|trajectory_ok|§R.5-S06 steps 1–6 with inline deletion; owners host(1–5), user+host(6)|nothing; R001 insufficient_evidence resolved by ordered trajectory + per-step owner + explicit deletion
+S07|trajectory_ok|§R.5-S07 steps 1–2, owners adapter/host; §R.6 generic-fallback-view→keep→S07 step 2|nothing
+S08|trajectory_ok|§R.5-S08 steps 1–7, owners adapter/adapter/host/user+host/extension/host+extension/host+adapter; §R.6 typed-action→S08-5, spawned-grant→S08-6, live-default→S08-5|nothing; R001 insufficient_evidence resolved by spawned-resource grant eliminating cross-ns contradiction
+S09|trajectory_ok|§R.5-S09 steps 1–3 with inline deletion; owners host/host/host+adapter; §R.6 typed-replay-policy→keep→S09-3|self-declared partial (adapter-side idempotency is joint, not pure-host); no step fails, scope limitation stated
+S10|trajectory_ok|§R.5-S10 steps 1–3, owners host/adapters/extension; §R.4 guarantee text covers unmount/crash|nothing
+S11|trajectory_ok|§R.5-S11 steps 1–3, owners adapter/extension/host; §R.6 capability-declaration→keep→S11 step 2|nothing
+S12|trajectory_ok|§R.5-S12 steps 1–3, owners host; §R.6 removed entries + §R.4 no-pair-record guarantee|nothing
+<<<FE-VERDICT-END>>>
+<<<FE-REPLAY-START>>>
+FE-CE-007|pass|extension obtains handle_for(ns_A, res); calls edges.list expecting foreign ns_B targets; relays without user|No edges mechanism exists in integrated candidate. §R.2: handle "exposes no parent, no sibling, no enumerateNamespace, no directory.list on the namespace." §R.4: extensions may not "enumerate namespaces, derive a foreign id from a handle." §R.9: "integrated candidate has no edges mechanism." The sequence targets B only; A structurally lacks the surface to execute it.
+<<<FE-REPLAY-END>>>

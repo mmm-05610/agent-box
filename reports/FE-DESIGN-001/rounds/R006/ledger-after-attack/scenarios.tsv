@@ -1,0 +1,13 @@
+sid|status|owner|mechanism|evidence|round
+S01|claimed|core|text.stream resource; typed-action send; ordered-stream delivery; namespaces/CapMap named non-load-bearing for S01|rounds/R004/integrate.md §R4.5-S01|R004
+S02|claimed|adaptation|pi kinds via announce + resolver + approve/send typed actions; per-step deletion for announce/stream/typed-action|rounds/R004/integrate.md §R4.5-S02|R004
+S03|claimed|core|explicit from_cursor=0 history, cursor.resolve return-later replay, read snapshot|rounds/R004/integrate.md §R4.5-S03|R004
+S04|claimed|core|submit/progress/result resources + typed-action + ordered-stream; no chat object; host-session-object confirmed removed|rounds/R004/integrate.md §R4.5-S04|R004
+S05|claimed|core|config.tree resource; directory.list; read action|rounds/R004/integrate.md §R4.5-S05|R004
+S06|claimed|core|namespaced ids; scope-checked handles; per-namespace action registry (payload store removed — FE-CE-006 closed, no shared key)|rounds/R004/integrate.md §R4.5-S06|R004
+S07|claimed|core|generic fallback renders kind/actions/CapMap/schema label; unregistered schema lands in fallback|rounds/R004/integrate.md §R4.5-S07|R004
+S08|claimed|core|two ns-local handles via user pair + explicit current-cursor mint (FE-CE-005) + spawned grant (FE-CE-004) + NamespaceGone re-pair|rounds/R004/integrate.md §R4.5-S08|R004
+S09|partial|core|host dedup/reorder (ns,resource,seq); fixed never-auto-resubmit; adapter-owned idempotency; double-execution is host+adapter joint|rounds/R004/integrate.md §R4.5-S09|R004
+S10|claimed|core|handle force-close on unmount incl spawned; cursor.resolve replay; no pair record|rounds/R004/integrate.md §R4.5-S10|R004
+S11|claimed|core|open CapMap informational + CapabilityAbsent structural; fixed enum reopens FE-CE-002|rounds/R004/integrate.md §R4.5-S11|R004
+S12|claimed|adaptation|namespace teardown isolates; generic fallback for removed resolver; recorded absence of pair|rounds/R004/integrate.md §R4.5-S12|R004

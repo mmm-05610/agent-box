@@ -1,0 +1,79 @@
+Reviewing the saved best candidate (digest b93d2dbedec5) as the cold, independent verifier for R002.
+
+<<<FE-OUT-START>>>
+# Independent Review — R002 Candidate (b93d2dbedec5)
+
+## Scenario rulings
+
+The artifact provides ordered trajectories with named per-step owners for all twelve scenarios. However, only S06 and S08 state per-step deletion consequences ("remove namespaces → step 2 collides; remove ns-scoped registry → step 5 bleeds; remove scope-check → step 3-4 leak" in S06; "core permits via two ns-local handles + spawned grant + live-default" in S08 with R.6 arguments mapped to specific steps). The remaining ten scenarios have ordered sequences and owners but do not state, for each core step within the trajectory, what specifically fails if that step's owning mechanism is deleted. The R.6 table gives mechanism-level deletion arguments but does not bind them back into the step-by-step text of each scenario's trajectory. Under the role contract's three-part test (ordered sequence + named owner per step + deletion consequence per core step), ten scenarios are `insufficient_evidence`.
+
+S09 is labeled "Partial" by the artifact itself: the double-execution guarantee is host+adapter joint, not pure-host. The trajectory is ordered with owners and the host's mechanism for dedup/reorder/resume is stated. The missing deletion-consequence binding is the same as the other nine, plus the self-declared partiality on the exactly-once claim.
+
+S03 has an interesting asymmetry: step 1 uses `from_cursor=0` for the initial open (getting full history), while S08 step 4's pair gesture uses the default live-only position. The artifact distinguishes these two use-cases explicitly in R.2 ("Default (no from_cursor): subscription begins at the resource's current cursor") and R.4 ("Each handle subscribes with the default live-only position (no from_cursor)"). This correctly separates the return-later catch-up (S03) from the pair gesture (S08), closing FE-CE-005.
+
+## Boundary scan
+
+No service, model, harness, plugin-host or conversation assumption is smuggled into the core. The artifact's host authority is explicitly limited to "identity, namespace isolation, subscription routing, and per-resource event ordering" (R.1). "Agent", "session", "chat" appear only as adapter-chosen kind strings. The `Envelope` structure contains no `role`, `turn`, `assistant`, or `session` field. The generic fallback view (R.4) renders CapMap entries as "plain labelled name→state pairs" with no invocation button and no "last envelope as output" treatment.
+
+No required burden is relocated to "an extension provides it" without extension-author cost being stated. The pair gesture (S08 step 4) is a user-facing host affordance, not a hidden extension burden. The spawned-resource handling requires the extension to process a typed Result field, which is stated in R.7's item (6): "if the action's result spawns resources, declare `spawned_resource_id` in the result_type schema." This is an adapter-side cost, stated. Extension authors need to handle `spawned_resource_id` in invoke-result processing (R.7: "Coordinating view additionally needs the user-pair gesture... and to handle spawned_resource_id in its invoke-result processing — no protocol code, no knowledge of other adapters' internals").
+
+## Escape-hatch scan
+
+Checked for `execute(any)`: R.2's typed action states "`action_type`s are registered per `kind` with concrete param/result types; no free-form params or results." The `action.invoke` signature takes `action_type:string` with `params:RegisteredType` — the type is registered at `action.register` time. No untyped escape hatch.
+
+Checked for omnipotent context: R.4 states the extension receives only "per-resource SubscriberScope handle(s) the host minted" with fields `{primary_id, spawned, subscriptionHandle, typedInvoker}`. It explicitly "may not: enumerate namespaces, derive a foreign id from a handle, register free-form event names, or hold a global context." No capability grab-bag.
+
+Checked for arbitrary event bus: R.2's subscribe is scoped to a specific resource_id and gated by the handle's accessible set (`{primary_id} ∪ spawned`). R.4 prohibits "subscribe across namespaces." Event delivery is per-resource with ns-scoped type registration. No global bus.
+
+## Replay rulings
+
+All seven ledger counterexamples traced through the artifact's own stated mechanism:
+
+FE-CE-001 (REJECTED, re-confirmed): Sequence "passive config.tree has no current-value path, only seq-replay" → artifact provides `action.invoke("read") → current snapshot` (R.5-S05 step 3, R.2 typed action). Host treats result as opaque `RegisteredType`. Cannot happen. Pass.
+
+FE-CE-002 (CLOSED, re-confirmed): Sequence "adapter writes CapMap name, host treats it specially" → R.2 "host defines no set of valid names, assigns no behavioral authority, never branches on a CapMap entry." R.1 "zero host behavioral authority." Cannot happen. Pass.
+
+FE-CE-003 (CLOSED): Sequence "adapter sets CapMap string 'idempotent-apply', host reads it to toggle auto-replay" → R.2 "replay_policy is a typed enumeration field on the registration, not a CapMap string; the host reads ONLY this field." R.5-S09 step 3 "host reads the typed replay_policy field (NOT any CapMap string)." Cannot happen. Pass.
+
+FE-CE-004 (CLOSED): Sequence "runner spawns (ns_R, job), coordinating view has no subscription path" → R.2 handle model includes `spawned: set<(ns_id, local_id)>` grown from typed Results. R.4 "extension may subscribe and invoke on any id in the accessible set." R.5-S08 step 6 "host adds (ns_R,job) to h_R's accessible set." Cannot happen. Pass.
+
+FE-CE-005 (CLOSED): Sequence "pair gesture → subscribe replays from seq 0 → stale ArtifactReady fires execute" → R.2 "Default (no from_cursor): subscription begins at the resource's current cursor — only new envelopes arrive (live-only)." R.4 "Each handle subscribes with the default live-only position." R.5-S08 step 4 "live-only default subscription (no from_cursor)" and step 5 "h_D receives a new live ArtifactReady envelope (not replayed from history due to step 4's live-only default)." Cannot happen. Pass.
+
+FE-CE-006 (CLOSED): Sequence "two adapters register same payload_schema_id, cross-contamination" → R.2 "each namespace holds its own registry: register_type(ns_id, payload_schema_id, type_descriptor). The host's delivery gate is (resource's ns_id, payload_schema_id) ∈ registry(ns_id)." R.5-S06 step 5 "Alpha's registration never constrains Beta's." Cannot happen. Pass.
+
+FE-CE-007 (B-specific, N/A for integrated candidate): Sequence "edges.list leaks foreign ns ids to scoped handle" → The integrated candidate has no `edges`, no `edges.list`, no cross-namespace edge, no persistent pair record. R.9 confirms. R.4 extension rules prohibit "derive a foreign id from a handle." Cannot happen in the integrated candidate. Pass.
+
+## Summary
+
+The integrated candidate is self-consistent on the D10 cross-module dimension. The FE-CE-003 through FE-CE-006 closures are structurally sound: each moves authority from a string-typed shared channel to a typed protocol field or ns-scoped partition, making the adversarial sequence impossible by construction rather than by policy. The S06 and S08 trajectories are the strongest in the artifact, providing per-step owners and explicit deletion arguments. The remaining ten scenarios have the structural prerequisites for coverage (ordered sequences, named owners) but lack the per-step deletion consequence binding that the convergence contract requires. A single addition — one sentence per scenario stating "remove [mechanism named for this step] → [specific observable failure at this step]" — would upgrade them to `trajectory_ok` without changing the design.
+<<<FE-OUT-END>>>
+<<<FE-VERDICT-START>>>
+S01|insufficient_evidence|§R.5-S01 steps 1-5|no per-step deletion consequence stated; only sequence and owners present
+S02|insufficient_evidence|§R.5-S02 steps 1-3|no per-step deletion consequence stated; mechanism is "adaptation" but core dependency per step unbound
+S03|insufficient_evidence|§R.5-S03 steps 1-4|ordered trajectory with owners present; no "remove X → step Y fails" bound to individual core steps
+S04|insufficient_evidence|§R.5-S04 steps 1-3|D12 clean; owners named; per-step deletion consequence absent
+S05|insufficient_evidence|§R.5-S05 steps 1-3|current-value path via invoke("read") stated; per-step deletion consequence absent
+S06|trajectory_ok|§R.5-S06 steps 1-6 with explicit deletion line|nothing
+S07|insufficient_evidence|§R.5-S07 single-pass narrative|ordered content present but per-step deletion consequence not stated
+S08|trajectory_ok|§R.5-S08 steps 1-7 with R.6 per-mechanism binding|nothing
+S09|insufficient_evidence|§R.5-S09 steps 1-3 marked Partial|artifact self-declares partial; no per-step deletion consequence; exactly-once is host+adapter joint not pure-host
+S10|insufficient_evidence|§R.5-S10 single-pass narrative|ordered content present; per-step deletion consequence not stated
+S11|insufficient_evidence|§R.5-S11 steps 1-3|structural+informational absence stated; per-step deletion consequence absent
+S12|insufficient_evidence|§R.5-S12 three removal cases|scenario is a removal test; ordered sequence structure not applicable; per-case deletion consequence stated inline but owners not tagged per-step in contract format
+FE-CE-001|pass|rejection confirmed against revised bytes|nothing new missing
+FE-CE-002|pass|closure confirmed: open CapMap + generic view renders labels only|nothing new missing
+FE-CE-003|pass|closure confirmed: typed ReplayPolicy field; host never reads CapMap for control flow|nothing new missing
+FE-CE-004|pass|closure confirmed: spawned-resource grant extends handle accessible set from typed Result|nothing new missing
+FE-CE-005|pass|closure confirmed: default subscribe is live-only (current cursor); pair gesture uses default|nothing new missing
+FE-CE-006|pass|closure confirmed: ns-scoped registry keyed (ns_id, payload_schema_id); partitions independent|nothing new missing
+FE-CE-007|pass|N/A for integrated candidate: no edges mechanism exists; remains OPEN against B|nothing for A; B-specific defect unchanged
+<<<FE-VERDICT-END>>>
+<<<FE-REPLAY-START>>>
+FE-CE-001|pass|config.tree announced, directory.list, resolver calls invoke("read") for current value|§R.2 "action.invoke(resource_id, action_type, params) → Result{RegisteredType}" + §R.5-S05 step 3 "action.invoke('read')→current snapshot"; host routes typed action without content interpretation; seq-stream is additional path not sole path
+FE-CE-002|pass|adapter uses CapMap name "cancel", host treats it as a recognized vocabulary term|§R.2 "host defines no set of valid names, assigns no behavioral authority to any name or value, and never branches on a CapMap entry in its delivery, replay, routing, or lifecycle logic"; §R.4 fallback renders "plain labelled name→state pairs" with no icon, no invocation button, no run/agent reading
+FE-CE-003|pass|adapter writes string "idempotent-apply" into CapMap; host reads CapMap string to toggle auto-replay on OutcomeUnknown|§R.2 "replay_policy is a typed enumeration field on the registration, not a CapMap string; the host reads ONLY this field to decide auto-replay behavior"; §R.5-S09 step 3 "host reads the typed replay_policy field on the action's registration (NOT any CapMap string)"; §R.1 "zero host behavioral authority"
+FE-CE-004|pass|runner spawns (ns_R,job); coordinating view holds h_R for (ns_R,runner) and has no subscription path to (ns_R,job)|§R.2 "When an invoke returns a Result with [spawned_resource_id] field populated, the host automatically adds that (ns_id, local_id) to the invoking handle's accessible set"; §R.4 "extension may... subscribe... on any id in the accessible set"; §R.5-S08 step 6 "host adds (ns_R,job) to h_R's accessible set... View calls h_R.subscriptionHandle.subscribe(ns_R, job)"
+FE-CE-005|pass|user pairs two resources; host mints secondary handle; subscribe replays from seq 0; stale ArtifactReady envelope fires execute|§R.2 "Default (no from_cursor): subscription begins at the resource's current cursor — only new envelopes arrive (live-only). History replay requires an explicit from_cursor=seq argument"; §R.4 "Each handle subscribes with the default live-only position (no from_cursor); stale historical events are NOT replayed"; §R.5-S08 step 4 "live-only default subscription (no from_cursor)" step 5 "h_D receives a new live ArtifactReady envelope (not replayed from history due to step 4's live-only default)"
+FE-CE-006|pass|Alpha and Beta both register payload_schema_id="Image"; Alpha's type leaks into Beta's envelope validation|§R.2 "Each namespace holds its own registry: register_type(ns_id, payload_schema_id, type_descriptor). The host's delivery gate is (resource's ns_id, payload_schema_id) ∈ registry(ns_id). Two namespaces may register the same bare string independently"; §R.5-S06 step 5 "Alpha registers Image under (ns_A,'Image'); Beta registers Image under (ns_B,'Image'); Alpha's registration never constrains Beta's"
+FE-CE-007|pass|extensions.list returns foreign ns id to scoped handle enabling adapter-authorized relay|No edges/list/relay mechanism exists in the integrated candidate. §R.4 "It may not: enumerate namespaces, derive a foreign id from a handle." §R.9 confirms "integrated candidate has no edges mechanism." §R.2 handle "exposes no parent, no sibling, no enumerateNamespace, no directory.list on the namespace." Sequence is structurally impossible: the mechanism it depends on does not exist
+<<<FE-REPLAY-END>>>

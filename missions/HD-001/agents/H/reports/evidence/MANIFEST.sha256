@@ -1,0 +1,16 @@
+# H-side gate evidence archive (B-HARNESS-PI-001 + B-HARNESS-CODEX-001)
+
+sha256 manifest, 2026-09-23T02:19+08:00 @HEAD 60d868ef; sources copied verbatim from /tmp run dirs (gates/receipts produced by the runs recorded in H-0007/H-0008 and H-0010).
+
+d4beb2a7a547af55a6b8eb11bebe10f5343ac81c763633698242000d5dbb65f2  pi-batch/deployment.json
+21d212ff64854fcd061c17f803ac670c8f124f3046cbd773a786b6e78e796350  pi-batch/harness-linux-pi.report.json
+555c27eb903dd7a40dac1a33fc2571222a7900e232777b1d0960782faad3cd26  pi-batch/r0e.json
+625788f4f2988cf615b870e4a4b86d00c7ecb09cf9313bd4313bdec4709bf6e8  pi-batch/r0.json
+9bab424ec8189227a73ec8fb11a1d7b4d84d5d4e1124543ceeb4b3a5841ca816  pi-batch/server-registration.json
+6364a402375d09d592d2c5707e532e0df48456cbfe70680b29f4dc6ac267608a  codex-batch/deployment.json
+54d8f34e678abf7ad13571b7a91f93fccc30d4a59604dcf9c870c8927f105523  codex-batch/harness-linux-codex.report.json
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  codex-batch/r0.err
+082c3f29631732dac227f87ba085c930401bd8acceeae2f319e63a62ca35e20a  codex-batch/r0full.err
+27aa7dc2842e2e1c000ba92cc2a293d7a6d49ba07a8a6770dc4c5772da083859  codex-batch/r0full.json
+77d38ac72de056b655c22267b7efb85c904685c28ebbee2dc66942cf069580fd  codex-batch/r0.json
+9ba9396db4f08033644ae6cd45d5c03ee5d4d04dfbbecd44179575a87f4699bb  codex-batch/server-registration.json

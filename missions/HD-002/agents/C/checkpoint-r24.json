@@ -1,0 +1,182 @@
+{
+  "evidence": "FC-0082/0084/0086；BC-0070；C-DEC-0001；C-0066；integration/checkpoint.json",
+  "id": "CP-SESSION-001",
+  "next": "等 C-DEC-0001 的 FE 外联裁决；BC 独立只读给 Pi settings 下一安全门，不冻结全队。",
+  "revision": 24,
+  "sections": [
+    {
+      "blockers": "具体外联模块 UNKNOWN；当前宿主无可用非特权网络 namespace，低影响诊断均未消除外联。",
+      "evidence": "FC-0069/0076/0080/0082/0084/0086；C-DEC-0001",
+      "id": "frontend",
+      "modules": [
+        {
+          "blockers": "外联源 UNKNOWN，无法标配对或产品默认安全。",
+          "doing": "停止可能成功外联的 live，等待 C-DEC-0001。",
+          "done": "FC-0084 spellcheck 关与 FC-0086 WebRequest 取消试验均隔离且 clean，原候选 90ca17b8 保留。",
+          "evidence": "FC-0082/0084/0086；C-DEC-0001",
+          "name": "桌面壳与工作台",
+          "next": "在用户选定隔离/准入边界后完成归因与产品修复。",
+          "observed_at": "2026-09-23T07:35:22.041375+00:00",
+          "owner": "F0 / FC",
+          "status": "IN_PROGRESS",
+          "summary": "两次独立假设诊断仍各有一次成功非 loopback connect；spellcheck 标签和 WebRequest 零回调均不能定名源模块。"
+        },
+        {
+          "blockers": "真实 Profile/项目/首发 ID 未经过 FE。",
+          "doing": "等待真实 Server 连接门。",
+          "done": "FC-0065 产品 enabled/workspace/lock/构建闭包完成。",
+          "evidence": "FC-0061/0065",
+          "name": "连接管理与后端适配器",
+          "next": "做双命令同实例与真实项目首发。",
+          "observed_at": "2026-09-23T06:33:36.291177+00:00",
+          "owner": "F1 / FC",
+          "status": "IN_PROGRESS",
+          "summary": "ordessa connector 已启入八包候选并通过假 Server 认证 hello；真后端配对仍待。"
+        },
+        {
+          "blockers": "尚未 FE/BE 配对。",
+          "doing": "等待独立候选运行装配。",
+          "done": "FC-0059/0063 合并 typecheck、renderer 153 通过。",
+          "evidence": "FC-0059/0063",
+          "name": "项目与会话列表",
+          "next": "验证真实项目恢复、首发 ID 与列表。",
+          "observed_at": "2026-09-23T06:33:36.291177+00:00",
+          "owner": "F2 / FC",
+          "status": "DONE",
+          "summary": "草稿首发错目标和可见草稿 pane 在 FC 合并树通过，仍待产品启用和真实项目联调。"
+        },
+        {
+          "blockers": "离线门不能证明真实流式/工具/审批。",
+          "doing": "等待候选装配与真实 Server 事件联调。",
+          "done": "FC-0063 clean d14ac6e0e6，typecheck、renderer 153、conversation 18 通过。",
+          "evidence": "FC-0063",
+          "name": "对话、思考与工具呈现",
+          "next": "在固定 FE/BE 配对中验证真实会话行为。",
+          "observed_at": "2026-09-23T06:33:36.291177+00:00",
+          "owner": "F3 / FC",
+          "status": "IN_PROGRESS",
+          "summary": "F3 pane/key/身份修复已由 FC 收编，opened 回原 S1 补测；合并树 renderer 153 通过。"
+        },
+        {
+          "blockers": "缺真实审批往返证据。",
+          "doing": "等待真实 Agent 与 FE/BE 配对。",
+          "done": "卡片按会话隔离，支持响应/失败呈现；界面测试通过。",
+          "evidence": "BC-0038；SESSION-CHECKPOINT.md",
+          "name": "权限审批与交互",
+          "next": "在固定配对中验证同意/拒绝及会话隔离。",
+          "observed_at": "2026-09-23T06:33:36.291177+00:00",
+          "owner": "F3 / F1",
+          "status": "IN_PROGRESS",
+          "summary": "对话内审批界面已集成，假 ACP allow/stop 门通过；真实 Pi 审批未测。"
+        }
+      ],
+      "name": "前端整体检查点",
+      "next": "用户裁隔离环境或外联准入后再定位/修复并复验。",
+      "observed_at": "2026-09-23T07:35:22.041375+00:00",
+      "status": "IN_PROGRESS",
+      "summary": "八包候选已构建；配对、空宿主、关闭 spellcheck 和 WebRequest 取消诊断均仍见启动外联，CP FE 外联门未过。",
+      "doing": "C-DEC-0001 已入队；FC 保留 clean 候选/独立诊断树和旧证据，暂停新的可能成功外联 live。"
+    },
+    {
+      "blockers": "settings 加载异常的动态原因及真实 turn 影响未知。",
+      "evidence": "BC-0064/0070；C-0066",
+      "id": "backend",
+      "modules": [
+        {
+          "blockers": "未执行 createAndSend。",
+          "doing": "等待真实 Work Core turn。",
+          "done": "BC-0049 同一 runtime HTTP 身份/项目及 port create 全 PASS。",
+          "evidence": "BC-0049",
+          "name": "Server与项目接入",
+          "next": "依据 C-0036 决定兼容 ACP 接线。",
+          "observed_at": "2026-09-23T06:33:36.291177+00:00",
+          "owner": "S / BC",
+          "status": "IN_PROGRESS",
+          "summary": "真实 Server CLI 认证身份、精确 ready Profile 和项目 open 已与同运行时原生 port 配对通过。"
+        },
+        {
+          "blockers": "真实 turn、终态与审批未验。",
+          "doing": "等待权限/工具预检后才准真实 dispatch。",
+          "done": "BC-0049 clean 1a30dc8e，fake resume 双门及真实无 prompt port 门通过。",
+          "evidence": "BC-0049",
+          "name": "执行组合与核心记账",
+          "next": "修兼容接线并验证真实事件与终态。",
+          "observed_at": "2026-09-23T06:33:36.291177+00:00",
+          "owner": "BC",
+          "status": "IN_PROGRESS",
+          "summary": "同运行时 execution.port_factory/open_execution 经 Worker register/start/create 真 Pi 桥通过；Work Core turn 未执行。"
+        },
+        {
+          "blockers": "settings manager 回退空设置，真实模型/权限影响未证。",
+          "doing": "BC 只读核现有 settings 诊断与 Pi 加载顺序，给假设/反例。",
+          "done": "BC-0051 离线计数探针自测通过；BC-0052 可采响应和计数。",
+          "evidence": "BC-0064；C-0066",
+          "name": "Harness与ACP接入",
+          "next": "C 依据有限证据裁新门；不把 modelPresent/工具 0 当正常配置。",
+          "observed_at": "2026-09-23T07:35:22.041375+00:00",
+          "owner": "H / BC",
+          "status": "IN_PROGRESS",
+          "summary": "受限 Pi 状态见模型存在/活跃工具 0，但现存 settings 动态错误类别 UNKNOWN，完整门仍 INCONCLUSIVE。"
+        },
+        {
+          "blockers": "全门因 FC Electron 外联 FAIL；Server 半门不能代替配对。",
+          "doing": "本批停服完成，等待下一配对裁决。",
+          "done": "BC-0068 修复 token-before-tap 监督；BC-0070 C-0058 Server 半门通过，12 个相关 DB 表均 0。",
+          "evidence": "BC-0068/0070；FC-0076",
+          "name": "启动与部署入口",
+          "next": "FE 外联定位后再固定下一可运行版本。",
+          "observed_at": "2026-09-23T06:57:28.149655+00:00",
+          "owner": "BC / F0",
+          "status": "IN_PROGRESS",
+          "summary": "第三批真实 Server 同实例身份/Profile/项目通过，tap 禁止/未知入站 0，停服后 port/lock/进程清。"
+        }
+      ],
+      "name": "后端整体检查点",
+      "next": "以 BC 回执裁独立最小门，真实 prompt 仍未放行。",
+      "observed_at": "2026-09-23T07:35:22.041375+00:00",
+      "status": "IN_PROGRESS",
+      "summary": "原生 Server C-0058 半门认证/Profile/项目与 ASGI 方法审计通过并清理；Pi settings 动态原因 UNKNOWN，真实 turn 未准入。",
+      "doing": "BC 按 C-0066 只读分析 Pi settings 受限门下一安全证据，不起 Pi。"
+    },
+    {
+      "blockers": "C-DEC-0001 待答；Pi settings 门 INCONCLUSIVE；真实 turn/CP 仍未验。",
+      "evidence": "FC-0086；BC-0064/0070；C-DEC-0001；C-0066",
+      "id": "integration",
+      "modules": [
+        {
+          "blockers": "未获可配对/真实请求准入。",
+          "doing": "等待外联归因与 Pi settings 受限门。",
+          "done": "BC-0070 真实 Server 入站计数与零 session/turn/执行/审批审计，FC-0076 零 Send。",
+          "evidence": "FC-0076/0077；BC-0070",
+          "name": "真实对话闭环",
+          "next": "单流验证项目首发、多轮、工具、审批、停止。",
+          "observed_at": "2026-09-23T06:57:28.149655+00:00",
+          "owner": "C / FC / BC",
+          "status": "NOT_STARTED",
+          "summary": "C-0058 无发送 UI/Server 半门通过但 Electron 外联总门 FAIL；tap 禁止方法 0、DB 12 表 0。"
+        },
+        {
+          "blockers": "实际验收面未通过。",
+          "doing": "等待真实配对与候选净化。",
+          "done": "已明确Profile及后续增量不纳入。",
+          "evidence": "SESSION-CHECKPOINT.md；integration/checkpoint.json",
+          "name": "基线发布与用户试用",
+          "next": "固定 SHA/命令/端口/目录与已知限制后交用户验收。",
+          "observed_at": "2026-09-23T06:33:36.291177+00:00",
+          "owner": "C",
+          "status": "NOT_STARTED",
+          "summary": "尚无满足检查点的可启动配对工件，Profile 独立包仍隔离。"
+        }
+      ],
+      "name": "整机与用户验收检查点",
+      "next": "待 FE 外联决策与 BC 配置门分别收敛后再跑真实闭环。",
+      "observed_at": "2026-09-23T07:35:22.041375+00:00",
+      "status": "NOT_STARTED",
+      "summary": "FE/BE 无发送配对仍 FAIL；Electron 空宿主也外联，用户裁决已排队，BC 独立调查不暂停。",
+      "doing": "FC 无 live；BC 只读 Pi settings；旧私有证据/main/PROFILE 保留。"
+    }
+  ],
+  "status": "IN_PROGRESS",
+  "summary": "Session 检查点未达验收：真实 FE/BE 配对两次因 Electron 外联 FAIL；空宿主及两种独立诊断均成功外联，具体模块 UNKNOWN。FE 准入/隔离环境已入 C-DEC-0001；BC Pi settings 门另行调查。",
+  "try_it": ""
+}

@@ -1,0 +1,18 @@
+mechanism|disposition|failure_scenario|experiment_ref|round
+namespaces|core|S06 step 2 colliding ids; steps 4-5 auth/cache bleed|best-candidate §R.2-§R.5-S06|2
+resource-directory|core|S05 step 2 cannot list/lookup without session|best-candidate §R.2-§R.5-S05|2
+ordered-replayable-stream|core|S03 step 4 no return-later catch-up; S09 step 2 no host dedup/reorder|best-candidate §R.2-§R.5-S03,S09|2
+capability-declaration|core|S11 step 2 — absence inferred from null, faking support|best-candidate §R.2 CapMap (open)|1
+typed-action|core|S08 step 5 no idempotent typed request without execute(any)|best-candidate §R.2-§R.5-S08|2
+generic-fallback-view|core|S07 step 2 unknown artefact renders blank|best-candidate §R.4-§R.5-S07|2
+host-session-object|removed|none — S04 passes without it|rounds/R001/cand-A §A.8|2
+host-turn/role-envelope-field|removed|none — D12 disqualifier; S04 passes without it|rounds/R001/cand-A §A.8|2
+host-event-store|removed|none at core — S03/S09/S10 are adapter-burden|rounds/R001/cand-B §B.9|2
+host-resource-directory-B|removed|none at core — port ids + adapter discipline suffice|rounds/R001/cand-B §B.9|2
+capability-declaration-open-map|core|S11 step 2 absence inferred from null; fake support|best-candidate §R.2-§R.5-S11|2
+typed-replay-policy-on-registration|core|S09 step 3 host branches on CapMap string (FE-CE-003 reopens if removed)|best-candidate §R.2-§R.5-S09|2
+spawned-resource-grant|core|S08 step 6 job resource unobservable (FE-CE-004 reopens if removed)|best-candidate §R.2-§R.5-S08|2
+live-default-subscribe|core|S08 step 5 pair gesture replays stale events and auto-executes (FE-CE-005 reopens if removed)|best-candidate §R.2-§R.4-§R.5-S08|2
+ns-scoped-payload-registration|core|S06 step 5 type registry bleeds across services (FE-CE-006 reopens if removed)|best-candidate §R.2-§R.5-S06|2
+cross-namespace-edge|removed|none — S08 passes with two ns-local handles + spawned grant|best-candidate §R.5-S08, §R.9|2
+persistent-pair-record|removed|none — re-pairing is user action; no scenario requires core-side record|best-candidate §R.4|2

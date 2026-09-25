@@ -1,0 +1,13 @@
+sid|status|owner|mechanism|evidence|round
+S01|claimed|core|text.stream + typed-action send + ordered stream|rounds/R006/cand-A.md §R6.5-S01|R006
+S02|claimed|adaptation|pi kinds via announce; subscribe-live; approve/send typed actions|rounds/R006/cand-A.md §R6.5-S02|R006
+S03|claimed|core|from_cursor=0 history + cursor.resolve return-later replay + read snapshot|rounds/R006/cand-A.md §R6.5-S03|R006
+S04|claimed|core|submit/progress/result resources + typed-action + ordered stream; no chat object|rounds/R006/cand-A.md §R6.5-S04|R006
+S05|claimed|core|config.tree resource; directory_list; invoke(read) snapshot, no stream|rounds/R006/cand-A.md §R6.5-S05|R006
+S06|claimed|core|namespaced ids; same-ns scoped handle; per-ns action registry|rounds/R006/cand-A.md §R6.5-S06|R006
+S07|claimed|core|generic fallback renders kind/actions/CapMap/schema label|rounds/R006/cand-A.md §R6.5-S07|R006
+S08|claimed|core|same-ns handle permits step6 job subscribe; pair gesture explicit cursor|rounds/R006/cand-A.md §R6.5-S08|R006
+S09|claimed|adaptation|adapter dedups by own stable id + pumps logical order; core never-auto-resubmit+cursor|rounds/R006/cand-A.md §R6.5-S09|R006
+S10|claimed|core|handle force-close on unmount; cursor.resolve replay; no pair record|rounds/R006/cand-A.md §R6.5-S10|R006
+S11|claimed|core|open CapMap informational + CapabilityAbsent structural|rounds/R006/cand-A.md §R6.5-S11|R006
+S12|claimed|adaptation|namespace teardown isolation; generic fallback for removed resolver|rounds/R006/cand-A.md §R6.5-S12|R006

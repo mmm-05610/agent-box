@@ -1,0 +1,23 @@
+{
+  "id": "provider",
+  "revision": 1,
+  "status": "IN_PROGRESS",
+  "summary": "研究任务已准备，等待用户启动 Qoder；未实施。",
+  "next": "核对 CC Switch/Zed/Vibe Kanban 和原生 Harness 配置，提交最简方案。",
+  "evidence": "roles/PROVIDER.md；control/product/provider-model-research-v0.1.md",
+  "try_it": "",
+  "modules": [
+    {
+      "name": "Provider/model 研究",
+      "owner": "PROVIDER",
+      "status": "NOT_STARTED",
+      "summary": "研究任务已准备，等待用户启动 Qoder；未实施。",
+      "done": "研究范围、参考入口、交付判据已备好。",
+      "doing": "尚未启动，未收到 TAKEOVER。",
+      "next": "核对 CC Switch/Zed/Vibe Kanban 和原生 Harness 配置，提交最简方案。",
+      "blockers": "无；不影响 CP-SESSION-001。",
+      "evidence": "roles/PROVIDER.md；control/product/provider-model-research-v0.1.md",
+      "observed_at": "2026-09-23T07:04:42Z"
+    }
+  ]
+}

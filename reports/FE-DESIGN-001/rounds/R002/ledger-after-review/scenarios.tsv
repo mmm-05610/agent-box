@@ -1,0 +1,13 @@
+sid|status|owner|mechanism|evidence|round
+S01|claimed|core|text.stream resource, adapter-chosen CapMap names (zero host authority), no profile/tool/recovery|best-candidate §R.5-S01|R002
+S02|claimed|adaptation|kinds pi.conversation/pi.tool-event/pi.approval + resolver + approve action; core stays neutral|best-candidate §R.5-S02|R002
+S03|claimed|core|explicit from_cursor=resolved for return-later replay; read action for snapshots; live default irrelevant here (view uses explicit cursor)|best-candidate §R.5-S03|R002
+S04|claimed|core|submit/progress/result resources, adapter-chosen CapMap, no chat object in core|best-candidate §R.5-S04|R002
+S05|claimed|core|config.tree resource, CapMap{read:supported} informational only, directory.list, invoke("read")|best-candidate §R.5-S05|R002
+S06|claimed|core|namespaced ids structurally prevent collision; ns-scoped type registry prevents cache bleed; scope-checked handles prevent auth leak|best-candidate §R.5-S06|R002
+S07|claimed|core|generic fallback renders kind + schema + CapMap labels + payload_schema_id, no run/agent reading|best-candidate §R.5-S07|R002
+S08|claimed|core|two ns-local handles via user pair + live-default subscription + spawned-resource-grant from typed Result; replaceable runner via NamespaceGone + re-pair|best-candidate §R.5-S08|R002
+S09|partial|core|host stable invoke_id + dedup/reorder + typed ReplayPolicy on registration (not CapMap); adapter-owned apply-idempotency; host refuses auto-replay for refuse_replay|best-candidate §R.5-S09|R002
+S10|claimed|core|handles closed on unmount including spawned set; resource stays authoritative; re-subscribe with explicit from_cursor|best-candidate §R.5-S10|R002
+S11|claimed|core|adapter-named CapMap not_supported (informational) + CapabilityAbsent (structural via registry omission); absence stated not inferred|best-candidate §R.5-S11|R002
+S12|claimed|adaptation|adapter teardown disposes namespace only; other namespaces unaffected; paired view removal leaves other modules untouched|best-candidate §R.5-S12|R002

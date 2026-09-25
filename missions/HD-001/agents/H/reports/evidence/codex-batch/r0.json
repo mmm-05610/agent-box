@@ -1,0 +1,6 @@
+{
+  "code": "GATE_WORKER_REQUIRED",
+  "error": "pass --worker <agent-box-worker binary>; bundles on disk: ",
+  "result": "CODEX_PRODUCTION_CHAIN_GATE_FAILED",
+  "script": "scripts/server-round1/codex-production-chain-gate.py"
+}

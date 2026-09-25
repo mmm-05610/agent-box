@@ -1,0 +1,80 @@
+[2026-09-21T16:29:24Z] sol: budget record created at zero (cap=10, final reserve=2)
+[2026-09-21T17:25:47Z] design rejected: plan declared 2 candidates, section 2 (B) missing
+[2026-09-21T17:48:26Z] validate[verify]:   invalid: no valid verdict block (<<<FE-VERDICT-START>>> ... <<<FE-VERDICT-END>>>)
+[2026-09-21T18:00:41Z] validate[verify]:   invalid: verdict S03: status [partial] is not a trajectory ruling
+[2026-09-21T18:00:42Z] validate[verify]:   invalid: verdict S05: status [fails] is not a trajectory ruling
+[2026-09-21T18:00:42Z] validate[verify]:   invalid: verdict S07: status [partial] is not a trajectory ruling
+[2026-09-21T18:00:42Z] validate[verify]:   invalid: verdict S09: status [partial] is not a trajectory ruling
+[2026-09-21T18:00:42Z] validate[verify]:   invalid: no valid verdict block (<<<FE-VERDICT-START>>> ... <<<FE-VERDICT-END>>>)
+[2026-09-21T18:14:11Z] validate[integrate]:   invalid: verdict FE-CE-001: this role may not rule counterexamples here
+[2026-09-21T18:14:11Z] validate[integrate]:   invalid: verdict FE-CE-002: this role may not rule counterexamples here
+[2026-09-21T18:14:11Z] validate[integrate]:   invalid: verdict block had no valid rows
+[2026-09-21T18:14:11Z] validate[integrate]:   invalid: regression set is non-empty and no replay block was produced
+[2026-09-21T18:21:41Z] validate[review]:   invalid: output section #1 below 700 words
+[2026-09-21T18:49:39Z] validate[review]:   invalid: output section #1 below 400 words
+[2026-09-21T18:49:54Z] R001 settled: review_holds=1 scenarios_broken=1 insufficient=2 clean=0 digest=b93d2dbedec5
+[2026-09-21T18:54:51Z] R001 settled: review_holds=1 scenarios_broken=1 insufficient=2 clean=0 digest=b93d2dbedec5
+[2026-09-21T18:55:48Z] R001 settled: review_holds=1 scenarios_broken=1 insufficient=2 clean=0 digest=b93d2dbedec5
+[2026-09-21T19:25:28Z] validate[review]:   invalid: verdict FE-CE-001: status [pass] is not one of {holds|does_not_hold|insufficient_evidence}
+[2026-09-21T19:25:28Z] validate[review]:   invalid: verdict FE-CE-002: status [pass] is not one of {holds|does_not_hold|insufficient_evidence}
+[2026-09-21T19:25:28Z] validate[review]:   invalid: verdict FE-CE-003: status [pass] is not one of {holds|does_not_hold|insufficient_evidence}
+[2026-09-21T19:25:28Z] validate[review]:   invalid: verdict FE-CE-004: status [pass] is not one of {holds|does_not_hold|insufficient_evidence}
+[2026-09-21T19:25:28Z] validate[review]:   invalid: verdict FE-CE-005: status [pass] is not one of {holds|does_not_hold|insufficient_evidence}
+[2026-09-21T19:25:28Z] validate[review]:   invalid: verdict FE-CE-006: status [pass] is not one of {holds|does_not_hold|insufficient_evidence}
+[2026-09-21T19:25:28Z] validate[review]:   invalid: verdict FE-CE-007: status [pass] is not one of {holds|does_not_hold|insufficient_evidence}
+[2026-09-21T19:25:28Z] validate[review]:   invalid: no valid verdict block (<<<FE-VERDICT-START>>> ... <<<FE-VERDICT-END>>>)
+[2026-09-21T19:27:15Z] validate[review]:   invalid: verdict FE-CE-001: this role may not rule counterexamples here
+[2026-09-21T19:27:15Z] validate[review]:   invalid: verdict FE-CE-002: this role may not rule counterexamples here
+[2026-09-21T19:27:15Z] validate[review]:   invalid: verdict FE-CE-003: this role may not rule counterexamples here
+[2026-09-21T19:27:15Z] validate[review]:   invalid: verdict FE-CE-004: this role may not rule counterexamples here
+[2026-09-21T19:27:15Z] validate[review]:   invalid: verdict FE-CE-005: this role may not rule counterexamples here
+[2026-09-21T19:27:15Z] validate[review]:   invalid: verdict FE-CE-006: this role may not rule counterexamples here
+[2026-09-21T19:27:15Z] validate[review]:   invalid: verdict FE-CE-007: this role may not rule counterexamples here
+[2026-09-21T19:27:15Z] validate[review]:   invalid: no valid verdict block (<<<FE-VERDICT-START>>> ... <<<FE-VERDICT-END>>>)
+[2026-09-21T19:32:27Z] R002 settled: review_holds=1 scenarios_broken=1 insufficient=2 clean=0 digest=b93d2dbedec5
+[2026-09-21T19:39:33Z] validate[review]:   invalid: output section #1 below 400 words
+[2026-09-21T19:40:28Z] validate[review]:   invalid: required declaration line missing: BOUNDARY_SCAN:
+[2026-09-21T19:40:28Z] validate[review]:   invalid: required declaration line missing: ESCAPE_HATCH_SCAN:
+[2026-09-21T19:44:17Z] validate[review]:   invalid: required declaration line missing: BOUNDARY_SCAN:
+[2026-09-21T19:44:17Z] validate[review]:   invalid: required declaration line missing: ESCAPE_HATCH_SCAN:
+[2026-09-21T19:47:28Z] R002 settled: review_holds=0 scenarios_broken=0 insufficient=0 clean=1 digest=2d2dde146c28
+[2026-09-21T19:50:19Z] R002 settled: review_holds=0 scenarios_broken=0 insufficient=5 clean=1 digest=2d2dde146c28
+[2026-09-21T20:16:10Z] validate[verify]:   invalid: output section #1 below 700 words
+[2026-09-21T20:24:02Z] validate[integrate]:   invalid: output section #1 below 1200 words
+[2026-09-21T20:25:30Z] validate[integrate]:   invalid: required declaration line missing: CHANGES_VS_PREVIOUS:
+[2026-09-21T20:31:22Z] validate[integrate]:   invalid: found 1 output section(s), contract declares 2 (each needs <<<FE-OUT-START>>> / <<<FE-OUT-END>>> lines)
+[2026-09-21T20:53:31Z] R004 settled: review_holds=0 scenarios_broken=0 insufficient=0 clean=1 digest=82e626862a16
+[2026-09-21T20:57:21Z] R004 settled: review_holds=0 scenarios_broken=0 insufficient=0 clean=1 digest=82e626862a16
+[2026-09-22T00:28:57Z] R005 settled: review_holds=0 scenarios_broken=0 insufficient=0 clean=1 digest=82e626862a16
+[2026-09-22T00:39:38Z] validate[design]:   invalid: found 0 output section(s), contract declares 1 (each needs <<<FE-OUT-START>>> / <<<FE-OUT-END>>> lines)
+[2026-09-22T01:00:19Z] R006 settled: review_holds=0 scenarios_broken=3 insufficient=0 clean=0 digest=b6da557abfc4
+[2026-09-22T01:01:43Z] R006 settled: review_holds=0 scenarios_broken=3 insufficient=0 clean=0 digest=b6da557abfc4
+[2026-09-22T01:38:01Z] validate[review]:   invalid: found 0 output section(s), contract declares 1 (each needs <<<FE-OUT-START>>> / <<<FE-OUT-END>>> lines)
+[2026-09-22T01:38:01Z] validate[review]:   invalid: required declaration line missing: BOUNDARY_SCAN:
+[2026-09-22T01:38:01Z] validate[review]:   invalid: required declaration line missing: ESCAPE_HATCH_SCAN:
+[2026-09-22T01:38:01Z] validate[review]:   invalid: no valid verdict block (<<<FE-VERDICT-START>>> ... <<<FE-VERDICT-END>>>)
+[2026-09-22T01:38:01Z] validate[review]:   invalid: this role must rule at least 12 scenarios; it ruled 0
+[2026-09-22T01:38:01Z] validate[review]:   invalid: regression set is non-empty and no replay block was produced
+[2026-09-22T01:41:05Z] R007 settled: review_holds=0 scenarios_broken=0 insufficient=4 clean=1 digest=0376a5497488
+[2026-09-22T02:02:03Z] validate[attack]:   invalid: found 0 output section(s), contract declares 1 (each needs <<<FE-OUT-START>>> / <<<FE-OUT-END>>> lines)
+[2026-09-22T02:02:03Z] validate[attack]:   invalid: no ledger block at all (<<<FE-LEDGER-START>>> ... <<<FE-LEDGER-END>>>)
+[2026-09-22T02:24:28Z] validate[review]:   invalid: output section #1 below 200 words
+[2026-09-22T02:24:28Z] validate[review]:   invalid: no valid verdict block (<<<FE-VERDICT-START>>> ... <<<FE-VERDICT-END>>>)
+[2026-09-22T02:24:28Z] validate[review]:   invalid: this role must rule at least 12 scenarios; it ruled 0
+[2026-09-22T02:24:28Z] validate[review]:   invalid: regression set is non-empty and no replay block was produced
+[2026-09-22T02:28:35Z] R008 settled: review_holds=0 scenarios_broken=0 insufficient=2 clean=1 digest=49df1e9345ab
+[2026-09-22T02:45:25Z] validate[attack]:   invalid: no ledger block at all (<<<FE-LEDGER-START>>> ... <<<FE-LEDGER-END>>>)
+[2026-09-22T02:51:26Z] validate[verify]:   invalid: found 0 output section(s), contract declares 1 (each needs <<<FE-OUT-START>>> / <<<FE-OUT-END>>> lines)
+[2026-09-22T02:51:26Z] validate[verify]:   invalid: required declaration line missing: FABRICATION_CHECK:
+[2026-09-22T02:51:26Z] validate[verify]:   invalid: required declaration line missing: CONTRADICTION_CHECK:
+[2026-09-22T02:51:27Z] validate[verify]:   invalid: required declaration line missing: MISSED_CHECK:
+[2026-09-22T02:51:27Z] validate[verify]:   invalid: no valid verdict block (<<<FE-VERDICT-START>>> ... <<<FE-VERDICT-END>>>)
+[2026-09-22T02:52:04Z] validate[verify]:   invalid: found 0 output section(s), contract declares 1 (each needs <<<FE-OUT-START>>> / <<<FE-OUT-END>>> lines)
+[2026-09-22T02:52:04Z] validate[verify]:   invalid: required declaration line missing: FABRICATION_CHECK:
+[2026-09-22T02:52:04Z] validate[verify]:   invalid: required declaration line missing: CONTRADICTION_CHECK:
+[2026-09-22T02:52:04Z] validate[verify]:   invalid: required declaration line missing: MISSED_CHECK:
+[2026-09-22T02:52:04Z] validate[verify]:   invalid: no valid verdict block (<<<FE-VERDICT-START>>> ... <<<FE-VERDICT-END>>>)
+[2026-09-22T04:09:10Z] R011 settled: review_holds=0 scenarios_broken=1 insufficient=6 clean=0 digest=fece1121311d
+[2026-09-22T04:27:24Z] R012 settled: review_holds=0 scenarios_broken=1 insufficient=1 clean=0 digest=25c36f4c40d8
+[2026-09-22T05:32:42Z] validate[verify]:   invalid: output section #1 below 250 words
+[2026-09-22T06:02:23Z] R013 settled: review_holds=0 scenarios_broken=6 insufficient=1 clean=0 digest=b4f5c5cc46c4

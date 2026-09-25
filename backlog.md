@@ -56,9 +56,10 @@ to DONE without the executing tree's own acceptance record.
 1. **No independent acceptance for the backend baseline.** `BACKEND_IMPLEMENTATION_READY`
    was registered on user authorisation plus executor self-review; the fixed
    reviewer's `ACCEPT` never arrived (quota). Conflict **C-10**, unresolved as **U-1**.
-2. **No integration verification at all.** Order `42`'s dual gate never passed, so
-   the two sides were never run together as a recorded result
-   ([current-state.md](current-state.md) §2).
+2. **Integrated acceptance remains incomplete.** Historical integration ownership
+   and five real UI replies are recorded; absence of independent review does not
+   mean no integration happened. The new native Linux baseline needs its own
+   verification ([current-state.md](current-state.md) §2).
 3. **Two withdrawal-forcing gaps have no acceptance row**: order `42` and order
    `110`, the two that made the `ACC-R3` window be withdrawn (conflict **C-6**).
 4. **The user's own credential entry does not exist yet** (order `151`). Until it

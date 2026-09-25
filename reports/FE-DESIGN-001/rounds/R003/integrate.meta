@@ -1,0 +1,5 @@
+phase=integrate
+role=integrator
+outcome=bad
+reason=contract_violation
+at=2026-09-21T20:31:22Z

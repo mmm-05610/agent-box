@@ -1,0 +1,34 @@
+namespaces|core|S01 step1 / S06 step2 id collision|§R13.2
+resource-directory|core|S05 step3 cannot list without an active session|§R13.7-S05
+cursor-stream-log|core|S03 step4 no catch-up / S04 step4 head unreplayable|EXPERIMENT R11-A
+typed-action|core|S01 step3 execute(any) disqualifier / S04 step2|§R13.7-S01
+generic-fallback-view|core|S05 step5 blank / S07 step4 / S11 step5|EXPERIMENT R11-B
+capability-declaration (open CapMap)|core|S11 step1 absence inferred from null→fake-support|EXPERIMENT R11-B
+pump|core|S01 step4 adapter cannot deliver|§R13.7-S01
+cursor_resolve|core|S08 step4 replay re-fires execute (FE-CE-005)|§R13.7-S08
+same-namespace-scoped-handle|core|S06 step4-5 out-of-scope subscribe/invoke|§R13.7-S06
+per-namespace-action-typing|core|S06 step5 shared mutable key reopens FE-CE-006|§R13.6
+never-auto-resubmit|core|S09 step4 host replays command → double execution|§R13.7-S09
+from-cursor-input-selection|core|FE-CE-016/017/025 head loss and ns-regen skip|EXPERIMENT R12-B
+resource-incarnation-burn|core|FE-CE-027 stale cursor renders complete|EXPERIMENT R12-A
+view-scope-minting|core|FE-CE-026 no scope to be scoped to|EXPERIMENT R12-C
+four/five-variant-outcome-rendering|core|FE-CE-019/023/032 unconfirmed or absent rendered current|EXPERIMENT R11-B
+generic-walk-totality|core|FE-CE-020 partial result renders fake-complete|EXPERIMENT R11-C
+recursive-path-labelled-walk|core|FE-CE-021 nested schema mis-renders|EXPERIMENT R11-C
+presence-is-not-reachability|core|FE-CE-023 dead producer advertises live capacity|§R13.4
+schema-declaration-grammar (SchemaDecl)|core|FE-CE-033 totality claims undecidable|EXPERIMENT R11-C
+extension-selection (namespaced claim table + on_claim_changed)|core|S07 step7 / S12 step3 unclaimed schema blank, silent swap (FE-CE-034/035)|§R13.5
+subscription-termination-signal (onEnd)|core|FE-CE-037 retired resource stays labelled current|EXPERIMENT R13-C
+spawn-announce-before-result|core|FE-CE-031 spawned head unreachable|EXPERIMENT R13-D
+transient-vs-permanent-loss-split|core|FE-CE-029 same-ns catch-up unreachable after loss|EXPERIMENT R13-B
+total-api-state-rendering|core|FE-CE-032/037 a view receives a state it cannot render|§R13.5
+host-session-object|removed|none — S04 passes without it|§R13.7-S04
+host-turn-role-envelope-field|removed|none — D12 disqualifier; S04 passes|§R13.2
+host-event-store|removed|none — the log is the stream|§R13.3
+spawned-resource-grant|removed|none — same-ns rule passes S08 without a per-handle set|§R13.7-S08
+cross-namespace-edge|removed|none — S08 on two ns-local handles|§R13.7-S08
+persistent-pair-record|removed|none — re-pairing is user action|§R13.7-S12
+host-dedup / host-reorder-by-seq|removed|none — vacuous under arrival index; adapter dedups own id|§R13.7-S09
+invoke-id-on-OutcomeUnknown|removed|none — no auto-resubmit, no consumer|§R13.7-S09
+adapter-flat-schema-obligation|removed|none — recursive total walk makes it unnecessary|EXPERIMENT R11-C
+envelope-dropped-on-subscription-close|removed|FE-CE-024 — retaining it empties catch-up|EXPERIMENT R11-A

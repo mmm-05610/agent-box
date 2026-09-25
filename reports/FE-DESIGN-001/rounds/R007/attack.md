@@ -1,0 +1,54 @@
+DIMENSION: D01-order-dedup.
+
+Candidate A's R007 fix replaces the R006 double-duty cursor with a single host rule — `subscribe(id, from_cursor=c)` delivers every stored envelope with `seq >= c` in increasing `seq`, then continues live — and makes the integer `c` a subscriber-owned input (live = `cursor.resolve(id)`; catch-up = `saved_last_seen+1`). I replayed that rule for the D01 classes (lost/late/interleaved/duplicate events; two producers for one slot; resume-cursor domain). The equality double-duty is genuinely gone (see FE-CE-015 replay), but the *value* of `c` the subscriber is instructed to use is wrong in two reachable cases, each producing a silent head-truncation with no gap marker.
+
+---
+
+FE-CE-016 — the "fresh resource → `from_cursor=cursor.resolve()` is live-only" guidance silently drops any envelope the adapter pumps between spawn and the resolve call.
+
+Exact sequence (S08/S04 spawn path):
+1. Adapter opens `ns_R` (host mints it).
+2. Extension calls `h_R.invoke((ns_R,"runner"),"execute",{ref})`. Inside the call the adapter spawns the job, `namespace.announce((ns_R,"job-1"))`, and pumps `Envelope{seq=1, payload:"starting"}`.
+3. The `invoke` returns `Result{..., spawned_resource_id=(ns_R,"job-1")}`.
+4. Following §A.5-S08 step6 / §A.5-S04 step2, the extension computes `from_cursor = cursor.resolve((ns_R,"job-1"))` → returns **2** (seq 1 is already assigned).
+5. `subscribe((ns_R,"job-1"), from_cursor=2)` → the single rule delivers `seq >= 2`; **seq=1 is never delivered**, and the stream index gives the subscriber no signal that a head envelope was excluded.
+
+Invariant broken: §A.5-S04 step2 / §A.5-S08 step6 assert the freshly-spawned resource satisfies "next_seq=1, live-only permitted." That premise is false whenever the adapter emits before the subscriber's `resolve` — which the design explicitly permits, because spawn is adapter-internal (§A.5-S08 step5 "Result{...,(ns_R,job)}" is produced by the adapter, not gated on the subscriber). §A.1's single rule then excludes seq=1. Worse, §A.6 states the correct input for a spawned job (`from_cursor=0`) "would contradict S08 and reopen FE-CE-005," so the design forbids the only input that preserves the head.
+
+Minimal version: exactly one envelope pumped before `resolve`. Remove that step (adapter's first envelope arrives only after the subscribe registers) → `resolve`=1 → seq=1 delivered live → passes.
+
+User-visible consequence: per §A.5-S08 step6 / §A.5-S04, the job's opening "starting/running" status is lost with no gap indicator, so the progress timeline the user "watches" (S04/S08) begins mid-stream and reads as if it started at the first delivered event — a silent loss of truth, not merely a smaller view. This is major: S04's stated result (submit/**progress**/result) and S08's job observation are partially and silently wrong.
+
+---
+
+FE-CE-017 — the persisted catch-up cursor `saved_last_seen` is bound to one `ns_id`'s numbering, but a *full reconnect* mints a new `ns_id` whose stream restarts; re-subscribing with `saved_last_seen+1` into the new stream skips the events the user is returning to see.
+
+Exact sequence (S03 leave/return; identical shape for S09/S10):
+1. `ns_A` open; adapter pumps resource `r` at `seq=1..20`; extension processes them and persists `saved_last_seen=20` (§A.2 "the subscriber persists the highest `Envelope.seq`").
+2. User navigates away; `Subscription.close()` (S03 step2).
+3. **Full link drop** → adapter reopens; §A.2: "a *full* reconnect yields a new `ns_id`" → host mints `ns_B`.
+4. Adapter re-announces `r` under `ns_B`; `(ns_B,r)` is a fresh host-assigned monotonic stream starting at `seq=1`; the adapter pumps the post-reconnect events `seq=1,2,...`.
+5. User returns; extension re-mints `h_B=handle_for(ns_B)`, `directory_lookup((ns_B,r))`, then per §A.5-S03 step4 / §A.5-S09 step4 / §A.5-S10 step3 calls `subscribe((ns_B,r), from_cursor=saved_last_seen+1 = 21)`.
+6. The single rule delivers `seq >= 21` in `(ns_B,r)` → the user misses `(ns_B,r)` envelopes `1..20` (the actual current/return-window events); if fewer than 21 exist yet, the view shows **nothing** until 21 more accumulate.
+
+Invariant broken: §A.2 makes `seq` a per-resource, host-assigned index on the *connection's* stream, and a full reconnect changes `ns_id`. Neither §A.2 nor §A.5 states that `saved_last_seen` is domain-bound to a specific `ns_id`; §A.5-S03/S09/S10 reuse the old-domain integer as the new-domain threshold.
+
+Minimal version: one full-reconnect boundary between persist and re-subscribe (with at least one needed new-stream event). Remove the reconnect (link stays up, same `ns_id`, continuous numbering) → `saved+1` is correct → passes.
+
+User-visible consequence: S03's stated result — "return later for progress and artefacts" — silently returns a truncated or empty timeline after a full reconnect, with no "gap here" marker; S09/S10 catch-up misbehaves the same way. This is also an adapter/subscriber-burden core leak: to use the cursor correctly the *view* must observe that `ns_id` changed and reset `saved_last_seen` to 0, yet §A.7's "5 core facts the subscriber must know" omits namespace-regeneration-and-numbering-reset — so the onboarding count under-states what a correct subscriber must know, and the burden sits in every view rather than being a stated core rule.
+
+---
+
+Regression replay (D01):
+
+FE-CE-015 (R006's cursor double-duty, currently OPEN). Replayed against bytes 345d: the specific invariant — one `subscribe(from_cursor=cursor.resolve(id))` declaration yielding both "replay missed" (S03/S10) and "live-not-replayed" (S08) — is **no longer constructible**: catch-up uses `saved+1`, live uses `resolve`, and §A.6's EXPERIMENT `both` list is empty. I judge the double-duty contradiction CLOSED; FE-CE-016/017 above are different defects (a single but *incorrect* delivered set, not two outcomes on one declaration), so they take new ids rather than reusing 015.
+
+FE-CE-007 (OPEN on demoted B). A has no `edges`/`list` mechanism, so it is N/A against A; I do not claim it repaired — it stays OPEN on B's ledger.
+
+Honest held attempts (so the round reflects a real attack, not an easy one):
+- **Replay/live handoff interleave.** I tried to make a live `seq=N+1` arrive while the host is emitting backlog `c..N` and slip out of order. Held: §A.2 defines `seq` as pump-arrival order, so any live envelope's `seq` is strictly greater than every backlog envelope's, and a `seq`-ordered delivery is therefore also arrival-ordered; no interleave survives. Discarded.
+- **Two producers for one `(ns_id,local_id)` slot.** Held: `namespace.announce` verifies in-namespace uniqueness and only that namespace's adapter pumps it, while cross-`ns` access is structurally impossible (§A.6 same-`ns` rule). No single slot has two writers. Discarded.
+- **Duplicate reaching the view via the core on reconnect.** Held as a closed angle: core dedup was removed as an accepted reduction under FE-CE-012/013/014; re-raising it would repeat a closed/rejected angle, so I opened nothing there.
+- **`from_cursor` equality trap.** Held: §A.1 removes host branching on equality-with-resolve; one integer yields one set. This is exactly why FE-CE-015 closes.
+
+I propose no fix (not my role); I name only the reachable sequences, the broken premises, their minimal forms, and the silent user-visible loss.

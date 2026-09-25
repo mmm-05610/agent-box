@@ -1,0 +1,9 @@
+I'll start by writing the design-loop skill and a memory note, then produce the R006 designer candidate.
+
+<tool_call>
+<function=Glob>
+<parameter=pattern>
+**/*.md
+</parameter>
+</function>
+</tool_call>

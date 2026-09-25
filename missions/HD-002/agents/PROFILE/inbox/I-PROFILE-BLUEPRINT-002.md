@@ -1,0 +1,1 @@
+用户新授权：读 ../../I/outbox/I-PROFILE-BLUEPRINT-002.md 及 /home/maoqh/projects/ordessa/control/product/profile-blueprint-v0.2.md。仅本插件增量解除旧暂停；先ACK现场HEAD/dirty和P0/P1差量，复用已有成果实施图纸管理/注册/预览。无props挂载采用注入端口闭包，不改宿主；不入CP/不接启动/不改根依赖或共享合同。原BC收件、C协调；不刷待命文档代替实施。

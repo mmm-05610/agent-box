@@ -1,0 +1,10 @@
+{
+  "alternatives": "B：维持 C-DEC-0002=A 的写域，只用同版 SettingsManager.create 作 settings 加载组件探针；仅能验证 settings 锁与 drainErrors，不能证明完整 CLI、模型或权限可用，真实首发仍需另行闭门。C：暂不做任何用户目录测试，保留 EROFS 根因及离线证据，真实首发继续阻塞。",
+  "created_at": "2026-09-23T08:05:50.226025+00:00",
+  "evidence": "BC-0077 源码锚：ModelRuntime.create→AuthStorage.create.reload→FileAuthStorageBackend.withLock 对现有 auth.json 创建 auth.json.lock；FileModelsStore 本地刷新→withLockAsync 对现有 models-store.json 创建 models-store.json.lock；--offline 仍恢复本地缓存。Managed launcher 另有 cleanupManagedInstall/update.lock，direct bundled CLI 避开该环境变量。当前三锁不存在、现有 auth 与模型文件仅核存在性，未读取内容。C-0076 已立即上报 I；旧 C-DEC-0002=A 仅覆盖 settings 锁。",
+  "id": "C-DEC-0003",
+  "impact": "A 额外涉及用户 HOME 中两个 Pi 自身的相邻锁目录，且 Pi 正常本地读取现有 auth 与模型存储；不批准修改 auth.json、models-store.json、settings.json、权限、HOME、agentDir 或模型，也不批准清理他人锁、更新安装、删除 staging。平台可能仍拒绝越沙箱执行，拒绝时原样报告。FC 的前端配对门修正和 H 的静态对照不受阻；BC 的真实 Agent 流保持停门至决策与预检完成。",
+  "question": "C-DEC-0002=A 只批准一次 settings.json.lock 临时创建/释放。BC 静态核出同版 Pi 0.86.1 完整 CLI 在本地读取现有 auth 和模型存储时，还会临时创建/释放 `/home/maoqh/.pi/agent/auth.json.lock` 与 `/home/maoqh/.pi/agent/models-store.json.lock`。是否授权 BC 在同一次无 prompt `get_state` 复验中，额外仅允许 Pi 原生机制对这两个精确锁目录短暂 mkdir/rmdir？仍执行已装同版本的 direct bundled CLI，不调用带更新锁与暂存清理的 managed launcher；实际升权另受平台审查。",
+  "recommendation": "A：追加上述两个精确锁目录的单次临时写入权限，并延续 C-DEC-0002=A 的 settings 锁权限。BC 先静态审完同版 direct CLI 的迁移及其他写分支、复核三锁均不存在且无别的 Pi 持有；若不能证明没有更多写面，当即停门上报，不申请升权。审查通过后只做无 prompt、无工具、无扩展、无会话的 get_state，记录锁生命周期、EROFS warning、脱敏错误类别、模型身份与工具数，不读出或修改凭据、设置、模型文件内容，不发消息或模型请求，进程及自建锁正常清理。",
+  "title": "Pi 完整无 prompt 复验所需另外两个临时锁"
+}

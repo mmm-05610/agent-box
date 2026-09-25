@@ -1,0 +1,4 @@
+[2026-09-22T02:56:20Z] validate[review]:   invalid: required declaration line missing: BOUNDARY_SCAN:
+[2026-09-22T02:56:20Z] validate[review]:   invalid: required declaration line missing: ESCAPE_HATCH_SCAN:
+[2026-09-22T02:56:21Z] validate[review]:   invalid: required declaration line missing: BOUNDARY_SCAN:
+[2026-09-22T02:56:21Z] validate[review]:   invalid: required declaration line missing: ESCAPE_HATCH_SCAN:

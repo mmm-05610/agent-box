@@ -1,0 +1,1215 @@
+You are one role in an adversarial design loop for the FE-DESIGN-001 Agent
+Desktop design task. Role: **candidate-reviewer**. Round: R013. Phase: candidate-reviewer.
+Run root: /home/maoqh/projects/ordessa/control/reports/FE-DESIGN-001
+
+Ground rules, non-negotiable:
+- You are given every material you are allowed to see, inlined below. You have
+  no tools and cannot read anything else. Do not ask to.
+- Product code is a migration constraint and evidence, not the answer. Do not
+  propose work orders or implementation.
+- Never soften, delete or reinterpret a required scenario or an established
+  counterexample. If you disagree, say so as a DISPUTED ledger row with a
+  concrete reason.
+- Be concrete enough that a reader can reject you. Style opinions, adjectives and
+  general advice are contract violations.
+
+OUTPUT CONTRACT (machine-checked; a phase that fails it is recorded as failed, never as passed)
+- Every deliverable section must be wrapped, on their own lines, in these two markers, in order:
+  <<<FE-OUT-START>>>
+  <the section>
+  <<<FE-OUT-END>>>
+- If a ledger block is required, wrap its rows in:
+  <<<FE-LEDGER-START>>>
+  FE-CE-NNN|<round>|<severity: major|minor>|<status: OPEN|CLOSED|DISPUTED|REJECTED|SUPERSEDED>|<invariant violated>|<title>|<evidence pointer>|<target CE ids or ->
+  <<<FE-LEDGER-END>>>
+- If a scenario table is required, wrap it in:
+  <<<FE-SCENARIO-START>>>
+  S01|<covered|partial|open>|<owner: core|adaptation|extension|unassigned>|<mechanism>|<evidence pointer>
+  <<<FE-SCENARIO-END>>>
+- If a mechanisms table is required, wrap it in:
+  <<<FE-MECH-START>>>
+  <mechanism name>|<core|delegated|removed>|<the scenario that fails if it is deleted>|<experiment pointer>
+  <<<FE-MECH-END>>>
+- One row per line. Exactly the field order above, pipe separated, no header row, no extra prose inside a block.
+- Ids: counterexamples FE-CE-001..FE-CE-999, scenarios S01..S12. Propose a fresh FE-CE-NNN for anything new.
+
+===== MATERIAL: role contract (authoritative for this call) =====
+(source: /home/maoqh/projects/ordessa/control/design-loop/roles/candidate-reviewer.md, sha256: a1bbd1f7abba900ea9b10bc40346e89c4f5919c1add196eff73b09fa1f65c41b)
+
+ROLESPEC|min_words|200
+ROLESPEC|require_experiments|0
+ROLESPEC|require_signatures|0
+ROLESPEC|require_lines|BOUNDARY_SCAN:,ESCAPE_HATCH_SCAN:
+ROLESPEC|require_scenarios|12
+ROLESPEC|extra|verdict+replay
+ROLESPEC|verdict_kinds|sc
+OUTPUT|review
+---
+
+# Role: candidate reviewer (independent verification of the SAVED artifact)
+
+You verify the **saved best candidate**, which is reproduced in the prompt with
+its digest. You did not write it, you did not attack it, and you did not see the
+round's reasoning. This is the only phase whose verdicts count toward
+convergence, so it is deliberately the coldest read in the loop.
+
+Judge the artifact as it stands. Not the loop's intentions, not previous
+rounds' claims, not what the author would obviously have meant.
+
+## Required output
+
+The verdict block carries **scenario rows only**. A counterexample is never ruled
+here: your evidence about a counterexample is a replay, and it belongs in the
+replay block with its event sequence. Do not summarise closures in the verdict
+block — that duplicate is read as a malformed ruling.
+
+   `S01|trajectory_ok|<where in the artifact the ordered trajectory lives>|<what is missing>`
+   `S01|trajectory_broken|<the step that fails>|<why>`
+   `S01|insufficient_evidence|<the passage that is ambiguous>|<what would settle it>`
+
+   `trajectory_ok` requires all three to be present **in the artifact text**: an
+   ordered event sequence, a named owner for each step, and the deletion
+   consequence for each core step in it. A section titled with the scenario id
+   and nothing checkable in it is `insufficient_evidence`, not `trajectory_ok`.
+   Do not fill the remaining twelve rows once you have found a broken one — still
+   rule each of them, but say plainly where the artifact is thin.
+
+2. **Replay rulings** — one row per counterexample in the regression set, in the
+   replay block:
+
+   `FE-CE-001|pass|<the event sequence you replayed>|<the exact text that stops it>`
+   `FE-CE-001|fail|<sequence>|<where it still gets through>`
+
+   `pass` means you traced the sequence through the artifact's own stated
+   mechanism and it cannot happen. Not "the author says it is fixed".
+
+Declare both scans as their own lines, machine-checked, each followed by the
+evidence: `BOUNDARY_SCAN: <what you found or none, with the passage>` and
+`ESCAPE_HATCH_SCAN: <what you found or none, with the passage>`.
+
+3. **Boundary scan** — in the prose section, state whether the core smuggles a
+   service, model, harness, plugin-host or conversation assumption; and whether
+   any required burden was relocated into "an extension provides it" without the
+   extension-author cost being paid in the onboarding section. One short
+   paragraph, quoting the offending text where you find any.
+
+4. **Escape-hatch scan** — quote any `execute(any)`, omnipotent context, or
+   arbitrary event bus you find, with the passage. Absence must be stated as
+   checked, not implied.
+
+## What this phase must not do
+
+* Do not revise the candidate, do not propose an alternative, do not write
+  implementation advice.
+* Do not pass a scenario because the loop has already spent several rounds on it.
+* Do not call anything "verified" beyond this artifact's own text. A model
+  experiment or a paper trail is not product behaviour.
+
+
+===== MATERIAL: required scenario set (authoritative) =====
+
+# Required scenario set S01–S12 (authoritative; user-approved goals, not to be cut)
+
+A scenario states only the user-observable result. It never states an internal
+object, a UI or a mechanism. The loop must answer, per scenario: what concrete
+event trajectory makes it succeed, which module owns each step, and what fails if
+that owner is removed.
+
+| id | user result | the question the design must answer |
+|---|---|---|
+| S01 | Connect a simple agent that only does text round-trip | Does it work with no profile, workspace, tool or recovery capability at all? |
+| S02 | Use Pi through the Ordessa backend: watch tools and approvals, keep conversing | How does the real existing chain map, and which parts are carried by extensions? |
+| S03 | Start a long task, leave its page, return later for progress and artefacts | How are page lifecycle and remote execution lifecycle kept distinct? |
+| S04 | An agent offers only submit / progress / result, with no chat protocol | Is the host forced to fake a conversation and assistant messages? |
+| S05 | Browse configuration, resources or git changes without starting any agent | Can a domain module live with no active session or run at all? |
+| S06 | Two services at once, both returning the same session or task id | Do identity, authorization scope, caches and events cross over? |
+| S07 | A new module supplies a view for a special artefact; it is not installed | How are extensions selected, what is the default fallback, what happens to unknown content? |
+| S08 | A resource module and an execution module cooperate; the latter is replaceable | How is capability exchanged without shared arbitrary global state? |
+| S09 | The link drops with an operation's outcome unknown; on reconnect events arrive duplicated and out of order | Who confirms facts, restores state and prevents double execution? |
+| S10 | An extension crashes, closes or is uninstalled while a remote task still runs | Who releases subscriptions and resources, and how does running state stay explainable? |
+| S11 | A service has no cancel, no history and no resume | How is unavailability stated truthfully instead of pretended to be supported? |
+| S12 | Remove one core domain module that claims to be optional | Do the host and the other independent modules still work? |
+
+S01 and S02 anchor near-term real need. The rest are extension and failure
+tests. Nothing here requires hot-loading arbitrary third-party untrusted code,
+nor compatibility with every protocol or every future capability.
+
+## Scenario ledger format (`scenarios.tsv`)
+
+```
+S01|<covered|partial|open>|<core|adaptation|extension|unassigned>|<mechanism or trajectory>|<evidence pointer: round/artifact section>
+```
+
+`covered` requires (a) a named trajectory with an owning module per step and
+(b) the deletion consequence for each core step in that trajectory. Anything
+less is `partial`. S01..S12 all covered is the convergence gate.
+
+===== MATERIAL: judging rubric (authoritative) =====
+
+# Judging rubric (authoritative for every role in this loop)
+
+## What wins
+
+A candidate wins by satisfying the required scenarios and their invariants under
+the smallest **total** cost — core + adapter burden + extension-author burden.
+Not by having the fewest files, not by self-scoring, not by naming things well.
+
+## The three tests every candidate must pass
+
+1. **Coverage** — S01–S12 each has a concrete trajectory with a named owner and
+   a stated deletion consequence. No "later" slots.
+2. **Non-smuggling** — the core is not a service/model/harness/conversation
+   assumption wearing a neutral name.
+3. **Minimality** — every core mechanism has a "deleting it breaks scenario X"
+   argument. If the argument is missing, the mechanism is deleted.
+
+## Disqualifiers (each ends the candidate, not just the section)
+
+* `execute(any)` and any other untyped escape hatch.
+* An omnipotent `context` object handed to extensions.
+* An arbitrary event bus used as the extension mechanism.
+* Complexity relocated into a plugin so the core *looks* minimal.
+* Faking support for a capability the service does not have.
+* Reinterpreting, weakening or dropping a required scenario.
+* A trajectory that only works when every adapter is the one we already have.
+
+## What counts as evidence
+
+* A specific event sequence beats an adjective.
+* An existing artifact beats an assertion about one.
+* A model experiment proves **the model only**. It is never product verification,
+  never protocol verification, never "the design works".
+* This repository's current code is a migration constraint and evidence about the
+  problem space. It is not the answer and not the baseline a candidate must keep.
+* Anything marked "unverified" in the inputs stays marked unverified in outputs.
+
+## Honest outcomes
+
+* Two candidates that cannot be simply ranked may both stay; say so, and say what
+  observation would rank them.
+* "I could not break it" and "it is correct" are different claims. Use the first.
+* A clean round is a real result only if the attack dimension was actually taken
+  up. Record which dimension was used, always.
+
+===== MATERIAL: attack dimensions =====
+
+# Attack dimensions — one per round, recorded, never repeated while clean
+
+The controller rotates these and writes the assignment into
+`rounds/RNNN/dimension.txt`. The attacker is confined to that dimension.
+
+| key | what the attacker must construct |
+|---|---|
+| D01-order-dedup | duplicate, reordered, interleaved and late events; two producers for one slot |
+| D02-lifecycle-leak | unsubscribe, page destroyed, extension unmounted, service restart, crash mid-operation |
+| D03-identity-scope | two services or tenants, colliding ids, cache bleed, authorization scope confusion |
+| D04-absent-capability | service lacks cancel/history/resume; where is it stated, and what does the UI claim meanwhile |
+| D05-fallback-unknown | unregistered view, unknown content type, partial data, malformed payload |
+| D06-adapter-burden | count what a *new service author* must write or must know about the core; any core internal leaking into the adapter contract is a finding |
+| D07-extension-burden | count what a *new module author* must learn; boilerplate, implicit coupling, ordering assumptions |
+| D08-reduction | delete one core mechanism and show a required scenario still passes; or show every candidate has one mechanism too many |
+| D09-splits-truth | two owners of one fact; who reconciles them when they disagree; find a state where the UI shows something that never happened remotely |
+| D10-cross-module | modules cooperating without shared global state; find the hidden channel — a shared key, an ordering assumption, a mutable context field |
+| D11-long-run | hours-long task, client restart, page never opened again, memory and subscription growth |
+| D12-authority-boundary | the candidate smuggling a service, model, harness, plugin-host or conversation assumption into the core as if it were neutral |
+
+Rotation rule: never reuse the immediately previous dimension while it is clean;
+after `FE_STALL_AFTER` consecutive clean rounds the controller rotates hard
+rather than polishing.
+
+===== MATERIAL: design brief (the approved statement of goal) =====
+(source: /home/maoqh/projects/ordessa/control/product/agent-desktop-design-brief.md, sha256: 0d36056c1039b3ae0bec6797e58824b247d19d093ae9505a74119fe8d648b47e)
+
+# Agent Desktop：设计循环目标与场景草案
+
+状态：目标已获用户认可；下列场景与循环参数由 I 提议，待用户查看。
+未启动循环、未安装外部框架、未任命新执行者。产品代码只读。
+
+## 用户确认的方向
+
+独立于特定后端、面向 Agent 使用的可扩展 Desktop。对话、工具调用、模型
+配置均可以成为能力，但不预设为整个产品的组织中心。
+Ordessa 后端可以提供最完整能力，不是所有接入的必需前提。
+不预先把 Agent、会话、任务或插件宿主指定为核心答案。
+通过场景、反例与删减实验寻找宿主最小机制与扩展领域能力的边界。
+
+## I 提议的场景集
+
+每个场景只规定用户结果，不提前规定内部对象或必须采用哪个 UI。
+
+| ID | 场景 | 需要设计回答的问题 |
+| --- | --- | --- |
+| S01 | 接入简单 Agent，仅支持文本往返 | 没有 Profile、工作区、工具和恢复能力时能否使用？ |
+| S02 | 通过 Ordessa 后端使用 Pi，观察工具与授权并持续交流 | 现有真实链如何映射，哪些能力由扩展承担？ |
+| S03 | 启动长任务，离开其页面，稍后查看进度和产物 | 页面生命周期与远端执行生命周期如何区分？ |
+| S04 | Agent 只提供任务提交、进度和结果，没有聊天协议 | 是否被迫伪造会话和 assistant 消息？ |
+| S05 | 不启动 Agent，独立浏览配置、资源或 Git 变更 | 领域模块能否不依赖活跃会话/运行？ |
+| S06 | 多服务同时接入，两个服务返回同名会话或任务 ID | 身份、授权范围、缓存和事件是否会串？ |
+| S07 | 新模块为特殊产物提供视图，未安装时仍能查看基础信息 | 扩展选择、默认回退与未知内容如何处理？ |
+| S08 | 一个资源模块与执行模块协作，后者可替换 | 怎样交换能力而不共享任意全局状态？ |
+| S09 | 连接断开后操作结果未知，重连收到重复/乱序事件 | 谁确认事实、恢复状态、防重复执行？ |
+| S10 | 扩展崩溃、关闭或卸载，远端任务仍在运行 | 谁释放订阅/资源，如何保留可解释的运行状态？ |
+| S11 | 服务缺少取消、历史或恢复能力 | 如何如实表达不可用，而非伪造支持？ |
+| S12 | 移除一个宣称可选的核心领域模块 | 宿主和其他独立模块是否还能工作？ |
+
+S01/S02 为近期真实需求锚点；其余是扩展与故障检验场景，不代表今夜实施范围。
+不要求任意第三方不可信代码热加载，不要求兼容所有协议或无限未来能力。
+
+## 评判方式
+
+先满足明确场景与不变式，再比较复杂度；不以文件少或自评分高判胜。
+对每个候选列：核心概念、接口操作、状态权威、生命周期、扩展依赖、接入成本、
+实现成本和不能覆盖的范围。不能用 execute(any)、万能 context/事件总线
+隐藏接口与错误语义后宣布核心最小。
+
+每个核心概念必须给一个“删掉它会失败”的具体场景；若移入扩展仍能满足
+全部必需条件，就列作可移除候选。总复杂度包含核心、适配器与扩展作者负担。
+允许保留多个不可简单排序的候选，不强行宣称存在唯一最简模型。
+
+## 建议循环（未启动）
+
+1. 首轮至少提出两个结构不同的候选，不以旧 mcode 方案为唯一出发点。
+2. 设计者给类型/伪代码、所有权与逐步场景轨迹。
+3. 攻击者给具体事件序列、被违反的不变式及最小反例；禁止只给风格意见。
+4. 验证者判断成立/不成立/证据不足，必要时在隔离设计目录写小型模型测试。
+   模型测试只能证明所建模型，不得冒充实际产品集成通过。
+5. 设计者修订并回放所有成立反例；不得删除场景、偷偷降低要求或压制攻击。
+6. 做删减攻击与新场景攻击，保存最佳候选、反例账和完整版本，不默认最后版最好。
+
+可借鉴的方法：
+- Self-Refine：https://github.com/madaan/self-refine （生成/反馈/修订）
+- Reflexion：https://github.com/noahshinn/reflexion （失败反思记忆）
+- evaluator–optimizer：https://www.anthropic.com/engineering/building-effective-agents
+- 运行控制候选：https://github.com/Kiriketsuki/ralph-loop
+以上阅读不代表已验证 Qoder 兼容、已安装或已授权其代码执行。
+
+建议上限：12 轮或 6 小时，先到者停止；这只是预算上限，不需要凑满时间。
+连续三轮没有新成立重大反例，且必需场景与删减检查通过，可提前交审。
+三轮仅换措辞/重复争论无实质进展则交出争议，不无限循环。
+目标冲突或产品取舍不明，记录交 I；其余独立问题可以继续。
+
+角色尽量用独立上下文；同一模型不同角色不等于独立质量证明。
+若 Qoder 无独立会话编排机制，先标注此限制，不假装已经启动独立审阅者。
+实现调度器前需读本机 Qoder --help，验证真实可用的非交互/会话参数，不猜 CLI。
+外部资料每条标实际读过的来源、版本与适用限制；未打开不作证据。
+
+## 次日交付
+
+一页最佳候选说明、核心/扩展边界、S01–S12 覆盖表、成立反例与修复记录、
+删减实验、未解决取舍，以及按真实模块划分的后续实施建议。
+停止状态为候选待审/预算截止/需决策，不自行宣布最终架构锁定。
+
+
+===== MATERIAL: counterexample ledger (authoritative; full) =====
+
+REGRESSION  FE-CE-007|R002|major|OPEN|extensions cannot derive foreign ns ids from their own handle and isolation is enforced at the registration boundary, but edges.list returns core-stored target ids enabling adapter-authorized, user-less relay edges|edges.list leaks foreign namespace ids into scoped handle|rounds/R002/cand-B.md §B.4 vs §B.1, §B.2, §B.3 ; verifier ruled it holds (RR002) ; Candidate B defect; §B.4 vs §B.1-§B.3; integrated candidate has no edges mechanism; N/A for A; remains OPEN against B as open alternative ; rounds/R003/cand-B.md §R003.B.5 (withdrawn not repaired) ; rounds/R002/cand-B.md §B.4 vs §B.1-§B.3 ; cand-A has no edges mechanism ; verifier ruled it holds (RR003) ; rounds/R003/cand-B.md §R003.B.3,B.5 carrier withdrawn not repaired; best candidate A has no edges mechanism; N/A vs A, OPEN vs demoted B ; rounds/R002/cand-B.md §B.4; N/A against A (no edges mechanism) ; verifier ruled it holds (RR006) ; cand-B §B.4 vs §B.1-3; A has no edges mechanism; N/A vs A, OPEN vs demoted B ; verifier ruled it does not hold (RR007) ; restored: an A-side does_not_hold ruling wrongly rejected the row; the defect still stands against discarded B ; cand-B §B.4 vs §B.1-3; A has no edges mechanism; N/A vs A, OPEN vs demoted B ; rounds/R002/cand-B.md §B.4 vs §B.1-3; A has no edges mechanism; N/A vs A, OPEN vs demoted B ; rounds/R002/cand-B.md §B.4 vs §B.1-3; A has no edges mechanism; N/A vs A, OPEN vs demoted B; R008 replay: unchanged ; rounds/R002/cand-B §B.4 vs §B.1-3; guards E6/E7; rounds/R009/cand-A.md §8 ; stays on the discarded alternative B ledger per guards E6/E7; no pass row is written for it in this round's replay block ; stays on the discarded alternative B ledger per guards E6/E7; no pass row is written for it in this round's replay block ; stays on the discarded alternative B ledger per guards E6/E7; no pass row is written for it in this round's replay block|-|R008|B-alternative|R002/R003 evidence names cand-B sections; saved candidate A has no edges mechanism; deferring B is not repairing B
+REGRESSION  FE-CE-037|R013|major|CLOSED|retirement is the artifact's only memory lever and is an observable change to a resource's existence, so a live subscriber must be able to learn that its resource ended, and invoke against a retired resource must have a defined outcome|releasing the log is invisible to every view already watching: Subscription declares no termination signal, no rendering rule covers the ended case, and invoke on a retired resource is undefined, so a frozen last state stays labelled current|new this round, produced by executing the release path with a live subscriber (_pt/model/run.repro.txt S04 and MC_capacity_gap GAP); §R11.2 Subscription, §R11.3 retention and disposal, §R11.4 existence, §R11.5 invariant ; §R13.2 Subscription.onEnd + §R13.3 disposal + §R13.5 ended row; EXPERIMENT R13-C|-/-|-
+
+-- all rows --
+id|raised_round|severity|status|invariant|title|evidence|targets|replayed|subject|subject_note
+FE-CE-001|R001|major|REJECTED|core defines observable content only as a seq-ordered replayable message log (no value/snapshot primitive), forcing the conversation/run shape onto passive data — violates "resource kinds are adapter types, host has no content authority"|A core has no value primitive: passive resource is content-as-message-log|rounds/R001/cand-A.md §A.1,§A.2,§A.5-S03,§A.5-S05 ; verifier ruled it does not hold (RR001) ; rounds/R001/verify.md §2 (does_not_hold); action.invoke→Result provides current-value path; replay against revised candidate confirms unchanged ; rounds/R001 §A.1/§A.2; RR001 does_not_hold; action.invoke→Result snapshot; unchanged in R7|-|R008|A-lineage|ruled does_not_hold in R001; concerns candidate A text
+FE-CE-002|R001|minor|CLOSED|core capability-declaration fixes a session-recovery vocabulary and core fallback view renders an agent/run reading while host claims no content interpretation|A core smuggles run/agent reading via fixed CapSet and generic last-envelope view|rounds/R001/cand-A.md §A.2,§A.4,§A.9 ; verifier ruled it holds (RR001) ; rounds/R001/verify.md §3 (holds); closed by open CapMap + revised fallback rendering per best candidate §R.2 §R.4 ; rounds/R001/verify.md §3 (holds); closed by open CapMap + revised fallback rendering per best candidate §R.2 §R.4 ; open CapMap + actionable fallback §R7.2/§R7.4 ; rounds/R009/cand-A.md §2 + §5 S11|-|R011|A-lineage|closed in R002 against A
+FE-CE-003|R002|major|CLOSED|host defines no meaning for capability names yet core replay behaviour keys on the literal string idempotent-apply — covert shared-key channel adapter→core, and unknown-outcome calls are auto-replayed to adapters that never negotiated invoke_id|idempotent-apply string toggles host auto-replay|rounds/R002/cand-A.md §A.5-S09 step 3 vs §A.2/§R.2 (FE-CE-002 closure text) ; verifier ruled it holds (RR002) ; revised: §R.2 replay_policy is a typed enum on action.register; §R.5-S09 step 3 host reads ONLY typed field; CapMap strings carry zero behavioral authority ; fixed never-auto-resubmit, no CapMap behavioral authority §R7.2/§R7.5-S09|FE-CE-002|R012|A-lineage|verifier-added row during R002 against A
+FE-CE-004|R002|major|CLOSED|every resource is reached only via a user-gated exactly-one-id handle, so a job resource spawned by a paired invoke is unobservable|S08 step 6 job resource has no subscription path|rounds/R002/cand-A.md §A.5-S08 steps 5-6 vs §A.2 handle_for, §A.4 user-gated mint ; verifier ruled it holds (RR002) ; revised: §R.2 handle model gains spawned set from typed Result.spawned_resource_id; §R.5-S08 step 6 subscribes via h_R accessible set ; same-ns rule permits subscribe; from_cursor=0 §R7.5-S08 step6|-|R012|A-lineage|R002 D10 against A
+FE-CE-005|R002|major|CLOSED|cooperation occurs only when the user asks (cand-A §A.8), but history replay into a freshly paired handle re-fires execute from stale events|pair gesture auto-executes on replayed envelopes|rounds/R002/cand-A.md §A.5-S08 step 5 vs §A.2 subscribe from_cursor, Envelope fields ; verifier ruled it holds (RR002) ; revised: §R.2 subscribe default is current cursor (live-only); §R.4 pair gesture's secondary handle uses default; §R.5-S08 step 4 no replay from seq 0 ; runner subscribe cursor.resolve live §R7.2/§R7.5-S08 step4; job replay from 0 has no execute hazard|-|R012|A-lineage|R002 D10 against A
+FE-CE-006|R002|major|CLOSED|host authority is identity/namespace isolation only, but the payload-type registry keyed by bare payload_schema_id string is a cross-namespace shared mutable key|global type registry bleeds registration across services|rounds/R002/cand-A.md §A.2 Envelope refusal clause vs §A.7, §A.1 ; verifier ruled it holds (RR002) ; revised: §R.2 ns-scoped payload-type registry keyed (ns_id, payload_schema_id); §R.3 registration call carries ns_id; §R.5-S06 step 5 checks ns-partitioned registry ; ns-scoped action registration §R7.5-S06 step5|-|R012|A-lineage|R002 D10 against A
+FE-CE-007|R002|major|OPEN|extensions cannot derive foreign ns ids from their own handle and isolation is enforced at the registration boundary, but edges.list returns core-stored target ids enabling adapter-authorized, user-less relay edges|edges.list leaks foreign namespace ids into scoped handle|rounds/R002/cand-B.md §B.4 vs §B.1, §B.2, §B.3 ; verifier ruled it holds (RR002) ; Candidate B defect; §B.4 vs §B.1-§B.3; integrated candidate has no edges mechanism; N/A for A; remains OPEN against B as open alternative ; rounds/R003/cand-B.md §R003.B.5 (withdrawn not repaired) ; rounds/R002/cand-B.md §B.4 vs §B.1-§B.3 ; cand-A has no edges mechanism ; verifier ruled it holds (RR003) ; rounds/R003/cand-B.md §R003.B.3,B.5 carrier withdrawn not repaired; best candidate A has no edges mechanism; N/A vs A, OPEN vs demoted B ; rounds/R002/cand-B.md §B.4; N/A against A (no edges mechanism) ; verifier ruled it holds (RR006) ; cand-B §B.4 vs §B.1-3; A has no edges mechanism; N/A vs A, OPEN vs demoted B ; verifier ruled it does not hold (RR007) ; restored: an A-side does_not_hold ruling wrongly rejected the row; the defect still stands against discarded B ; cand-B §B.4 vs §B.1-3; A has no edges mechanism; N/A vs A, OPEN vs demoted B ; rounds/R002/cand-B.md §B.4 vs §B.1-3; A has no edges mechanism; N/A vs A, OPEN vs demoted B ; rounds/R002/cand-B.md §B.4 vs §B.1-3; A has no edges mechanism; N/A vs A, OPEN vs demoted B; R008 replay: unchanged ; rounds/R002/cand-B §B.4 vs §B.1-3; guards E6/E7; rounds/R009/cand-A.md §8 ; stays on the discarded alternative B ledger per guards E6/E7; no pass row is written for it in this round's replay block ; stays on the discarded alternative B ledger per guards E6/E7; no pass row is written for it in this round's replay block ; stays on the discarded alternative B ledger per guards E6/E7; no pass row is written for it in this round's replay block|-|R008|B-alternative|R002/R003 evidence names cand-B sections; saved candidate A has no edges mechanism; deferring B is not repairing B
+FE-CE-008|R003|minor|CLOSED|every core mechanism must have a delete-it-breaks-a-required-scenario argument; the ns-scoped payload_schema_id descriptor store has no host consumer after FE-CE-008 removes the delivery gate, so it is non-load-bearing|payload-type registry outlived its reader|rounds/R003/cand-A.md §R003.2 (FE-CE-008 forward clause) vs §R003.2 ns-scoped registration + §R003.5-S06 step5 (claims FE-CE-006 reopens) ; S06/S07 pass with payload store deleted while action RegisteredType store kept ; verifier ruled it holds (RR003) ; verifier ruled it holds (RR003) ; rounds/R003/verify.md (holds); best candidate §R4.2 opaque label + §R4.5-S06 step5 / §R4.5-S07 pass without store ; opaque label §R7.2; S06/S07 pass without store|-|R008|A-lineage|R003 D08 against A
+FE-CE-009|R003|minor|CLOSED|spawned-resource-grant's per-handle accessible-set is not minimal; a same-namespace subscription-scope rule passes S08 without accumulating a set, and also removes the R003.8-admitted unbounded-growth weakness|spawned-set bookkeeping over-built for a same-ns guarantee|rounds/R003/cand-A.md §R003.2 (Result.spawned_resource_id / SubscriberScope.spawned) vs §R003.5-S08 steps5-6 (justification invokes foreign-id leak that R.2 says cannot occur) + §R003.8 ; verifier ruled it holds (RR003) ; insufficient evidence (RR003) ; rounds/R003/verify.md (insufficient_evidence) + EXPERIMENT both gates pass S08; best candidate §R4.2 spawned grant retained ; rounds/R006/cand-A.md §R6.6 EXPERIMENT Model2 + §R6.9 FE-CE-009 RESOLVED ; rounds/R006/cand-A.md §R6.6 Model2 experiment + §R6.2/§R6.5-S06,S08 ; integrated §R6.2/§R6.5-S08 ; Model2 §R7.6; same-ns rule passes S08+S06|FE-CE-004|R008|A-lineage|A minimality dispute: preventing the foreign-id leak is not a necessity proof for per-handle spawned sets ; minimality dispute remains; a safety argument is not a necessity proof
+FE-CE-010|R003|minor|CLOSED|invoke_id on OutcomeUnknown has no surviving host consumer after FE-CE-009 removes the auto-resubmit path; call-site return correlation is sufficient, so the token is residual non-load-bearing state|invoke_id orphaned by the fixed no-auto-replay invariant|rounds/R003/cand-A.md §R003.2 Typed action (removed replay_policy) + §R003.5-S09 step1/3 (invoke_id named only by §R003.5, no host reader) ; S09 dedup keys (ns,resource,seq) not invoke_id ; rounds/R003/verify.md (holds); best candidate §R4.2 OutcomeUnknown carries no token + §R4.5-S09 dedup keys ns,resource,seq ; no token §R7.5-S09|FE-CE-009|R008|A-lineage|R003 D08 against A
+FE-CE-011|R003|minor|CLOSED|live-default-subscribe is presented as a distinct core mechanism but is only a parameter default; making from_cursor explicit and having the pair-gesture mint supply cursor.resolve(id) preserves S08/FE-CE-005 without an implicit-default primitive|implicit-subscribe-default is not a load-bearing mechanism|rounds/R003/cand-A.md §R003.2 Event stream (default current cursor) + §R003.4 pair gesture (host mints h_R) vs §R003.6/R003.5-S08 step4 ; rounds/R003/verify.md (holds); best candidate §R4.2/§R4.4 from_cursor mandatory, pair-mint passes current cursor ; from_cursor mandatory §R7.2|FE-CE-005|R008|A-lineage|R003 D08 against A
+FE-CE-012|R006|major|CLOSED|host dedup by (ns,resource,seq) is vacuous: seq is host-assigned monotonic per resource, so no two envelopes for the same resource ever share a key; the dedup predicate is false for all inputs|host dedup key has no collision domain|rounds/R006/cand-A.md §R6.5-S09 step2 "host dedups/reorders by (ns,resource,seq)" vs §R6.2 "seq host-assigned monotonic per resource" ; verifier ruled it holds (RR006) ; rounds/R006/cand-A.md §R6.2 (seq = stream index, not dedup key) + §R6.5-S09 + §R6.6 ; seq=stream index; adapter dedups own id §R7.2/§R7.5-S09|-|R012|A-lineage|R006 D01 against the saved candidate A
+FE-CE-013|R006|major|CLOSED|adapter boundary rule R6.3 item7 instructs dedup by (ns_id, resource_local_id, seq) but seq is host-assigned and not returned to the adapter at pump time, making the rule unimplementable or a core-internal leak into the adapter contract|adapter cannot dedup by an opaque host counter|rounds/R006/cand-A.md §R6.3 item7 vs §R6.2 Event stream (host-assigned seq, no pump return specified) ; verifier ruled it holds (RR006) ; rounds/R006/cand-A.md §R6.3 item6 + §R6.7 item6 ; adapter dedups own stable id §R7.3 item6|FE-CE-012|R012|A-lineage|R006 D01 against the saved candidate A
+FE-CE-014|R006|major|CLOSED|host "reorders by (ns,resource,seq)" is identity since the host assigned seq in arrival order; S09's out-of-order premise has no core correction mechanism|reorder-by-self-assigned-seq is a no-op|rounds/R006/cand-A.md §R6.5-S09 step2 "dedups/reorders by (ns,resource,seq)" + §R6.2 "seq host-assigned monotonic" + §R6.3 item3 "seq-ordered pump" ; verifier ruled it holds (RR006) ; rounds/R006/cand-A.md §R6.3 item3 + §R6.5-S09 + §R6.6 ; adapter pumps logical order §R7.5-S09 step3|-|R012|A-lineage|R006 D01 against the saved candidate A
+FE-CE-015|R007|major|REJECTED|one subscribe(from_cursor=cursor.resolve(id)) declaration promised both replay-missed and live-not-replayed|cursor double-duty resolved by distinct subscriber inputs|rounds/R007 §A.1/§A.6 EXPERIMENT both=[]; catch-up saved+1 vs live resolve not one declaration ; verifier ruled it does not hold (RR007) ; RR007 does_not_hold: catch-up=saved+1, live=resolve, head=0 distinct integers §R7.2/§R7.6 EXPERIMENT|-|R008|A-lineage|R007 ordering claim against cand-A
+FE-CE-016|R007|major|CLOSED|from_cursor=cursor.resolve() on a freshly-spawned resource drops any envelope the adapter pumped between spawn and the resolve call|fresh-resource live-edge subscribe silently loses head envelope seq=1|rounds/R007 §A.5-S04 step2 / §A.5-S08 step6 vs §A.1 single rule + §A.6 (from_cursor=0 forbidden for S08 step5) ; verifier ruled it holds (RR007) ; §R7.2 "just-spawned → from_cursor=0"; §R7.5-S04 step2 / §R7.5-S08 step6 job subscribe from_cursor=0; replay names spawn→pump seq=1→subscribe(0) delivers head|FE-CE-015|R012|A-lineage|raised in R007 against cand-A with §A anchors
+FE-CE-017|R007|major|CLOSED|saved_last_seen is bound to one ns_id's numbering but a full reconnect mints a new ns_id whose stream restarts, so re-subscribing saved+1 skips the return-window events|persisted catch-up cursor invalid across namespace regeneration|rounds/R007 §A.2 (full reconnect=new ns_id; seq per-resource) vs §A.5-S03 step4/S09/S10 + §A.7 5-core-facts omission ; verifier ruled it holds (RR007) ; §R7.2 guard "recorded_ns_id==current else 0"; §R7.5-S03 step4/S09/S10; §R7.7 core fact #6; replay names ns_A save20→full reconnect ns_B→from_cursor=0 delivers 1..5|FE-CE-015|R012|A-lineage|raised in R007 against cand-A with §A anchors
+FE-CE-018|R008|major|CLOSED|every operation the adapter must perform is expressed in the typed interface; §2 lists type signatures as the adapter contract|adapter event-pump operation has no typed interface — §3 item 3 and all §5 scenario tables reference "pump" but §2 NamespaceHandle exposes no pump/emit method|rounds/R008/cand-A.md §2 code block (no pump method on NamespaceHandle) vs §3 item 3 "pump events in remote-stable logical order" vs §5 S01 step4 / S04 step4 / S02 step3 / S03 step3 ; verifier ruled it holds (RR008) ; §R8.2 NamespaceHandle.pump typed; sequence open→announce→register→pump viable ; rounds/R009/cand-A.md §2 + §6 FE-CE-018 re-check|FE-CE-007|R012
+FE-CE-019|R009|major|CLOSED|the read-result path must render every InvokeOutcome variant truthfully; §4 Q1 gives rules only for Result and CapabilityAbsent, so a dropped read (OutcomeUnknown) shows stale prior rows as the current value, the exact hide-uncertainty disqualifier the candidate forbids for status|read-OutcomeUnknown has no fallback rule: stale value presented as current|rounds/R009/cand-A.md §4 Q1 vs §4 Q3 + §2 InvokeOutcome ; verifier ruled it holds (RR010) ; §R11.5 four-variant table with the single invariant applying to both the value and the state channel; prior rows survive only as last-confirmed evidence with a banner and Retry; EXPERIMENT R11-B asserts the stale-as-current rendering is impossible ; §R11.5 four-variant table with the single invariant applying to both the value and the state channel; prior rows survive only as last-confirmed evidence with a banner and Retry; EXPERIMENT R11-B asserts the stale-as-current rendering is impossible|-|R012
+FE-CE-020|R009|major|CLOSED|GenericWalk is total over values that conform to the declared schema; a partial (missing declared field) or null-for-list Result reopens §5 S05 step7's crash-or-fake-complete fork this round claims closed, silently dropping a real deletions count or replacing the pane via error boundary|non-conforming Result renders fake-complete or blank, silently wrong value|rounds/R009/cand-A.md §2 GenericWalk contract + §5 S05 step7 ; verifier ruled it holds (RR010) ; §R11.5 totality rule: explicit (absent at runtime) and (unreadable: declared shape) rows; the walk never throws and never replaces the pane; EXPERIMENT R11-C covers conforming/partial/null-list/nested ; §R11.5 totality rule: explicit (absent at runtime) and (unreadable: declared shape) rows; the walk never throws and never replaces the pane; EXPERIMENT R11-C covers conforming/partial/null-list/nested|-|R012
+FE-CE-021|R009|minor|CLOSED|the default view must render declared (non-opaque) content to its depth; GenericWalk has no branch for a nested list field inside a record → `[object Object]` or silent omission, and §3/§7 make the adapter pre-flatten to the host's private walk depth, leaking a core internal into the adapter schema contract|nested declared schema mis-renders + renderer-depth core leak|rounds/R009/cand-A.md §3 D05 clause + §7 item6 + §2 walk cases ; verifier ruled it holds (RR010) ; §R11.5 recursive path-labelled walk to any depth plus deletion of the adapter flat-schema obligation; EXPERIMENT R11-C asserts nested paths render and that no depth constant exists ; §R11.5 recursive path-labelled walk to any depth plus deletion of the adapter flat-schema obligation; EXPERIMENT R11-C asserts nested paths render and that no depth constant exists|-|R012
+FE-CE-022|R011|major|CLOSED|delivery is defined as replay of stored envelopes while the mechanism ledger declares the host event store removed — the fact of which events exist for a resource has two contradicting owners, and either resolution breaks a claimed property (unnamed unbounded core buffer with no retention rule, or an empty catch-up guarantee that fails S03/S04/S09/S10)|replay promise has no owner: no party in the candidate retains the envelopes that from_cursor catch-up is defined to deliver|rounds/R011/attack.md FE-CE-022 vs candidates/best.md §R8.1 and §R8.2 line 50 and §R8.5-S03 steps 1 3 4 and mechanisms.tsv row host-event-store ; verifier ruled it holds (RR011) ; §R11.3 names the cursor-stream log as the retained store with resource-lifetime retention, and replaces the false host-event-store removed row with cursor-stream-log core; EXPERIMENT R11-A ; §R11.3 names the cursor-stream log as the retained store with resource-lifetime retention, and replaces the false host-event-store removed row with cursor-stream-log core; EXPERIMENT R11-A|-/-|R012
+FE-CE-023|R011|major|CLOSED|the host is authoritative for a resource's existence, but existence can only be retracted by the producing adapter via retire or teardown, so a link drop without teardown leaves the directory and the fallback's action list asserting a live cancelable resource that no reachable service can support indefinitely|namespace death has no owner: presence is asserted without any party able to retract it|rounds/R011/attack.md FE-CE-023 vs candidates/best.md §R8.2 existence authority and §R8.3 item 7 and §R8.4 fallback actions and §R8.5-S11 ; verifier ruled it holds (RR011) ; §R11.4 narrows existence to announced-and-not-retired, adds adapter boundary rule 8 teardown-on-observed-loss, renders OutcomeUnknown actions as unconfirmed, and declares the hard-killed-adapter residual ; §R11.4 narrows existence to announced-and-not-retired, adds adapter boundary rule 8 teardown-on-observed-loss, renders OutcomeUnknown actions as unconfirmed, and declares the hard-killed-adapter residual|-/-|R012
+FE-CE-024|R011|major|CLOSED|the candidate's catch-up guarantee over retained envelopes must be consistent with its own envelope-lifetime rule|envelope disposal on subscription close emptied exactly the backlog catch-up replays|§R11.3 replaces the disposal clause: a closed subscription releases a reference, not a log entry; retire/teardown is the sole disposal point; EXPERIMENT R11-A shows 0 versus 15 caught-up envelopes ; §R11.3 replaces the disposal clause: a closed subscription releases a reference, not a log entry; retire/teardown is the sole disposal point; EXPERIMENT R11-A shows 0 versus 15 caught-up envelopes|-|R012
+FE-CE-025|R012|major|CLOSED|delivery is defined as replay of log entries with seq at or above the subscriber's chosen c, while the artifact's own rule for choosing c assigns the live edge to pre-existing resources only and its own S01 table applies that rule to a resource the same table just created, so the entries the table's delete column claims are delivered fall below c|S01 pumps the typed deltas before the subscription selects the live edge, so the replay filter starts above the user's own input|rounds/R012/attack.md FE-CE-025 vs candidates/best.md §R11.1 from-cursor selection and §R11.2 cursor_resolve returns the next Seq and §R11.3 replay filter seq at or above c and the S01 step table rows 3 4 5 with their delete columns ; verifier ruled it holds (RR012) ; §R11.7-S01 step 5 now subscribes with from_cursor=0 under the just-created rule and its delete column names the wrong choice; EXPERIMENT R12-B shows the loss and the repair|-/-|R012
+FE-CE-026|R012|major|CLOSED|every scenario's extension-side step depends on holding a SubscriberScope for a namespace, so the mechanism that mints and scopes that handle must be declared in the artifact's typed surface|handle_for is called by S01 step 3 and declared nowhere: no interface method, boundary rule or stated mint and authorization rule exists for obtaining a subscriber handle|rounds/R012/attack.md FE-CE-026 vs candidates/best.md §R11.2 interface blocks for NamespaceHandle and SubscriberScope and §R11.6 eight boundary rules and the S01 step 3 row ; verifier ruled it holds (RR012) ; §R11.2 adds ViewHost.open_scope; §R11.6 item 9 fixes minting, scoping and permission; §R11.5 states the deferred extension-selection and uninstall rules; §R11.7b classifies the extension cost; EXPERIMENT R12-C fails on the pre-patch bytes and passes here|-/-|R012
+FE-CE-027|R012|major|CLOSED|a persisted catch-up cursor must not be silently re-pointed at a different incarnation of the same local_id, so resource identity must be immutable for a resource's life|retire plus re-announce under the same local_id restarted the seq space while the only guard checked the namespace id, so the catch-up rendered complete with the new incarnation's first events missing|§R11.3 burns a retired local_id for the namespace's lifetime, raises LocalIdBurned on re-announce, returns ExplicitAbsent from cursor_resolve and subscribe for a non-announced resource, and restates the memory lever; §R11.7-S09 step 7 renders the ExplicitAbsent path; EXPERIMENT R12-A|-|R012
+FE-CE-028|R013|major|CLOSED|a pair gesture confers scopes only, so an envelope pumped in a second namespace reaches the view only through a subscription on a resource of that namespace|S08 step 7 asserts a delivery for which the artifact declares no mechanism: executed, the view receives 0 envelopes on the data resource|carried from the R012 candidate-reviewer and reproduced by execution in _pt/model/run.repro.txt (S08 as-written FAIL); §R11.3 delivery rule, §R11.5 pair gesture, §R11.7-S08 step 7 ; verifier ruled it holds (RR013) ; §R13.7-S08 step 7 + §R13.5 pair gesture; EXPERIMENT R13-A|-/-|R013
+FE-CE-029|R013|major|CLOSED|if an observed link loss makes teardown mandatory and teardown disposes logs and force-closes subscribers, then a same-namespace catch-up branch cannot also be reachable after that loss|observed loss and the catch-up branch are mutually exclusive as written, and no row re-mints the view's scope after the forced close|carried from the R012 candidate-reviewer and reproduced by execution (S09 as-written FAIL: pump raises NamespaceGone after link_lost); §R11.4 item 8, §R11.3 teardown, §R11.7-S09 steps 5-6 ; verifier ruled it holds (RR013) ; §R13.4 items 8/8b + §R13.7-S09 steps 5-6; EXPERIMENT R13-B|-/-|R013
+FE-CE-030|R013|major|CLOSED|a scenario step may only rely on an action that some row registered, because absence from the registry is the artifact's own structural expression of an unsupported action|scenario tables invoke actions no row registers and use an unminted bare handle, so the typed-action step is unreachable as written|carried from the R012 candidate-reviewer (miscited counts corrected there) and reproduced by execution (MC_reg_missing and S01 as-written FAIL); §R11.6 item 4 and its closing paragraph ; verifier ruled it holds (RR013) ; register and open_scope rows added in S01/S02/S03/S04/S05/S09/S11; EXPERIMENT R12-C|-/-|R013
+FE-CE-031|R013|major|CLOSED|a resource an invoke spawns must be announced by the time the invoke returns, or the from_cursor=0 head rule cannot be applied to it|the invoke-spawned head rule and the not-announced ExplicitAbsent rule contradict each other because no rule states when an invoke-spawned resource is announced|carried from the R012 candidate-reviewer; §R11.1 from_cursor selection, §R11.3 subscribe returns ExplicitAbsent, §R11.7-S04 step 4 and -S08 step 6 ; verifier ruled it holds (RR013) ; §R13.3 spawn-announce rule + §R13.7-S04 step 3 / S08 step 5; EXPERIMENT R13-D|-/-|R013
+FE-CE-032|R013|major|CLOSED|every state the API can return must have a truthful rendering rule in the fallback, because the core must not acquire an opinion about what a missing or unknown declaration means|ExplicitAbsent from open_scope and directory_lookup, and the CapMap value unknown, have no rendering rule, so a view cannot show the state the API handed it|carried from the R012 candidate-reviewer (BOUNDARY_SCAN and S11) and reproduced by execution (S11 GAP); §R11.5 four-variant table, §R11.2 CapMap, §R11.6 item 9 ; verifier ruled it holds (RR013) ; §R13.5 total API-state rendering table|-/-|R013
+FE-CE-033|R013|major|CLOSED|the fallback's totality and recursion claims must be decidable from the artifact, so the declared-schema notation has to be defined|list<record>, opaque and recursion presuppose a declaration language that the artifact never defines, while the adapter-side rule says field names only|carried from the R012 candidate-reviewer; §R11.5 GenericWalk, §R11.7b item 7, and the closures of FE-CE-020 and FE-CE-021 ; verifier ruled it holds (RR013) ; §R13.2 SchemaDecl + §R13.5 GenericWalk + §R13.7b item 7; EXPERIMENT R11-C|-/-|R013
+FE-CE-034|R013|minor|CLOSED|renderer selection between modules must be a declared rule, not an implicit ordering channel, and a swap must not be silent|the most recently mounted claimant wins and the host records nothing, so unmounting the winner silently changes what the user sees|carried from the R012 candidate-reviewer; §R11.5 extension selection ; verifier ruled it holds (RR013) ; verifier ruled it holds (RR013) ; §R13.5 extension selection + §R13.2 claim table/on_claim_changed; §R13.7-S07 step 7 / S12 step 3|-/-|R013
+FE-CE-035|R013|minor|CLOSED|a claim on a payload schema must be scoped the same way action registration and handles are, or one namespace's view can claim another namespace's schema|payload_schema_id claims are unnamespaced while action registration and scopes are keyed by namespace|carried from the R012 candidate-reviewer; §R11.5 extension selection, §R11.6 item 4, §R11.6 item 9 ; verifier ruled it holds (RR013) ; §R13.6 item 9 + §R13.5 claim keyed by (ns_id, payload_schema_id)|-/-|R013
+FE-CE-036|R013|minor|CLOSED|the artifact must cost what a new author of each side must write, or its burden answer is one-sided|the classified cost prices seven extension duties while the adapter's ordering, dedup and teardown duties and the retire-then-announce lever are costed nowhere|carried from the R012 candidate-reviewer; §R11.7b, §R11.6 items 3 5 8, §R11.3 honest cost ; verifier ruled it holds (RR013) ; §R11.7c adapter-author cost section|-/-|R013
+FE-CE-037|R013|major|CLOSED|retirement is the artifact's only memory lever and is an observable change to a resource's existence, so a live subscriber must be able to learn that its resource ended, and invoke against a retired resource must have a defined outcome|releasing the log is invisible to every view already watching: Subscription declares no termination signal, no rendering rule covers the ended case, and invoke on a retired resource is undefined, so a frozen last state stays labelled current|new this round, produced by executing the release path with a live subscriber (_pt/model/run.repro.txt S04 and MC_capacity_gap GAP); §R11.2 Subscription, §R11.3 retention and disposal, §R11.4 existence, §R11.5 invariant ; §R13.2 Subscription.onEnd + §R13.3 disposal + §R13.5 ended row; EXPERIMENT R13-C|-/-|-
+
+===== MATERIAL: scenario coverage ledger (authoritative; full) =====
+
+sid|status|owner|mechanism|evidence|round
+S01|claimed|core|namespaces.open + announce + action.register(send) + ViewHost.open_scope mint + invoke + pump + subscribe from_cursor=0 just-created|§R13.7-S01|R013
+S02|claimed|adaptation|namespaces.open + open_scope + announce pi kinds + register send/approve/cancel + cursor_resolve live edge + pump|§R13.7-S02|R013
+S03|claimed|core|open_scope + subscribe 0 + close releases reference + persist triple + pump appends + ns-guard catch-up + register/read|§R13.7-S03|R013
+S04|claimed|core|announce job + register submit + open_scope + spawn-announce inside handler + subscribe 0 + pump + retire sends onEnd|§R13.7-S04|R013
+S05|claimed|core|announce + register read + open_scope + directory_list + invoke read → recursive walk rows|§R13.7-S05|R013
+S06|claimed|core|two namespaces + per-ns action typing + open_scope + same-ns ScopeDenied on subscribe/invoke + scoped directory_list|§R13.7-S06|R013
+S07|claimed|core|open CapMap + open_scope + namespaced recorded claim table + fallback + read or CapabilityAbsent + opaque row + on_claim_changed|§R13.7-S07|R013
+S08|claimed|core|two ns + register execute + pair gesture + cursor_resolve live + spawn-announce + subscribe 0 + s_D.subscribe(data-1) + teardown onEnd|§R13.7-S08 + EXPERIMENT R13-A|R013
+S09|claimed|adaptation|adapter dedup by own id + pump logical order + never-auto-resubmit + five-variant rendering + transient/permanent split + ns-guard catch-up + burn ExplicitAbsent|§R13.7-S09 + EXPERIMENT R13-B|R013
+S10|claimed|core|open_scope + onEnd termination signal + error boundary + uninstall closes scopes + retention + replay|§R13.7-S10 + EXPERIMENT R13-C|R013
+S11|claimed|core|open CapMap not_supported + registry absence → CapabilityAbsent + fallback renders absence + unknown row|§R13.7-S11|R013
+S12|claimed|adaptation|teardown scoped disposal + recorded selection revert with on_claim_changed + no pair record + new ns_id|§R13.7-S12|R013
+
+===== MATERIAL: unresolved independent-review findings (full) =====
+
+A scenario is only settled when a reviewer ruled its trajectory good against the CURRENT candidate bytes. Anything else is still open:
+scenario|verdict|round|evidence   (rulings bound to b4f5c5cc46c4…)
+
+_9 ruling set(s) above this line are VOID: they were made against different candidate bytes and are kept only as history._
+
+===== MATERIAL: mechanism disposition ledger (full) =====
+
+mechanism|disposition|failure_scenario|experiment_ref|round
+namespaces|core|S01 step1 / S06 step2 id collision|§R13.2|13
+resource-directory|core|S05 step3 cannot list without an active session|§R13.7-S05|13
+ordered-replayable-stream|core|S03 step4 no catch-up / S10 step3 no replay (meaning narrowed to stream index)|rounds/R006/cand-A.md §R6.5-S03,S10|6
+capability-declaration|core|S11 step 2 — absence inferred from null, faking support|best-candidate §R.2 CapMap (open)|1
+typed-action|core|S01 step3 execute(any) disqualifier / S04 step2|§R13.7-S01|13
+generic-fallback-view|core|S05 step5 blank / S07 step4 / S11 step5|EXPERIMENT R11-B|13
+host-session-object|removed|none — S04 passes without it|§R13.7-S04|13
+host-turn/role-envelope-field|removed|none — D12 disqualifier; S04 passes|§R7.5-S04|7
+host-event-store|removed|none — the log is the stream|§R13.3|13
+host-resource-directory-B|removed|none — per-service ns handles suffice|rounds/R001/cand-B §B.9|4
+capability-declaration-open-map|core|S11 step 2 absence inferred from null; fake support|best-candidate §R.2-§R.5-S11|2
+typed-replay-policy-on-registration|core|S09 step 3 host branches on CapMap string (FE-CE-003 reopens if removed)|best-candidate §R.2-§R.5-S09|2
+spawned-resource-grant|removed|none — same-ns rule passes S08 without a per-handle set|§R13.7-S08|13
+live-default-subscribe|core|S08 step 5 pair gesture replays stale events and auto-executes (FE-CE-005 reopens if removed)|best-candidate §R.2-§R.4-§R.5-S08|2
+ns-scoped-payload-registration|removed|none — payload_schema_id opaque; FE-CE-008 closed|rounds/R006/cand-A.md §R6.2|6
+cross-namespace-edge|removed|none — S08 on two ns-local handles|§R13.7-S08|13
+persistent-pair-record|removed|none — re-pairing is user action|§R13.7-S12|13
+open capability map|core|S11 step1 absence inferred from null -> fake-support disqualifier|EXPERIMENT R11-B|12
+ns-scoped-action-type-registration|core|S06 two services same kind/action name share a mutable key; FE-CE-006 reopens|rounds/R004/integrate.md §R4.2-§R4.5-S06|4
+handle-accessible-set|core|S06 step3-4 out-of-scope subscribe/invoke; FE-CE-007 leak class|rounds/R004/integrate.md §R4.2-§R4.5-S06,S08|4
+ns-scoped-envelope-payload-descriptor-store|removed|none — S06/S07 pass without it; sole reader (delivery gate) already gone FE-CE-008|rounds/R004/integrate.md §R4.6 (FE-CE-008)|4
+invoke-id-on-OutcomeUnknown|removed|none — no auto-resubmit, no consumer|§R13.7-S09|13
+implicit-live-default-subscribe|removed|none — from_cursor mandatory|§R8.5-S01|8
+envelope-payload-delivery-gate|removed|none — S07 renders unregistered schema identically; confirmed R003|rounds/R004/integrate.md §R4.2|4
+typed-replay-policy-enum|removed|none — fixed never-auto-resubmit; FE-CE-003 closed|rounds/R004/integrate.md §R4.6|6
+same-namespace-scoped-handle|core|S06 step4-5 out-of-scope subscribe/invoke|§R13.7-S06|13
+host-dedup-(ns,resource,seq)|removed|none — vacuous; S09 via adapter dedup|§R7.5-S09|7
+host-reorder-by-seq|removed|none — identity under arrival index|§R8.5-S09|8
+never-auto-resubmit-invariant|core|S09 step2 host replays command -> double execution if removed|rounds/R006/cand-A.md §R6.5-S09|6
+open-capability-map|core|S11 step2 absence inferred from null→fake-support disqualifier|EXPERIMENT2|8
+per-namespace-action-typing|core|S06 step5 shared mutable key reopens FE-CE-006|§R13.6|13
+monotonic-cursor-stream|core|S03 step4 no catch-up / S10 step3 no replay|EXPERIMENT3|8
+cursor.resolve|core|S08 step4/5 runner forced to replay history (FE-CE-005 reopens)|§R7.5-S08;§R7.6|7
+ns-scoped-action-typing|core|S06 step5 shared mutable key reopens FE-CE-006|§R7.5-S06|7
+never-auto-resubmit|core|S09 step4 host replays command → double execution|§R13.7-S09|13
+from-cursor-input-selection|core|FE-CE-016/017/025 head loss and ns-regen skip|EXPERIMENT R12-B|13
+replay_mode|removed|none — subscriber-chosen from_cursor passes S03/S04/S08/S10|EXPERIMENT3|8
+subscription-last-seq-accessor|removed|none — Envelope.seq carries persist position|§R8.5-S03|8
+ns-scoped-payload-descriptor-store|removed|none — payload_schema_id opaque; FE-CE-008 closed|§R8.2|8
+cursor_resolve|core|S08 step4 replay re-fires execute (FE-CE-005)|§R13.7-S08|13
+generic-actionable-fallback-view|core|S07 unregistered renders blank / S12 removed resolver blank|EXPERIMENT2|8
+envelope-seq-stream-index|core|S03 step2 no position to persist / S01 step4 no ordering|EXPERIMENT1|8
+pump|core|S01 step4 adapter cannot deliver|§R13.7-S01|13
+host-turn-role-envelope-field|removed|none — D12 disqualifier; S04 passes|§R13.2|13
+host-dedup-ns-resource-seq|removed|none — vacuous; S09 via adapter dedup|§R8.5-S09|8
+cursor-stream-log|core|S03 step4 no catch-up / S04 step4 head unreplayable|EXPERIMENT R11-A|13
+typed-action (read/status)|core|S05 step4 no current value / S11 step3 cannot answer absence structurally / delete -> execute(any)|§R11.7-S05,S11|12
+four-variant-outcome-rendering|core|FE-CE-019 and FE-CE-023: an unconfirmed outcome rendered as a current value or an available action is the hide-uncertainty disqualifier|EXPERIMENT R11-B|12
+generic-walk-totality|core|FE-CE-020 partial result renders fake-complete|EXPERIMENT R11-C|13
+recursive-path-labelled-walk|core|FE-CE-021 nested schema mis-renders|EXPERIMENT R11-C|13
+presence-is-not-reachability|core|FE-CE-023 dead producer advertises live capacity|§R13.4|13
+from-cursor input-selection|core|FE-CE-025: choosing the live edge for a resource this extension just created pumps the events above the replay filter / S04 step6 spawned head loss FE-CE-016 / ns-regen skip FE-CE-017|EXPERIMENT R12-B|12
+per-namespace action typing|core|S06 step5 shared mutable key -> FE-CE-006 reopens|§R11.6|12
+envelope-dropped-on-subscription-close|removed|FE-CE-024 — retaining it empties catch-up|EXPERIMENT R11-A|13
+adapter-flat-schema-obligation|removed|none — recursive total walk makes it unnecessary|EXPERIMENT R11-C|13
+host-dedup / host-reorder-by-seq|removed|none — vacuous under arrival index; adapter dedups own id|§R13.7-S09|13
+invoke_id on OutcomeUnknown|removed|none — no auto-resubmit and no consumer|§R11.7-S09|12
+resource-incarnation-burn|core|FE-CE-027 stale cursor renders complete|EXPERIMENT R12-A|13
+view-scope-minting|core|FE-CE-026 no scope to be scoped to|EXPERIMENT R12-C|13
+extension-selection|core|S07 step7 / S12 step3: with no selection rule an unclaimed schema has no renderer (blank pane) and an uninstalled view keeps claiming it|§R11.5|12
+capability-declaration (open CapMap)|core|S11 step1 absence inferred from null→fake-support|EXPERIMENT R11-B|13
+four/five-variant-outcome-rendering|core|FE-CE-019/023/032 unconfirmed or absent rendered current|EXPERIMENT R11-B|13
+schema-declaration-grammar (SchemaDecl)|core|FE-CE-033 totality claims undecidable|EXPERIMENT R11-C|13
+extension-selection (namespaced claim table + on_claim_changed)|core|S07 step7 / S12 step3 unclaimed schema blank, silent swap (FE-CE-034/035)|§R13.5|13
+subscription-termination-signal (onEnd)|core|FE-CE-037 retired resource stays labelled current|EXPERIMENT R13-C|13
+spawn-announce-before-result|core|FE-CE-031 spawned head unreachable|EXPERIMENT R13-D|13
+transient-vs-permanent-loss-split|core|FE-CE-029 same-ns catch-up unreachable after loss|EXPERIMENT R13-B|13
+total-api-state-rendering|core|FE-CE-032/037 a view receives a state it cannot render|§R13.5|13
+
+===== MATERIAL: per-round counters (full) =====
+
+round|holds_major|new_major|closed_major|clean|note|digest|review_holds
+R001|0|0|0|0|dim=D12-authority-boundary attack=1095w verify=1110w|b93d2dbedec53eaa05d7de4a9d762f3621d5f9bc623f8ea7da916298e690d30b|1
+R002|0|1|4|1|dim=D10-cross-module attack=1725w verify=1215w|2d2dde146c280db1e9ba555b358212f089cb4d99aa3bcbf60d6879699aebc496|0
+R004|0|0|4|1|dim=D08-reduction attack=0w verify=0w|82e626862a1629503f37199869ae75f4ed0d21dad63bef890ce7a163ce265ebc|0
+R006|0|0|7|0|dim=D01-order-dedup attack=1512w verify=907w|b6da557abfc47cc25d1e770381afa126bd2668e13b85563ddc6edc599f220560|0
+R007|0|0|9|1|dim=D01-order-dedup attack=1029w verify=698w|0376a54974883f9a750001e703098f4bbf0c6170db1caf03882592b89a605097|0
+R008|0|0|10|1|dim=D06-adapter-burden attack=1317w verify=439w|49df1e9345ab1f5c30f7fb2ffbb3306780ac0f45a318e3626b090ae0c9af9bc8|0
+R011|0|0|11|0|dim=D09-splits-truth. The rotation rule forbids reusing the immediately previous clean attack=1200w verify=739w|fece1121311d6d5f3227259d4b9056e13276700cebc2c5346c939cb91ba21b6c|0
+R011|0|0|11|0|dim=D09-splits-truth. The rotation rule forbids reusing the immediately previous clean attack=1200w verify=739w|fece1121311d6d5f3227259d4b9056e13276700cebc2c5346c939cb91ba21b6c|0
+R012|0|0|18|0|dim=D01-order-dedup attack=1099w verify=930w|25c36f4c40d85fed87d79a175c6964018ff7c91bcd0ca6d66a042fe2e25293e7|0
+R013|0|0|6|0|dim=D11-long-run attack=1467w verify=602w|b4f5c5cc46c41cbf59389bc99ab71b38819261b3a5da6e18a15d7a3cdd35c38e|0
+
+===== SAVED CANDIDATE (digest b4f5c5cc46c41cbf59389bc99ab71b38819261b3a5da6e18a15d7a3cdd35c38e) =====
+
+===== MATERIAL: candidates/best.md =====
+(source: /home/maoqh/projects/ordessa/control/reports/FE-DESIGN-001/candidates/best.md, sha256: b4f5c5cc46c41cbf59389bc99ab71b38819261b3a5da6e18a15d7a3cdd35c38e)
+
+# Best Candidate — FE-DESIGN-001 / R013 integrated (A)
+
+## R11.1 Core bet
+
+The host core is a namespaced directory of `(ns_id, local_id)` resources, each carrying an
+append-only cursor-stream log; an adapter-owned open CapMap; ns-scoped typed actions; a typed
+`pump` on the adapter handle; and namespace-scoped subscriber handles whose only permission rule is
+`resource.ns_id == handle.ns_id`. Delivery is one host rule — `subscribe(id, from_cursor=c)`
+replays the log's envelopes with `seq >= c` in increasing `seq`, then continues live — and the
+*value* of `c` is computed by the subscriber from its own state: `0` for a just-spawned resource's
+head, `cursor_resolve(id)` for the live edge of a pre-existing resource, `saved_last_seen + 1` to
+catch up while the persisted position's `recorded_ns_id` still equals the current `ns_id`, else
+`0`. **A `Result` returned by `invoke` that names a spawned resource implies the adapter announced
+that resource inside the invoke handler before returning** (the spawn-announce rule), and
+`invoke` against a retired or never-announced resource returns `ExplicitAbsent`. The host holds no
+content authority: it never reads a payload, never branches on a CapMap string, and names no
+capability of its own. What it does hold is the log — stated plainly.
+
+## R11.2 Types
+
+```typescript
+type ResourceId = { readonly ns_id: string; readonly local_id: string }
+type Seq = number // int64; host-assigned per-resource log index; NOT a dedup key
+
+interface NamespaceHandle {
+  readonly ns_id: string;
+  announce(desc: { local_id: string; kind: string; capabilities: CapMap }): void;
+  retire(local_id: string, reason: string): void;   // disposes log + burns id + onEnd to live subscribers
+  teardown(reason: string): void;                    // disposes every log + onEnd + force-closes
+  pump(local_id: string, payload_schema_id: string, payload: unknown): void;
+}
+
+interface SubscriberScope {
+  readonly ns_id: string;
+  directory_list(filter?: { kind?: string }): readonly ResourceDescriptor[];
+  directory_lookup(local_id: string): ResourceDescriptor | ExplicitAbsent;
+  cursor_resolve(resource_id: ResourceId): Seq | ExplicitAbsent; // next Seq, or absent if not announced
+  subscribe(resource_id: ResourceId, from_cursor: Seq): Subscription | ExplicitAbsent;
+  invoke<A extends ActionSchema>(resource_id: ResourceId, action_type: A,
+         params: A["params"]): InvokeOutcome<A>;
+}
+
+type InvokeOutcome<A> = Result<A> | CapabilityAbsent | ScopeDenied | OutcomeUnknown | ExplicitAbsent
+interface Subscription {
+  onNext(h: (env: Envelope) => void): void;
+  onEnd(h: (reason: string) => void): void;  // the declared termination signal (FE-CE-037)
+  close(): void;
+}
+type Envelope = { resource_id: ResourceId; seq: Seq; ts: number; kind: string;
+                  payload_schema_id: string; payload: unknown }
+type RenderRow = { readonly path: string; readonly label: string; readonly value: string;
+                   readonly status: "value" | "absent" | "unreadable" | "opaque" }
+type CapMap = Readonly<Record<string, "supported" | "not_supported" | "unknown">>
+type ClaimOutcome = "claimed" | "ScopeDenied"
+
+// The declaration grammar the recursive walk is decidable against (FE-CE-033).
+type SchemaDecl =
+  | { kind: "scalar" }
+  | { kind: "opaque" }
+  | { kind: "record"; fields: Readonly<Record<string, SchemaDecl>> }
+  | { kind: "list"; item: SchemaDecl }
+
+interface ViewHost {
+  open_scope(ns_id: string): SubscriberScope | ExplicitAbsent;
+  // A view claims a schema within one of its scopes' namespaces. Claims are keyed by
+  // (ns_id, payload_schema_id), recorded in the host claim table; a claim outside the
+  // view's scopes returns ScopeDenied and is not recorded (FE-CE-034, FE-CE-035).
+  claim_schema(ns_id: string, payload_schema_id: string): ClaimOutcome;
+  // Fired non-silently whenever the winning claimant of (ns_id, schema_id) changes;
+  // owner === null means the fallback now serves it. The swap is declared, never silent.
+  on_claim_changed(h: (ns_id: string, schema_id: string, owner: string | null) => void): void;
+}
+```
+
+## R11.3 The cursor stream is the log (FE-CE-022, FE-CE-024)
+
+Every resource has one cursor-stream log. `pump(local_id, payload_schema_id, payload)` appends an
+envelope and returns `void`; the host assigns the next `Seq` in pump-arrival order and routes the
+envelope to every live subscriber whose `from_cursor <= seq`. `subscribe(id, from_cursor=c)`
+replays the log's retained envelopes with `seq >= c` in increasing `seq`, then continues live; it
+returns `ExplicitAbsent` if `id` is not currently announced.
+
+- **Retention.** An envelope is retained from the moment `pump` appends it until the resource is
+  retired or its namespace torn down. There is no truncation, expiry or window while the resource
+  exists. `cursor_resolve(id)` always names a position the log can still serve, so
+  `from_cursor = saved_last_seen + 1` is serviceable for any live resource (guarded, as before, by
+  `recorded_ns_id == current ns_id`; a full reconnect mints a new namespace and restarts at `1`,
+  in which case the subscriber uses `0`).
+- **Disposal and observability (FE-CE-037).** `retire(local_id, reason)` disposes that resource's
+  log, `burn`s the `local_id`, delivers `onEnd(reason)` to every live subscriber of that resource,
+  then closes those subscriptions. `teardown(reason)` disposes every log in the namespace, delivers
+  `onEnd("namespace torn down: " + reason)` to every live subscriber scoped to it, then force-closes
+  them. A closed subscription releases its *routing reference*, never a log entry.
+- **Spawn-announce (FE-CE-031).** When `invoke` returns a `Result` naming a resource (e.g.
+  `SubmitResult.job_resource`), that resource is **announced by the producing adapter inside the
+  invoke handler, before the `Result` is returned**. The head envelope the handler pumps is
+  therefore retained by the time the caller applies the just-created rule with `from_cursor=0`.
+  `invoke` against a retired or never-announced resource returns `ExplicitAbsent`.
+- **One incarnation per `local_id` (FE-CE-027).** `retire` burns the `local_id` for that
+  namespace's lifetime: a later `announce` with the same `local_id` in the same namespace raises
+  `LocalIdBurned`, and `cursor_resolve` / `subscribe` / `invoke` on a `local_id` that is not
+  currently announced returns `ExplicitAbsent`. `teardown` restarts the id space with the
+  namespace.
+- **Honest cost.** A resource's log grows with every envelope it has ever emitted, for the life of
+  the resource. The bound is the resource's lifetime, which the producing adapter controls: it can
+  `retire` the resource (the watching view is now told via `onEnd`) and announce its successor
+  under a **new** `local_id`, or expose a `read` snapshot instead of a long stream. A service with
+  a very long-lived high-volume resource pays that memory cost; the design does not hide it behind
+  an unnamed buffer.
+- **Corrected claim.** No second store is introduced: the log *is* the stream.
+
+## R11.4 Presence is not reachability (FE-CE-023)
+
+`directory_list` / `directory_lookup` report that a resource is **announced and not retired**. They
+do not report that the service behind it is reachable, and no part of the core may present
+reachability as a fact. Consequences:
+
+- **Adapter boundary rule (item 8, transient loss).** When an adapter observes that its connection
+  is **transiently** lost but intends to resume the same logical stream, it does **not** teardown.
+  It stops pumping while the link is down; in-flight invokes return `OutcomeUnknown` (host-owned);
+  on reconnect it dedups by its own stable id and resumes pumping into the **same** namespace. The
+  log, the subscriptions and the `recorded_ns_id` cursor all remain valid — this is what makes the
+  same-namespace catch-up branch of S09 reachable after a drop.
+- **Adapter boundary rule (item 8b, permanent loss).** When the adapter declares the service gone
+  or will not resume the same stream, it calls `teardown(reason)`. Logs are disposed, subscribers
+  receive `onEnd` and are force-closed. The view must re-pair: `open_scope` on a fresh `ns_id`,
+  replay from `0`.
+- **Interface failure, not death.** While a namespace is neither retired nor torn down, `invoke`
+  on an unreachable resource returns `OutcomeUnknown` — the host-owned variant — and never
+  `CapabilityAbsent`. The fallback must therefore render an action whose last attempt returned
+  `OutcomeUnknown` as unconfirmed, never as available-and-working.
+- **Stated limitation.** If an adapter is killed so that it never observes the loss, its
+  namespace's registrations and logs remain until the host process ends, and nothing in the core
+  retracts them. Fixing that requires a liveness/heartbeat mechanism the core declines to impose.
+  The directory's meaning is narrowed so that this limitation is truthful.
+
+## R11.5 Fallback rendering contract (FE-CE-019, FE-CE-020, FE-CE-021, FE-CE-032, FE-CE-033)
+
+**Invariant (one rule, all channels).** An outcome the host has not confirmed may never be
+rendered as a current value or a current state, and a resource the host declares ended may never
+stay labelled current.
+
+**`InvokeOutcome` rendering — all five variants:**
+
+| Variant | Rendering | Clickable consequence |
+|---|---|---|
+| `Result` | GenericWalk rows, labelled `current (fresh invoke at <ts>)` | **Reload** re-invokes; rows replaced |
+| `CapabilityAbsent(x)` | `no <x> action registered for this kind; value not obtainable` + last-event metadata | none |
+| `ScopeDenied` | `this resource is outside this view's namespace scope` | none |
+| `OutcomeUnknown` | prior rows, if any, relabelled `last confirmed at <ts> — NOT current`, plus a banner `read did not return; value not confirmed`; with no prior rows, `value not confirmed; read did not return` | **Retry** re-invokes |
+| `ExplicitAbsent` | `this resource no longer exists (retired or never announced)` | none |
+
+**Total API-state rendering (FE-CE-032).** Every state the API can return has an explicit row so
+a view never receives a state it cannot display. These live in the fallback's rendering rules, not
+in core semantics:
+
+- `open_scope(ns_id) → ExplicitAbsent` → `that namespace is not open in this host process — open
+  the service first`.
+- `directory_lookup(local_id) → ExplicitAbsent` → `no resource with this id is announced`.
+- CapMap value `"unknown"` → `support for <cap> is unknown — the service has not declared it`. The
+  fallback does not claim supported nor unsupported; it displays the third declared truth.
+- `onEnd(reason)` → all rows for the ended resource are relabelled `ended at <ts>: <reason>`,
+  current labels are withdrawn, and the action list is marked unconfirmed.
+
+**GenericWalk, decidable over SchemaDecl.** The walk renders the *declared* schema recursively to
+any depth, with each row labelled by the declared field path (`files[0].hunks[1].lines`). For
+every declared field it emits exactly one row, with an explicit status:
+
+- present and conforming → `status="value"`, `value=str(primitive)`;
+- declared but absent at runtime → `status="absent"`, `value="(absent at runtime)"`;
+- present with the wrong shape (e.g. `null` or a scalar where a `list` was declared) →
+  `status="unreadable"`, `value="(unreadable: declared <shape>)"`;
+- declared opaque → `status="opaque"`, `value="opaque: <declared_schema_id>, no view installed"`.
+
+The walk never throws and never causes the pane to be replaced. The host still attaches no meaning
+to any name — `status`, `state`, `additions` are labels it echoes. The **adapter** declares each
+field's name and its `SchemaDecl` shape (`scalar` | `opaque` | `record` | `list`); the previous
+"field name only" clause is deleted because it could not express opacity or shape and made totality
+undecidable (FE-CE-033). The walk uses no host depth constant; a display cap (`… N more rows`) is a
+display concern, not a schema-authoring rule.
+
+**Extension selection — recorded, namespaced, non-silent (FE-CE-034, FE-CE-035).** A view claims a
+`(ns_id, payload_schema_id)` through `claim_schema` when it mounts, and only for a namespace it
+holds a scope to; otherwise `ScopeDenied`. The host records the current claimant of each
+`(ns_id, schema_id)` in a claim table. When the winning claimant changes — on mount or on unmount —
+the host emits `on_claim_changed(ns_id, schema_id, owner|null)`; `owner === null` means the
+fallback resumes. The swap is declared and announced, never an implicit mount-order channel and
+never silent. The generic fallback serves a resource whose schema no view currently claims.
+
+- **absent → fallback.** `CapabilityAbsent(x)` and a missing action are rendered by the fallback;
+  absence is never an error state and never a blank pane.
+- **throws → error boundary.** A view that throws is contained to that view's region; the fallback
+  is not substituted for the pane.
+- **uninstall → host closes scope.** When a view unmounts or is uninstalled, the host closes every
+  subscription made through that view's scopes, releases its claims (emitting `on_claim_changed`
+  where a renderer changes) and releases routing references. Resource logs are untouched.
+- **pair gesture.** A user gesture that opens scopes in two namespaces (S08). It records nothing in
+  the core; the view holds both scopes, and the only permission each confers is
+  `resource.ns_id == scope.ns_id`. **A scope is not a subscription:** delivery to the view through
+  either scope requires a `subscribe` on a resource of that scope's namespace.
+
+## R11.6 Boundary rules (adapter items 1–8, host items 9–10)
+
+1. `namespaces.open({service})`; 2. `announce` each kind with `local_id`, `kind` and an open CapMap
+including explicit `not_supported`; 3. `pump(local_id, payload_schema_id, payload)` for every remote
+event, in remote-stable logical order — the host assigns arrival-index `seq` and does not reorder;
+4. `action.register(ns_handle.ns_id, kind, action_type, params_type, result_type)`; 5. on reconnect,
+dedup by the adapter's own protocol-level stable event id, never by host `seq`; 6. register a typed
+`read` (value) or `status` (state) action for any resource that should be inspectable in the
+default view; 7. on `retire`/`teardown`, stop pumping — `pump` on a retired `local_id` is a silent
+no-op and `pump` after `teardown` raises `NamespaceGone`; **8. (transient loss) do not teardown on
+a transient link loss — stop pumping, return `OutcomeUnknown` for in-flight invokes, resume the same
+namespace after reconnect; 8b. (permanent loss) call `teardown(reason)` when the service is gone or
+the same stream will not resume.**
+**9. (host duty, FE-CE-026/035) the host mints a view's `SubscriberScope` only through
+`ViewHost.open_scope(ns_id)` — one scope per (view, ns_id), returning `ExplicitAbsent` if that
+namespace is not open in this host process. A scope is never discoverable from another scope, never
+shares another namespace's contents, and confers no permission beyond
+`resource.ns_id == scope.ns_id`. There is no other way to obtain a scope. `claim_schema` is granted
+only for a namespace the view holds a scope to.**
+**10. (adapter duty, FE-CE-031) a resource named by an `invoke` result is announced by the adapter
+inside the invoke handler, before the result is returned.**
+
+An adapter does not know or use host `seq`, does not compute `from_cursor`, does not persist
+`recorded_ns_id`, does not know what views subscribe with, does not know whether a log entry is
+retained, and does not shape its schema around a renderer algorithm. Absence is expressed twice and
+never as null: `CapMap[x]="not_supported"` (informational) **and** `x` absent from
+`action.register` → `invoke(…, x, …)` returns structural `CapabilityAbsent(x)`.
+
+## R11.7 Scenario trajectories (self-contained)
+
+All twelve scenarios are step tables: each step carries an actor, the operation, what is
+authoritative for it, and the user-visible failure if the mechanism that step uses is deleted.
+
+**S01 text-only.**
+
+| Step | Actor | Action | State change | Authoritative | Delete-consequence |
+|---|---|---|---|---|---|
+| 1 | Host | `namespaces.open({service:"text-echo"})` → `ns_handle` | Namespace created | Host | Delete namespace: step 2 cannot scope; S06 collision |
+| 2 | Adapter | `ns_handle.announce({local_id:"main", kind:"text.stream", capabilities:{cancel:"not_supported"}})`; `action.register(ns, "text.stream", "send", SendParams, SendResult)` | Resource + action registered | Adapter | Delete register: step 3 invoke returns CapabilityAbsent (FE-CE-030) |
+| 3 | Extension | `s = host.open_scope(ns_handle.ns_id)`; `s.invoke((ns,"main"), "send", {text:"hello"})` | Scope minted then routed | Host/Adapter | Delete `open_scope`: no scope at all (FE-CE-026). Delete typed-action: execute(any) |
+| 4 | Adapter | `ns_handle.pump("main", "text.delta", "h")`; `ns_handle.pump("main", "text.delta", "e")` | Host assigns seq, routes to subscribers | Adapter (content)/Host (seq) | Delete pump: no data enters stream |
+| 5 | Extension | `sub = s.subscribe((ns,"main"), from_cursor=0)` — just-created rule; step 4's deltas are seq 1..2 and c=0 admits both, then live | Replays seq 1..2, then live | Extension | Delete cursor-stream: no ordered delivery. Subscribe with `cursor_resolve` instead: c=3, deltas never replayed (FE-CE-025) |
+
+**covered (core).**
+
+**S04 submit/progress/result, no chat.**
+
+| Step | Actor | Action | State change | Authoritative | Delete-consequence |
+|---|---|---|---|---|---|
+| 1 | Adapter | `announce({local_id:"acme", kind:"acme.job", capabilities:{cancel:"not_supported"}})`; `action.register(ns, "acme.job", "submit", SubmitParams, SubmitResult)`; SubmitResult has typed field `job_resource: ResourceId` | Resource + action registered | Adapter | Delete register: step 3 unreachable (FE-CE-030) |
+| 2 | Extension | `s = host.open_scope(ns)`; `r = s.invoke((ns,"acme"), "submit", {input:"..."})` | Scope minted; host routes, adapter creates job | Adapter/Host | Delete `open_scope`: no handle (FE-CE-026). Delete namespace: no target |
+| 3 | Adapter | inside the submit handler: `announce({local_id:"job-7", kind:"acme.job", …})`; `ns_handle.pump("job-7", "progress", {pct:0})`; then return `SubmitResult{job_resource:{ns,"job-7"}}` | Spawned resource announced + head pumped before return | Adapter (FE-CE-031) | Delete the spawn-announce step: step 4 subscribe returns ExplicitAbsent, head lost |
+| 4 | Extension | `sub = s.subscribe(r.job_resource, from_cursor=0)` — just-spawned; captures head seq=1 + live | Subscription delivers stored then live | Host | Delete cursor-stream: no delivery position |
+| 5 | Adapter | `ns_handle.pump("job-7", "progress", {pct:50})`, `pump("job-7","result",{…})`, then `retire("job-7","done")` → subscriber receives `onEnd("done")` | Envelopes routed in order; termination signalled | Adapter/Host | Delete onEnd: the resource ends while the view still labels the last state current (FE-CE-037) |
+| 6 | Extension | Renders progress from seq 1..N; on `onEnd` relabels `ended at <ts>: done`; no role/turn/session in Envelope | User sees submit→progress→result→ended | Extension | Delete resource-directory: step 2 target not found |
+
+**No-chat proof:** `Envelope` contains no `role`, `turn`, `sender`, `assistant`, or `message_type`
+field. A "progress" envelope and a "result" envelope are distinct payloads in a stream, not
+messages in a conversation. **covered (core).**
+
+**S03 long task, leave/return (T-Boring).**
+
+| Step | Actor | Action | State change | Authoritative | Delete-consequence |
+|---|---|---|---|---|---|
+| 1 | Extension | `s = host.open_scope(ns)`; `sub = s.subscribe(job_id, from_cursor=0)` — full history, first session | Delivers all stored then live | Host | Delete `open_scope`: no handle (FE-CE-026) |
+| 2 | Extension | `sub.close()`; persist `{local_id:"job-7", recorded_ns_id:"ns_A", saved_last_seen:20}` | Subscription closed; persisted in extension store | Extension | Delete Envelope.seq: step 2 persist has no position |
+| 3 | Adapter | Remote continues; `ns_handle.pump("job-7", "progress", {…})` for seq=21..35 | Host assigns seq, stores for next subscriber | Adapter/Host | Delete pump: seq 21-35 never enter |
+| 4 | Extension | Return: `recorded_ns_id=="ns_A" == current_ns_id` → `s.subscribe(job_id, 21)`. Host delivers stored seq=21..35 then live | Catch-up rendered | Host/Extension | Delete resource-lifetime retention: no entries to replay |
+| 4-alt | Extension | If ns regenerated: `recorded_ns_id != current_ns_id` → `from_cursor=0` | Full new-stream replay | Extension | Delete cursor-stream: no replay |
+| 5 | Extension | `action.register(ns,"acme.job","read", ReadParams, ReadResult)`; passive: `s.invoke(job_id, "read", {})` → snapshot | Display | Adapter/Extension | Delete register: read returns CapabilityAbsent (FE-CE-030) |
+
+**covered (core+adaptation for persisted-cursor discipline).**
+
+**S02 Pi/Ordessa (T-Pi).**
+
+| Step | Actor | Action | State change | Authoritative | Delete-consequence |
+|---|---|---|---|---|---|
+| 1 | Adapter | `namespaces.open({service:"ordessa"})` → `ns_P` | Namespace created | Host | Delete namespace: no scope |
+| 2 | Adapter | `announce` pi.conversation/pi.tool-event/pi.approval with CapMap; `action.register` send/approve/cancel | Kinds + actions available | Adapter | Delete register: step 4/5 CapabilityAbsent (FE-CE-030) |
+| 3 | Extension | `s = host.open_scope(ns_P)`; `sub = s.subscribe(tool_event_id, from_cursor=s.cursor_resolve(tool_event_id))` → live | Scope minted; subscription at live edge | Extension/Host | Delete `open_scope`: no scope (FE-CE-026). Delete cursor_resolve: replay → FE-CE-005 |
+| 4 | Extension | `s.invoke(conversation_id, "send", {text:"..."})` → adapter sends to Pi, pumps response | Round-trip works | Adapter/Host | Delete typed-action: execute(any) |
+| 5 | Extension | On approval event: `s.invoke(approval_id, "approve", {decision:"accept"})` | Approval honored | Adapter/Extension | Delete ordered-stream: events undelivered |
+| — | Adapter | `ns_P.pump("tool-event-42", "tool.call", {…})` to live subscriber | Envelope routed | Adapter/Host | Delete pump: user sees no tool activity |
+
+**covered (adaptation).**
+
+**S06 two services, same id (T-Isolation).**
+
+| Step | Actor | Operation | Authoritative | Delete-mechanism → user-visible failure at this step |
+|---|---|---|---|---|
+| 1 | Adapter A | `namespaces.open({service:"runner"})` → `ns_R` | Host | Delete **namespaces**: both services share one key space |
+| 2 | Adapter B | `namespaces.open({service:"data"})` → `ns_D` | Host | Delete **namespaces**: as step 1 |
+| 3 | Adapters A and B | both `announce({local_id:"job-1", kind:"acme.job", …})` and `action.register(ns, "acme.job", "cancel", Params, Result)` | Adapter | Delete **per-(ns,kind,action) registry**: the second registration overwrites the first's types (FE-CE-006) |
+| 4 | Extension | `s_D = host.open_scope(ns_D)`; `s_D.subscribe((ns_R,"job-1"), 0)` → `ScopeDenied` | Host | Delete the **open_scope** seam / **same-ns rule**: the cross-namespace subscription succeeds |
+| 5 | Extension | `s_D.invoke((ns_R,"job-1"), "cancel", {})` → `ScopeDenied` | Host | Delete the **same-ns rule**: a foreign action is invoked |
+| 6 | Extension | `s_D.directory_list({kind:"acme.job"})` → only `ns_D`'s `job-1` | Host | Delete **directory scoping by namespace**: foreign ids leak (FE-CE-007 class) |
+
+**covered (core).**
+
+**S07 special artefact, no view installed (T-Unknown-Schema).**
+
+| Step | Actor | Operation | Authoritative | Delete-mechanism → user-visible failure at this step |
+|---|---|---|---|---|
+| 1 | Adapter | `announce({local_id:"plot-1", kind:"acme.plot", payload_schema_id:"acme.plot.v1", capabilities:{export:"supported", share:"not_supported"}})` | Adapter | Delete **open CapMap**: `share` must be inferred from a failure (fake-support) |
+| 2 | Extension | `s = host.open_scope(ns_id)`; `s.directory_list({kind:"acme.plot"})` renders `plot-1` | Host | Delete **open_scope**: no scope (FE-CE-026) |
+| 3 | Host (selection) | no view claims `(ns_id, "acme.plot.v1")` in the claim table → the generic fallback serves the resource | Host | Delete **extension selection**: unclaimed schema has no renderer |
+| 4 | Fallback | renders kind, registered action names with CapMap values (`export: supported`, `share: not_supported`, anything else `unknown`) and `payload_schema_id` | Host | Delete **generic-fallback-view**: user cannot see which action exists |
+| 5 | Extension | `s.invoke((ns_id,"plot-1"), "read", {})` → `Result`, recursive walk rows; if no `read` registered → `CapabilityAbsent(read)` row | Adapter (content) / Host (route) | Delete **typed-action**: absence cannot be expressed structurally |
+| 6 | Fallback | opaque payload renders `opaque: acme.plot.v1, no view installed` | Host | Delete **recursive walk**: unrenderable payload blanks the pane |
+| 7 | Extension | a view mounts and `claim_schema(ns_id, "acme.plot.v1")` → `"claimed"`; the host records the owner, emits `on_claim_changed`, and the fallback stops serving | Extension | Delete **recorded selection**: two claimants have no defined winner and unmount is silent (FE-CE-034) |
+
+**covered (core).**
+
+**S08 resource + replaceable runner (T-Pair).**
+
+| Step | Actor | Operation | Authoritative | Delete-mechanism → user-visible failure at this step |
+|---|---|---|---|---|
+| 1 | Adapter | `namespaces.open({service:"runner"})` → `ns_R`; `announce({local_id:"runner-1", kind:"acme.runner", capabilities:{execute:"supported"}})`; `action.register(ns_R, "acme.runner", "execute", ExecuteParams, SubmitResult)` | Adapter | Delete **register**: step 5 CapabilityAbsent (FE-CE-030) |
+| 2 | Adapter | `namespaces.open({service:"data"})` → `ns_D`; `announce({local_id:"data-1", kind:"acme.data", …})` | Adapter | Delete **namespaces**: step 8's handoff becomes cross-namespace access |
+| 3 | Extension | pair gesture → `s_R = host.open_scope(ns_R)`, `s_D = host.open_scope(ns_D)` | Host | Delete **pair gesture**: no second scope exists |
+| 4 | Extension | `s_R.subscribe((ns_R,"runner-1"), from_cursor=s_R.cursor_resolve((ns_R,"runner-1")))` | Extension | Delete **cursor_resolve**: replay re-fires execute (FE-CE-005) |
+| 5 | Extension | `s_R.invoke((ns_R,"runner-1"), "execute", {job:"…"})`; inside the handler the adapter `announce`s `job-7` and pumps its head, then returns `SubmitResult{job_resource:{ns_R,"job-7"}}` | Adapter (content) / Host (route) | Delete **spawn-announce**: step 6's subscribe returns ExplicitAbsent (FE-CE-031) |
+| 6 | Extension | `s_R.subscribe(r.job_resource, from_cursor=0)` — invoke-spawned head | Host | Delete **just-spawned rule**: head lost (FE-CE-016) |
+| 7 | Extension | `s_D.subscribe((ns_D,"data-1"), from_cursor=s_D.cursor_resolve((ns_D,"data-1")))` | Host | Delete **this subscription**: step 8's delivery has no mechanism — a scope is not a subscription (FE-CE-028) |
+| 8 | Adapter | `ns_D` pumps `ArtifactReady`; it is delivered to the view through the `s_D` subscription on `data-1` | Adapter | Delete the **pair gesture** or **subscription**: the data service has no route to this view |
+| 9 | Adapter | runner replaced → `ns_R.teardown("superseded")` → `s_R` subscribers receive `onEnd`; further scope operations report `NamespaceGone` | Host | Delete **teardown**: stale runner handles keep routing |
+| 10 | Extension | re-pairs: `host.open_scope(ns_R')`, then steps 4–6 against the new namespace | Extension | Delete the **recorded_ns_id rule**: cursor resumes against the dead namespace (FE-CE-017) |
+
+**covered (core).**
+
+**S09 drop, unknown outcome, duplicate, out-of-order (T-Unknown).**
+
+| Step | Actor | Operation | Authoritative | Delete-mechanism → user-visible failure at this step |
+|---|---|---|---|---|
+| 1 | Extension | `s = host.open_scope(ns)`; `action.register(ns, kind, "execute", …)`; `s.invoke(id, "execute", {…})` | Host | Delete **register**/**open_scope**: the command has no route or no scope (FE-CE-030) |
+| 2 | Host | the link drops mid-command → the host returns `OutcomeUnknown`; no token, no retry policy | Host | Delete **four-variant rendering**: uncertainty hidden (FE-CE-003/019) |
+| 3 | Extension | renders "outcome unknown — not confirmed" with Retry | Extension | Delete **not-current invariant**: stale success stays while fate is unknown |
+| 4 | Extension | re-invoke is a fresh user gesture; the host issues no automatic resubmit | Host | Delete **never-auto-resubmit**: a reconnecting host replays the command and it executes twice |
+| 5 | Adapter | **transient drop** (the same stream will resume): no teardown; on reconnect the adapter dedups by its own stable id and pumps in remote-stable logical order into the **same** namespace | Adapter | Delete the **transient/permanent split**: item 8 forces teardown on the observed loss, disposing the log, so step 6's same-namespace catch-up becomes unreachable (FE-CE-029) |
+| 6 | Extension | if `recorded_ns_id` still matches (transient reconnect): catches up from `saved_last_seen+1`; if **permanent** (adapter called `teardown` → new `ns_id`): `open_scope(new_ns)`, replay from `0` | Extension | Delete the **recorded_ns_id rule**: the post-reconnect window is skipped (FE-CE-017) |
+| 7 | Host | if the persisted `local_id` no longer resolves (retired while away) → `ExplicitAbsent`, rendered "this resource is gone" | Host | Delete **one-incarnation-per-local_id**: a re-announced `local_id` silently re-points the cursor (FE-CE-027) |
+
+**covered (adaptation).**
+
+**S10 extension crash while remote runs (T-Handoff).**
+
+| Step | Actor | Operation | Authoritative | Delete-mechanism → user-visible failure at this step |
+|---|---|---|---|---|
+| 1 | Extension | view mounts and subscribes through `host.open_scope(ns_R)` | Host | Delete **open_scope**: no subscription (FE-CE-026) |
+| 2 | Host | a throwing view is contained to its region | Host | Delete **error boundary**: the exception replaces the host surface |
+| 3 | Extension | view unmounts/closes → host closes its subscriptions and releases routing references | Host | Delete **uninstall→host-closes-scope**: dead view keeps receiving |
+| 4 | Adapters | resources keep running; `ns_D`/`ns_R` remain authoritative for their kinds and logs | Adapter | Delete **resource-lifetime retention**: later view has nothing to replay |
+| 5 | Extension | new view mounts, `host.open_scope(ns_R)`, subscribes `from_cursor=0` (or `saved_last_seen+1` if it persisted a matching `recorded_ns_id`) | Host / Extension | Delete **cursor-stream-log**: step 5 replays nothing (FE-CE-022/024) |
+| 6 | Extension | renders replayed history; if the adapter retires the resource meanwhile, the view receives `onEnd(reason)` and relabels rows ended, never current | Extension | Delete **subscription termination signal**: a retired resource stays labelled current (FE-CE-037) |
+
+**covered (core).**
+
+**S12 remove an "optional" core domain module (T-Compose).**
+
+| Step | Actor | Operation | Authoritative | Delete-mechanism → user-visible failure at this step |
+|---|---|---|---|---|
+| 1 | Adapter | `ns_R.teardown("service removed")` | Host | Delete **teardown**: the removed service's resources and logs linger |
+| 2 | Host | `ns_D` is unaffected: its directory entries and logs are untouched | Host | Delete **namespace scoping**: one teardown would dispose the other's logs |
+| 3 | Extension | a mounted `plot.v1` view is uninstalled → host releases its claims, emits `on_claim_changed`, closes its scopes, and the fallback resumes serving | Host / Extension | Delete **recorded selection**: an uninstalled view keeps claiming silently (FE-CE-034) |
+| 4 | Extension | the user's paired view is removed → other single-resource modules are untouched | Host | Delete the **no-pair-record** rule: removal would require reconciling paired state never recorded |
+| 5 | Adapter | the runner returns and is re-opened → `namespaces.open` mints a new `ns_id`; views re-pair and replay from `0` | Adapter / Host | Delete the **new-ns_id-on-reopen** rule: a stale cursor resumes against the dead namespace |
+
+**covered (adaptation).**
+
+**S05 — config/Git browse, no session (deletion-complete).**
+
+| Step | Actor | Operation | Authoritative | Delete-mechanism → user-visible failure at this scenario |
+|---|---|---|---|---|
+| 1 | Host | `namespaces.open({service:"cfg"})` → `ns_C` | Host | Delete **namespaces**: nothing to browse |
+| 2 | Adapter | `announce({local_id:"app.conf", kind:"config.tree", capabilities:{read:"supported"}})`; `action.register(ns_C, "config.tree", "read", ReadParams, ReadResult)` | Adapter | Delete **register**: step 4 read returns CapabilityAbsent (FE-CE-030) |
+| 3 | Extension | `s = host.open_scope(ns_C)`; `s.directory_list({kind:"config.tree"})`; `s.directory_lookup(id)` | Host | Delete **open_scope**/**resource-directory**: cannot list without an active session |
+| 4 | Extension | `r = s.invoke(id, "read", {})` → `ReadResult` | Adapter(content)/Host(route) | Delete **typed-action**: no `read`; execute(any) |
+| 5 | Host | GenericWalk `ReadResult` → rows `port=8080` … | Host | Delete **generic-fallback-view**: the returned ReadResult has no renderer |
+| 6 | Extension | User clicks **Read** → re-invoke `read` | View | Delete **generic-fallback-view**'s re-invoke action: stale row forever |
+| 7 | Host | opaque body field → `RenderRow(…, "opaque: …, no view installed")` | Host | Delete **opaque handling**: crash or silently drop |
+
+**S11 — service lacks cancel/history/resume (deletion-complete).**
+
+| Step | Actor | Operation | Authoritative | Delete-mechanism → user-visible failure at this scenario |
+|---|---|---|---|---|
+| 1 | Adapter | `announce kind:"acme.job", CapMap{cancel:"not_supported",history:"not_supported",resume:"not_supported"}` | Adapter | Delete **open CapMap**: UI infers absence from null → fake-support |
+| 2 | Adapter | does **not** `action.register(ns,"acme.job","cancel")`; registers `status` (state) | Adapter | Delete **per-ns action registry**: no structural `CapabilityAbsent` |
+| 3 | Extension | `s = host.open_scope(ns)` | Host | Delete **open_scope**: the invoke attempt has no handle (FE-CE-026/030) |
+| 4 | Extension | user clicks Cancel → `s.invoke(job,"cancel",{})` → `CapabilityAbsent("cancel")` | Host | Delete **typed-action routing**: absence cannot be answered |
+| 5 | Host/View | fallback renders `cancel: not_supported` (CapMap) + `invoke returned CapabilityAbsent`; any CapMap value `unknown` renders `support for X is unknown` | Host | Delete **generic-fallback-view**/**unknown row**: the user cannot tell unsupported from still-processing, and an `unknown` state is unrenderable (FE-CE-032) |
+| 6 | Extension | Cancel control greyed with reason, never a spinner that resolves to success | View | Delete **open CapMap** (rendering side): a dead button looks enabled |
+
+## R11.7b What an extension author must implement (the classified cost)
+
+1. **Persist a cursor triple** per resumable subscription: `{local_id, recorded_ns_id, saved_last_seen}`.
+2. **Choose `from_cursor` correctly**: `0` for a just-created / invoke-spawned head, `cursor_resolve`
+   for a pre-existing resource's live edge, `saved_last_seen + 1` while `recorded_ns_id` matches.
+3. **Handle `ExplicitAbsent`**: a persisted `local_id` that no longer resolves means the resource was
+   retired; render "gone", never a complete-looking catch-up.
+4. **Close subscriptions on unmount**, so the host can release routing references.
+5. **Render all five `InvokeOutcome` variants**, including the not-confirmed state and the
+   "resource no longer exists" state with Retry where the user may re-invoke.
+6. **Register a typed `read` (value) or `status` (state) action** for anything the extension wants
+   inspectable in the default view.
+7. **Declare each result field's name and its `SchemaDecl` shape** (`scalar` | `opaque` | `record`
+   | `list`), never a shape chosen to suit a renderer (§R11.5, FE-CE-033).
+8. **Handle the termination signal**: on `onEnd(reason)` relabel all rows of the ended resource
+   `ended at <ts>: <reason>`, withdraw current labels, and mark actions unconfirmed (§R11.5,
+   FE-CE-037).
+
+## R11.7c What an adapter author must implement (the other side of the cost, FE-CE-036)
+
+The core declines content authority, so these duties are the adapter's; each is priced here because
+the previous artifact priced only the extension side:
+
+1. **Pump in remote-stable logical order** (R11.6 item 3). Cost: the adapter must buffer or
+   sequence remote events by its own protocol's order before calling `pump`; the host does not
+   reorder. Buys: S01 step 4 / S04 step 5 / S02 step 5 ordered delivery without a host reorder
+   mechanism (deleted as vacuous).
+2. **Dedup by the adapter's own protocol-level stable event id** (R11.6 item 5). Cost: the adapter
+   must persist or receive a stable remote event id to key on. Buys: S09's duplicate-after-reconnect
+   event reaches the subscriber once; the host dedup key is deleted.
+3. **Teardown on permanent loss, not on transient loss** (R11.6 item 8/8b). Cost: the adapter must
+   distinguish "I will resume this stream" from "the service is gone", and call `teardown` only for
+   the latter. Buys: S09's same-namespace catch-up stays reachable after a drop (FE-CE-029), while a
+   dead producer's presence is truthfully retracted (FE-CE-023).
+4. **Retire-then-announce-successor memory lever** (R11.3 honest cost). Cost: the adapter bounds a
+   long-lived resource's memory by retiring it and announcing a successor under a new `local_id`,
+   accepting that the watching view sees an explicit end and a new beginning. Buys: S03/S10 resource-
+   lifetime catch-up without an unbounded unnamed buffer; retirement is now observable via `onEnd`
+   (FE-CE-037).
+
+## R11.8 Reduction and the standing dead list
+
+Retained core: namespaces, resource-directory, cursor-stream-log, typed-action, generic fallback
+view (recursive total walk over `SchemaDecl`), `pump`, `cursor_resolve`, `from_cursor` selection
+with the namespace guard, same-namespace scoped handles, per-namespace action typing, open CapMap,
+never-auto-resubmit, the five-variant outcome rendering, presence-vs-reachability narrowing,
+resource-incarnation burn, view-scope minting, namespaced recorded extension selection with the
+`on_claim_changed` notice, the subscription termination signal (`onEnd`), the spawn-announce rule,
+the transient/permanent loss split, the total API-state rendering rows, and the `SchemaDecl`
+declaration grammar. Deleted or still-dead: adapter flat-schema obligation, spawned set, host
+dedup/reorder, payload descriptor store, `invoke_id` on `OutcomeUnknown`, implicit live default,
+persistent pair record, typed `replay_policy`, cross-namespace edge, `replay_mode`,
+`Subscription.last_seq`, "envelope dropped when the subscription closes".
+
+## R11.9 Honest cost and non-goals
+
+The default view's ability to answer "current value / what changed / running-or-done" is carried by
+the adapter's registered `read`/`status` action; with none registered the view truthfully says the
+value cannot be obtained. The log's memory is proportional to a resource's total emitted events,
+bounded only by the producing adapter via retire-then-announce — now observable through `onEnd`.
+`"unknown"` CapMap values and `ExplicitAbsent` states are rendered as explicit rows, never guessed.
+A hard-killed adapter leaves a stale registration until the host process ends; the core declines a
+liveness protocol. Non-goals unchanged: no cross-namespace joins or edges, no content search, no host
+turn/role/session model, no host capability vocabulary, no automatic re-pairing, no host
+apply-idempotency or event dedup, no heartbeat. `FE-CE-007` stays OPEN on demoted B's ledger; A has
+no edges mechanism, and this round neither repairs nor rejects B — deferring is not repairing.
+
+## R11.10 Experiments (MODEL ONLY — each proves the model it encodes, never the product or a protocol)
+
+**EXPERIMENT R11-A — storage ownership and the disposal point (FE-CE-022, FE-CE-024).**
+```python
+# MODEL ONLY: proves the storage-ownership/disposal model, not the product or any protocol.
+class Stream:                       # the cursor stream IS the log
+    def __init__(self):
+        self.log = []               # retained (seq, payload)
+    def pump(self, payload):
+        seq = len(self.log) + 1
+        self.log.append((seq, payload))
+        return seq
+    def subscribe(self, from_cursor, live):
+        return [(s, p) for (s, p) in self.log if s >= from_cursor] + live
+    def retire(self, reason):
+        self.log = []               # the sole disposal point
+
+def t_boring(dispose_on_close):
+    job = Stream()
+    for pct in range(1, 21):
+        job.pump({"pct": pct})
+    sub = job.subscribe(0, [])                      # first session: full head
+    assert len(sub) == 20, len(sub)
+    if dispose_on_close:
+        job.log = []                                # the deleted clause: "envelope is dropped"
+    for pct in range(21, 36):
+        job.pump({"pct": pct})                      # no subscriber alive
+    return job.subscribe(21, [])                    # the T-Boring return
+
+old, new = t_boring(True), t_boring(False)
+print("dispose-on-close   -> caught up %d envelopes" % len(old))
+print("retain-to-retire   -> caught up %d envelopes" % len(new))
+assert len(old) == 0 and len(new) == 15
+print("FE-CE-024 confirmed: retire/teardown is the only disposal point")
+```
+
+**EXPERIMENT R11-B — outcome variants, and unconfirmed is never rendered as current (FE-CE-019, FE-CE-023).**
+```python
+# MODEL ONLY: proves the variant-rendering model, not the product or any protocol.
+U, CAP, SCOPE, ABS = "OutcomeUnknown", "CapabilityAbsent", "ScopeDenied", "ExplicitAbsent"
+
+def render(outcome, prior, ts):
+    if outcome not in (U, CAP, SCOPE, ABS):         # Result -> GenericWalk rows
+        return ("current@%s" % ts, outcome)
+    if outcome == U:
+        if prior:
+            return ("last-confirmed@%s NOT current" % prior[1], prior[0])
+        return ("value not confirmed; read did not return", [])
+    if outcome == ABS:
+        return ("this resource no longer exists", [])
+    return ("not obtainable: %s" % outcome, [])
+
+prior = (["port=8080"], "t0")
+assert render(U, prior, "t1")[0].startswith("last-confirmed")
+assert render(ABS, prior, "t1")[0] == "this resource no longer exists"
+assert render(ABS, prior, "t1") != render(["port=8080"], prior, "t1")
+print("five variants distinct; unconfirmed/absent never rendered as current")
+```
+
+**EXPERIMENT R11-C — GenericWalk totality and recursion, decidable over SchemaDecl (FE-CE-020, FE-CE-021, FE-CE-033).**
+```python
+# MODEL ONLY: proves the walk is total and recursive against SchemaDecl.
+DECL = {  # the SchemaDecl grammar: scalar | opaque | record | list
+  "branch": {"kind": "scalar"}, "diff_body": {"kind": "opaque"},
+  "files": {"kind": "list", "item": {"kind": "record", "fields": {
+      "path": {"kind": "scalar"}, "additions": {"kind": "scalar"},
+      "deletions": {"kind": "scalar"},
+      "hunks": {"kind": "list", "item": {"kind": "record", "fields": {
+          "lines": {"kind": "scalar"}}}}}}}}
+
+def walk(decl, actual, path=""):
+    rows = []
+    if decl["kind"] == "scalar":
+        v = actual if isinstance(actual, (str, int, float, bool)) else None
+        rows.append((path or "value", str(v) if v is not None
+                     else "(unreadable: declared scalar)"))
+    elif decl["kind"] == "opaque":
+        rows.append((path or "value", "(opaque: no view installed)"))
+    elif decl["kind"] == "record":
+        for name, item in decl["fields"].items():
+            p = "%s.%s" % (path, name) if path else name
+            if not isinstance(actual, dict) or name not in actual:
+                rows.append((p, "(absent at runtime)"))
+            else:
+                rows += walk(item, actual[name], p)
+    elif decl["kind"] == "list":
+        if not isinstance(actual, list):
+            rows.append((path or "value", "(unreadable: declared list)"))
+        else:
+            for i, item in enumerate(actual):
+                rows += walk(decl["item"], item, "%s[%d]" % (path, i))
+    return rows
+
+nested = {"branch": "main", "diff_body": None,
+          "files": [{"path": "a.rs", "additions": 1, "deletions": 0,
+                     "hunks": [{"lines": 9}, {"lines": 4}]}]}
+rows = walk(DECL, nested)
+assert any(p == "files[0].hunks[1].lines" for p, v in rows)
+assert any(p.endswith("deletions") and v == "(absent at runtime)" for p, v in walk(DECL, {
+    "branch": "main", "files": [{"path": "a.rs", "additions": 1, "hunks": [{"lines": 3}]}]}))
+print("recursive walk over SchemaDecl, total, no depth constant, no exception")
+```
+
+**EXPERIMENT R12-A — the resource-incarnation fix (FE-CE-027).**
+```python
+# MODEL ONLY: proves the incarnation rule, not the product or any protocol.
+class Namespace:
+    def __init__(self, burn_local_ids):
+        self.resources, self.burned, self.burn = {}, set(), burn_local_ids
+    def announce(self, lid):
+        if self.burn and lid in self.burned:
+            raise RuntimeError("LocalIdBurned")
+        self.resources[lid] = []
+    def pump(self, lid, ev):
+        self.resources[lid].append(ev)
+        return len(self.resources[lid])
+    def subscribe(self, lid, c):
+        if lid not in self.resources:
+            return ("ExplicitAbsent", [])
+        return ("ok", [e for i, e in enumerate(self.resources[lid], 1) if i >= c])
+    def retire(self, lid):
+        del self.resources[lid]
+        if self.burn:
+            self.burned.add(lid)
+
+for burn in (False, True):
+    ns = Namespace(burn)
+    ns.announce("job-7")
+    for i in range(1, 21):
+        ns.pump("job-7", {"pct": i})
+    ns.retire("job-7")
+    if burn:
+        try:
+            ns.announce("job-7")
+        except RuntimeError as e:
+            print("burn=True re-announce ->", e)
+        ns.announce("job-7#2")
+        print("burn=True old id ->", ns.subscribe("job-7", 21))
+    else:
+        ns.announce("job-7")
+        for i in range(1, 6):
+            ns.pump("job-7", {"pct": i})
+        print("burn=False stale cursor ->", ns.subscribe("job-7", 21))
+print("FE-CE-027: burn makes a stale cursor return ExplicitAbsent instead of skipping")
+```
+
+**EXPERIMENT R12-B — S01's subscription order (FE-CE-025).**
+```python
+# MODEL ONLY: proves the ordering/cursor rule, not the product or any protocol.
+class Stream:
+    def __init__(self):
+        self.log, self.subs = [], []
+    def pump(self, ev):
+        self.log.append(ev)
+        for s in self.subs:
+            if s.c <= len(self.log):
+                s.got.append(ev)
+    def subscribe(self, c):
+        return (c, [e for i, e in enumerate(self.log, 1) if i >= c])
+    def cursor_resolve(self):
+        return len(self.log) + 1
+
+s = Stream(); s.pump("h"); s.pump("e")
+assert s.subscribe(s.cursor_resolve())[1] == []
+assert len(s.subscribe(0)[1]) == 2
+print("FE-CE-025: live edge wrong for a just-created resource; from_cursor=0 admits inputs")
+```
+
+**EXPERIMENT R12-C — every call in the scenario tables is declared (FE-CE-026, FE-CE-030).**
+```python
+# MODEL ONLY: a static check of the artifact's own tables, not a product test.
+import io, re, sys
+DECLARED = {"open_scope", "directory_list", "directory_lookup", "cursor_resolve",
+            "subscribe", "invoke", "announce", "retire", "teardown", "pump",
+            "register", "close", "claim_schema", "on_claim_changed", "open"}
+NOT_A_CALL = {"execute"}
+SPAN = re.compile(r"`([^`]+)`")
+CALL = re.compile(r"(?<![A-Za-z0-9_])([A-Za-z_][A-Za-z0-9_]*)\s*\(")
+path = sys.argv[1]
+lines = io.open(path, encoding="utf-8").read().split("\n")
+tables, cur = 0, None
+for l in lines:
+    if l.startswith("| Step |"):
+        tables += 1
+for l in lines:
+    if l.startswith("| "):
+        for span in SPAN.findall(l):
+            for name in CALL.findall(span):
+                assert name in DECLARED or name in NOT_A_CALL, (name, span)
+print("tables:", tables, "— every call token resolves to a declared member")
+assert tables == 12
+```
+
+**EXPERIMENT R13-A — S08's data delivery has a subscription (FE-CE-028).**
+```python
+# MODEL ONLY: a scope is not a subscription; delivery requires subscribe on the resource.
+class Scope:
+    def __init__(self, ns):
+        self.ns, self.subs = ns, {}
+    def subscribe(self, rid, c):
+        self.subs[rid] = c
+        return self.subs[rid]
+class NS:
+    def __init__(self): self.log = {}
+    def pump(self, rid, ev):
+        self.log.setdefault(rid, []).append(ev)
+observed = {}
+ns_D, s_D = NS(), Scope("ns_D")
+s_D.subscribe("data-1", 0)          # S08 step 7: the subscription row
+ns_D.pump("data-1", "ArtifactReady")
+observed["s_D"] = [e for rid, evs in ns_D.log.items() if rid in s_D.subs for e in evs]
+print("delivered:", observed)
+assert observed["s_D"] == ["ArtifactReady"]
+```
+
+**EXPERIMENT R13-B — transient loss does not teardown; permanent loss does (FE-CE-029).**
+```python
+# MODEL ONLY: proves the branches are separate, not the product.
+class NS:
+    def __init__(self): self.log, self.torn = [1, 2], False
+    def teardown(self): self.torn, self.log = True, []
+def catchup_after(loss_is_permanent):
+    ns = NS()
+    if loss_is_permanent:
+        ns.teardown()                       # item 8b: permanent
+        return None                         # view must re-pair, replay from 0
+    return [e for e in ns.log if e > 1]     # item 8: transient, saved_last_seen+1
+print("transient:", catchup_after(False), "permanent:", catchup_after(True))
+assert catchup_after(False) == [2] and catchup_after(True) is None
+print("FE-CE-029: same-ns catch-up reachable only when teardown did not run")
+```
+
+**EXPERIMENT R13-C — retire is observable to live subscribers; invoke-on-retired is defined (FE-CE-037).**
+```python
+# MODEL ONLY: proves the termination-signal model, not the product.
+class Subscription:
+    def __init__(self): self.ended = None
+class Resource:
+    def __init__(self): self.log, self.subs, self.retired = [], [], False
+    def subscribe(self, s): self.subs.append(s)
+    def pump(self, ev): self.log.append(ev)
+    def retire(self, reason):
+        self.retired = True
+        for s in self.subs:
+            s.ended = reason            # onEnd
+    def invoke(self):
+        return ("ExplicitAbsent",) if self.retired else ("Result", self.log)
+r, s = Resource(), Subscription()
+r.subscribe(s); r.pump("ev1"); r.retire("bound memory")
+print("subscriber ended:", s.ended, "invoke:", r.invoke())
+assert s.ended == "bound memory" and r.invoke() == ("ExplicitAbsent",)
+```
+
+**EXPERIMENT R13-D — a Result's spawned resource is announced before it is returned (FE-CE-031).**
+```python
+# MODEL ONLY: proves the spawn-announce rule, not the product.
+class NS:
+    def __init__(self): self.r = {}
+    def announce(self, lid): self.r[lid] = []
+    def invoke_submit(self):
+        self.announce("job-7")              # announce inside the handler
+        self.r["job-7"].append("head")      # head pumped inside the handler
+        return {"job_resource": "job-7"}    # Result names an already-announced resource
+    def subscribe(self, lid, c):
+        return self.r.get(lid, "ExplicitAbsent")[c:]
+ns = NS(); out = ns.invoke_submit()
+print("spawned head delivered:", ns.subscribe(out["job_resource"], 0))
+assert ns.subscribe(out["job_resource"], 0) == ["head"]
+print("FE-CE-031: from_cursor=0 works because the resource was announced before the Result returned")
+```
+
+
+===== FINAL: THE ONLY ACCEPTABLE ANSWER SHAPE =====
+Your reply is machine-checked. Anything not inside these markers is read as
+commentary and cannot enter the record. Emit the sections and blocks below,
+in this order, with the markers alone on their own lines:
+
+<<<FE-OUT-START>>>
+<deliverable>
+<<<FE-OUT-END>>>
+<<<FE-VERDICT-START>>>
+S01|trajectory_ok|where the ordered trajectory lives|nothing
+<<<FE-VERDICT-END>>>
+<<<FE-REPLAY-START>>>
+FE-CE-NNN|pass|the sequence you replayed|the text that stops it
+<<<FE-REPLAY-END>>>
+
+Your prose section must also contain these lines verbatim:
+  BOUNDARY_SCAN: <what you found, with the passage>
+  ESCAPE_HATCH_SCAN: <what you found, with the passage>
+
+If a block applies and you leave it empty, that is a failed phase, not an
+empty result: the verdict block in particular is the only thing that can move
+a counterexample, and prose verdicts are not read.

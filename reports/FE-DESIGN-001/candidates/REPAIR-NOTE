@@ -1,0 +1,6 @@
+Stale-anchor repair, 2026-09-22T03:40Z.
+A defect in commit_integrate left candidates/best.md on the R001 bytes after R002 integrated
+a different candidate (rounds/R002/best-candidate.md, 2379 words). The file was promoted from
+that round artifact, which is what the code should have done. Consequence: the R002 review
+rulings recorded against digest b93d2dbe... are now VOID by digest binding and were re-run
+against the corrected bytes; the void rows remain in review-rulings.tsv as history.

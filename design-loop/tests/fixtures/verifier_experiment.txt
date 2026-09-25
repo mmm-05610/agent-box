@@ -1,0 +1,22 @@
+<<<FE-OUT-START>>>
+the dispute is whether an owner-qualified ordinal stops a replay from
+re-applying a turn. The candidate text does not settle it, so the only honest
+move is a model of exactly the mechanism in question.
+EXPERIMENT:
+```python
+events = [("a", 1), ("b", 2), ("a", 1), ("c", 0)]
+seen, applied = set(), []
+for owner, seq in events:
+    k = (owner, seq)
+    if k in seen:
+        continue
+    seen.add(k); applied.append(k)
+print("applied", applied)
+print("MODEL SAYS: duplicates dropped, arrival order kept")
+```
+The point of the model is narrow: it shows only that an owner qualified key
+drops the replayed pair while keeping the rest in arrival order. It says nothing
+about the real transport, the real service or the real renderer, and it must not
+be written up as verification of any of them. What remains open after it is the
+question of who assigns the owner part when two producers share one ordinal
+space, which the candidate does not answer and which is recorded separately.

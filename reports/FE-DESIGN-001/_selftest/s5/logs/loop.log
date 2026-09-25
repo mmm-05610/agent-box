@@ -1,0 +1,12 @@
+[2026-09-21T16:28:10Z] sol: budget record created at zero (cap=10, final reserve=2)
+[2026-09-21T16:28:10Z] R001: round start (best= sol=cap=10 reserved=0 ok=0 bad=0 remaining=10 final_reserve=2)
+[2026-09-21T16:28:10Z] R001/plan attempt 1 of 2
+[2026-09-21T16:28:10Z] R001/plan commit rejected — phase not passed
+[2026-09-21T16:28:11Z] sol: existing budget record kept (cap=10 reserved=0 ok=0 bad=0 remaining=10 final_reserve=2)
+[2026-09-21T16:28:11Z] R002: round start (best= sol=cap=10 reserved=0 ok=0 bad=0 remaining=10 final_reserve=2)
+[2026-09-21T16:28:11Z] R002/plan attempt 1 of 2
+[2026-09-21T16:28:11Z] R002/plan commit rejected — phase not passed
+[2026-09-21T16:28:11Z] sol: existing budget record kept (cap=10 reserved=0 ok=0 bad=0 remaining=10 final_reserve=2)
+[2026-09-21T16:28:11Z] R003: round start (best= sol=cap=10 reserved=0 ok=0 bad=0 remaining=10 final_reserve=2)
+[2026-09-21T16:28:11Z] R003/plan attempt 1 of 2
+[2026-09-21T16:28:12Z] R003/plan commit rejected — phase not passed

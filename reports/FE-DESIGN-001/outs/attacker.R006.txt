@@ -1,0 +1,118 @@
+<<<FE-OUT-START>>>
+
+**Dimension: D01-order-dedup**
+
+This round attacks the candidate A (R006 revised) claim that "host dedups/reorders by `(ns,resource,seq)`" on reconnect, and the adapter boundary rule (R6.3 item 7) instructing the adapter to "deduplicate/reorder by `(ns_id, resource_local_id, seq)` before presenting to the stream." Both are checked against the simultaneous claim that "`seq` is host-assigned monotonic per resource." Two counterexamples establish that S09's ordering and dedup story has no working mechanism at either claimed owner.
+
+---
+
+## FE-CE-012: Host dedup key (ns,resource,seq) is vacuous — no component can deduplicate as specified
+
+### 1. Exact event sequence
+
+1. Adapter pumps event A into resource (ns_A, "log"). Host assigns seq=1. Subscriber receives Envelope{resource_id=(ns_A,"log"), seq=1, payload=content_A}.
+2. Adapter pumps event B into same resource. Host assigns seq=2. Subscriber receives Envelope{seq=2, payload=content_B}.
+3. Link drops mid-stream; TCP reconnects without triggering `namespace.teardown` (the connection is the same ns_id — "reconnect yields a new ns_id" applies to a *full* reconnect, not a transient drop within the session). ns_A is still alive.
+4. Adapter, uncertain whether A and B were delivered, replays A and B into its pump function targeting resource (ns_A, "log").
+5. Host receives them, assigns seq=3 and seq=4 (monotonic per resource — the host has no reason to reuse 1,2; it always increments).
+6. Subscriber receives: Envelope{seq=3, payload=content_A}, Envelope{seq=4, payload=content_B}.
+7. Host's "dedup by (ns,resource,seq)" checks whether (ns_A,"log",3) or (ns_A,"log",4) have been seen before → they haven't → both pass.
+
+### 2. Invariant broken
+
+"host dedups/reorders by `(ns,resource,seq)`" (R6.5-S09 step 2) and "seq host-assigned monotonic per resource" (R6.2 Event stream paragraph: "`seq` host-assigned monotonic per resource"). The dedup key requires two envelopes to collide in (ns,resource,seq), but monotonic-per-resource host assignment guarantees every envelope for a given resource has a unique seq. The dedup predicate is `false` for all inputs.
+
+### 3. Minimal version
+
+Remove step 3 (the link drop motivation). The counterexample stands simply: the adapter pumps the same content twice for any reason (bug, retry, race). Host assigns fresh seq to each arrival. Dedup by (ns,resource,seq) can never fire. The mechanism is structurally vacuous regardless of network events.
+
+### 4. User-visible consequence
+
+S09: the user sees duplicate progress events or repeated tool-call notifications in the log view. The design's S09 scenario requires "who confirms facts, restores state, and prevents double execution." The host claims dedup but provides none. The adapter is instructed (R6.3 item 7) to dedup by (ns,resource,seq) — a key it cannot compute (see FE-CE-013) — so it cannot implement this either. The user sees duplicates unless the adapter happens to implement idempotency via its own protocol-level keys, a mechanism the design neither specifies nor requires as a core guarantee.
+
+---
+
+## FE-CE-013: Adapter boundary rule 7 instructs dedup by host-assigned seq — the adapter has no access to it at pump time
+
+### 1. Exact event sequence
+
+1. Adapter opens connection → host mints ns_A. Adapter announces resource (ns_A, "log").
+2. Adapter pumps event A. Host assigns seq=1 internally and delivers Envelope{seq=1} to subscribers. The design's pump interface is not a return-value-with-seq contract — R6.2 defines the host's seq as "host-assigned monotonic per resource" with no mention of the pump function returning the assigned seq to the caller. The adapter's `pump(event)` call completes without learning seq=1.
+3. Link drops. Adapter decides to re-pump A as part of its "reconnect dedup/reorder by (ns_id, resource_local_id, seq)" (R6.3 item 7).
+4. The adapter needs to know: "has (ns_A, log, seq=1) already been pumped?" — but it never learned that its event got seq=1. The dedup key in the boundary rule is not in the adapter's epistemic state.
+5. Adapter re-pumps A. Host assigns seq=2. Duplicate delivered.
+
+### 2. Invariant broken
+
+Boundary rule R6.3 item 7: "on reconnect, deduplicate/reorder by (ns_id, resource_local_id, seq) before presenting to the stream." Simultaneously, R6.2: "`seq` host-assigned monotonic per resource." The adapter cannot deduplicate by a field assigned by the host that the adapter does not observe. The boundary rule is either (a) a typo for the adapter's own protocol id (which would mean the stated key is wrong), or (b) an unimplementable instruction, making item 7 a core-internal leak — the adapter must know a host-assigned seq value to comply.
+
+### 3. Minimal version
+
+Steps 2 and 4 alone: adapter pumps once (receives no seq back), adapter needs to dedup by seq. No network event needed. The instruction is impossible given the design's stated ownership of seq.
+
+### 4. User-visible consequence
+
+The adapter author either (a) ignores item 7 because it's unimplementable (host-assigned seq is not in their hands), in which case S09 duplicates reach the user; or (b) the pump function actually DOES return the host-assigned seq (not in the interface spec), in which case the adapter must maintain a per-resource set of delivered seq values — unbounded growth within a long connection, contradicting R6.8's claim that "D11 growth is addressed... removing the spawned set eliminates the per-handle accumulated-state growth concern entirely." The growth concern simply relocated from host handle to adapter pump state.
+
+---
+
+## FE-CE-014: Host "reorder" is identity — S09's out-of-order premise has no core correction mechanism
+
+### 1. Exact event sequence
+
+1. Remote system emits logical events in order [A, B] where A→B is a dependency (e.g., "create_session" → "tool_result"). Network delivers them reversed: B arrives first, A second.
+2. Adapter's pump (boundary rule 3 says "seq-ordered pump" — meaning the adapter pumps in arrival order) pumps B, then A.
+3. Host assigns seq=1 to B, seq=2 to A (arrival order = host order).
+4. Subscriber receives: Envelope{seq=1, content=B}, Envelope{seq=2, content=A}. Logical order is inverted.
+5. S09 claims "host dedups/**reorders** by (ns,resource,seq)." Reordering by host-assigned seq is identity — the host assigned seq in that order. The "reorder" operation has zero effect.
+6. The view renders "tool_result" before "create_session." User sees nonsensical interleaving.
+
+### 2. Invariant broken
+
+R6.5-S09 step 2: "host dedups/reorders by (ns,resource,seq)." If host-assigned seq defines the order, sorting by it is a no-op. The design claims a reordering mechanism that structurally cannot correct any order. S09's premise — "events arrive duplicated and **out of order**" — requires either a remote-stable seq (in the envelope, adapter-assigned) or a reorder buffer with timeout. The Envelope type `{resource_id, seq, ts, kind, payload_schema_id, payload:opaque}` has ts, but "reorders by seq" not "reorders by ts." The host has no mechanism to use ts for reordering.
+
+### 3. Minimal version
+
+Steps 2-3-4-5: pump B then A, host assigns 1 then 2, subscriber sees B before A. "Reorder by seq" is identity. Remove any reconnect/dedup framing — this is pure order corruption within one stable namespace.
+
+### 4. User-visible consequence
+
+The S09 scenario requires the host to handle out-of-order events. The design's only claimed mechanism (reorder by host-assigned seq) is a no-op. If boundary rule 3 ("seq-ordered pump") pushes order correction entirely onto the adapter, then the host has no D01 mechanism at all, and S09's "host dedups/reorders" claim is a capability lie (the host does neither in any non-identity way).
+
+---
+
+## Regression replays
+
+**FE-CE-007 (OPEN vs B):** N/A against A. A has no edges mechanism. Carried unchanged; B is demoted, the defect stands on B's account.
+
+**FE-CE-009 (DISPUTED):** The candidate removed the spawned set and proved Model2 passes S08 via the same-ns rule. The invariant ("spawned-resource-grant's per-handle accessible-set is not minimal") is satisfied: the set is gone. The original FE-CE-004 is closed by the same-ns rule allowing step 6 access. **CLOSED** against A.
+
+**FE-CE-012/013/014 are NEW.** They are not a restatement of any closed row. The prior rows (FE-CE-003, FE-CE-005) addressed replay_policy and auto-resubmit — different failure modes. These attack the dedup/reorder mechanism itself.
+
+---
+
+## Extension/adapter burden — core leak into adapter contract
+
+R6.7 lists the second-service onboarding: item 7 requires "Reconnect dedup/reorder — adapter implements (ns,local_id,seq) key dedup." This instruction embeds a host-assigned value (`seq`) into the adapter's required logic. The adapter must store and compare against host-assigned seq values to comply — knowledge of a core internal (the host's monotonic per-resource counter) leaking into the adapter contract. Either the pump API returns seq (making it an adapter obligation with host-internal visibility — core leak), or it doesn't (making item 7 unimplementable — FE-CE-013). This is a core-internal leaking into the adapter contract as D06/D01 overlap.
+
+---
+
+## Disqualifier scan
+
+- **Complexity relocated into plugin/adapter to make core look minimal:** the host claims "dedups/reorders by (ns,resource,seq)" in S09, but the mechanism is structurally vacuous (FE-CE-012, FE-CE-014). The actual dedup is pushed to the adapter (R6.3 item 7) via an unimplementable key (FE-CE-013). This is the disqualifier pattern: the core appears to provide a mechanism it cannot, and the obligation is relocated to the adapter. The design's R4.6/§R6.6 deletion experiment for "spawned-resource-grant" removed a mechanism the core used for safety; simultaneously, the dedup/reorder "mechanism" that remains in the core description does no work. The host's D01 contribution is zero.
+
+---
+
+## Summary
+
+Three counterexamples establish that S09's claimed core dedup/reorder mechanism is vacuous, and that the boundary rule instructing adapter-side dedup references a key the adapter cannot compute. S09 cannot be marked "covered" with the owner as "core" while the design's own event model makes the host's dedup/reorder structurally inert.
+
+<<<FE-OUT-END>>>
+
+<<<FE-LEDGER-START>>>
+FE-CE-012|R006|major|OPEN|host dedup by (ns,resource,seq) is vacuous: seq is host-assigned monotonic per resource, so no two envelopes for the same resource ever share a key; the dedup predicate is false for all inputs|host dedup key has no collision domain|rounds/R006/cand-A.md §R6.5-S09 step2 "host dedups/reorders by (ns,resource,seq)" vs §R6.2 "seq host-assigned monotonic per resource"|-
+FE-CE-013|R006|major|OPEN|adapter boundary rule R6.3 item7 instructs dedup by (ns_id, resource_local_id, seq) but seq is host-assigned and not returned to the adapter at pump time, making the rule unimplementable or a core-internal leak into the adapter contract|adapter cannot dedup by an opaque host counter|rounds/R006/cand-A.md §R6.3 item7 vs §R6.2 Event stream (host-assigned seq, no pump return specified)|FE-CE-012
+FE-CE-014|R006|major|OPEN|host "reorders by (ns,resource,seq)" is identity since the host assigned seq in arrival order; S09's out-of-order premise has no core correction mechanism|reorder-by-self-assigned-seq is a no-op|rounds/R006/cand-A.md §R6.5-S09 step2 "dedups/reorders by (ns,resource,seq)" + §R6.2 "seq host-assigned monotonic" + §R6.3 item3 "seq-ordered pump"|-
+FE-CE-007|R004|major|OPEN|extensions cannot derive foreign ns ids from their own handle and isolation is enforced at the registration boundary, but edges.list returns core-stored target ids enabling adapter-authorized, user-less relay edges|edges.list leaks foreign namespace ids into scoped handle|rounds/R002/cand-B.md §B.4; N/A against A (no edges mechanism)|-
+FE-CE-009|R003|minor|CLOSED|spawned-resource-grant's per-handle accessible-set is not minimal; a same-namespace subscription-scope rule passes S08 without accumulating a set|spawned set eliminated by same-ns rule per Model2 experiment|rounds/R006/cand-A.md §R6.6 EXPERIMENT Model2 + §R6.9 FE-CE-009 RESOLVED|-
+<<<FE-LEDGER-END>>>

@@ -1,0 +1,65 @@
+{
+  "status": "PHASE_1_FE_PREP_GRANTED",
+  "frontend": {
+    "commit": "85cc3cd01497bb185be417a38dbeeeca4edb08e6",
+    "integration": "worktrees/harness-desktop-001/fc"
+  },
+  "backend": {
+    "commit": "60d868ef258e4044a03c8650312431e5b57a48ab (integrated pi+codex batches)",
+    "integration": "worktrees/harness-desktop-001/bc"
+  },
+  "contract_version": "wire/1",
+  "paired_verified": false,
+  "batches": [
+    {
+      "id": "HD-001-FE-PREP-001",
+      "type": "FE mechanical migration (Phase 1)",
+      "application": "agents/FC/outbox/FC-0012.md",
+      "grant": "agents/C/outbox/C-0018.md",
+      "decision": "decisions.md HD-001-C-008",
+      "executor": "F0",
+      "executor_generation": 2,
+      "effective": "on successor-session TAKEOVER referencing batch id; tree 85cc3cd/work/hd001-f0 clean",
+      "acceptance": "FC-0012 acceptance criteria (serial green gates, byte-identical dist except lock, dual-mode startup, examples build)",
+      "contract_change": "none (pure re-export; token strings and manifest hostApi unchanged)",
+      "budget": "zero real calls",
+      "status": "RESUMED (F0 successor session F0-0009 revived 08:15, gen2 kept; step 1/7 @7fcdfdf committed, step 2 in progress staged)",
+      "recovery_note": "prior F0 session hit 100-turn platform cap mid-step-2; staged renames packages/{foundation,agent-ui}-contracts/src/entry.ts -> contracts/*/src/, contracts/ five-domain+two-package dirs created; contract.ts untouched"
+    },
+    {
+      "id": "B-HARNESS-PI-001",
+      "type": "BE harness enable+accept (Linux launch wiring, offline R0/R1)",
+      "application": "agents/BC/outbox/BC-0009.md",
+      "grant": "agents/C/outbox/C-0032.md",
+      "decision": "decisions.md HD-001-C-013/C-014",
+      "executor": "H",
+      "executor_generation": 1,
+      "acceptance": "R0' = gate loads+executes in h tree, fails only with known env code GATE_WORKER_REQUIRED (worker binary absent machine-wide; full R0 exit-0 deferred to optional future worker grant); R1 = script produces deployment.json and server loads (with --sidecar-deployment x --plugin-root hard constraint); R2 real Pi round = separate grant pending budget bounds closure",
+      "contract_change": "none",
+      "budget": "zero real calls (R2 excluded, separate grant)",
+      "status": "VERIFIED (root gate green: 20F/1465P/33S, roster diff empty)",
+      "executor_head": "6704928304c4133f3678d2c4ec41ef6a6752ac55",
+      "receipt": "agents/BC/outbox/BC-0017.md",
+      "r0": "FULL exit 0 (external same-source worker bundle, BC cmp-verified, provenance registered)",
+      "r1": "HARNESS_LINUX_PI_R1_OK, modelCallsMade:0",
+      "pairing": "20F roster holds (19 reproduced + 1 not-collected + 8 environmental reds as disclosed); 0 unexpected greens",
+      "integrated": "bc tree HEAD 67049283 (FF merge, HD-001-C-019)"
+    },
+    {
+      "id": "B-HARNESS-CODEX-001",
+      "type": "BE harness enable+accept (codex, Linux launch wiring, offline R0'/full-R0/R1)",
+      "application": "agents/BC/outbox/BC-0011.md (merged final)",
+      "grant": "agents/C/outbox/C-0043.md",
+      "decision": "decisions.md HD-001-C-019",
+      "executor": "H",
+      "executor_generation": 1,
+      "executor_head": "60d868ef258e4044a03c8650312431e5b57a48ab (4 files, +192/-6)",
+      "receipt": "agents/BC/outbox/BC-0021.md",
+      "status": "VERIFIED (root gate green: 20F/1465P/33S identical to roster at 60d868ef)",
+      "acceptance": "R0' typed GATE_WORKER_REQUIRED receipt + full R0 exit 0 via c12 bundle (C-017 s2 reserved path); R1 HARNESS_LINUX_CODEX_R1_OK modelCallsMade:0; pairing vs root-gate 20F roster (codex family absent, expect 20F/0)",
+      "contract_change": "none (doc-red (a) two lines included per C-019)",
+      "budget": "zero real calls (R2/luna excluded, separate grant pending budget bounds closure)"
+    }
+  ],
+  "contract_version_formalized": "wire/1 (formalized at B-HARNESS-PI-001 checkpoint, HD-001-C-017)"
+}

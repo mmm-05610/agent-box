@@ -1,0 +1,15 @@
+{
+  "id": "CP-SESSION-001",
+  "revision": 1,
+  "status": "IN_PROGRESS",
+  "summary": "I依据C/FC最新报告初始化：前端会话与对话尾项已集成，原生后端与connector仍在接线，尚不可整机验收。",
+  "modules": [
+    {"name": "会话与对话UI", "status": "DONE", "summary": "草稿首发、必选项目、对话内审批和输入框尾项已集成；FC报告99项界面测试及构建冒烟通过，非整机验收。"},
+    {"name": "后端connector", "status": "IN_PROGRESS", "summary": "F1适配器仍未交付，真实会话身份及Harness选择接缝尚待收尾。"},
+    {"name": "原生后端", "status": "IN_PROGRESS", "summary": "已改为原生Agent方向并分配接线职责，尚未取得新路径实现及运行闭环证据。"},
+    {"name": "整机检查点", "status": "NOT_STARTED", "summary": "尚未完成新前后端配对联调、候选净化和可启动验收交付；Profile不纳入。"}
+  ],
+  "next": "C继续更新此面板：收connector和原生后端交付，实际联调后提供可启动检查点。",
+  "evidence": "agents/C/status.md、agents/FC/status.md（FC-0050/0051）、agents/BC/status.md；本次I未重跑测试。",
+  "try_it": ""
+}

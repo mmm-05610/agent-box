@@ -1,0 +1,55 @@
+<<<FE-OUT-START>>>
+Verification — D08-reduction, R003, against cand-A e71bd… (R003 revisions) and cand-B 044795….
+
+Verdicts first (ledger IDs are authoritative; the attack's 010–013 map to ledger 008–011).
+
+FE-CE-007 — holds. cand-B §R003.B.3 concedes "there is no revision that keeps B's benefit and closes FE-CE-007"; §R003.B.5 withdraws the carrier (edges.list) but never repairs the foreign-id-leak invariant. A has no edges mechanism → N/A against A, OPEN against B. Missing: none for A; for B the isolation invariant remains unmet.
+
+FE-CE-008 — holds. R003.2 states "the host no longer refuses delivery of an envelope whose payload_schema_id is unregistered; it forwards it." Every surviving consumer uses the envelope *string*, not the descriptor: R003.4 resolver "match: kind + payload_schema_id", fallback renders "last payload_schema_id" as a label, action typing reads the *action* RegisteredType store. So the ns-scoped payload-schema descriptor store is write-only — zero host readers. Deleting the payload portion while keeping the action store leaves S06/S07 user outcomes intact. This is a non-load-bearing core mechanism (minimality violated).
+
+FE-CE-009 — insufficient_evidence. R003.2 claims the set enforces "not sibling enumeration" and "directory/subscribe/invoke are scope-checked against {primary}∪spawned." The attack's same-ns-subscription alternative admits subscribing any `(ns_R, local_id)` the extension names, including a guessed same-ns id it never received via a Result — exactly the capability the candidate's own handle text forbids. So the two designs differ precisely on provenance-bounded subscribe. No required scenario exercises guessing a sibling, but the candidate claims the bound. The reduction is therefore not established by the text as given; see experiment. Single settling check: confirm whether "extension may not subscribe a same-ns id not returned by a Result" is a protected invariant (then the set is load-bearing → does_not_hold) or merely same-ns isolation (then holds).
+
+FE-CE-010 — holds. R003.2 returns `OutcomeUnknown(invoke_id)` synchronously and "the user/extension decides the retry"; the auto-resubmit path that re-used the token was removed (replay_policy deleted). S09 dedup keys "(ns,resource,seq)", not invoke_id. Call-site return correlation subsumes the token; the host stores it and never reads it. Residual non-load-bearing state.
+
+FE-CE-011 — holds. R003.2 "default begins at current cursor (live-only)"; R003.4 shows the host already mints `h_R` at the pair gesture and subscribes it live-only. Making `from_cursor` mandatory and having the host's pair-mint pass `cursor.resolve(id)` preserves the live position that closes FE-CE-005 without an implicit-default primitive. The implicitness is sugar; no scenario fails when it is removed.
+
+Checks:
+FABRICATION_CHECK: FE-CE-011/ledger-009 evidence line calls R003.8's "spawned-set grows within a view lifetime" an "unbounded-growth weakness"; "unbounded" appears only in best.md R.8, not cand-A R003.8. Not material — both admit growth; the reduction argument stands on the guessed-sibling gap, not the adjective. No invented requirement, no altered scenario; all S01–S12 preserved by the attack.
+CONTRADICTION_CHECK: cand-A self-contradicts. R003.5-S06 step-5 claims "delete ns-scoped type registration → FE-CE-006 reopens (cache/type bleed)", but R003.2/R003.4 (FE-CE-008) removed the only host read of the payload-schema key (the delivery gate), so a shared bare-name key has no observable bleed; FE-CE-006 cannot reopen through a deleted reader. This is the same defect FE-CE-008 names.
+MISSED_CHECK: none within D08. I independently re-tested the four "held" reductions: namespaces (S06 step 2 collides if deleted), ordered-stream (S03 step 4 / S09 step 2 fail), open CapMap (S11 fakes support if deleted; fixed enum reopens FE-CE-002), generic-fallback (S07/S12 step 2 blank), typed-action (execute(any) disqualifier) — all survive a delete-and-check-scenario, so the attacker correctly left them.
+
+EXPERIMENT:
+```python3
+# Model only the disputed spawned-set-vs-same-ns subscribe scope. Proves the MODEL only.
+def subscribe_set(h, target):   # candidate: accessible = {primary} U spawned
+    return target in ({h["primary"]} | h["spawned"])
+def subscribe_samens(h, target): # attack alternative
+    return target[0] == h["ns"]
+def check(h, target, gate):
+    g = {"set": subscribe_set, "samens": subscribe_samens}[gate] if False else \
+        {"set": subscribe_set, "samens": subscribe_samens}[gate]
+    return g(h, target)
+hR = {"ns":"R", "primary":("R","runner"), "spawned":{("R","job")}}
+foreign = ("D","ref")      # must stay unreachable via hR
+job     = ("R","job")      # spawned via Result -> must be observable
+guessed = ("R","secret")   # same-ns id NEVER returned by a Result
+for gate in ("set","samens"):
+    print(gate,
+          "job_ok=", subscribe_set(hR,job) if gate=="set" else subscribe_samens(hR,job),
+          "foreign_denied=", not (subscribe_set(hR,foreign) if gate=="set" else subscribe_samens(hR,foreign)),
+          "guessed_sibling=", subscribe_set(hR,guessed) if gate=="set" else subscribe_samens(hR,guessed))
+# Result: both gates pass S08 (job_ok, foreign_denied). They differ ONLY on guessed_sibling.
+# So the spawned-set is load-bearing iff "no sibling subscribe" is protected;
+# not load-bearing iff same-ns isolation alone satisfies every required scenario.
+```
+Output (model): `job_ok=True foreign_denied=True` for both gates; `guessed_sibling=False` for set, `True` for same-ns. The set does no work any required scenario needs (S08 passes both ways); its sole effect is bounding subscribe to host-observed Result ids. That bounding is a claimed candidate invariant, not an S01–S12 user result — hence insufficient_evidence, not holds.
+
+No FE-CE-008/009/010/011 change to prior rounds' rulings; FE-CE-006 stays CLOSED (attack does not reopen it). Dimension used: D08-reduction. Clean? No — three of four reductions hold as minor non-minimality (FE-CE-008, 010, 011), one unresolved (FE-CE-009).
+<<<FE-OUT-END>>>
+<<<FE-VERDICT-START>>>
+FE-CE-007|holds|cand-B §R003.B.3 "no revision keeps B's benefit and closes FE-CE-007"; §R003.B.5 withdraws edges.list but never repairs the foreign-id-leak invariant; A has no edges mechanism (N/A)|B must either close the edges.list leak while keeping standing relay (which the candidate itself says is impossible) or stay demoted; invariant unmet if B returns
+FE-CE-008|holds|R003.2 "host no longer refuses delivery ... it forwards it"; R003.4 resolver matches on envelope strings and fallback renders payload_schema_id as a label, so the ns-scoped payload-schema descriptor store has zero host readers|drop the payload-schema descriptor registration (keep the action RegisteredType store) or name a host consumer; FE-CE-006 cannot reopen through a deleted reader
+FE-CE-010|holds|R003.2 returns OutcomeUnknown(invoke_id) synchronously and "user/extension decides the retry"; auto-resubmit path (replay_policy) removed; S09 dedups by (ns,resource,seq) not invoke_id|host stores invoke_id and never reads it; call-site correlation suffices; name a consumer or delete the token
+FE-CE-011|holds|R003.2 "default begins at current cursor"; R003.4 host already mints h_R live-only at pair gesture, so it can pass from_cursor=cursor.resolve explicitly|demote from a named core mechanism to a parameter convention, or show a scenario that requires the implicit default specifically (none found)
+FE-CE-009|insufficient_evidence|R003.2 "not sibling enumeration" and "scope-checked against {primary}∪spawned" vs the attack's same-ns rule that admits a guessed same-ns id never returned by a Result|settle whether the candidate protects "no subscribe to a same-ns id not granted via a Result"; if protected → does_not_hold (set load-bearing), if only same-ns isolation is protected → holds (smaller rule suffices). Experiment shows both gates pass S08; only guessed-sibling differs
+<<<FE-VERDICT-END>>>

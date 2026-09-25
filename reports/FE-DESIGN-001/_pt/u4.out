@@ -1,0 +1,99 @@
+
+--- A  sol.sh — one transaction, exact call ids, damaged record denies
+  PASS  A1 the record is created at the configured ceiling
+  PASS  A1b a second init never resets a spent record
+  PASS  A1c deleting half the record never yields a fresh zero
+
+--- A2 reserve mints an exact call id and completion closes that row only
+  PASS  A2 a call id is returned
+  PASS  A2 the row sits at PENDING until that id is completed
+  PASS  A2 the slot is taken before the call
+  PASS  A2 completing it closes exactly that row
+  PASS  A2 the slot is not given back afterwards
+
+--- A3 completion matches on the exact call id, never on 'the newest row'
+  PASS  A3 an unknown call id updates nothing
+  PASS  A3 completing the second call first is allowed
+  PASS  A3 it did NOT close the other pending row
+  PASS  A3 it closed its own row
+  PASS  A3 a closed row cannot be re-closed to flip its outcome
+  PASS  A3 the recorded outcome stays ok
+
+--- A4 check and reserve are one mutually exclusive transaction
+  PASS  A4 12 concurrent key-node races stop at the 8 key slots
+  PASS  A4 the four over-requesters were denied, none double-spent
+  PASS  A4 then only the two held-back final slots can be won
+  PASS  A4 the final pair then fills the ceiling exactly
+  PASS  A4 counter equals log rows: no phantom call, no lost call
+  PASS  A4 the record is self-consistent after the race
+
+--- A5 ceilings, duplicate refusal, and failed calls still counting
+  PASS  A5 key nodes stop at cap minus the held-back pair
+  PASS  A5 the two final-verification slots are still reachable
+  PASS  A5 nothing is granted past the total ceiling
+  PASS  A5 a repeated candidate+question is refused as a duplicate
+  PASS  A5 and the ceiling is reached, not overshot
+  PASS  A5b refusing a duplicate consumes nothing
+  PASS  A5b a failed call is still counted
+
+--- A6 a missing or damaged record denies the call; it is never re-zeroed
+  PASS  A6 a vanished budget file is a denial, not a reset to zero
+  PASS  A6 the denial reason is recorded
+  PASS  A6 re-init refuses to run over the damaged state
+  PASS  A6b a non-numeric ceiling denies the call
+  PASS  A6b it recovers once repaired, without losing the earlier call
+  PASS  A6c a malformed log row denies every further call
+  PASS  A6d re-init cannot paper over it
+  PASS  A6e a clobbered counter is rebuilt from the log, never from zero
+  PASS  A6f the call is allowed again after the self-heal
+  PASS  A7 automatic Sol dispatch is off unless an operator turns it on
+  PASS  A7 an uncompleted call is visible as PENDING, not silently absorbed
+  PASS  A7 the status line names the held-back final pair
+
+--- B  validate.sh — shape violations are refusals, and shape is not meaning
+  PASS  B1 a well-formed attack report is accepted
+  PASS  B2 refused: [FE-CE-001|R001|catastrophic|OPEN|inv|t|e|-]
+  PASS  B2 refused: [FE-CE-001|R001|major|WONKY|inv|t|e|-]
+  PASS  B2 refused: [FE-CE-001|R001|major|OPEN|   |t|e|-]
+  PASS  B2 refused: [CE-01|R001|major|OPEN|inv|t|e|-]
+  PASS  B2 refused: [FE-CE-001|R001|major|OPEN|only|seven]
+  PASS  B2 refused: [FE-CE-001|R001|major||inv|t|e|-]
+  PASS  B3 truncated output is refused
+  PASS  B4 an empty ledger block with no declaration is refused
+  PASS  B5 an honest no-counterexample declaration is accepted
+  PASS  B5b the declaration alone does not excuse a body under the word floor
+  PASS  B6 both ruling kinds are accepted together
+  PASS  B6b and land in separate ruling files
+  PASS  B7 a scenario may not be ruled with a counterexample verdict
+  PASS  B8 a replay ruling is accepted while a regression is open
+  PASS  B9 a review that replays nothing while the regression set is non-empty is refused
+
+--- C  handoff + convergence — the record survives, coverage needs a witness
+  PASS  C1 a status transition updates the row instead of adding one
+  PASS  C2 the original invariant text is never overwritten
+  PASS  C3 severity only escalates
+  PASS  C4 a cross-reference follows the canonical id
+  PASS  C5 unresolved row 1 is handed over verbatim
+  PASS  C5 unresolved row 2 is handed over verbatim
+  PASS  C5 the block is marked authoritative
+  PASS  C6 nothing inside the ledger section is truncated
+  PASS  C6b both OPEN rows are visible to the next role
+  PASS  C6c the role's own contract travels with the material
+  PASS  C7 an integrator may claim coverage but never grant it
+  PASS  C8 a ruling counts only against the exact bytes it read
+  PASS  C9 editing the candidate voids rulings made against the old bytes
+  PASS  C10 a spotless but unreviewed record never converges
+  PASS  C10b it names the coverage gap rather than hiding it
+  PASS  C10c an un-replayed closed counterexample is held against it
+  PASS  C10d and a claimed-coverage row alone is not enough
+  FAIL  C11 a fully ruled, owned, quiet, reduced candidate does converge
+        missing [FINAL_REVIEW_DUE]
+  FAIL  C11b an approved scenario nobody owns blocks convergence
+        missing [without_an_owner]
+
+--- D  the retired supervisor is not reachable from the active path
+  PASS  D1 no active library sources the retired process supervisor
+  PASS  D2 the retired phase runner is absent in the active environment
+  PASS  D3 no model invoker exists in the active path at all
+
+=== unit tests: 75 passed, 2 failed

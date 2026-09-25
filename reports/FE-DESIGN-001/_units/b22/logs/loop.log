@@ -1,0 +1,2 @@
+[2026-09-22T02:56:18Z] validate[attack]:   invalid: ledger row FE-CE-001: bad status [WONKY]
+[2026-09-22T02:56:18Z] validate[attack]:   invalid: ledger block present but contained no valid rows

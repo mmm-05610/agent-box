@@ -1,0 +1,404 @@
+You are one role in an adversarial design loop for the FE-DESIGN-001 Agent
+Desktop design task. Role: **planner**. Round: R001. Phase: planner.
+Run root: /home/maoqh/projects/ordessa/control/reports/FE-DESIGN-001
+
+Ground rules, non-negotiable:
+- You are given every material you are allowed to see, inlined below. You have
+  no tools and cannot read anything else. Do not ask to.
+- Product code is a migration constraint and evidence, not the answer. Do not
+  propose work orders or implementation.
+- Never soften, delete or reinterpret a required scenario or an established
+  counterexample. If you disagree, say so as a DISPUTED ledger row with a
+  concrete reason.
+- Be concrete enough that a reader can reject you. Style opinions, adjectives and
+  general advice are contract violations.
+
+OUTPUT CONTRACT (machine-checked; a phase that fails it is recorded as failed, never as passed)
+- Every deliverable section must be wrapped, on their own lines, in these two markers, in order:
+  <<<FE-OUT-START>>>
+  <the section>
+  <<<FE-OUT-END>>>
+- If a ledger block is required, wrap its rows in:
+  <<<FE-LEDGER-START>>>
+  FE-CE-NNN|<round>|<severity: major|minor>|<status: OPEN|CLOSED|DISPUTED|REJECTED|SUPERSEDED>|<invariant violated>|<title>|<evidence pointer>|<target CE ids or ->
+  <<<FE-LEDGER-END>>>
+- If a scenario table is required, wrap it in:
+  <<<FE-SCENARIO-START>>>
+  S01|<covered|partial|open>|<owner: core|adaptation|extension|unassigned>|<mechanism>|<evidence pointer>
+  <<<FE-SCENARIO-END>>>
+- If a mechanisms table is required, wrap it in:
+  <<<FE-MECH-START>>>
+  <mechanism name>|<core|delegated|removed>|<the scenario that fails if it is deleted>|<experiment pointer>
+  <<<FE-MECH-END>>>
+- One row per line. Exactly the field order above, pipe separated, no header row, no extra prose inside a block.
+- Ids: counterexamples FE-CE-001..FE-CE-999, scenarios S01..S12. Propose a fresh FE-CE-NNN for anything new.
+
+===== MATERIAL: role contract (authoritative for this call) =====
+(source: /home/maoqh/projects/ordessa/control/design-loop/roles/planner.md, sha256: 7bc76adfc005b329fa83542edd9232f17296ad195c0817aa7dd8104efe27949b)
+
+ROLESPEC|min_words|260
+ROLESPEC|extra|none
+OUTPUT|round_plan
+---
+
+# Role: planner
+
+Decide the shape of this round. You are not designing the host — the designer
+does that. A round without a decided question produces polished prose.
+
+Your plan must state:
+
+1. **CANDIDATES: A,B** (or one id) on its own line — the candidate ids this
+   round's designer must produce. Two or more **structurally different cores**
+   whenever no candidate has yet survived an attack; structurally different
+   means a different answer to "what is the host core", not the same core with
+   different names, ordering or wording.
+2. **DIMENSION: <one attack dimension>** on its own line — what the attacker is
+   ordered to attack this round. Rotate away from dimensions that produced no
+   established counterexample last time; never repeat the immediately previous
+   dimension if it was clean.
+3. **THE QUESTION THIS ROUND MUST SETTLE** — one sentence, answerable yes/no by
+   reading the round's artifacts.
+4. Per candidate: the core bet in two sentences, the **strongest objection**
+   against it, and what evidence would settle that objection this round.
+5. Which required scenarios are currently uncovered and must be this round's
+   centre of gravity.
+
+Do not restate the material. Do not summarise prior rounds beyond what the plan
+needs. Do not propose implementation steps or work orders.
+
+
+===== MATERIAL: required scenario set (authoritative) =====
+
+# Required scenario set S01–S12 (authoritative; user-approved goals, not to be cut)
+
+A scenario states only the user-observable result. It never states an internal
+object, a UI or a mechanism. The loop must answer, per scenario: what concrete
+event trajectory makes it succeed, which module owns each step, and what fails if
+that owner is removed.
+
+| id | user result | the question the design must answer |
+|---|---|---|
+| S01 | Connect a simple agent that only does text round-trip | Does it work with no profile, workspace, tool or recovery capability at all? |
+| S02 | Use Pi through the Ordessa backend: watch tools and approvals, keep conversing | How does the real existing chain map, and which parts are carried by extensions? |
+| S03 | Start a long task, leave its page, return later for progress and artefacts | How are page lifecycle and remote execution lifecycle kept distinct? |
+| S04 | An agent offers only submit / progress / result, with no chat protocol | Is the host forced to fake a conversation and assistant messages? |
+| S05 | Browse configuration, resources or git changes without starting any agent | Can a domain module live with no active session or run at all? |
+| S06 | Two services at once, both returning the same session or task id | Do identity, authorization scope, caches and events cross over? |
+| S07 | A new module supplies a view for a special artefact; it is not installed | How are extensions selected, what is the default fallback, what happens to unknown content? |
+| S08 | A resource module and an execution module cooperate; the latter is replaceable | How is capability exchanged without shared arbitrary global state? |
+| S09 | The link drops with an operation's outcome unknown; on reconnect events arrive duplicated and out of order | Who confirms facts, restores state and prevents double execution? |
+| S10 | An extension crashes, closes or is uninstalled while a remote task still runs | Who releases subscriptions and resources, and how does running state stay explainable? |
+| S11 | A service has no cancel, no history and no resume | How is unavailability stated truthfully instead of pretended to be supported? |
+| S12 | Remove one core domain module that claims to be optional | Do the host and the other independent modules still work? |
+
+S01 and S02 anchor near-term real need. The rest are extension and failure
+tests. Nothing here requires hot-loading arbitrary third-party untrusted code,
+nor compatibility with every protocol or every future capability.
+
+## Scenario ledger format (`scenarios.tsv`)
+
+```
+S01|<covered|partial|open>|<core|adaptation|extension|unassigned>|<mechanism or trajectory>|<evidence pointer: round/artifact section>
+```
+
+`covered` requires (a) a named trajectory with an owning module per step and
+(b) the deletion consequence for each core step in that trajectory. Anything
+less is `partial`. S01..S12 all covered is the convergence gate.
+
+===== MATERIAL: judging rubric (authoritative) =====
+
+# Judging rubric (authoritative for every role in this loop)
+
+## What wins
+
+A candidate wins by satisfying the required scenarios and their invariants under
+the smallest **total** cost — core + adapter burden + extension-author burden.
+Not by having the fewest files, not by self-scoring, not by naming things well.
+
+## The three tests every candidate must pass
+
+1. **Coverage** — S01–S12 each has a concrete trajectory with a named owner and
+   a stated deletion consequence. No "later" slots.
+2. **Non-smuggling** — the core is not a service/model/harness/conversation
+   assumption wearing a neutral name.
+3. **Minimality** — every core mechanism has a "deleting it breaks scenario X"
+   argument. If the argument is missing, the mechanism is deleted.
+
+## Disqualifiers (each ends the candidate, not just the section)
+
+* `execute(any)` and any other untyped escape hatch.
+* An omnipotent `context` object handed to extensions.
+* An arbitrary event bus used as the extension mechanism.
+* Complexity relocated into a plugin so the core *looks* minimal.
+* Faking support for a capability the service does not have.
+* Reinterpreting, weakening or dropping a required scenario.
+* A trajectory that only works when every adapter is the one we already have.
+
+## What counts as evidence
+
+* A specific event sequence beats an adjective.
+* An existing artifact beats an assertion about one.
+* A model experiment proves **the model only**. It is never product verification,
+  never protocol verification, never "the design works".
+* This repository's current code is a migration constraint and evidence about the
+  problem space. It is not the answer and not the baseline a candidate must keep.
+* Anything marked "unverified" in the inputs stays marked unverified in outputs.
+
+## Honest outcomes
+
+* Two candidates that cannot be simply ranked may both stay; say so, and say what
+  observation would rank them.
+* "I could not break it" and "it is correct" are different claims. Use the first.
+* A clean round is a real result only if the attack dimension was actually taken
+  up. Record which dimension was used, always.
+
+===== MATERIAL: attack dimensions =====
+
+# Attack dimensions — one per round, recorded, never repeated while clean
+
+The controller rotates these and writes the assignment into
+`rounds/RNNN/dimension.txt`. The attacker is confined to that dimension.
+
+| key | what the attacker must construct |
+|---|---|
+| D01-order-dedup | duplicate, reordered, interleaved and late events; two producers for one slot |
+| D02-lifecycle-leak | unsubscribe, page destroyed, extension unmounted, service restart, crash mid-operation |
+| D03-identity-scope | two services or tenants, colliding ids, cache bleed, authorization scope confusion |
+| D04-absent-capability | service lacks cancel/history/resume; where is it stated, and what does the UI claim meanwhile |
+| D05-fallback-unknown | unregistered view, unknown content type, partial data, malformed payload |
+| D06-adapter-burden | count what a *new service author* must write or must know about the core; any core internal leaking into the adapter contract is a finding |
+| D07-extension-burden | count what a *new module author* must learn; boilerplate, implicit coupling, ordering assumptions |
+| D08-reduction | delete one core mechanism and show a required scenario still passes; or show every candidate has one mechanism too many |
+| D09-splits-truth | two owners of one fact; who reconciles them when they disagree; find a state where the UI shows something that never happened remotely |
+| D10-cross-module | modules cooperating without shared global state; find the hidden channel — a shared key, an ordering assumption, a mutable context field |
+| D11-long-run | hours-long task, client restart, page never opened again, memory and subscription growth |
+| D12-authority-boundary | the candidate smuggling a service, model, harness, plugin-host or conversation assumption into the core as if it were neutral |
+
+Rotation rule: never reuse the immediately previous dimension while it is clean;
+after `FE_STALL_AFTER` consecutive clean rounds the controller rotates hard
+rather than polishing.
+
+===== MATERIAL: design brief (the approved statement of goal) =====
+(source: /home/maoqh/projects/ordessa/control/product/agent-desktop-design-brief.md, sha256: 0d36056c1039b3ae0bec6797e58824b247d19d093ae9505a74119fe8d648b47e)
+
+# Agent Desktop：设计循环目标与场景草案
+
+状态：目标已获用户认可；下列场景与循环参数由 I 提议，待用户查看。
+未启动循环、未安装外部框架、未任命新执行者。产品代码只读。
+
+## 用户确认的方向
+
+独立于特定后端、面向 Agent 使用的可扩展 Desktop。对话、工具调用、模型
+配置均可以成为能力，但不预设为整个产品的组织中心。
+Ordessa 后端可以提供最完整能力，不是所有接入的必需前提。
+不预先把 Agent、会话、任务或插件宿主指定为核心答案。
+通过场景、反例与删减实验寻找宿主最小机制与扩展领域能力的边界。
+
+## I 提议的场景集
+
+每个场景只规定用户结果，不提前规定内部对象或必须采用哪个 UI。
+
+| ID | 场景 | 需要设计回答的问题 |
+| --- | --- | --- |
+| S01 | 接入简单 Agent，仅支持文本往返 | 没有 Profile、工作区、工具和恢复能力时能否使用？ |
+| S02 | 通过 Ordessa 后端使用 Pi，观察工具与授权并持续交流 | 现有真实链如何映射，哪些能力由扩展承担？ |
+| S03 | 启动长任务，离开其页面，稍后查看进度和产物 | 页面生命周期与远端执行生命周期如何区分？ |
+| S04 | Agent 只提供任务提交、进度和结果，没有聊天协议 | 是否被迫伪造会话和 assistant 消息？ |
+| S05 | 不启动 Agent，独立浏览配置、资源或 Git 变更 | 领域模块能否不依赖活跃会话/运行？ |
+| S06 | 多服务同时接入，两个服务返回同名会话或任务 ID | 身份、授权范围、缓存和事件是否会串？ |
+| S07 | 新模块为特殊产物提供视图，未安装时仍能查看基础信息 | 扩展选择、默认回退与未知内容如何处理？ |
+| S08 | 一个资源模块与执行模块协作，后者可替换 | 怎样交换能力而不共享任意全局状态？ |
+| S09 | 连接断开后操作结果未知，重连收到重复/乱序事件 | 谁确认事实、恢复状态、防重复执行？ |
+| S10 | 扩展崩溃、关闭或卸载，远端任务仍在运行 | 谁释放订阅/资源，如何保留可解释的运行状态？ |
+| S11 | 服务缺少取消、历史或恢复能力 | 如何如实表达不可用，而非伪造支持？ |
+| S12 | 移除一个宣称可选的核心领域模块 | 宿主和其他独立模块是否还能工作？ |
+
+S01/S02 为近期真实需求锚点；其余是扩展与故障检验场景，不代表今夜实施范围。
+不要求任意第三方不可信代码热加载，不要求兼容所有协议或无限未来能力。
+
+## 评判方式
+
+先满足明确场景与不变式，再比较复杂度；不以文件少或自评分高判胜。
+对每个候选列：核心概念、接口操作、状态权威、生命周期、扩展依赖、接入成本、
+实现成本和不能覆盖的范围。不能用 execute(any)、万能 context/事件总线
+隐藏接口与错误语义后宣布核心最小。
+
+每个核心概念必须给一个“删掉它会失败”的具体场景；若移入扩展仍能满足
+全部必需条件，就列作可移除候选。总复杂度包含核心、适配器与扩展作者负担。
+允许保留多个不可简单排序的候选，不强行宣称存在唯一最简模型。
+
+## 建议循环（未启动）
+
+1. 首轮至少提出两个结构不同的候选，不以旧 mcode 方案为唯一出发点。
+2. 设计者给类型/伪代码、所有权与逐步场景轨迹。
+3. 攻击者给具体事件序列、被违反的不变式及最小反例；禁止只给风格意见。
+4. 验证者判断成立/不成立/证据不足，必要时在隔离设计目录写小型模型测试。
+   模型测试只能证明所建模型，不得冒充实际产品集成通过。
+5. 设计者修订并回放所有成立反例；不得删除场景、偷偷降低要求或压制攻击。
+6. 做删减攻击与新场景攻击，保存最佳候选、反例账和完整版本，不默认最后版最好。
+
+可借鉴的方法：
+- Self-Refine：https://github.com/madaan/self-refine （生成/反馈/修订）
+- Reflexion：https://github.com/noahshinn/reflexion （失败反思记忆）
+- evaluator–optimizer：https://www.anthropic.com/engineering/building-effective-agents
+- 运行控制候选：https://github.com/Kiriketsuki/ralph-loop
+以上阅读不代表已验证 Qoder 兼容、已安装或已授权其代码执行。
+
+建议上限：12 轮或 6 小时，先到者停止；这只是预算上限，不需要凑满时间。
+连续三轮没有新成立重大反例，且必需场景与删减检查通过，可提前交审。
+三轮仅换措辞/重复争论无实质进展则交出争议，不无限循环。
+目标冲突或产品取舍不明，记录交 I；其余独立问题可以继续。
+
+角色尽量用独立上下文；同一模型不同角色不等于独立质量证明。
+若 Qoder 无独立会话编排机制，先标注此限制，不假装已经启动独立审阅者。
+实现调度器前需读本机 Qoder --help，验证真实可用的非交互/会话参数，不猜 CLI。
+外部资料每条标实际读过的来源、版本与适用限制；未打开不作证据。
+
+## 次日交付
+
+一页最佳候选说明、核心/扩展边界、S01–S12 覆盖表、成立反例与修复记录、
+删减实验、未解决取舍，以及按真实模块划分的后续实施建议。
+停止状态为候选待审/预算截止/需决策，不自行宣布最终架构锁定。
+
+
+===== MATERIAL: counterexample ledger (authoritative; full) =====
+
+
+-- all rows --
+id|raised_round|severity|status|invariant|title|evidence|targets|replayed
+FE-CE-001|R001|major|REJECTED|core defines observable content only as a seq-ordered replayable message log (no value/snapshot primitive), forcing the conversation/run shape onto passive data — violates "resource kinds are adapter types, host has no content authority"|A core has no value primitive: passive resource is content-as-message-log|rounds/R001/cand-A.md §A.1,§A.2,§A.5-S03,§A.5-S05 ; verifier ruled it does not hold (RR001) ; rounds/R001/verify.md §2 (does_not_hold); action.invoke→Result provides current-value path; replay against revised candidate confirms unchanged|-|R001
+FE-CE-002|R001|minor|CLOSED|core capability-declaration fixes a session-recovery vocabulary and core fallback view renders an agent/run reading while host claims no content interpretation|A core smuggles run/agent reading via fixed CapSet and generic last-envelope view|rounds/R001/cand-A.md §A.2,§A.4,§A.9 ; verifier ruled it holds (RR001) ; rounds/R001/verify.md §3 (holds); closed by open CapMap + revised fallback rendering per best candidate §R.2 §R.4|-|R001
+
+===== MATERIAL: scenario coverage ledger (authoritative; full) =====
+
+sid|status|owner|mechanism|evidence|round
+S01|claimed|core|text.stream resource, adapter-chosen CapMap names, no profile/tool/recovery|best-candidate §R.5-S01|R001
+S02|claimed|adaptation|kinds pi.conversation/pi.tool-event/pi.approval + conversation resolver + approve action|best-candidate §R.5-S02|R001
+S03|claimed|core|namespace outlives page; re-subscribe from cursor; read-action for snapshots|best-candidate §R.5-S03|R001
+S04|claimed|core|submit/progress/result resources, adapter-chosen CapMap names, no chat object in core|best-candidate §R.5-S04|R001
+S05|claimed|core|config.tree resource, CapMap{read:supported} valid under open map, no session|best-candidate §R.5-S05|R001
+S06|claimed|core|namespaced resource ids structurally prevent collision|best-candidate §R.5-S06|R001
+S07|claimed|core|generic fallback renders kind + schema + CapMap labels, not run-strip|best-candidate §R.5-S07|R001
+S08|claimed|extension|cross-kind view passing ids via typed action, replaceable runner adapter|best-candidate §R.5-S08|R001
+S09|partial|core|host seq/dedup on stream; action double-exec needs adapter idempotency; (namespace_id,action_seq) is D06 deferred|best-candidate §R.5-S09|R001
+S10|claimed|core|handles closed on unmount, resource stays authoritative, re-subscribe from cursor|best-candidate §R.5-S10|R001
+S11|claimed|core|adapter-named CapMap not_supported + CapabilityAbsent sentinel; absence stated, never inferred|best-candidate §R.5-S11|R001
+S12|claimed|adaptation|adapter teardown disposes namespace only; resolver absent falls to generic view|best-candidate §R.5-S12|R001
+
+===== MATERIAL: mechanism disposition ledger (full) =====
+
+mechanism|disposition|failure_scenario|experiment_ref|round
+namespaces|core|S06 step 1 — colliding resource ids from two services cross directory and routing|rounds/R001/cand-A §A.6-namespaces|1
+resource-directory|core|S05 step 2 — domain module cannot be listed/looked-up without a session|rounds/R001/cand-A §A.6-directory|1
+ordered-replayable-stream|core|S03 step 4 and S09 step 2 — no return-later catch-up, no host dedup/reorder|rounds/R001/cand-A §A.6-stream|1
+capability-declaration|core|S11 step 2 — absence inferred from null, faking support|best-candidate §R.2 CapMap (open)|1
+typed-action|core|S08 step 2 — no idempotent typed request without execute(any)|rounds/R001/cand-A §A.6-action|1
+generic-fallback-view|core|S07 step 2 — unknown artefact renders blank|best-candidate §R.4 revised fallback|1
+host-session-object|removed|none — no scenario requires it; S04 passes without it|rounds/R001/cand-A §A.8|1
+host-turn/role-envelope-field|removed|none — D12 disqualifier; S04 passes without it|rounds/R001/cand-A §A.8|1
+host-event-store|removed|none at core — S03/S09/S10 consequences are adapter-burden findings for D06|rounds/R001/cand-B §B.9|1
+host-resource-directory-B|removed|none at core — S05/S06 handled by port ids + adapter discipline|rounds/R001/cand-B §B.9|1
+
+===== MATERIAL: per-round counters (full) =====
+
+round|holds_major|new_major|closed_major|clean|note|digest|review_holds
+1|0|0|0|1|dim=D12-authority-boundary attack=1095w verify=1110w|no-candidate
+
+===== SAVED CANDIDATE (digest b93d2dbedec53eaa05d7de4a9d762f3621d5f9bc623f8ea7da916298e690d30b) =====
+
+===== MATERIAL: candidates/best.md =====
+(source: /home/maoqh/projects/ordessa/control/reports/FE-DESIGN-001/candidates/best.md, sha256: b93d2dbedec53eaa05d7de4a9d762f3621d5f9bc623f8ea7da916298e690d30b)
+
+# Best Candidate (R001 revised) — Namespaced resource/event space with open capability vocabulary
+
+## R.1 Core bet
+
+The host core is a **namespaced directory of resources**, each an addressable service-scoped identity plus a seq-ordered replayable event stream plus a declared **open** capability map. The host's only authority is identity, namespace isolation, subscription routing, and per-resource event ordering; "agent", "session", "chat" are resource kinds declared by adapters, never host types, and **capability names are adapter-chosen strings with no predefined meaning in the host**. Nothing smaller keeps a remote task observable while its page and its view resolver are both gone (S03/S10) or keeps two services' colliding ids from crossing (S06).
+
+## R.2 Core concepts and operations
+
+**Namespace.** `namespaces.open(service_descriptor) → NamespaceHandle{id}`; `namespace.teardown(reason)`. Authoritative in host. Every `resource_id` is `(namespace_id, local_id)`; raw id collision across services is structurally impossible. Lifecycle: opened on adapter connect, torn down on adapter disconnect; teardown disposes all its resources and force-closes every subscription to them.
+
+**Resource.** `namespace.announce(resource_descriptor{id, kind:string, capabilities:CapMap})` (adapter-origin only, host verifies uniqueness within namespace); `namespace.retire(resource_id, reason)`; `directory.list(namespace_id, filter{kind?}) → [descriptor]`; `directory.lookup(namespace_id, resource_id) → descriptor | ExplicitAbsent`. Content authority is the **producing adapter**; identity/lifecycle authority is the host.
+
+**Event stream.** `stream.subscribe(resource_id, from_cursor?) → Subscription{ close(), onNext(Envelope) }`. `Envelope = {resource_id, seq:int, ts, kind:string, payload_schema_id:string, payload:RegisteredType}`, where the host refuses to deliver any `payload_schema_id` whose type was not registered. `cursor.resolve(resource_id) → seq` supports resume. `seq` is monotonic per resource, assigned by the host on ingest. Unsubscribe = `Subscription.close()`; host also closes it on resolver unmount or page destroy (handle owned by the subscriber's scope).
+
+**Capability map (OPEN, per FE-CE-002 fix).** `capabilities.get(resource_id) → CapMap` where `CapMap = {capability_name: string → {supported | not_supported | unknown}}`. The host defines no set of valid capability names; the adapter populates the map with whatever names describe its features. The host guarantees only the three-state sentinel; absence of a name from the map is not interpretable — it means "unknown", not "unsupported". This prevents the host from encoding a session-recovery vocabulary while retaining truthful absence (S11).
+
+**Action.** `action.invoke(resource_id, action_type:string, params:RegisteredType) → Result{RegisteredType} | CapabilityAbsent(action_type)`. `action_type`s are registered per `kind` with concrete param/result types; no free-form params or results. The host returns `CapabilityAbsent` only when the adapter explicitly registered the action as absent or the `kind` has no such `action_type` in its registry.
+
+## R.3 Boundary rules
+
+A service adapter must translate its protocol into four things: (1) `announce`/`retire` of resources with `kind` + `CapMap`; (2) a seq-numbered typed event stream per resource; (3) a registry of payload types per `kind`; (4) typed `action` handlers. To express "this service does not support this," the adapter sets the relevant capability_name to `not_supported` in `CapMap` and/or omits the action from the kind's registry; any attempt to `invoke` returns `CapabilityAbsent(action_type)`. `ExplicitAbsent` and `CapabilityAbsent` are distinct non-null terminal states; absence is never inferred from a missing message, a timeout, or a null.
+
+## R.4 Extension mechanism (FE-CE-002 fix applied)
+
+An extension registers a **view resolver**: `{match: kind + payload_schema_id, component, optional typed action bindings}`. Selection: host resolves by exact kind/schema match, most-specific-first; **default fallback is a host-builtin generic descriptor view** that renders: resource kind, declared action names with their typed parameter schemas, the open `CapMap` entries as plain labelled name→state pairs (no icon affordance, no invocation button, no "last envelope as output" treatment), the last envelope's `payload_schema_id` (not its content), and the line: *"No dedicated view installed; structured data available via subscription."* Unknown content is never blank or silently dropped (S07) and is never presented with a run/agent reading (FE-CE-002 fix).
+
+An extension may render, subscribe (via the subscription handle), and invoke registered actions; it may **not** mint ids, bypass its namespace, subscribe across namespaces, register free-form event names, or touch a global context — it receives only a resource-scoped `SubscriberScope{descriptor, subscriptionHandle, typedInvoker}`, not a capability grab-bag. Guarantees: resolver **absent** → generic view (rendering as above); resolver **throws** → host error-boundary keeps delivering the stream to a re-mounted resolver; resolver **unmounted mid-operation** → host closes its handles, the remote resource stays authoritative and observable, a new page re-subscribes via `from_cursor`.
+
+## R.5 Scenario trajectories (owner per step, revised)
+
+**S01 — text-only agent.** 1. User connects simple service → `namespaces.open` (host). 2. Adapter `announce{kind:"text.stream", CapMap:{"streaming":supported, "cancel":not_supported, "resume":not_supported}}` (adapter — names are adapter-chosen, not core-defined). 3. User types; extension bound to kind `text.stream` calls `action.invoke(id,"send",{text})` (extension → adapter). 4. Adapter emits envelopes `seq 1..n` of registered `TextDelta` payload (adapter). 5. Resolver renders deltas as it chooses; no assistant-message object materialised in core — "message" is purely the view's interpretation (extension). Covered; zero profile/workspace/tool/recovery.
+
+**S04 — submit/progress/result, no chat protocol.** 1. `namespaces.open`; adapter `announce{kind:"acme.job", CapMap:{"cancel":supported,"history":supported,"resume":supported}}` — adapter-chosen names; actions registered `submit`,`result` (adapter). 2. View resolver for `acme.job` renders sections from envelopes of payload types `JobProgress`/`JobResult` (extension). 3. No session, no turn, no role field in any envelope — envelope is `{resource_id,seq,ts,kind,payload_schema_id,payload}` only. D12 answer: **yes** — trajectory written against core ops with no core concept named or shaped like conversation/assistant/session/run; the CapMap names are adapter-authored strings, not host types.
+
+**S05 — browse config/git without session.** 1. Adapter `announce{kind:"config.tree", CapMap:{"read":supported}}` (adapter). The name `"read"` is not reserved by the host; it is a meaningful adapter label. 2. `directory.list(ns, filter{kind:"config.tree"})` (host). 3. Resolver for `config.tree` renders via `action.invoke("read") → current snapshot` or via stream envelopes (extension). No `namespaces.open` for an agent and no run. Covered.
+
+**S02 — Pi via Ordessa, tools + approvals.** 1. Ordessa adapter `namespaces.open`; `announce` resources with kinds `pi.conversation`, `pi.tool-event`, `pi.approval`, each adapter-declared (adapter). 2. The "conversation" view is an extension resolver on `pi.conversation`, not a core type (extension). 3. Approvals via `action.invoke(pi.approval,"approve",…)`. Mapping: real chain's session/tools/approval become resources+actions carried by adapter and a conversation-shaped extension; core stays neutral. Covered via adaptation+extension.
+
+**S03 — long task, leave page, return later.** 1. User opens resolver → subscribes (extension). 2. Navigates away → host closes Subscription (host). 3. Remote keeps emitting; adapter keeps announce+envelopes (adapter). 4. Returns → new resolver `directory.lookup(ns,job_id)` then `stream.subscribe(id, from_cursor=resolved)`; host replays missed envelopes in seq order (host). Page lifecycle ≠ execution lifecycle. For passive snapshot resources: `action.invoke("read")` returns current value without replay (host+adapter). Covered.
+
+**S06 — two services, same id.** Separate namespaces → `(ns_A,"job-1")` ≠ `(ns_B,"job-1")`. Auth/capability checks namespace-scoped. Covered by namespacing.
+
+**S07 — special artefact, view not installed.** Adapter `announce{kind:"acme.plot"}`. No resolver matches → host generic view renders: kind `acme.plot`, declared actions and parameter schemas, CapMap as name→state labels, last envelope's `payload_schema_id`, "no dedicated view installed." Kind, not agent. Covered.
+
+**S08 — resource + execution cooperate, replaceable.** Resource module kind `data.ref`; execution module kind `runner`. Coordinating view resolves both and calls `action.invoke(runner,"execute",{ref})` — id + typed params, no shared mutable state. Replacing runner adapter changes who answers `kind:runner`; resource untouched. Covered without global-state channel.
+
+**S09 — drop, unknown outcome, reconnect dup/out-of-order.** 1. Link drops mid invoke → `Unknown` returned; UI does not guess (adapter). 2. Reconnect: adapter replays envelope history; host dedups by `(resource_id,seq)` and reorders; `cursor.resolve` gives resume point (host). 3. Action idempotency: host-assigned `(namespace_id, action_seq)` on each invoke; adapter declares whether it dedups. **Partial** — double-execution guarantee is host+adapter joint; no scenario forces pure-host idempotency.
+
+**S10 — extension crashes while remote task runs.** Resolver throws/unmounts → host closes subscription handles; resource stays. Remote authoritative; re-mounted or generic resolver re-subscribes from cursor. Running state explainable because resource+stream never depended on the extension. Covered.
+
+**S11 — no cancel/history/resume.** Adapter `announce{CapMap:{"cancel":not_supported,"history":not_supported,"resume":not_supported}}` — names are adapter-chosen (adapter). UI reads `capabilities.get` → renders each name with its state; `"cancel": not_supported` shown as "cancel: not offered by this service" (extension). `invoke(...,"cancel")` → `CapabilityAbsent`. Absence stated, never pretended. With open CapMap, the UI cannot infer anything about a name the adapter did not write; it can only present what was declared. Covered.
+
+**S12 — remove an "optional" core domain module.** Removing an optional adapter tears down its namespace; other namespaces unaffected (host). Removing an optional resolver falls back to generic view (host). Covered.
+
+## R.6 Delegation / deletion experiments
+
+| mechanism | keep/remove | scenario that fails if removed |
+|---|---|---|
+| namespaces | keep | S06 — colliding ids from two services cross |
+| resource-directory | keep | S05 — cannot list/lookup without session |
+| ordered-replayable-stream | keep | S03 step 4, S09 step 2 — no catch-up, no dedup |
+| capability-declaration (open map) | keep | S11 step 2 — absence inferred from null |
+| typed-action | keep | S08 step 2 — no idempotent typed request without execute(any) |
+| generic-fallback-view | keep | S07 step 2 — unknown renders blank |
+| host-session-object | removed | none — S04 passes without it |
+| host-turn/role-envelope-field | removed | none — D12 disqualifier |
+
+## R.7 Second-service onboarding cost (revised)
+
+To attach a service with a different protocol: (1) `namespaces.open`; (2) `announce/retire` with kind + open CapMap (adapter-chosen names, no host vocabulary to learn); (3) payload-type registration per kind; (4) seq-ordered event pump (or rely on host ingest-seq); (5) typed action handlers per registered action_type; (6) explicit `not_supported` entries in CapMap for absent features. Six items; the core event-ordering/dedup/namespace/cursor machinery is reused, not rewritten. To add a view only: one `{match:kind+schema, component}` resolver, no protocol code, no knowledge of other modules.
+
+## R.8 Honest cost and non-goals
+
+Weakest points: modelling transient text as an addressable resource is heavier than a pure broker for stateless round-trips; the generic fallback is shallow (every rich view is an extension); S09's double-execution guarantee is host+adapter joint (partial). Non-goals: no cross-namespace joins, no content search, no host-level turn/role model, no host-defined capability vocabulary (per FE-CE-002 fix). Largest second-order cost: every "thing" being a resource pushes adapters to give identity + capability declarations to ephemeral streams. The open CapMap removes the agent-session assumption but transfers naming responsibility to adapters — a D06 finding deferred.
+
+## R.9 Open alternative — Candidate B
+
+B (typed connection broker, no default event plane) is the cleanest possible answer to D12: the core has no vocabulary, no event plane, and no capability names at all. Absence is structurally true. B is retained as an open alternative for a future round to weigh if D06 determines that per-adapter event machinery is cheaper than centralized machinery for the expected service count (1–3 Ordessa-adjacent adapters). B's current disqualifier: S09 is open (no owner for dedup/reorder), violating the coverage requirement.
+
+
+===== FINAL: THE ONLY ACCEPTABLE ANSWER SHAPE =====
+Your reply is machine-checked. Anything not inside these markers is read as
+commentary and cannot enter the record. Emit the sections and blocks below,
+in this order, with the markers alone on their own lines:
+
+<<<FE-OUT-START>>>
+<deliverable>
+<<<FE-OUT-END>>>
+
+If a block applies and you leave it empty, that is a failed phase, not an
+empty result: the verdict block in particular is the only thing that can move
+a counterexample, and prose verdicts are not read.

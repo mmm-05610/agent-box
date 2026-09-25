@@ -1,0 +1,173 @@
+I am closing R003. I settle the round's ledger (four minor non-minimality rows + the disputed one), reduce A's core accordingly, keep B demoted, and re-issue a single integrated best candidate. I ran the verifier's spawned-set-vs-same-ns model as the settling check for FE-CE-009.
+
+<<<FE-OUT-START>>>
+
+# Integration report — FE-DESIGN-001 / R003 (D08-reduction)
+
+## 1. Per established (holds) counterexample: the exact change that makes it impossible
+
+- **FE-CE-007 (OPEN, against demoted B; N/A for A).** No change to A (A carries no edges mechanism). B is demoted, not repaired: `edges.list` returning core-stored target ids remains an unmet isolation invariant. The counterexample is not softened — it is carried OPEN against B-as-open-alternative and stays out of the integrated candidate. Lives nowhere in A.
+- **FE-CE-008 (payload_schema_id descriptor store outlived its reader).** Change: delete the ns-scoped **payload**-schema descriptor store entirely. Adapters no longer `register_type` for envelope payload shapes; `Envelope.payload_schema_id` remains only as a resolver-match string and a fallback label. The ns-scoped store survives **only** as the action param/result type registry. Location: best-candidate §2 (typed action + action-type registry), §3 (boundary item 3 reduced), §4. FE-CE-006 does not reopen: with the delivery gate (removed for FE-CE-003) gone, the payload key has no host read site, so there is nothing to bleed.
+- **FE-CE-009 (spawned set over-built).** Change: delete the accumulated `SubscriberScope.spawned` set and the `Result.spawned_resource_id` field; replace with **same-namespace subscription-scope** — a handle may `subscribe`/`invoke` any `(ns, local_id)` where `ns == handle.ns`. FE-CE-004 (job observable) is now served by this rule (job is same-ns as runner); FE-CE-007/S06 foreign isolation is served because a foreign ns id fails the `ns==handle.ns` test. The lost capability ("extension may not subscribe a same-ns sibling it never received via a Result") is not a required-scenario outcome — see §1b. Location: §2 (handle model), §5-S08 step 6.
+- **FE-CE-010 (invoke_id orphaned).** Change: `OutcomeUnknown` carries no `invoke_id` token. Call-site return correlation subsumes it; the auto-resubmit path that re-used a stable token was already deleted. Location: §2 (typed action), §5-S09 step 1/3.
+- **FE-CE-011 (live-default is not a mechanism).** Change: `from_cursor` is **mandatory** on `subscribe`; the pair-gesture (already a host mint) supplies `from_cursor=cursor.resolve(id)` at mint. No implicit-default primitive. FE-CE-005 stays closed because the pair mint is explicitly live. Location: §2 (event stream), §4 (pair gesture), §5-S08 step 4-5.
+
+## 1a. Per insufficient_evidence row: the single check and whether I ran it
+
+- **FE-CE-009** was left insufficient_evidence by the verifier (model output `2d2dde…` ruleset note; verifier EXPERIMENT block). Single check: *is "no same-ns sibling subscribe" a required-scenario invariant, or merely same-ns isolation?* **I ran it.** Reviewed S01–S12: none require prohibiting a same-ns sibling subscribe; S06 isolation is cross-namespace only. Re-ran the verifier's model: both gates pass S08 (`job_ok=True foreign_denied=True`); they differ only on `guessed_sibling`, which is a candidate-asserted bound, not an S01–S12 user result. Ruling: not scenario-required → the set is non-minimal → adopted the same-ns reduction → FE-CE-009 **CLOSED**.
+
+## Regressions — every ledger counterexample replayed against the revised candidate
+
+- **FE-CE-001 (REJECTED, stays REJECTED):** `invoke("read")→snapshot` + ordered-stream still provide current-value; sequence unchanged → still does not hold.
+- **FE-CE-002:** open CapMap + generic fallback renders kind/actions/CapMap/schema labels, no run reading → pass.
+- **FE-CE-003:** host has no auto-replay branch on any string (fixed never-auto-resubmit invariant) → pass.
+- **FE-CE-004:** `(ns_R,job)` observable via same-ns subscription-scope → pass (closure mechanism changed, user outcome unchanged).
+- **FE-CE-005:** pair mint passes `cursor.resolve(id)` (live), no stale replay, no auto-execute → pass.
+- **FE-CE-006:** action-type registry ns-scoped; payload store removed leaves no reader → no bleed → pass.
+- **FE-CE-007:** A has no edges mechanism → N/A/pass vs A; OPEN vs demoted B, not repaired → stays OPEN.
+- **FE-CE-008:** S06/S07 pass with the payload descriptor store deleted while action store kept → pass → CLOSED.
+- **FE-CE-009:** S08 step-6 job observable + foreign denied via same-ns scope, no set → pass → CLOSED.
+- **FE-CE-010:** S09 dedup keys `(ns,resource,seq)`, no auto-resubmit, call-site correlation → pass with `OutcomeUnknown` token-less → CLOSED.
+- **FE-CE-011:** S08 step 4-5 no stale replay with explicit cursor at pair-mint → pass → CLOSED.
+
+## Reduction — each core mechanism (see FE-MECH)
+
+namespaces / resource-directory / ordered-replayable-stream(explicit-cursor) / open CapMap / typed-action+never-auto-resubmit / generic-fallback-view / same-ns-subscription-scope / ns-scoped action-type registry: each keeps a named failing scenario. Removed this round: payload-schema descriptor store, typed replay_policy enum, invoke_id, implicit live-default, spawned-resource-grant set + Result field — each reduced because a required scenario does NOT fail without it, and FE-CE-004/005/006/007 closures do NOT reopen under the replacements.
+
+## Unassigned work (left for later rounds, with reason)
+
+- **S09 double-execution is host+adapter joint, not pure-host** — stays `partial`; no current dimension forces a host-only guarantee; a future D-dimension should test it.
+- **Within-namespace sibling visibility** is now permitted by same-ns scope; no scenario forbids it, so accepted as an explicit design choice, not a defect — flagged for a future authority-boundary (D12) look.
+- **D11 long-run memory/subscription growth** improved (no per-handle growing set) but event-store retention/cursor-window growth is still unmeasured; not attacked this round.
+
+CHANGES_VS_PREVIOUS: removed the ns-scoped payload_schema_id descriptor store (S06/S07 hold without it — FE-CE-008); removed typed replay_policy in favour of a fixed never-auto-resubmit invariant (S09 holds, FE-CE-003 not reopened); removed invoke_id on OutcomeUnknown (S09 dedup keys (ns,resource,seq) — FE-CE-010); made from_cursor mandatory with the host pair-mint supplying cursor.resolve(id), deleting live-default-subscribe (S08/FE-CE-005 hold — FE-CE-011); replaced spawned-resource-grant accumulated set + Result.spawned_resource_id with same-ns-subscription-scope (S08 job observable, S06/FE-CE-007 foreign denied, D11 growth removed — FE-CE-009/004); B demoted under D08 (its edge/relay primitive has no failing scenario; FE-CE-007 fatal, carried OPEN against B).
+
+---
+
+# Best Candidate (R003 integrated) — Namespaced resource/event core with explicit-cursor replay, same-namespace scope, no payload-type gate, no auto-replay, no invoke token
+
+## 1 Core bet
+
+The host core is a **namespaced directory of resources**, each an addressable `(namespace_id, local_id)` plus a seq-ordered replayable event stream plus an adapter-owned **open** capability map. Host authority is identity, namespace isolation, subscription routing, and per-resource ordering only. "Agent", "session", "chat" are adapter-declared kinds, never host types. Capability names are adapter strings with **zero host behavioral authority**. The host **never auto-resubmits** an unknown-outcome call (fixed invariant, not a policy field), **never interprets payloads** (no delivery gate), **never tracks spawned ids** (a handle may subscribe/invoke any resource within its own namespace), and **never supplies an implicit subscription position** (`from_cursor` is mandatory). S08 cooperation needs no cross-namespace primitive and no grant bookkeeping: two user-paired ns-local handles plus the same-namespace subscription rule.
+
+## 2 Core concepts and operations
+
+- **Namespace.** `namespaces.open(descriptor)→NamespaceHandle{ns_id}`; `namespace.teardown(reason)`. `ns_id` host-minted per connect, never service-supplied; teardown disposes resources and force-closes handles. `resource_id=(ns_id,local_id)`; raw-id collision structurally impossible.
+- **Resource.** `namespace.announce({local_id,kind,capabilities:CapMap})` (adapter-origin, host checks in-ns uniqueness); `namespace.retire(local_id,reason)`; `directory.list(ns_id,filter{kind?})`; `directory.lookup(ns_id,local_id)→descriptor|ExplicitAbsent`. Content authority=adapter; identity/lifecycle=host.
+- **Event stream.** `subscribe(resource_id, from_cursor:int)→Subscription{close(),onNext(Envelope)}` — **from_cursor mandatory**: `0`=from-first replay, `cursor.resolve(resource_id)`=live/return-later catch-up. `Envelope{resource_id,seq,ts,kind,payload_schema_id,payload}`. `seq` host-assigned monotonic per resource. **No delivery gate:** the host forwards every envelope regardless of whether `payload_schema_id` is registered; it never interprets payload. Dedup/reorder keyed `(ns,resource,seq)`. Release=`Subscription.close()` or handle-scope destruction; teardown force-closes.
+- **Open capability map.** `capabilities.get(resource_id)→CapMap{name→{supported|not_supported|unknown}}`. Host defines no valid names, assigns no behavioral authority, never branches on a value. Absence="unknown".
+- **ns-scoped action-type registry.** `register_type(ns_id,schema_id,descriptor)` **for action params/results only**. Keyed by ns so two services sharing a bare kind/type name do not share a mutable host key. There is **no payload-schema store**; `payload_schema_id` is a resolver label, not a registry entry.
+- **Typed action + never-auto-resubmit.** `action.register(kind,action_type,params_type:RegisteredType,result_type:RegisteredType)`; `action.invoke(resource_id,action_type,params)→Result|CapabilityAbsent(action_type)|OutcomeUnknown`. `OutcomeUnknown` carries **no token**. Fixed invariant: the host never re-sends an unknown-outcome call; the user/extension decides a **fresh** invoke; adapters that want idempotent auto-retry implement re-invocation themselves. No `replay_policy` field, no CapMap string toggles host behavior. `CapabilityAbsent` only when action not registered for the kind.
+- **Same-namespace subscription-scope handle (the cooperation/isolation primitive).** `handle_for(ns_id,local_id)→SubscriberScope{primary_id,subscriptionHandle,typedInvoker}`. Accessible = **all `(ns,local_id)` with `ns==primary_id.ns`**. `directory/subscribe/invoke` via the handle reject any target whose ns ≠ handle.ns with `ScopeDenied`. Exposes no `parent`, no `enumerateNamespace`, no cross-ns target, no foreign id. This single rule yields both S08 spawned-job observability (job is same-ns) and S06/FE-CE-007 foreign isolation.
+
+Distinct non-null terminals: `ExplicitAbsent, CapabilityAbsent, ScopeDenied, NamespaceGone, OutcomeUnknown`. Absence never inferred from null/timeout.
+
+## 3 Boundary rules (adapter obligation)
+
+A service adapter: (1) `namespaces.open`; (2) `announce/retire` kind+open CapMap; (3) `register_type(ns_id,schema_id,descriptor)` **only for action param/result types**; (4) seq-ordered pump (host assigns seq); (5) `action.register(kind,action_type,params,result)` — **no replay_policy**; (6) explicit `not_supported` CapMap entries for absent features. "No cancel" = `CapMap{"cancel":not_supported}` (informational) AND omit `"cancel"` from the kind's action registry (structural) → `invoke(...,"cancel")→CapabilityAbsent`. The adapter sees only its own namespace; there is no adapter API to name/target another namespace's resource.
+
+## 4 Extension mechanism
+
+A view registers a resolver `{match: kind + payload_schema_id, component, optional typed action bindings}`; selection exact/most-specific-first; **default fallback** = host generic descriptor view rendering kind + registered action names with typed param schemas + CapMap name→state pairs + last envelope's `payload_schema_id` label + the line *"No dedicated view installed; structured data available via subscription."* Unknown content is never blank and never given a run/agent reading; an unregistered-schema envelope lands in this generic view identically (no gate). A view receives only host-minted `SubscriberScope` handles. Coordinating view: its primary handle plus, on user pair gesture, a separately-minted second handle whose `subscribe` the **host** mints with `from_cursor=cursor.resolve(id)` (live; no stale replay). Core records **nothing** about the pairing. Guarantees: resolver absent→generic view; throws→error boundary keeps delivering on still-mounted handles; unmounted mid-op→host force-closes that view's handles; re-subscription uses explicit `from_cursor=cursor.resolve(id)`. Extensions may not enumerate namespaces, derive a foreign id, register free-form events, or hold a global context.
+
+## 5 Scenario trajectories (owner per core step + deletion consequence)
+
+**S01 text-only.** 1 `namespaces.open` (host). 2 `announce kind:"text.stream" CapMap{cancel:not_supported}` (adapter). 3 `h=handle_for(ns,…)`; `h.typedInvoker("send",{text})`; `h.subscriptionHandle.subscribe(id,from_cursor=cursor.resolve(id))` (extension). 4 adapter emits seq TextDelta; host routes (adapter/host). 5 resolver renders (extension). Deletion: typed-action→step 3 has no defined submit (`execute(any)` disqualifier); ordered-stream/subscribe→step 4-5 deltas never reach. namespaces/capmap not load-bearing here (fail S06/S11). **Covered, core.**
+
+**S02 Pi via Ordessa.** 1 `namespaces.open` (host). 2 `announce pi.conversation/pi.tool-event/pi.approval` (adapter). 3 subscribe via handle → live tool/approval (host routing). 4 `invoke(approval,"approve")`, `invoke(conversation,"send")` (typed-action). 5 resolver renders (extension). Deletion: resource lifecycle→step 2 no addressable resource; ordered-stream→step 3 not watchable; typed-action→step 4 cannot converse. **Covered, adaptation+extension.**
+
+**S03 long task leave/return.** 1 subscribe `from_cursor=0` (extension+host). 2 leave→`Subscription.close()` (host). 3 remote emits, adapter announces (adapter). 4 return→`directory.lookup` then `subscribe(from_cursor=cursor.resolve(id))` replays missed seq (host). 5 snapshot via `invoke("read")`. Deletion: ordered-stream→step 4 no catch-up; resource-directory→step 4 lookup fails; typed-action→step 5 fails. **Covered, core.**
+
+**S04 submit/progress/result, no chat.** 1 open ns; `announce kind:"acme.job"`; register `submit`+`result` (adapter). 2 render JobProgress/JobResult (extension). 3 no session/turn/role in any envelope (host+adapter). Deletion: resource lifecycle→step 1 no job resource; typed-action→step 1 cannot submit; ordered-stream→step 2 progress undelivered. host-session-object removal→S04 still passes (confirmed dead weight). **Covered, core.**
+
+**S05 browse config/git.** 1 `announce kind:"config.tree" CapMap{read:supported}` (adapter). 2 `directory.list(ns,{kind})` (host). 3 `invoke("read")→snapshot`. Deletion: resource-directory→step 2 fails; typed-action→step 3 fails. **Covered, core.**
+
+**S06 two services, same id.** 1 two `namespaces.open→ns_A,ns_B` (host). 2 both announce `job-1`→keys `(ns_A,job-1)`,`(ns_B,job-1)` distinct (host). 3 `handle_for(ns_A,…)` reaches only ns_A; same-ns scope denies ns_B→`ScopeDenied` (host). 4 grant bound to ns (host). 5 action-type registry keyed `(ns_id,name)`; Alpha/Beta register same action type name independently, neither constrains other (host). 6 only user pair presents second-ns handle; ns_A's data never yields ns_B id. Deletion: namespaces→step 2 collides; same-ns scope→step 3-4 leak (FE-CE-007 class); ns-scoped action registry→step 5 shares mutable key (FE-CE-006). **Covered, core.** (No payload store involved; removing it does not affect S06.)
+
+**S07 special artefact, no view installed.** `announce kind:"acme.plot"`; no resolver→generic view renders kind+actions+CapMap+last schema label+"no dedicated view installed" (host). Deletion: generic-fallback→blank. **Covered, core.**
+
+**S08 resource + replaceable runner.** 1 ns_R `announce kind:"runner"`, register `execute` (adapter). 2 ns_D `announce kind:"data.ref"` (adapter). 3 `h_D=handle_for(ns_D,ref)` (host). 4 user pair→host mints independent `h_R=handle_for(ns_R,runner)` with `from_cursor=cursor.resolve(id)` live; no core relationship (user+host). 5 `h_D` receives new live ArtifactReady (not stale-replayed — explicit live cursor); view `h_R.typedInvoker("execute",{ref})` (extension→adapter). 6 Result identifies `(ns_R,job)`; view `h_R.subscriptionHandle.subscribe((ns_R,job),from_cursor=…)` — allowed by same-ns scope; progress rendered (host+extension). 7 replace: `namespace.teardown`→`h_R` next call `NamespaceGone`; `h_D` unaffected; view does NOT silently re-bind; user re-pairs to `h_R′`. Deletion: same-ns scope→step 6 job unobservable (FE-CE-004) OR foreign reachable (FE-CE-007); explicit live cursor→step 5 stale auto-execute (FE-CE-005); typed-action→step 5 no execute; namespaces/teardown→step 7 silent mis-bind. **Covered, extension owns cooperation; core permits via same-ns scope + live pair-mint.**
+
+**S09 drop / unknown outcome / dup-out-of-order.** 1 invoke sent, drop pre-ack→`OutcomeUnknown` (no token) (host). 2 reconnect: adapter replays; host dedups/reorders by `(ns,resource,seq)`; `cursor.resolve` resume (host). 3 host **never auto-resubmits**; surfaces to user for explicit fresh retry; adapter-owned apply-idempotency prevents double execution. Deletion: ordered-stream dedup→step 2 duplicates reach view. invoke_id removal: step 1/3 use call-site correlation; S09 holds. **Partial** (double-execution is host+adapter joint).
+
+**S10 extension crash while remote runs.** 1 view throws/unmounts→host force-closes its handles (host). 2 ns_D/ns_R resources authoritative (adapters). 3 new view `subscribe(from_cursor=cursor.resolve(id))` (extension+host). 4 no core pair record→nothing to lose. Deletion: handle force-close→subscription leak, dead view receives, D11 growth, state unexplainable; cursor.resolve/stream→step 3 no catch-up. persistent-pair-record removal confirmed correct. **Covered, core.**
+
+**S11 no cancel/history/resume.** `announce CapMap{cancel/history/resume:not_supported}` (adapter, informational); `invoke(…,"cancel")→CapabilityAbsent` (host, registry omission). Deletion: open CapMap→UI infers absence from null→fakes support (and a fixed enum reopens FE-CE-002). **Covered, core.**
+
+**S12 remove "optional" core module.** 1 remove optional adapter→its `namespace.teardown`, other ns unaffected (host). 2 remove optional resolver→generic fallback (host). 3 remove paired coordinating view→other single-resource modules untouched (core recorded no pair). Deletion: namespaces/teardown isolation→step 1 affects other ns; generic-fallback→step 2 blanks. **Covered, adaptation+core.**
+
+## 6 Deletion / reduction experiments
+
+See FE-MECH. **Removed and recorded (no failing scenario):** payload delivery-gate; ns-scoped payload_schema_id descriptor store (FE-CE-008); typed replay_policy (FE-CE-003, now fixed invariant); invoke_id (FE-CE-010); implicit live-default (FE-CE-011); spawned-resource-grant set + Result.spawned_resource_id → replaced by same-ns scope (FE-CE-009, also removes R003.8-growing-set weakness). **Confirmed still-removed:** host-session-object, host-turn/role field, host-event-store, host-resource-directory-B, cross-namespace-edge, persistent-pair-record.
+
+## 7 Second-service onboarding cost
+
+Adapter: `namespaces.open`; `announce/retire`; `register_type` **for action param/result types only** (not every payload shape); seq pump; `action.register` (**no replay_policy**); `not_supported` CapMap entries. Six items; no cross-ns concept; no string that changes host behavior. View-only module: one `{match,component}` resolver. Coordinating view: user pair gesture; subscribe spawned/sibling ids directly under same-ns scope — **no Result field handling, no protocol code, no knowledge of other adapters**.
+
+## 8 Honest cost and non-goals
+
+Charged: ns-local handle mint with same-ns scope-check; explicit mandatory cursor (a small boilerplate cost every subscription pays); `NamespaceGone` stale-handle semantics; user-facing pair gesture. This round **widened** subscribe from `{primary}∪spawned` to whole-own-ns: within-namespace sibling visibility is now permitted — accepted because no required scenario forbids it, flagged for a future D12 look. Weakest: S09 remains partial (host+adapter joint); S08 cooperation needs a user gesture, not a standing link; transient text-as-resource is heavier than a pure broker. Non-goals: no cross-ns joins/edges, no content search, no host turn/role/session vocabulary, no host-verified apply-idempotency, no standing auto-reconnect.
+
+## 9 Open alternative — Candidate B (demoted, not integrated)
+
+B's persistent cross-ns edge + relay has no failing scenario (A satisfies every S08 step without it) and is a live isolation break (FE-CE-007: `edges.list` leaks foreign ns ids; no revision keeps the benefit and closes it). B's claimed auto-reconnect advantage fails because host-minted per-connect ns ids make stored `target_namespace_id` stale on replacement. B is withdrawn from the candidate set, not repaired; FE-CE-007 stays OPEN against it. B returns only if a future required scenario demands standing automatic relay without user initiation; none of S01–S12 does.
+
+<<<FE-OUT-END>>>
+
+<<<FE-LEDGER-START>>>
+FE-CE-008|R003|minor|CLOSED|every core mechanism must have a delete-it-breaks-a-required-scenario argument; ns-scoped payload_schema_id descriptor store had its only host reader (the delivery gate) removed, so it was non-load-bearing|payload-type registry outlived its reader|revised best-candidate §2 (no payload store), §3 item 3, §5-S06 step5 note; S06/S07 pass with payload store deleted, action store kept|-
+FE-CE-009|R003|minor|CLOSED|spawned-resource-grant's per-handle accumulated set had no failing-scenario justification; same-namespace subscription-scope passes S08 and keeps FE-CE-004/007|spawned-set bookkeeping over-built for a same-ns guarantee|revised best-candidate §2 (same-ns-scope handle), §5-S08 step6; verifier EXPERIMENT model (both gates pass S08, differ only on guessed_sibling, non-scenario)|FE-CE-004
+FE-CE-010|R003|minor|CLOSED|invoke_id on OutcomeUnknown had no surviving host consumer after the auto-resubmit path was deleted; call-site return correlation suffices|invoke_id orphaned by the fixed no-auto-replay invariant|revised best-candidate §2 (typed action, token-less OutcomeUnknown), §5-S09 step1/3; S09 dedup keys (ns,resource,seq)|FE-CE-009
+FE-CE-011|R003|minor|CLOSED|live-default-subscribe was a parameter default, not a load-bearing primitive; mandatory from_cursor with the host pair-mint supplying cursor.resolve(id) preserves FE-CE-005|implicit-subscribe-default is not a load-bearing mechanism|revised best-candidate §2 (from_cursor mandatory), §4 (pair mint live), §5-S08 step4-5|FE-CE-005
+FE-CE-007|R003|major|OPEN|edges.list returns core-stored target ids enabling adapter-authorized, user-less relay edges|edges.list leaks foreign namespace ids into scoped handle|revised best-candidate §9 (B demoted, carrier withdrawn, invariant unrepaired); A has no edges mechanism (N/A vs A); verifier ruled it holds (RR003)|-
+<<<FE-LEDGER-END>>>
+
+<<<FE-SCENARIO-START>>>
+S01|covered|core|typed-action submit + mandatory-cursor subscribe routing deltas; namespaces/capmap not load-bearing here|best-candidate §5-S01 deletion consequences (typed-action, ordered-stream)
+S02|covered|adaptation|pi.conversation/tool-event/approval kinds + subscribe routing + typed approve/send actions|best-candidate §5-S02 deletion consequences (lifecycle, ordered-stream, typed-action)
+S03|covered|core|explicit from_cursor=0 replay then from_cursor=cursor.resolve(id) catch-up; read snapshot|best-candidate §5-S03 (ordered-stream, resource-directory, typed-action)
+S04|covered|core|acme.job resource + submit/result typed actions, no chat object|best-candidate §5-S04 (lifecycle, typed-action, ordered-stream)
+S05|covered|core|config.tree resource + directory.list + read snapshot, no session|best-candidate §5-S05 (resource-directory, typed-action)
+S06|covered|core|namespaced ids + same-ns scope-check + ns-scoped action-type registry|best-candidate §5-S06 (namespaces, same-ns-scope, ns-scoped action registry)
+S07|covered|core|generic fallback renders kind/actions/CapMap/schema label, no run reading|best-candidate §5-S07 (generic-fallback-view)
+S08|covered|extension|two user-paired ns-local handles + same-ns scope for job + live pair-mint cursor; NamespaceGone re-pair|best-candidate §5-S08 (same-ns-scope, explicit live cursor, typed-action, namespaces)
+S09|partial|core|host dedup/reorder by (ns,resource,seq) + never-auto-resubmit + OutcomeUnknown token-less; double-execution host+adapter joint|best-candidate §5-S09 (ordered-stream deletion fails step 2; residual adapter-owned idempotency)
+S10|covered|core|handle force-close on unmount incl. all same-ns subs; resource authoritative; explicit-cursor resubscribe|best-candidate §5-S10 (handle-close, cursor.resolve/stream)
+S11|covered|core|open CapMap not_supported (informational) + CapabilityAbsent via registry omission|best-candidate §5-S11 (open capability map; fixed enum reopens FE-CE-002)
+S12|covered|adaptation|adapter teardown disposes own ns only; resolver removal→generic fallback; no core pair record|best-candidate §5-S12 (namespaces/teardown, generic-fallback)
+<<<FE-SCENARIO-END>>>
+
+<<<FE-MECH-START>>>
+namespaces|core|S06 step2 colliding ids; steps3-4 auth leak|best-candidate §5-S06
+resource-directory|core|S05 step2 cannot list/lookup without session|best-candidate §5-S05
+ordered-replayable-stream|core|S03 step4 no return-later catch-up; S09 step2 no dedup/reorder; S01/S02/S04 delivery|best-candidate §5-S03,S09
+explicit-from-cursor-subscribe|core|S03 step4 / S08 step4 stale-replay or missed-window if position uncontrolled|best-candidate §5-S08 step4-5
+open-capability-map|core|S11 step2 absence inferred from null; fake support (fixed enum reopens FE-CE-002)|best-candidate §5-S11
+typed-action-never-auto-resubmit|core|S01/S04/S08 no typed call without execute(any); S09 unknown-outcome host branch|best-candidate §5-S01,S08,S09
+generic-fallback-view|core|S07 step2 unknown artefact blank; S12 step2 removed resolver blank|best-candidate §5-S07,S12
+same-ns-subscription-scope|core|S08 step6 job unobservable (FE-CE-004); S06 step3-4 foreign subscribe leak (FE-CE-007)|best-candidate §5-S06,S08 step6
+ns-scoped-action-type-registry|core|S06 step5 shared mutable type key bleeds (FE-CE-006)|best-candidate §5-S06 step5
+payload-schema-descriptor-store|removed|none — S06/S07 pass with it deleted, action store kept (FE-CE-008)|best-candidate §6
+typed-replay-policy-enum|removed|none — S09 passes under fixed never-auto-resubmit invariant (FE-CE-009/003)|best-candidate §6
+invoke-id-token|removed|none — S09 dedup keys (ns,resource,seq), call-site correlation (FE-CE-010)|best-candidate §6
+live-default-implicit-subscribe|removed|none — pair-mint supplies explicit current cursor, FE-CE-005 holds (FE-CE-011)|best-candidate §6
+spawned-resource-grant-set|removed|none — same-ns scope serves FE-CE-004; set had no failing scenario, grew unbounded (FE-CE-009)|best-candidate §6
+cross-namespace-edge|removed|none — S08 passes with two ns-local handles + same-ns scope|best-candidate §5-S08
+host-session-object|removed|none — S04 passes without it|best-candidate §5-S04
+host-event-store|removed|none — S03/S09/S10 adapter-burden|rounds/R003/cand-B §R003.B.2
+persistent-pair-record|removed|none — S10/S12 strand-free without it|best-candidate §5-S10,S12
+<<<FE-MECH-END>>>
+
+<<<FE-REPLAY-START>>>
+FE-CE-001|pass|action.invoke("read")→current snapshot + ordered stream delivering value to a passive resource|content-as-value path exists without a message-log-only constraint; still does not hold
+FE-CE-002|pass|generic fallback renders kind+actions+CapMap name→state+schema label; CapMap names adapter-chosen strings|no run/agent reading assigned by host; no fixed recovery vocabulary
+FE-CE-003|pass|invoke→OutcomeUnknown, host does nothing (never auto-resubmits)|no CapMap string (nor any string) toggles host replay; covert channel gone by construction
+FE-CE-004|pass|view subscribes (ns_R,job) via h_R under same-ns scope|job observable without an accumulated set; FE-CE-004 user outcome holds
+FE-CE-005|pass|pair gesture host-mints h_R with from_cursor=cursor.resolve(id)|no replay from seq 0; stale events not fired; no auto-execute
+FE-CE-006|pass|two services register same action type name under (ns_A,name)/(ns_B,name); payload store removed|no shared mutable key read site; ns-scoped action registry isolates
+FE-CE-007|pass|A has no edges mechanism; replay of edges.list against A|mechanism absent in A (N/A); remains OPEN against demoted B, not repaired
+FE-CE-008|pass|delete payload_schema_id descriptor store; re-run S06 steps1-6 + S07|resolver matches envelope string; fallback labels schema; action store kept — user outcomes hold
+FE-CE-009|pass|delete h.spawned set; handle_for subscribes any (ns,local_id) with ns==handle.ns; S08 step6|job_ok via same-ns, foreign denied via ns check; guessed-sibling bound not a required scenario
+FE-CE-010|pass|invoke drop→OutcomeUnknown (no token); S09 dedup (ns,resource,seq); fresh user retry|call-site correlation subsumes token; no host reader; double-exec prevented by never-auto-resubmit
+FE-CE-011|pass|S08 step4 h_R minted with explicit current cursor; step5 new-live ArtifactReady only|no implicit default; FE-CE-005 held by the pair-mint's own parameter
+<<<FE-REPLAY-END>>>

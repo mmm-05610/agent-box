@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# FE-DESIGN-001 — active-path entry point.
+#
+# The native /loop does the scheduling. This tool only does the three things the
+# native mechanism cannot be trusted to do by itself: hand material to a role,
+# accept what comes back through a machine-checked gate, and keep the ledgers
+# and the Sol budget honest. It sources no process supervisor and starts no
+# background process of any kind.
+#
+#   loopctl status                     one-screen state, straight from the record
+#   loopctl handoff <role> <RNNN> [f]  write the role's prompt file, print path
+#   loopctl accept <role> <RNNN> <f>   gate a role's output; commit it or refuse
+#   loopctl convergence                the deterministic convergence answer
+#   loopctl sol-status|sol-init|sol-audit|sol-pending
+#   loopctl sol-reserve <kind> <reason> <key>   prints a call id, or denies
+#   loopctl sol-complete <call-id> <ok|bad|error>
+#   loopctl sol-on|sol-off             operator-only switch for auto dispatch
+#   loopctl path <NAME>                print a configured path
+set -uo pipefail
+
+CTL=$(readlink -f "$0")
+. "$(dirname "$CTL")/env.conf"
+for l in common validate ledger sol material converge handoff; do
+  . "$FE_LOOP/lib/$l.sh"
+done
+
+fn_usage(){ sed -n '2,22p' "$CTL" | sed 's/^# \{0,1\}//'; }
+
+# re-derive a phase's record from its stored output. No model call happens here;
+# this exists so a defect found in the recording layer can be repaired against
+# evidence already on disk instead of by spending another call.
+fn_reindex(){
+  local rid="${1:-$(fn_rid "$(fn_latest_round)")}" ph cf content n i=1
+  [ -n "$rid" ] || { printf 'reindex: no round\n' >&2; return 2; }
+  local d="$FE_RUN/rounds/$rid"
+  for ph in plan design attack verify integrate review; do
+    content="$d/$ph.content.txt"
+    [ -f "$content" ] || continue
+    cf="$FE_ROLES/$(printf '%s' "$ph" | sed 's/^plan$/planner/;s/^design$/designer/;s/^attack$/attacker/;s/^verify$/verifier/;s/^integrate$/integrator/;s/^review$/candidate-reviewer/').md"
+    [ -r "$cf" ] || continue
+    if ! fn_validate_phase "$ph" "$cf" "$content"; then
+      printf 'reindex: %s/%s no longer satisfies its contract — record left as is\n' "$rid" "$ph" >&2
+      return 1
+    fi
+    n=$(fn_section_count "$content")
+    while [ "$i" -le "$n" ]; do
+      fn_section "$content" "$i" "$FE_TMP/sec.$i" && fn_atomic "$d/$ph.sec$i.md" "$FE_TMP/sec.$i"
+      i=$((i+1))
+    done
+    fn_commit_phase "$ph" "$((10#${rid#R}))" "$n" || { printf 'reindex: %s/%s commit rejected\n' "$rid" "$ph" >&2; return 3; }
+    printf 'reindexed %s/%s from stored output (no model call)\n' "$rid" "$ph"
+  done
+}
+
+case "${1:-help}" in
+  path) printf '%s\n' "${!2}" ;;
+
+  status)   fn_bootstrap_quiet 2>/dev/null; fn_status_summary ;;
+  handoff)  shift; fn_stage_handoff "$@" ;;
+  accept)   shift; fn_accept "$@" ;;
+  convergence) fn_bootstrap_quiet 2>/dev/null; fn_convergence_check ;;
+  reindex)   shift; fn_bootstrap_quiet 2>/dev/null; fn_reindex "${1:-}" ;;
+  summary)   shift; fn_bootstrap_quiet 2>/dev/null; fn_summary_write "${1:-}"; printf 'wrote %s\n' "$FE_RUN/latest-summary.md" ;;
+
+  sol-init)    fn_sol_init ;;
+  sol-status)  fn_sol_status_line ;;
+  sol-audit)   fn_sol_audit ;;
+  sol-pending) fn_sol_open_pending ;;
+  sol-reserve) shift; fn_sol_reserve "$@" ;;
+  sol-complete) shift; fn_sol_complete "$@" ;;
+  sol-on)  fn_sol_auto_enable;  printf 'automatic Sol dispatch ENABLED (this is a deliberate, recorded action)\n' ;;
+  sol-off) fn_sol_auto_disable; printf 'automatic Sol dispatch disabled\n' ;;
+
+  help|*) fn_usage ;;
+esac

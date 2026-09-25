@@ -1,0 +1,80 @@
+I verified the R001 attack (dimension D12-authority-boundary) against cand-A.md and cand-B.md as written. Verdicts first, then the checks. The assigned dimension was D12; I did not judge other dimensions.
+
+<<<FE-OUT-START>>>
+
+## Verdicts
+
+**FE-CE-001 (A, major, D12): does_not_hold as a D12 smuggle.** The event sequence is possible under A as written — `directory.lookup` returns only the descriptor (§A.2), and the sole content op is `stream.subscribe` delivering `Envelope = {resource_id, seq, ts, kind, payload}` with no `read(value)` op. That much is true. But the *invariant the attacker claims is broken* — §A.1 "agent/session/chat are resource kinds declared by adapters, never host types" and "a resource has its own identity and lifecycle independent of any view or conversation" — is not broken by A. A's envelope carries no `role`, no `turn`, no assistant-message field: §A.8 states explicitly "I removed, and did not add, a host `session` object and a host `turn/message-role` envelope field… so including them would be relabelled conversation smuggling," and §A.9 records `host-turn/role-envelope-field → removed`. The move the sequence relies on ("an append-only ordered stream is the assistant-message/conversation log") is the attacker's reinterpretation; a seq-ordered stream is also what S03 return-later and S09 reconnect *require* (§A.5-S03, §A.5-S09), so the shape is not conversation-specific. The "returning page shows the old diff as live" consequence is the *view resolver's* rendering choice, and A.1/§A.2 place content interpretation entirely with the adapter/view — the core not marking supersession is *consistent* with its stated no-content-authority, not a violation of it. Text that blocks the D12 reading: §A.8 + §A.2 envelope definition. The underlying observation (core has no value/snapshot primitive, so passive resources are forced through the stream) is real but is a reduction/burden finding, not an authority-boundary smuggle — I preserve it below rather than let it die.
+
+**FE-CE-002 (A, minor, D12): holds.** §A.2 fixes `CapSet` to the session-recovery trio `cancel ∈ {supported, not_supported}`, `history ∈ {supported{depth}, not_supported}`, `resume ∈ {supported, not_supported}` — a vocabulary that only means something for an invokable run — while §A.1 bills the host as carrying no run/agent interpretation. §A.4 compounds it: the host-builtin generic view (declared core, §A.9) renders "kind, capability set, declared actions and a **last-envelope summary**," i.e. it presents every resource as a thing-with-invokable-outputs. That is a run/agent reading shipped by the core under a neutral name. The attacker's minimal version (open adapter-named capability map + render raw schema) survives S07 and S11 (S11 needs only *declared absence*, which an open map gives), so the fixed trio is not scenario-required — it is smuggled. Non-blocking, so minor as raised.
+
+**Candidate B (D12): holds / no counterexample.** I confirmed B's core (§B.2) declares no event plane, no session, no run, no chat turn — `*.cancel.request` absence is structural (B.3), and `builtin-default-view-provider` (B.4) is *admitted* impurity, not smuggled-as-neutral. B passes the literal authority-boundary test. I did not file a D12 row against B, and I did not touch B's per-adapter event-plane relocation (correctly left for D06/D01).
+
+## 1. Fabrication / quotation check
+
+One unsupported quote: the attacker elevates FE-CE-001 by citing a "plan's neutrality test" — *"Any step that materialises an assistant message, a session object, or a workspace to satisfy the core is a major counterexample."* That sentence appears in neither cand-A.md nor the design brief provided to me. The brief's judging section and §A.5-S04 say nothing in those words. This quote is the sole textual hook that turns "no value primitive" into "major conversation smuggle"; without it the claim reduces to the burden observation I re-filed as FE-CE-003. All other attacker quotes (§A.1 lines, §A.4 fallback string, §A.2 CapSet) are verbatim and correct. No scenario was invented or altered; S03/S05/S07/S11 are used faithfully.
+
+## 2. Missed-check (assigned dimension D12)
+
+No additional D12 break against A beyond FE-CE-002: A's `namespace` (connection scope) and `Envelope.kind` + payload-type registry are content-neutral and are justified by S06 and by the execute(any) disqualifier, not by a session. The one near-miss worth flagging for rotation is that A.1 *justifies* the ordered stream with run-observability ("keeps a remote task observable while its page and view are both gone"), a task-shaped motive sitting under a content-neutral mechanism — but that is D08-territory, not an established D12 break, so I do not file it against A. Against B, none.
+
+## 3. Self-contradiction check (A)
+
+A contradicts itself on §A.1: it claims the host owns "only… event delivery" and has no content interpretation, yet §A.9 declares `generic-fallback-view` a **core** mechanism that interprets a resource as "invokable thing with a latest output and a capability strip." A core component that renders interpretation cannot simultaneously hold "no content authority." This is the same defect as FE-CE-002 and confirms it.
+
+## 4. Experiment
+
+FE-CE-001's concrete user-visible claim ("a returning subscriber sees superseded seq=1 with no invalidate marker") is settleable as a pure replay model. This models only the two disputed representations, not the product or protocol.
+
+EXPERIMENT:
+```python
+# Model of the disputed mechanism ONLY: snapshot-as-stream (A) vs value+invalidate (minimal form).
+# Does a returning reader, given only host-provided metadata, ever surface a stale value as live?
+
+def stream_replay(envelopes):
+    # A's core Envelope: {resource_id, seq, ts, kind, payload}. No superseded/current flag exists.
+    # Host guarantees ordering; content interpretation is the view's job.
+    return sorted(envelopes, key=lambda e: e["seq"])
+
+def value_replay(buffer):
+    # Minimal form: read(resource_id) -> one current value, plus an invalidate signal.
+    return buffer["current"] if not buffer["invalidated"] else None
+
+# git.diff resource. Working tree changed once: old diff then new diff.
+seq_log = [
+    {"seq": 1, "payload": "OLD_DIFF"},
+    {"seq": 2, "payload": "NEW_DIFF"},
+]
+value_buf = {"current": "NEW_DIFF", "invalidated": False}
+
+# Returning page re-subscribes (from_cursor). It has NO host marker of supersession:
+replayed = stream_replay(seq_log)
+stream_last  = replayed[-1]["payload"]            # what a "render the latest" view picks
+stream_seen  = [e["payload"] for e in replayed]   # what a "render the log" view shows as live
+has_supersede_flag = any("superseded" in e for e in replayed)
+
+value_now = value_replay(value_buf)
+
+print("STREAM: host marks superseded?", has_supersede_flag)
+print("STREAM: seq-ordered payloads offered to view:", stream_seen)
+print("STREAM: latest payload:", stream_last, "| stale still present as an entry:", "OLD_DIFF" in stream_seen)
+print("VALUE : current only:", value_now, "| stale present:", "OLD_DIFF" == value_now)
+```
+Model result: under the stream representation the host offers the reader no `superseded` marker, so whether the stale `OLD_DIFF` is surfaced depends entirely on the view's choice — the core provides no signal to distinguish it; under value+invalidate the stale value cannot appear as the current read. This shows the *model* behaved this way; it is not a verification of A, the protocol, or the product.
+
+## Disposition
+
+- FE-CE-001: REJECTED as a D12 counterexample (does_not_hold), substance preserved as FE-CE-003 under D08/D06 so it is not deleted.
+- FE-CE-002: accepted (holds), minor, remains OPEN pending designer replay.
+- Candidate B: D12 clean this round.
+- Rotation note: A's §A.5-S09 `(namespace_id, action_seq)` adapter-must-know and B's "offering module must stay resident" are real and were deliberately left out of D12 by the attacker; carry them to D06/D01/D02.
+
+<<<FE-OUT-END>>>
+
+<<<FE-LEDGER-START>>>
+FE-CE-001|R001|major|REJECTED|core defines observable content only as a seq-ordered replayable message log, forcing conversation/run shape onto passive data — violates "no host conversation/session type"|A core has no value primitive: passive resource is content-as-message-log|rounds/R001/cand-A.md §A.2,§A.5-S03,§A.5-S05|FE-CE-003|-
+FE-CE-002|R001|minor|OPEN|core capability-declaration fixes a session-recovery vocabulary and core fallback view renders an agent/run reading while host claims no content interpretation|A core smuggles run/agent reading via fixed CapSet and generic last-envelope view|rounds/R001/cand-A.md §A.1,§A.2,§A.4,§A.9|-|-
+FE-CE-003|R001|minor|OPEN|core provides no value/snapshot primitive; a passive resource is only observable as an append-only stream (reduction/burden, not an authority smuggle)|A forces passive snapshots through the event plane; no read(value)+invalidate op|rounds/R001/cand-A.md §A.2,§A.5-S05|-|-
+<<<FE-LEDGER-END>>>
+
+Net: the D12 round is not clean — FE-CE-002 holds (minor, real core vocabulary/rendering smuggle), FE-CE-001's D12 framing fails but its substance survives as FE-CE-003 under a different dimension, and one attacker quote ("plan's neutrality test") is not in the provided materials.

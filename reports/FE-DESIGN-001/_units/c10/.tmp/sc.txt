@@ -1,0 +1,2 @@
+S01|claimed|core|mech|ev
+S02|claimed|core|mech|ev

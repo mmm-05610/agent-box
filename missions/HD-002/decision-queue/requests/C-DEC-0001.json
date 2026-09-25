@@ -1,0 +1,10 @@
+{
+  "alternatives": "B 会改变现有外联停门及用户产品网络行为，且目标请求尚不能与具体模块确证关联；不能把已有局部 UI/Server 通过直接升级为 CP ready。C 最少引入新风险，但 FE/BE 真配对继续受阻；无需新增环境，可等后续信息。测试专用代理或 WebRequest 取消只能改变测试行为，已无法证明生产默认安全，故不作为等价修复。",
+  "created_at": "2026-09-23T07:33:34.075810+00:00",
+  "evidence": "FC-0069、FC-0076/0077、BC-0070：两次真实无发送配对均因 Electron 外联 FAIL，Server tap 无 Send 且 DB 零；FC-0080 空宿主无凭据仍成功外联；FC-0081/0082 注释标签虽映射拼写检查词典下载器但缺 connect 因果边；FC-0084 关闭拼写检查仍外联；FC-0086 WebRequest 前置监听零回调且仍外联；FC-0079 syscall 注入同时拦 AF_UNIX，宿主 unshare/bwrap 非特权 namespace 不可用。具体模块 UNKNOWN；Pi settings 门另为 INCONCLUSIVE。",
+  "id": "C-DEC-0001",
+  "impact": "只影响 FC Electron 外联诊断和 CP 整机准入，不暂停 BC 的独立 Pi settings/权限调查或 PROFILE 原会话。A 需要隔离环境和一次新诊断；B 需重新定义产品可接受的外联及告知范围；C 延后用户可试用的 CP。所有旧证据、main、用户服务/Qoder/PROFILE、唯一预算账本原样保留；未授权前不再跑可能成功外联的 FE live。",
+  "question": "Electron 在真实 Server 配对和无 Server/无凭据空宿主中均于启动期成功建立一次非 loopback 连接；已批准的非 loopback 即停门因此使 CP 无法就绪。下一步请选：A 保持硬门，并提供/批准可按目的地址阻断外联且保留本地 Unix/loopback 的隔离网络环境，让 C 在该环境中定位来源后修复；B 明确允许此类外联作为产品行为并调整 CP 外联准入；C 暂停相关 FE live 配对，仅继续静态与独立后端工作。",
+  "recommendation": "推荐 A。保持现有硬门与 CP 未就绪结论；在真正隔离网络环境中采完整进程/NetLog 证据，定位请求后再决定产品默认。当前宿主 unshare/bwrap 无非特权 namespace 权限，需你提供可用隔离环境或批准相应环境权限；在环境可用前 FE live 保持停门，其他写域继续。",
+  "title": "CP 桌面启动外联：隔离诊断环境与准入边界"
+}

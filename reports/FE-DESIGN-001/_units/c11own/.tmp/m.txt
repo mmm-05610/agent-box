@@ -1,0 +1,1 @@
+registry|core|S09 loses truth|integration 1

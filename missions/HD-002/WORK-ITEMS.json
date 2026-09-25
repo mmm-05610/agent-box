@@ -1,0 +1,47 @@
+[
+  {
+    "id": "SESSION-DESKTOP",
+    "owner": "FC",
+    "module": "frontend",
+    "title": "桌面完整两轮对话",
+    "scope": "选项目、首发、同会话续发及回复呈现；不含配置/模型切换",
+    "overview": true
+  },
+  {
+    "id": "SESSION-BACKEND",
+    "owner": "BC",
+    "module": "backend",
+    "title": "后端原生 Pi 对话链",
+    "scope": "Server→ACP→Pi，同会话两轮；不等于桌面验收",
+    "overview": true
+  },
+  {
+    "id": "SESSION-ACCEPTANCE",
+    "owner": "C",
+    "module": "integration",
+    "title": "会话基线验收",
+    "scope": "桌面会话、产出、工具审批、停止等分项验收；Profile/Provider不入基线",
+    "overview": true
+  },
+  {
+    "id": "HARNESS-PERMISSION",
+    "owner": "H",
+    "module": "backend",
+    "title": "工具审批接入",
+    "scope": "当前原生桥的审批覆盖及反例；离线合同不等于真实验证"
+  },
+  {
+    "id": "PROFILE-PLUGIN",
+    "owner": "PROFILE",
+    "module": "extensions",
+    "title": "Profile 独立插件",
+    "scope": "仅独立包开发，未装配入当前会话基线"
+  },
+  {
+    "id": "PROVIDER-DESIGN",
+    "owner": "PROVIDER",
+    "module": "extensions",
+    "title": "Provider / Model 方案",
+    "scope": "仅研究设计，未授权实现，不属于会话基线"
+  }
+]

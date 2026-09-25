@@ -1,0 +1,184 @@
+
+=== S1 one clean round: design -> attack -> verify -> integrate
+  FAIL  S1 round exits 0
+        want [0] got [4]
+  FAIL  S1 artifact plan.md missing
+        
+  FAIL  S1 artifact dimension.txt missing
+        
+  FAIL  S1 artifact cand-A.md missing
+        
+  FAIL  S1 artifact cand-B.md missing
+        
+  FAIL  S1 artifact attack.md missing
+        
+  FAIL  S1 artifact verify.md missing
+        
+  FAIL  S1 artifact integrate.md missing
+        
+  FAIL  S1 artifact best-candidate.md missing
+        
+  FAIL  S1 plan.meta outcome=ok
+        want [ok] got [bad]
+  FAIL  S1 design.meta outcome=ok
+        want [ok] got []
+  FAIL  S1 attack.meta outcome=ok
+        want [ok] got []
+  FAIL  S1 verify.meta outcome=ok
+        want [ok] got []
+  FAIL  S1 integrate.meta outcome=ok
+        want [ok] got []
+  FAIL  S1 candidate files follow the plan
+        want [2] got [0]
+cat: /home/maoqh/projects/ordessa/control/reports/FE-DESIGN-001/_selftest/s1/rounds/R001/dimension.txt: No such file or directory
+  FAIL  S1 attack dimension recorded
+        want [DIMENSION: D01-order-dedup] got []
+  FAIL  S1 counterexample 001 closed by integrate
+        want [CLOSED] got []
+  FAIL  S1 closed 001 stamped as replayed
+        want [R001] got []
+  FAIL  S1 rejected 002 kept, not deleted
+        want [REJECTED] got []
+  FAIL  S1 scenarios covered
+        want [12] got [0]
+  FAIL  S1 mechanisms recorded
+        want [3] got [0]
+cat: /home/maoqh/projects/ordessa/control/reports/FE-DESIGN-001/_selftest/s1/latest-summary.md: No such file or directory
+  FAIL  S1 summary page written
+        missing [Current best candidate]
+  FAIL  S1 the model actually used is recorded
+        missing [Efficient]
+  FAIL  S1 first complete candidate consumed exactly one Sol slot
+        want [1] got [0]
+  FAIL  S1 that slot recorded as ok
+        want [1] got [0]
+cat: /home/maoqh/projects/ordessa/control/reports/FE-DESIGN-001/_selftest/s1/sol-verdicts.tsv: No such file or directory
+  FAIL  S1 Sol verdict bound to the reviewed artifact
+        missing [FirstCompleteCandidate]
+
+=== S2 output that violates its contract is a failure, not a pass
+  FAIL  S2 round aborts on garbage attack output
+        want [3] got [4]
+sed: 无法读取 /home/maoqh/projects/ordessa/control/reports/FE-DESIGN-001/_selftest/s2/rounds/R001/attack.meta: 没有那个文件或目录
+  FAIL  S2 attack recorded bad
+        want [contract_violation] got []
+  PASS  S2 nothing committed from invalid output
+  FAIL  S2 both attempts consumed
+        want [2] got []
+  FAIL  S2 earlier phases still passed
+        want [2] got [0]
+cat: /home/maoqh/projects/ordessa/control/reports/FE-DESIGN-001/_selftest/s2/rounds/R001/design.meta: No such file or directory
+  FAIL  S2 resumed round completes
+        want [0] got [4]
+cat: /home/maoqh/projects/ordessa/control/reports/FE-DESIGN-001/_selftest/s2/rounds/R001/design.meta: No such file or directory
+  FAIL  S2 completed phases skipped, not redone
+        want [phase=plan
+role=planner
+attempt=1
+outcome=bad
+reason=commit_rejected
+at=2026-09-21T16:28:08Z] got [phase=plan
+role=planner
+attempt=2
+outcome=bad
+reason=commit_rejected
+at=2026-09-21T16:28:09Z]
+  FAIL  S2 attempt budget not reset by resume
+        want [3] got []
+sed: 无法读取 /home/maoqh/projects/ordessa/control/reports/FE-DESIGN-001/_selftest/s2/rounds/R001/attack.meta: 没有那个文件或目录
+  FAIL  S2 attack now passed
+        want [ok] got []
+
+=== S3 a failed, empty or malformed call never counts as passed
+  FAIL  S3 round aborts on call error
+        want [1] got [4]
+sed: 无法读取 /home/maoqh/projects/ordessa/control/reports/FE-DESIGN-001/_selftest/s3/rounds/R001/attack.meta: 没有那个文件或目录
+  FAIL  S3 reason recorded
+        want [call_error] got []
+  FAIL  S3 infrastructure counter advanced
+        missing [CONSEC_PHASE_FAIL=2]
+  PASS  S3 output with no closing marker is refused
+  PASS  S3 a ledger row with an illegal severity is refused
+  PASS  S3 a row with an empty invariant is refused
+
+=== S4 Sol budget: reserved before the call, failures count, key nodes capped
+bash: 行 8: fn_sol_ensure: 未找到命令
+  PASS  S4 the 9th key-node call is denied
+  PASS  S4 only the two reserved final slots remain
+  FAIL  S4 same candidate+question refused as duplicate
+        missing [dup=2]
+  PASS  S4 accounting reports nothing left
+bash: 行 7: fn_sol_get: 未找到命令
+  FAIL  S4 budget survives a fresh process (no reset on restart)
+        want [10] got []
+
+=== S5 convergence arithmetic, the independent-verification gate, stall rotation
+  FAIL  S5 three rounds recorded
+        want [3] got [0]
+  FAIL  S5 clean streak is three
+        want [3] got [0]
+  FAIL  S5 criteria met but no independent pass yet -> review is due
+        missing [FINAL_REVIEW_DUE]
+  FAIL  S5 an independent pass turns it into CONVERGED
+        missing [CONVERGED:]
+  FAIL  S5c an exhausted budget cannot claim verified convergence
+        missing [CONVERGED_UNVERIFIED]
+  FAIL  S5b a stalled round exits for rotation instead of polishing
+        want [91] got [4]
+
+=== S6 stop kills only this task's children; resume continues mid-round
+  PASS  S6 status sees the running controller
+  FAIL  S6 the worker child was tracked
+        want [1] got [0]
+  PASS  S6 the loop is no longer running
+  PASS  S6 no fake worker survived the stop
+  PASS  S6 an unrelated process was left alone
+  FAIL  S6 plan never committed
+        
+  FAIL  S6 resume finishes the interrupted round
+        want [0] got [1]
+sha256sum: /home/maoqh/projects/ordessa/control/reports/FE-DESIGN-001/_selftest/s6/rounds/R001/plan.md: No such file or directory
+  PASS  S6 the committed plan was not regenerated
+sed: 无法读取 /home/maoqh/projects/ordessa/control/reports/FE-DESIGN-001/_selftest/s6/rounds/R001/attack.meta: 没有那个文件或目录
+  FAIL  S6 the interrupted phase completed after resume
+        want [ok] got []
+  FAIL  S6 the Sol budget was unchanged across stop and resume
+        want [1] got [0]
+
+=== S7 proposed counterexample ids are canonical, refs follow
+  PASS  S7 a proposed id is allocated canonically, never trusted
+  FAIL  S7 the attack phase's map shows the renumbering
+        want [FE-CE-900|FE-CE-001] got []
+  FAIL  S7 the integrator's close hit the canonical row, not a new one
+        want [CLOSED|R001] got []
+  FAIL  S7 exactly one row for that finding
+        want [1] got [0]
+
+=== S8 unresolved counterexamples are re-handed in full
+  FAIL  S8 R001 open row appears verbatim in R002 prompt
+        missing []
+  FAIL  S8 the block is marked authoritative
+        missing [counterexample ledger (authoritative; full)]
+  PASS  S8 no truncation notice inside the ledger section
+  FAIL  S8 scenario ledger handed over too
+        missing [scenario coverage ledger]
+
+=== S9 verifier experiments run confined and are recorded with their limits
+  FAIL  S9 no experiment record
+        ls: cannot access '/home/maoqh/projects/ordessa/control/reports/FE-DESIGN-001/_selftest/s9/experiments': No such file or directory
+  FAIL  S9 transcript captured
+        missing [MODEL SAYS: duplicates dropped]
+  FAIL  S9 limits stated, not oversold
+        missing [not, and may not be cited as, verification of the real product]
+  PASS  S9 the product tree is still untouched
+
+=== S10 the controller refuses writes outside its run directory
+  PASS  S10 a product-tree path is refused
+  FAIL  S10 a run-directory path is allowed
+        missing [allowed=0]
+  PASS  S10 nothing was created in the product tree
+
+=== S11 no credential-shaped text appears in any prompt or artifact
+  PASS  S11 zero prompt or artifact files match
+
+=== selftest: 18 passed, 60 failed

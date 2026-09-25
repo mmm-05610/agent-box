@@ -1,0 +1,26 @@
+mechanism|disposition|failure_scenario|experiment_ref|round
+namespaces|core|S06 step2 same local_id collides if deleted; steps 3-4 auth/cache bleed|rounds/R004/integrate.md §R4.2-§R4.5-S06|4
+resource-directory|core|S05 step2 cannot list/lookup without an active session|rounds/R004/integrate.md §R4.2-§R4.5-S05|4
+ordered-replayable-stream|core|S03 step4 no return-later catch-up; S09 step2 duplicates render twice|rounds/R004/integrate.md §R4.2-§R4.5-S03,S09|4
+capability-declaration|core|S11 step 2 — absence inferred from null, faking support|best-candidate §R.2 CapMap (open)|1
+typed-action|core|S01/S04/S08 fall back to execute(any) disqualifier|rounds/R004/integrate.md §R4.2-§R4.5-S01,S04,S08|4
+generic-fallback-view|core|S07 unknown artefact renders blank; S12 step2 removed-resolver blanks|rounds/R004/integrate.md §R4.4-§R4.5-S07,S12|4
+host-session-object|removed|none — S04 passes without it|rounds/R004/integrate.md §R4.5-S04|4
+host-turn/role-envelope-field|removed|none — D12 disqualifier; S04 passes|rounds/R004/integrate.md §R4.5-S04|4
+host-event-store|removed|none at core — S03/S09/S10 are adapter burden|rounds/R001/cand-B §B.9|4
+host-resource-directory-B|removed|none — per-service ns handles suffice|rounds/R001/cand-B §B.9|4
+capability-declaration-open-map|core|S11 step 2 absence inferred from null; fake support|best-candidate §R.2-§R.5-S11|2
+typed-replay-policy-on-registration|core|S09 step 3 host branches on CapMap string (FE-CE-003 reopens if removed)|best-candidate §R.2-§R.5-S09|2
+spawned-resource-grant|core|S08 step6 spawned job unobservable; FE-CE-004 reopens|rounds/R004/integrate.md §R4.2-§R4.5-S08|4
+live-default-subscribe|core|S08 step 5 pair gesture replays stale events and auto-executes (FE-CE-005 reopens if removed)|best-candidate §R.2-§R.4-§R.5-S08|2
+ns-scoped-payload-registration|core|S06 step 5 type registry bleeds across services (FE-CE-006 reopens if removed)|best-candidate §R.2-§R.5-S06|2
+cross-namespace-edge|removed|none — S08 passes with two ns-local handles + spawned grant|rounds/R004/integrate.md §R4.5-S08|4
+persistent-pair-record|removed|none — re-pairing is a user action; no scenario needs a core record|rounds/R004/integrate.md §R4.4|4
+open capability map|core|S11 fake-support disqualifier; a fixed enum reopens FE-CE-002|rounds/R004/integrate.md §R4.2-§R4.5-S11|4
+ns-scoped-action-type-registration|core|S06 two services same kind/action name share a mutable key; FE-CE-006 reopens|rounds/R004/integrate.md §R4.2-§R4.5-S06|4
+handle-accessible-set|core|S06 step3-4 out-of-scope subscribe/invoke; FE-CE-007 leak class|rounds/R004/integrate.md §R4.2-§R4.5-S06,S08|4
+ns-scoped-envelope-payload-descriptor-store|removed|none — S06/S07 pass without it; sole reader (delivery gate) already gone FE-CE-008|rounds/R004/integrate.md §R4.6 (FE-CE-008)|4
+invoke-id-on-OutcomeUnknown|removed|none — S09 dedups (ns,resource,seq); auto-resubmit path already gone|rounds/R004/integrate.md §R4.5-S09 (FE-CE-010)|4
+implicit-live-default-subscribe|removed|none — pair-mint supplies explicit current cursor; FE-CE-005 stays closed|rounds/R004/integrate.md §R4.4-§R4.5-S08 (FE-CE-011)|4
+envelope-payload-delivery-gate|removed|none — S07 renders unregistered schema identically; confirmed R003|rounds/R004/integrate.md §R4.2|4
+typed-replay-policy-enum|removed|none — fixed never-auto-resubmit invariant; FE-CE-003 stays closed|rounds/R004/integrate.md §R4.2|4

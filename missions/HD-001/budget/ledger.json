@@ -1,0 +1,27 @@
+{
+  "mission": "HD-001 continued by HD-002",
+  "authority": "I-DEC-0001 user answer 2026-09-23T04:00:42.004557+00:00, acknowledged by HD-002 C-0025",
+  "active_policy": {
+    "request_limit": null,
+    "review_limit": null,
+    "counting_required": false,
+    "numeric_reservations_required": false,
+    "real_test_usage_authorized": true,
+    "scope_note": "Usage limits only. Model choice, project scope, native-agent path, credential protection, and single real-test-flow coordination remain governed by HD-002."
+  },
+  "prior_policy": {
+    "authority": "User authorisation this task; independent of historical ledgers",
+    "total_cap": 99,
+    "review_cap": 10,
+    "reserved_total": 0,
+    "reserved_review": 0,
+    "final_review_reserve": 2,
+    "grants": [],
+    "real_calls_enabled": false
+  },
+  "user_answer": {
+    "id": "I-DEC-0001",
+    "request_hash": "2c36a7a6d6c7bd0314aea884606834a37a631a6f3db2b66cb79de5227bc3d44f",
+    "answer_file": "HD-002/decision-queue/answers/I-DEC-0001--9183f61c110f478aa3f8f53166541a76.json"
+  }
+}

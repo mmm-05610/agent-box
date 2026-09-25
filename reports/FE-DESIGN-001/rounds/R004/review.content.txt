@@ -1,0 +1,27 @@
+<<<FE-OUT-START>>>
+R004 candidate-reviewer verdict against saved artifact 82e626862a16.
+
+BOUNDARY_SCAN: The core does not smuggle a service, model, harness, plugin-host or conversation assumption. §R4.2 explicitly states: "Agent", "session", "chat" are adapter-declared resource kinds, never host types; capability names carry "zero host-defined meaning and zero host behavioural authority"; the Envelope has no turn, role or from field; the fallback view renders metadata without assigning run/agent reading. §R4.4: "Core records nothing about the pairing." No adapter sees another namespace's resource. The namespace mechanism is load-bearing for S06 identity isolation, not a disguised service bus. Required adapter burden for idempotency under S09 is stated in §R4.5-S09 and §R4.2 ("adapter-owned apply-idempotency prevents double execution") but is absent from the numbered §R4.7 onboarding list; this is an adapter-side requirement acknowledged in the trajectory text, not a relocation of core duty into "an extension provides it" without cost disclosure, so no boundary violation is ruled. Extension-author cost is paid: §R4.7 names one resolver, the pair gesture and explicit cursor.
+
+ESCAPE_HATCH_SCAN: Checked each disqualifier. No `execute(any)`: params/results are concrete declared schemas per §R4.2 `action.invoke(resource_id, action_type, params:ActionSchema)`. No omnipotent context: `SubscriberScope` exposes only `{primary}∪spawned`; §R4.4 states views "may not enumerate namespaces, derive a foreign id from a handle, register free-form event names, or hold a global context." No arbitrary event bus: subscriptions are per-resource_id with explicit cursor; no global emit/subscribe channel. Envelope `payload:opaque` is pass-through routing content, not a typed escape. Absence confirmed; nothing found.
+
+Assessment: All twelve scenarios carry an ordered event sequence with named owners and per-core-step deletion consequences in §R4.5. S09 is self-designated "partial" (double-execution prevention is host+adapter joint, never pure-host); the trajectory is nonetheless complete with stated owners and deletion consequences for each deletable core mechanism (ordered-stream dedup, typed-action). The never-auto-resubmit is declared a "fixed invariant" in §R4.2, not a deletable mechanism, so it does not require its own deletion-consequence entry to make the trajectory checkable. No previously-closed counterexample reopens: the three mechanisms removed this round (payload descriptor store, invoke_id, implicit-live-default) each have an explicit passing trajectory in §R4.6, and FE-CE-003/005/006 isolation and safety arguments remain structural under the per-namespace action registry and fixed invariant. The candidate is internally consistent at the artifact text level; I could not break it.
+<<<FE-OUT-END>>>
+<<<FE-VERDICT-START>>>
+S01|trajectory_ok|§R4.5-S01 steps 1–5 with owners (host, adapter, extension) and deletion consequences for typed-action and ordered-stream|nothing
+S02|trajectory_ok|§R4.5-S02 steps 1–5 with owners and deletion consequences for announce, ordered-stream, typed-action|nothing
+S03|trajectory_ok|§R4.5-S03 steps 1–5 with owners and deletion consequences for ordered-replayable-stream, resource-directory, typed-action|nothing
+S04|trajectory_ok|§R4.5-S04 steps 1–3 with owners and deletion consequences for resource-lifecycle, typed-action, ordered-stream; host-session-object confirmed dead|nothing
+S05|trajectory_ok|§R4.5-S05 steps 1–3 with owners and deletion consequences for resource-directory, typed-action|nothing
+S06|trajectory_ok|§R4.5-S06 steps 1–6 with owners and deletion consequences for namespaces, scope-check, per-namespace action registry|nothing
+S07|trajectory_ok|§R4.5-S07 announce→no-match→fallback-render sequence with owners (adapter, host) and deletion consequence for generic-fallback-view|nothing
+S08|trajectory_ok|§R4.5-S08 steps 1–7 with owners and deletion consequences for spawned-resource-grant, explicit-cursor pair-mint, typed-action, namespaces|nothing
+S09|trajectory_ok|§R4.5-S09 steps 1–3 with owners (host, adapter) and deletion consequences for ordered-stream dedup/reorder and typed-action; candidate self-flags partial (joint double-exec prevention) but trajectory is ordered, owned, and checkable|nothing
+S10|trajectory_ok|§R4.5-S10 steps 1–4 with owners and deletion consequences for handle force-close and cursor.resolve/replayable-stream|nothing
+S11|trajectory_ok|§R4.5-S11 informational CapMap + structural CapabilityAbsent sequence with owners and deletion consequence for open-capability-map|nothing
+S12|trajectory_ok|§R4.5-S12 steps 1–3 with owners and deletion consequences for namespaces/teardown and generic-fallback|nothing
+<<<FE-VERDICT-END>>>
+<<<FE-REPLAY-START>>>
+FE-CE-007|pass|Sequence: edges.list(ns_B) from h_A returns (ns_B,target) foreign-id to scoped handle|The saved candidate has no edges mechanism whatsoever; §R4.2 handle exposes no edges, §R4.4 "may not enumerate namespaces, derive a foreign id," §R4.9: "Candidate B has no edges mechanism in A; demoted"; the sequence has no carrier in this artifact
+FE-CE-009|pass|Sequence: view on h_R calls subscribe((ns_R,guessed_sibling),cursor) without Result.spawned_resource_id grant|h_R accessible set = {primary}∪spawned (§R4.2); guessed sibling is in neither; subscribe is rejected by scope-check (§R4.5-S06 step3); the spawned-set gate holds; DISPUTED severity is a design-minimality question, not a broken-invariant sequence
+<<<FE-REPLAY-END>>>

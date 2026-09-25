@@ -1,0 +1,255 @@
+You are one role in an adversarial design loop for the FE-DESIGN-001 Agent
+Desktop design task. Role: **planner**. Round: R001. Phase: plan.
+Run root: /home/maoqh/projects/ordessa/control/reports/FE-DESIGN-001/_selftest/s5b
+
+Ground rules, non-negotiable:
+- You are given every material you are allowed to see, inlined below. You have
+  no tools and cannot read anything else. Do not ask to.
+- Product code is a migration constraint and evidence, not the answer. Do not
+  propose work orders or implementation.
+- Never soften, delete or reinterpret a required scenario or an established
+  counterexample. If you disagree, say so as a DISPUTED ledger row with a
+  concrete reason.
+- Be concrete enough that a reader can reject you. Style opinions, adjectives and
+  general advice are contract violations.
+
+OUTPUT CONTRACT (machine-checked; a phase that fails it is recorded as failed, never as passed)
+- Every deliverable section must be wrapped, on their own lines, in these two markers, in order:
+  <<<FE-OUT-START>>>
+  <the section>
+  <<<FE-OUT-END>>>
+- If a ledger block is required, wrap its rows in:
+  <<<FE-LEDGER-START>>>
+  FE-CE-NNN|<round>|<severity: major|minor>|<status: OPEN|CLOSED|DISPUTED|REJECTED|SUPERSEDED>|<invariant violated>|<title>|<evidence pointer>|<target CE ids or ->
+  <<<FE-LEDGER-END>>>
+- If a scenario table is required, wrap it in:
+  <<<FE-SCENARIO-START>>>
+  S01|<covered|partial|open>|<owner: core|adaptation|extension|unassigned>|<mechanism>|<evidence pointer>
+  <<<FE-SCENARIO-END>>>
+- If a mechanisms table is required, wrap it in:
+  <<<FE-MECH-START>>>
+  <mechanism name>|<core|delegated|removed>|<the scenario that fails if it is deleted>|<experiment pointer>
+  <<<FE-MECH-END>>>
+- One row per line. Exactly the field order above, pipe separated, no header row, no extra prose inside a block.
+- Ids: counterexamples FE-CE-001..FE-CE-999, scenarios S01..S12. Propose a fresh FE-CE-NNN for anything new.
+
+===== MATERIAL: required scenario set (authoritative) =====
+
+# Required scenario set S01–S12 (authoritative; user-approved goals, not to be cut)
+
+A scenario states only the user-observable result. It never states an internal
+object, a UI or a mechanism. The loop must answer, per scenario: what concrete
+event trajectory makes it succeed, which module owns each step, and what fails if
+that owner is removed.
+
+| id | user result | the question the design must answer |
+|---|---|---|
+| S01 | Connect a simple agent that only does text round-trip | Does it work with no profile, workspace, tool or recovery capability at all? |
+| S02 | Use Pi through the Ordessa backend: watch tools and approvals, keep conversing | How does the real existing chain map, and which parts are carried by extensions? |
+| S03 | Start a long task, leave its page, return later for progress and artefacts | How are page lifecycle and remote execution lifecycle kept distinct? |
+| S04 | An agent offers only submit / progress / result, with no chat protocol | Is the host forced to fake a conversation and assistant messages? |
+| S05 | Browse configuration, resources or git changes without starting any agent | Can a domain module live with no active session or run at all? |
+| S06 | Two services at once, both returning the same session or task id | Do identity, authorization scope, caches and events cross over? |
+| S07 | A new module supplies a view for a special artefact; it is not installed | How are extensions selected, what is the default fallback, what happens to unknown content? |
+| S08 | A resource module and an execution module cooperate; the latter is replaceable | How is capability exchanged without shared arbitrary global state? |
+| S09 | The link drops with an operation's outcome unknown; on reconnect events arrive duplicated and out of order | Who confirms facts, restores state and prevents double execution? |
+| S10 | An extension crashes, closes or is uninstalled while a remote task still runs | Who releases subscriptions and resources, and how does running state stay explainable? |
+| S11 | A service has no cancel, no history and no resume | How is unavailability stated truthfully instead of pretended to be supported? |
+| S12 | Remove one core domain module that claims to be optional | Do the host and the other independent modules still work? |
+
+S01 and S02 anchor near-term real need. The rest are extension and failure
+tests. Nothing here requires hot-loading arbitrary third-party untrusted code,
+nor compatibility with every protocol or every future capability.
+
+## Scenario ledger format (`scenarios.tsv`)
+
+```
+S01|<covered|partial|open>|<core|adaptation|extension|unassigned>|<mechanism or trajectory>|<evidence pointer: round/artifact section>
+```
+
+`covered` requires (a) a named trajectory with an owning module per step and
+(b) the deletion consequence for each core step in that trajectory. Anything
+less is `partial`. S01..S12 all covered is the convergence gate.
+
+===== MATERIAL: judging rubric (authoritative) =====
+
+# Judging rubric (authoritative for every role in this loop)
+
+## What wins
+
+A candidate wins by satisfying the required scenarios and their invariants under
+the smallest **total** cost — core + adapter burden + extension-author burden.
+Not by having the fewest files, not by self-scoring, not by naming things well.
+
+## The three tests every candidate must pass
+
+1. **Coverage** — S01–S12 each has a concrete trajectory with a named owner and
+   a stated deletion consequence. No "later" slots.
+2. **Non-smuggling** — the core is not a service/model/harness/conversation
+   assumption wearing a neutral name.
+3. **Minimality** — every core mechanism has a "deleting it breaks scenario X"
+   argument. If the argument is missing, the mechanism is deleted.
+
+## Disqualifiers (each ends the candidate, not just the section)
+
+* `execute(any)` and any other untyped escape hatch.
+* An omnipotent `context` object handed to extensions.
+* An arbitrary event bus used as the extension mechanism.
+* Complexity relocated into a plugin so the core *looks* minimal.
+* Faking support for a capability the service does not have.
+* Reinterpreting, weakening or dropping a required scenario.
+* A trajectory that only works when every adapter is the one we already have.
+
+## What counts as evidence
+
+* A specific event sequence beats an adjective.
+* An existing artifact beats an assertion about one.
+* A model experiment proves **the model only**. It is never product verification,
+  never protocol verification, never "the design works".
+* This repository's current code is a migration constraint and evidence about the
+  problem space. It is not the answer and not the baseline a candidate must keep.
+* Anything marked "unverified" in the inputs stays marked unverified in outputs.
+
+## Honest outcomes
+
+* Two candidates that cannot be simply ranked may both stay; say so, and say what
+  observation would rank them.
+* "I could not break it" and "it is correct" are different claims. Use the first.
+* A clean round is a real result only if the attack dimension was actually taken
+  up. Record which dimension was used, always.
+
+===== MATERIAL: attack dimensions =====
+
+# Attack dimensions — one per round, recorded, never repeated while clean
+
+The controller rotates these and writes the assignment into
+`rounds/RNNN/dimension.txt`. The attacker is confined to that dimension.
+
+| key | what the attacker must construct |
+|---|---|
+| D01-order-dedup | duplicate, reordered, interleaved and late events; two producers for one slot |
+| D02-lifecycle-leak | unsubscribe, page destroyed, extension unmounted, service restart, crash mid-operation |
+| D03-identity-scope | two services or tenants, colliding ids, cache bleed, authorization scope confusion |
+| D04-absent-capability | service lacks cancel/history/resume; where is it stated, and what does the UI claim meanwhile |
+| D05-fallback-unknown | unregistered view, unknown content type, partial data, malformed payload |
+| D06-adapter-burden | count what a *new service author* must write or must know about the core; any core internal leaking into the adapter contract is a finding |
+| D07-extension-burden | count what a *new module author* must learn; boilerplate, implicit coupling, ordering assumptions |
+| D08-reduction | delete one core mechanism and show a required scenario still passes; or show every candidate has one mechanism too many |
+| D09-splits-truth | two owners of one fact; who reconciles them when they disagree; find a state where the UI shows something that never happened remotely |
+| D10-cross-module | modules cooperating without shared global state; find the hidden channel — a shared key, an ordering assumption, a mutable context field |
+| D11-long-run | hours-long task, client restart, page never opened again, memory and subscription growth |
+| D12-authority-boundary | the candidate smuggling a service, model, harness, plugin-host or conversation assumption into the core as if it were neutral |
+
+Rotation rule: never reuse the immediately previous dimension while it is clean;
+after `FE_STALL_AFTER` consecutive clean rounds the controller rotates hard
+rather than polishing.
+
+===== MATERIAL: design brief (the user-approved statement of goal) =====
+(source: /home/maoqh/projects/ordessa/control/product/agent-desktop-design-brief.md, sha256: 0d36056c1039b3ae0bec6797e58824b247d19d093ae9505a74119fe8d648b47e)
+
+# Agent Desktop：设计循环目标与场景草案
+
+状态：目标已获用户认可；下列场景与循环参数由 I 提议，待用户查看。
+未启动循环、未安装外部框架、未任命新执行者。产品代码只读。
+
+## 用户确认的方向
+
+独立于特定后端、面向 Agent 使用的可扩展 Desktop。对话、工具调用、模型
+配置均可以成为能力，但不预设为整个产品的组织中心。
+Ordessa 后端可以提供最完整能力，不是所有接入的必需前提。
+不预先把 Agent、会话、任务或插件宿主指定为核心答案。
+通过场景、反例与删减实验寻找宿主最小机制与扩展领域能力的边界。
+
+## I 提议的场景集
+
+每个场景只规定用户结果，不提前规定内部对象或必须采用哪个 UI。
+
+| ID | 场景 | 需要设计回答的问题 |
+| --- | --- | --- |
+| S01 | 接入简单 Agent，仅支持文本往返 | 没有 Profile、工作区、工具和恢复能力时能否使用？ |
+| S02 | 通过 Ordessa 后端使用 Pi，观察工具与授权并持续交流 | 现有真实链如何映射，哪些能力由扩展承担？ |
+| S03 | 启动长任务，离开其页面，稍后查看进度和产物 | 页面生命周期与远端执行生命周期如何区分？ |
+| S04 | Agent 只提供任务提交、进度和结果，没有聊天协议 | 是否被迫伪造会话和 assistant 消息？ |
+| S05 | 不启动 Agent，独立浏览配置、资源或 Git 变更 | 领域模块能否不依赖活跃会话/运行？ |
+| S06 | 多服务同时接入，两个服务返回同名会话或任务 ID | 身份、授权范围、缓存和事件是否会串？ |
+| S07 | 新模块为特殊产物提供视图，未安装时仍能查看基础信息 | 扩展选择、默认回退与未知内容如何处理？ |
+| S08 | 一个资源模块与执行模块协作，后者可替换 | 怎样交换能力而不共享任意全局状态？ |
+| S09 | 连接断开后操作结果未知，重连收到重复/乱序事件 | 谁确认事实、恢复状态、防重复执行？ |
+| S10 | 扩展崩溃、关闭或卸载，远端任务仍在运行 | 谁释放订阅/资源，如何保留可解释的运行状态？ |
+| S11 | 服务缺少取消、历史或恢复能力 | 如何如实表达不可用，而非伪造支持？ |
+| S12 | 移除一个宣称可选的核心领域模块 | 宿主和其他独立模块是否还能工作？ |
+
+S01/S02 为近期真实需求锚点；其余是扩展与故障检验场景，不代表今夜实施范围。
+不要求任意第三方不可信代码热加载，不要求兼容所有协议或无限未来能力。
+
+## 评判方式
+
+先满足明确场景与不变式，再比较复杂度；不以文件少或自评分高判胜。
+对每个候选列：核心概念、接口操作、状态权威、生命周期、扩展依赖、接入成本、
+实现成本和不能覆盖的范围。不能用 execute(any)、万能 context/事件总线
+隐藏接口与错误语义后宣布核心最小。
+
+每个核心概念必须给一个“删掉它会失败”的具体场景；若移入扩展仍能满足
+全部必需条件，就列作可移除候选。总复杂度包含核心、适配器与扩展作者负担。
+允许保留多个不可简单排序的候选，不强行宣称存在唯一最简模型。
+
+## 建议循环（未启动）
+
+1. 首轮至少提出两个结构不同的候选，不以旧 mcode 方案为唯一出发点。
+2. 设计者给类型/伪代码、所有权与逐步场景轨迹。
+3. 攻击者给具体事件序列、被违反的不变式及最小反例；禁止只给风格意见。
+4. 验证者判断成立/不成立/证据不足，必要时在隔离设计目录写小型模型测试。
+   模型测试只能证明所建模型，不得冒充实际产品集成通过。
+5. 设计者修订并回放所有成立反例；不得删除场景、偷偷降低要求或压制攻击。
+6. 做删减攻击与新场景攻击，保存最佳候选、反例账和完整版本，不默认最后版最好。
+
+可借鉴的方法：
+- Self-Refine：https://github.com/madaan/self-refine （生成/反馈/修订）
+- Reflexion：https://github.com/noahshinn/reflexion （失败反思记忆）
+- evaluator–optimizer：https://www.anthropic.com/engineering/building-effective-agents
+- 运行控制候选：https://github.com/Kiriketsuki/ralph-loop
+以上阅读不代表已验证 Qoder 兼容、已安装或已授权其代码执行。
+
+建议上限：12 轮或 6 小时，先到者停止；这只是预算上限，不需要凑满时间。
+连续三轮没有新成立重大反例，且必需场景与删减检查通过，可提前交审。
+三轮仅换措辞/重复争论无实质进展则交出争议，不无限循环。
+目标冲突或产品取舍不明，记录交 I；其余独立问题可以继续。
+
+角色尽量用独立上下文；同一模型不同角色不等于独立质量证明。
+若 Qoder 无独立会话编排机制，先标注此限制，不假装已经启动独立审阅者。
+实现调度器前需读本机 Qoder --help，验证真实可用的非交互/会话参数，不猜 CLI。
+外部资料每条标实际读过的来源、版本与适用限制；未打开不作证据。
+
+## 次日交付
+
+一页最佳候选说明、核心/扩展边界、S01–S12 覆盖表、成立反例与修复记录、
+删减实验、未解决取舍，以及按真实模块划分的后续实施建议。
+停止状态为候选待审/预算截止/需决策，不自行宣布最终架构锁定。
+
+
+===== MATERIAL: prior independent (Sol) review findings =====
+
+_no independent review yet; treat every conclusion below as self-reviewed and mark it as such_
+
+===== MATERIAL: counterexample ledger (authoritative; full) =====
+
+
+-- all rows --
+id|raised_round|severity|status|invariant|title|evidence|targets|replayed
+
+===== MATERIAL: scenario coverage ledger (authoritative; full) =====
+
+sid|status|owner|mechanism|evidence|round
+
+===== MATERIAL: mechanism disposition ledger (full) =====
+
+mechanism|disposition|failure_scenario|experiment_ref|round
+
+===== MATERIAL: per-round counters (full) =====
+
+round|holds_major|new_major|closed_major|clean|note|digest
+
+===== PRIOR CANDIDATES =====
+
+===== THIS ROUND =====
+R001

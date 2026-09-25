@@ -1,0 +1,113 @@
+I have all the material inlined and no tools available, so I'll produce the R001 designer deliverable directly. Here is my reasoning: the scenario set forbids session/conversation/agent from being the core (S04, S05, S12), so I anchor the candidate on a neutral substrate — a *Source* that advertises typed *Capabilities* — and earn each of the eight core mechanisms against a specific deleting-breaks-scenario argument.
+
+One honesty note up front: the brief recommends R001 carry two structurally different candidates. My role contract for this call is "one complete candidate per id declared," and only this designer phase is invoked, so I deliver one fully-worked candidate and flag the second-variant question as an open ledger row rather than shipping a stub.
+
+<<<FE-OUT-START>>>
+
+# Candidate C1 — "Source & Capability Substrate"
+
+## 1. Core bet
+
+The host core is a **typed capability substrate over connected Sources**: a *Source* (a service or module instance) advertises *Capabilities* (named, typed commands and typed event streams), each tagged `Declared` or an explicit `Absent`; the host owns namespacing, run/page lifecycle separation, scoped-resource release, idempotent event folding, and typed view/extension resolution. No session, chat, task, agent-object or plugin-host is the organizing center, because S04 must succeed with no conversation, S05 with no session, and S12 with one domain module removed — any of those being core would make a required scenario unsatisfiable, and nothing smaller than this eight-mechanism set closes S01–S12 without smuggling a service/model/conversation assumption into the core.
+
+## 2. Core concepts and operations
+
+- **Source** — a connected service or mounted module instance. Operations: `register(descriptor)`, `capabilities() -> CapabilityTable`, `deregister(id)`. Authoritative for its own connection/transport state (adapter-owned). Lifecycle: created on connect/mount, destroyed on disconnect/unmount; on destroy the host forces release of every `ScopedResource` the Source minted and evicts its namespaced facts.
+- **ResourceRef** — `{ source, id }`. The host's only identity currency. Operations: `scopeOf(ref)`, `isLocalTo(ref, source)`. Authoritative: namespacing is host-owned (S06). Pure data; no lifecycle.
+- **CapabilityTable** — `Partial<Record<CapabilityId, CapabilityStatus>>`, `CapabilityStatus = Declared{...} | Absent{reasonCode}`. Operations: `lookup(capId)`, `declare`, `withdraw`. Authoritative: a Source is authoritative for which caps it exposes; the `Absent` variant is host-defined and total (S11). Lives with the Source.
+- **Command** — typed capability with input `I`, output `O`. Operations: `invoke(cmd, input, {requestId}) -> Result<O>` where `Result = Ok | Err | Absent`. Authoritative: request-id idempotency contract is host-defined (S09). Stateless handle.
+- **EventStream** — typed stream capability. Operations: `subscribe(onEvent) -> ScopedResource`. Authoritative: none for the facts themselves; facts live in the fold.
+- **Run** — a remote execution token `{ runToken }` produced by a submit-like command. Operations: `attach(runToken) -> EventStream` (re-attachable), `detach(attachHandle)`. Authoritative: the *service* owns remote run state; the *host* owns the attach/detach local handle — this is the S03 split (page lifecycle != remote execution lifecycle).
+- **Fold** — reducer over an event domain: `{ foldKey, seq, apply(state, envelope) -> state }`. Authoritative: host-owned store keyed by `ResourceRef` + `seq` (S09/S03-return). Created on first subscribe, retained after detach so returning re-reads the last folded state, dropped on Source deregister.
+- **ScopedResource** — subscription/handle wrapper. Operations: `release()`, host-registered `onTeardown(owner) -> ScopedResource` (finalization). Authoritative: host guarantees exactly-once release tied to owner lifecycle (S10, S02 approvals).
+- **ViewProvider / MountContract** — `ViewProvider { of: ArtifactKind, fallback?: Component, render(ref) }`; module `MountContract { mount(binder) -> void, unmount() }`. Authoritative: host owns resolution and the unmount-revoke binding (S07, S10).
+
+## 3. Boundary rules — what an adapter must translate, and how "not supported" is stated
+
+A service adapter must translate exactly: (a) transport/auth into `connect`/`disconnect`; (b) its surface into `describe(): CapabilityTable` where every capability the host may query is either `Declared{input,output}` or `Absent{reasonCode}` — a capability a service lacks is **not** an omitted key and **not** `null`; it is the explicit `Absent` value, so `lookup` is total and the UI can render the reason code truthfully (S11); (c) its events into the host `EventEnvelope` supplying a `foldKey`, `seq` and `requestId`; (d) its run/task objects into `RunToken` + namespaced `ResourceRef`. `Absent` propagates as a `Result = Absent` on any invocation attempt, never as a thrown `undefined` or silent no-op. The exact "does not support" shape is `Absent{ reasonCode: string }` — a first-class, machine- and human-addressable value.
+
+## 4. Extension mechanism — permission, selection, fallback, absence/throw/unmount
+
+An extension (module or view provider) may: register a typed `CapabilityTable`, a `ViewProvider`, and bind typed **ports** (capability ids it needs). It may **not**: reach another module's private state, subscribe to a Source it does not own without a typed capability, or emit on undeclared channels. Selection is by `CapabilityId`/`ArtifactKind` resolution, most-specific-registered-provider wins; the default fallback for an artifact kind is a built-in `DefaultView`. Guarantees: **absent** → the declared `fallback`, else a generic "unknown artifact of kind X" card showing the raw `ResourceRef` — no crash, no faked content (S07); **throws** → caught to that card, other providers unaffected; **uninstalled mid-operation** → the host runs the extension's `MountContract.unmount`, revokes its capability bindings so in-flight calls fail typed with `CapabilityRevoked` (never hang), and releases its `ScopedResource`s. The run's *owning Source* subscription is host-level, not extension-scoped, so the remote `Run` keeps progressing and the UI falls back to `DefaultView` showing it still runs (S10).
+
+## 5. Scenario trajectories
+
+**S01 (text round-trip)** — 1. User adds an echo Source; adapter `describe` returns `{ChatText: Declared{input:string,output:string}}` and `Absent` for run/session/history/cancel/approval/tool. 2. User sends; `invoke(ChatText,"hi")` → `Ok("echo hi")` folded under the source's `ResourceRef`. 3. No Profile/workspace/tool/recovery exists. Owner: **core**. Passes with zero adaptation beyond the text capability.
+
+**S02 (Pi via Ordessa)** — 1. Ordessa adapter `describe` declares `Chat`, `Tools`, `Approvals`, `Run`, `Session`. 2. `Chat.send` returns a `RunToken` (session is an adapter-defined `ResourceRef` kind, *not* a host object). 3. `Tools`/`Approvals` surfaces are a module bound to `Run`+`Approvals`. Owner: **adaptation** (Ordessa adapter) + extension modules. No session in core is required.
+
+**S03 (long task, leave, return)** — 1. `invoke(submitJob,...)` → `RunToken`. 2. `attach(runToken)` → live `EventStream` → `ScopedResource`. 3. User navigates away → host tears down the local `ScopedResource` **and retains the Fold**; the remote run keeps progressing (service-authoritative). 4. User returns → `attach(runToken)` again → host re-reads last folded state and continues. Owners: page lifecycle = **core** view routing; remote lifecycle = **service**.
+
+**S04 (submit/progress/result, no chat)** — Source declares only `submitJob`/`progressStream`/`result`; `describe` marks `Chat`/`History` as `Absent`. 1. `invoke(submitJob)` → `RunToken`. 2. `attach(progressStream)` folds progress. 3. completion → `Ok(resultRef)` → `ViewProvider` renders the result. No assistant message, no conversation faked. Owner: **core** (proves chat is not forced).
+
+**S05 (browse config/resources/git, no session)** — Git module binds source-level capabilities `git.readStatus`/`git.diff` (not tied to any `RunToken`). 1. User opens Git view; no run exists. 2. `invoke(git.diff, {ref})` → `Ok(DiffRef)`. Owner: **extension** module over core Source/Capability substrate; nothing core requires a session.
+
+**S06 (two services, colliding ids)** — Service A and B both emit `id="abc"`. 1. Refs become `{A,"abc"}` and `{B,"abc"}`; fold stores are keyed per `source`. 2. Each adapter's authorization scope is bound to its own connection; a `RunToken` is opaque and scoped to its issuing source, so cross-source attach is rejected with `Err`. Cache/eviction keyed by full `ResourceRef`. Owner: **core** (`ResourceNamespace`).
+
+**S07 (missing special-artifact view)** — 1. Result artifact kind `excalidraw` arrives; no `ViewProvider` registered. 2. Host resolves → none → uses `DefaultView`. 3. If `DefaultView` cannot render the shape → "unknown artifact of kind excalidraw" card + raw ref. No crash, no fabricated render. Owner: **core** resolution + fallback.
+
+**S08 (resource module + replaceable execution module)** — 1. Execution module declares `provides: RunSubmit`, `needs: SourceSelection` (typed port). 2. Host binds `SourceSelection` to the resource module's exported capability by **type id**. 3. Modules communicate only via host-routed typed messages — no shared mutable global. Replacing execution module rebinds `RunSubmit`; resource module untouched. Owner: **core** typed binder (host-mediated, no arbitrary `context`).
+
+**S09 (drop, unknown outcome, dup/out-of-order events)** — 1. `invoke(cancel,{requestId:r1})` sent, connection drops, outcome unknown. 2. On reconnect adapter resends `r1` for confirmation; fold applies idempotently → UI shows confirmed once, no double execution. 3. Duplicate/out-of-order events carry adapter-supplied `foldKey`+`seq`; the `Fold` discards dups and merges by seq domain. Owners: confirmation/`requestId` scheme = **adaptation**; fold/dedup machinery = **core**. (DISPUTED risk, see FE-CE-003.)
+
+**S10 (extension crash/uninstall during live run)** — 1. Approval extension mounted, has a `ScopedResource` on an approvals stream, remote `Run` live. 2. Extension unmounted. 3. Host revokes its capability bindings, releases its `ScopedResource`s, in-flight calls fail `CapabilityRevoked`. 4. Remote `Run` (Source-owned, not extension-owned) continues; the run's own subscription is host-level; UI falls back to `DefaultView` still showing progress. Owner: **core** teardown/ownership.
+
+**S11 (no cancel/history/resume)** — Adapter `describe` sets `cancel=Absent{code:"not_supported"}`, `history=Absent{...}`, `resume=Absent{...}`. 1. Cancel button rendered disabled with the reason code; clicking the (un)affordance returns `Absent`, never a fake "cancelled". Owner: **core** (`Absent` totality).
+
+**S12 (remove an "optional" core domain module)** — Remove Chat/Tools. 1. `CapabilityTable` simply does not declare those ids. 2. `DefaultView` for artifacts, Git module, Source registry, run tracking all keep working. Only modules that *bound* Chat's port fail with `CapabilityRevoked` — a declared binding failure, not a core failure. Owner: **core**; demonstrates the removed module was genuinely domain, not core machinery.
+
+## 6. Deletion / delegation experiments
+
+- Delete **SourceRegistry/CapabilityTable** → S01 has nothing to connect to; every scenario's step 1 fails. Keep.
+- Delete **RunToken + attach/detach** → S03 step 3 (return later) and S10 step 4 cannot keep remote execution alive independently of the page. Keep.
+- Delete **ResourceNamespace** → S06 colliding refs collapse into one fold store; cache bleed. Keep.
+- Delete **EventFold** → S09 duplicate/out-of-order events double-apply; no reconnect restore. Keep.
+- Delete **ScopedResource** → S10 step 3 leaks the crashed extension's subscriptions; S02 approval stream never released. Keep.
+- Delete **MountContract** → S07 unregistered-view fallback and S10 unmount-time capability revocation both fail. Keep.
+- Delete **Absent** totality → S11/S04 adapters return `null`/`undefined`; host infers support and fakes it. Keep.
+- **Removed as too-large**: a first-class core `Session`, `Agent`, `Message`, `Transcript` and a general `EventBus` — none has a scenario that fails when deleted (S04/S12 fail *if* they exist), and a general bus violates the named-producer/consumer rule; replaced by typed capability streams. Record: these were deliberately left out, not deferred.
+
+## 7. Second-service onboarding cost
+
+New adapter author must write: (1) adapter descriptor `{id, version}`; (2) `connect`/`disconnect` (transport + auth); (3) `describe(): CapabilityTable` enumerating `Declared`/`Absent` for every queryable cap; (4) a typed handler per declared `Command` (`I`→`Result<O>`) and per declared `EventStream` (`Envelope`→`Fold`); (5) `transport→EventEnvelope` mapping producing `foldKey`/`seq`/`requestId`; (6) `Fold` reducers per event domain (dedup/order rules); (7) a `requestId` idempotency scheme for cancel/resume-like commands; (8) namespace/`ResourceRef` mapping; (9) `RunToken` issuance/attach for long ops. Must *know*: `Result` algebra, `Absent` is explicit, subscriptions are host-released, and its event domain's ordering/idempotency semantics are its responsibility.
+
+View-only module author writes: (1) one `MountContract` `{name,version, provides:[ViewProvider], unmount}`. That's all — no `describe`, no transport, no fold, no namespace, no `requestId`.
+
+## 8. Honest cost and non-goals
+
+Not covered: multi-window shared-state sync, the auth/identity-provider integration beyond "adapter connects", cross-service transactional run composition, and any trust/sandbox model for third-party code (out of scope per brief). Weakest scenarios: **S06** — I assert per-connection authorization isolation but do not model token scoping; **S09** — fold/dedup correctness is only as sound as the adapter-supplied `foldKey`/`seq`, which is exactly the burden this design shifts onto adapters; **S02** — depends on the existing Ordessa/Pi chain, unverified beyond the provided brief. Largest second-order cost: making the `Fold` a core mechanism forces every adapter author to define an event ordering/idempotency domain; get it wrong and S09 silently breaks — this is the design's main risk, raised as FE-CE-001/FE-CE-003 rather than hidden. On two candidates: the brief wants a second structural variant for R001 (e.g., a *Run-centric* core); this single call produced only C1, recorded as FE-CE-002 rather than stubbed.
+
+<<<FE-OUT-END>>>
+
+<<<FE-SCENARIO-START>>>
+S01|covered|core|Source+Capability; echo text round-trip with all other caps Absent|R001/C1 §5.1
+S02|covered|adaptation|Ordessa adapter declares Chat/Tools/Approvals/Run/Session as capability+ResourceRef kinds|R001/C1 §5.2
+S03|covered|core|RunToken attach/detach + retained Fold; local ScopedResource torn down, remote run survives|R001/C1 §5.3
+S04|covered|core|submit/progress/result caps only; Chat marked Absent; no assistant message fabricated|R001/C1 §5.4
+S05|covered|extension|git/config modules bind source-level caps; host core never requires a Run|R001/C1 §5.5
+S06|covered|core|ResourceNamespace scopes ids/caches/folds per source; cross-source attach rejected|R001/C1 §5.6
+S07|covered|core|ViewProvider resolution -> DefaultView -> unknown-artifact fallback card|R001/C1 §5.7
+S08|covered|core|typed ports + CapabilityTable binding by type id; no shared mutable global|R001/C1 §5.8
+S09|covered|core|EventFold dedup by foldKey+seq; requestId idempotency; adapter resends on reconnect|R001/C1 §5.9
+S10|covered|core|unmount revokes capabilities, releases extension ScopedResources, Source-owned Run continues|R001/C1 §5.10
+S11|covered|core|Absent totality: cancel/history/resume declared Absent with reason codes, never faked|R001/C1 §5.11
+S12|covered|core|removing domain module withdraws its CapabilityTable entry; others keep working|R001/C1 §5.12
+<<<FE-SCENARIO-END>>>
+
+<<<FE-MECH-START>>>
+SourceRegistry+CapabilityTable|core|S01 (no Source to register/connect a plain text agent)|R001/C1 §6
+RunLifecycle (RunToken attach/detach)|core|S03 step 3 & S10 step 4 (return-later / remote survives local teardown)|R001/C1 §6
+ResourceNamespace|core|S06 (two services emitting id "abc" collide and cross caches/events)|R001/C1 §6
+EventFold|core|S09 (duplicate/out-of-order events double-apply on reconnect)|R001/C1 §6
+ScopedResource|core|S10 (crashed extension leaks its subscriptions; S02 approvals stream never released)|R001/C1 §6
+MountContract|core|S07 (unregistered-view fallback) & S10 (capability revocation on unmount)|R001/C1 §6
+AbsentTotality|core|S11 & S04 (null-inferred support makes host fake cancel/history/chat)|R001/C1 §6
+Session-as-core-object|removed|no scenario fails when absent; S04 & S12 fail if present as core|R001/C1 §6
+GeneralEventBus|removed|violates named-producer/consumer rule; all streams are typed capabilities|R001/C1 §6
+<<<FE-MECH-END>>>
+
+<<<FE-LEDGER-START>>>
+FE-CE-001|R001|major|OPEN|EventFold placed in core shifts event ordering/idempotency semantics onto every adapter; an adapter with a sound-foldKey bug silently breaks S09 while core code is correct|C1 §6,§8 targets D06/D09|-
+FE-CE-002|R001|minor|OPEN|No second structurally-different candidate (Run-centric) produced this round; brief R001 recommendation unmet, so minimality of C1 is not yet cross-checked|C1 §8 targets D08|-
+FE-CE-003|R001|major|OPEN|S06 authorization-scope isolation asserted per-connection but not modelled; two sources with a shared credential may still bleed identity scope|C1 §5.6 §8 targets D03|-
+<<<FE-LEDGER-END>>>

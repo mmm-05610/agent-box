@@ -1,0 +1,2 @@
+[2026-09-22T02:56:19Z] validate[attack]: attacker declared no counterexample (COUNTEREXAMPLES: none)
+[2026-09-22T02:56:19Z] validate[attack]:   invalid: found 0 output section(s), contract declares 1 (each needs <<<FE-OUT-START>>> / <<<FE-OUT-END>>> lines)

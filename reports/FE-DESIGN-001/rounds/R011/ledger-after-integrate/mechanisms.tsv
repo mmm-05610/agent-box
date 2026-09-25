@@ -1,0 +1,58 @@
+mechanism|disposition|failure_scenario|experiment_ref|round
+namespaces|core|S01 step1 no scope / S06 step2 id collision|§R11.2|11
+resource-directory|core|S05 step3 cannot list or look up without an active session|§R11.7-S05|11
+ordered-replayable-stream|core|S03 step4 no catch-up / S10 step3 no replay (meaning narrowed to stream index)|rounds/R006/cand-A.md §R6.5-S03,S10|6
+capability-declaration|core|S11 step 2 — absence inferred from null, faking support|best-candidate §R.2 CapMap (open)|1
+typed-action|core|S01 step3 execute(any) disqualifier / S04 step2|§R8.5-S01|8
+generic-fallback-view|core|S05 step5 blank and no Reload / S07 unregistered payload renders blank / S11 step4 blank|EXPERIMENT R11-B|11
+host-session-object|removed|none — S04 passes without it|§R8.5-S04|8
+host-turn/role-envelope-field|removed|none — D12 disqualifier; S04 passes|§R7.5-S04|7
+host-event-store|removed|none — corrected: no second store is added; the store is the cursor stream itself, which is now named. This row was false from R006 to R010|§R11.3|11
+host-resource-directory-B|removed|none — per-service ns handles suffice|rounds/R001/cand-B §B.9|4
+capability-declaration-open-map|core|S11 step 2 absence inferred from null; fake support|best-candidate §R.2-§R.5-S11|2
+typed-replay-policy-on-registration|core|S09 step 3 host branches on CapMap string (FE-CE-003 reopens if removed)|best-candidate §R.2-§R.5-S09|2
+spawned-resource-grant|removed|none — same-ns rule passes S08 without set|§R8.5-S08|8
+live-default-subscribe|core|S08 step 5 pair gesture replays stale events and auto-executes (FE-CE-005 reopens if removed)|best-candidate §R.2-§R.4-§R.5-S08|2
+ns-scoped-payload-registration|removed|none — payload_schema_id opaque; FE-CE-008 closed|rounds/R006/cand-A.md §R6.2|6
+cross-namespace-edge|removed|none — S08 on two ns-local handles; FE-CE-007 on B|§R8.8|8
+persistent-pair-record|removed|none — re-pairing is user action|§R8.4|8
+open capability map|core|S11 step1 absence inferred from null -> fake-support disqualifier|EXPERIMENT R11-B|11
+ns-scoped-action-type-registration|core|S06 two services same kind/action name share a mutable key; FE-CE-006 reopens|rounds/R004/integrate.md §R4.2-§R4.5-S06|4
+handle-accessible-set|core|S06 step3-4 out-of-scope subscribe/invoke; FE-CE-007 leak class|rounds/R004/integrate.md §R4.2-§R4.5-S06,S08|4
+ns-scoped-envelope-payload-descriptor-store|removed|none — S06/S07 pass without it; sole reader (delivery gate) already gone FE-CE-008|rounds/R004/integrate.md §R4.6 (FE-CE-008)|4
+invoke-id-on-OutcomeUnknown|removed|none — no auto-resubmit; no consumer|§R8.5-S09|8
+implicit-live-default-subscribe|removed|none — from_cursor mandatory|§R8.5-S01|8
+envelope-payload-delivery-gate|removed|none — S07 renders unregistered schema identically; confirmed R003|rounds/R004/integrate.md §R4.2|4
+typed-replay-policy-enum|removed|none — fixed never-auto-resubmit; FE-CE-003 closed|rounds/R004/integrate.md §R4.6|6
+same-namespace-scoped-handle|core|S06 step3-4 out-of-scope subscribe or invoke / S08 step6 job subscribe|§R11.7-S06|11
+host-dedup-(ns,resource,seq)|removed|none — vacuous; S09 via adapter dedup|§R7.5-S09|7
+host-reorder-by-seq|removed|none — identity under arrival index|§R8.5-S09|8
+never-auto-resubmit-invariant|core|S09 step2 host replays command -> double execution if removed|rounds/R006/cand-A.md §R6.5-S09|6
+open-capability-map|core|S11 step2 absence inferred from null→fake-support disqualifier|EXPERIMENT2|8
+per-namespace-action-typing|core|S06 step5 shared mutable key→FE-CE-006 reopens|§R8.5-S06|8
+monotonic-cursor-stream|core|S03 step4 no catch-up / S10 step3 no replay|EXPERIMENT3|8
+cursor.resolve|core|S08 step4/5 runner forced to replay history (FE-CE-005 reopens)|§R7.5-S08;§R7.6|7
+ns-scoped-action-typing|core|S06 step5 shared mutable key reopens FE-CE-006|§R7.5-S06|7
+never-auto-resubmit|core|S09 step2 host replays the command -> double execution|§R11.7-S09|11
+from-cursor-input-selection|core|FE-CE-016 head loss (spawned→0) / FE-CE-017 ns-regen guard (else saved+1 skips window)|§R7.2;§R7.6 EXPERIMENT|7
+replay_mode|removed|none — subscriber-chosen from_cursor passes S03/S04/S08/S10|EXPERIMENT3|8
+subscription-last-seq-accessor|removed|none — Envelope.seq carries persist position|§R8.5-S03|8
+ns-scoped-payload-descriptor-store|removed|none — payload_schema_id opaque; FE-CE-008 closed|§R8.2|8
+cursor_resolve|core|S08 step4 runner forced to replay -> FE-CE-005 / S02 step3 live edge unexpressible|§R11.3|11
+generic-actionable-fallback-view|core|S07 unregistered renders blank / S12 removed resolver blank|EXPERIMENT2|8
+envelope-seq-stream-index|core|S03 step2 no position to persist / S01 step4 no ordering|EXPERIMENT1|8
+pump|core|S01 step4 adapter cannot deliver; S04 step3 head never enters stream|§R8.6 FE-CE-018|8
+host-turn-role-envelope-field|removed|none — Envelope has no such field; S04 passes|§R11.2|11
+host-dedup-ns-resource-seq|removed|none — vacuous; S09 via adapter dedup|§R8.5-S09|8
+cursor-stream-log|core|S03 step4 backlog empty and no catch-up / S04 step4 head unreplayable / S10 step3 no replay — this row replaces the false host-event-store removed row (FE-CE-022, FE-CE-024)|EXPERIMENT R11-A|11
+typed-action (read/status)|core|S05 step4 no current value / S11 step3 cannot answer absence structurally / delete -> execute(any)|§R11.7-S05,S11|11
+four-variant-outcome-rendering|core|FE-CE-019 and FE-CE-023: an unconfirmed outcome rendered as a current value or an available action is the hide-uncertainty disqualifier|EXPERIMENT R11-B|11
+generic-walk-totality|core|FE-CE-020: a partial or null-for-list Result renders fake-complete or blanks the pane without an explicit row|EXPERIMENT R11-C|11
+recursive-path-labelled-walk|core|FE-CE-021: a nested declared schema mis-renders, and any depth contract leaks a host renderer internal into the adapter schema obligation|EXPERIMENT R11-C|11
+presence-is-not-reachability|core|FE-CE-023: a dead producer's resource advertises a live cancel capacity indefinitely|§R11.4|11
+from-cursor input-selection|core|S04 step2 / S08 step6 spawned head loss -> FE-CE-016 / ns-regen window skip -> FE-CE-017|§R11.3|11
+per-namespace action typing|core|S06 step5 shared mutable key -> FE-CE-006 reopens|§R11.6|11
+envelope-dropped-on-subscription-close|removed|FE-CE-024: deleting this clause is what makes catch-up possible; retaining it empties the backlog catch-up replays|EXPERIMENT R11-A|11
+adapter-flat-schema-obligation|removed|FE-CE-021: deleting it removes the core-internal leak, and nothing fails because the walk is recursive and total|EXPERIMENT R11-C|11
+host-dedup / host-reorder-by-seq|removed|none — vacuous under an arrival index; the adapter dedups by its own stable id|§R11.6|11
+invoke_id on OutcomeUnknown|removed|none — no auto-resubmit and no consumer|§R11.7-S09|11

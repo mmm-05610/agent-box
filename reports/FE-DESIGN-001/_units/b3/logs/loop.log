@@ -1,0 +1,2 @@
+[2026-09-22T02:56:19Z] validate[attack]:   invalid: no ledger block at all (<<<FE-LEDGER-START>>> ... <<<FE-LEDGER-END>>>)
+[2026-09-22T02:56:19Z] validate[attack]:   invalid: ledger block present but contained no valid rows

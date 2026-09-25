@@ -1,0 +1,127 @@
+Dimension D11-long-run. Artifact under attack: `candidates/best.md` = `25c36f4c40d8…`.
+This round the evidence changed method: instead of reading the tables, the round built a minimal
+executable model of the artifact's own rules (`_pt/model/core.py`, driven by `_pt/model/run.py`
+through twelve scenarios plus four model checks, one model for all of them, no per-scenario
+behaviour). Everything below is either a finding the model produced by execution or a finding the
+R012 candidate-reviewer produced by reading, registered here as a ledger row so that it enters the
+convergence judgement instead of sitting in a review's prose.
+
+**Carried into the ledger from the R012 candidate-reviewer** (each was found independently, is
+against these bytes, and was left unregistered until now — which is why `open_major` read 0 while
+real defects were open):
+
+**FE-CE-028 — S08 asserts a delivery that has no mechanism.** S08 step 7 states that an envelope
+pumped in `ns_D` "is delivered to the view through `s_D`". §R11.3 delivers only through a live
+subscription whose `from_cursor <= seq`, and §R11.5's pair gesture confers scopes only. The model
+executes S08 as written: after `pump(ns_D, data-1, …)` the view's `s_D` has received **0** envelopes
+(`run.repro.txt`: `sD received 0 envelope(s) on data-1 but the scenario requires 1`). Minimal form:
+two namespaces, a pair gesture, one pump on the data namespace, no subscription on its resource.
+
+**FE-CE-029 — observed loss and same-namespace catch-up cannot both be reachable.** §R11.4 item 8
+makes `teardown` mandatory the moment an adapter observes its connection lost; §R11.3 makes
+`teardown` dispose the logs, force-close the subscribers and restart the id space. S09's step 5 has
+the adapter pumps after a drop and step 6 keeps a same-namespace catch-up branch
+(`recorded_ns_id` still matches → `saved_last_seen+1`), and no row re-mints the view's scope after
+the forced close. Executed as written, S09 fails: the pump after the observed loss raises
+`NamespaceGone` and the catch-up finds nothing. Minimal form: one resource, a live subscription, one
+observed loss, one connect-back.
+
+**FE-CE-030 — scenario steps depend on prerequisites no row provides.** S01 step 3 invokes `"send"`
+and S03 step 5 / S05 step 4 invoke `"read"`, and none of those tables contains an `action.register`
+row, although §R11.6 item 4 is the only registration path and §R11.6's closing paragraph makes an
+unregistered action return structural `CapabilityAbsent(x)`. Executed, the as-written S01 invoke
+returns `CapabilityAbsent`, so the typed-action step the scenario is built on is unreachable
+(`MC_reg_missing` confirms the mechanism). Six tables (S02, S03, S04, S05, S09, S11) additionally use
+a bare `h`/`s` with no `view_scope`/`open_scope` mint row, although FE-CE-026's closure rests on that
+mint and reaches only S01. Minimal form: announce a resource, invoke an action, register nothing.
+
+**FE-CE-031 — the invoke-spawned rule and the not-announced rule contradict each other.** §R11.1
+prescribes `0` for "a just-spawned resource's head", and S04 step 4 / S08 step 6 subscribe an
+invoke-spawned resource with `from_cursor=0`. §R11.3 says `subscribe` "returns `ExplicitAbsent` if
+`id` is not currently announced". The artifact never says when an invoke-spawned resource becomes
+announced, so the head-capture rule is either unimplementable or relies on an unstated timing
+assumption inside the invoke handler. Minimal form: one `invoke` whose result names a resource, then
+`subscribe(..., 0)` on that id.
+
+**FE-CE-032 — states the API can return have no rendering rule.** `ViewHost.open_scope` and
+`directory_lookup` return `ExplicitAbsent`, and `CapMap` admits a third value `"unknown"`, but
+§R11.5 rules only the four `InvokeOutcome` variants and one `ExplicitAbsent` case (a persisted
+`local_id`). Executed, rendering S11's capability map raises "artifact silent"
+(`MC`/S11 `GAP`), and a view handed `ExplicitAbsent` from `open_scope` has no stated output. Minimal
+form: announce a resource whose CapMap carries `"unknown"`, then render it. Note the direction of the
+repair: this belongs in the fallback's rendering rules, **not** in the core — the core must not
+acquire an opinion about what `unknown` means.
+
+**FE-CE-033 — the declared-schema notation is undefined.** §R11.5 speaks of "declared opaque
+(binary/text blob)", "`list<record>`", recursion to any depth, and one row per declared field, and
+§R11.7b item 7 tells adapter authors to "declare result schemas by field name only" — which cannot
+express opacity or shape. Nothing in the artifact defines the notation that `list<record>` and
+"opaque" belong to, so `FE-CE-020`/`FE-CE-021`'s totality and recursion claims are not decidable from
+the artifact: two conforming implementations can disagree about what a declaration is. Minimal form:
+ask what the declaration of a nested list of records looks like.
+
+**FE-CE-035 — extension selection runs on mount order and is never recorded.** §R11.5 says the most
+recently mounted claimant renders the schema and "the host records nothing about the choice", and
+then admits that unmounting the winner silently swaps the renderer. That is a hidden ordering channel
+between modules — precisely what D10/D07 forbid — and it produces an unexplained pane change with no
+record of who rendered before. Minimal form: two views claim one `payload_schema_id`, then the last
+mounted unmounts.
+
+**FE-CE-036 — the schema claim is not namespaced while everything else is.** Action registration is
+keyed by `(ns_id, kind, action_type)`, scopes are namespace-scoped, and `ResourceId` carries a
+namespace — but a view claims a bare `payload_schema_id`. A view opened against one service can
+therefore claim a schema belonging to another, and the claim has no namespace to be checked against.
+Minimal form: two namespaces describing the same schema id differently, one view claiming it.
+
+**FE-CE-037 — the classified cost prices only one side.** §R11.7b prices seven extension duties, but
+the adapter's duties (pump in remote-stable logical order, dedup by the adapter's own id, teardown on
+an observed loss) and the retire-then-announce successor lever appear only in §R11.6/§R11.3 prose and
+are costed nowhere, so the artifact's own "what does a new author have to write" question has a
+one-sided answer.
+
+**FE-CE-038 — new this round, produced by executing the long-run case: releasing the log — the only
+memory lever the artifact offers — is invisible to every view already watching.** Sequence, run in
+`S04` and `MC_capacity_gap`. (1) Adapter announces `job-7`; a view subscribes `from_cursor=0` and is
+live. (2) The adapter pumps events; the view renders them as current. (3) The adapter follows
+§R11.3's own honest-cost advice — "it can `retire` the resource and announce its successor under a
+new `local_id`" — and calls `retire("job-7", "bound memory")`. (4) `retire` disposes the log. (5) The
+live subscription receives **nothing**: §R11.2's `Subscription` declares `onNext` and `close` only,
+and no section, scenario step or rendering rule tells the view that its resource ended. The view's
+last rendered rows stay on screen under §R11.5's "current" label for a resource the directory no
+longer lists. (6) If the view then calls `invoke` on that `local_id`, the artifact defines
+`ExplicitAbsent` for `subscribe` and `cursor_resolve` only; `invoke` against a non-announced resource
+is undefined.
+
+Invariant broken: §R11.3's retention rule and §R11.4's "announced and not retired" definition of
+existence together imply that retirement is an observable fact, and §R11.5's invariant forbids an
+unconfirmed outcome being rendered as current. Executing the release path shows the fact is not
+observable to the only party that cares, so the default view can present a frozen last state as
+current for a resource that exists no longer — D09's "the UI shows something that never happened
+remotely", reached through the long-run axis the artifact itself says matters most (T-Boring).
+
+Minimal form: one resource, one live subscriber, one `retire`. The model records it as a `GAP`, not a
+`FAIL`, because the artifact is silent rather than self-contradictory — and that is the point: the
+silence is where a view's honesty has to be decided.
+
+Why this was not found before: R011 and R012 both reasoned about *retention* — whether the log
+survives long enough to replay. Both treated `retire` as a memory bound and checked that a
+*returning* view gets `ExplicitAbsent` (S09 step 7). Neither asked what a view that is *already
+watching* is told, which is only visible when the release path is executed with a live subscriber.
+
+Regression replay on these bytes, as prose. `FE-CE-022`/`FE-CE-024` still hold — the model confirms
+that a closed subscription releases only its routing reference and that the log survives to
+`retire`, which is exactly what makes `FE-CE-038` reachable. `FE-CE-027`'s burn rule holds
+(`MC_rebuild_burn`: `LocalIdBurned` and `ExplicitAbsent`). `FE-CE-025`'s ordering repair holds
+(`MC_events_before_sub_FIXED` delivers both deltas while the as-written live-edge variant delivers
+none). `FE-CE-019`/`FE-CE-020`/`FE-CE-021` are not reopened by this attack, but `FE-CE-033` now
+qualifies how much their closure is worth. `FE-CE-018` must be re-checked if the interface surface
+moves. `FE-CE-007` stays OPEN on B.
+
+Disqualifier scan: no `execute(any)`, no omnipotent context, no arbitrary event bus; `payload:
+unknown` is opacity-by-design on a non-branching route. The findings are missing prerequisite rows,
+one silent release path, one undefined notation, one unrecorded selection channel and two
+unrendered states.
+
+What genuinely held: the resource-lifetime log with its single disposal point; the incarnation burn;
+the same-namespace permission rule; the four-variant rendering of `InvokeOutcome`; the
+`from_cursor` choice for a just-created head; the namespace guard.

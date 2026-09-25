@@ -1,0 +1,5 @@
+phase=verify
+role=verifier
+outcome=bad
+reason=contract_violation
+at=2026-09-22T02:52:04Z

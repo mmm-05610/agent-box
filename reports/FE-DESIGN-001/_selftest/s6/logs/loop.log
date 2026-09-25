@@ -1,0 +1,39 @@
+[2026-09-21T16:28:16Z] sol: budget record created at zero (cap=10, final reserve=2)
+[2026-09-21T16:28:16Z] sol: existing budget record kept (cap=10 reserved=0 ok=0 bad=0 remaining=10 final_reserve=2)
+[2026-09-21T16:28:16Z] loop up: pid=731278 round= sol=cap=10 reserved=0 ok=0 bad=0 remaining=10 final_reserve=2
+[2026-09-21T16:28:16Z] R001: round start (best= sol=cap=10 reserved=0 ok=0 bad=0 remaining=10 final_reserve=2)
+[2026-09-21T16:28:16Z] R001/plan attempt 1 of 1
+/home/maoqh/projects/ordessa/control/design-loop/lib/phases.sh: 行 118: fn_commit_plan: 未找到命令
+[2026-09-21T16:28:16Z] R001/plan commit rejected — phase not passed
+[2026-09-21T16:28:17Z] round 1 aborted rc=4
+/home/maoqh/projects/ordessa/control/design-loop/loop.sh: 第 122 行： [: : 需要整数
+[2026-09-21T16:28:17Z] R002: round start (best= sol=cap=10 reserved=0 ok=0 bad=0 remaining=10 final_reserve=2)
+[2026-09-21T16:28:17Z] R002/plan attempt 1 of 1
+/home/maoqh/projects/ordessa/control/design-loop/lib/phases.sh: 行 118: fn_commit_plan: 未找到命令
+[2026-09-21T16:28:17Z] R002/plan commit rejected — phase not passed
+[2026-09-21T16:28:17Z] round 2 aborted rc=4
+/home/maoqh/projects/ordessa/control/design-loop/loop.sh: 第 122 行： [: : 需要整数
+[2026-09-21T16:28:17Z] R003: round start (best= sol=cap=10 reserved=0 ok=0 bad=0 remaining=10 final_reserve=2)
+[2026-09-21T16:28:17Z] R003/plan attempt 1 of 1
+/home/maoqh/projects/ordessa/control/design-loop/lib/phases.sh: 行 118: fn_commit_plan: 未找到命令
+[2026-09-21T16:28:18Z] R003/plan commit rejected — phase not passed
+[2026-09-21T16:28:18Z] round 3 aborted rc=4
+/home/maoqh/projects/ordessa/control/design-loop/loop.sh: 第 122 行： [: : 需要整数
+[2026-09-21T16:28:18Z] R004: round start (best= sol=cap=10 reserved=0 ok=0 bad=0 remaining=10 final_reserve=2)
+[2026-09-21T16:28:18Z] R004/plan attempt 1 of 1
+/home/maoqh/projects/ordessa/control/design-loop/lib/phases.sh: 行 118: fn_commit_plan: 未找到命令
+[2026-09-21T16:28:18Z] R004/plan commit rejected — phase not passed
+[2026-09-21T16:28:18Z] round 4 aborted rc=4
+/home/maoqh/projects/ordessa/control/design-loop/loop.sh: 第 122 行： [: : 需要整数
+[2026-09-21T16:28:19Z] reached FE_ROUND_CAP=4 without convergence — paused for the user; `resume` with a higher cap continues
+[2026-09-21T16:28:19Z] loop exited state=round_cap_paused
+[2026-09-21T16:28:24Z] sol: existing budget record kept (cap=10 reserved=0 ok=0 bad=0 remaining=10 final_reserve=2)
+[2026-09-21T16:28:24Z] sol: existing budget record kept (cap=10 reserved=0 ok=0 bad=0 remaining=10 final_reserve=2)
+[2026-09-21T16:28:25Z] loop up: pid=733183 round=4 sol=cap=10 reserved=0 ok=0 bad=0 remaining=10 final_reserve=2
+[2026-09-21T16:28:25Z] R004: round start (best= sol=cap=10 reserved=0 ok=0 bad=0 remaining=10 final_reserve=2)
+[2026-09-21T16:28:25Z] R004/plan attempt 2 of 2
+/home/maoqh/projects/ordessa/control/design-loop/lib/phases.sh: 行 118: fn_commit_plan: 未找到命令
+[2026-09-21T16:28:25Z] R004/plan commit rejected — phase not passed
+[2026-09-21T16:28:25Z] round 4 aborted rc=4
+[2026-09-21T16:28:25Z] reached FE_ROUND_CAP=4 without convergence — paused for the user; `resume` with a higher cap continues
+[2026-09-21T16:28:25Z] loop exited state=round_cap_paused

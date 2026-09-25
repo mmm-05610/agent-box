@@ -1,0 +1,32 @@
+mechanism|disposition|failure_scenario|experiment_ref|round
+namespaces|core|S06 step2 raw-id collision|rounds/R006/cand-A.md §R6.5-S06|6
+resource-directory|core|S05 step2 cannot list/lookup without active session|rounds/R006/cand-A.md §R6.5-S05|6
+ordered-replayable-stream|core|S03 step4 no catch-up / S10 step3 no replay (meaning narrowed to stream index)|rounds/R006/cand-A.md §R6.5-S03,S10|6
+capability-declaration|core|S11 step 2 — absence inferred from null, faking support|best-candidate §R.2 CapMap (open)|1
+typed-action|core|S01/S04/S05/S08 fall back to execute(any) disqualifier|rounds/R006/cand-A.md §R6.5-S01,S04,S05,S08|6
+generic-fallback-view|core|S07/S12 unknown or removed-resolver renders blank|rounds/R006/cand-A.md §R6.5-S07,S12|6
+host-session-object|removed|none — S04 passes without it|rounds/R006/cand-A.md §R6.5-S04|6
+host-turn/role-envelope-field|removed|none — D12 disqualifier; S04 passes|rounds/R006/cand-A.md §R6.5-S04|6
+host-event-store|removed|none — S03/S09/S10 are adapter burden|rounds/R004/integrate.md §R4.6|6
+host-resource-directory-B|removed|none — per-service ns handles suffice|rounds/R001/cand-B §B.9|4
+capability-declaration-open-map|core|S11 step 2 absence inferred from null; fake support|best-candidate §R.2-§R.5-S11|2
+typed-replay-policy-on-registration|core|S09 step 3 host branches on CapMap string (FE-CE-003 reopens if removed)|best-candidate §R.2-§R.5-S09|2
+spawned-resource-grant|removed|none — Model2 experiment: same-ns rule passes S08+S06 without the set|rounds/R006/cand-A.md §R6.6 Model2|6
+live-default-subscribe|core|S08 step 5 pair gesture replays stale events and auto-executes (FE-CE-005 reopens if removed)|best-candidate §R.2-§R.4-§R.5-S08|2
+ns-scoped-payload-registration|removed|none — payload_schema_id opaque; FE-CE-008 closed|rounds/R006/cand-A.md §R6.2|6
+cross-namespace-edge|removed|none — S08 passes on two ns-local handles|rounds/R004/integrate.md §R4.5-S08|6
+persistent-pair-record|removed|none — re-pairing is a user action|rounds/R004/integrate.md §R4.4|6
+open capability map|core|S11 fake-support disqualifier; a fixed enum reopens FE-CE-002|rounds/R004/integrate.md §R4.2-§R4.5-S11|4
+ns-scoped-action-type-registration|core|S06 two services same kind/action name share a mutable key; FE-CE-006 reopens|rounds/R004/integrate.md §R4.2-§R4.5-S06|4
+handle-accessible-set|core|S06 step3-4 out-of-scope subscribe/invoke; FE-CE-007 leak class|rounds/R004/integrate.md §R4.2-§R4.5-S06,S08|4
+ns-scoped-envelope-payload-descriptor-store|removed|none — S06/S07 pass without it; sole reader (delivery gate) already gone FE-CE-008|rounds/R004/integrate.md §R4.6 (FE-CE-008)|4
+invoke-id-on-OutcomeUnknown|removed|none — no auto-resubmit; FE-CE-010 closed|rounds/R006/cand-A.md §R6.2|6
+implicit-live-default-subscribe|removed|none — explicit from_cursor mandatory; FE-CE-011 closed|rounds/R006/cand-A.md §R6.2|6
+envelope-payload-delivery-gate|removed|none — S07 renders unregistered schema identically; confirmed R003|rounds/R004/integrate.md §R4.2|4
+typed-replay-policy-enum|removed|none — fixed never-auto-resubmit; FE-CE-003 closed|rounds/R004/integrate.md §R4.6|6
+same-namespace-scoped-handle|core|S06 step3-4 same-ns ScopeDenied / S08 step6 job subscribe fails if removed|rounds/R006/cand-A.md §R6.2/§R6.5-S06,S08|6
+host-dedup-(ns,resource,seq)|removed|none — vacuous under host-assigned seq; S09 passes via adapter dedup|rounds/R006/cand-A.md §R6.2/§R6.6|6
+host-reorder-by-seq|removed|none — identity; adapter pumps logical order|rounds/R006/cand-A.md §R6.3 item3/§R6.6|6
+never-auto-resubmit-invariant|core|S09 step2 host replays command -> double execution if removed|rounds/R006/cand-A.md §R6.5-S09|6
+open-capability-map|core|S11 absence inferred from null; fixed enum reopens FE-CE-002|rounds/R006/cand-A.md §R6.5-S11|6
+per-namespace-action-typing|core|S06 step5 shared mutable key reopens FE-CE-006|rounds/R006/cand-A.md §R6.5-S06|6

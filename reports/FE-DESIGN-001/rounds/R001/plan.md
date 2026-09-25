@@ -1,0 +1,74 @@
+CANDIDATES: A,B
+
+DIMENSION: D12-authority-boundary
+
+# THE QUESTION THIS ROUND MUST SETTLE
+
+Does each candidate's core state, for a service that has no chat protocol and no
+cancel/history/resume, an owner other than a host-builtin object — i.e. can the
+S04 and S11 trajectories be written against the core without any core concept
+named or shaped like conversation, assistant message, session or run?
+
+The two candidates answer "what is the host core" differently, not the same
+answer in two vocabularies:
+
+**A — the host core is a namespaced resource/event space.** Every remotely
+observable thing (text stream, task progress, config tree, git diff, artefact
+descriptor) is a *resource*: an addressable, service-scoped identity plus a
+replayable event stream plus a declared capability set. The host owns only
+directory, subscription, namespacing and event delivery; "agent", "session" and
+"chat" are resource kinds declared by adapters, not host types.
+
+**B — the host core is a typed connection broker with no default event plane.**
+Extensions declare *ports* (typed request/response and typed streams) and the
+host only authenticates, namespacing-checks and wires declared port pairs.
+Nothing is observable unless some module offers a port for it; progress is a
+stream port offered by an execution module, not a property of a core resource.
+
+## Candidate A
+
+*Core bet:* a resource is the smallest unit that both S05 (domain module with no
+session) and S03 (remote task outliving its page) need: it has its own identity
+and lifecycle independent of any view or conversation. The host's only authority
+is over resource identity, subscription and event ordering within a namespace.
+*Strongest objection:* "resource kind" and the event envelope smuggle a run/turn
+correlation model — if the envelope carries fields like turn, message-role or
+session-state, or if kind registration is pre-seeded with agent/session views,
+A is a conversation host relabelled, and S04 passes only by faking.
+*Settling evidence:* the designer writes the S04 trajectory (submit → progress →
+result, no chat) and S01 (text round-trip, no profile/workspace/tool/recovery)
+step by step against A's declared operations only. Any step that materialises an
+assistant message, a session object, or a workspace to satisfy the core is a
+major counterexample; if both trajectories land without such steps, the
+objection is answered for this round.
+
+## Candidate B
+
+*Core bet:* the host has no opinion about what exists at all — it brokers typed
+connections between modules, so absence of a capability is trivially truthful
+(no port, no feature), which attacks S11/S04 head-on. State, replay and
+ordering live entirely in whatever module offers the stream port.
+*Strongest objection:* S03's return-later, S06's two-same-id and S09's
+reconnect-duplicate-out-of-order have no owner: without a core event plane
+someone must keep running state addressable while its page and its extension
+author module are both gone — either a hidden long-lived default broker (B
+becomes A with extra ceremony) or the responsibility lands on adapters, which
+D06 will score as adapter burden. Also a new service author must know every
+port pair, so progress may end up smuggled per-extension.
+*Settling evidence:* the designer writes S03 (progress after page destroyed and
+after the offering extension is unmounted, S10) and S09 (duplicate/out-of-order
+events on reconnect) using only B's declared operations; if the trajectory needs
+an implicit always-on subscription ledger, B is either smuggling A or has no
+owner for these scenarios, both of which the attacker records.
+
+## Centre of gravity
+
+All of S01–S12 are open in the ledger; R001 cannot carry them. This round's
+centre is the cluster that decides whether a core is admissible at all:
+**S01, S04, S05, S11** — simple text-only agent, no-chat service,
+no-session domain module, absent capability. S03/S06/S09 are carried as the
+structural stress on B (do they have an owner, or does B secretly need A?).
+The designer must produce, per candidate, the core's declared operations, the
+per-scenario step trajectories with the owning module named per step, and the
+deletion consequence for each claimed-core mechanism. No scenario may be marked
+"later": an unowned step is an open question, not a gap in this round's plan.

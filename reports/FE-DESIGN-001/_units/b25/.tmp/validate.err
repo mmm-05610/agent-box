@@ -1,0 +1,2 @@
+  invalid: ledger row FE-CE-001 needs 8 pipe fields (id|round|severity|status|invariant|title|evidence|targets)
+  invalid: ledger block present but contained no valid rows

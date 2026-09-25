@@ -1,0 +1,31 @@
+{
+  "status": "FE_CP_CANDIDATE_BUILT_UDP_PROBE_CORRECTED_PI_LOCK_EROFS_NOT_PAIRED",
+  "frontend": "90ca17b8cb7feca3a83eec5ad8b1ec31670e729c",
+  "frontend_integration_source": "d14ac6e0e6dee507541536dee980809b8bec11cb",
+  "backend": "c83dbc9d4e0318034cc4ff6979ceeaddf270bf14",
+  "frontend_receipt": "agents/FC/outbox/FC-0080.md",
+  "backend_receipt": "agents/BC/outbox/BC-0070.md",
+  "backend_note": "BC-0038/39 fake ACP Server CLI gates passed. BC-0048 direct Pi RPC-to-ACP initialize/session/new passed with current user Pi CLI and no prompt. BC-0049 at earlier SHA 1a30dc8e verified actual Server CLI same-runtime HTTP identity/project plus execution.port_factory/open_execution worker register/start/create through the fixed bridge and Pi CLI, without prompt/model request. BC-0070 at current native tree verified the C-0058 Server-only half, actual ASGI ingress had zero send/unknown routes and 12 relevant DB tables had zero rows. I-PI-EROFS-001 and BC-0076 identify the Pi GLOBAL settings warning directly as lock directory mkdir→EROFS; current test sandbox mount is read-only, C-DEC-0002 requests exact one-time lock write permission. BC/H investigate user-approved svkozak/pi-acp versus Go bridge; real Work Core turn dispatch, createAndSend, permission and conversation remain unverified.",
+  "remaining_frontend": [
+    "FC-0065 built an eight-package FE candidate; FC-0068 added a dedicated no-send Electron smoke at ccc1b3c1. The C-0048 actual Server pairing attempt FC-0069/BC-0062 failed because an Electron child made a non-loopback IPv6:443 connection before the first local Server connection; that batch had no retry",
+    "FC-0072 prepared a clean test-only single-switch and private-root/port candidate at 68394f8b. C-0056 Server attempt stopped before READY on a test supervisor timing error (BC-0067); FC-0074 confirms Electron did not launch. BC-0068 repaired the test supervisor. C-0058 no-send attempt FC-0076/BC-0070 passed UI and Server partial gates with no Send but was marked FAIL by the old any-nonloopback-connect rule. I-ELECTRON-ROOTCAUSE-001 and FC-0089 corrected that interpretation: the observed remote connect target is Chromium HostResolverManager UDP IPv6 reachability probe, not evidenced TCP443/data transfer. A separate spellcheck .bdic GET request is recorded, completion/transmission not yet shown. FC is correcting socket/send classification and network risk remains separate from functionality. Product default and credentialed full pairing remain unverified",
+    "paired FE/BE application and real native-agent verification"
+  ],
+  "paired_verified": false,
+  "historical_baseline1": {
+    "status": "FE_BASELINE1_VERIFIED_BE_OFFLINE_ONLY_NOT_PAIRED",
+    "frontend": "d44a5f8e2ccfbbeb7c330ecb9d0ba6e72859b0f4",
+    "backend": "60d868ef258e4044a03c8650312431e5b57a48ab",
+    "received_frontend": {
+      "f1_original": "ce7919304deb987285cd9c84b1ebf0f1215d11f8",
+      "f3_original": "fb87a2929d56b6a10121f1aed468cf3d15070104",
+      "f1_integrated": "bc58c021048a20b9203dcb5bda3864a53907f481",
+      "f3_integrated": "2ee1d69bbbb6e6e7e959b8c796f1dd2d5ee6ac54"
+    },
+    "frontend_receipt": "agents/FC/outbox/FC-0002.md",
+    "frontend_clean_correction": "agents/FC/outbox/FC-0003.md",
+    "remaining_frontend_at_that_time": ["P2-2 item 4: Requests placement and application probes"],
+    "paired_verified": false
+  },
+  "budget_ledger": "/home/maoqh/projects/ordessa/control/missions/HD-001/budget/ledger.json"
+}

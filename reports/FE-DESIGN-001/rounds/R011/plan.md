@@ -1,0 +1,49 @@
+CANDIDATES: A
+DIMENSION: D09-splits-truth
+
+Single candidate this round. R009's design bytes (`cf554e67…`) are not integrated — its verify
+never passed — so the artifact that matters is still the saved `49df1e9345ab…` bytes plus the
+un-integrated R009 additions, and neither of this round's findings is answered by anything R009
+added. A fork into a second host core becomes mandatory only if an attack produces a `holds`
+major showing that A's *structure* (namespaced directory + per-resource cursor stream + typed
+pump + subscriber-chosen `from_cursor`, host holding no content authority) cannot be made
+self-consistent at all. Naming or bounding the storage that catch-up already presupposes is a
+repair inside A, not a rival core; so one candidate.
+
+DIMENSION: D09-splits-truth. The rotation rule forbids reusing the immediately previous clean
+dimension (R008 used D06-adapter-burden, R009 used D05-fallback-unknown and was never accepted),
+and D09 has never been used on this lineage. It is also the exact fit for the user-supplied focus:
+"does the replay promise agree with the 'no core event store' responsibility?" That is a
+two-owners-of-one-fact question: the delivery rule says the host emits *stored* envelopes; the
+mechanism ledger says the host holds no store. D08-reduction is folded in only as a
+sub-question — a mechanism declared `removed` that is in fact load-bearing is also a reduction-
+table error — but the primary axis is ownership of the fact "which events exist for this
+resource", not mechanism counting.
+
+THE QUESTION THIS ROUND MUST SETTLE
+When `subscribe(id, from_cursor=c)` emits envelopes with `seq >= c` that were pumped while no
+subscriber existed, which party retained those payloads, by what name and rule, and when are they
+released? If no party can be named from the candidate's own text, the candidate either holds an
+unnamed unbounded core buffer or its catch-up guarantee is empty — and S03 (leave the page,
+return hours later) fails either way. Secondarily: after a link drop with no `teardown`, which
+party is able to say that a namespace's resources no longer exist?
+
+Core bet (A, one sentence): a namespaced directory of cursor-streamed resources with same-ns
+scoped subscriber handles, a subscriber-chosen single `from_cursor`, adapter-owned open CapMap
+and typed actions, and a typed `pump`, holding no content authority.
+
+Strongest objection against A: its only delivery rule is written as a *replay* rule over stored
+envelopes, while its mechanism table advertises the store as removed. Either the store is core
+and must be named, bounded and given an owner, or the replay rule is false and three scenarios
+plus the user's own T-Boring anchor are not covered. Silence is not a resolution, and no scenario
+table currently names who keeps the backlog.
+
+Centre-of-gravity scenarios: S03 and S10 (catch-up and replay), S04 step 4 (head envelope
+delivered to a late subscriber), S09 (catch-up line), S02 (post-reconnect continuity). S01, S06,
+S08, S11, S12 remain claimed and must not be weakened. `FE-CE-007` stays OPEN on the discarded
+alternative B's ledger and may not be converted by any verdict door; `FE-CE-018`'s pass does not
+inherit if the interface surface moves.
+
+Boundary discipline: necessity claims ride on deletion experiments, not on "it prevents an
+over-reach". No scenario may be altered and no requirement raised without a named
+`SCENARIO_CHANGE_PROPOSAL:` line.

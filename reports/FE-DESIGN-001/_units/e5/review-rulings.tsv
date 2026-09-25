@@ -1,0 +1,15 @@
+round|digest|kind|id|verdict|evidence
+R999|no-candidate|sc|S01|trajectory_ok|e
+R999|no-candidate|sc|S02|trajectory_ok|e
+R999|no-candidate|sc|S03|trajectory_ok|e
+R999|no-candidate|sc|S04|trajectory_ok|e
+R999|no-candidate|sc|S05|trajectory_ok|e
+R999|no-candidate|sc|S06|trajectory_ok|e
+R999|no-candidate|sc|S07|trajectory_ok|e
+R999|no-candidate|sc|S08|trajectory_ok|e
+R999|no-candidate|sc|S09|trajectory_ok|e
+R999|no-candidate|sc|S10|trajectory_ok|e
+R999|no-candidate|sc|S11|trajectory_ok|e
+R999|no-candidate|sc|S12|trajectory_ok|e
+R999|no-candidate|ce|FE-CE-001|pass|e
+R999|no-candidate|ce|FE-CE-002|pass|e

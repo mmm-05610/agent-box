@@ -1,0 +1,67 @@
+{
+  "harnesses": [
+    {
+      "adapter": {
+        "args": [
+          "/runtime/artifacts/pi-runtime/node_modules/@automatalabs/pi-acp/dist/index.js"
+        ],
+        "command": "/usr/bin/node",
+        "environment": {
+          "PI_CODING_AGENT_DIR": "/runtime/home/.pi/agent",
+          "PI_OFFLINE": "1",
+          "PI_SKIP_VERSION_CHECK": "1",
+          "PI_TELEMETRY": "0"
+        }
+      },
+      "capabilityClaims": {
+        "attach": true,
+        "finish": true,
+        "native_continuation": true,
+        "observe": true,
+        "permissions": false,
+        "start": true,
+        "steer": false,
+        "stream": true
+      },
+      "controlOptions": {
+        "model": []
+      },
+      "credentialEnvironment": "DEEPSEEK_API_KEY",
+      "credentialKind": "api-key",
+      "id": "pi",
+      "modelControlId": "model",
+      "projectionFiles": [
+        {
+          "source": "deploy/pi/models.json",
+          "target": "/runtime/home/.pi/agent/models.json"
+        },
+        {
+          "source": "deploy/pi/settings.json",
+          "target": "/runtime/home/.pi/agent/settings.json"
+        }
+      ],
+      "runtimeArtifactMounts": [
+        {
+          "target": "/runtime/artifacts/pi-runtime",
+          "token": "pi-runtime",
+          "treeDigest": "sha256:afe238d3439df45af77581f7bc969897aa445a1c7b9a686c36c9a31dafa8420f"
+        }
+      ],
+      "sessionStore": {
+        "kind": "sessions-subtree"
+      },
+      "stateProjection": {
+        "target": "/runtime/home/.pi/agent/sessions"
+      },
+      "timeoutMs": 120000,
+      "usageProbe": {
+        "format": "pi-acp-journal",
+        "journalSuffix": ".jsonl"
+      },
+      "wireProtocols": {
+        "openai-chat": "openai-completions"
+      }
+    }
+  ],
+  "schemaVersion": 1
+}

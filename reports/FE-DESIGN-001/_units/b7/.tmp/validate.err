@@ -1,0 +1,4 @@
+  invalid: verdict S01: status [holds] is not one of {trajectory_ok|trajectory_broken|insufficient_evidence}
+  invalid: verdict block had no valid rows
+  invalid: no valid verdict block (<<<FE-VERDICT-START>>> ... <<<FE-VERDICT-END>>>)
+  invalid: this role must rule at least 12 scenarios; it ruled 0

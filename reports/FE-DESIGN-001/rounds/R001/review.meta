@@ -1,0 +1,5 @@
+phase=review
+role=candidate-reviewer
+outcome=bad
+reason=contract_violation
+at=2026-09-21T18:49:39Z

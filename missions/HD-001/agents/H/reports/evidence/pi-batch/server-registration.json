@@ -1,0 +1,11 @@
+{
+ "artifact": "/tmp/hd001-r1/artifacts/pi-runtime",
+ "dataRoot": "/tmp/hd001-r4/data",
+ "deployment": "/tmp/hd001-r4/deployment.json",
+ "mountToken": "pi-runtime",
+ "pid": 277752,
+ "pluginRoot": "plugins/agent-box-harnesses",
+ "port": 32933,
+ "startedAt": "2026-09-22T17:23:54.196924+00:00",
+ "treeDigest": "sha256:afe238d3439df45af77581f7bc969897aa445a1c7b9a686c36c9a31dafa8420f"
+}

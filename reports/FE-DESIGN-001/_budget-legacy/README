@@ -1,0 +1,5 @@
+Migration note, not a reset.
+Before: sol-budget.env predated the SOL_INITIALIZED field, so the new validator denied it.
+Evidence kept here, including the log with 0 call rows -> 0 Sol calls had been made.
+After: the record was recreated in the new format at 0, matching the log.
+Audited by: control/design-loop/loopctl sol-audit

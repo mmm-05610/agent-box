@@ -1,0 +1,42 @@
+<<<FE-OUT-START>>>
+# Candidate Review — R001 (D12-authority-boundary)
+
+## Boundary scan
+
+The core defines namespaces, resource-directory, event-stream (per-resource seq-ordered), open capability map, typed action, and a generic fallback view. The envelope structure is `{resource_id, seq, ts, kind:string, payload_schema_id:string, payload:RegisteredType}` — no `role`, `turn`, `assistant`, `message`, `session`, or `run` field. The capability map is open (adapter-named strings); the host defines no vocabulary. The `kind` field is a string filter label, not a host-interpreted type. The host does not know what a resource *means*, only that it exists under a namespace and has a declared kind. No service, model, harness, or conversation assumption is smuggled under a neutral name. The subscription lifecycle awareness (page destroy, resolver unmount) is a practical leak-prevention mechanism, not a domain-content assumption. The extension author's cost is paid explicitly in §R.7 (six-item adapter onboarding; one resolver registration for views); no required burden is relocated to "an extension provides it" without the cost being itemized.
+
+## Escape-hatch scan — checked, not implied
+
+- `action.invoke(resource_id, action_type:string, params:RegisteredType) → Result{RegisteredType}`: action_type is a registry key with concrete param/result types; the host "refuses to deliver any payload_schema_id whose type was not registered." This is not `execute(any)`. Checked in §R.2.
+- Subscriber receives `SubscriberScope{descriptor, subscriptionHandle, typedInvoker}`, "not a capability grab-bag" (§R.4). No omnipotent context object. Checked.
+- Event stream is per-resource with typed envelopes; there is no global event bus, no `emit(any)`, no arbitrary topic subscription. §R.2 signature: `stream.subscribe(resource_id, from_cursor?) → Subscription{close(), onNext(Envelope)}`. Checked.
+- No free-form params or results in actions. No unregistered payload delivery. Checked.
+
+## Convergence verdict
+
+The regression set (FE-CE-001, FE-CE-002) replays cleanly. Three scenarios (S06, S09, S12) lack a fully specified ordered event trajectory with per-step owners and deletion consequences. S09 is marked partial by the artifact itself. The convergence gate (all twelve covered) is NOT met. The round should not be read as converged.
+
+## Thinness notes
+
+S06 states a structural invariant (namespaced composite key) but does not trace the concrete event sequence: service-A-announces-job-1 → service-B-announces-job-1 → user-subscribes-to-A-job-1 → user-subscribes-to-B-job-1 → events-arrive-in-correct-namespace. S12 names the outcome ("other namespaces unaffected") but does not specify the trigger event (who calls `namespace.teardown`? adapter disconnect? user removal in settings?) or the user-observable sequence after removal. S09 step 3 ("host-assigned (namespace_id, action_seq)") is a design point, not a traceable trajectory with named owners.
+<<<FE-OUT-END>>>
+
+<<<FE-VERDICT-START>>>
+S01|trajectory_ok|§R.5-S01 steps 1-5; owners tagged per step; deletion via R.6 (namespaces→step1, event-stream→step4, typed-action→step3)|nothing
+S02|trajectory_ok|§R.5-S02 steps 1-3; owners tagged (adapter, extension, adapter+extension); deletion via R.6 core mechanisms used in each step|nothing
+S03|trajectory_ok|§R.5-S03 steps 1-4; owners tagged; R.6 explicitly names "S03 step 4" as deletion consequence for ordered-replayable-stream|nothing
+S04|trajectory_ok|§R.5-S04 steps 1-3; owners tagged; R.6 names "S04 passes without it" for host-session-object and host-turn/role-envelope-field removal|nothing
+S05|trajectory_ok|§R.5-S05 steps 1-3; owners tagged; R.6 names "S05" as deletion consequence for resource-directory|nothing
+S06|insufficient_evidence|§R.5-S06 is a structural invariant sentence, not an ordered event sequence; no per-step owners enumerated|A concrete trajectory: (1) adapter-A announces job-1 (adapter), (2) adapter-B announces job-1 (adapter), (3) user subscribes to (ns_A,job-1) (host), (4) user subscribes to (ns_B,job-1) (host), (5) events arrive in correct namespace (host), (6) deletion: removing namespaces breaks step 5 — ids cross. Currently only the conclusion is stated.
+S07|trajectory_ok|§R.5-S07; three implied steps (announce[adapter], no-match[host], render[host]); R.6 names "S07 step 2" for generic-fallback-view deletion|nothing (terse but checkable)
+S08|trajectory_ok|§R.5-S08; steps: announce data.ref[adapter], announce runner[adapter], view resolves both[extension], invoke execute[extension→host→adapter]; R.6 names "S08 step 2" for typed-action deletion|nothing
+S09|insufficient_evidence|§R.5-S09 step 3 is a design assertion ("host-assigned (namespace_id, action_seq)") with no concrete event sequence showing who deduplicates and what happens when the adapter does not declare dedup; artifact itself marks this Partial|A concrete replay trajectory: (1) invoke sent [extension], (2) link drops [host], (3) Unknown returned [host], (4) reconnect [adapter], (5) adapter replays with (resource_id,seq) [adapter], (6) host dedups [host], (7) action idempotency check with (ns,action_seq) [host+adapter], (8) duplicate suppressed or forwarded [adapter] — with owner per step and deletion consequence for each core step in that sequence.
+S10|trajectory_ok|§R.5-S10; steps: resolver throws[extension], host closes handles[host], remote emits[adapter], re-subscribe from cursor[extension+host]; R.6 event-stream deletion breaks re-subscribe step|nothing
+S11|trajectory_ok|§R.5-S11; steps: announce with not_supported[adapter], capabilities.get[host], render state[extension], invoke→CapabilityAbsent[host]; R.6 names "S11 step 2" for capability-declaration deletion|nothing
+S12|insufficient_evidence|§R.5-S12 states the invariant ("other namespaces unaffected") but does not trace the removal trigger (who calls teardown? via what event?) or the user-observable sequence (user sees resource disappear, other modules remain, no error)|A concrete trajectory: (1) user/system triggers adapter disconnect or removal [owner?], (2) namespace.teardown called [host], (3) all subscriptions closed [host], (4) resources removed from directory [host], (5) other namespaces' resources remain in directory and interactive [host], (6) deletion consequence: removing namespace isolation breaks step 5. Currently step 1 has no specified actor or trigger mechanism.
+<<<FE-VERDICT-END>>>
+
+<<<FE-REPLAY-START>>>
+FE-CE-001|pass|(1) adapter announces config.tree, (2) user views passive resource without starting agent, (3) expect no conversation-shaped content forced by core|§R.2 `action.invoke(resource_id, action_type:string, params:RegisteredType) → Result{RegisteredType}` is a typed current-value return; §R.5-S03: "For passive snapshot resources: action.invoke('read') returns current value without replay." The core has a value path. The original attack (no value primitive, content forced into seq-log) cannot occur because invoke→Result is an orthogonal read mechanism that requires no subscription and no replay. Rejection holds unchanged.
+FE-CE-002|pass|(1) adapter announces config.tree with no session-recovery features, (2) generic fallback view renders it, (3) core CapSet has cancel/history/resume vocabulary baked in, (4) passive resource displayed as live agent with run-strip|§R.2: "The host defines no set of valid capability names; the adapter populates the map with whatever names describe its features." Closed CapSet with session-recovery vocabulary is gone. §R.4 fallback: "renders: resource kind, declared action names with their typed parameter schemas, the open CapMap entries as plain labelled name→state pairs (no icon affordance, no invocation button, no 'last envelope as output' treatment), the last envelope's payload_schema_id (not its content)." Step (3) blocked — no core vocabulary for cancel/history/resume. Step (4) blocked — fallback has no run-strip and no invocation affordance. The attack sequence cannot complete.
+<<<FE-REPLAY-END>>>

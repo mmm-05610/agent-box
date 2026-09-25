@@ -1,0 +1,4 @@
+seq|reserved_at|kind|reason|key|outcome|completed_at|call_id
+1|2026-09-22T02:56:17Z|key|r|k1|PENDING|-|SOL-01-02561726228
+2|2026-09-22T02:56:17Z|key|r|k2|PENDING|-|SOL-02-025617640
+3|2026-09-22T02:56:18Z|key|r|k3|PENDING|-|SOL-03-02561830061

@@ -1,0 +1,43 @@
+[run-group] group=server phase=research sandbox=per-group-bwrap inner=FAKE(no-model)
+EXEC group=server phase=research pid=2 uid=1000 home=/home/agent
+== WRITE probes ==
+PROBE write:outbox writable /outbox
+PROBE write:reports writable /reports
+PROBE write:tests writable /tests
+PROBE write:work writable /work
+PROBE write:source denied /source
+PROBE write:inbox denied /inbox
+PROBE write:ctrl denied /control-loop
+PROBE write:budget denied /control-loop/controller/ledger
+PROBE write:etc denied /etc
+PROBE write:root denied /root
+PROBE write:run denied /run
+== READ (source view must be readable) ==
+PROBE read:source-top absent /source/src
+PROBE read:own-outbox present /outbox
+== ISOLATION: things that must be absent ==
+PROBE absent:host-home absent /home/maoqh
+PROBE absent:host-home2 absent /home/agent/../maoqh
+PROBE absent:qoder-cfg absent /home/maoqh/.qoder
+PROBE absent:codex-cfg absent /home/agent/.codex
+PROBE absent:docker-sock absent /run/docker.sock
+PROBE absent:other-server absent /worktrees/backend-loop/server
+PROBE absent:other-execution absent /worktrees/backend-loop/execution
+PROBE absent:other-harness absent /worktrees/backend-loop/harness
+PROBE absent:other-platform absent /worktrees/backend-loop/platform
+PROBE absent:integration-tree absent /home/maoqh/projects/ordessa/worktrees/integration-linux
+PROBE absent:qa-scratch absent /tmp/qa-line
+PROBE absent:reviewer-sandbox absent /tmp/audit-fe-2
+PROBE read:private-home present /home/agent
+== Sol/codex must be unreachable from the executor ==
+PROBE sol-entry missing codex-not-in-sandbox
+PROBE absent:codex-bin absent /usr/local/bin/codex
+PROBE absent:codex-bin2 absent /usr/bin/codex
+== network: host loopback services must be unreachable ==
+PROBE net:trial unreachable 18790
+PROBE net:cdp unreachable 9222
+== symlink escape attempt: link into read-only source, write through it ==
+PROBE symlink-escape denied /outbox/esc->/source
+== subprocess escape attempt: re-exec bwrap from inside? ==
+PROBE nested-bwrap denied cannot-spawn-usable-bwrap
+EXEC done

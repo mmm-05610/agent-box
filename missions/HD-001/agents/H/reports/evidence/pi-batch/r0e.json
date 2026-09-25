@@ -1,0 +1,244 @@
+{
+  "artifact": {
+    "adapter": {
+      "entry": "node_modules/@automatalabs/pi-acp/dist/index.js",
+      "package": "@automatalabs/pi-acp",
+      "version": "0.5.0"
+    },
+    "bytes": 64909674,
+    "entries": 15458,
+    "output": "/tmp/agentbox-pi-gate-2zq0k8m2/artifacts/pi-runtime",
+    "packages": 317,
+    "sourceLockDigest": "sha256:75e25605bd3b57da85fd098dc160f7bb7ef5cea2fccf52755d8b85b3434c1240",
+    "treeDigest": "sha256:afe238d3439df45af77581f7bc969897aa445a1c7b9a686c36c9a31dafa8420f"
+  },
+  "checkpointAfterFirst": {
+    "files": [
+      "pi/--workspace--/2026-09-22T17-19-16-499Z_01a0ca21-0413-79f5-b91d-9d47a9cf8eac.jsonl",
+      "pi/pi/MDFhMGNhMjEtMDQxMy03OWY1LWI5MWQtOWQ0N2E5Y2Y4ZWFj.json"
+    ],
+    "harnessType": "pi",
+    "nativeSessionId": "01a0ca21-0413-79f5-b91d-9d47a9cf8eac",
+    "resumable": true,
+    "schemaVersion": 3
+  },
+  "checkpointNativeIdStable": true,
+  "cleanup": {
+    "adapterProcessesRemoved": true,
+    "authorizedLocatorDeleted": null,
+    "gateTokenRemoved": true,
+    "madeWritable": 15545,
+    "removed": true,
+    "workerProjectionsRemoved": true,
+    "workspaceRemoved": true
+  },
+  "credential": {
+    "credentialObservation": "observed on the fake endpoint",
+    "injectedTokenReachedProvider": true,
+    "tokenInEvents": false,
+    "tokenInReportableState": false,
+    "unauthorizedRequests": 0
+  },
+  "deltaAttribution": {
+    "deltas": 2,
+    "perTurn": {
+      "execution_38f0425c493143c3b0b313c8d280882a": 1,
+      "execution_60928a54d5be4118885451b5627afcf7": 1
+    },
+    "unattributed": 0
+  },
+  "egress": {
+    "auditPresent": true,
+    "denied": [],
+    "guardExpected": true,
+    "guardLoaded": true
+  },
+  "mode": "loopback-fake-endpoint",
+  "nativeSessionId": "01a0ca21-0413-79f5-b91d-9d47a9cf8eac",
+  "provider": {
+    "baseUrl": "http://127.0.0.1:42707",
+    "paths": [
+      "/chat/completions",
+      "/chat/completions"
+    ],
+    "requests": [
+      {
+        "authorizationMatchesInjectedToken": true,
+        "contentType": "application/json",
+        "index": 1,
+        "path": "/chat/completions",
+        "structure": {
+          "maxCompletionTokens": null,
+          "maxTokens": 64,
+          "messages": [
+            {
+              "chars": 2615,
+              "containsRound1Assistant": false,
+              "containsRound1User": false,
+              "role": "system"
+            },
+            {
+              "chars": null,
+              "containsRound1Assistant": true,
+              "containsRound1User": true,
+              "role": "user"
+            }
+          ],
+          "model": "deepseek-flash",
+          "stream": true,
+          "temperature": null,
+          "thinking": {
+            "type": "disabled"
+          },
+          "toolCount": 4
+        }
+      },
+      {
+        "authorizationMatchesInjectedToken": true,
+        "contentType": "application/json",
+        "index": 2,
+        "path": "/chat/completions",
+        "structure": {
+          "maxCompletionTokens": null,
+          "maxTokens": 64,
+          "messages": [
+            {
+              "chars": 2615,
+              "containsRound1Assistant": false,
+              "containsRound1User": false,
+              "role": "system"
+            },
+            {
+              "chars": null,
+              "containsRound1Assistant": true,
+              "containsRound1User": true,
+              "role": "user"
+            },
+            {
+              "chars": 20,
+              "containsRound1Assistant": true,
+              "containsRound1User": true,
+              "role": "assistant"
+            },
+            {
+              "chars": null,
+              "containsRound1Assistant": false,
+              "containsRound1User": false,
+              "role": "user"
+            }
+          ],
+          "model": "deepseek-flash",
+          "stream": true,
+          "temperature": null,
+          "thinking": {
+            "type": "disabled"
+          },
+          "toolCount": 4
+        }
+      }
+    ],
+    "requestsBeyondBudget": 0,
+    "unauthorizedRequests": 0
+  },
+  "reopenObservation": {
+    "chunksAfterReopenPrompt": [
+      {
+        "kind": "started",
+        "text": ""
+      },
+      {
+        "kind": "message.delta",
+        "text": "PI-GATE-NONCE-2B7D31"
+      }
+    ],
+    "chunksDuringReopen": [
+      {
+        "kind": "started",
+        "text": ""
+      }
+    ],
+    "nativeSessionIdStable": true,
+    "note": "Pi reopens its journal through the replaying session/load path, but that replay arrives before the prompt and is history, not this turn's stream; continuity is proven by the reopened session carrying the stored turn into its provider request.",
+    "providerRequests": 2,
+    "reopenedRequests": 1,
+    "replayedStoredTurn": false,
+    "stateFiles": 4,
+    "stateResumable": false,
+    "storedTurnReachedTheModel": true
+  },
+  "result": "PI_PRODUCTION_CHAIN_GATE_OK",
+  "rounds": {
+    "first": {
+      "completedSeq": 9,
+      "deltaSeq": [
+        5
+      ],
+      "deltaText": [
+        "PI-GATE-NONCE-1F4A9C"
+      ],
+      "deltasBeforeCompletion": true,
+      "state": "completed"
+    },
+    "second": {
+      "completedSeq": 18,
+      "deltaSeq": [
+        14
+      ],
+      "deltaText": [
+        "PI-GATE-NONCE-2B7D31"
+      ],
+      "deltasBeforeCompletion": true,
+      "state": "completed"
+    }
+  },
+  "run": {
+    "removed": true,
+    "temporary": "/tmp/agentbox-pi-gate-2zq0k8m2",
+    "workspace": "/tmp/agentbox-pi-gate-2zq0k8m2/workspace"
+  },
+  "script": "scripts/server-round1/pi-production-chain-gate.py",
+  "sessionId": "session_b1bb6607601f42378d27fec3d7ec0f71",
+  "stateScan": {
+    "bytes": 2375,
+    "files": 2,
+    "scan": "fail-closed audit; a hit would have failed the turn",
+    "tokenHits": [],
+    "tokenInState": false,
+    "truncated": {
+      "bytes": 0,
+      "entries": 0,
+      "oversize": 0
+    }
+  },
+  "template": {
+    "adapterEntry": "/runtime/artifacts/pi-runtime/node_modules/@automatalabs/pi-acp/dist/index.js",
+    "artifactTarget": "/runtime/artifacts/pi-runtime",
+    "credentialEnvironment": "DEEPSEEK_API_KEY",
+    "loopbackOverrideChanges": {
+      "providers.deepseek.baseUrl": [
+        "https://api.deepseek.com",
+        "http://127.0.0.1:42707"
+      ]
+    },
+    "nativeModelValue": "deepseek/deepseek-flash",
+    "officialBaseUrl": "https://api.deepseek.com",
+    "outputTokenLimit": 64,
+    "productModelId": "deepseek-flash"
+  },
+  "unknownModel": {
+    "deltas": [],
+    "providerRequestCountAvailable": true,
+    "providerRequestsAfterRefusal": 0,
+    "reasonMentionsModel": true,
+    "reasons": [
+      "SidecarError: SIDECAR_OP_FAILED: Harness model is not available: deepseek-unknown"
+    ],
+    "refusalObservedAs": "the turn failed with the sidecar's model-availability reason",
+    "refusedBeforeProviderRequest": true,
+    "state": "failed"
+  },
+  "worker": {
+    "path": "/home/maoqh/projects/agent-box-env-provider/workers/agent-box-worker/.acceptance-bundle-c12/agent-box-worker",
+    "sha256": "sha256:9d8df86d214bf2b3e99afa461bd5ca83c62caae847cec507ea20e2518ce97088"
+  }
+}

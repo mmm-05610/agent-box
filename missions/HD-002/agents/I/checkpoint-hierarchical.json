@@ -1,0 +1,179 @@
+{
+  "id": "CP-SESSION-001",
+  "revision": 2,
+  "status": "IN_PROGRESS",
+  "summary": "尚未达到用户验收：前端主体已集成，后端原生接线已开始落码，当前关键路径是connector与原生执行的配对。",
+  "next": "合入后端适配器与原生执行链，跑真实项目对话闭环，再发布固定可启动检查点。",
+  "evidence": "I本次读取C/FC/BC报告初始化分层面板；未重新运行测试。BC/FC部分旧状态行滞后，已按C较新交付记录标注。",
+  "sections": [
+    {
+      "id": "frontend",
+      "name": "前端整体检查点",
+      "status": "IN_PROGRESS",
+      "summary": "会话、项目选择及审批已集成；仍缺后端接入完成与最终产品装配。",
+      "next": "收F1 connector和F3未发文本修复，再与原生后端合起来验证。",
+      "blockers": "connector未交付；尚未完成新后端配对。",
+      "evidence": "agents/C/status.md；agents/FC/status.md，FC-0052/0053/0054",
+      "observed_at": "2026-09-23T04:46:09Z",
+      "modules": [
+        {
+          "name": "桌面壳与工作台",
+          "owner": "F0 / FC",
+          "status": "IN_PROGRESS",
+          "summary": "桌面能启动，最终基线装配和启动探针还需跟随新后端更新。",
+          "done": "旧Requests位置断言已调整，前一合并点构建和桌面冒烟通过。",
+          "doing": "准备新后端两命令启动验证。",
+          "next": "清理候选启用清单，验证前后端连接的是同一实例。",
+          "blockers": "等待connector与后端新启动入口。",
+          "evidence": "FC-0051；FC/status",
+          "observed_at": "2026-09-23T04:46:09Z"
+        },
+        {
+          "name": "连接管理与后端适配器",
+          "owner": "F1 / FC",
+          "status": "IN_PROGRESS",
+          "summary": "Ordessa适配器在写，尚未交付到集成版本。",
+          "done": "已明确首发返回真实会话ID及后端公开的Harness身份映射。",
+          "doing": "连接认证、Harness选择与请求/事件映射收尾。",
+          "next": "提交适配器和测试，由FC集成。",
+          "blockers": "真实ID返回和Harness选择必须与后端一致，不能暗选首个Profile。",
+          "evidence": "FC-0049/0053；C/status",
+          "observed_at": "2026-09-23T04:46:09Z"
+        },
+        {
+          "name": "项目与会话列表",
+          "owner": "F2 / FC",
+          "status": "DONE",
+          "summary": "必选项目、恢复上次选择、首发才建会话已集成，待整机共同验证。",
+          "done": "前端草稿、项目重验、真实会话身份及连接作用域记忆已落地。",
+          "doing": "本包无新实施；待集成反馈。",
+          "next": "用真实connector核对项目与侧边栏会话。",
+          "blockers": "无本包待裁项；整机证据尚未形成。",
+          "evidence": "F2-0007/0008；FC-0044",
+          "observed_at": "2026-09-23T04:46:09Z"
+        },
+        {
+          "name": "对话、思考与工具呈现",
+          "owner": "F3 / FC",
+          "status": "IN_PROGRESS",
+          "summary": "输入框尾项已集成，正在修切会话时未发送文本的保留。",
+          "done": "流式呈现与输入框草稿接入；断线保留文本测试已合入。",
+          "doing": "会话切换未发文本续批。",
+          "next": "交修复并在connector联调中验多轮对话和工具。",
+          "blockers": "真实事件仍待新后端接线验证。",
+          "evidence": "FC-0050/0052；C/status",
+          "observed_at": "2026-09-23T04:46:09Z"
+        },
+        {
+          "name": "权限审批与交互",
+          "owner": "F3 / F1",
+          "status": "IN_PROGRESS",
+          "summary": "审批已放进对话，不再常驻右栏；真实Agent审批往返未验。",
+          "done": "卡片按会话隔离，支持响应/失败呈现；界面测试通过。",
+          "doing": "等待适配器和后端确认支持的交互类型。",
+          "next": "真实触发审批并验证同意/拒绝；不支持的输入能力显式说明。",
+          "blockers": "不能把界面测试当作Agent真实审批通过。",
+          "evidence": "F3-0007；FC/status",
+          "observed_at": "2026-09-23T04:46:09Z"
+        }
+      ]
+    },
+    {
+      "id": "backend",
+      "name": "后端整体检查点",
+      "status": "IN_PROGRESS",
+      "summary": "已转向原生Agent路径并开始提交；仍在补齐服务接入与真实执行验证。",
+      "next": "BC收S/H包，完成原生启动与准入后验证项目目录、身份和审批。",
+      "blockers": "新原生链尚未整体验证，旧bwrap门不再算本阶段成果。",
+      "evidence": "agents/C/status.md（f71538a7）；BC旧status部分滞后，以C最新集成记录为准",
+      "observed_at": "2026-09-23T04:46:09Z",
+      "modules": [
+        {
+          "name": "Server与项目接入",
+          "owner": "S / BC",
+          "status": "IN_PROGRESS",
+          "summary": "项目门修改已被BC暂收，原生模式服务准入仍在收尾。",
+          "done": "S项目门包已集成；确定启动级原生模式，不增加逐项目混用。",
+          "doing": "原生请求准入、动态Harness身份与目录删除拒绝处理。",
+          "next": "核首发与续聊沿正确项目，不启动无效目录。",
+          "blockers": "需与F1公开契约一致。",
+          "evidence": "C/status；S-0015；C-0027/0028",
+          "observed_at": "2026-09-23T04:46:09Z"
+        },
+        {
+          "name": "执行组合与核心记账",
+          "owner": "BC",
+          "status": "IN_PROGRESS",
+          "summary": "原生执行连接处已有提交，尚未作为完整包交验。",
+          "done": "BC原生接线445f9c7与项目门暂收到f71538a7；核心仍沿用现有执行记账。",
+          "doing": "补齐bootstrap/Execution到原生Harness的调用链。",
+          "next": "验证创建、续聊、取消和未知终态不丢失。",
+          "blockers": "不得绕过Work Core记账或静默降级隔离路径。",
+          "evidence": "C/status；BC-0030",
+          "observed_at": "2026-09-23T04:46:09Z"
+        },
+        {
+          "name": "Harness与ACP接入",
+          "owner": "H / BC",
+          "status": "IN_PROGRESS",
+          "summary": "原生测试资产已交，只有fake peer证据，真实Agent闭环还未完成。",
+          "done": "H交clean测试包；报告17通过、6未测、1不支持。",
+          "doing": "BC接收测试资产并与原生执行入口拼接。",
+          "next": "验证已配置Agent在项目A/B运行及真实权限往返。",
+          "blockers": "fake peer不等于真实Agent验证。",
+          "evidence": "H-0007；C/status",
+          "observed_at": "2026-09-23T04:46:09Z"
+        },
+        {
+          "name": "启动与部署入口",
+          "owner": "BC / F0",
+          "status": "IN_PROGRESS",
+          "summary": "旧隔离部署不再作为前置，新原生Server启动说明和双进程验证尚未交。",
+          "done": "已明确沿用用户原生配置，不新增SecretStore产品。",
+          "doing": "准备原生Server启动参数与桌面连接参数。",
+          "next": "给出可重复启动命令并验证同实例连接。",
+          "blockers": "等待原生接线收口；无预算次数限制。",
+          "evidence": "C-0024/0025/0026；C/status",
+          "observed_at": "2026-09-23T04:46:09Z"
+        }
+      ]
+    },
+    {
+      "id": "integration",
+      "name": "整机与用户验收检查点",
+      "status": "NOT_STARTED",
+      "summary": "目前还不能交给用户做最终验收；前后端尚未完成新路径真实配对。",
+      "next": "配对版本跑项目首发、多轮、工具、审批与停止，再固定可启动工件。",
+      "blockers": "先完成connector和原生后端。",
+      "evidence": "agents/C/status.md；integration/checkpoint.json",
+      "observed_at": "2026-09-23T04:46:09Z",
+      "modules": [
+        {
+          "name": "真实对话闭环",
+          "owner": "C / FC / BC",
+          "status": "NOT_STARTED",
+          "summary": "还没有新原生前后端配对的真实对话通过证据。",
+          "done": "用户已取消调用次数限制；旧离线报告保留但不冒充新路径。",
+          "doing": "等待可运行配对。",
+          "next": "串行跑真实测试，记录失败点并定向修复。",
+          "blockers": "connector及原生后端未收口。",
+          "evidence": "C/status；I-DEC-0001答复",
+          "observed_at": "2026-09-23T04:46:09Z"
+        },
+        {
+          "name": "基线发布与用户试用",
+          "owner": "C",
+          "status": "NOT_STARTED",
+          "summary": "尚未发布可启动的Session基线，不是main已可用。",
+          "done": "已明确Profile及后续增量不纳入。",
+          "doing": "等待配对验证和候选清理。",
+          "next": "固定前后端版本、工件和启动命令，提交可验收状态。",
+          "blockers": "整体门未通过；不得用待定包默认禁用冒充干净基线。",
+          "evidence": "SESSION-CHECKPOINT.md；SESSION-BASELINE-TARGET.md",
+          "observed_at": "2026-09-23T04:46:09Z"
+        }
+      ]
+    }
+  ],
+  "try_it": ""
+}

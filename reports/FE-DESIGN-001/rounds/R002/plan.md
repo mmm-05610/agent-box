@@ -1,0 +1,43 @@
+
+CANDIDATES: A,B
+
+DIMENSION: D10-cross-module
+
+THE QUESTION THIS ROUND MUST SETTLE: Does the core need a first-class cross-namespace reference or join mechanism to satisfy S08, or can S08's "resource module + replaceable execution module cooperate" trajectory be achieved within a namespace-isolated core by a delegation pattern the core merely permits?
+
+---
+
+**Candidate A — Revision of R001 best (namespaced resource/event core), resolving S08 via explicit external-handle injection.**
+
+Core bet: The core remains a flat namespace-of-resources with no cross-namespace awareness. S08 cooperation is achieved when a *user-launched* coordinating extension receives two SubscriberScope handles (resource-ns, runner-ns) minted by the host on the user's explicit "pair these" action; the extension subscribes both handles independently and invokes typed actions across them. The core never holds a reference from one namespace into another; the joining is done by the extension with two scoped handles.
+
+Strongest objection: The R001 candidate's §R.4 says extensions "may not subscribe across namespaces." If the coordinating extension holds two handles from different namespaces and invokes actions on the runner based on events from the resource, a D10 attacker will argue the *pattern itself* is a hidden cross-namespace channel — the core is the mechanism enabling it by minting dual-scope handles, making "no cross-namespace subscription" a naming fiction. What fails if the handle-minting is removed: S08 step 2 (no typed invoke without a runner handle in scope).
+
+Settling evidence: A concrete ordered event trajectory for S08 showing (a) who mints each handle, (b) at what moment, (c) whether the core's `subscribe` API structurally prevents an extension from *discovering* the second namespace on its own (vs. receiving it from the user), and (d) what happens when the runner adapter is replaced (does the resource-ns extension's handle survive, go stale, or must it be re-minted?). Also: fix S06 with a step-by-step collision trajectory naming the owner per step; fix S09's broken idempotency trajectory or declare it partial with a named owner for each sub-step.
+
+---
+
+**Candidate B — Structurally different core: typed-reference graph as the host primitive.**
+
+Core bet: The host core is a directed graph of typed references between resources, where an edge is `(source_id, edge_type:string, target_namespace_id, target_local_id)`. Cross-namespace cooperation is native: the resource module declares an outgoing edge to a runner resource; the core resolves, subscribes, and relays events along edges. Identity and namespace isolation are enforced at the *edge-registration* boundary — only the adapter that owns the source may register edges out of its namespace, and the target namespace validates authorization. The core's primitive is not "flat namespace of resources" but "typed graph edges with namespace-scoped registration."
+
+Strongest objection: This is D12 bait — "edge" and "graph" are service-architecture assumptions. If the graph is the core, every passive resource (S05 config.tree) must exist in a graph even when it has no edges, and S01 (text round-trip) pays the cost of an unused edge system. The minimal core with no edges can do S01–S05; the graph is needed only for S08. A reduction attack (D08) will show: delete edges, route S08 through candidate-A-style handle injection, and the graph mechanism is surplus.
+
+Settling evidence: Show that at least one *additional* scenario beyond S08 fails if edges are removed (i.e., S10's re-subscription after runner replacement requires a persistent recorded relationship). If S08 is the *only* scenario that needs the graph, this candidate loses on minimality against A and should say so explicitly. Also show S06 trajectory: does edge registration across namespaces create the collision vector that namespaces were designed to close?
+
+---
+
+**Required scenarios currently uncovered and centre of gravity:**
+
+- S08: `insufficient_evidence` + internal contradiction (§R.4 "may not subscribe across namespaces" vs §R.5-S08 "Coordinating view resolves both"). Must be resolved or conceded this round. This is the D10 target.
+- S06: `insufficient_evidence` — structural key alone is not a trajectory. Both candidates must show an ordered event sequence with per-step ownership demonstrating that id collision, cache bleed, and authorization scope are structurally prevented, not merely "separate namespaces means separate dicts."
+- S09: `trajectory_broken` on the idempotency step. The (namespace_id, action_seq) mechanism is contested. At minimum, a named owner for each sub-step (who guarantees exactly-once invoke? what happens if the adapter replays the action after reconnect?) and the deletion consequence.
+
+S01–S05, S07, S10–S12: claimed in R001 but the independent-review rulings are bound to old bytes; the designer must replay them against the current revision without regression. They are not this round's centre but cannot silently break.
+
+---
+
+**Why D10, not D01/D03/D06:**
+
+D12 was the previous dimension and produced no held majors → off-limits per rotation rule. D10 is chosen because S08 contains a live *contradiction* (not just missing detail) between §R.4 and §R.5-S08, and the resolution determines whether the core's namespace isolation is a structural guarantee or a permission boundary that can be circumvented by design. This is the most consequential open question. D01 (S09 order/dedup) is important but its fix path is bounded (who owns idempotency: host/adapter/both). D03 (S06 identity) is a presentation gap — the mechanism is sound, the trajectory is not written. D06 (adapter burden) is the right *next* dimension once the core shape is settled this round.
+

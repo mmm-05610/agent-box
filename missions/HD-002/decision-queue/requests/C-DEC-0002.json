@@ -1,0 +1,10 @@
+{
+  "alternatives": "B：你在有正常 HOME 写权限的原生会话自行运行同等无 prompt 探针并提供脱敏结果，C/BC 不触用户锁；但需你操作，联调延后。C：暂不授予锁写权限，BC 保留 EROFS 根因和离线/fake 证据，真实首发继续阻塞。任何选项都不批准编辑 settings.json/auth、清理别人的锁、修改 HOME/agentDir/模型或强杀原 Pi。",
+  "created_at": "2026-09-23T07:53:36.451276+00:00",
+  "evidence": "I-PI-EROFS-001 第一手核旧 147-byte stderr：errno=EROFS、operation=mkdir、目标=settings.json.lock；BC-0072 scope=GLOBAL；BC-0076 复核原探针 env copy、当前 findmnt 用户 agentDir 所属 / ro、Pi proper-lockfile 以 settings 相邻 .lock 目录 mkdir/rmdir；当前该锁目录不存在，settings 文件未读取内容。I-CLOSEOUT-FOCUS-001 要求并行推进真实首发且权限缺口当轮入队。",
+  "id": "C-DEC-0002",
+  "impact": "A 需要让单次测试进程获得当前沙箱外 `/home/maoqh/.pi/agent/settings.json.lock` 的临时目录创建/释放权限；可能触发执行平台的额外权限审查。Pi 会读取现有用户原生 settings 以验证加载，但不输出内容或凭据，不发送 prompt/模型请求。旧错误直接原因已从 UNKNOWN 改为 mkdir→EROFS；旧 ACP ENOENT 与之是否同因仍未知。FE 无凭据外联归因、H 静态能力对照继续，不冻结全队。",
+  "question": "已核实 Pi 无 prompt 探针的 global settings 加载在创建 `/home/maoqh/.pi/agent/settings.json.lock` 临时锁目录时遇到 EROFS；当前测试沙箱把该用户目录所在挂载标为只读。是否授权 BC 在一次受控无 prompt 复验中，让原生 Pi 测试进程仅能按 Pi 自身机制对这个锁目录短暂 `mkdir`/`rmdir`，同时只读 settings.json，不改其内容、不改用户权限或配置？",
+  "recommendation": "A：授权这个精确锁路径的一次受控写入复验。C 协调单一真实 Agent 流、现有 Pi 身份和模型；BC 先核锁目录不存在及无其他 Pi 持有，运行 `--offline --no-tools --no-extensions` 的无 prompt `get_state`，只记 EROFS warning 是否消失、锁创建/释放、非秘密错误类别、无模型请求和进程清理；异常即停。完成后再单独核原生权限策略与真实首发条件。",
+  "title": "Pi 原生设置锁的最小测试写权限"
+}

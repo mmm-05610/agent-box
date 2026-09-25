@@ -1,5 +1,14 @@
 # Current state
 
+**当前开发起点：**[linux-native-dev-0](development-baseline.json) 已固定，
+两仓集成工作区干净、四条源线为其祖先、协议摘要一致（I 复核）。
+允许据此组织后续开发，已知缺陷分配见 [development-layout.md](development-layout.md)。
+这不是 Linux 全链运行或用户验收通过。
+
+**2026-09-21 更新：**已迁到 native Linux；下文服务 PID、端口可达性和 Windows
+试用窗口均为 09-20 历史快照，不代表新环境运行状态。当前源码盘点及下一步见
+[Linux 基线计划](linux-native-baseline-plan.md)。本轮未启动服务、未运行产品验收。
+
 Written 2026-09-20 by the cleanup executor, from first-hand observation of the
 live process table, the git worktrees, and the preserved records. Every claim
 below is either **实测** (observed by the cleanup executor on 2026-09-20), or
@@ -75,21 +84,25 @@ manifest (`archive/legacy-scheduling/…/manifest.json`), not re-verified here.
 
 ## 2. Integrated (the two sides actually run together, verified)
 
-**Not achieved.** No full-stack cross-repository integration was performed.
+**历史主链路曾跑通；完整验收未闭环，新 Linux 基线尚未验证。**
+2026-09-21 校正：原清理报告据独立审阅缺失推导“从未联调”，该推导不成立。
 
 - **引用**: order `42` required two gates (backend READY *and* desktop READY) plus a
   released writer lease before taking over integration. The desktop side recorded
   `writer_lease=RELEASED` and self-reported `DESKTOP_IMPLEMENTATION_READY`
   (`status.md:102–127`), but the backend side's independent closure never arrived,
-  so `42` never passed its dual gate and no cross-repo integration ran.
+  which leaves an independent-review evidence gap, not proof that integration never ran.
+  The archived `status.md:90–101` records registration on user authorisation plus
+  executor self-review and an integration owner; `docs/acceptance/round-5.md`
+  `ACC-R5-10` records five real UI messages and replies through the full chain.
 - **引用 — what *is* real**: both sides were built against the **same wire**: the TS
   and generated-artifact wire digests were recomputed in place in the front-end
   worktree and matched the locked values (`status.md:128–131`). So the *contract*
-  was aligned; the *running of the two together* was not verified.
+  was aligned; runtime integration evidence is separately recorded in `ACC-R5-10`.
 - **实测**: as of this cleanup, the running trial server loads the backend tree and
   the user's app is a Windows-side frozen copy of the chat tree — that is a
-  **de-facto** pairing in front of the user (see §3), but it is not a recorded,
-  verified integration result, and it has open defects.
+  historical pairing in front of the user (see §3), with recorded end-to-end
+  replies and open defects, not a completed acceptance or a current Linux result.
 
 ---
 
@@ -157,7 +170,7 @@ Their findings were turned into orders (`P41`, `P42`, `106`, `108`, `110`, `120`
 | Typed upstream cause on the live leg | `150` on the runtime tree | the window is not running the runtime tree at all; structurally invisible in this window |
 | Credential self-service | `151` (not implemented) | no wire surface exists yet |
 | Visible wire-host failure | `P70` stage 2 (in flight on the chat tree) | not in the frozen Windows copy the user is running |
-| Two sides verified together | order `42` dual gate | the independent backend closure never happened |
+| Complete integrated acceptance | order `42`, `ACC-R5` | historical end-to-end replies exist; independent review and defect closure remain incomplete; native Linux must be reverified |
 
 **Note on version identity (实测):** the running server's *process* started at 09:45
 and its `PYTHONPATH` points at the env-provider worktree, whose HEAD is now

@@ -1,0 +1,11 @@
+{
+ "artifact": "/tmp/hd001-c1/r1/artifacts/codex-runtime",
+ "dataRoot": "/tmp/hd001-c1/r1/data",
+ "deployment": "/tmp/hd001-c1/r1/deployment.json",
+ "mountToken": "codex-runtime",
+ "pid": 307531,
+ "pluginRoot": "plugins/agent-box-harnesses",
+ "port": 55009,
+ "startedAt": "2026-09-22T17:56:29.355723+00:00",
+ "treeDigest": "sha256:9051b844a8feeb241667dd0cc03e80d082e140e88e49ecb3f195385e209f2ca1"
+}

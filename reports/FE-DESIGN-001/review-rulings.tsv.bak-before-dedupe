@@ -1,0 +1,43 @@
+round|digest|kind|id|verdict|evidence
+R001|no-candidate|ce|FE-CE-003|holds|S09 double-execution guarantee is deferred to "adapter discipline" (integrate.md §5); host assigns (namespace_id,action_seq) but no core mechanism dedups against it, so a non-conforming adapter re-executes an unknown-outcome action on reconnect
+R001|no-candidate|sc|S01|insufficient_evidence|scenario ledger "text.stream resource, adapter-chosen CapMap names, no profile/tool/recovery" is a terse note, not the referenced best-candidate §R.5-S01 trajectory; saved candidate is "_none yet_"
+R001|no-candidate|sc|S02|insufficient_evidence|best-candidate §R.5-S02 (pi.conversation/tool-event/approval kinds + resolver + approve action) is cited but absent
+R001|no-candidate|sc|S03|insufficient_evidence|§R.5-S03 "namespace outlives page; re-subscribe from cursor; read-action for snapshots" is a mechanism gloss, no ordered sequence present
+R001|no-candidate|sc|S04|insufficient_evidence|§R.5-S04 "submit/progress/result resources, no chat object in core" not reproduced as steps
+R001|no-candidate|sc|S05|insufficient_evidence|§R.5-S05 "config.tree resource, CapMap{read:supported}, no session" cited, absent
+R001|no-candidate|sc|S06|insufficient_evidence|§R.5-S06 "namespaced resource ids prevent collision" is the reduction-table line, not a step sequence
+R001|no-candidate|sc|S07|insufficient_evidence|§R.5-S07 revised-fallback rendering described in integrate.md §2, not the scenario's own ordered trajectory
+R001|no-candidate|sc|S08|insufficient_evidence|§R.5-S08 "cross-kind view passing ids via typed action, replaceable runner adapter" is a gloss, no steps
+R001|no-candidate|sc|S09|insufficient_evidence|even reported text is partial: integrate.md §5 defers dedup to adapter discipline; no §R.5-S09 core-owned sequence present
+R001|no-candidate|sc|S10|insufficient_evidence|§R.5-S10 "handles closed on unmount, resource stays authoritative, re-subscribe from cursor" not shown as ordered steps
+R001|no-candidate|sc|S11|insufficient_evidence|§R.5-S11 "adapter-named CapMap not_supported + CapabilityAbsent sentinel" mechanism note, no trajectory
+R001|no-candidate|sc|S12|insufficient_evidence|§R.5-S12 "adapter teardown disposes namespace only; resolver absent falls to generic view" is a gloss
+R001|b93d2dbedec53eaa05d7de4a9d762f3621d5f9bc623f8ea7da916298e690d30b|ce|FE-CE-003|holds|§R.5-S08 has the coordinating view "resolves both" data.ref and runner and invokes cross-module, but §R.4 bars an extension from subscribing across namespaces and the artifact never states the two modules share one namespace
+R001|b93d2dbedec53eaa05d7de4a9d762f3621d5f9bc623f8ea7da916298e690d30b|sc|S01|trajectory_ok|§R.5-S01 steps 1-5 with owners host/adapter/extension; core steps namespace.open and stream delivery carry §R.6 deletion consequences (namespaces→S06, stream→S03/S09)
+R001|b93d2dbedec53eaa05d7de4a9d762f3621d5f9bc623f8ea7da916298e690d30b|sc|S02|trajectory_ok|§R.5-S02 steps 1-3 with owners adapter/extension; core ops map to §R.6
+R001|b93d2dbedec53eaa05d7de4a9d762f3621d5f9bc623f8ea7da916298e690d30b|sc|S03|trajectory_ok|§R.5-S03 steps 1-4 with owners extension/host/adapter/host; §R.6 ordered-replayable-stream→S03 step 4
+R001|b93d2dbedec53eaa05d7de4a9d762f3621d5f9bc623f8ea7da916298e690d30b|sc|S04|trajectory_ok|§R.5-S04 steps 1-3 with owners adapter/extension; envelope has no role/turn field; §R.6 host-turn/role removed
+R001|b93d2dbedec53eaa05d7de4a9d762f3621d5f9bc623f8ea7da916298e690d30b|sc|S05|trajectory_ok|§R.5-S05 steps 1-3 with owners adapter/host/extension; §R.6 resource-directory→S05 step 2
+R001|b93d2dbedec53eaa05d7de4a9d762f3621d5f9bc623f8ea7da916298e690d30b|sc|S06|insufficient_evidence|§R.5-S06 "Separate namespaces → (ns_A,job-1) ≠ (ns_B,job-1). Auth/capability checks namespace-scoped." — structural key only, no ordered trajectory and no per-step owner
+R001|b93d2dbedec53eaa05d7de4a9d762f3621d5f9bc623f8ea7da916298e690d30b|sc|S07|trajectory_ok|§R.5-S07 announce→no-match→generic view with owners adapter/host; §R.6 generic-fallback-view→S07 step 2
+R001|b93d2dbedec53eaa05d7de4a9d762f3621d5f9bc623f8ea7da916298e690d30b|sc|S08|insufficient_evidence|§R.5-S08 "Coordinating view resolves both" conflicts with §R.4 "may not subscribe across namespaces" for a replaceable runner in a different adapter
+R001|b93d2dbedec53eaa05d7de4a9d762f3621d5f9bc623f8ea7da916298e690d30b|sc|S09|trajectory_broken|§R.5-S09 step 3 "host-assigned (namespace_id, action_seq) … adapter declares whether it dedups"
+R001|b93d2dbedec53eaa05d7de4a9d762f3621d5f9bc623f8ea7da916298e690d30b|sc|S10|trajectory_ok|§R.5-S10 resolver-throws→host-closes→re-subscribe with owners host/extension; §R.6 namespaces+stream consequences
+R001|b93d2dbedec53eaa05d7de4a9d762f3621d5f9bc623f8ea7da916298e690d30b|sc|S11|trajectory_ok|§R.5-S11 adapter announces not_supported→capabilities.get→invoke CapabilityAbsent with owners adapter/extension/host; §R.6 capability-declaration→S11 step 2
+R001|b93d2dbedec53eaa05d7de4a9d762f3621d5f9bc623f8ea7da916298e690d30b|sc|S12|trajectory_ok|§R.5-S12 adapter-teardown + resolver-absent with owner host; §R.6 namespaces(S06)+generic-view(S07)
+R002|b93d2dbedec53eaa05d7de4a9d762f3621d5f9bc623f8ea7da916298e690d30b|ce|FE-CE-007|pass|extension obtains handle_for(ns_A, res); calls edges.list expecting foreign ns_B targets; relays without user
+R002|b93d2dbedec53eaa05d7de4a9d762f3621d5f9bc623f8ea7da916298e690d30b|ce|FE-CE-007|pass|extension obtains handle_for(ns_A, res); calls edges.list expecting foreign ns_B targets; relays without user
+R002|2d2dde146c280db1e9ba555b358212f089cb4d99aa3bcbf60d6879699aebc496|ce|FE-CE-001|pass|passive config.tree reached only as a seq-ordered message log, no current-value primitive (§A old core)
+R002|2d2dde146c280db1e9ba555b358212f089cb4d99aa3bcbf60d6879699aebc496|ce|FE-CE-002|pass|core fixes a capability-name vocabulary and the generic fallback renders an agent/run reading
+R002|2d2dde146c280db1e9ba555b358212f089cb4d99aa3bcbf60d6879699aebc496|ce|FE-CE-003|pass|adapter writes a CapMap string, host reads it to toggle auto-replay
+R002|2d2dde146c280db1e9ba555b358212f089cb4d99aa3bcbf60d6879699aebc496|ce|FE-CE-004|pass|runner invoke spawns (ns_R,job) but the view has no subscription path for it
+R002|2d2dde146c280db1e9ba555b358212f089cb4d99aa3bcbf60d6879699aebc496|ce|FE-CE-005|pass|pair gesture → secondary handle subscribes from seq 0 → stale ArtifactReady auto-fires execute
+R002|2d2dde146c280db1e9ba555b358212f089cb4d99aa3bcbf60d6879699aebc496|ce|FE-CE-006|pass|two adapters register the same bare payload_schema_id string, cross-contaminating type
+R002|2d2dde146c280db1e9ba555b358212f089cb4d99aa3bcbf60d6879699aebc496|ce|FE-CE-007|pass|edges.list(ns) returns a foreign target_namespace_id into a scoped handle, enabling adapter-authorized user-less relay
+R002|2d2dde146c280db1e9ba555b358212f089cb4d99aa3bcbf60d6879699aebc496|ce|FE-CE-001|pass|passive config.tree reached only as a seq-ordered message log, no current-value primitive (§A old core)
+R002|2d2dde146c280db1e9ba555b358212f089cb4d99aa3bcbf60d6879699aebc496|ce|FE-CE-002|pass|core fixes a capability-name vocabulary and the generic fallback renders an agent/run reading
+R002|2d2dde146c280db1e9ba555b358212f089cb4d99aa3bcbf60d6879699aebc496|ce|FE-CE-003|pass|adapter writes a CapMap string, host reads it to toggle auto-replay
+R002|2d2dde146c280db1e9ba555b358212f089cb4d99aa3bcbf60d6879699aebc496|ce|FE-CE-004|pass|runner invoke spawns (ns_R,job) but the view has no subscription path for it
+R002|2d2dde146c280db1e9ba555b358212f089cb4d99aa3bcbf60d6879699aebc496|ce|FE-CE-005|pass|pair gesture → secondary handle subscribes from seq 0 → stale ArtifactReady auto-fires execute
+R002|2d2dde146c280db1e9ba555b358212f089cb4d99aa3bcbf60d6879699aebc496|ce|FE-CE-006|pass|two adapters register the same bare payload_schema_id string, cross-contaminating type
+R002|2d2dde146c280db1e9ba555b358212f089cb4d99aa3bcbf60d6879699aebc496|ce|FE-CE-007|pass|edges.list(ns) returns a foreign target_namespace_id into a scoped handle, enabling adapter-authorized user-less relay

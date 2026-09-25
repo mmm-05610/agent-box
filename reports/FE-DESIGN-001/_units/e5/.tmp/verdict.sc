@@ -1,0 +1,12 @@
+S01|trajectory_ok|section 4|nothing
+S02|trajectory_ok|section 4|nothing
+S03|trajectory_ok|section 4|nothing
+S04|trajectory_ok|section 4|nothing
+S05|trajectory_ok|section 4|nothing
+S06|trajectory_ok|section 4|nothing
+S07|trajectory_ok|section 4|nothing
+S08|trajectory_ok|section 4|nothing
+S09|trajectory_ok|section 4|nothing
+S10|trajectory_ok|section 4|nothing
+S11|trajectory_ok|section 4|nothing
+S12|trajectory_ok|section 4|nothing

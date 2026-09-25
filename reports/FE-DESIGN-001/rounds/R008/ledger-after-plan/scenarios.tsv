@@ -1,0 +1,13 @@
+sid|status|owner|mechanism|evidence|round
+S01|claimed|core|namespaces.open + typed-action send + ordered stream|rounds/R007 integrate §R7.5-S01|R007
+S02|claimed|adaptation|pi kinds via announce; subscribe from_cursor=resolve live; approve/send typed actions|rounds/R007 integrate §R7.5-S02 (T-Pi)|R007
+S03|claimed|core|from_cursor=0 history; close persists (ns_id,local_id,seq); return subscribe saved+1, or 0 after ns regen|rounds/R007 integrate §R7.5-S03 (T-Boring)|R007
+S04|claimed|core|submit/progress/result; just-spawned job subscribe from_cursor=0 (head kept, FE-CE-016); no chat object|rounds/R007 integrate §R7.5-S04|R007
+S05|claimed|core|config.tree; directory_list; invoke(read) snapshot rendered actionable by fallback|rounds/R007 integrate §R7.5-S05 (T-Static)|R007
+S06|claimed|core|namespaced ids; same-ns handle ScopeDenied; per-ns action registry|rounds/R007 integrate §R7.5-S06|R007
+S07|claimed|core|actionable fallback renders kind/actions/CapMap/schema label + read snapshot|rounds/R007 integrate §R7.5-S07;§R7.4|R007
+S08|claimed|core|runner from_cursor=resolve live (step4); job from_cursor=0 head (step6); same-ns permits subscribe|rounds/R007 integrate §R7.5-S08|R007
+S09|claimed|adaptation|adapter dedups own stable id + pumps logical order; core never-auto-resubmit + cursor ns-guard|rounds/R007 integrate §R7.5-S09|R007
+S10|claimed|core|handle force-close on unmount; return subscribe saved+1 or 0 catches up|rounds/R007 integrate §R7.5-S10|R007
+S11|claimed|core|open CapMap informational not_supported + CapabilityAbsent structural|rounds/R007 integrate §R7.5-S11|R007
+S12|claimed|adaptation|namespace teardown isolation; actionable fallback for removed resolver|rounds/R007 integrate §R7.5-S12|R007

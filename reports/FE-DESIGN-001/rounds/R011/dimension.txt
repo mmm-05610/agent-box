@@ -1,0 +1,1 @@
+DIMENSION: D09-splits-truth. The rotation rule forbids reusing the immediately previous clean

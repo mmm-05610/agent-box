@@ -1,0 +1,1682 @@
+Reading additional input from stdin...
+OpenAI Codex v0.155.1
+--------
+workdir: /home/maoqh/projects/ordessa/worktrees/backend-loop/execution
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: medium
+reasoning summaries: none
+session id: 01a0c505-4393-7211-b513-058872542ff0
+--------
+user
+Strict boundary/architecture review of execution-group (E) design for BE-LOOP-001. Read workspace-relative: reports/E-R1-composition-research.md, reports/E-P1-boundary-design-v0.md, reports/E-D1-interface-delta-v0.md.
+Approval standard: E = single-execution lifecycle coordination hub; plan lists KEEP/UPSHIFT/DOWNSHIFT/REUSE-Core, survives five attacks (sink lower resp into E; replace lower provider; replace upper product module; delete kept mechanism; partial failure), does NOT reimplement bwrap params/native ACP behavior/file-delete policy/second process-manager or Work Core, keeps public Wire & work_core frozen, never conflates timeout/unknown/definite-refusal/definite-completion.
+Output ONLY compact JSON: {"verdict":"accept|reject","unresolved_major_counterexamples":[],"must_fix_before_impl":[],"notes":""}. Adversarial and specific; list genuine violations/ambiguities, else empty.
+exec
+/bin/bash -lc "sed -n '1,220p' README.md && sed -n '1,260p' control/README.md && sed -n '1,320p' reports/E-R1-composition-research.md && sed -n '1,360p' reports/E-P1-boundary-design-v0.md && sed -n '1,360p' reports/E-D1-interface-delta-v0.md" in /home/maoqh/projects/ordessa/worktrees/backend-loop/execution
+ exited 2 in 0ms:
+sed: can't read README.md: No such file or directory
+
+exec
+/bin/bash -lc "pwd; rg --files -g 'README.md' -g 'E-R1-composition-research.md' -g 'E-P1-boundary-design-v0.md' -g 'E-D1-interface-delta-v0.md' -g 'AGENTS.md' .. ../.. ../../.. ../../../.." in /home/maoqh/projects/ordessa/worktrees/backend-loop/execution
+ succeeded in 72ms:
+../../../../agent-box-desktop-settings-round1/docs/desktop-product-delivery/evidence/P48-stage7/README.md
+../../../../open-source-agents/litellm/ui/litellm-dashboard/README.md
+../../../../open-source-agents/codex/codex-rs/exec-server/testing/README.md
+../../../../open-source-agents/autogen/python/packages/autogen-studio/README.md
+../../../../agent-box-desktop-settings-round1/docs/desktop-product-delivery/evidence/P25-stage3/README.md
+../../../../open-source-agents/codex/codex-rs/shell-escalation/README.md
+../../../../agent-box-desktop-settings-round1/docs/desktop-product-delivery/evidence/P55-stage2-5/README.md
+../../../../open-source-agents/litellm/litellm/types/interactions/README.md
+../../../../agent-box-desktop-settings-round1/apps/desktop/src/dev/debug/README.md
+../../../../agent-box-desktop-settings-round1/docs/desktop-product-delivery/evidence/P36-stage5/README.md
+../../../../agent-box-desktop-settings-round1/docs/desktop-product-delivery/evidence/P47-stage4/README.md
+../../../../agent-box-desktop-settings-round1/docs/desktop-product-delivery/evidence/P24-stage1/README.md
+../../../../agent-box-desktop-settings-round1/docs/desktop-product-delivery/evidence/P49-stage1/README.md
+../../../../open-source-agents/codex/codex-rs/memories/README.md
+../../../../agent-box-desktop-settings-round1/apps/desktop/src/plugins/radio/README.md
+../../../../agent-box-desktop-settings-round1/docs/desktop-product-delivery/evidence/P21-read-faces/README.md
+../../../../agent-box-desktop-settings-round1/apps/desktop/src/plugins/README.md
+../../../../open-source-agents/codex/codex-rs/apply-patch/tests/fixtures/scenarios/README.md
+../../../../open-source-agents/litellm/litellm/types/proxy/README.md
+../../../../agent-box-desktop-settings-round1/docs/desktop-product-delivery/evidence/P24-stage4/README.md
+../../../../agent-box-desktop-settings-round1/docs/desktop-product-delivery/evidence/P41b-stage14/README.md
+../../../../agent-box-desktop-settings-round1/docs/desktop-product-delivery/evidence/P24-stage3/README.md
+../../../../agent-box-desktop-settings-round1/docs/desktop-product-delivery/evidence/P31-stage5/README.md
+../../../../open-source-agents/litellm/litellm/containers/README.md
+../../../../open-source-agents/autogen/python/packages/autogen-studio/frontend/README.md
+../../../../open-source-agents/litellm/litellm/litellm_core_utils/README.md
+../../../../open-source-agents/codex/codex-rs/file-search/README.md
+../../../../open-source-agents/litellm/litellm/passthrough/README.md
+../../../../open-source-agents/codex/codex-rs/app-server-client/README.md
+../../../../open-source-agents/autogen/python/packages/autogen-studio/frontend/src/components/shared/README.md
+../../../../open-source-agents/litellm/litellm/a2a_protocol/litellm_completion_bridge/README.md
+../../../../open-source-agents/codex/codex-rs/app-server-test-client/README.md
+../../../../open-source-agents/codex/codex-rs/codex-client/README.md
+../../../../open-source-agents/codex/codex-rs/chatgpt/README.md
+../../../../open-source-agents/litellm/litellm/router_strategy/adaptive_router/README.md
+../../../../open-source-agents/litellm/litellm/completion_extras/README.md
+../../../../open-source-agents/codex/codex-cli/scripts/README.md
+../../../../open-source-agents/litellm/litellm/router_strategy/complexity_router/README.md
+../../../../open-source-agents/agno/AGENTS.md
+../../../../open-source-agents/codex/codex-rs/responses-api-proxy/README.md
+../../../../open-source-agents/codex/codex-rs/responses-api-proxy/npm/README.md
+../../../../open-source-agents/litellm/litellm/integrations/otel/README.md
+../../../../open-source-agents/litellm/litellm/proxy/workflows/README.md
+../../../../open-source-agents/agno/cookbook/02_agents/11_approvals/README.md
+../../../../open-source-agents/agno/cookbook/02_agents/14_advanced/README.md
+../../../../open-source-agents/litellm/ui/litellm-dashboard/src/app/(dashboard)/README.md
+../../../../open-source-agents/agno/cookbook/02_agents/14_advanced/interchange_model/README.md
+../../../../open-source-agents/codex/codex-rs/tui/src/bottom_pane/AGENTS.md
+../../../../open-source-agents/agno/cookbook/02_agents/03_context_management/README.md
+../../../../open-source-agents/agno/cookbook/02_agents/04_tools/README.md
+../../../../open-source-agents/agno/cookbook/02_agents/12_multimodal/README.md
+../../../../open-source-agents/agno/cookbook/02_agents/02_input_output/README.md
+../../../../open-source-agents/litellm/litellm/integrations/arize/README.md
+../../../../open-source-agents/agno/cookbook/02_agents/01_quickstart/README.md
+../../../../open-source-agents/agno/cookbook/02_agents/README.md
+../../../../open-source-agents/agno/cookbook/02_agents/06_memory_and_learning/README.md
+../../../../open-source-agents/agno/cookbook/02_agents/07_knowledge/README.md
+../../../../open-source-agents/agno/cookbook/02_agents/15_dependencies/README.md
+../../../../open-source-agents/agno/cookbook/02_agents/10_human_in_the_loop/README.md
+../../../../open-source-agents/agno/cookbook/02_agents/08_guardrails/README.md
+../../../../open-source-agents/agno/cookbook/02_agents/16_skills/README.md
+../../../../open-source-agents/dspy/tests/README.md
+../../../../open-source-agents/autogen/python/packages/autogen-core/README.md
+../../../../open-source-agents/agno/cookbook/02_agents/05_state_and_session/README.md
+../../../../open-source-agents/agno/cookbook/02_agents/09_hooks/README.md
+../../../../open-source-agents/litellm/litellm/integrations/dotprompt/README.md
+../../../../open-source-agents/agno/cookbook/02_agents/13_reasoning/README.md
+../../../../open-source-agents/agno/cookbook/06_storage/gcs/README.md
+../../../../open-source-agents/agno/cookbook/06_storage/mongo/async_mongo/README.md
+../../../../open-source-agents/agno/cookbook/06_storage/mongo/README.md
+../../../../open-source-agents/agno/cookbook/06_storage/redis/README.md
+../../../../open-source-agents/codex/codex-rs/protocol/README.md
+../../../../open-source-agents/agno/cookbook/06_storage/in_memory/README.md
+../../../../open-source-agents/agno/cookbook/06_storage/README.md
+../../../../open-source-agents/dspy/tests/reliability/README.md
+../../../../open-source-agents/agno/cookbook/06_storage/sqlite/async_sqlite/README.md
+../../../../open-source-agents/agno/cookbook/06_storage/sqlite/README.md
+../../../../open-source-agents/litellm/litellm/integrations/levo/README.md
+../../../../open-source-agents/agno/cookbook/06_storage/postgres/README.md
+../../../../open-source-agents/codex/codex-rs/utils/pty/README.md
+../../../../open-source-agents/agno/cookbook/06_storage/postgres/async_postgres/README.md
+../../../../open-source-agents/litellm/litellm/integrations/bitbucket/README.md
+../../../../open-source-agents/agno/cookbook/06_storage/dynamodb/README.md
+../../../../open-source-agents/agno/cookbook/06_storage/surrealdb/README.md
+../../../../open-source-agents/litellm/litellm/integrations/gitlab/README.md
+../../../../open-source-agents/agno/cookbook/06_storage/examples/README.md
+../../../../open-source-agents/litellm/litellm/proxy/guardrails/guardrail_hooks/litellm_content_filter/examples/README.md
+../../../../open-source-agents/codex/codex-rs/utils/cargo-bin/README.md
+../../../../open-source-agents/agno/cookbook/06_storage/json_db/README.md
+../../../../open-source-agents/agno/libs/agno/tests/integration/models/litellm_openai/README.md
+../../../../open-source-agents/agno/cookbook/06_storage/mysql/README.md
+../../../../open-source-agents/agno/cookbook/06_storage/mysql/async_mysql/README.md
+../../../../open-source-agents/litellm/litellm/realtime_api/README.md
+../../../../open-source-agents/agno/cookbook/06_storage/singlestore/README.md
+../../../../open-source-agents/agno/cookbook/06_storage/firestore/README.md
+../../../../open-source-agents/agno/cookbook/frameworks/00_quickstart/README.md
+../../../../open-source-agents/dspy/README.md
+../../../../open-source-agents/OpenHands/frontend/src/api/README.md
+../../../../open-source-agents/agno/cookbook/frameworks/antigravity/README.md
+../../../../open-source-agents/agno/cookbook/frameworks/antigravity/example_agent/AGENTS.md
+../../../../open-source-agents/litellm/litellm/llms/a2a/chat/guardrail_translation/README.md
+../../../../open-source-agents/codex/codex-rs/utils/template/README.md
+../../../../open-source-agents/litellm/litellm/llms/litellm_proxy/skills/README.md
+../../../../open-source-agents/litellm/litellm/proxy/client/README.md
+../../../../open-source-agents/litellm/litellm/proxy/client/cli/README.md
+../../../../open-source-agents/litellm/ui/litellm-dashboard/src/app/(dashboard)/prompts/components/README.md
+../../../../open-source-agents/litellm/litellm/proxy/discovery_endpoints/README.md
+../../../../open-source-agents/codex/codex-rs/utils/stream-parser/README.md
+../../../../open-source-agents/autogen/python/packages/autogen-ext/README.md
+../../../../open-source-agents/agno/cookbook/90_models/litellm_openai/README.md
+../../../../open-source-agents/codex/codex-rs/vendor/bubblewrap/README.md
+../../../../open-source-agents/agno/cookbook/90_models/cometapi/README.md
+../../../../open-source-agents/agno/cookbook/90_models/cloudflare/README.md
+../../../../open-source-agents/litellm/litellm/proxy/types_utils/README.md
+../../../../open-source-agents/litellm/litellm/proxy/guardrails/guardrail_hooks/ibm_guardrails/README.md
+../../../../open-source-agents/agno/cookbook/90_models/sambanova/README.md
+../../../../open-source-agents/agno/cookbook/90_models/deepinfra/README.md
+../../../../open-source-agents/OpenHands/frontend/__tests__/helpers/README.md
+../../../../open-source-agents/agno/cookbook/90_models/aimlapi/README.md
+../../../../open-source-agents/litellm/litellm/proxy/README.md
+../../../../open-source-agents/agno/cookbook/90_models/meta/llama_openai/README.md
+../../../../open-source-agents/codex/codex-rs/execpolicy-legacy/README.md
+../../../../open-source-agents/agno/cookbook/90_models/meta/llama/README.md
+../../../../open-source-agents/agno/cookbook/90_models/meta/README.md
+../../../../open-source-agents/agno/cookbook/90_models/neosantara/README.md
+../../../../open-source-agents/litellm/litellm/llms/openai_like/README.md
+../../../../open-source-agents/dspy/docs/README.md
+../../../../open-source-agents/agno/cookbook/90_models/cerebras_openai/README.md
+../../../../open-source-agents/autogen/python/packages/autogen-ext/src/autogen_ext/tools/mcp/_host/README.md
+../../../../open-source-agents/agno/cookbook/90_models/xai/README.md
+../../../../open-source-agents/agno/cookbook/90_models/ollama/README.md
+../../../../open-source-agents/codex/codex-rs/tools/README.md
+../../../../open-source-agents/agno/cookbook/90_models/ollama/responses/README.md
+../../../../open-source-agents/agno/cookbook/90_models/ollama/chat/README.md
+../../../../open-source-agents/codex/codex-rs/app-server/README.md
+../../../../open-source-agents/agno/cookbook/90_models/moonshot/README.md
+../../../../open-source-agents/agno/cookbook/90_models/siliconflow/README.md
+../../../../open-source-agents/agno/cookbook/90_models/internlm/README.md
+../../../../open-source-agents/agno/cookbook/90_models/tuning_engines/README.md
+../../../../open-source-agents/agno/cookbook/90_models/nebius/README.md
+../../../../open-source-agents/agno/cookbook/90_models/langdb/README.md
+../../../../open-source-agents/agno/cookbook/90_models/nexus/README.md
+../../../../open-source-agents/agno/cookbook/90_models/llama_cpp/README.md
+../../../../open-source-agents/agno/cookbook/90_models/inception/README.md
+../../../../open-source-agents/agno/cookbook/90_models/README.md
+../../../../open-source-agents/codex/codex-rs/codex-api/README.md
+../../../../open-source-agents/agno/cookbook/90_models/ibm/README.md
+../../../../open-source-agents/agno/cookbook/90_models/ibm/watsonx/README.md
+../../../../open-source-agents/agno/cookbook/90_models/vercel/README.md
+../../../../open-source-agents/agno/cookbook/90_models/dashscope/README.md
+../../../../open-source-agents/codex/codex-rs/config/src/loader/README.md
+../../../../open-source-agents/agno/cookbook/90_models/google/gemini/README.md
+../../../../open-source-agents/agno/cookbook/90_models/google/README.md
+../../../../open-source-agents/agno/cookbook/90_models/google/gemini_interactions/README.md
+../../../../open-source-agents/agno/cookbook/90_models/openai/README.md
+../../../../open-source-agents/litellm/ui/litellm-dashboard/src/components/guardrails/README.md
+../../../../open-source-agents/agno/cookbook/90_models/openai/responses/README.md
+../../../../open-source-agents/agno/cookbook/90_models/openai/chat/README.md
+../../../../open-source-agents/codex/codex-rs/app-server-daemon/README.md
+../../../../open-source-agents/agno/cookbook/90_models/cohere/README.md
+../../../../open-source-agents/agno/cookbook/90_models/azure/README.md
+../../../../open-source-agents/codex/codex-rs/git-utils/README.md
+../../../../open-source-agents/litellm/litellm/llms/gemini/context_caching/README.md
+../../../../open-source-agents/agno/cookbook/90_models/azure/ai_foundry/README.md
+../../../../open-source-agents/codex/codex-rs/README.md
+../../../../open-source-agents/agno/cookbook/90_models/azure/openai/README.md
+../../../../open-source-agents/codex/codex-rs/process-hardening/README.md
+../../../../open-source-agents/agno/cookbook/90_models/azure/claude/README.md
+../../../../open-source-agents/codex/codex-rs/ansi-escape/README.md
+../../../../open-source-agents/agno/cookbook/90_models/openrouter/README.md
+../../../../open-source-agents/agno/cookbook/90_models/openrouter/responses/README.md
+../../../../open-source-agents/agno/cookbook/90_models/openrouter/chat/README.md
+../../../../open-source-agents/agno/cookbook/90_models/minimax/README.md
+../../../../open-source-agents/agno/cookbook/90_models/aws/README.md
+../../../../open-source-agents/codex/codex-rs/thread-store/README.md
+../../../../open-source-agents/agno/cookbook/90_models/aws/bedrock/README.md
+../../../../open-source-agents/codex/codex-rs/network-proxy/README.md
+../../../../open-source-agents/agno/cookbook/90_models/aws/claude/README.md
+../../../../open-source-agents/agno/cookbook/90_models/xiaomi/README.md
+../../../../open-source-agents/codex/codex-rs/rollout-trace/README.md
+../../../../open-source-agents/agno/cookbook/90_models/lmstudio/README.md
+../../../../open-source-agents/agno/cookbook/90_models/n1n/README.md
+../../../../open-source-agents/agno/cookbook/90_models/cerebras/README.md
+../../../../open-source-agents/agno/cookbook/90_models/litellm/README.md
+../../../../open-source-agents/litellm/litellm/llms/anthropic/experimental_pass_through/messages/interceptors/README.md
+../../../../open-source-agents/agno/cookbook/90_models/fireworks/README.md
+../../../../open-source-agents/codex/codex-rs/execpolicy/README.md
+../../../../open-source-agents/agno/cookbook/90_models/requesty/README.md
+../../../../open-source-agents/agno/cookbook/90_models/vertexai/README.md
+../../../../open-source-agents/agno/cookbook/90_models/vertexai/claude/README.md
+../../../../open-source-agents/agno/cookbook/90_models/nvidia/README.md
+../../../../open-source-agents/agno/cookbook/90_models/deepseek/README.md
+../../../../open-source-agents/agno/cookbook/90_models/together/README.md
+../../../../open-source-agents/codex/codex-rs/stdio-to-uds/README.md
+../../../../open-source-agents/agno/cookbook/90_models/groq/reasoning/README.md
+../../../../open-source-agents/agno/cookbook/90_models/groq/README.md
+../../../../open-source-agents/OpenHands/containers/dev/README.md
+../../../../open-source-agents/OpenHands/containers/README.md
+../../../../open-source-agents/agno/cookbook/90_models/perplexity/README.md
+../../../../open-source-agents/autogen/python/packages/autogen-ext/src/autogen_ext/experimental/task_centric_memory/README.md
+../../../../open-source-agents/agno/cookbook/90_models/clients/README.md
+../../../../open-source-agents/agno/cookbook/90_models/portkey/README.md
+../../../../open-source-agents/agno/cookbook/90_models/anthropic/skills/README.md
+../../../../open-source-agents/agno/cookbook/90_models/anthropic/README.md
+../../../../open-source-agents/agno/cookbook/90_models/vllm/README.md
+../../../../open-source-agents/agno/cookbook/90_models/mistral/README.md
+../../../../open-source-agents/agno/cookbook/90_models/huggingface/README.md
+../../../../open-source-agents/autogen/python/packages/agbench/README.md
+../../../../open-source-agents/agno/cookbook/levels_of_agentic_software/README.md
+../../../../open-source-agents/codex/codex-rs/core/tests/remote_env_windows/README.md
+../../../../open-source-agents/agno/cookbook/91_tools/exceptions/README.md
+../../../../open-source-agents/agno/cookbook/91_tools/tool_decorator/README.md
+../../../../open-source-agents/agno/cookbook/91_tools/tool_hooks/README.md
+../../../../open-source-agents/composio/AGENTS.md
+../../../../open-source-agents/agno/cookbook/91_tools/README.md
+../../../../open-source-agents/agno/cookbook/91_tools/other/README.md
+../../../../open-source-agents/hermes-agent/AGENTS.md
+../../../../open-source-agents/agno/cookbook/91_tools/google/README.md
+../../../../open-source-agents/codex/codex-rs/core/README.md
+../../../../open-source-agents/autogen/python/packages/agbench/benchmarks/HumanEval/README.md
+../../../../open-source-agents/agno/cookbook/91_tools/mcp/mcp_toolbox_demo/README.md
+../../../../open-source-agents/autogen/python/packages/agbench/benchmarks/README.md
+../../../../open-source-agents/agno/cookbook/91_tools/mcp/local_server/README.md
+../../../../open-source-agents/agno/cookbook/91_tools/mcp/sse_transport/README.md
+../../../../open-source-agents/agno/cookbook/91_tools/mcp/README.md
+../../../../open-source-agents/agno/cookbook/91_tools/mcp/streamable_http_transport/README.md
+../../../../open-source-agents/agno/cookbook/91_tools/mcp/dynamic_headers/README.md
+../../../../open-source-agents/agno/cookbook/91_tools/docling_tools/README.md
+../../../../open-source-agents/autogen/python/packages/agbench/benchmarks/GAIA/README.md
+../../../../open-source-agents/ccs-simbajigege/README.md
+../../../../open-source-agents/agno/cookbook/91_tools/models/README.md
+../../../../open-source-agents/agno/cookbook/91_tools/workspace_tools/README.md
+../../../../open-source-agents/agno/cookbook/91_tools/parallel/README.md
+../../../../open-source-agents/agno/cookbook/91_tools/coding_tools/README.md
+../../../../open-source-agents/autogen/python/packages/component-schema-gen/README.md
+../../../../open-source-agents/agno/libs/agno/tests/system/README.md
+../../../../open-source-agents/agno/cookbook/04_workflows/02_conditional_execution/README.md
+../../../../open-source-agents/autogen/python/docs/README.md
+../../../../open-source-agents/agno/cookbook/04_workflows/03_loop_execution/README.md
+../../../../open-source-agents/composio/python/scripts/README.md
+../../../../open-source-agents/agno/libs/agno/migrations/README.md
+../../../../open-source-agents/agno/cookbook/04_workflows/05_conditional_branching/README.md
+../../../../open-source-agents/agno/cookbook/04_workflows/README.md
+../../../../open-source-agents/agno/cookbook/04_workflows/07_cel_expressions/router/README.md
+../../../../open-source-agents/agno/cookbook/04_workflows/07_cel_expressions/README.md
+../../../../open-source-agents/agno/cookbook/04_workflows/07_cel_expressions/condition/README.md
+../../../../open-source-agents/agno/cookbook/04_workflows/07_cel_expressions/loop/README.md
+../../../../open-source-agents/composio/python/composio/integration_test/README.md
+../../../../open-source-agents/composio/python/README.md
+../../../../open-source-agents/litellm/litellm/llms/azure_ai/README.md
+../../../../open-source-agents/composio/python/providers/gemini/README.md
+../../../../open-source-agents/litellm/litellm/llms/hosted_vllm/embedding/README.md
+../../../../open-source-agents/composio/python/providers/llamaindex/README.md
+../../../../open-source-agents/composio/python/providers/langchain/README.md
+../../../../open-source-agents/composio/python/providers/crewai/README.md
+../../../../open-source-agents/agno/cookbook/04_workflows/04_parallel_execution/README.md
+../../../../open-source-agents/open-interpreter/sdk/python/README.md
+../../../../open-source-agents/agno/cookbook/04_workflows/01_basic_workflows/02_step_with_function/README.md
+../../../../open-source-agents/agno/cookbook/04_workflows/01_basic_workflows/README.md
+../../../../open-source-agents/composio/python/providers/claude_agent_sdk/README.md
+../../../../open-source-agents/litellm/litellm/llms/README.md
+../../../../open-source-agents/autogen/README.md
+../../../../open-source-agents/agno/cookbook/04_workflows/01_basic_workflows/01_sequence_of_steps/README.md
+../../../../open-source-agents/agno/cookbook/04_workflows/01_basic_workflows/03_function_workflows/README.md
+../../../../open-source-agents/composio/python/providers/google/README.md
+../../../../open-source-agents/agno/cookbook/04_workflows/06_advanced_concepts/structured_io/README.md
+../../../../open-source-agents/agno/cookbook/04_workflows/06_advanced_concepts/background_execution/README.md
+../../../../open-source-agents/agno/cookbook/04_workflows/06_advanced_concepts/tools/README.md
+../../../../open-source-agents/agno/cookbook/04_workflows/06_advanced_concepts/run_control/README.md
+../../../../open-source-agents/agno/cookbook/04_workflows/06_advanced_concepts/guardrails/README.md
+../../../../open-source-agents/agno/cookbook/04_workflows/06_advanced_concepts/early_stopping/README.md
+../../../../open-source-agents/agno/cookbook/04_workflows/06_advanced_concepts/README.md
+../../../../open-source-agents/open-interpreter/sdk/python/examples/README.md
+../../../../open-source-agents/agno/cookbook/04_workflows/06_advanced_concepts/workflow_agent/README.md
+../../../../open-source-agents/agno/cookbook/04_workflows/06_advanced_concepts/previous_step_outputs/README.md
+../../../../open-source-agents/agno/cookbook/04_workflows/06_advanced_concepts/history/README.md
+../../../../open-source-agents/composio/python/providers/openai/README.md
+../../../../open-source-agents/composio/python/providers/google_adk/README.md
+../../../../open-source-agents/agno/cookbook/04_workflows/06_advanced_concepts/session_state/README.md
+../../../../open-source-agents/composio/python/providers/langgraph/README.md
+../../../../open-source-agents/agno/cookbook/04_workflows/06_advanced_concepts/long_running/README.md
+../../../../open-source-agents/composio/python/providers/openai_agents/README.md
+../../../../open-source-agents/agno/cookbook/09_evals/agent_as_judge/README.md
+../../../../open-source-agents/agno/cookbook/09_evals/README.md
+../../../../open-source-agents/agno/cookbook/09_evals/performance/README.md
+../../../../open-source-agents/composio/python/providers/anthropic/README.md
+../../../../open-source-agents/agno/cookbook/09_evals/performance/comparison/README.md
+../../../../open-source-agents/agno/cookbook/09_evals/reliability/multiple_tool_calls/README.md
+../../../../open-source-agents/agno/cookbook/09_evals/reliability/README.md
+../../../../open-source-agents/composio/python/providers/autogen/README.md
+../../../../open-source-agents/agno/cookbook/09_evals/reliability/team/README.md
+../../../../open-source-agents/composio/README.md
+../../../../open-source-agents/agno/cookbook/09_evals/reliability/single_tool_calls/README.md
+../../../../open-source-agents/open-interpreter/sdk/typescript/README.md
+../../../../open-source-agents/agno/cookbook/09_evals/accuracy/README.md
+../../../../open-source-agents/open-interpreter/sdk/python-runtime/README.md
+../../../../open-source-agents/agno/cookbook/03_teams/16_search_coordination/README.md
+../../../../open-source-agents/agno/cookbook/03_teams/05_knowledge/README.md
+../../../../open-source-agents/agno/cookbook/03_teams/14_run_control/README.md
+../../../../open-source-agents/litellm/tests/router_unit_tests/README.md
+../../../../open-source-agents/agno/cookbook/03_teams/03_tools/README.md
+../../../../open-source-agents/agno/cookbook/03_teams/07_session/README.md
+../../../../open-source-agents/agno/cookbook/03_teams/04_structured_input_output/README.md
+../../../../open-source-agents/composio/ts/README.md
+../../../../open-source-agents/agno/cookbook/03_teams/18_guardrails/README.md
+../../../../open-source-agents/open-interpreter/tools/argument-comment-lint/README.md
+../../../../open-source-agents/agno/cookbook/03_teams/01_quickstart/README.md
+../../../../open-source-agents/litellm/litellm/llms/openai/completion/guardrail_translation/README.md
+../../../../open-source-agents/agno/cookbook/03_teams/12_learning/README.md
+../../../../open-source-agents/agno/cookbook/03_teams/README.md
+../../../../open-source-agents/litellm/litellm/llms/pass_through/guardrail_translation/README.md
+../../../../open-source-agents/agno/cookbook/03_teams/20_human_in_the_loop/README.md
+../../../../open-source-agents/agno/cookbook/03_teams/11_reasoning/README.md
+../../../../open-source-agents/agno/cookbook/03_teams/08_streaming/README.md
+../../../../open-source-agents/litellm/litellm/llms/openai/image_generation/guardrail_translation/README.md
+../../../../open-source-agents/agno/cookbook/03_teams/09_context_management/README.md
+../../../../open-source-agents/agno/cookbook/03_teams/17_dependencies/README.md
+../../../../open-source-agents/agno/cookbook/03_teams/15_distributed_rag/README.md
+../../../../open-source-agents/agno/cookbook/03_teams/19_multimodal/README.md
+../../../../open-source-agents/agno/cookbook/03_teams/22_metrics/README.md
+../../../../open-source-agents/open-interpreter/third_party/v8/README.md
+../../../../open-source-agents/agno/cookbook/03_teams/10_context_compression/README.md
+../../../../open-source-agents/open-interpreter/README.md
+../../../../open-source-agents/agno/cookbook/03_teams/21_state/README.md
+../../../../open-source-agents/litellm/litellm/llms/openai/speech/guardrail_translation/README.md
+../../../../open-source-agents/litellm/scripts/adaptive_router_demo/README.md
+../../../../open-source-agents/agno/cookbook/03_teams/13_hooks/README.md
+../../../../open-source-agents/litellm/docker/README.md
+../../../../open-source-agents/agno/cookbook/03_teams/02_modes/coordinate/README.md
+../../../../open-source-agents/agno/cookbook/03_teams/02_modes/broadcast/README.md
+../../../../open-source-agents/agno/cookbook/03_teams/02_modes/tasks/README.md
+../../../../open-source-agents/agno/cookbook/03_teams/02_modes/README.md
+../../../../open-source-agents/litellm/litellm/llms/openai/responses/guardrail_translation/README.md
+../../../../open-source-agents/agno/cookbook/03_teams/02_modes/route/README.md
+../../../../open-source-agents/agno/cookbook/03_teams/06_memory/README.md
+../../../../open-source-agents/litellm/litellm/llms/openai/transcriptions/guardrail_translation/README.md
+../../../../open-source-agents/agno/cookbook/00_quickstart/README.md
+../../../../open-source-agents/agno/cookbook/README.md
+../../../../open-source-agents/agno/cookbook/12_context/README.md
+../../../../open-source-agents/agno/cookbook/observability/README.md
+../../../../open-source-agents/litellm/litellm/llms/openai/chat/guardrail_translation/README.md
+../../../../open-source-agents/agno/cookbook/observability/workflows/README.md
+../../../../open-source-agents/agno/cookbook/observability/teams/README.md
+../../../../open-source-agents/agno/cookbook/05_agent_os/remote/README.md
+../../../../open-source-agents/agno/cookbook/05_agent_os/middleware/README.md
+../../../../open-source-agents/litellm/litellm/llms/cohere/rerank/guardrail_translation/README.md
+../../../../open-source-agents/agno/cookbook/05_agent_os/mcp_demo/README.md
+../../../../open-source-agents/composio/ts/packages/cli-local-tools/local-tools-binaries/README.md
+../../../../open-source-agents/agno/cookbook/05_agent_os/mcp_demo/dynamic_headers/README.md
+../../../../open-source-agents/agno/cookbook/05_agent_os/interfaces/a2a/basic_agent/README.md
+../../../../open-source-agents/agno/cookbook/05_agent_os/interfaces/a2a/multi_agent_a2a/README.md
+../../../../open-source-agents/agno/cookbook/05_agent_os/interfaces/a2a/README.md
+../../../../open-source-agents/composio/ts/packages/core/pack/README.md
+../../../../open-source-agents/agno/cookbook/05_agent_os/interfaces/discord/README.md
+../../../../open-source-agents/agno/cookbook/05_agent_os/interfaces/README.md
+../../../../open-source-agents/agno/cookbook/05_agent_os/interfaces/agui/README.md
+../../../../open-source-agents/composio/ts/packages/core/scripts/README.md
+../../../../open-source-agents/composio/ts/packages/core/README.md
+../../../../open-source-agents/agno/cookbook/05_agent_os/interfaces/slack/README.md
+../../../../open-source-agents/agno/cookbook/05_agent_os/interfaces/telegram/README.md
+../../../../open-source-agents/agno/cookbook/05_agent_os/interfaces/whatsapp/README.md
+../../../../open-source-agents/autogen/dotnet/samples/Hello/HelloAgentState/README.md
+../../../../open-source-agents/autogen/dotnet/samples/Hello/README.md
+../../../../open-source-agents/autogen/dotnet/samples/Hello/HelloAgent/README.md
+../../../../open-source-agents/agno/cookbook/05_agent_os/skills/README.md
+../../../../open-source-agents/composio/ts/packages/core/src/telemetry/README.md
+../../../../open-source-agents/agno/cookbook/05_agent_os/skills/sample_skills/system-info/scripts/README.md
+../../../../open-source-agents/agno/cookbook/05_agent_os/README.md
+../../../../open-source-agents/autogen/dotnet/samples/dev-team/README.md
+../../../../open-source-agents/autogen/dotnet/README.md
+../../../../open-source-agents/agno/cookbook/05_agent_os/scheduler/README.md
+../../../../open-source-agents/agno/cookbook/05_agent_os/customize/README.md
+../../../../open-source-agents/agno/cookbook/05_agent_os/knowledge/README.md
+../../../../open-source-agents/agno/cookbook/05_agent_os/advanced_demo/README.md
+../../../../open-source-agents/agno/cookbook/05_agent_os/factories/README.md
+../../../../open-source-agents/autogen/dotnet/samples/dev-team/seed-memory/README.md
+../../../../open-source-agents/litellm/litellm-proxy-extras/README.md
+../../../../open-source-agents/agno/cookbook/05_agent_os/human_in_the_loop/README.md
+../../../../open-source-agents/litellm/README.md
+../../../../open-source-agents/agno/cookbook/05_agent_os/integrations/README.md
+../../../../open-source-agents/open-interpreter/codex-rs/linux-sandbox/README.md
+../../../../open-source-agents/agno/cookbook/05_agent_os/tracing/README.md
+../../../../open-source-agents/agno/cookbook/05_agent_os/tracing/dbs/README.md
+../../../../open-source-agents/agno/cookbook/05_agent_os/background_tasks/README.md
+../../../../open-source-agents/agno/cookbook/05_agent_os/client/README.md
+../../../../open-source-agents/open-interpreter/codex-rs/otel/README.md
+../../../../open-source-agents/agno/cookbook/05_agent_os/rbac/README.md
+../../../../open-source-agents/open-interpreter/codex-rs/app-server/README.md
+../../../../open-source-agents/agno/cookbook/05_agent_os/rbac/symmetric/README.md
+../../../../open-source-agents/agno/cookbook/05_agent_os/rbac/asymmetric/README.md
+../../../../open-source-agents/agno/cookbook/05_agent_os/client_a2a/README.md
+../../../../open-source-agents/composio/ts/packages/core/test/AuthConfigs/README.md
+../../../../open-source-agents/agno/cookbook/05_agent_os/client_a2a/servers/README.md
+../../../../open-source-agents/agno/cookbook/05_agent_os/os_config/README.md
+../../../../open-source-agents/composio/ts/packages/core/test/fixtures/webhook/README.md
+../../../../open-source-agents/composio/ts/packages/json-schema-to-zod/README.md
+../../../../open-source-agents/agno/cookbook/05_agent_os/dbs/surreal_db/README.md
+../../../../open-source-agents/agno/cookbook/05_agent_os/dbs/README.md
+../../../../open-source-agents/agno/cookbook/05_agent_os/workflow/README.md
+../../../../open-source-agents/agno/cookbook/05_agent_os/schemas/README.md
+../../../../open-source-agents/agno/cookbook/05_agent_os/learnings/README.md
+../../../../open-source-agents/composio/ts/packages/ts-builders/README.md
+../../../../open-source-agents/agno/cookbook/gemini_3/use_cases/README.md
+../../../../open-source-agents/agno/cookbook/gemini_3/README.md
+../../../../open-source-agents/agno/cookbook/11_memory/optimize_memories/README.md
+../../../../open-source-agents/agno/cookbook/11_memory/README.md
+../../../../open-source-agents/composio/ts/packages/cli-keyring/README.md
+../../../../open-source-agents/agno/cookbook/11_memory/integrations/README.md
+../../../../open-source-agents/agno/cookbook/11_memory/memory_manager/README.md
+../../../../open-source-agents/composio/ts/packages/cli/AGENTS.md
+../../../../open-source-agents/open-interpreter/codex-rs/git-utils/README.md
+../../../../open-source-agents/open-interpreter/codex-rs/ansi-escape/README.md
+../../../../open-source-agents/agno/cookbook/07_knowledge/09_archive/README.md
+../../../../open-source-agents/composio/ts/packages/cli/README.md
+../../../../open-source-agents/agno/cookbook/07_knowledge/README.md
+../../../../open-source-agents/agno/cookbook/07_knowledge/testing_resources/README.md
+../../../../open-source-agents/open-interpreter/codex-rs/exec-server/README.md
+../../../../open-source-agents/open-interpreter/codex-rs/apply-patch/tests/fixtures/scenarios/README.md
+../../../../open-source-agents/agno/cookbook/07_knowledge/05_integrations/rag/README.md
+../../../../open-source-agents/agno/cookbook/07_knowledge/05_integrations/README.md
+../../../../open-source-agents/agno/cookbook/07_knowledge/04_advanced/README.md
+../../../../open-source-agents/agno/cookbook/07_knowledge/02_building_blocks/README.md
+../../../../open-source-agents/agno/cookbook/07_knowledge/01_getting_started/README.md
+../../../../open-source-agents/agno/cookbook/07_knowledge/03_production/README.md
+../../../../open-source-agents/agno/cookbook/integrations/README.md
+../../../../open-source-agents/agno/cookbook/integrations/surrealdb/README.md
+../../../../open-source-agents/agno/cookbook/integrations/parallel/README.md
+../../../../open-source-agents/open-interpreter/codex-rs/shell-escalation/README.md
+../../../../open-source-agents/agno/cookbook/data_labeling/_14_video_extraction/README.md
+../../../../open-source-agents/agno/cookbook/data_labeling/_02_text_multilabel_classification/README.md
+../../../../open-source-agents/agno/cookbook/data_labeling/_06_image_classification/README.md
+../../../../open-source-agents/agno/cookbook/data_labeling/_13_video_classification/README.md
+../../../../open-source-agents/agno/cookbook/data_labeling/_16_document_extraction/README.md
+../../../../open-source-agents/agno/cookbook/data_labeling/_04_text_span_labeling/README.md
+../../../../open-source-agents/open-interpreter/codex-rs/file-search/README.md
+../../../../open-source-agents/agno/cookbook/data_labeling/_05_text_pairwise_preference/README.md
+../../../../open-source-agents/composio/ts/packages/cli/src/effect-errors/README.md
+../../../../open-source-agents/agno/cookbook/data_labeling/_01_text_classification/README.md
+../../../../open-source-agents/agno/cookbook/data_labeling/_09_image_extraction_to_vectordb/README.md
+../../../../open-source-agents/open-interpreter/codex-rs/app-server-client/README.md
+../../../../open-source-agents/agno/cookbook/data_labeling/_15_document_classification/README.md
+../../../../open-source-agents/autogen/dotnet/src/AutoGen.SourceGenerator/README.md
+../../../../open-source-agents/agno/cookbook/data_labeling/_17_llm_as_judge/README.md
+../../../../open-source-agents/agno/cookbook/data_labeling/_11_audio_transcription/README.md
+../../../../open-source-agents/agno/cookbook/data_labeling/_03_text_extraction/README.md
+../../../../open-source-agents/agno/cookbook/data_labeling/README.md
+../../../../open-source-agents/open-interpreter/codex-rs/app-server-test-client/README.md
+../../../../open-source-agents/hermes-agent/optional-skills/mlops/saelens/references/README.md
+../../../../open-source-agents/agno/cookbook/data_labeling/image_search/README.md
+../../../../open-source-agents/open-interpreter/codex-rs/chatgpt/README.md
+../../../../open-source-agents/agno/cookbook/data_labeling/_10_audio_classification/README.md
+../../../../open-source-agents/hermes-agent/README.md
+../../../../open-source-agents/agno/cookbook/data_labeling/_07_image_extraction/README.md
+../../../../open-source-agents/agno/cookbook/data_labeling/_18_quality_review/README.md
+../../../../open-source-agents/agno/cookbook/data_labeling/_08_image_bounding_boxes/README.md
+../../../../open-source-agents/agno/cookbook/data_labeling/_12_audio_extraction/README.md
+../../../../open-source-agents/litellm/tests/test_litellm/llms/openai/realtime/README.md
+../../../../open-source-agents/agno/cookbook/08_learning/07_patterns/README.md
+../../../../open-source-agents/agno/cookbook/08_learning/02_user_profile/README.md
+../../../../open-source-agents/ccs-simbajigege/mcp-server/README.md
+../../../../open-source-agents/agno/cookbook/08_learning/05_learned_knowledge/README.md
+../../../../open-source-agents/agno/libs/agno_infra/README.md
+../../../../open-source-agents/agno/cookbook/08_learning/04_entity_memory/README.md
+../../../../open-source-agents/agno/cookbook/08_learning/00_quickstart/README.md
+../../../../open-source-agents/agno/cookbook/08_learning/README.md
+../../../../open-source-agents/open-interpreter/codex-rs/codex-client/README.md
+../../../../open-source-agents/autogen/dotnet/src/AutoGen.LMStudio/README.md
+../../../../open-source-agents/agno/cookbook/08_learning/06_quick_tests/README.md
+../../../../open-source-agents/agno/cookbook/08_learning/09_decision_logs/README.md
+../../../../open-source-agents/agno/cookbook/08_learning/10_demo/README.md
+../../../../open-source-agents/autogen/dotnet/website/README.md
+../../../../open-source-agents/agno/cookbook/08_learning/03_session_context/README.md
+../../../../open-source-agents/agno/cookbook/08_learning/08_custom_stores/README.md
+../../../../open-source-agents/agno/cookbook/08_learning/01_basics/README.md
+../../../../open-source-agents/agno/cookbook/10_reasoning/tools/README.md
+../../../../open-source-agents/agno/cookbook/10_reasoning/README.md
+../../../../open-source-agents/agno/cookbook/10_reasoning/models/azure_ai_foundry/README.md
+../../../../open-source-agents/agno/cookbook/10_reasoning/models/gemini/README.md
+../../../../open-source-agents/hermes-agent/optional-skills/software-development/code-wiki/templates/README.md
+../../../../open-source-agents/agno/cookbook/10_reasoning/models/xai/README.md
+../../../../open-source-agents/open-interpreter/codex-rs/responses-api-proxy/README.md
+../../../../open-source-agents/agno/cookbook/10_reasoning/models/ollama/README.md
+../../../../open-source-agents/agno/cookbook/10_reasoning/models/README.md
+../../../../open-source-agents/agno/cookbook/10_reasoning/models/vertex_ai/README.md
+../../../../open-source-agents/open-interpreter/codex-rs/responses-api-proxy/npm/README.md
+../../../../open-source-agents/agno/cookbook/10_reasoning/models/openai/README.md
+../../../../open-source-agents/agno/cookbook/10_reasoning/models/azure_openai/README.md
+../../../../open-source-agents/agno/cookbook/10_reasoning/models/deepseek/README.md
+../../../../open-source-agents/agno/cookbook/10_reasoning/models/groq/README.md
+../../../../open-source-agents/autogen/dotnet/nuget/README.md
+../../../../open-source-agents/agno/cookbook/10_reasoning/models/anthropic/README.md
+../../../../open-source-agents/open-interpreter/codex-cli/scripts/README.md
+../../../../open-source-agents/agno/cookbook/10_reasoning/agents/README.md
+../../../../open-source-agents/agno/cookbook/10_reasoning/teams/README.md
+../../../../open-source-agents/agno/cookbook/93_components/README.md
+../../../../open-source-agents/agno/cookbook/93_components/workflows/README.md
+../../../../open-source-agents/agno/cookbook/01_demo/README.md
+../../../../open-source-agents/hermes-agent/packaging/homebrew/README.md
+../../../../open-source-agents/agno/README.md
+../../../../open-source-agents/composio/docs/scripts/README.md
+../../../../open-source-agents/composio/docs/README.md
+../../../../open-source-agents/crewAI/README.md
+../../../../open-source-agents/composio/ts/packages/providers/mastra/README.md
+../../../../open-source-agents/open-interpreter/codex-rs/utils/pty/README.md
+../../../../open-source-agents/composio/ts/packages/providers/mastra/test/README.md
+../../../../open-source-agents/composio/ts/packages/providers/cloudflare/README.md
+../../../../open-source-agents/open-interpreter/codex-rs/utils/cargo-bin/README.md
+../../../../open-source-agents/composio/ts/packages/providers/openai-agents/README.md
+../../../../open-source-agents/autogen/docs/dotnet/README.md
+../../../../open-source-agents/autogen/dotnet/test/Microsoft.AutoGen.Integration.Tests.AppHosts/HelloAgentTests/README.md
+../../../../open-source-agents/composio/ts/packages/providers/llamaindex/README.md
+../../../../open-source-agents/autogen/dotnet/test/Microsoft.AutoGen.Integration.Tests.AppHosts/core_xlang_hello_python_agent/README.md
+../../../../open-source-agents/composio/ts/packages/providers/langchain/README.md
+../../../../open-source-agents/composio/ts/packages/providers/README.md
+../../../../open-source-agents/aider/benchmark/README.md
+../../../../open-source-agents/aider/README.md
+../../../../open-source-agents/composio/ts/packages/providers/claude-agent-sdk/README.md
+../../../../open-source-agents/README.md
+../../../../open-source-agents/open-interpreter/codex-rs/execpolicy/README.md
+../../../../open-source-agents/aider/aider/queries/tree-sitter-languages/README.md
+../../../../open-source-agents/composio/ts/packages/providers/vercel/README.md
+../../../../open-source-agents/aider/aider/queries/tree-sitter-language-pack/README.md
+../../../../open-source-agents/open-interpreter/codex-rs/utils/template/README.md
+../../../../open-source-agents/hermes-agent/website/README.md
+../../../../open-source-agents/composio/ts/packages/providers/google/README.md
+../../../../open-source-agents/aider/aider/website/examples/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/README.md
+../../../../open-source-agents/composio/ts/packages/providers/openai/README.md
+../../../../open-source-agents/open-interpreter/codex-rs/execpolicy-legacy/README.md
+../../../../open-source-agents/open-interpreter/codex-rs/debug-client/README.md
+../../../../open-source-agents/open-interpreter/codex-rs/network-proxy/README.md
+../../../../open-source-agents/open-interpreter/codex-rs/tools/README.md
+../../../../open-source-agents/composio/ts/packages/providers/anthropic/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/youtube_video_search_tool/README.md
+../../../../open-source-agents/open-interpreter/codex-rs/utils/stream-parser/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/databricks_query_tool/README.md
+../../../../open-source-agents/composio/ts/examples/cjs/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/scrapegraph_scrape_tool/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/merge_agent_handler_tool/README.md
+../../../../open-source-agents/composio/ts/examples/mastra/README.md
+../../../../open-source-agents/open-interpreter/codex-rs/codex-api/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/stagehand_tool/README.md
+../../../../open-source-agents/composio/ts/examples/versioning/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/ai_mind_tool/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/daytona_sandbox_tool/README.md
+../../../../open-source-agents/composio/ts/examples/tools/README.md
+../../../../open-source-agents/open-interpreter/codex-rs/stdio-to-uds/README.md
+../../../../open-source-agents/composio/ts/examples/google/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/singlestore_search_tool/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/contextualai_parse_tool/README.md
+../../../../open-source-agents/open-interpreter/codex-rs/thread-store/src/remote/AGENTS.md
+../../../../open-source-agents/composio/ts/examples/mcp/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/tavily_extractor_tool/README.md
+../../../../open-source-agents/composio/ts/examples/llamaindex/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/linkup/README.md
+../../../../open-source-agents/open-interpreter/codex-rs/core/README.md
+../../../../open-source-agents/open-interpreter/codex-rs/rollout-trace/README.md
+../../../../open-source-agents/hermes-agent/tests/e2e/matrix_xsign_bootstrap/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/mysql_search_tool/README.md
+../../../../open-source-agents/composio/ts/examples/json-schema-to-zod/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/firecrawl_crawl_website_tool/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/apify_actors_tool/README.md
+../../../../open-source-agents/composio/ts/examples/connected-accounts/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/rag/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/tavily_research_tool/README.md
+../../../../open-source-agents/composio/ts/examples/modifiers/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/e2b_sandbox_tool/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/mongodb_vector_search_tool/README.md
+../../../../open-source-agents/composio/ts/examples/tool-router/README.md
+../../../../open-source-agents/composio/ts/examples/session-management/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/serper_dev_tool/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/youtube_channel_search_tool/README.md
+../../../../open-source-agents/composio/ts/e2e-tests/_utils/README.md
+../../../../open-source-agents/composio/ts/examples/vercel/README.md
+../../../../open-source-agents/composio/ts/examples/file-handling/README.md
+../../../../open-source-agents/composio/ts/examples/triggers/README.md
+../../../../open-source-agents/composio/ts/e2e-tests/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/tavily_search_tool/README.md
+../../../../open-source-agents/open-interpreter/codex-rs/protocol/README.md
+../../../../open-source-agents/composio/ts/e2e-tests/cli/README.md
+../../../../open-source-agents/composio/ts/docs/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/github_search_tool/README.md
+../../../../open-source-agents/composio/ts/examples/toolkits/README.md
+../../../../open-source-agents/open-interpreter/codex-rs/vendor/bubblewrap/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/firecrawl_scrape_website_tool/README.md
+../../../../open-source-agents/composio/ts/e2e-tests/runtimes/cloudflare/cf-workers-tool-router-ai/README.md
+../../../../open-source-agents/composio/ts/e2e-tests/cli/toolkits/list/README.md
+../../../../open-source-agents/hermes-agent/tests/stress/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/xml_search_tool/README.md
+../../../../open-source-agents/composio/ts/e2e-tests/cli/toolkits/search/README.md
+../../../../open-source-agents/hermes-agent/web/README.md
+../../../../open-source-agents/open-interpreter/codex-rs/core/src/config_loader/README.md
+../../../../open-source-agents/composio/ts/e2e-tests/cli/toolkits/info/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/nl2sql/README.md
+../../../../open-source-agents/composio/ts/e2e-tests/cli/version/README.md
+../../../../open-source-agents/composio/ts/e2e-tests/runtimes/cloudflare/cf-workers-files/README.md
+../../../../open-source-agents/composio/ts/e2e-tests/cli/whoami/README.md
+../../../../open-source-agents/hermes-agent/docs/middleware/README.md
+../../../../open-source-agents/composio/ts/e2e-tests/runtimes/deno/esm-basic/README.md
+../../../../open-source-agents/hermes-agent/apps/desktop/README.md
+../../../../open-source-agents/hermes-agent/docs/observability/README.md
+../../../../open-source-agents/composio/ts/e2e-tests/runtimes/cloudflare/cf-workers-basic/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/json_search_tool/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/website_search/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/directory_read_tool/README.md
+../../../../open-source-agents/composio/ts/e2e-tests/runtimes/node/typescript-mjs-import-nodenext/README.md
+../../../../open-source-agents/open-interpreter/codex-rs/core/src/memories/README.md
+../../../../open-source-agents/hermes-agent/providers/README.md
+../../../../open-source-agents/open-interpreter/codex-rs/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/oxylabs_amazon_search_scraper_tool/README.md
+../../../../open-source-agents/composio/ts/e2e-tests/runtimes/node/mastra-tool-router-zod-v4/README.md
+../../../../open-source-agents/open-interpreter/codex-rs/process-hardening/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/selenium_scraping_tool/README.md
+../../../../open-source-agents/composio/ts/e2e-tests/runtimes/node/json-schema-to-zod-v4/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/jina_scrape_website_tool/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/contextualai_create_agent_tool/README.md
+../../../../open-source-agents/hermes-agent/ui-tui/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/serpapi_tool/README.md
+../../../../open-source-agents/composio/ts/e2e-tests/runtimes/node/file-roundtrip/README.md
+../../../../open-source-agents/composio/ts/e2e-tests/runtimes/node/tool-router-pagination/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/couchbase_tool/README.md
+../../../../open-source-agents/composio/ts/e2e-tests/runtimes/node/mastra-tool-router-zod-v3/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/files_compressor_tool/README.md
+../../../../open-source-agents/composio/ts/e2e-tests/runtimes/node/cjs-basic/README.md
+../../../../open-source-agents/composio/ts/e2e-tests/runtimes/node/tool-router-files/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/vision_tool/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/code_docs_search_tool/README.md
+../../../../open-source-agents/composio/ts/e2e-tests/runtimes/node/esm-basic/README.md
+../../../../open-source-agents/composio/ts/e2e-tests/runtimes/node/openai-zod4-compat/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/firecrawl_search_tool/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/exa_tools/README.md
+../../../../open-source-agents/composio/ts/e2e-tests/runtimes/node/json-schema-to-zod-v3/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/composio_tool/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/arxiv_paper_tool/README.md
+../../../../open-source-agents/hermes-agent/plugins/google_meet/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/spider_tool/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/brightdata_tool/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/scrape_website_tool/README.md
+../../../../open-source-agents/hermes-agent/plugins/platforms/photon/sidecar/README.md
+../../../../open-source-agents/hermes-agent/plugins/platforms/photon/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/contextualai_rerank_tool/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/oxylabs_google_search_scraper_tool/README.md
+../../../../open-source-agents/hermes-agent/plugins/observability/langfuse/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/contextualai_query_tool/README.md
+../../../../open-source-agents/hermes-agent/plugins/observability/nemo_relay/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/oxylabs_amazon_product_scraper_tool/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/file_writer_tool/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/llamaindex_tool/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/scrapfly_scrape_website_tool/README.md
+../../../../open-source-agents/hermes-agent/plugins/security-guidance/README.md
+../../../../open-source-agents/open-interpreter/codex-rs/tui/src/bottom_pane/AGENTS.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/browserbase_load_tool/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/mdx_search_tool/README.md
+../../../../open-source-agents/hermes-agent/plugins/disk-cleanup/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/hyperbrowser_load_tool/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/multion_tool/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/docx_search_tool/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/brave_search_tool/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/serply_api_tool/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/file_read_tool/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/parallel_tools/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/zapier_action_tool/README.md
+../../../../open-source-agents/hermes-agent/plugins/memory/hindsight/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/csv_search_tool/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/pdf_search_tool/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/oxylabs_universal_scraper_tool/README.md
+../../../../open-source-agents/hermes-agent/plugins/memory/byterover/README.md
+../../../../open-source-agents/hermes-agent/skills/creative/ascii-video/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/qdrant_vector_search_tool/README.md
+../../../../open-source-agents/hermes-agent/skills/creative/comfyui/tests/README.md
+../../../../open-source-agents/hermes-agent/plugins/memory/holographic/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/weaviate_tool/README.md
+../../../../open-source-agents/hermes-agent/plugins/memory/supermemory/README.md
+../../../../open-source-agents/atomic-agents/atomic-examples/progressive-disclosure/README.md
+../../../../open-source-agents/hermes-agent/skills/creative/comfyui/workflows/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/invoke_crewai_automation_tool/README.md
+../../../../open-source-agents/hermes-agent/plugins/memory/openviking/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/tavily_get_research_tool/README.md
+../../../../open-source-agents/hermes-agent/plugins/memory/retaindb/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/generate_crewai_automation_tool/README.md
+../../../../open-source-agents/hermes-agent/plugins/hermes-achievements/README.md
+../../../../open-source-agents/hermes-agent/plugins/memory/mem0/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/snowflake_search_tool/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/aws/bedrock/browser/README.md
+../../../../open-source-agents/hermes-agent/plugins/memory/honcho/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/directory_search_tool/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/aws/bedrock/knowledge_base/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/ocr_tool/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/aws/bedrock/code_interpreter/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/tools/txt_search_tool/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/aws/bedrock/agents/README.md
+../../../../open-source-agents/atomic-agents/atomic-examples/rag-chatbot/README.md
+../../../../open-source-agents/crewAI/lib/crewai-tools/src/crewai_tools/aws/s3/README.md
+../../../../open-source-agents/crewAI/lib/crewai-core/README.md
+../../../../open-source-agents/crewAI/lib/crewai-files/README.md
+../../../../open-source-agents/hermes-agent/skills/creative/p5js/README.md
+../../../../open-source-agents/atomic-agents/atomic-examples/hooks-example/README.md
+../../../../open-source-agents/hermes-agent/plugins/model-providers/README.md
+../../../../open-source-agents/crewAI/lib/devtools/README.md
+../../../../open-source-agents/atomic-agents/atomic-examples/quickstart/README.md
+../../../../open-source-agents/hermes-agent/skills/creative/manim-video/README.md
+../../../../open-source-agents/atomic-agents/atomic-examples/mcp-agent/README.md
+../../../../open-source-agents/atomic-agents/atomic-examples/basic-multimodal/README.md
+../../../../open-source-agents/atomic-agents/atomic-examples/dspy-integration/README.md
+../../../../open-source-agents/atomic-agents/atomic-examples/mcp-agent/example-mcp-server/README.md
+../../../../open-source-agents/atomic-agents/atomic-forge/tools/searxng_search/README.md
+../../../../open-source-agents/crewAI/lib/cli/README.md
+../../../../open-source-agents/atomic-agents/atomic-examples/youtube-summarizer/README.md
+../../../../open-source-agents/atomic-agents/atomic-examples/youtube-to-recipe/README.md
+../../../../open-source-agents/atomic-agents/atomic-examples/web-search-agent/README.md
+../../../../open-source-agents/crewAI/lib/crewai/README.md
+../../../../open-source-agents/atomic-agents/atomic-forge/tools/hackernews_search/README.md
+../../../../open-source-agents/hermes-agent/skills/research/research-paper-writing/templates/acl/README.md
+../../../../open-source-agents/hermes-agent/skills/research/research-paper-writing/templates/README.md
+../../../../open-source-agents/hermes-agent/skills/research/research-paper-writing/templates/aaai2026/README.md
+../../../../open-source-agents/atomic-agents/atomic-examples/deep-research/README.md
+../../../../open-source-agents/atomic-agents/atomic-forge/tools/youtube_transcript_scraper/README.md
+../../../../open-source-agents/hermes-agent/skills/research/research-paper-writing/templates/colm2025/README.md
+../../../../open-source-agents/atomic-agents/claude-plugin/atomic-agents/README.md
+../../../../open-source-agents/crewAI/lib/cli/src/crewai_cli/templates/AGENTS.md
+../../../../open-source-agents/atomic-agents/atomic-assembler/README.md
+../../../../open-source-agents/atomic-agents/atomic-examples/orchestration-agent/README.md
+../../../../open-source-agents/atomic-agents/atomic-forge/tools/pdf_reader/README.md
+../../../../open-source-agents/atomic-agents/README.md
+../../../../open-source-agents/atomic-agents/atomic-examples/nested-multimodal/README.md
+../../../../open-source-agents/crewAI/lib/cli/src/crewai_cli/templates/crew/README.md
+../../../../open-source-agents/atomic-agents/atomic-forge/tools/wikipedia_search/README.md
+../../../../open-source-agents/atomic-agents/atomic-examples/basic-pdf-analysis/README.md
+../../../../open-source-agents/atomic-agents/atomic-examples/fastapi-memory/README.md
+../../../../open-source-agents/atomic-agents/atomic-forge/tools/fia_signals/README.md
+../../../../open-source-agents/crewAI/lib/cli/src/crewai_cli/templates/tool/README.md
+../../../../open-source-agents/atomic-agents/atomic-forge/tools/arxiv_search/README.md
+../../../../open-source-agents/atomic-agents/atomic-forge/tools/weather/README.md
+../../../../open-source-agents/atomic-agents/atomic-forge/tools/bocha_search/README.md
+../../../../open-source-agents/atomic-agents/atomic-forge/tools/datetime_tool/README.md
+../../../../open-source-agents/atomic-agents/atomic-forge/README.md
+../../../../open-source-agents/crewAI/lib/cli/src/crewai_cli/templates/flow/README.md
+../../../../open-source-agents/atomic-agents/atomic-forge/tools/tavily_search/README.md
+../../../../open-source-agents/atomic-agents/atomic-forge/tools/webpage_scraper/README.md
+../../../../open-source-agents/atomic-agents/atomic-forge/tools/calculator/README.md
+../../../../open-source-agents/opencode/AGENTS.md
+../../../../open-source-agents/opencode/README.md
+../../../../open-source-agents/opencode/github/README.md
+../../../../open-source-agents/opencode/sdks/vscode/README.md
+../../../../open-source-agents/opencode/packages/console/app/README.md
+../../../../open-source-agents/opencode/packages/enterprise/README.md
+../../../../open-source-agents/opencode/packages/effect-drizzle-sqlite/AGENTS.md
+../../../../open-source-agents/opencode/packages/desktop/AGENTS.md
+../../../../open-source-agents/opencode/packages/desktop/README.md
+../../../../open-source-agents/opencode/packages/slack/README.md
+../../../../open-source-agents/opencode/packages/http-recorder/README.md
+../../../../open-source-agents/opencode/packages/web/README.md
+../../../../open-source-agents/opencode/packages/docs/README.md
+../../../../open-source-agents/opencode/packages/containers/README.md
+../../../../open-source-agents/opencode/packages/desktop/icons/README.md
+../../../../open-source-agents/opencode/packages/llm/AGENTS.md
+../../../../open-source-agents/opencode/packages/llm/README.md
+../../../../open-source-agents/opencode/packages/stats/AGENTS.md
+../../../../open-source-agents/opencode/packages/core/src/tool/AGENTS.md
+../../../../open-source-agents/opencode/packages/app/AGENTS.md
+../../../../open-source-agents/opencode/packages/app/README.md
+../../../../open-source-agents/opencode/packages/core/src/github-copilot/README.md
+../../../../open-source-agents/opencode/packages/stats/README.md
+../../../../open-source-agents/opencode/packages/opencode/AGENTS.md
+../../../../open-source-agents/opencode/packages/opencode/README.md
+../../../../open-source-agents/opencode/packages/opencode/test/AGENTS.md
+../../../../open-source-agents/opencode/packages/opencode/src/sync/README.md
+../../../../open-source-agents/opencode/packages/opencode/test/server/AGENTS.md
+../../../../open-source-agents/opencode/packages/opencode/src/control-plane/dev/README.md
+../../../../open-source-agents/opencode/packages/opencode/src/plugin/openai/README.md
+../../../../open-source-agents/opencode/packages/opencode/src/server/routes/instance/httpapi/AGENTS.md
+../../../../open-source-agents/opencode/packages/opencode/src/session/llm/AGENTS.md
+
+exec
+/bin/bash -lc 'cat reports/E-R1-composition-research.md' in /home/maoqh/projects/ordessa/worktrees/backend-loop/execution
+ succeeded in 0ms:
+# E-研究1：现有执行组合机制研究（基线 b067c57）
+
+> 文档事实（研究结论），全部论断带 `file:line` 证据；基线 = 本树 HEAD
+> `b067c5718556c8efa93b054e6573ad3d186b3cf6`。路径前缀 `SRC = src/agent_box`。
+> 研究目的：为"保留/下沉/上移/复用 Core"四类职责表提供现状底座。**不含实施决定**。
+
+## 1. 总体形状：其实是"两层三链"，不是一个组合器
+
+| 层 | 位置 | 实际角色 |
+| --- | --- | --- |
+| 中立组合层 | `SRC/extensions/runtime_composition/` | 封闭类型化组合协议 + provider-neutral 协调器（声明能力校验、attempt 账本、补偿清理） |
+| Server 执行编排层 | `SRC/server/execution/` | 面向 S 的 `TurnExecutionPort`；Core 适配；两条 sidecar 通道（Worker 托管 / 本地）；大量下层机制直控 |
+| 中立内核 | `SRC/work_core/`（冻结） | push-only 事实账本：dispatch 单_attempts、三类终态语义、append-only 观测 |
+
+调用主链（一次 Session Turn）：
+`server/sessions/service.py` →（`TurnExecutionPort.accept`）→
+`sidecar_backend.SidecarExecutionBackend.accept`（sidecar_backend.py:210）→
+Core `create_work`/`create_execution`/`dispatch_execution`（:238-270；
+work_core/services.py:136）→ Core 回调 `_CoreSidecarProvider.start`（:123）→
+`_start_run`：port_factory 建端口 → `_capability_gate`（:908，先于任何原生副作用）
+→ `first_run_gate`（:312）→ `port.open_execution`（:316）→ prompt 线程 →
+完成路径 `_complete_then_retire`：审计、usage、订阅回收、credential-hit 处置、
+finalization 落 Core（:477/:542 apply_finalization，:515/:581 complete_work）。
+
+第二条链（typed 组合协调器）：`assembler.assemble_runtime_composition`
+（assembler.py:25，校验投影源/摘要漂移/cwd 在 guest 内，产出 `MountPlan`+coordinator）
+→ `RuntimeCompositionCoordinator.start`（coordinator.py:81：preflight→bundle→
+attempt_key→`sandbox.wrap`→`terminal.allocate`→RUN_INTENT→`terminal.run`→
+未知即 AMBIGUOUS）→ `cleanup`（:156 内到外幂等补偿）。
+**关键现状：这条链的 provider 端口（RuntimeHost/Sandbox/TerminalSession）与第一条
+链的实际通道（sidecar.py/local_channel.py）目前是平行存在**——通道经
+`sandbox_port.resolve_sandbox_port` 只取 Sandbox 的 room 翻译（sidecar.py:512、
+local_channel.py:498），进程 spawn/生命周期不走 coordinator/RuntimeHost/TerminalSession
+端口（local_channel.py:526 直接 `subprocess.Popen`，:599-614 直接 killpg/Job；
+sidecar.py:118-124 LocalProcessLauncher Popen、:551 Worker RPC spawn）。
+这是"是否另造第二套生命周期"风险的实证底座：**基线里已经存在两套启动形状**，
+收敛方向是把通道并进端口，而不是再造第三套。
+
+## 2. runtime_composition 内部（逐文件）
+
+- `protocol.py`（578 行）：封闭 DTO + 四个 provider Protocol
+  （`RuntimeHost`/`Sandbox`/`TerminalSession`/`HostTransport`，:474-498）+
+  `TransportOperation*` 受限原生载体扩展点（:504-562，单用令牌、响应丢失必
+  START_AMBIGUOUS，:532-535 硬编码不可选退）。`attempt_key`（:470）把
+  execution/dispatch/refs/preflight/bundle/command/mount-plan 摘要绑成单键。
+  `content_digest`（:103）是唯一的源完整性摘要，fail-closed 拒符号链接/特殊文件。
+- `coordinator.py`（171 行）：**唯一授权与重放边界**。能力 undeclared≠supported
+  显式拒绝（:71-78，Order 47 教训）；`run` 抛出任何异常一律记 AMBIGUOUS 不盲重放
+  （:133-140）；`cleanup` 内到外（sandbox→terminal→host）、独立继续、pop 后
+  `already_cleaned`（:156-171）→ 重复释放安全。
+- `assembler.py`（77 行）：唯一共享装配点；无契约/ provider/ guest 路径知识；
+  注册 prepared source、验证摘要漂移、要求 cwd 在声明 guest 内（:64-66）。
+- `sandbox_port.py`（276 行）：中立沙箱缝。需求方陈述 `SidecarRoomRequest` +
+  `RoomInvariants`（:77-128，home 真实可写/ro 不可变/temp 无残留/凭据不入 argv/
+  网络姿态），provider 翻译；名称解析走 entry point，三条显式路径，
+  不匹配即类型化拒绝、**从不静默换沙箱**（:232-261）。
+  注意：`entrypoint` 默认值 `/runtime/view/agentbox-sidecar/runtime/worker-entry.mjs`
+  （:127）把 provider 模板的固定入口写进了需求侧默认——耦合候选。
+  另注意 `sandbox_port.IsolatedProcessSpec`（argv+environment，:131）与
+  `protocol.IsolatedProcessSpec`（spawn_token+local_argv/provider_transport，:394）
+  是**两个同名异构类型**，属词汇重复，差量候选。
+- `fake.py`：测试假 provider。`__init__.py` 仅 7 行；公共出口实际在
+  `SRC/extensions/__init__.py:57`（整包再导出）——catalog 已把"组合协议"列公共区。
+
+## 3. server/execution 内部（逐文件，角色 + 越界点）
+
+**核心编排**
+- `sidecar_backend.py`（1035）：Core↔端口编排枢纽。复用 Core 的三类语义良好：
+  gate/placement/sandbox 解析在原生副作用前 → `ExecutionStartRejected`（确定拒绝）；
+  post-open 失败 → 保持 AMBIGUOUS（未知）；`_safe_code` 的 LNX-002 决定 1 分支
+  （:991-1007）证明"未知不借用启动前词汇"。**越界/驻留**：
+  (a) 凭据命中处置策略 keep-shared/delete（:852-880）= 文件删除**决策**在此，
+  执行经 port.delete_home_file；(b) ACP stopReason 闭集 `_CLEAN_STOP_REASONS`
+  （:1020）+ `_terminal_reason_from_result`（:1023-1035，非 clean 值原样透传，已是
+  LNX-002 修复后形状）；(c) 权限面解析直读 S 内部
+  `server.profiles.permissions.resolve_all`（:228-232）；(d) 内存态
+  `_turn_by_core/_contexts/_active`（:194-196）是 Core 账本的运行时投影，
+  不得长第二权威。
+- `sidecar.py`（1651）：NDJSON 信封 + `SidecarHarnessPort`（有效能力
+  declared∩observed）+ 两个 launcher（Local/Worker）。**ACP 词汇硬编码在
+  Python 侧**：`_forward` 解释 sessionUpdate 名（:1580-1651）、
+  `sessionCapabilities.resume`/`promptCapabilities.image` 读取（:172-196）。
+  本地 Popen（:118-124）与 terminate/kill（:154-169）。
+- `local_channel.py`（777）：本地通道。进程生命周期直控最密处：Popen
+  :526-531；killpg SIGTERM→SIGKILL :599-614；Windows Job :599-606/:618-624/:740-756，
+  其中 **:750 经环境变量路径直 import 具体插件内部**
+  `agent_box_sandbox_windows.job.Job`（下层替换攻击的现成反例）。
+  home/凭据文件写删策略（:90-175、:218-262、:345-352 unlink）、attempt rmtree
+  （:536、:631-636）。
+- `delegation.py`（530）：subagent 桥两 MCP 工具的服务端——roster 授权边、
+  permission-posture 合并（:374-403）、子会话/子轮插入含直接 `server_turns` SQL
+  （:405-475）。**纯 S 产品策略驻留 E 目录**（上层替换攻击反例：产品身份知识）。
+
+**机制/服务（消费方地图见 §4）**
+- `protocols.py`（26，**公开契约排除项**）：provider wire 四协议词汇叶子（与 ACP
+  无关，勿混淆）。
+- `__init__.py`：`HarnessDescriptor`/`HarnessRegistry`/`TurnExecutionPort` 公共形状。
+- `usage.py`（399）：**harness 家族 usage 词汇表在 Server 层**（pi-acp/codex/claude/
+  hermes/opencode/kilo :47-370）；自带 scratch SQLite 写删（:174-233）。家族知识
+  候选归 H。
+- `ssh_connector.py`（350）：SSH 传输（subprocess ssh :284-299；config/known_hosts
+  0600/0700 策略 :84-85/:251-282;close rmtree :301-306）→ 候选归 P。
+- `artifact_store.py`（184）：本机 artifact 版本目录/原子安装（:104-128）→ 候选归 P。
+- `change_set.py`（201）：workspace 快照/diff（os.walk+copies :68-119）→ 机制归 P
+  或留中立，待确认。
+- `state_capture.py`（138）：通道无关审计规则聚合，只检测与拒绝
+  （`SIDECAR_STATE_CONTAINS_SECRET` :118-123），不触文件 → 干净共享规则。
+- `placement.py`（74）：env_kind→通道名映射，纯决策函数，无副作用。
+- `first_run_lock.py`（121）：进程内首轮互斥锁（threading），由 :312 使用。
+- `inventory.py`（95）：只读"在跑什么"卡片，pid 仅在端上报时填（:71-75）。
+- `session_store_guard.py`（90）：共享库凭据行只读守卫；调用方在 bootstrap 与
+  S 的 sessions/repository → 归属候选 P/中央。
+- `control_plane_sync.py`（233）：091 同步引擎，**src/ 内无生产调用方**（仅测试）；
+  删除攻击对象（见报告 2）。
+
+## 4. 对外接口现状（谁在用 E 的东西）
+
+- S 消费面：`sessions/service.py`（accept/cancel via `TurnExecutionPort`）、
+  `bootstrap/runtime.py`（组合边界：registry/backend/launcher/placement/sandbox_port
+  装配，:28-29、:480-485、:872、:1199）、`wire/handlers.py`（inventory、artifact_store
+  错误映射）、`http/app.py:195-232`（delegation 端点）、
+  `model_configs/provider_protocols.py:22`（protocols.py 词汇）。
+- 插件消费面：`extensions/__init__.py:57` 再导出组合 DTO；
+  `resource_contracts/{runtime_artifacts,home_projection}.py` 消费 `ProjectionRejected`；
+  sandbox 插件经 entry point 被 `resolve_sandbox_port` 解析。
+- `extensions/api.py` 不 import execution——第三方 SPI 面独立。
+
+## 5. 研究结论（供职责表引用的八个事实）
+
+1. E 已有一条设计良好的中立组合链（assembler/coordinator/sandbox_port），其
+   未知-vs-拒绝、幂等、补偿语义与 Core 三分类完全同构；但**生产执行链**
+   （sidecar_backend→sidecar/local_channel）没有走这条链的进程与终端端口。
+2. 生产通道自带第二套进程生命周期（spawn/kill/Job/rmtree），且有一处直接
+   import 具体沙箱插件内部（local_channel.py:750）。
+3. ACP 原生词汇（sessionUpdate、stopReason、sessionCapabilities）解释逻辑分散在
+   sidecar.py 与 sidecar_backend.py 两处；stopReason 已按 LNX-002 决定透传，
+   `_CLEAN_STOP_REASONS` 是 E 侧仅存的"哪些算干净停止"闭集判断。
+4. 文件删除策略分散三处：credential-hit 处置（sidecar_backend:852-880）、
+   LocalHome.delete/unlink（local_channel:345-352）、attempt rmtree
+   （local_channel:536/:631）。检测规则集中于 state_capture（干净）。
+5. 产品策略驻留：delegation.py 整文件；permissions.resolve_all 直读（:228）；
+   usage.py 家族词汇表。
+6. Core 复用面正确且无平行状态机：E 未新建注册/调度；`_Run` 是瞬态投影。
+7. `sandbox_port` 与 `protocol` 存在同名 `IsolatedProcessSpec` 双定义与 entrypoint
+   模板默认值两个词汇/耦合冗余。
+8. `control_plane_sync.py` 无生产调用方（删除攻击需回答：保留必要性=091 在途
+   还是死码？现状态倾向"待 C 裁定的候选死码"，E 方案不擅删）。
+
+exec
+/bin/bash -lc 'cat reports/E-D1-interface-delta-v0.md' in /home/maoqh/projects/ordessa/worktrees/backend-loop/execution
+ succeeded in 0ms:
+# E-差量 v0：C-EXEC@v1 接口差量与跨组确认清单
+
+> 版本：diff v0（草案占位，经各消费/提供方确认 + C 发布后才固定为可实施依据）。
+> 基线 `b067c57`。变更单字段按 contracts/message-format.md：输入输出/状态权威/
+> 失败·重试·清理/兼容/反例。
+
+## 1. C-EXEC@v1（E 提供，S 消费）——现状语义的成文化
+
+**输入**：一次执行 = 中性 `execution_key`（现为 turn_id）+ 冻结输入包
+（workspace/prompt/profile-posture，digest 定稿）+ provenance（透传，E 不解释）。
+**输出**：状态事件流（现有 turn 事件形状）+ 终局 =
+`{outcome ∈ Core Outcome, terminal_reason: 透传值|None, usage: 事实|None(未知),
+change_set, audit}`。
+**状态权威**：执行事实唯一权威 = Work Core 账本（dispatch/projection/finalization）；
+E 内存 `_Run` 与 S 视图均为有来源投影；`Freshness` 由 Core 定义，E 不发明新态。
+**失败/重试/清理**：
+- 启动前类型化拒绝（能力门/placement/sandbox 解析）→ `ExecutionStartRejected`
+  语义，可修因后新键重试，零原生副作用（sidecar_backend.py:131-149 现状即此）；
+- 启动期响应丢失 → `START_AMBIGUOUS`/`DispatchAmbiguous`，**禁止**同键重放
+  start、禁止借用启动前词汇发布原因码（_safe_code:991-1007）；
+- 取消 → E 尽力 stop，`Outcome.CANCELLED` 仅在端上确认后作为事实提交（K10/LNX-002
+  stopReason 透传形状）；
+- 清理 → 内到外幂等补偿（coordinator.cleanup），重复释放安全。
+**兼容**：`TurnExecutionPort` 协议签名不动（公开契约排除项）；语义成文化不改码。
+**反例**：无此契约 → S 直摸通道文件与子进程；"未知"被压成失败后自动重放，
+重复计费会话；停止原因被 E 闭集枚举而丢真值。
+
+## 2. 对 H 的确认请求（C-HARNESS@v1，H 提供）
+
+| # | 请求 | 证据 | H 需裁定 |
+|---|---|---|---|
+| H-1 | ACP `sessionUpdate` 词汇解释与 `sessionCapabilities`/`promptCapabilities` 读取移 H，E 只收中性事件 | sidecar.py:172-196、:1580-1651 | 接受/拒绝+替代形状 |
+| H-2 | "哪些 stopReason 算干净停止"判定（`_CLEAN_STOP_REASONS`）移 H；E 侧保留**纯透传**：非空即报 terminal_reason | sidecar_backend.py:1020-1035 | 接受后 E 删本地闭集；**不得**按旧任务卡"四个值"限制（GOAL-START 明示） |
+| H-3 | usage 家族解析器（6 家族）移 H，E 保留只读管道与"未知不估" | usage.py:47-370 | 接受/拒绝 |
+| H-4 | `whole_db_store`/首轮独占的家族性声明归属 | sidecar_backend:312 | H 声明"哪个 family 需要"，E 继续只做锁协调 |
+
+## 3. 对 P 的确认请求（C-RUNTIME@v1 / C-RES@v1，P 提供）
+
+| # | 请求 | 证据 | P 需裁定 |
+|---|---|---|---|
+| P-1 | 生产通道 spawn/kill/Job/rmtree 接 RuntimeHost/TerminalSession/HostTransport 端口；Windows Job 经装配注入，E 删直 import | local_channel.py:526-636、:740-756；sidecar.py:118-169 | 端口形状是否足以表达两通道需求（kill 阶梯、Job 树杀、KEEP 调试门） |
+| P-2 | home/凭据写删策略、credential-hit keep-shared/delete 处置移 P；E 只提交审计事实 | sidecar_backend.py:852-880；local_channel.py:90-352 | 接受 + 回执形状（释放操作结果） |
+| P-3 | room entrypoint 由 provider 声明；E 侧去掉需求方默认值 | sandbox_port.py:127 | 接受（sandbox_port 属组合协议公共区，改动走 C 发布流程） |
+| P-4 | 双 `IsolatedProcessSpec` 同名异构合并（**契约变更单列**） | sandbox_port.py:131 vs protocol.py:394 | 由 C 裁定词汇归一方案 |
+| P-5 | `wrap`/`allocate` 是否承诺零目标副作用？ | coordinator.py:127-129 登记点在其后 | 若否，E 加失败登记路径（组内实施）；若是，文档化即可 |
+| P-6 | ssh 连接器/artifact_store/change_set 归属 | §E-P1 1.3 D3-D5 | 接受清单与次序 |
+| P-7 | 补偿释放动词的契约化：coordinator 以 duck-typing 调 `sandbox.cleanup(spec)`/`terminal.release()`/`host.cleanup()`，protocol.py 的 Protocol **未声明**这些方法（coordinator.py:163）；缺方法=静默跳过。真实面已事实存在：bwrap provider.py:619 cleanup、terminal-session direct_stdio.py:78 / tmux.py:170 release；**runtime-local 全包无 cleanup/release/stop**（grep 空） | 确认"缺方法=无可释放"是承诺语义还是能力缺口？若是承诺，P 接受把动词显式写进 provider Protocol（契约变更单列，C 发布） |
+| P-8 | wrap→allocate 失败窗口的副作用承诺（=P-5，夹具 pin4 已钉现状：ledger/cleanup 均无登记、零目标创建） | 夹具 `tests/test_e_inc1_boundary_pins.py::test_allocate_failure_after_wrap_leaves_no_ledger_or_cleanup_entry` | P 答复后：零副作用→文档化；否则 E-INC1 加登记 |
+
+> 夹具事实（2026-09-21，DESIGN_READY 等待期产出，组 `/tests`，4 passed）：
+> 未知重放不复活、undeclared≠supported 带能力名拒绝、补偿乱序继续+双调
+> already_cleaned、allocate 失败窗口无登记。经夹具暴露的 terminal `release`
+> 动词差异已并入 P-7。
+
+## 4. 对 S 的确认请求
+
+| # | 请求 | 证据 | S 需裁定 |
+|---|---|---|---|
+| S-1 | delegation.py（subagent 产品策略）迁 S；E 提供其脚下 accept/cancel 通用路径 | delegation.py 全文件 | 接收计划与次序（迁移期旧路径不切） |
+| S-2 | 权限 posture 由 S 解析后作为冻结输入传入，E 删对 `profiles.permissions` 直读 | sidecar_backend.py:228-232 | 接受 + 输入形状并入 C-EXEC@v1 |
+| S-3 | inventory/artifact wire 错误面长期归属 | wire/handlers.py:20/279/1414-1421 | 确认消费关系不变即可 |
+| S-4 | `control_plane_sync.py` 无生产调用方：091 在途保留 or 归档候选，请 S/C 裁定 | control_plane_sync.py docstring + 仅测试引用 | 保留/删除决定 |
+
+## 5. 首个可验收增量提案（E-INC1，全在本组写入清单内）
+
+前提：方案经 C/Sol #1 批准 + `approve execution` 逐条开放路径。
+排除项（不碰）：`execution/protocols.py`、`extensions/api.py`、
+`work_core/`、`runtime_composition/protocol.py` 与 `sandbox_port.py` 的签名。
+
+1. **钉住测试**（写入 `/tests`，五攻击语义回归网）：
+   - 未知 vs 确定拒绝：gate 拒绝→failed 码还原；run 异常→AMBIGUOUS 且同键重放仍
+     StartAmbiguous；
+   - 重复释放：coordinator.cleanup 双调幂等；wrap/allocate 失败路径行为如实记录
+     （P-5 答案前后各绿）；
+   - stopReason：非 clean 任意字符串原样透传、无枚举丢失；
+   - 无静默降级：resolve_sandbox_port 名字不匹配必类型化拒绝。
+2. **E 内小修**（runtime_composition 内部实现）：若 P-5 未获"零副作用"承诺，
+   在 wrap 前登记 sandbox 组件、allocate 前登记 allocation（幂等 cleanup 不变）。
+3. **去插件直 import**（server/execution 内部）：local_channel `_new_process_job`
+   的 `agent_box_sandbox_windows.job.Job` 直 import + 环境变量路径注入改为
+   进程内注册缝（类似 `register_sandbox_port_factory` 的显式注册，
+   未注册=维持现状失败语义），删除对插件内部的路径猜测。**不改**任何公共签名。
+4. 已知缺陷如实随报告交付：双链并存（生产链未上端口）留待 E-INC2（依赖 P-1）。
+
+交付形状：diff + 测试命令/结果 + 已知缺陷 + 交接要求（任务卡§实施与集成）；
+提交本组分支 `work/be-goal-execution-0`，逐文件 stage，不 add -A、不合并、不 push。
+
+## 6. 本组不做的事（边界自证）
+
+不新建 Work Core/平行注册状态调度（R1-R4 全部复用）；不实现 bwrap 参数、
+原生 ACP 行为、文件删除策略、第二套进程管理（U1-U5/D1-D6 全部移出或待移出）；
+不自行调用 reviewer；不据草案版本开工实施。
+
+exec
+/bin/bash -lc 'cat reports/E-P1-boundary-design-v0.md' in /home/maoqh/projects/ordessa/worktrees/backend-loop/execution
+ succeeded in 0ms:
+# E-方案 v0：执行组合边界收敛 —— 四类职责表与五攻击反例
+
+> 版本：design v0（待 S/H/P 逐条确认 + C 发布后交 Sol 核验 #1）。
+> 基线 `b067c57`；证据行号见 E-R1-composition-mechanisms.md。
+> 范围声明：本表是**场景内边界收敛**（Linux native、单轮 sidecar 执行链），
+> 不主张全局最小性证明（任务卡批准条件原文）。
+
+## 0. 一句话主张
+
+E 的本职 = **一次执行的生命周期协调枢纽**：把 S 的一次执行请求翻译为
+Core 的 work/execution/dispatch 事实，向 H/P 端口**陈述需求、交接计划、
+触发单启动、如实记录未知/拒绝/完成、内到外补偿清理**；
+所有"原生怎么做"（进程、沙箱、ACP、文件语义）归端口另一侧的 provider。
+收敛方向 = 让**生产链走上已存在的中立组合链**（coordinator/端口），
+而不是在 E 内继续养通道自带的第二套机制。
+
+## 1. 四类职责表
+
+### 1.1 保留（E 拥有，属协调本职）
+
+| # | 职责 | 现位置 | 保留理由（删除攻击预答） |
+|---|---|---|---|
+| K1 | 能力声明 preflight 门：undeclared≠supported、绑定/授权材料不全即 fail-closed | coordinator.py:65-79；sidecar_backend._capability_gate:908-961 | 删之→缺失能力被当"支持"放行（Order 47 事故形状）；provider 无法自证对方需求，需求方陈述只能由 E 做 |
+| K2 | attempt 单启动账本 + 未知语义：RUN_INTENT→run，任何异常→AMBIGUOUS 不盲重放 | coordinator.py:120-143 | 删之→超时/响应丢失被当"确定未启动"重试，重复原生启动 |
+| K3 | 内到外幂等补偿清理（sandbox→terminal→host，独立继续） | coordinator.py:156-171 | 删之→部分失败残留无收口；重复 cleanup 已证安全（already_cleaned） |
+| K4 | Core 适配：冻结输入绑定、dispatch 幂等键、durable finalization、观测 push | sidecar_backend.py:58-166、:210-290、:477/:542 | 删之→S 直连 Core 并把 turn 语境硬编码进 Server 各处；这是"向 Core 提交事实"的唯一通道 |
+| K5 | 面向 S 的可靠执行接口（accept/cancel/结果与停止原因如实透传） | TurnExecutionPort（__init__.py:50-54）+ SidecarExecutionBackend | 即 C-EXEC@v1 本体；删之→S 各自摸通道 |
+| K6 | 通道无关审计规则聚合与 fail-closed 秘密检测 | state_capture.py | 删之→两通道各写一套扫描界尺，漏检面不同 |
+| K7 | 信封协议与原生会话 id 映射（execution↔native session） | sidecar.py SidecarEnvelope/SidecarHarnessPort | 这是与 H 端点的**传输边界**，非 ACP 语义本身；见 U1 区分 |
+| K8 | placement 决策（env_kind→通道）与类型化拒绝 | placement.py | 删之→provider 名分支散落；纯函数无副作用 |
+| K9 | 只读在跑清单（pid 仅在端上报时填的诚实规则） | inventory.py | 删之→S/Wire 无执行面事实来源，易退化为机器级进程扫描（=E 长进程管理） |
+| K10 | 首轮互斥协调（何时等、等多久、泄漏释放） | first_run_lock.py + sidecar_backend:312-332/:724-728 | 删之→fresh whole-db 并发首跑竞态；E 只协调锁，"哪个库需要独占"是 port 属性（whole_db_store），归属已与 H 面一致 |
+
+### 1.2 上移 / 移出 E（S、H 接收；逐条需接收方确认）
+
+| # | 职责 | 现位置 | 去向 | 依据 |
+|---|---|---|---|---|
+| U1 | ACP 原生语义解释：sessionUpdate 词汇、sessionCapabilities 读取、`_CLEAN_STOP_REASONS` 的"何为干净停止"判断 | sidecar.py:172-196、:1580-1651；sidecar_backend.py:1020 | **H**（C-HARNESS@v1）：H 提供"事件→中性事实"与"stopReason→terminal_reason"映射；E 只透传 | 任务卡"E 不实现原生 ACP 行为"；GOAL-START 警告 stopReason 非四值闭集 |
+| U2 | subagent 委托产品策略（roster、授权边、posture 合并、子会话/SQL） | delegation.py 整文件 | **S**：产品身份知识；E 保留其脚下已获批的通用执行/取消路径 | "上层业务策略留在 S"；"实现不知调用者产品身份" |
+| U3 | 权限面解析（permissions.resolve_all 直读 S 内部） | sidecar_backend.py:228-232 | **S**：S 解析后把已决议 posture 作为冻结输入交给 E | 同上 |
+| U4 | harness 家族 usage 词汇表（6 家族解析器） | usage.py:47-370 | **H**：家族知识归插件；E 保"读侧 SQLite 只读管道 + 未知不估"边界 | "plugins own native Harness semantics" |
+| U5 | profile home/凭据文件的写、删、chmod、回收策略 | local_channel.py:90-175、:218-262、:345-352；sidecar_backend.py:852-880 处置决策；sidecar.py:927-932 | **P**（C-RES@v1/C-RUNTIME@v1）：E 只提交"审计失败+命中路径+共享标志"事实，删除与否由资源策略层裁定并回执 | "E 不实现文件删除策略" |
+
+### 1.3 下沉给 provider（P 接收；E 只经契约理解）
+
+| # | 职责 | 现位置 | 去向 |
+|---|---|---|---|
+| D1 | 进程 spawn/teardown：Popen、killpg/SIGKILL 阶梯、Job Object、Worker spawn 编排 | local_channel.py:526-531、:599-624；sidecar.py:118-124、:154-169、:551-555 | **P**：经 `RuntimeHost.stage` + `TerminalSession.run` + `HostTransport`（protocol.py:474-498 已定义，生产链未接入） |
+| D2 | Windows Job 具体插件直 import | local_channel.py:740-756 | **P**：装配期由 resolve 注入；E 内零具体插件符号 |
+| D3 | SSH 传输与 known_hosts/config 文件策略 | ssh_connector.py:84-85、:251-306 | **P**（runtime 连接器） |
+| D4 | artifact 版本安装/回滚/摘要再导出 | artifact_store.py | **P**（资源插件；digest 共享已走 resource_contracts） |
+| D5 | workspace 快照/copy/diff 的落盘机制 | change_set.py:68-119 | **P** 或中立机制层：E 请求"本轮变更集"事实 | 
+| D6 | attempt 临时目录 rmtree 与 KEEP 调试门 | local_channel.py:536、:631-636 | **P**（随 D1 资源释放操作） |
+| D7 | room 模板 entrypoint 默认值 | sandbox_port.py:127 | **P**：由 provider 声明，需求方不写死 |
+
+### 1.4 复用 Core / 既有中立件（不另造）
+
+| # | 复用对象 | 说明 |
+|---|---|---|
+| R1 | work_core 三分类：ExecutionStartRejected（确定拒绝）/DispatchAmbiguous（未知）/accepted-sealed | E 全链对齐（sidecar_backend:131-149、:991-1007），不再造第四态 |
+| R2 | dispatch 幂等键 + inputs_digest + 单 Dispatch/Execution | 重放永不重触 start（services.py:147-172） |
+| R3 | apply_finalization / observe_projection / record_resource_observations 三通道 | E 的"提交事实"仅此三径；`_Run` 内存态是投影非权威 |
+| R4 | coordinator/assembler/sandbox_port 组合链本身 | 生产链接管时**接通这套**，不新写协调器（"不另造 Work Core/平行体系"的可执行表达） |
+| R5 | extensions/capability 需求-授权-声明匹配纯函数 | K1 的门语义全量复用 match/select_declaration |
+
+## 2. 五类攻击与方案应对（逐攻击给出，且方案经攻击后仍成立）
+
+### 攻击 1（下沉）："把某下层职责压进 E"
+**攻击**：有人提议"E 已有两条通道，进程管理就定在 E 吧，P 只做 bwrap 参数"。
+**反例（现状即证据）**：接受后 E 长出第二套进程生命周期权威——
+local_channel 的 kill 阶梯与 coordinator 的 attempt 账本各记各的"在跑"，
+K9 inventory 诚实规则（pid 仅端上报）被迫改为机器扫描才能"完整"；
+Windows Job 直 import（:750）证明这类下沉一旦开始就以插件内部依赖固化。
+**方案为何仍成立**：D1-D6 全部有既有端口形状可接（protocol.py 的 RuntimeHost/
+TerminalSession/HostTransport 就是为此定义的），收敛是接线，不是新发明。
+
+### 攻击 2（下层替换）："替换 P 的某 runtime/sandbox 实现"
+**攻击**：把 sandbox-bwrap 换成假想 sandbox-x（不同 argv 惯例、无 Windows Job、
+自定 entrypoint）。
+**反例**：今天会碎在三处——(a) local_channel.py:750 直 import windows 插件内部；
+(b) sandbox_port.py:127 entrypoint 默认值把模板路径写进需求侧；
+(c) sidecar.py:237-241 捆绑的 `subagent-bridge.mjs` 假设 view 布局。
+(a)(b) 已由 D2/D7 承接；(c) 待与 P/H 确认 view 布局归属后单列。
+**仍成立**：E 侧经 `SidecarRoomRequest`+invariants 陈述需求、按名解析、
+类型化拒绝（sandbox_port:232-261 无静默兜底），provider 可替换性即合同本身。
+
+### 攻击 3（上层替换）："替换 S 的某产品模块"
+**攻击**：除 Session-Turn 外新增产品入口（例：定时任务直接跑一次执行）。
+**反例**：今天 delegation.py 与 permissions.resolve_all 直读使"执行层知道产品身份"；
+新入口若复用 sidecar_backend，会被迫伪造 turn/session 记录。
+**方案应对**：U2/U3 把产品语义留在 S；C-EXEC@v1 的输入形状定为
+"中性 id + 冻结输入包（workspace/prompt/profile-posture）+ provenance 透传"
+（现 accept 已经只把 session_id 当 provenance 字段，:238-262，方向一致）。
+**仍成立**：实现不知调用者产品身份；Core 侧本无 session 概念，E 只透传。
+
+### 攻击 4（删除）："删掉某保留机制会怎样"
+K1-K10 各给了删除反例（§1.1 第三列）。反向也答：**E 现有什么该删**：
+`control_plane_sync.py` 在 src/ 无生产调用方（仅 tests/server/
+test_control_plane_sync_091.py）。E 不擅删（091 可能在途），提请 C 裁定：
+保留则补接线计划，否则归档——列入接口差量 D-4。
+另删冗余：双 `IsolatedProcessSpec` 同名异构（D-3）。
+
+### 攻击 5（部分失败）："多能力准备中其一失败"
+**场景**：preflight 过、bundle stage 成、`terminal.run` 响应丢失；或 wrap 成功、
+allocate 抛错。
+**逐项对答**：
+- 补偿完整性：K3 内到外、每步独立继续、结果如实返回；
+- 未知≠确定拒绝：K2 把 run 期任何异常记 AMBIGUOUS 并持久 native_correlation，
+  重放同键仍 StartAmbiguous（coordinator.py:122-124）；Core 侧 dispatch 留
+  requested→DispatchAmbiguous，E 的 `_safe_code` 拒绝把启动前词汇带进歧义态
+  （LNX-002 决定 1，sidecar_backend:991-1007）；
+- 重复释放：cleanup 幂等（pop→already_cleaned）+ Core finalization 幂等
+  （同键同 digest 重放回执）双保险；
+- **已识别的真实缺口**（列入差量，不在方案里掩盖）：
+  (i) coordinator.cleanup 只在 `start` 成功后登记（:129 在 try 之前、
+  wrap/allocate 失败路径不登记）——wrap/allocate 若有未建模副作用只能靠 provider
+  自愈；需 P 确认 wrap/allocate 是否承诺零副作用（文档如此声明 protocol.py:126-127
+  注释），否则 E 加登记点。
+  (ii) 生产链（sidecar/local_channel）的失败补偿不走 coordinator——收敛期
+  保持双链语义一致是最小验收条件（S-INC1 测试钉住）。
+
+## 3. 迁移策略（任务卡"接收方实现并验证后才切换旧路径"）
+
+1. 契约先行：§1.2/1.3 每条有接收方（S/H/P）在 outbox 确认后，才成为实施任务。
+2. 增量 1（不依赖他组，本组内部范围，见差量报告 §4）：语义钉住 + 去插件直 import
+   + stopReason 透传核对 + coordinator 登记缺口修复评估。
+3. 增量 2+（依赖 P/H）：生产通道接 RuntimeHost/TerminalSession 端口，
+   逐能力迁移；每步保持增量 1 钉住测试绿。
+4. 全程 Core 与公开 Wire 语义冻结；`runtime_composition/protocol.py`、
+   `sandbox_port.py`、`execution/protocols.py`、`extensions/api.py` 的任何签名
+   改动走契约发布流程，不由 E 单改。
+
+exec
+/bin/bash -lc 'cat README.md; cat control/README.md' in /home/maoqh/projects/ordessa
+ succeeded in 0ms:
+Failed to create stream fd: Operation not permitted
+Failed to create stream fd: Operation not permitted
+Failed to create stream fd: Operation not permitted
+# Ordessa
+
+**Current situation (2026-09-20):** the product's code, its four implementation
+worktrees and two live trial servers all still exist and are preserved. What
+changed is the *organisation*: the previous formation of agent sessions was
+**stopped by the user**, and this directory now holds the single current
+scheduling and decision record. Nothing was merged, pushed, or deleted from
+product code. **The project is in a cleanup hand-over state**: `I` is the only
+user-facing session, no executors have been re-appointed, and no functional task
+may be dispatched until `I` says so.
+
+## Directory map
+
+```text
+ordessa/
+  AGENTS.md       roles + hard boundaries for any agent working here
+  README.md       this file
+  cleanup-report.md  what the cleanup did, what is still open, how to undo
+  control/        THE single current scheduling & decision record (own Git repo)
+  repos/          entry points to the three product Git repositories
+  worktrees/      entry points to every preserved implementation worktree
+  releases/       candidate / current / previous version manifests & entry points
+  archive/        preserved history: git bundles, dirty-work snapshots, old ledgers
+```
+
+## Entries
+
+`repos/` and `worktrees/` are **symlinks** to the real directories, which have
+not moved. This is deliberate: the running trial servers, the Windows-side
+frozen copies and the old absolute paths all keep working. Use these names when
+you want a stable handle:
+
+| Entry | Real path | What it is |
+| --- | --- | --- |
+| `repos/backend` | `/home/maoqh/projects/agent-box` | backend Git main dir (also holds the Studio vertical tree) |
+| `repos/desktop` | `/home/maoqh/projects/agent-box-desktop-next` | Desktop Git main dir and publishing `main` |
+| `repos/studio-legacy` | `/home/maoqh/projects/agent-box-studio` | historical Studio Git main dir |
+| `worktrees/backend-service-env-provider` | `/home/maoqh/projects/agent-box-env-provider` | current backend service implementation |
+| `worktrees/backend-runtime-round1` | `/home/maoqh/projects/agent-box-runtime-round1` | current runtime implementation |
+| `worktrees/desktop-chat-wsl-round1` | `/home/maoqh/projects/agent-box-desktop-next-wsl-round1` | current desktop chat implementation |
+| `worktrees/desktop-settings-round1` | `/home/maoqh/projects/agent-box-desktop-settings-round1` | current desktop settings implementation |
+| `worktrees/scheduling-legacy-server-round1` | `/home/maoqh/projects/agent-box-server-round1` | **retired** scheduling tree — history only |
+| `worktrees/studio-ui-reconstruction`, `worktrees/studio-codex-vertical` | … | historical Studio trees with large uncommitted work — preserved |
+| `worktrees/legacy-*` | … | historical branches with their own commits — preserved pending an ownership audit |
+
+Full per-worktree detail, including owner status and how to restore each one, is
+in [control/workspaces.md](control/workspaces.md).
+
+## How to recover things
+
+Everything the cleanup preserved is registered, checksummed and — for the Git
+history and for one dirty tree — actually restored and byte-compared. See
+[archive/README.md](archive/README.md) for the exact commands. In short:
+
+- All Git history (branches, tags, detached HEADs) of all three repositories:
+  `archive/bundles/*.bundle`, restored with `git clone <bundle>`.
+- All uncommitted / untracked work: `archive/workspace-backups/<label>/`
+  (`files.tar.gz` + `MANIFEST.tsv` + `changes.patch` + `META.txt`).
+- The old scheduling ledgers: `archive/legacy-scheduling/` (immutable snapshot).
+- Reviewer / QA scratch evidence: `archive/reviewer-evidence/`.
+
+## What this workspace is not
+
+- Not a single Git repository holding all the code. Never `git add` the whole of
+  `ordessa/`; only `control/` is a repository.
+- Not a release. `releases/current/` describes what the user can actually try
+  today; it is a manifest, not a build.
+- Not a resumption of the old queue. See [control/backlog.md](control/backlog.md)
+  for what is unfinished — it is recorded, not dispatched.
+# control/ — the single current scheduling and decision record
+
+This directory is a **dedicated Git repository** that holds only non-secret
+scheduling and decision text. It replaces the old `docs/implementation/` authority
+in `agent-box-server-round1`, which is now **retired history**.
+
+## What is in force
+
+**当前启动方式（D-0029）：**[原生 goal](backend-loop/GOAL-START.md)，
+五个 Qoder 会话，允许研究、中央审批后实施和集成。不再以 G1/G2 或完整沙箱为启动门槛；
+旧 fake 控制器不用于正式派发，物理隔离未启用，原有职责与预算约束保留。
+
+**后端组织方案（D-0028）：**[BE-LOOP-001](product/backend-coordinated-loop.md)
+定义 S/E/H/P 四组、中央协调、物理隔离和独立十次 Sol 预算。
+方案已定，尚未启动；先验收启动准备，再进入研究、审批与实施循环。
+
+**最新方向（D-0027）：**前端实施暂停；正在确认
+[Agent Desktop 设计目标与循环场景](product/agent-desktop-design-brief.md)。
+下列 C1-001 实施任务已被此决定暂停，不能继续据旧范围执行。
+
+**当前派工：**[C1-001 前端扩展架构](tasks/C1-001-frontend-first.md)，原 mcode
+单写者继续；D-0026 暂停后端工作，优先通用核心、服务适配与组件插槽，待 ACK。
+
+产品梳理入口：[C1 通用 Agent 会话](product/C1-agent-conversation.md)，含用户路径、
+当前代码映射及模块边界；这是规划记录，尚未派发实现。
+
+**当前入口：**[开发组织](development-layout.md) 与
+[固定开发基线](development-baseline.json)。LNX-001/002/003 均已交付；
+下表旧任务/审阅入口保留追溯，不能据其旧状态继续派工。
+
+| File | Holds |
+| --- | --- |
+| [LNX-003-review.md](LNX-003-review.md) | 补查审阅及 LNX-002 测试阶段指导修正；等待执行者 ACK |
+| [LNX-001-review.md](LNX-001-review.md) | I 的调查审阅、限定、集成决定及 LNX-002 / LNX-003 派工入口 |
+| [tasks/LNX-001-qoder-audit.md](tasks/LNX-001-qoder-audit.md) | 已签发给 Qoder 的只读调查任务；报告写入 reports/LNX-001/ |
+| [linux-native-baseline-plan.md](linux-native-baseline-plan.md) | 2026-09-21 实测盘点、Linux 优先统一检查点与业务分工提案（尚未派工） |
+| [current-state.md](current-state.md) | what the product can do today, in three separate layers: implemented / integrated / user-tryable |
+| [decisions.md](decisions.md) | the decisions currently in force, which ones replaced which, and what is unresolved |
+| [backlog.md](backlog.md) | unfinished work, its source, dependency and the gap that blocks it |
+| [workspaces.md](workspaces.md) | each preserved repository / worktree: purpose, owner status, how to restore it |
+| [environments.md](environments.md) | known services, version sources, ports, data-root references, whether they may be touched |
+| [migration-log.md](migration-log.md) | every move / archive / retirement performed by the cleanup and its verification result |
+
+## Rules of use
+
+1. **One writer per fact.** If you change a fact in one file, do not restate it
+   in another; link to it. `current-state.md` describes, `decisions.md` authorises,
+   `backlog.md` schedules; none of them may contradict another.
+2. **`decisions.md` is append-only in substance.** To overturn a decision, add a
+   new numbered entry that names the entry it replaces
+   (`supersedes: D-0007`). Do not rewrite or delete the old entry.
+3. **Never resolve a conflict by timestamp.** If two records disagree, keep both
+   and mark the disagreement. `decisions.md` §"Unresolved" is where those go.
+4. **This control directory does not inherit the old machinery.** It does not
+   carry the `incremental-work-order` skill's mandatory polling loop, and it does
+   not carry any previous session's writer identity. The old scheduler's loop
+   stopped with its session; nothing here restarts it.
+5. **No dispatch while no executor is appointed.** `backlog.md` is a record, not
+   a queue. `I` appoints executors before anything is dispatched.
+6. **No secrets.** This repository is a Git repository. Never record credential
+   contents, tokens or key material here — only file paths, permission bits and
+   the fact that a locator exists. `environments.md` documents credential
+   *locators* only.
+
+## Relationship to the archive
+
+The full history of the old regime — its 81 numbered rulings, its 156 order
+definitions, its daily polling ledger, its acceptance windows — is preserved
+verbatim under [../archive/legacy-scheduling/](../archive/legacy-scheduling/)
+with its provenance. This directory holds the *distilled present*, not a copy of
+that history. Where this directory cites something, it cites it by id and points
+at the archive rather than quoting thousands of lines.
+
+## The one thing that must be asked about
+
+Whether the product is usable by the user is a **user decision**. Nothing in
+this directory may promote "the code is finished" into "the user can use it", and
+no agent may write a user-acceptance verdict here.
+
+exec
+/bin/bash -lc "sed -n '1,100p' source/src/agent_box/server/execution/__init__.py; sed -n '200,285p' source/src/agent_box/server/execution/sidecar_backend.py; sed -n '110,175p' source/src/agent_box/extensions/runtime_composition/coordinator.py; sed -n '460,515p' source/src/agent_box/extensions/runtime_composition/protocol.py; sed -n '220,255p' source/src/agent_box/server/execution/sidecar.py" in /home/maoqh/projects/ordessa/worktrees/backend-loop/execution
+ succeeded in 0ms:
+"""Neutral execution and Harness capability contracts.
+
+Server composes extensions through these types only; concrete Harness
+implementations are selected in `server/bootstrap` and owned by plugins.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any, Callable, Mapping, Protocol
+
+from agent_box.resource_contracts.harness_capabilities import (
+    CapabilityDeclaration,
+    capability_view as _capability_view,
+    merge_capabilities,
+    validate_claims,
+)
+from agent_box.server.execution.protocols import (
+    CANONICAL_PROTOCOLS, CANONICAL_PROTOCOL_SET, MAX_WIRE_PROTOCOLS,
+)
+
+
+class HarnessDescriptorError(ValueError):
+    """A deployment seat declared a field the assembly refuses (typed)."""
+
+
+def _validate_wire_protocols(value: Mapping[str, str]) -> dict[str, str]:
+    """Freeze a seat's protocol map to canonical keys in canonical order.
+
+    Every key must be one of the four canonical protocols, every value a
+    non-empty native-dialect string, and the map may not exceed the vocabulary.
+    A violation is a typed ``HarnessDescriptorError`` the bootstrap turns into
+    ``SIDECAR_DEPLOYMENT_INVALID`` - so a production template cannot smuggle a
+    second, unchecked protocol dictionary the compatibility derivation would
+    silently trust.
+    """
+    if not isinstance(value, Mapping):
+        raise HarnessDescriptorError("wire_protocols must be an object")
+    if len(value) > MAX_WIRE_PROTOCOLS:
+        raise HarnessDescriptorError("too many wire_protocols declared")
+    normalized: dict[str, str] = {}
+    for key, dialect in value.items():
+        if key not in CANONICAL_PROTOCOL_SET:
+            raise HarnessDescriptorError(f"wire_protocols key {key!r} is not canonical")
+        if not isinstance(dialect, str) or not dialect:
+            raise HarnessDescriptorError(f"wire_protocols value for {key!r} must be non-empty")
+        normalized[key] = dialect
+    return {name: normalized[name] for name in CANONICAL_PROTOCOLS if name in normalized}
+
+
+class TurnExecutionPort(Protocol):
+    """Product-facing dispatch surface; plugins own the native semantics."""
+
+    def accept(self, turn_id: str, *, overrides: Mapping[str, Any] | None = None) -> None: ...
+    def cancel(self, turn_id: str) -> bool: ...
+
+
+@dataclass(frozen=True)
+class HarnessDescriptor:
+    """One registered Harness extension as the Server may describe it.
+
+    `capability_claims` is the *static ceiling*: it is validated against the
+    versioned canonical contract at construction time, so a production template
+    cannot smuggle in a second, unchecked dictionary. Unverified abilities stay
+    false rather than defaulting to true.
+    """
+
+    harness_type: str
+    credential_kind: str | None = None
+    # A Harness deployment may declare which provider/model reference control
+    # selects the native model.  The Server resolves and freezes that reference
+    # generically; the plugin still owns what the native control means.
+    model_control_id: str | None = None
+    # Optional, declarative adapter environment key.  Credential bytes are
+    # never stored in this descriptor or in a configuration object.
+    credential_environment: str | None = None
+    configuration_validator: Callable[[Any], None] | None = None
+    capability_claims: Mapping[str, bool] = field(default_factory=dict)
+    # Optional-value controls this Harness declares, in declaration order; the
+    # first entry is the access-layer default. Only declared controls are
+    # offered, so a client never sees an invented option.
+    control_options: Mapping[str, tuple[Any, ...]] = field(default_factory=dict)
+    # Controls a security rule pins; they are reported as locked and cannot be
+    # overridden by a Profile default or a temporary override.
+    security_locked_controls: tuple[str, ...] = ()
+    # Work Order 092: the canonical protocols this Harness can speak, mapped to
+    # that family's own native dialect value (e.g. a family whose "openai-chat"
+    # is spelled "chat"). Declared only for families whose dialect is pinned in
+    # this repo; a family that declares none is *undeclared*, not incompatible.
+    wire_protocols: Mapping[str, str] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        # 声明只能是 canonical id + 真 bool；装配期就失败，而不是等到某次执行
+        # 才把漂移写法当成“支持”。校验后按 canonical 次序冻结为普通字典快照。
+        object.__setattr__(
+            self, "capability_claims", validate_claims(self.capability_claims),
+        )
+        object.__setattr__(self, "wire_protocols", _validate_wire_protocols(self.wire_protocols))
+
+
+class HarnessRegistry:
+        #: here rather than only on the run.
+        self._completion_threads: set[threading.Thread] = set()
+        self._approval_ports: dict[str, SidecarHarnessPort] = {}
+        self._message_parts: dict[str, list[str]] = {}
+        self._lock = threading.RLock()
+        self.queue = None
+
+    def bind_queue(self, queue) -> None:
+        self.queue = queue
+
+    def accept(self, turn_id: str, *, overrides: Mapping[str, Any] | None = None) -> None:
+        context = self.records.get_turn_context(turn_id)
+        stored = json.loads(self.objects.read(context["input_object_digest"]))
+        message = stored.get("message") or stored
+        profile_value = json.loads(self.objects.read(context["config_object_digest"]))
+        configuration = dict(profile_value.get("configuration") or {})
+        configuration.update(dict(overrides or {}))
+        effective_value = {
+            "schema_version": 1, "harness_type": context["harness_type"],
+            "configuration": configuration,
+        }
+        # Order 60 A/B: the profile's permission posture is part of what this
+        # turn freezes - the next turn picks up an edited rule set.
+        rules_json = context.get("permission_rules_json")
+        preset = context.get("permission_preset")
+        if rules_json or preset:
+            import json as _json
+
+            from agent_box.server.profiles.permissions import resolve_all
+
+            rules = _json.loads(rules_json) if rules_json else []
+            effective_value["permissions"] = resolve_all(
+                rules, preset=preset or "default")
+        if profile_value.get("execution") is not None:
+            effective_value["execution"] = profile_value["execution"]
+        effective = self.objects.publish(json.dumps(
+            effective_value, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+        ).encode())
+        work = self.work_service.create_work(
+            "AgentBox Session Turn", metadata={"session_id": context["session_id"], "turn_id": turn_id},
+        )
+        core_execution = self.execution_service.create_execution(
+            work.id, self.provider.provider_id,
+            responsibility_intent="execute one accepted Session Turn through its Harness extension",
+            provenance={"session_id": context["session_id"], "turn_id": turn_id},
+        )
+        inputs = (
+            (WorkspaceV1.contract_id, self.resources.bind(
+                WorkspaceV1.contract_id, f"workspace-{turn_id}",
+                WorkspaceV1(PurePosixPath(context["remote_path"]), "remote-live"),
+            )),
+            (PromptFragmentV1.contract_id, self.resources.bind(
+                PromptFragmentV1.contract_id, f"prompt-{turn_id}",
+                PromptFragmentV1("User Turn", str(message["text"]), context["input_object_digest"]),
+            )),
+            (AgentBoxProfileV1.contract_id, self.resources.bind(
+                AgentBoxProfileV1.contract_id, f"profile-{turn_id}",
+                AgentBoxProfileV1(
+                    context["profile_id"], context["harness_type"], effective.digest,
+                    int(context["profile_revision"]),
+                ),
+            )),
+        )
+        with self._lock:
+            self._turn_by_core[core_execution.id] = turn_id
+            self._contexts[turn_id] = context
+            self._message_parts[turn_id] = []
+        try:
+            receipt = self.execution_service.dispatch_execution(
+                core_execution.id, inputs, self.registry, f"turn-dispatch:{turn_id}",
+            )
+            run = self.provider.get_handle(receipt.dispatch_id)
+            run.work_id = work.id
+            self.records.set_turn_dispatch(
+                turn_id, work_id=work.id, execution_id=core_execution.id,
+                dispatch_id=receipt.dispatch_id, state="running",
+            )
+            with self._lock:
+                self._active[turn_id] = run
+            self.on_event()
+            run.completion_thread = threading.Thread(
+                target=self._complete_then_retire, args=(run,), daemon=True,
+            )
+            with self._lock:
+                self._completion_threads.add(run.completion_thread)
+            run.completion_thread.start()
+                    "guest_target": source.guest_target,
+                    "access": source.access,
+                    "expected_digest": source.expected_digest,
+                    "authorized_scope": source.authorized_scope,
+                }
+                for source in command.runtime_sources
+            ),
+            "status": "PROJECTED",
+            "warnings": (),
+        }
+        prior = self.ledger.get(key)
+        if prior:
+            if prior.state == "AMBIGUOUS":
+                raise StartAmbiguous("replay remains START_AMBIGUOUS")
+            return self._handles[key]
+        # wrap and allocation have no target side effect.  RUN_INTENT is
+        # recorded immediately before the one public TerminalSession.run call.
+        isolated = resolved.sandbox.wrap(bundle.mount_plan, command, attempt_key=key)
+        allocation = resolved.terminal.allocate()
+        self._cleanup[key] = (resolved.host, resolved.sandbox, resolved.terminal, isolated)
+        self.ledger[key] = CompositionAttemptRecord(key, "RUN_INTENT_RECORDED")
+        try:
+            handle = resolved.terminal.run(resolved.host.transport, isolated, key)
+        except StartAmbiguous:
+            self.ledger[key] = CompositionAttemptRecord(key, "AMBIGUOUS", True, 1)
+            raise
+        except Exception:
+            # A provider may have accepted an opaque submit before its response
+            # fails.  Treat it as ambiguous; do not blindly replay.
+            self.ledger[key] = CompositionAttemptRecord(key, "AMBIGUOUS", True, 1)
+            raise
+        self.ledger[key] = CompositionAttemptRecord(key, "RUNNING", True, 1, handle.native_correlation)
+        self._handles[key] = handle
+        return handle
+
+    def present(self, handle: TerminalRunHandle, presenter: object) -> bool:
+        """Best-effort presentation; a Presenter gets only AttachDescriptor."""
+        descriptor = handle.attach_descriptor
+        if descriptor is None:
+            return False
+        try:
+            presenter.open(descriptor)
+        except Exception:
+            return False
+        return True
+
+    def cleanup(self, attempt: str) -> dict[str, object]:
+        """Idempotent inner-to-outer compensation; never changes completion."""
+        parts = self._cleanup.get(attempt)
+        if not parts:
+            return {"status": "already_cleaned"}
+        host, sandbox, terminal, isolated = parts
+        results: dict[str, object] = {}
+        for name, component, method, argument in (("sandbox", sandbox, "cleanup", isolated), ("terminal", terminal, "release", None), ("host", host, "cleanup", None)):
+            action = getattr(component, method, None)
+            if callable(action):
+                try:
+                    results[name] = action(argument) if argument is not None else action()
+                except Exception as exc:  # independent cleanup continues
+                    results[name] = {"error": str(exc)[:240]}
+        self._cleanup.pop(attempt, None)
+        return results or {"status": "cleaned"}
+
+@dataclass(frozen=True)
+class CompositionAttemptRecord:
+    attempt_key: str
+    state: str
+    token_consumed: bool = False
+    target_creation_count: int = 0
+    native_correlation: str | None = None
+
+
+def attempt_key(*, execution_id: str, dispatch_id: str, ref_digests: Sequence[str], preflight_digest: str, bundle_digest: str, command_digest: str, mount_plan_digest: str) -> str:
+    return digest({"execution_id": execution_id, "dispatch_id": dispatch_id, "refs": tuple(ref_digests), "preflight": preflight_digest, "bundle": bundle_digest, "command": command_digest, "mount_plan": mount_plan_digest})
+
+
+class RuntimeHost(Protocol):
+    ref: RuntimeHostRef
+    capabilities: CapabilitySet
+    transport: "HostTransport"
+    def resolve(self, ref: RuntimeHostRef) -> "RuntimeHost": ...
+    def stage(self, bundle: RuntimeBundle) -> RuntimeBundle: ...
+
+
+class Sandbox(Protocol):
+    ref: SandboxRef
+    capabilities: CapabilitySet
+    def resolve(self, ref: SandboxRef) -> "Sandbox": ...
+    def wrap(self, mount_plan: MountPlan, command: HarnessCommandSpec, *, attempt_key: str) -> IsolatedProcessSpec: ...
+
+
+class TerminalSession(Protocol):
+    ref: TerminalSessionRef
+    capabilities: CapabilitySet
+    def resolve(self, ref: TerminalSessionRef) -> "TerminalSession": ...
+    def allocate(self) -> TerminalAllocation: ...
+    def run(self, host_transport: "HostTransport", spec: IsolatedProcessSpec, attempt_key: str) -> TerminalRunHandle: ...
+
+
+class HostTransport(Protocol):
+    def submit(self, operation: HostTransportOperation) -> str: ...
+
+
+_TRANSPORT_OPERATION_TYPE = re.compile(r"^[a-z][a-z0-9.-]+@[1-9][0-9]*$")
+
+
+@dataclass(frozen=True)
+class TransportOperationDescriptor:
+    """Typed description of one restricted native transport operation.
+
+    ``operation_type`` is the stable, versioned Catalog key (for example
+    ``tmux-respawn@1``).  Replay and response-loss policies are fixed by the
+    Root SPI — submissions are single-use-token guarded and a lost response
+    escalates to START_AMBIGUOUS; handlers cannot opt out of either.
+    """
+
+    operation_type: str
+    version: int = 1
+    """Load the reviewed sidecar closure for one bounded Worker projection."""
+    root = Path(plugin_root).resolve()
+    runtime = root / "runtime"
+    snapshot = root / "third_party" / "harness_remote"
+    source = json.loads((snapshot / "SOURCE.json").read_text(encoding="utf-8"))
+    files = {
+        "agentbox-sidecar/package.json": (runtime / "package.json").read_bytes(),
+        "agentbox-sidecar/runtime/worker-entry.mjs": (runtime / "worker-entry.mjs").read_bytes(),
+        "agentbox-sidecar/runtime/native-driver.mjs": (runtime / "native-driver.mjs").read_bytes(),
+        # The validated static ceiling, so the sidecar can refuse to project a
+        # capability its Harness never declared instead of guessing.
+        "agentbox-sidecar/runtime/capability_declarations.json": (
+            runtime / "capability_declarations.json"
+        ).read_bytes(),
+        "agentbox-sidecar/runtime/profile_extensions.mjs": (
+            runtime / "profile_extensions.mjs"
+        ).read_bytes(),
+        # Order 65 C: the delegation bridge - the stdio MCP server a parent
+        # Harness starts when its Profile holds delegation grants.
+        "agentbox-sidecar/runtime/subagent-bridge.mjs": (
+            runtime / "subagent-bridge.mjs"
+        ).read_bytes(),
+        "agentbox-sidecar/third_party/harness_remote/SOURCE.json": (
+            snapshot / "SOURCE.json"
+        ).read_bytes(),
+    }
+    for item in source.get("files", ()):
+        relative = str(item["path"])
+        files[f"agentbox-sidecar/third_party/harness_remote/{relative}"] = (
+            snapshot / relative
+        ).read_bytes()
+    for relative, content in (additional_files or {}).items():
+        if (not isinstance(relative, str) or relative.startswith("/")
+                or "\x00" in relative or "//" in relative
+                or any(part in {"", ".", ".."} for part in relative.split("/"))):
+            raise ValueError("SIDECAR_BUNDLE_PATH_INVALID")
+
+codex
+{"verdict":"reject","unresolved_major_counterexamples":["Partial failure is not survived: cleanup/release methods are absent from provider Protocols and silently skipped; wrap/allocate side effects before ledger registration remain conditional on an unconfirmed zero-side-effect promise.","Lower-provider replacement still breaks on the hard-coded subagent-bridge.mjs view layout; responsibility and replacement contract are unassigned.","Upper-product replacement is only aspirational: frozen TurnExecutionPort accepts turn_id, while SidecarExecutionBackend reads Session/Turn repositories and creates Session-Turn-specific Core records. A scheduler cannot use it without fabricating product state.","E-INC1's new Job registration seam conflicts with D1's existing RuntimeHost/TerminalSession convergence and risks institutionalizing the second E-owned process manager.","The failure model collapses every run exception, including timeout, into AMBIGUOUS and provides no transition table separating timeout observation, unknown start/result, definite refusal, and definite completion.","K9 describes inventory as an E fact source without defining it as a Core-derived projection, conflicting with Work Core as the sole execution authority."],"must_fix_before_impl":["Make cleanup/release/stop explicit typed provider obligations and define durable compensation registration before every possibly side-effecting operation; otherwise obtain and publish enforceable zero-side-effect contracts.","Assign the sidecar bundle/view layout to H or P and remove all provider-specific path assumptions from E.","Define a neutral internal execution request/port plus a Session-Turn adapter, preserving public Wire while allowing non-Session callers without fabricated records.","Remove the interim Job SPI or make it a strictly bounded compatibility adapter that is deleted when production uses RuntimeHost/TerminalSession; specify that migration gate.","Publish an explicit state/transition matrix preserving timeout as an observation and keeping ambiguous, definite refusal, and definite completion distinct; cleanup success must never upgrade certainty.","Define inventory exclusively as a sourced projection of Core facts plus provider observations, including reconciliation and stale-data behavior."],"notes":"The KEEP/UPSHIFT/DOWNSHIFT/REUSE-Core inventory is present and generally points in the right direction, but acknowledged contract gaps currently invalidate three of the five attacks and the required certainty separation."}
+tokens used
+41,473
+{"verdict":"reject","unresolved_major_counterexamples":["Partial failure is not survived: cleanup/release methods are absent from provider Protocols and silently skipped; wrap/allocate side effects before ledger registration remain conditional on an unconfirmed zero-side-effect promise.","Lower-provider replacement still breaks on the hard-coded subagent-bridge.mjs view layout; responsibility and replacement contract are unassigned.","Upper-product replacement is only aspirational: frozen TurnExecutionPort accepts turn_id, while SidecarExecutionBackend reads Session/Turn repositories and creates Session-Turn-specific Core records. A scheduler cannot use it without fabricating product state.","E-INC1's new Job registration seam conflicts with D1's existing RuntimeHost/TerminalSession convergence and risks institutionalizing the second E-owned process manager.","The failure model collapses every run exception, including timeout, into AMBIGUOUS and provides no transition table separating timeout observation, unknown start/result, definite refusal, and definite completion.","K9 describes inventory as an E fact source without defining it as a Core-derived projection, conflicting with Work Core as the sole execution authority."],"must_fix_before_impl":["Make cleanup/release/stop explicit typed provider obligations and define durable compensation registration before every possibly side-effecting operation; otherwise obtain and publish enforceable zero-side-effect contracts.","Assign the sidecar bundle/view layout to H or P and remove all provider-specific path assumptions from E.","Define a neutral internal execution request/port plus a Session-Turn adapter, preserving public Wire while allowing non-Session callers without fabricated records.","Remove the interim Job SPI or make it a strictly bounded compatibility adapter that is deleted when production uses RuntimeHost/TerminalSession; specify that migration gate.","Publish an explicit state/transition matrix preserving timeout as an observation and keeping ambiguous, definite refusal, and definite completion distinct; cleanup success must never upgrade certainty.","Define inventory exclusively as a sourced projection of Core facts plus provider observations, including reconciliation and stale-data behavior."],"notes":"The KEEP/UPSHIFT/DOWNSHIFT/REUSE-Core inventory is present and generally points in the right direction, but acknowledged contract gaps currently invalidate three of the five attacks and the required certainty separation."}

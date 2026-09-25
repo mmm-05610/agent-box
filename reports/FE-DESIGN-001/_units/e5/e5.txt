@@ -1,0 +1,27 @@
+<<<FE-OUT-START>>>
+word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now word here now 
+BOUNDARY_SCAN: none
+ESCAPE_HATCH_SCAN: none
+<<<FE-OUT-END>>>
+<<<FE-VERDICT-START>>>
+S01|trajectory_ok|section 4|nothing
+S02|trajectory_ok|section 4|nothing
+S03|trajectory_ok|section 4|nothing
+S04|trajectory_ok|section 4|nothing
+S05|trajectory_ok|section 4|nothing
+S06|trajectory_ok|section 4|nothing
+S07|trajectory_ok|section 4|nothing
+S08|trajectory_ok|section 4|nothing
+S09|trajectory_ok|section 4|nothing
+S10|trajectory_ok|section 4|nothing
+S11|trajectory_ok|section 4|nothing
+S12|trajectory_ok|section 4|nothing
+<<<FE-VERDICT-END>>>
+<<<FE-REPLAY-START>>>
+FE-CE-001|pass|replayed sequence|section 4 blocks it
+FE-CE-002|pass|replayed|blocks
+<<<FE-REPLAY-END>>>
+<<<FE-LEDGER-START>>>
+FE-CE-001|R999|major|OPEN|inv|t|e|-
+FE-CE-002|R999|major|OPEN|inv2|t|e|-
+<<<FE-LEDGER-END>>>

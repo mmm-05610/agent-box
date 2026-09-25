@@ -1,0 +1,3731 @@
+Reading additional input from stdin...
+OpenAI Codex v0.155.1
+--------
+workdir: /home/maoqh/projects/ordessa/worktrees/integration-linux/backend
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: medium
+reasoning summaries: none
+session id: 01a0c565-a3d8-7462-994f-3bf90265fa70
+--------
+user
+Independent implementation-acceptance review (round 2) of ONE increment. An ACCEPT is a release gate. End with a line exactly `VERDICT: ACCEPT` or `VERDICT: REJECT` and numbered reasons; every reject blocker labeled `blocks:impl` or `later:increment`.
+
+SCOPE DISCIPLINE: read ONLY these files (repo cwd = the candidate at HEAD). Do not grep or list the rest of the workspace. This is a focused re-review, not a whole-repo scan.
+  src/agent_box/server/execution/execution_contract.py
+  src/agent_box/server/execution/__init__.py
+  src/agent_box/server/execution/sidecar.py
+  src/agent_box/server/execution/sidecar_backend.py
+
+CONTEXT: prior review REJECTED this increment for two concurrency races in sidecar_backend.py, since fixed (claim-before-seam in submit; write the cancel receipt inside the run's cancel_lock). You are accepting the FIXED code.
+
+Judge specifically:
+1. submit(): is the existence-check and the placeholder `_NeutralRun(port=None)` registration inside ONE `with self._lock` critical section, so two racing submits of one execution_key cannot each build a port / each call port_factory / each call open_execution? Does a racing caller get replayed=True with the winner's dispatch_id? Does a typed factory refusal release the claim, and a lost open_execution keep the claim as start_uncertain (no laundering)?
+2. cancel_execution(): is the `_cancel_receipts[key]=outcome` write performed WHILE STILL HOLDING target.cancel_lock, and is there a double-check of `prior` inside cancel_lock, so a woken racer finds the receipt and does NOT re-dispatch port.cancel? Is the global self._lock never held across a port call (liveness)?
+3. NON-FALSIFIABILITY OF THE NEW TESTS: read tests/test_e_inc1a_matrix_pins.py. Do the two concurrency pins deterministically FORCE the race window (barrier/event or an event-blocking fake port_factory), or could they pass even if the race were reintroduced (i.e. false-green stress)? A stress loop with no forced interleaving is NOT sufficient proof.
+
+Also confirm none of the prior-approved invariants regressed: no Core/objective in submit, correlation opaque, observe pure-read, a-6 zero-reachable literal, bool cancel shell byte-compatible (unknown->False).
+Note: this is a read-only sandbox with no writable temp dir, so do NOT attempt full pytest; reason from the source and the test bodies.
+codex
+I’ll perform the focused, source-only re-review against the three race criteria and the previously approved invariants. I’ll inspect only the four permitted implementation files plus the explicitly requested concurrency-pin test, and I won’t run pytest or scan the repository.
+exec
+/bin/bash -lc 'wc -l src/agent_box/server/execution/execution_contract.py src/agent_box/server/execution/__init__.py src/agent_box/server/execution/sidecar.py src/agent_box/server/execution/sidecar_backend.py tests/test_e_inc1a_matrix_pins.py' in /home/maoqh/projects/ordessa/worktrees/integration-linux/backend
+ exited 1 in 0ms:
+   114 src/agent_box/server/execution/execution_contract.py
+   171 src/agent_box/server/execution/__init__.py
+  1685 src/agent_box/server/execution/sidecar.py
+  1217 src/agent_box/server/execution/sidecar_backend.py
+wc: tests/test_e_inc1a_matrix_pins.py: No such file or directory
+  3187 total
+
+codex
+The requested test path does not exist at `tests/test_e_inc1a_matrix_pins.py` in this candidate. I’ll continue the permitted implementation review now; I won’t search for a similarly named file because the scope explicitly forbids listing or grepping the workspace. The missing test body may prevent acceptance of criterion 3 unless its exact in-scope path is supplied.
+exec
+/bin/bash -lc "sed -n '1,430p' src/agent_box/server/execution/sidecar.py" in /home/maoqh/projects/ordessa/worktrees/integration-linux/backend
+ succeeded in 0ms:
+"""AgentBox-side client for the Harness sidecar envelope (Work Order 40 glue).
+
+The sidecar owns ACP; this module only speaks the generic NDJSON envelope. It
+never interprets a native protocol, never decides product state, and never sees
+credential content: the Worker materializes credentials into the isolated
+projection and the sidecar inherits nothing from this process's environment.
+
+A launcher is injected so the same client runs over a local process (tests and
+Linux acceptance) or over the Worker's interactive channel (WSL deployment).
+"""
+from __future__ import annotations
+
+import json
+import base64
+import hashlib
+from pathlib import Path, PurePosixPath
+import queue
+import subprocess
+import sys
+import threading
+import time
+from typing import Any, Callable, Mapping, Protocol, Sequence
+from uuid import uuid4
+
+from .state_capture import StateCaptureError, audit_snapshot
+
+from agent_box.resource_contracts.harness_capabilities import (
+    CapabilityDeclaration, capability_view, merge_capabilities, validate_claims,
+)
+
+
+#: How often a blocked channel reader re-checks its keepalive. Small enough that
+#: a failed lease ends the turn promptly, large enough not to spin.
+LEASE_POLL_SECONDS = 0.25
+
+#: Failures while reading a state subtree that mean "it is still moving", so the
+#: capture keeps waiting (bounded) instead of accepting a mixed snapshot. The
+#: list is deliberately short: everything else - a refusal, a bound violation,
+#: credential material, a plain I/O fault - is reported as it happened, with the
+#: code that names it. Classification reads the code alone, never the message.
+#:
+#: Audited Worker view sites, and what their codes mean here:
+#:
+#:   VIEW_CHANGED          an entry changed identity while the Worker was
+#:                         reading it from an already-opened fd - churn
+#:   VIEW_MISSING          an entry is not there - a refusal by the Worker
+#:                         (it cannot know the caller ever saw it); this
+#:                         capture converts it to its identity conflict
+#:                         because it just listed the path
+#:   VIEW_SPECIAL_FILE     a FIFO, socket or device, or a path resolving
+#:                         through a symlink - a refusal, never churn
+#:   VIEW_TRAVERSAL_LIMIT  more than 4096 visited entries - a refusal
+#:   VIEW_FILE_LIMIT       more than 1024 files, in a listing or a manifest
+#:   VIEW_INVALID          malformed identity, manifest, path or fetch range
+#:                         (including a first fetch past the end of a file)
+#:   VIEW_IO               a real listing, metadata, read or write fault
+#:   VIEW_INCOMPLETE       the view is not committed, or a file is missing
+#:   VIEW_DIGEST_MISMATCH  read-back did not match what was declared
+_STATE_TRANSIENT_CODES = frozenset({
+    "SIDECAR_STATE_IDENTITY_CONFLICT",  # raised here: size, offset or digest moved
+    "VIEW_CHANGED",                     # the Worker's own "the bytes moved" code
+})
+
+
+def _matches_ephemeral_prefix(relative: str, prefixes: Sequence[str]) -> bool:
+    """Whether a state-relative path is (under) a declared attempt-ephemeral
+    directory. Shared by the capture exclusion and the restore drop: decision A
+    keeps this scratch out of the view/state/checkpoint on every path."""
+    for prefix in prefixes:
+        if relative == prefix or relative.startswith(prefix.rstrip("/") + "/"):
+            return True
+    return False
+
+
+def _state_error_is_transient(error: BaseException) -> bool:
+    """Whether a capture may wait for this failure to go away.
+
+    Only the code decides. The same sentence can describe churn or a refusal, so
+    no message text is inspected here: an untyped or unknown failure is reported
+    as it arrived.
+    """
+    code = getattr(error, "code", None)
+    return isinstance(code, str) and code in _STATE_TRANSIENT_CODES
+
+
+#: The guest's isolated home root. Every Harness home is a projection inside it:
+#: read-only configuration files and one bounded writable state subtree, both
+#: declared by the deployment. It is never the host home and never a Windows
+#: profile root.
+
+
+class SidecarError(RuntimeError):
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(f"{code}: {message}")
+        self.code = code
+        self.message = message
+
+
+class SidecarLauncher(Protocol):
+    """Starts the sidecar and returns (write, read) byte channels plus a stopper."""
+
+    def launch(self, environment: Mapping[str, str]) -> "SidecarChannels": ...
+
+
+class SidecarChannels(Protocol):
+    def write_line(self, value: str) -> None: ...
+    def iter_chunks(self): ...
+    def close(self) -> None: ...
+
+
+class LocalProcessLauncher:
+    """Launch the sidecar as a local child process (tests, Linux acceptance)."""
+
+    def __init__(self, command: Sequence[str], *, cwd: str | None = None) -> None:
+        self.command = tuple(command)
+        self.cwd = cwd
+
+    def launch(self, environment: Mapping[str, str]):
+        process = subprocess.Popen(
+            self.command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, bufsize=0, env=dict(environment), cwd=self.cwd,
+        )
+        assert process.stdin and process.stdout
+        return _ProcessChannels(process)
+
+
+class _ProcessChannels:
+    def __init__(self, process: subprocess.Popen) -> None:
+        self.process = process
+
+    def write_line(self, value: str) -> None:
+        """Write one envelope line, or refuse with the same typed error as the
+        Worker channels do.
+
+        A cancelled or already-finished execution can reach this after its
+        channel was closed; the caller (`SidecarHarnessPort.cancel`) treats a
+        typed closed-sidecar error as "nothing left to cancel", while a bare
+        ValueError from a closed file object would escape it and fail the whole
+        server shutdown.
+        """
+        stream = self.process.stdin
+        if stream is None or getattr(stream, "closed", False):
+            raise SidecarError("SIDECAR_CLOSED", "sidecar channel is closed")
+        try:
+            stream.write((value + "\n").encode("utf-8"))
+            stream.flush()
+        except (ValueError, OSError) as exc:
+            raise SidecarError("SIDECAR_CLOSED", "sidecar channel is closed") from exc
+
+    def iter_chunks(self):
+        assert self.process.stdout
+        return iter(lambda: self.process.stdout.readline().decode("utf-8", "replace"), "")
+
+    def close(self) -> None:
+        process = self.process
+        if process.stdin:
+            try:
+                process.stdin.close()
+            except OSError:
+                pass
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.terminate()
+            try:
+                process.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=3)
+
+
+def _advertised(capability: Any) -> bool | None:
+    """A native capability advertisement, read as the tri-state it really is.
+
+    ACP marks a session capability by its presence, conventionally as an empty
+    object. Treating the value as a boolean would make every such Harness look
+    incapable in Python, where `{}` is falsy but an absent or explicitly false
+    value is the only honest "no". A missing key (or an explicit null) is not an
+    advertisement at all and stays "not observed".
+    """
+    if capability is None:
+        return None
+    if capability is False:
+        return False
+    return True
+
+
+def _advertised_image(capability: Any) -> bool | None:
+    """`promptCapabilities.image`: only an explicit truth is an observation.
+
+    A missing or explicitly false value stays "not observed": attachment
+    support is never inferred from a default policy or from a nearby ability.
+    """
+    if capability is None or capability is False:
+        return None
+    return True
+
+
+def _require_matching_artifact_authorizations(
+    authorizations: Sequence[Mapping[str, str]],
+    mounts: Sequence[tuple[str, str]],
+) -> None:
+    """Every runtime artifact mount must carry its own declaration.
+
+    A mount without a declaration would reach bwrap unverified; a declaration
+    without a mount would be a claim the Server silently dropped.  Both are
+    refused here, before any Worker is contacted.
+    """
+    declared = {(str(item.get("path")), str(item.get("target"))) for item in authorizations}
+    mounted = {(str(source), str(target)) for source, target in mounts}
+    if len(declared) != len(authorizations) or len(mounted) != len(mounts):
+        raise ValueError("SIDECAR_RUNTIME_ARTIFACT_DECLARATION_DUPLICATED")
+    if declared != mounted:
+        raise ValueError("SIDECAR_RUNTIME_ARTIFACT_DECLARATION_MISMATCH")
+
+
+def _safe_bundle_relative(value: str) -> bool:
+    return (isinstance(value, str) and not value.startswith("/")
+            and "\x00" not in value and "//" not in value
+            and not any(part in {"", ".", ".."} for part in value.split("/")))
+
+
+def sidecar_bundle_files(
+    plugin_root: Path | str, *,
+    closure: Sequence[tuple[str, str]] | None = None,
+    additional_files: Mapping[str, bytes] | None = None,
+) -> dict[str, bytes]:
+    """Load the reviewed sidecar closure for one bounded Worker projection.
+
+    E-INC1a (a-6): ``closure`` is the neutral seam - a pure data list of
+    ``(source_relative, target_relative)`` pairs. When given, this function
+    assembles exactly what the declaration says (path-safety validation and
+    bounds unchanged) and touches none of the literal view layout below.
+    The ``closure=None`` branch is the *frozen compatibility shell* for the
+    bootstrap call site's two-positional shape: the hardcoded
+    view-layout names are Harness-runtime content, owned by H (C-HARNESS,
+    IFR-04), and this shell leaves with INC1b once that declaration exists -
+    nothing outside it may grow these literals (pinned in the group tests).
+    """
+    root = Path(plugin_root).resolve()
+    if closure is not None:
+        files: dict[str, bytes] = {}
+        for source_relative, target_relative in closure:
+            if not _safe_bundle_relative(source_relative) or not _safe_bundle_relative(target_relative):
+                raise ValueError("SIDECAR_BUNDLE_PATH_INVALID")
+            if target_relative in files:
+                raise ValueError("SIDECAR_BUNDLE_PATH_CONFLICT")
+            files[target_relative] = (root / source_relative).read_bytes()
+        return _finish_bundle(files, additional_files)
+    runtime = root / "runtime"
+    snapshot = root / "third_party" / "harness_remote"
+    source = json.loads((snapshot / "SOURCE.json").read_text(encoding="utf-8"))
+    files = {
+        "agentbox-sidecar/package.json": (runtime / "package.json").read_bytes(),
+        "agentbox-sidecar/runtime/worker-entry.mjs": (runtime / "worker-entry.mjs").read_bytes(),
+        "agentbox-sidecar/runtime/native-driver.mjs": (runtime / "native-driver.mjs").read_bytes(),
+        # The validated static ceiling, so the sidecar can refuse to project a
+        # capability its Harness never declared instead of guessing.
+        "agentbox-sidecar/runtime/capability_declarations.json": (
+            runtime / "capability_declarations.json"
+        ).read_bytes(),
+        "agentbox-sidecar/runtime/profile_extensions.mjs": (
+            runtime / "profile_extensions.mjs"
+        ).read_bytes(),
+        # Order 65 C: the delegation bridge - the stdio MCP server a parent
+        # Harness starts when its Profile holds delegation grants.
+        "agentbox-sidecar/runtime/subagent-bridge.mjs": (
+            runtime / "subagent-bridge.mjs"
+        ).read_bytes(),
+        "agentbox-sidecar/third_party/harness_remote/SOURCE.json": (
+            snapshot / "SOURCE.json"
+        ).read_bytes(),
+    }
+    for item in source.get("files", ()):
+        relative = str(item["path"])
+        files[f"agentbox-sidecar/third_party/harness_remote/{relative}"] = (
+            snapshot / relative
+        ).read_bytes()
+    return _finish_bundle(files, additional_files)
+
+
+def _finish_bundle(
+    files: dict[str, bytes], additional_files: Mapping[str, bytes] | None,
+) -> dict[str, bytes]:
+    """Shared tail: caller extras and the worker bounds, identical for both
+    the declared-closure path and the frozen compatibility shell."""
+    for relative, content in (additional_files or {}).items():
+        if not _safe_bundle_relative(relative):
+            raise ValueError("SIDECAR_BUNDLE_PATH_INVALID")
+        if relative in files:
+            raise ValueError("SIDECAR_BUNDLE_PATH_CONFLICT")
+        files[relative] = bytes(content)
+    if len(files) > 1024 or sum(map(len, files.values())) > 64 * 1024 * 1024:
+        raise ValueError("SIDECAR_BUNDLE_OUTSIDE_WORKER_BOUNDS")
+    return files
+
+
+class WorkerSidecarLauncher:
+    """Launch the reviewed sidecar through one Worker's interactive channel.
+
+    The Worker is the host boundary, and this launcher is what it looks like from
+    the product side: stage the bytes, ask the sandbox layer for the room, spawn,
+    stream, capture. Which machine the Worker runs on is the connector's fact,
+    not this class's - a WSL Worker and an SSH Worker take exactly this path, and
+    neither one makes this layer know a host name.
+    """
+
+    def __init__(
+        self, connector, *, workspace: Mapping[str, Any], bundle: Mapping[str, bytes],
+        credential: bytes | None = None,
+        executable_authorizations: Sequence[Mapping[str, str]] = (),
+        executable_mounts: Sequence[tuple[str, str]] = (),
+        runtime_artifact_authorizations: Sequence[Mapping[str, str]] = (),
+        runtime_artifact_mounts: Sequence[tuple[str, str]] = (),
+        projection_mounts: Sequence[tuple[str, str]] = (),
+        home_locator: str = "", native_home: str = "", profile_id: str = "",
+        harness_type: str = "", audit_window: str | None = None,
+        state_ephemeral_paths: Sequence[str] = (),
+        protected_state_paths: Sequence[str] = (),
+        timeout_ms: int = 120_000,
+        sandbox_port: "SandboxPort | None" = None,
+        session_store_harness: str | None = None,
+        session_store_target: str | None = None,
+        session_store_shared: Sequence[str] = (),
+        subscription_files: Sequence[str] = (),
+        asset_files: Mapping[str, bytes] | None = None,
+        usage_probe: dict[str, str] | None = None,
+    ) -> None:
+        self.connector = connector
+        self.workspace = dict(workspace)
+        self.bundle = {str(path): bytes(content) for path, content in bundle.items()}
+        self.credential = None if credential is None else bytes(credential)
+        self.executable_authorizations = tuple(dict(item) for item in executable_authorizations)
+        self.executable_mounts = tuple((str(source), str(target)) for source, target in executable_mounts)
+        self.runtime_artifact_authorizations = tuple(
+            dict(item) for item in runtime_artifact_authorizations
+        )
+        self.runtime_artifact_mounts = tuple(
+            (str(source), str(target)) for source, target in runtime_artifact_mounts
+        )
+        _require_matching_artifact_authorizations(
+            self.runtime_artifact_authorizations, self.runtime_artifact_mounts,
+        )
+        self.projection_mounts = tuple((str(source), str(target)) for source, target in projection_mounts)
+        #: The Profile's durable home on the target machine: `<role>/<native
+        #: home>` under the machine's home root. The Worker creates and marker-
+        #: verifies it; nothing about it is ever uploaded or restored.
+        self.home_locator = str(home_locator)
+        self.native_home = str(native_home)
+        self.profile_id = str(profile_id)
+        self.harness_type = str(harness_type)
+        #: The declared audit window: the deployment's `stateProjection.target`
+        #: minus the guest home prefix, relative to the role directory.
+        self.audit_window = audit_window
+        #: Paths (relative to the audit window) that a read-only projection
+        #: owns. They are excluded from the audit by name: configuration the
+        #: deployment projects read-only is not Harness state.
+        self.protected_state_paths = tuple(_safe_relative_state_path(path) for path in protected_state_paths)
+        self.state_ephemeral_paths = tuple(state_ephemeral_paths)
+        self.timeout_ms = timeout_ms
+        #: The resolved sandbox, injected by the assembly boundary. The channel
+        #: states the demand; this object translates it. A missing port is a
+        #: typed refusal at launch, never a silent run without isolation.
+        self.sandbox_port = sandbox_port
+        #: §14: when set, this Harness's session subtree lives in the per-harness
+        #: session library on the target machine (shared by every profile of the
+        #: family) instead of inside the profile's native home. The declared
+        #: state target is then the session subtree's guest path.
+        self.session_store_harness = session_store_harness
+        #: The declared session-subtree guest path the store binds at (the
+        #: deployment's state target when the family split its store out).
+        self.session_store_target = session_store_target
+        #: Order 66's whole-db names and kinds: the entries the family library
+        #: owns, bound over the profile home's own copies. Empty means the
+        #: store (if any) is the §14 subtree shape.
+        self.session_store_shared = tuple(
+            (str(name), str(kind)) for name, kind in session_store_shared)
+        #: Order 58: rendered asset files (role-relative name -> text). They
+        #: are written once per turn and never read back - assets have zero
+        #: writeback by construction.
+        self.asset_files = dict(asset_files or {})
+        #: Order 56: a bound subscription account's working-copy names. The
+        #: Worker-hosted channel has no home-write op yet, so a bound account
+        #: on this channel is a typed refusal rather than a silent no-op.
+        self.subscription_files = tuple(str(name) for name in subscription_files)
+        #: Order 51: a declared usage probe turns the audited journal into the
+        #: neutral usage fact after the attempt (tokens only, no estimates).
+        self.usage_probe = dict(usage_probe) if usage_probe else None
+
+    def launch(self, environment: Mapping[str, str]):
+        from agent_box.extensions.runtime_composition.sandbox_port import (
+            SandboxPortUnavailable, SidecarRoomRequest,
+        )
+
+        if self.sandbox_port is None:
+            raise SidecarError(
+                "SANDBOX_PORT_UNAVAILABLE",
+                "no sandbox provider was resolved for this execution",
+            )
+
+        attempt_id = f"sidecar-{uuid4().hex}"
+        view_id = f"view-{attempt_id}"
+        secret_frame_id = "harness-credential"
+        credential_material, self.credential = self.credential, None
+        client = self.connector.client_for_workspace(
+            distribution=self.workspace["distribution"],
+            user=self.workspace["remote_user"],
+            connection_id=self.workspace["connection_id"],
+            workspace_path=self.workspace["remote_path"],
+            executable_authorizations=self.executable_authorizations,
+            runtime_artifact_authorizations=self.runtime_artifact_authorizations,
+        )
+        try:
+            client.start()
+        except BaseException as error:
+            client.close()
+            # A Worker bootstrap refusal carries a code (an unsupported control
+            # protocol, or a runtime artifact tree whose digest did not match
+            # its declaration). Re-raise it as this layer's typed error so the
+            # reason survives into durable product state instead of a bare
+            # disconnect message.
+            code = getattr(error, "code", None)
+            if isinstance(code, str) and code:
+                raise SidecarError(code, str(error)) from error
+            raise
+        try:
+            manifest = [
+                {"path": path, "size": len(content), "digest": _sha256(content)}
+                for path, content in sorted(self.bundle.items())
+            ]
+
+exec
+/bin/bash -lc "sed -n '431,860p' src/agent_box/server/execution/sidecar.py" in /home/maoqh/projects/ordessa/worktrees/integration-linux/backend
+ succeeded in 0ms:
+            client.request("view.prepare", {"viewId": view_id, "files": manifest})
+            for path, content in sorted(self.bundle.items()):
+                for offset in range(0, len(content), 32 * 1024):
+                    client.request("view.put", {
+                        "viewId": view_id, "path": path, "offset": offset,
+                        "data": base64.b64encode(content[offset:offset + 32 * 1024]).decode(),
+                    })
+            runtime_view = client.request("view.commit", {"viewId": view_id})["path"]
+            secret = None
+            if credential_material is not None:
+                secret = client.request("secret.put", {
+                    "attemptId": attempt_id, "frameId": secret_frame_id,
+                    "data": base64.b64encode(credential_material).decode(),
+                })["path"]
+            # Order 54: the launcher's before-snapshot of the declared
+            # workspace, taken while the room's files do not exist yet — the
+            # audit's after listing diffs against this. An older Worker
+            # without the op (or a deployment that declared no workspace)
+            # degrades to None: the change set stays honestly unknown instead
+            # of failing the turn.
+            before_snapshot = None
+            try:
+                listing = client.request("workspace.list", {}, timeout=60.0)
+                before_snapshot = {
+                    entry.get("path"): entry
+                    for entry in listing.get("files", ())
+                    if entry.get("path")
+                }
+            except Exception:
+                before_snapshot = None
+            # The home is prepared before the room exists: the Worker creates
+            # (or marker-verifies) the Profile's directory and the declared
+            # audit window, and answers with the host path that the room will
+            # bind read-write. Nothing is uploaded; nothing is restored.
+            home_path = None
+            window_host = None
+            store_overlays: tuple[tuple[str, str], ...] = ()
+            if self.home_locator:
+                home_path = client.request("home.prepare", {
+                    "locator": self.home_locator,
+                    "marker": {"profileId": self.profile_id, "harnessType": self.harness_type,
+                               "nativeHome": self.native_home},
+                    **({"window": self.audit_window} if self.audit_window else {}),
+                })["path"]
+                if self.subscription_files:
+                    # Order 56: the working copy is written through home.put
+                    # (role-relative, like every home op) before the room
+                    # exists; only the declared names, only this turn's asset.
+                    materialize_subscription(
+                        client, locator=self.home_locator,
+                        declared=self.subscription_files,
+                        asset=self.subscription_asset,
+                    )
+                if self.asset_files:
+                    # Order 58: the rendered asset files take the same path.
+                    materialize_subscription(
+                        client, locator=self.home_locator,
+                        declared=tuple(sorted(self.asset_files)),
+                        asset=self.asset_files,
+                    )
+                if self.session_store_harness:
+                    # §14: the declared state target is the session subtree, and
+                    # its host side is the per-harness library (no profile
+                    # marker: the library is harness-scoped). The room binds the
+                    # library at that deeper target, so it wins over the profile
+                    # home's own subtree by the existing depth ordering.
+                    seed = (
+                        [{"name": name, "kind": kind}
+                         for name, kind in self.session_store_shared]
+                        if self.session_store_shared else None
+                    )
+                    library_host = client.request("home.prepare", {
+                        "locator": self.session_store_harness,
+                        "harness": self.session_store_harness,
+                        "kind": "session-store",
+                        **({"entries": seed} if seed else {}),
+                    })["path"]
+                    if self.session_store_shared:
+                        # Order 66's whole-db: the library owns the named
+                        # entries only. The profile's own data directory stays
+                        # the window (log/, repos/, telemetry-id, auth.json
+                        # live there), and each shared name is bound from the
+                        # library over it.
+                        if not self.audit_window:
+                            raise SidecarError(
+                                "SESSION_STORE_INVALID",
+                                "a whole-db session store needs a state target "
+                                "outside the native home",
+                            )
+                        suffix = f"/{self.native_home}"
+                        role_dir = (
+                            home_path[: -len(suffix)] if home_path.endswith(suffix) else home_path
+                        )
+                        window_host = f"{role_dir}/{self.audit_window}"
+                        store_overlays = tuple(
+                            (f"{library_host}/{name}",
+                             f"{self.session_store_target}/{name}")
+                            for name, _kind in self.session_store_shared
+                        )
+                    else:
+                        window_host = library_host
+                elif self.audit_window and self.audit_window != self.native_home:
+                    # The prepared path ends with the locator's segments, so the
+                    # role directory it belongs to is the prefix above the
+                    # native home; the window hangs off that role directory.
+                    suffix = f"/{self.native_home}"
+                    role_dir = (
+                        home_path[: -len(suffix)] if home_path.endswith(suffix) else home_path
+                    )
+                    window_host = f"{role_dir}/{self.audit_window}"
+            # The room is the sandbox layer's product, not this channel's: the
+            # guest home layout, the XDG roots, which mounts are writable and
+            # which state paths are attempt-ephemeral are all decided there.
+            # This layer only supplies the token bindings it just obtained and
+            # the neutral demand; the resolved provider translates it.
+            room = self.sandbox_port.compose_sidecar_room(SidecarRoomRequest(
+                workspace=self.workspace["remote_path"], staged_view=runtime_view,
+                secret=secret, base_environment=environment,
+                executable_mounts=tuple(self.executable_mounts),
+                projection_mounts=tuple(self.projection_mounts),
+                runtime_artifact_mounts=tuple(self.runtime_artifact_mounts),
+                state_home_source=home_path,
+                state_target=f"/runtime/home/{self.native_home}" if home_path else None,
+                native_home=self.native_home,
+                state_window_source=window_host,
+                state_window_target=(
+                    self.session_store_target if self.session_store_harness
+                    else (f"/runtime/home/{self.audit_window}" if window_host else None)
+                ),
+                state_overlays=store_overlays,
+                state_ephemeral_paths=tuple(self.state_ephemeral_paths),
+            ))
+            argv = list(room.argv)
+            if self.session_store_harness:
+                # §14: the audited tree is the per-harness store; the credential
+                # rule's delete walks the same locator.
+                store_locator = f"_sessions/{self.session_store_harness}"
+                channels_kwargs = {"home_locator": store_locator, "audit_window": None,
+                                   "audit_whole_home": True}
+            else:
+                channels_kwargs = {"home_locator": self.home_locator,
+                                   "audit_window": self.audit_window}
+            channels = _WorkerChannels(
+                client, attempt_id, 1, view_id,
+                secret_frame_id if secret is not None else None,
+                **channels_kwargs,
+                protected_state_paths=self.protected_state_paths,
+                state_ephemeral_paths=self.state_ephemeral_paths,
+                forbidden_content=(credential_material or b"").strip(),
+                usage_probe=self.usage_probe,
+                workspace_before_snapshot=before_snapshot,
+                subscription_files=self.subscription_files,
+            )
+            channels.subscribe()
+            client.request(
+                "spawn", {"argv": argv, "timeoutMs": self.timeout_ms,
+                          "stdinBase64": "", "interactive": True},
+                attempt_id=attempt_id, generation=1,
+            )
+            return channels
+        except BaseException:
+            if credential_material is not None:
+                try:
+                    client.request("secret.cleanup", {
+                        "attemptId": attempt_id, "frameId": secret_frame_id,
+                    }, timeout=2)
+                except BaseException:
+                    pass
+            try:
+                client.request("view.cleanup", {"viewId": view_id}, timeout=2)
+            except BaseException:
+                pass
+            client.close()
+            raise
+
+
+#: The name under which this launcher was WSL-only. Every caller it had - the
+#: four family gates, the Windows acceptance and the tests - still reads it; the
+#: class itself has since stopped knowing which machine its Worker runs on.
+WslSidecarLauncher = WorkerSidecarLauncher
+
+
+def materialize_subscription(
+    client, *, locator: str, declared: Sequence[str], asset: Mapping[str, bytes],
+) -> list[str]:
+    """Write this turn's subscription working copy through `home.put`.
+
+    One bounded call per declared name the asset actually carries; nothing
+    else is ever sent, and a name the asset does not hold is left alone (the
+    Harness may create it, and the reclaim decides what that means).
+    """
+    written: list[str] = []
+    for name in declared:
+        payload = asset.get(name)
+        if payload is None:
+            continue
+        client.request("home.put", {
+            "locator": locator, "path": name,
+            "data": base64.b64encode(payload).decode("ascii"),
+        }, timeout=30.0)
+        written.append(name)
+    return written
+
+
+class _WorkerChannels:
+    def __init__(
+        self, client, attempt_id: str, generation: int, view_id: str,
+        secret_frame_id: str | None = None,
+        home_locator: str = "", audit_window: str | None = None,
+        audit_whole_home: bool = False,
+        usage_probe: Mapping[str, str] | None = None,
+        workspace_before_snapshot: Mapping[str, Any] | None = None,
+        protected_state_paths: Sequence[str] = (),
+        state_ephemeral_paths: Sequence[str] = (),
+        forbidden_content: bytes = b"",
+        subscription_files: Sequence[str] = (),
+    ) -> None:
+        self.client = client
+        self.attempt_id = attempt_id
+        self.generation = generation
+        self.view_id = view_id
+        self.secret_frame_id = secret_frame_id
+        self.home_locator = home_locator
+        self.audit_window = audit_window
+        #: §14 session library: the audited tree *is* the store root (the
+        #: locator already names it), so the walk starts at the root instead of
+        #: at a role-relative window inside it.
+        self.audit_whole_home = bool(audit_whole_home)
+        #: Order 51: the declared usage probe (journal suffix + format), used
+        #: after the attempt to read the family's own numbers.
+        self.usage_probe = dict(usage_probe) if usage_probe else None
+        #: Order 54: the launcher's before-snapshot of the declared workspace
+        #: (path -> {size, digest}); the after listing comes from
+        #: `workspace.list` over the same root.
+        #: Order 142: distinguish a *declared empty* workspace (`{}`) from *no
+        #: snapshot at all* (`None`). `{}` is falsy, so the old truthiness test
+        #: folded it into `None` and `workspace_change_set` then reported the WSL
+        #: channel's change set as unknown on every first turn. Keep `{}` as `{}`.
+        self.workspace_before_snapshot = (
+            dict(workspace_before_snapshot) if workspace_before_snapshot is not None else None
+        )
+        #: Read-only configuration that lives *inside* the audited window. It
+        #: is not state: it must not enter the audit manifest.
+        self.protected_state_paths = frozenset(protected_state_paths)
+        self.state_ephemeral_paths = tuple(state_ephemeral_paths)
+        self._forbidden_content = forbidden_content
+        #: Order 56's declared working-copy names, read back for the reclaim.
+        self._subscription_files = tuple(subscription_files)
+        self._chunks: queue.Queue = queue.Queue()
+        self._unsubscribe = None
+        self._disconnect_unsubscribe = None
+        self._closed = False
+        # The Worker cancels any attempt whose client stays quiet past its
+        # lease, and a sidecar prompt is exactly such a client. This owner keeps
+        # the lease alive for as long as the attempt does; it is started in
+        # `subscribe()` (not here) because the launcher may hand us a client
+        # substitute that has no lease support at all.
+        self._lease_keepalive = None
+
+    def subscribe(self) -> None:
+        self._unsubscribe = self.client.subscribe_output(self._worker_event)
+        subscribe_disconnect = getattr(self.client, "subscribe_disconnect", None)
+        if callable(subscribe_disconnect):
+            self._disconnect_unsubscribe = subscribe_disconnect(self._worker_disconnect)
+        keep_lease = getattr(self.client, "keep_lease", None)
+        if callable(keep_lease):
+            # Before `spawn`, so the very first silent stretch is covered too.
+            self._lease_keepalive = keep_lease(label=f"channels-{self.attempt_id}")
+            self._lease_keepalive.start()
+
+    def _worker_disconnect(self, error) -> None:
+        if not self._closed:
+            self._chunks.put(SidecarError(
+                "WORKER_DISCONNECTED", getattr(error, "message", str(error)),
+            ))
+
+    def _worker_event(self, event: Mapping[str, Any]) -> None:
+        result = event.get("result") or {}
+        if (result.get("attemptId") != self.attempt_id
+                or int(result.get("generation", -1)) != self.generation):
+            return
+        if event.get("event") == "process.terminal":
+            self._stop_lease()  # the attempt is over; nothing left to keep alive
+            self._chunks.put(None)
+            return
+        if event.get("event") != "process.output" or result.get("stream") != "stdout":
+            return
+        if result.get("truncated"):
+            self._chunks.put(SidecarError("SIDECAR_OUTPUT_TRUNCATED", "Worker stream budget exceeded"))
+            return
+        try:
+            content = base64.b64decode(result.get("data", ""), validate=True)
+        except ValueError as exc:
+            self._chunks.put(SidecarError("SIDECAR_OUTPUT_INVALID", str(exc)))
+            return
+        if content:
+            self._chunks.put(content.decode("utf-8", "replace"))
+
+    def write_line(self, value: str) -> None:
+        if self._closed:
+            raise SidecarError("SIDECAR_CLOSED", "Worker sidecar is closed")
+        content = (value + "\n").encode("utf-8")
+        for offset in range(0, len(content), 60 * 1024):
+            chunk = content[offset:offset + 60 * 1024]
+            deadline = time.monotonic() + 2
+            while True:
+                try:
+                    self.client.write_stdin(
+                        self.attempt_id, self.generation, chunk, timeout=10,
+                    )
+                    break
+                except BaseException as exc:
+                    # spawn acknowledgement precedes child-pipe installation.
+                    # ATTEMPT_NOT_READY is issued before any byte is written,
+                    # so this one narrow retry cannot duplicate input.
+                    if (getattr(exc, "code", None) != "ATTEMPT_NOT_READY"
+                            or time.monotonic() >= deadline):
+                        raise
+                    time.sleep(0.01)
+
+    def iter_chunks(self):
+        while True:
+            try:
+                item = self._chunks.get(timeout=LEASE_POLL_SECONDS)
+            except queue.Empty:
+                # A failed keepalive must end this turn - typed, and without
+                # waiting for a frame that will never arrive.
+                failure = self._lease_failure()
+                if failure is not None:
+                    raise failure
+                continue
+            if item is None:
+                return
+            if isinstance(item, BaseException):
+                raise item
+            yield item
+
+    def _lease_failure(self) -> SidecarError | None:
+        """The keepalive's typed failure, if the lease could not be kept."""
+        owner = self._lease_keepalive
+        failure = getattr(owner, "failure", None) if owner is not None else None
+        if failure is None:
+            return None
+        code = getattr(failure, "code", None) or "WORKER_LEASE_HEARTBEAT_FAILED"
+        message = getattr(failure, "message", None) or str(failure)
+        return SidecarError(str(code), str(message))
+
+    def _stop_lease(self) -> None:
+        owner, self._lease_keepalive = self._lease_keepalive, None
+        if owner is not None:
+            try:
+                owner.stop()
+            except BaseException:  # noqa: BLE001 - stopping must never mask the turn
+                pass
+
+    def audit_state(self) -> dict[str, Any]:
+        """Audit the declared home window through the shared audit rules.
+
+        Nothing is uploaded and nothing is restored: the Worker lists its own
+        durable home (`home.list`, digest included, bounded, truncation as a
+        fact), and the only bytes read are the ones the fail-closed credential
+        scan must look at. The manifest that comes out is a *record* of what
+        the home looks like, not a copy of it.
+        """
+        if not self.home_locator or (self.audit_window is None and not self.audit_whole_home):
+            return {
+                "files": [], "skipped": 0,
+                "truncated": {"entries": 0, "bytes": 0, "oversize": 0},
+                "audited": {"files": 0, "bytes": 0,
+                            "truncated": {"entries": 0, "bytes": 0, "oversize": 0}},
+            }
+        # Real homes can be large (hundreds of MB, thousands of files); the
+        # walk stays bounded by the Worker's audit caps but takes longer than
+        # the default RPC window, so the audit carries its own generous one.
+        result = self.client.request("home.list", {
+            "locator": self.home_locator,
+            **({"relative": self.audit_window} if self.audit_window else {}),
+        }, timeout=120.0)
+        try:
+            return audit_snapshot(
+                result.get("files", ()), self._home_bytes,
+                protected_state_paths=tuple(self.protected_state_paths),
+                state_ephemeral_paths=self.state_ephemeral_paths,
+                forbidden_content=self._forbidden_content,
+                truncated=result.get("truncated") or {},
+                skipped=int(result.get("skipped") or 0),
+            )
+        except StateCaptureError as error:
+            # The shared rules speak their own error type; this layer's callers
+            # expect the sidecar's, with the same code - and the credential
+            # rule needs the offending relative path with it.
+            failure = SidecarError(error.code, str(error))
+            failure.path = getattr(error, "path", None)
+            raise failure from error
+
+    def read_usage(
+        self, usage_probe: Mapping[str, str] | None,
+    ) -> dict[str, int] | None:
+        """Read the declared journal via home.get and parse the usage fact.
+
+        Nothing here estimates: the parser copies the family's own numbers, a
+        family that reports nothing leaves every column NULL, and the read
+        rides the same audited, bounded home channel the capture uses.
+        """
+        from agent_box.server.execution.usage import parse_usage
+
+        if not usage_probe or not self.home_locator:
+            return None
+        suffix = usage_probe.get("journalSuffix")
+        usage_format = usage_probe.get("format")
+        if not suffix or not usage_format:
+            return None
+        listing = self.client.request("home.list", {
+            "locator": self.home_locator,
+            **({"relative": self.audit_window} if self.audit_window else {}),
+        }, timeout=60.0)
+        candidates = [
+            entry["path"] for entry in listing.get("files", ())
+            if str(entry.get("path", "")).endswith(suffix)
+        ]
+        if not candidates:
+            return None
+        path = max(candidates)  # journal names carry the newest timestamp last
+        full = f"{self.audit_window}/{path}" if self.audit_window else path
+        def fetch(relative_path: str) -> bytes | None:
+            chunks = bytearray()
+            while True:
+                item = self.client.request("home.get", {
+                    "locator": self.home_locator, "path": relative_path,
+                    # The Worker's own fetch bound is 32 KiB per response; asking
+
+exec
+/bin/bash -lc "sed -n '1,220p' src/agent_box/server/execution/execution_contract.py" in /home/maoqh/projects/ordessa/worktrees/integration-linux/backend
+ succeeded in 0ms:
+"""Neutral execution-domain contract types (C-EXEC@v1 block1 carrier, E-INC1a a-1).
+
+Pure frozen data and enumerations only: no IO, no imports beyond the standard
+library, and no knowledge of any caller's product identity. The vocabulary of
+this module is deliberately execution-only - an opaque key, an opaque
+correlation map, declared bindings - so a scheduler that is not the product
+Server can drive the same surface without fabricating anything.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
+from types import MappingProxyType
+from typing import Mapping
+
+
+class CancelOutcome(str, Enum):
+    """The three block-1 cancellation classes (spelling owned by E per the
+    contract; the consumer is only promised pairwise distinguishability, and
+    no class may ever be pressed into another)."""
+
+    CONFIRMED_STOPPED = "confirmed_stopped"
+    REFUSED_NO_ACTIVE_RUN = "refused_no_active_run"
+    UNKNOWN = "unknown"
+
+
+class ObservationState(str, Enum):
+    """What the provider honestly knows about one execution key right now.
+
+    ``NOT_KNOWN_TO_E`` is bounded knowledge, never a proof of absence: it says
+    the execution domain holds no tracked run under this key, not that no
+    execution ever started elsewhere.
+    """
+
+    NOT_KNOWN_TO_E = "not_known_to_e"
+    RUNNING = "running"
+    TERMINAL = "terminal"
+    STOPPED_CONFIRMED = "stopped_confirmed"
+
+
+class EvidenceClass(str, Enum):
+    """The kind of proof an observation rests on. Observations never create
+    transitions; they only report which evidence the domain already holds."""
+
+    DISPATCH_ACK = "dispatch_ack"
+    NATIVE_REPORT = "native_report"
+    TERMINAL_RECEIPT = "terminal_receipt"
+    CANCEL_CONFIRMATION = "cancel_confirmation"
+    NONE = "none"
+
+
+@dataclass(frozen=True)
+class NeutralBinding:
+    """One caller-owned input the executor must mount, as an opaque reference.
+
+    The executor validates presence and safety of the references only; it
+    never resolves a contract id into a product concept.
+    """
+
+    contract_id: str
+    object_digest: str
+    mount_token: str
+
+
+@dataclass(frozen=True)
+class DeadlinePolicy:
+    """Declarative bounds carried with a request; enforcement is composed
+    elsewhere. ``None`` means the caller declares no deadline."""
+
+    hard_deadline: datetime | None = None
+    idle_timeout_seconds: float | None = None
+
+
+@dataclass(frozen=True)
+class ExecutionRequest:
+    """A neutral start-intent for one execution.
+
+    ``execution_key`` is an idempotency key issued by the caller after *its
+    own* record creation; the execution domain never mints, reads, or infers
+    any business ledger entry. ``correlation`` is passed through un-parsed
+    and its persistence is the caller's responsibility.
+    """
+
+    execution_key: str
+    bundle_ref: str
+    resource_bindings: tuple[NeutralBinding, ...] = ()
+    capability_demand: frozenset[str] = frozenset()
+    deadline_policy: DeadlinePolicy | None = None
+    correlation: Mapping[str, str] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "correlation", MappingProxyType(dict(self.correlation)))
+
+
+@dataclass(frozen=True)
+class ExecutionReceipt:
+    """Answer to ``submit``. A replay of a known key returns the original
+    receipt with ``replayed=True`` and never re-dispatches the start."""
+
+    execution_key: str
+    dispatch_id: str
+    replayed: bool = False
+
+
+@dataclass(frozen=True)
+class ExecutionObservation:
+    """Pure-read answer to ``observe_execution``: current knowledge plus the
+    evidence class it rests on. Producing one dispatches nothing."""
+
+    execution_key: str
+    state: ObservationState
+    evidence: EvidenceClass
+    observed_at: datetime
+
+exec
+/bin/bash -lc "sed -n '1,240p' src/agent_box/server/execution/__init__.py" in /home/maoqh/projects/ordessa/worktrees/integration-linux/backend
+ succeeded in 0ms:
+"""Neutral execution and Harness capability contracts.
+
+Server composes extensions through these types only; concrete Harness
+implementations are selected in `server/bootstrap` and owned by plugins.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any, Callable, Mapping, Protocol
+
+from agent_box.resource_contracts.harness_capabilities import (
+    CapabilityDeclaration,
+    capability_view as _capability_view,
+    merge_capabilities,
+    validate_claims,
+)
+from agent_box.server.execution.execution_contract import (
+    CancelOutcome, ExecutionObservation, ExecutionReceipt, ExecutionRequest,
+)
+from agent_box.server.execution.protocols import (
+    CANONICAL_PROTOCOLS, CANONICAL_PROTOCOL_SET, MAX_WIRE_PROTOCOLS,
+)
+
+
+class HarnessDescriptorError(ValueError):
+    """A deployment seat declared a field the assembly refuses (typed)."""
+
+
+def _validate_wire_protocols(value: Mapping[str, str]) -> dict[str, str]:
+    """Freeze a seat's protocol map to canonical keys in canonical order.
+
+    Every key must be one of the four canonical protocols, every value a
+    non-empty native-dialect string, and the map may not exceed the vocabulary.
+    A violation is a typed ``HarnessDescriptorError`` the bootstrap turns into
+    ``SIDECAR_DEPLOYMENT_INVALID`` - so a production template cannot smuggle a
+    second, unchecked protocol dictionary the compatibility derivation would
+    silently trust.
+    """
+    if not isinstance(value, Mapping):
+        raise HarnessDescriptorError("wire_protocols must be an object")
+    if len(value) > MAX_WIRE_PROTOCOLS:
+        raise HarnessDescriptorError("too many wire_protocols declared")
+    normalized: dict[str, str] = {}
+    for key, dialect in value.items():
+        if key not in CANONICAL_PROTOCOL_SET:
+            raise HarnessDescriptorError(f"wire_protocols key {key!r} is not canonical")
+        if not isinstance(dialect, str) or not dialect:
+            raise HarnessDescriptorError(f"wire_protocols value for {key!r} must be non-empty")
+        normalized[key] = dialect
+    return {name: normalized[name] for name in CANONICAL_PROTOCOLS if name in normalized}
+
+
+class TurnExecutionPort(Protocol):
+    """Product-facing dispatch surface; plugins own the native semantics.
+
+    C-EXEC@v1 block-1 (O-3): the three neutral verbs below are the additive
+    carrier of the contract. The bool ``cancel`` above is the temporary
+    compatibility shell and stays byte-compatible until the consumer switches
+    and the shell is deleted in a separately approved increment.
+    """
+
+    def accept(self, turn_id: str, *, overrides: Mapping[str, Any] | None = None) -> None: ...
+    def cancel(self, turn_id: str) -> bool: ...
+
+    def submit(self, request: ExecutionRequest) -> ExecutionReceipt: ...
+    def cancel_execution(self, execution_key: str) -> CancelOutcome: ...
+    def observe_execution(self, execution_key: str) -> ExecutionObservation: ...
+
+
+@dataclass(frozen=True)
+class HarnessDescriptor:
+    """One registered Harness extension as the Server may describe it.
+
+    `capability_claims` is the *static ceiling*: it is validated against the
+    versioned canonical contract at construction time, so a production template
+    cannot smuggle in a second, unchecked dictionary. Unverified abilities stay
+    false rather than defaulting to true.
+    """
+
+    harness_type: str
+    credential_kind: str | None = None
+    # A Harness deployment may declare which provider/model reference control
+    # selects the native model.  The Server resolves and freezes that reference
+    # generically; the plugin still owns what the native control means.
+    model_control_id: str | None = None
+    # Optional, declarative adapter environment key.  Credential bytes are
+    # never stored in this descriptor or in a configuration object.
+    credential_environment: str | None = None
+    configuration_validator: Callable[[Any], None] | None = None
+    capability_claims: Mapping[str, bool] = field(default_factory=dict)
+    # Optional-value controls this Harness declares, in declaration order; the
+    # first entry is the access-layer default. Only declared controls are
+    # offered, so a client never sees an invented option.
+    control_options: Mapping[str, tuple[Any, ...]] = field(default_factory=dict)
+    # Controls a security rule pins; they are reported as locked and cannot be
+    # overridden by a Profile default or a temporary override.
+    security_locked_controls: tuple[str, ...] = ()
+    # Work Order 092: the canonical protocols this Harness can speak, mapped to
+    # that family's own native dialect value (e.g. a family whose "openai-chat"
+    # is spelled "chat"). Declared only for families whose dialect is pinned in
+    # this repo; a family that declares none is *undeclared*, not incompatible.
+    wire_protocols: Mapping[str, str] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        # 声明只能是 canonical id + 真 bool；装配期就失败，而不是等到某次执行
+        # 才把漂移写法当成“支持”。校验后按 canonical 次序冻结为普通字典快照。
+        object.__setattr__(
+            self, "capability_claims", validate_claims(self.capability_claims),
+        )
+        object.__setattr__(self, "wire_protocols", _validate_wire_protocols(self.wire_protocols))
+
+
+class HarnessRegistry:
+    """Registration state assembled at bootstrap; never brand-switched on."""
+
+    def __init__(self) -> None:
+        self._descriptors: dict[str, HarnessDescriptor] = {}
+
+    def register(self, descriptor: HarnessDescriptor) -> None:
+        if descriptor.harness_type in self._descriptors:
+            raise ValueError(f"harness already registered: {descriptor.harness_type}")
+        self._descriptors[descriptor.harness_type] = descriptor
+
+    def get(self, harness_type: str) -> HarnessDescriptor:
+        try:
+            return self._descriptors[harness_type]
+        except KeyError:
+            raise KeyError("HARNESS_NOT_REGISTERED") from None
+
+    def registered(self) -> tuple[str, ...]:
+        return tuple(sorted(self._descriptors))
+
+    def wire_protocols(self, harness_type: str) -> dict[str, str]:
+        """The canonical→native protocol map one Harness seat declared (092).
+
+        Empty means the seat declares none: an *undeclared* family is not
+        incompatible, it is unknown, and the Server never blocks on unknown.
+        """
+        descriptor = self._descriptors.get(harness_type)
+        return dict(descriptor.wire_protocols) if descriptor else {}
+
+    def claims_for(self, harness_type: str) -> dict[str, bool]:
+        """External-compatible shape: {canonical id: declared}; unknown → {}."""
+        return self.canonical_claims(harness_type)
+
+    def canonical_claims(self, harness_type: str) -> dict[str, bool]:
+        """registry 派生的 canonical 静态声明（Profile 视图的唯一来源）。"""
+        descriptor = self._descriptors.get(harness_type)
+        return dict(descriptor.capability_claims) if descriptor else {}
+
+    def capability_declarations(self, harness_type: str) -> tuple[CapabilityDeclaration, ...]:
+        """静态 canonical 视图（无任何运行时观测；未注册 → 空）。"""
+        descriptor = self._descriptors.get(harness_type)
+        if descriptor is None:
+            return ()
+        return merge_capabilities(descriptor.capability_claims, {})
+
+    def capability_view(self, harness_type: str) -> dict[str, Any]:
+        """静态 canonical 视图字典，形状与运行时视图一致。"""
+        return _capability_view(harness_type, self.capability_declarations(harness_type))
+
+    def __contains__(self, harness_type: str) -> bool:
+        return harness_type in self._descriptors
+
+
+from .sidecar_backend import SidecarExecutionBackend  # noqa: E402
+
+__all__ = [
+    "CancelOutcome", "ExecutionObservation", "ExecutionReceipt", "ExecutionRequest",
+    "HarnessDescriptor", "HarnessRegistry", "SidecarExecutionBackend", "TurnExecutionPort",
+]
+
+exec
+/bin/bash -lc "sed -n '1291,1720p' src/agent_box/server/execution/sidecar.py" in /home/maoqh/projects/ordessa/worktrees/integration-linux/backend
+ succeeded in 0ms:
+        # 答复；prompt 之前到达的增量一律不计入本轮。规则与 harness 品牌无关。
+        self._prompted: set[str] = set()
+        # 被排除掉的历史回放字符数：不进本轮答复，但要记得住，便于事后核对。
+        self._replayed: dict[str, int] = {}
+        self._lock = threading.RLock()
+
+    def open_execution(self, execution_id: str) -> str:
+        """Open a sidecar, register the profile, and open one native session.
+
+        Returns the opaque native session id. Credentials are never passed here:
+        the Worker materializes them inside the isolated projection.
+        """
+        with self._lock:
+            if execution_id in self._sessions:
+                return self._native_sessions[execution_id]
+            # 早于 start/create 设置：原生在打开会话时播发的事件也属于这次执行。
+            self._current = execution_id
+        envelope = SidecarEnvelope(self.launcher.launch(self.environment), on_event=self._forward)
+        try:
+            registered = envelope.request({
+                "op": "register", "profile": self.profile, "launch": self.adapter,
+                "credentialEnvironment": self.credential_environment,
+                "preferredAuthMethod": self.preferred_auth_method,
+                "stateDirectory": self.state_directory, "directory": self.directory,
+                "permissionRoundTrip": True, "permissionTimeoutMs": 60_000,
+            })
+            started = envelope.request({"op": "start"})
+            if self.resume_native_id is None:
+                session = envelope.request({
+                    "op": "create", "title": execution_id, "model": self.model,
+                })
+                session_operation = "create"
+            else:
+                session = envelope.request({"op": "open", "sessionId": self.resume_native_id})
+                session_operation = "open"
+        except BaseException:
+            envelope.close()
+            raise
+        native = str(session.get("sessionId") or "")
+        if not native:
+            envelope.close()
+            raise SidecarError("NATIVE_SESSION_MISSING", "sidecar did not report a native session id")
+        with self._lock:
+            self._sessions[execution_id] = envelope
+            self._native_sessions[execution_id] = native
+            self._current = execution_id
+            # 运行时观测只记录原生真正给出的事实，且只属于本次执行：
+            # - start 操作合同已注册且被真实调用，这就是 start 的观测来源；
+            # - create/open 返回了原生会话身份，这就是 observe 的观测来源；
+            # - 会话/提示能力按原生播发读取（空对象算播发，null/缺失是“未观测”）。
+            self._record_observation(execution_id, "start", True, "sidecar.operation.start")
+            self._record_observation(
+                execution_id, "observe", True, f"sidecar.operation.{session_operation}",
+            )
+            self._record_observation(
+                execution_id, "native_continuation",
+                _advertised((started.get("sessionCapabilities") or {}).get("resume")),
+                "sessionCapabilities.resume",
+            )
+            self._record_observation(
+                execution_id, "attach",
+                _advertised_image((started.get("promptCapabilities") or {}).get("image")),
+                "promptCapabilities.image",
+            )
+        self.on_event(execution_id, "started", {
+            "nativeSessionId": native, "provenance": registered.get("provenance"),
+        })
+        return native
+
+    def workspace_change_set(self, execution_id: str) -> dict[str, Any] | None:
+        """Order 54: the declared workspace's per-turn change set.
+
+        Delegates to the execution's own channel; a channel without the
+        capability answers None (honest unknown).
+        """
+        envelope = self._require(execution_id)
+        read = getattr(envelope, "workspace_change_set", None)
+        return read() if callable(read) else None
+
+    def read_usage(
+        self, execution_id: str, usage_probe: Mapping[str, str] | None,
+    ) -> dict[str, int] | None:
+        """Read and parse the declared journal into the neutral usage fact.
+
+        The completion boundary calls this once the audit is done; the read
+        rides the execution's own audited channel and the parse is the only
+        place a family's field names appear.
+        """
+        envelope = self._require(execution_id)
+        return envelope.read_usage(usage_probe)
+
+    def capture_execution(self, execution_id: str) -> tuple[dict[str, Any], bool]:
+        """Flush the adapter, then audit the declared home window.
+
+        The audit is a record, not a copy: what comes back are facts about the
+        home directory the Harness owns on this machine (per-file digests,
+        counts, truncation), never bytes to store.
+        """
+        envelope = self._require(execution_id)
+        with self._lock:
+            already_closed = execution_id in self._native_closed
+        if not already_closed:
+            envelope.request({"op": "close"}, timeout=10)
+            with self._lock:
+                self._native_closed.add(execution_id)
+        audit = envelope.audit_state()
+        # resumable 的算法不变：静态声明了 native_continuation 且本次执行真的
+        # 被原生播发过，才允许声明 resumable。
+        resumable = self._effective_supported(execution_id, "native_continuation")
+        return {
+            "nativePlatform": self.native_platform,
+            "homeLocator": self.home_locator,
+            **audit,
+        }, resumable
+
+    @property
+    def shared_store(self) -> bool:
+        """Whether this execution's audited tree is the shared family library.
+
+        Order 66 §2.5: a credential hit in the shared library is a typed
+        failure that must NOT delete the file - deleting there would destroy
+        other Profiles' sessions. The launcher is the only object that knows
+        which tree the audit covers.
+        """
+        return bool(getattr(self.launcher, "session_store_harness", None))
+
+    @property
+    def whole_db_store(self) -> bool:
+        """Whether this execution opens one shared *whole* library (order 80).
+
+        `shared_store` is true for sessions-subtree as well, where every
+        session has its own files and no harness initialises a shared database;
+        only a whole-db store carries `shared` entries, and only there does the
+        first run need the exclusive lock.
+        """
+        return self.shared_store and bool(
+            getattr(self.launcher, "session_store_shared", ()))
+
+    def delete_home_file(self, execution_id: str, relative: str) -> None:
+        """Remove one leaked file from the home (the credential rule)."""
+        envelope = self._require(execution_id)
+        envelope.delete_state_file(relative)
+
+    def pid(self, execution_id: str) -> int | None:
+        """The execution-side pid, or None when this side has not reported one.
+
+        Only the local channel's process object is readable here; a
+        Worker-hosted run has no pid on this machine, and the order's rule is
+        that the field stays null rather than being guessed.
+        """
+        envelope = self._require(execution_id)
+        process = getattr(envelope, "process", None)
+        pid = getattr(process, "pid", None)
+        return pid if isinstance(pid, int) and not isinstance(pid, bool) else None
+
+    def read_subscription(self, execution_id: str) -> dict[str, bytes]:
+        """Read the declared subscription working files back (order 56)."""
+        envelope = self._require(execution_id)
+        read = getattr(envelope, "read_subscription", None)
+        return read() if callable(read) else {}
+
+    def accept(self, execution_id: str, *, overrides: Mapping[str, Any] | None = None) -> None:
+        """Open the execution; the prompt is issued by `prompt`."""
+        del overrides
+        self.open_execution(execution_id)
+
+    def prompt(
+        self, execution_id: str, text: str,
+        attachments: Sequence[Mapping[str, Any]] = (),
+    ) -> dict[str, Any]:
+        envelope = self._require(execution_id)
+        items = [dict(item) for item in attachments]
+        if items and not self._effective_supported(execution_id, "attach"):
+            # 有效 attach=false 时在派发前类型化拒绝：附件要么被原生真正支持，
+            # 要么带着明确错误失败，绝不静默丢弃。
+            raise SidecarError(
+                "ATTACHMENT_UNSUPPORTED",
+                "this execution has no effective 'attach' capability",
+            )
+        with self._lock:
+            self._current = execution_id
+            # 标记在请求发出之前：prompt 一发出，随后到达的块就是这一轮的输出。
+            self._prompted.add(execution_id)
+        result = envelope.request(
+            {"op": "prompt", "sessionId": self._native_sessions[execution_id], "text": text,
+             "model": self.model, "attachments": items},
+            timeout=600,
+        )
+        # prompt 返回即完成合同被真实调用，这是 finish 的观测来源。
+        self._record_observation(execution_id, "finish", True, "sidecar.operation.prompt")
+        return result
+
+    def cancel(self, execution_id: str) -> bool:
+        with self._lock:
+            envelope = self._sessions.get(execution_id)
+            native = self._native_sessions.get(execution_id)
+        if envelope is None or native is None:
+            return False
+        try:
+            envelope.request({"op": "abort", "sessionId": native}, timeout=10)
+            return True
+        except SidecarError:
+            return False
+
+    def close_execution(self, execution_id: str) -> None:
+        with self._lock:
+            envelope = self._sessions.pop(execution_id, None)
+            self._native_sessions.pop(execution_id, None)
+            self._observed.pop(execution_id, None)
+            self._evidence.pop(execution_id, None)
+            self._prompted.discard(execution_id)
+            self._replayed.pop(execution_id, None)
+            native_closed = execution_id in self._native_closed
+            self._native_closed.discard(execution_id)
+            self._approvals = {
+                key: value for key, value in self._approvals.items() if value[0] != execution_id
+            }
+        if envelope is not None:
+            try:
+                if not native_closed:
+                    envelope.request({"op": "close"}, timeout=5)
+            except BaseException:
+                pass
+            envelope.close()
+
+    def stop(self) -> bool:
+        with self._lock:
+            sessions = list(self._sessions.values())
+            self._sessions.clear()
+            self._native_sessions.clear()
+            self._observed.clear()
+            self._evidence.clear()
+            self._prompted.clear()
+            self._replayed.clear()
+            self._native_closed.clear()
+            self._approvals.clear()
+        for envelope in sessions:
+            try:
+                envelope.close()
+            except BaseException:
+                pass
+        return True
+
+    def register_approval(
+        self, approval_id: str, execution_id: str, sidecar_request_id: str,
+    ) -> None:
+        with self._lock:
+            if execution_id not in self._sessions:
+                raise SidecarError("EXECUTION_UNKNOWN", "approval execution is no longer active")
+            self._approvals[approval_id] = (execution_id, sidecar_request_id)
+
+    def decide_approval(
+        self, approval_id: str, decision: str, scope: Mapping[str, Any],
+    ) -> None:
+        with self._lock:
+            route = self._approvals.pop(approval_id, None)
+        if route is None:
+            raise SidecarError("PERMISSION_REQUEST_UNKNOWN", "approval route is no longer active")
+        execution_id, request_id = route
+        self._require(execution_id).request({
+            "op": "permission_decision", "requestId": request_id,
+            "decision": decision, "scope": dict(scope),
+        }, timeout=10)
+
+    def effective_capabilities(self, execution_id: str) -> dict:
+        """该 execution 的 canonical 能力视图（静态声明 ∩ 本次运行时观测）。
+
+        形状与 ``harness_capabilities.capability_view`` 一致：``declared`` 永远是静态
+        上限，``observed`` 三态且随执行过程更新（例如首条 delta 到达后
+        ``stream.observed=true``），``supported`` 是两者合并后的结论。未知 execution
+        抛出与 `_native`/`_require` 一致的 ``EXECUTION_UNKNOWN``。
+        """
+        with self._lock:
+            if execution_id not in self._sessions:
+                raise SidecarError("EXECUTION_UNKNOWN", "no sidecar for this execution")
+        return capability_view(self.profile, self._effective(execution_id))
+
+    def _effective(self, execution_id: str) -> tuple[CapabilityDeclaration, ...]:
+        with self._lock:
+            observed = dict(self._observed.get(execution_id) or {})
+            evidence = dict(self._evidence.get(execution_id) or {})
+        return merge_capabilities(self.declared_capabilities, observed, evidence=evidence)
+
+    def _effective_supported(self, execution_id: str, capability_id: str) -> bool:
+        for declaration in self._effective(execution_id):
+            if declaration.id == capability_id:
+                return declaration.supported
+        return False
+
+    def _record_observation(
+        self, execution_id: str, capability_id: str, value: bool | None,
+        evidence: str | None = None,
+    ) -> None:
+        """记录一条本次执行的原生事实。
+
+        ``None`` 表示"没有观测到"，既不写观测也不覆盖已有观测——观测是单调事实，
+        而且它只影响本次执行的合并结果，不会回写任何静态声明。
+        """
+        if value is None:
+            return
+        with self._lock:
+            self._observed.setdefault(execution_id, {})[capability_id] = value
+            if evidence is not None:
+                self._evidence.setdefault(execution_id, {})[capability_id] = evidence
+
+    def replayed_history_chars(self, execution_id: str) -> int:
+        """原生在 prompt 之前回放的历史字符数：排除在本轮答复之外，只作记账。"""
+        with self._lock:
+            return self._replayed.get(execution_id, 0)
+
+    def _native(self, execution_id: str) -> str:
+        native = self._native_sessions.get(execution_id)
+        if native is None:
+            raise SidecarError("EXECUTION_UNKNOWN", "no native session for this execution")
+        return native
+
+    def _require(self, execution_id: str) -> SidecarEnvelope:
+        with self._lock:
+            envelope = self._sessions.get(execution_id)
+        if envelope is None:
+            raise SidecarError("EXECUTION_UNKNOWN", "no sidecar for this execution")
+        return envelope
+
+    def _forward(self, message: Mapping[str, Any]) -> None:
+        """Project upward sidecar events onto product-neutral callback facts."""
+        event = message.get("event")
+        data = message.get("data") or {}
+        with self._lock:
+            execution_id = self._current
+        if event == "acp_notification":
+            update = ((data.get("params") or {}).get("update") or {})
+            if update.get("sessionUpdate") == "agent_message_chunk":
+                text = ((update.get("content") or {}).get("text") or "")
+                # 只有 prompt 已经发出之后到达的块才是这一轮的答复；重开会话时
+                # 回放的历史在这里被排除，否则它会成为答复的前缀（真实复现：
+                # 每一轮都把上一轮的全文重复一遍）。
+                live = bool(text) and execution_id in self._prompted
+                if text and not live:
+                    with self._lock:
+                        self._replayed[execution_id] = self._replayed.get(execution_id, 0) + len(text)
+                if live:
+                    # 收到一条流式增量，就是 stream 被真实观测到的证据；两条传输
+                    # （ACP 与 deployment-declared driver）在这里汇成同一个产品事实。
+                    self._record_observation(
+                        execution_id, "stream", True, "sidecar.event.message.delta",
+                    )
+                    self.on_event(execution_id, "message.delta", {"text": text})
+            elif update.get("sessionUpdate") == "agent_thought_chunk":
+                # Order 52: the harness's own reasoning, as a neutral fact. The
+                # live/replay exclusion matches the message chunk above.
+                text = ((update.get("content") or {}).get("text") or "")
+                if text and execution_id in self._prompted:
+                    self.on_event(execution_id, "thought.delta", {"text": text})
+            elif update.get("sessionUpdate") in {"tool_call", "tool_call_update"}:
+                status = str(update.get("status") or "in_progress")
+                tool_name = update.get("_meta", {}).get("toolName") if isinstance(update.get("_meta"), dict) else None
+                self.on_event(execution_id, "tool.update", {
+                    "tool_call_id": str(update.get("toolCallId") or "tool"),
+                    "tool": tool_name if tool_name is not None else update.get("title"),
+                    "state": {"in_progress": "running", "failed": "failed"}.get(status, status),
+                    **({"summary": str(update["title"])} if update.get("title") else {}),
+                })
+            elif update.get("sessionUpdate") == "plan":
+                entries = update.get("entries")
+                self.on_event(execution_id, "plan.updated", {
+                    "entries": entries if isinstance(entries, list) else [],
+                })
+            elif update.get("sessionUpdate") == "current_mode_update":
+                self.on_event(execution_id, "mode.updated", {
+                    "currentModeId": str(update.get("currentModeId") or ""),
+                })
+        elif event == "message_delta":
+            # A deployment-declared native driver reports the same product fact
+            # as an ACP message chunk. The event name is the driver contract's,
+            # never a Harness's, so this mapping stays brand-free.
+            text = str(data.get("text") or "")
+            if text:
+                self._record_observation(
+                    execution_id, "stream", True, "sidecar.event.message.delta",
+                )
+                self.on_event(execution_id, "message.delta", {"text": text})
+        elif event == "driver_exit":
+            self.on_event(execution_id, "failed", {"code": "ADAPTER_EXIT"})
+        elif event == "adapter_exit":
+            self.on_event(execution_id, "failed", {"code": "ADAPTER_EXIT"})
+        elif event == "permission_request":
+            # 只有真实发生了 permission round-trip、并且插件静态声明了
+            # permissions 时，才把它算作观测；否则保持“未观测”，绝不因为一次
+            # 原生请求或某种 deny 默认就宣称支持审批。请求本身仍然如实上报。
+            if self.declared_capabilities.get("permissions"):
+                self._record_observation(
+                    execution_id, "permissions", True,
+                    "sidecar.operation.permission_request",
+                )
+            self.on_event(execution_id, "approval.requested", {"request": data})
+
+exec
+/bin/bash -lc "sed -n '861,1290p' src/agent_box/server/execution/sidecar.py" in /home/maoqh/projects/ordessa/worktrees/integration-linux/backend
+ succeeded in 0ms:
+                    # for more is a typed range refusal, not a shorter answer.
+                    "offset": len(chunks), "maxLength": 32 * 1024,
+                })
+                if not isinstance(item.get("data"), str):
+                    raise SidecarError("SIDECAR_STATE_INVALID", "home fetch data is invalid")
+                chunks.extend(base64.b64decode(item["data"], validate=True))
+                if item.get("eof") is True:
+                    break
+                if len(chunks) > 4 * 1024 * 1024:
+                    raise SidecarError(
+                        "SIDECAR_STATE_OUTSIDE_BOUNDS", "usage journal exceeds the read bound",
+                    )
+            return bytes(chunks)
+
+        content = fetch(full)
+        # A live SQLite carrier keeps recently committed rows in its -wal
+        # sidecar; fetching only the main file would read a stale database and
+        # report "no usage" for a family that did report it.
+        listed = {str(entry.get("path", "")) for entry in listing.get("files", ())}
+        sidecars: dict[str, bytes] = {}
+        for suffix_name in ("-wal", "-shm"):
+            relative = f"{path}{suffix_name}"
+            if relative in listed:
+                full_sidecar = f"{self.audit_window}/{relative}" if self.audit_window else relative
+                try:
+                    sidecars[suffix_name] = fetch(full_sidecar)
+                except (SidecarError, KeyError):
+                    sidecars.pop(suffix_name, None)
+        return parse_usage(usage_format, content, sidecars=sidecars or None)
+
+    def read_subscription(self) -> dict[str, bytes]:
+        """Read the declared subscription working files back (order 56).
+
+        Role-relative, like every home op: the declared name is the path.
+        A missing file is simply absent; one unreadable name does not hide the
+        others, and the reclaim treats the result as "no working copy".
+        """
+        files: dict[str, bytes] = {}
+        for name in self._subscription_files:
+            chunks = bytearray()
+            try:
+                while True:
+                    item = self.client.request("home.get", {
+                        "locator": self.home_locator, "path": name,
+                        "offset": len(chunks), "maxLength": 32 * 1024,
+                    })
+                    if not isinstance(item.get("data"), str):
+                        raise SidecarError("SIDECAR_STATE_INVALID", "home fetch data is invalid")
+                    chunks.extend(base64.b64decode(item["data"], validate=True))
+                    if item.get("eof") is True:
+                        break
+                    if len(chunks) > 512 * 1024:
+                        raise SidecarError(
+                            "SIDECAR_STATE_OUTSIDE_BOUNDS",
+                            "subscription file exceeds the read bound",
+                        )
+            except (SidecarError, KeyError, ValueError):
+                continue
+            if chunks:
+                files[name] = bytes(chunks)
+        return files
+
+    def workspace_change_set(self) -> dict[str, Any] | None:
+        """Order 54: diff the workspace against the launcher's before-snapshot.
+
+        The after listing comes from the Worker's `workspace.list` op (same
+        bounded, link-free walk as the home audit). Line counts are not
+        available on this channel: the Worker reports path/size/digest only,
+        and no content copies cross the wire — the fact records that honestly.
+        """
+        if self.workspace_before_snapshot is None:
+            return None
+        listing = self.client.request("workspace.list", {}, timeout=120.0)
+        before = self.workspace_before_snapshot
+        after = {}
+        for entry in listing.get("files", ()):
+            path = entry.get("path")
+            if path:
+                after[path] = {"size": entry.get("size"), "digest": entry.get("digest")}
+        added, modified, removed = [], [], []
+        for path in sorted(set(before) | set(after)):
+            b, a = before.get(path), after.get(path)
+            bd = b.get("digest") if isinstance(b, dict) else None
+            ad = a.get("digest") if isinstance(a, dict) else None
+            entry = {"path": path,
+                     "sizeBefore": b.get("size") if isinstance(b, dict) else None,
+                     "sizeAfter": a.get("size") if isinstance(a, dict) else None}
+            if b is None and a is not None:
+                added.append({**entry, "kind": "added"})
+            elif b is not None and a is None:
+                removed.append({**entry, "kind": "removed"})
+            elif isinstance(b, dict) and isinstance(a, dict) and bd != ad:
+                modified.append({**entry, "kind": "modified"})
+        return {"added": added, "modified": modified, "removed": removed,
+                "addedLines": None, "removedLines": None,
+                "facts": {"truncatedEntries": (after.get("truncated") or {}).get("entries", 0)
+                          + (before.get("truncated") or {}).get("entries", 0)},
+                "note": "line counts require content copies; the Worker channel "
+                        "reports file-level changes with digests"}
+
+    def delete_state_file(self, relative: str) -> None:
+        """Remove exactly one home file - the credential rule's clean-up."""
+        self.client.request("home.delete", {
+            "locator": self.home_locator,
+            "path": f"{self.audit_window}/{relative}" if self.audit_window else relative,
+        }, timeout=10)
+
+    def _home_bytes(self, path: str) -> tuple[bytes, str]:
+        chunks = bytearray()
+        expected = None
+        full = f"{self.audit_window}/{path}" if self.audit_window else path
+        while True:
+            item = self.client.request("home.get", {
+                "locator": self.home_locator, "path": full,
+                "offset": len(chunks), "maxLength": 32 * 1024,
+            })
+            if expected is None:
+                expected = item.get("digest")
+            if (item.get("digest") != expected or item.get("offset") != len(chunks)
+                    or not isinstance(item.get("data"), str)):
+                raise SidecarError("SIDECAR_STATE_IDENTITY_CONFLICT", "home fetch identity changed")
+            try:
+                chunks.extend(base64.b64decode(item["data"], validate=True))
+            except ValueError as exc:
+                raise SidecarError("SIDECAR_STATE_INVALID", "home chunk is invalid") from exc
+            if item.get("nextOffset") != len(chunks):
+                raise SidecarError("SIDECAR_STATE_IDENTITY_CONFLICT", "home fetch offset changed")
+            if item.get("eof") is True:
+                break
+            if item.get("nextOffset") == item.get("offset"):
+                raise SidecarError("SIDECAR_STATE_INVALID", "home fetch made no progress")
+        content = bytes(chunks)
+        if expected != _sha256(content):
+            raise SidecarError("SIDECAR_STATE_DIGEST_MISMATCH", "home digest did not match")
+        return content, str(expected)
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        try:
+            try:
+                self.client.close_stdin(self.attempt_id, self.generation, timeout=3)
+            except BaseException:
+                self.client.request(
+                    "cancel", attempt_id=self.attempt_id, generation=self.generation, timeout=3,
+                )
+            try:
+                self.client.wait_terminal(self.attempt_id, self.generation, timeout=10)
+            finally:
+                operations = [("result.ack", {}, True)]
+                if self.secret_frame_id is not None:
+                    operations.append(("secret.cleanup", {
+                        "attemptId": self.attempt_id, "frameId": self.secret_frame_id,
+                    }, False))
+                operations.extend((
+                    ("view.cleanup", {"viewId": self.view_id}, False),
+                    ("attempt.cleanup", {}, True),
+                ))
+                for op, arguments, identified in operations:
+                    try:
+                        self.client.request(
+                            op, arguments,
+                            **({"attempt_id": self.attempt_id, "generation": self.generation}
+                               if identified else {}), timeout=3,
+                        )
+                    except BaseException:
+                        pass
+        finally:
+            self._stop_lease()
+            self._forbidden_content = b""
+            if self._unsubscribe:
+                self._unsubscribe()
+            if self._disconnect_unsubscribe:
+                self._disconnect_unsubscribe()
+            self.client.close()
+            self._chunks.put(None)
+
+
+def _sha256(content: bytes) -> str:
+    return "sha256:" + hashlib.sha256(content).hexdigest()
+
+
+def _safe_relative_state_path(value: str) -> str:
+    if (not isinstance(value, str) or not value or value.startswith("/")
+            or "\\" in value or "\x00" in value or "//" in value
+            or any(part in {"", ".", ".."} for part in value.split("/"))
+            or str(PurePosixPath(value)) != value):
+        raise ValueError("SIDECAR_STATE_PATH_INVALID")
+    return value
+
+
+class SidecarEnvelope:
+    """One sidecar session: request/response plus typed upward events."""
+
+    def __init__(self, channels: SidecarChannels, *, on_event: Callable[[dict[str, Any]], None]) -> None:
+        self._channels = channels
+        self._on_event = on_event
+        self._responses: dict[str, dict[str, Any]] = {}
+        self._fatal: dict[str, Any] | None = None
+        self._condition = threading.Condition()
+        self._stderr: list[str] = []
+        # Set when the channel reader itself failed (for example a keepalive
+        # that could not keep the lease). The pending request must see that
+        # reason and its code, not a generic "sidecar exited".
+        self._reader_error: BaseException | None = None
+        self._closed = threading.Event()
+        self._reader = threading.Thread(target=self._read_loop, daemon=True)
+        self._reader.start()
+
+    # -- request helper ----------------------------------------------------
+
+    def request(self, payload: Mapping[str, Any], *, timeout: float = 30.0) -> dict[str, Any]:
+        request_id = f"sc-{uuid4().hex}"
+        body = {**payload, "id": request_id}
+        with self._condition:
+            self._channels.write_line(json.dumps(body, ensure_ascii=False, separators=(",", ":")))
+            deadline = time.monotonic() + timeout
+            while request_id not in self._responses:
+                if self._fatal is not None:
+                    fatal, self._fatal = self._fatal, None
+                    error = fatal.get("error") or {}
+                    raise SidecarError(
+                        str(error.get("code", "SIDECAR_ERROR")),
+                        str(error.get("message", "")),
+                    )
+                if self._closed.is_set():
+                    raise self._closed_error()
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise SidecarError("SIDECAR_TIMEOUT", f"no answer for {payload.get('op')}")
+                self._condition.wait(min(remaining, 1.0))
+            answer = self._responses.pop(request_id)
+        if not answer.get("ok"):
+            error = answer.get("error") or {}
+            raise SidecarError(str(error.get("code", "SIDECAR_ERROR")), str(error.get("message", "")))
+        return answer.get("result") or {}
+
+    def _closed_error(self) -> "SidecarError":
+        """The reason the channel ended: the reader's own typed failure first.
+
+        A keepalive failure is a real cause and must reach the caller with its
+        code; "sidecar exited before answering" stays the fallback for every
+        ordinary close.
+        """
+        reader_error = self._reader_error
+        if isinstance(reader_error, SidecarError):
+            return reader_error
+        if reader_error is not None and getattr(reader_error, "code", None):
+            return SidecarError(str(reader_error.code), str(getattr(reader_error, "message", reader_error)))
+        return SidecarError("SIDECAR_CLOSED", "sidecar exited before answering")
+
+    def close(self) -> None:
+        try:
+            self._channels.close()
+        finally:
+            self._closed.set()
+            with self._condition:
+                self._condition.notify_all()
+
+    def audit_state(self) -> dict[str, Any]:
+        """Audit the declared home window, whichever channel supplies the walk."""
+        audit = getattr(self._channels, "audit_state", None)
+        return audit() if callable(audit) else {
+            "files": [], "skipped": 0,
+            "truncated": {"entries": 0, "bytes": 0, "oversize": 0},
+            "audited": {"files": 0, "bytes": 0,
+                        "truncated": {"entries": 0, "bytes": 0, "oversize": 0}},
+        }
+
+    def read_usage(self, usage_probe: Mapping[str, str] | None) -> dict[str, int] | None:
+        """Read and parse the declared journal into the neutral usage fact.
+
+        The journal is one of the files the audit already listed (same
+        locator, same bounds, same refusal rules); the parse is the only
+        place a family's field names appear.
+        """
+        read = getattr(self._channels, "read_usage", None)
+        if not callable(read):
+            return None
+        return read(usage_probe)
+
+    def delete_state_file(self, relative: str) -> None:
+        delete = getattr(self._channels, "delete_state_file", None)
+        if callable(delete):
+            delete(relative)
+
+    def read_subscription(self) -> dict[str, bytes]:
+        """Read the declared subscription working files back (order 56)."""
+        read = getattr(self._channels, "read_subscription", None)
+        return read() if callable(read) else {}
+
+    # -- reader ------------------------------------------------------------
+
+    def _read_loop(self) -> None:
+        buffer = ""
+        stream = getattr(self._channels, "stdout", None)
+        try:
+            for chunk in self._iter_chunks():
+                buffer += chunk
+                while "\n" in buffer:
+                    line, buffer = buffer.split("\n", 1)
+                    if line.strip():
+                        self._line(line)
+        except BaseException as exc:  # noqa: BLE001 - surfaced to the caller
+            self._reader_error = exc
+            self._stderr.append(str(exc))
+        finally:
+            del stream
+            self._closed.set()
+            with self._condition:
+                self._condition.notify_all()
+
+    def _iter_chunks(self):
+        iterator = getattr(self._channels, "iter_chunks", None)
+        if callable(iterator):
+            return iterator()
+        process = getattr(self._channels, "process", None)
+        if process is None or process.stdout is None:
+            return iter(())
+        return iter(lambda: process.stdout.readline().decode("utf-8", "replace"), "")
+
+    def _line(self, line: str) -> None:
+        try:
+            message = json.loads(line)
+        except ValueError:
+            return
+        if "event" in message:
+            try:
+                self._on_event(dict(message))
+            except Exception:  # noqa: BLE001 - an event consumer must not kill the reader
+                pass
+            return
+        with self._condition:
+            if message.get("id") is None and not message.get("ok", True):
+                # A startup refusal (for example missing isolation) answers no
+                # request; surface it to whoever is waiting.
+                self._fatal = message
+            else:
+                self._responses[str(message.get("id"))] = message
+            self._condition.notify_all()
+
+
+class SidecarHarnessPort:
+    """TurnExecutionPort implemented over one sidecar per execution.
+
+    The native session id is kept per execution on the instance; nothing here
+    is class-level state, so two ports in one process cannot share or overwrite
+    each other's identity.
+
+    The port also owns the *effective* capability view of each execution: the
+    deployment's static declaration intersected with what the native side really
+    demonstrated during that execution. Downstream behaviour (checkpoint
+    resumability, attachment dispatch) reads that view, so a declared ability
+    never becomes a product promise on its own, and an observed ability never
+    exceeds what was declared.
+    """
+
+    def __init__(
+        self, launcher: SidecarLauncher, *, environment: Mapping[str, str],
+        profile: str = "", adapter: Mapping[str, Any] | None = None,
+        model: str | None = None, credential_environment: str | None = None,
+        preferred_auth_method: str | None = None,
+        resume_native_id: str | None = None,
+        state_directory: str = "/tmp/agentbox-sidecar",
+        directory: str = "/workspace", on_event=None,
+        declared_capabilities: Mapping[str, bool] | None = None,
+        native_platform: str | None = None,
+        home_locator: str | None = None,
+        capability_documents: "tuple[Any, ...] | None" = None,
+        capability_grants: "tuple[Any, ...] | None" = None,
+        capability_authorized_providers: "tuple[str, ...] | None" = None,
+        capability_binding: str | None = None,
+        usage_probe: dict[str, str] | None = None,
+        subscription: Mapping[str, Any] | None = None,
+        account_plumbing: Any = None,
+    ) -> None:
+        self.launcher = launcher
+        #: Order 56: this turn's subscription binding (account id, the digest
+        #: it materialised, and the declared working-copy names) plus the
+        #: records/assets pair the reclaim path needs. All None/empty when the
+        #: profile is not bound to an account.
+        self.subscription = dict(subscription) if subscription else None
+        self.account_plumbing = account_plumbing
+        self.environment = dict(environment)
+        # 调用方必须给出部署声明的 harness 类型；空值会在 register 时被 sidecar
+        # 以 HARNESS_PROFILE_UNREGISTERED 拒绝，这里不替任何一家猜一个默认名字。
+        self.profile = profile
+        self.adapter = dict(adapter or {})
+        self.model = model
+        self.credential_environment = credential_environment
+        self.preferred_auth_method = preferred_auth_method
+        self.resume_native_id = resume_native_id
+        self.state_directory = state_directory
+        self.directory = directory
+        #: Which machine family owns this Profile's home, and where it sits on
+        #: that machine (relative to the machine's home root). Both go into the
+        #: audit manifest as the *reference*; the absolute host path the
+        #: channel resolved never leaves this process.
+        self.native_platform = native_platform
+        self.home_locator = home_locator
+        self.on_event = on_event or (lambda *_: None)
+        # 静态上限：只能来自部署/插件声明（经 canonical 校验）；缺省按“全部 false”
+        # 处理——不猜、不默认 true。
+        if declared_capabilities is None:
+            self.declared_capabilities: dict[str, bool] = {}
+        else:
+            self.declared_capabilities = validate_claims(declared_capabilities)
+        self._sessions: dict[str, SidecarEnvelope] = {}
+        self._native_sessions: dict[str, str] = {}
+        self._approvals: dict[str, tuple[str, str]] = {}
+        self._native_closed: set[str] = set()
+        # 中立能力材料：由装配边界（bootstrap port_factory）逐执行注入——声明文档、
+        # 锁定政策 grant、授权提供者集与本次执行的环境绑定。业务层只消费，不解释
+        # deployment、不按品牌分支；缺失即 fail-closed（门在 _start_run 内联）。
+        self.capability_documents: tuple[Any, ...] = tuple(capability_documents or ())
+        self.capability_grants: tuple[Any, ...] = tuple(capability_grants or ())
+        self.capability_authorized_providers: tuple[str, ...] = tuple(
+            capability_authorized_providers or ()
+        )
+        self.capability_binding: str | None = capability_binding
+        #: Order 51: the declared usage probe; the completion boundary reads
+        #: the journal through the audited channel and records the tokens.
+        self.usage_probe = dict(usage_probe) if usage_probe else None
+        # 本次执行的原生观测与观测来源；observed 只反映这一次执行，绝不回写静态声明。
+        self._observed: dict[str, dict[str, bool | None]] = {}
+        self._evidence: dict[str, dict[str, str]] = {}
+        self._current: str = ""
+        # 已经发出过 prompt 的执行。原生在重开一个已存在的会话时可能先把存下来的
+        # 历史回放一遍（Pi 的 session/load 就是这样），那些块是历史，不是这一轮的
+
+exec
+/bin/bash -lc "nl -ba src/agent_box/server/execution/sidecar_backend.py | sed -n '1,420p'" in /home/maoqh/projects/ordessa/worktrees/integration-linux/backend
+ succeeded in 0ms:
+     1	"""Provider-neutral Server/Core orchestration for the Harness sidecar port."""
+     2	from __future__ import annotations
+     3	
+     4	from dataclasses import dataclass, field
+     5	from datetime import datetime, timezone
+     6	import base64
+     7	import json
+     8	import logging
+     9	import re
+    10	import threading
+    11	import time
+    12	import uuid
+    13	from pathlib import PurePosixPath
+    14	from typing import Any, Callable, Mapping
+    15	
+    16	from agent_box.extensions import capability
+    17	from agent_box.extensions.runtime_composition.sandbox_port import SandboxPortUnavailable
+    18	from agent_box.resource_contracts import AgentBoxProfileV1, PromptFragmentV1, WorkspaceV1
+    19	from agent_box.server.execution.execution_contract import (
+    20	    CancelOutcome, EvidenceClass, ExecutionObservation, ExecutionReceipt,
+    21	    ExecutionRequest, ObservationState,
+    22	)
+    23	from agent_box.server.execution.first_run_lock import first_run_gate
+    24	from agent_box.server.execution.placement import PlacementUnsupported
+    25	from agent_box.server.execution.sidecar import SidecarError, SidecarHarnessPort
+    26	from agent_box.work_core import (
+    27	    ExecutionFinalizationRequest, ExecutionProjection, ExecutionStartReceipt,
+    28	    Freshness, Outcome, Phase, ProviderDescriptor, Ref, RefType,
+    29	)
+    30	from agent_box.work_core.errors import DispatchAmbiguous, ExecutionStartRejected
+    31	from agent_box.work_core.registry import ExtensionRegistry
+    32	from agent_box.work_core.repository import CoreRepository
+    33	from agent_box.work_core.services import ExecutionService, WorkService
+    34	
+    35	
+    36	@dataclass
+    37	class _Run:
+    38	    turn_id: str
+    39	    work_id: str
+    40	    core_execution_id: str
+    41	    dispatch_id: str
+    42	    port: SidecarHarnessPort
+    43	    native_id: str
+    44	    done: threading.Event
+    45	    cancel_lock: threading.Lock = field(default_factory=threading.Lock)
+    46	    cancel_confirmed: bool = False
+    47	    result: Mapping[str, Any] | None = None
+    48	    error: BaseException | None = None
+    49	    #: Order 51: the neutral usage fact, read while the channel lived; None
+    50	    #: means unknown (and the ledger must keep it unknown, never estimate).
+    51	    usage_fact: dict[str, int] | None = None
+    52	    usage_source: str | None = None
+    53	    #: Order 80: the exclusive hold on this library's *first* run (only the run
+    54	    #: that opened a whole-db store while it was still fresh carries one);
+    55	    #: released when this run reaches its terminal.
+    56	    first_run_hold: Any = None
+    57	    #: The worker that persists the durable turn result. It outlives the prompt
+    58	    #: worker by design, so a runtime is only really stopped once it is done:
+    59	    #: the Work Core connection is shared and is not safe to use after shutdown.
+    60	    completion_thread: threading.Thread | None = None
+    61	
+    62	
+    63	@dataclass
+    64	class _NeutralRun:
+    65	    """One execution tracked through the neutral verbs (C-EXEC@v1 block1).
+    66	
+    67	    Deliberately free of product identity: the run is keyed by the caller's
+    68	    opaque ``execution_key`` and carries only dispatch facts and captured
+    69	    evidence. It is a projection of what this process knows, never an
+    70	    authoritative ledger.
+    71	    """
+    72	
+    73	    execution_key: str
+    74	    dispatch_id: str
+    75	    port: Any
+    76	    native_id: str = ""
+    77	    created_at: datetime = field(
+    78	        default_factory=lambda: datetime.now(timezone.utc))
+    79	    cancel_lock: threading.Lock = field(default_factory=threading.Lock)
+    80	    cancel_confirmed: bool = False
+    81	    #: The start intent reached the port but `open_execution` did not answer —
+    82	    #: honestly unresolved, never silently rewritten as "nothing was started".
+    83	    start_uncertain: bool = False
+    84	    #: (kind, observed_at) pairs captured from the sidecar event callback;
+    85	    #: monotonic by construction - evidence is only ever appended.
+    86	    evidence: list[tuple[str, datetime]] = field(default_factory=list)
+    87	
+    88	
+    89	class _BoundResources:
+    90	    provider_id = "server-sidecar-input"
+    91	    supported_contract_ids = frozenset({
+    92	        WorkspaceV1.contract_id, PromptFragmentV1.contract_id, AgentBoxProfileV1.contract_id,
+    93	    })
+    94	
+    95	    def __init__(self) -> None:
+    96	        self._values: dict[tuple[str, str], object] = {}
+    97	        self._lock = threading.Lock()
+    98	
+    99	    def descriptor(self):
+   100	        return ProviderDescriptor(self.provider_id, "Server frozen sidecar inputs", "1")
+   101	
+   102	    def bind(self, contract_id: str, native_id: str, value: object) -> Ref:
+   103	        with self._lock:
+   104	            self._values[(contract_id, native_id)] = value
+   105	        ref_type = RefType.WORKSPACE if contract_id == WorkspaceV1.contract_id else RefType.ARTIFACT
+   106	        return Ref(ref_type, self.provider_id, native_id)
+   107	
+   108	    def resolve(self, contract_id: str, ref: Ref, *, context=None) -> object:
+   109	        del context
+   110	        with self._lock:
+   111	            return self._values[(contract_id, ref.native_id)]
+   112	
+   113	    def release(self, turn_id: str) -> None:
+   114	        with self._lock:
+   115	            self._values = {
+   116	                key: value for key, value in self._values.items() if not key[1].endswith(turn_id)
+   117	            }
+   118	
+   119	
+   120	class _CoreSidecarProvider:
+   121	    provider_id = "harness-sidecar"
+   122	
+   123	    def __init__(self, backend: "SidecarExecutionBackend") -> None:
+   124	        self.backend = backend
+   125	        self._handles: dict[str, _Run] = {}
+   126	
+   127	    def descriptor(self):
+   128	        return ProviderDescriptor(self.provider_id, "Harness sidecar execution", "1")
+   129	
+   130	    def capabilities(self):
+   131	        """Work Core execution-provider operation contract (NOT Harness abilities).
+   132	
+   133	        This mapping belongs to the Work Core SPI: `ExtensionRegistry.require_capability`
+   134	        reads it to decide whether a provider may be asked for an operation, and its
+   135	        keys are Work Core operation names (`streaming`, `cancel`, `approvals`).
+   136	
+   137	        The Harness capability contract is a *different* namespace with a different
+   138	        question ("what can this harness do, as declared and observed?"), and the
+   139	        two must never be projected into one another: these keys are not canonical
+   140	        abilities, they must not reach a Profile view, a Session/execution effective
+   141	        capability view, `server.hello` or a deployment's `capabilityClaims`, and a
+   142	        canonical ability must not be invented here. `test_capability_namespace_boundary.py`
+   143	        fails if that separation is broken.
+   144	        """
+   145	        return {"streaming": "supported", "cancel": "supported", "approvals": "supported"}
+   146	
+   147	    def input_limits(self):
+   148	        return {
+   149	            WorkspaceV1.contract_id: (1, 1),
+   150	            PromptFragmentV1.contract_id: (1, 1),
+   151	            AgentBoxProfileV1.contract_id: (1, 1),
+   152	        }
+   153	
+   154	    def start(self, request):
+   155	        values = {item.contract_id: item.value for item in request.resolved_inputs}
+   156	        try:
+   157	            run = self.backend._start_run(
+   158	                request.execution_id, request.dispatch_id,
+   159	                values[WorkspaceV1.contract_id], values[PromptFragmentV1.contract_id],
+   160	                values[AgentBoxProfileV1.contract_id],
+   161	            )
+   162	        except CapabilityGateRefusal as refusal:
+   163	            # 能力门紧邻 open_execution 之前拒绝（专用类型，来源隔离）：已证明原生
+   164	            # 启动未发生，按 Core 既有 ExecutionStartRejected 语义记录为 failed
+   165	            # （而非 ambiguous），并把原因码挂在异常上供 Server 映射还原。
+   166	            # post-open 的任何 SidecarError（即使同名错误码）不经此转换，保持
+   167	            # 既有歧义语义。
+   168	            rejection = ExecutionStartRejected(str(refusal))
+   169	            rejection.code = refusal.code
+   170	            raise rejection from refusal
+   171	        except (PlacementUnsupported, SandboxPortUnavailable) as refusal:
+   172	            # Order 090: placement/sandbox resolution happens inside port_factory,
+   173	            # strictly before any native side effect (open_execution/spawn). A turn
+   174	            # that cannot resolve its placement is therefore a deterministic
+   175	            # "start never happened" refusal - it must be recorded as a typed
+   176	            # failure with its own code, never as an ambiguous dispatch. This is
+   177	            # the same ExecutionStartRejected seam the capability gate uses.
+   178	            rejection = ExecutionStartRejected(str(refusal))
+   179	            rejection.code = refusal.code
+   180	            raise rejection from refusal
+   181	        self._handles[request.dispatch_id] = run
+   182	        return ExecutionStartReceipt(
+   183	            request.execution_id, request.dispatch_id, request.inputs_digest,
+   184	            correlation_ref=Ref(RefType.SESSION, self.provider_id, run.native_id),
+   185	            runtime_handle=run,
+   186	        )
+   187	
+   188	    def get_handle(self, dispatch_id: str) -> _Run:
+   189	        return self._handles[dispatch_id]
+   190	
+   191	    def release_handle(self, dispatch_id: str) -> None:
+   192	        self._handles.pop(dispatch_id, None)
+   193	
+   194	    def observe(self, native_ref):
+   195	        del native_ref
+   196	        return None
+   197	
+   198	
+   199	class SidecarExecutionBackend:
+   200	    """TurnExecutionPort using Core dispatch and a sidecar factory.
+   201	
+   202	    The factory is the deployment composition seam. It receives a stored,
+   203	    provider-neutral Turn context and an event callback, and returns a port
+   204	    whose Node sidecar owns all native Harness semantics.
+   205	    """
+   206	
+   207	    def __init__(
+   208	        self, records, objects, approvals, *,
+   209	        port_factory: Callable[[Mapping[str, Any], Callable[..., None]], SidecarHarnessPort],
+   210	        on_event: Callable[[], None] | None = None,
+   211	    ) -> None:
+   212	        self.records = records
+   213	        self.objects = objects
+   214	        self.approvals = approvals
+   215	        self.port_factory = port_factory
+   216	        self.on_event = on_event or (lambda: None)
+   217	        self.core_repository = CoreRepository()
+   218	        self.work_service = WorkService(self.core_repository)
+   219	        self.execution_service = ExecutionService(self.core_repository)
+   220	        self.resources = _BoundResources()
+   221	        self.provider = _CoreSidecarProvider(self)
+   222	        self.registry = ExtensionRegistry()
+   223	        self.registry.register_resource_provider(self.resources.provider_id, self.resources)
+   224	        self.registry.register_execution_provider(self.provider)
+   225	        self._turn_by_core: dict[str, str] = {}
+   226	        self._contexts: dict[str, Mapping[str, Any]] = {}
+   227	        self._active: dict[str, _Run] = {}
+   228	        #: Completion workers still running. A run is retired from `_active` when
+   229	        #: its durable result is written, but the worker itself may still be
+   230	        #: finishing; stopping must wait for every live one, so they are tracked
+   231	        #: here rather than only on the run.
+   232	        self._completion_threads: set[threading.Thread] = set()
+   233	        self._approval_ports: dict[str, SidecarHarnessPort] = {}
+   234	        self._message_parts: dict[str, list[str]] = {}
+   235	        #: Neutral-verb state (C-EXEC@v1 block1, E-INC1a): runs tracked by the
+   236	        #: caller's opaque key, and cancel receipts kept for replay. A receipt
+   237	        #: outlives its run on purpose: a replay after retirement must return
+   238	        #: the original honest answer, never a fresh dispatch or a new refusal.
+   239	        self._neutral_runs: dict[str, _NeutralRun] = {}
+   240	        self._cancel_receipts: dict[str, CancelOutcome] = {}
+   241	        self._lock = threading.RLock()
+   242	        self.queue = None
+   243	
+   244	    def bind_queue(self, queue) -> None:
+   245	        self.queue = queue
+   246	
+   247	    def accept(self, turn_id: str, *, overrides: Mapping[str, Any] | None = None) -> None:
+   248	        context = self.records.get_turn_context(turn_id)
+   249	        stored = json.loads(self.objects.read(context["input_object_digest"]))
+   250	        message = stored.get("message") or stored
+   251	        profile_value = json.loads(self.objects.read(context["config_object_digest"]))
+   252	        configuration = dict(profile_value.get("configuration") or {})
+   253	        configuration.update(dict(overrides or {}))
+   254	        effective_value = {
+   255	            "schema_version": 1, "harness_type": context["harness_type"],
+   256	            "configuration": configuration,
+   257	        }
+   258	        # Order 60 A/B: the profile's permission posture is part of what this
+   259	        # turn freezes - the next turn picks up an edited rule set.
+   260	        rules_json = context.get("permission_rules_json")
+   261	        preset = context.get("permission_preset")
+   262	        if rules_json or preset:
+   263	            import json as _json
+   264	
+   265	            from agent_box.server.profiles.permissions import resolve_all
+   266	
+   267	            rules = _json.loads(rules_json) if rules_json else []
+   268	            effective_value["permissions"] = resolve_all(
+   269	                rules, preset=preset or "default")
+   270	        if profile_value.get("execution") is not None:
+   271	            effective_value["execution"] = profile_value["execution"]
+   272	        effective = self.objects.publish(json.dumps(
+   273	            effective_value, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+   274	        ).encode())
+   275	        work = self.work_service.create_work(
+   276	            "AgentBox Session Turn", metadata={"session_id": context["session_id"], "turn_id": turn_id},
+   277	        )
+   278	        core_execution = self.execution_service.create_execution(
+   279	            work.id, self.provider.provider_id,
+   280	            responsibility_intent="execute one accepted Session Turn through its Harness extension",
+   281	            provenance={"session_id": context["session_id"], "turn_id": turn_id},
+   282	        )
+   283	        inputs = (
+   284	            (WorkspaceV1.contract_id, self.resources.bind(
+   285	                WorkspaceV1.contract_id, f"workspace-{turn_id}",
+   286	                WorkspaceV1(PurePosixPath(context["remote_path"]), "remote-live"),
+   287	            )),
+   288	            (PromptFragmentV1.contract_id, self.resources.bind(
+   289	                PromptFragmentV1.contract_id, f"prompt-{turn_id}",
+   290	                PromptFragmentV1("User Turn", str(message["text"]), context["input_object_digest"]),
+   291	            )),
+   292	            (AgentBoxProfileV1.contract_id, self.resources.bind(
+   293	                AgentBoxProfileV1.contract_id, f"profile-{turn_id}",
+   294	                AgentBoxProfileV1(
+   295	                    context["profile_id"], context["harness_type"], effective.digest,
+   296	                    int(context["profile_revision"]),
+   297	                ),
+   298	            )),
+   299	        )
+   300	        with self._lock:
+   301	            self._turn_by_core[core_execution.id] = turn_id
+   302	            self._contexts[turn_id] = context
+   303	            self._message_parts[turn_id] = []
+   304	        try:
+   305	            receipt = self.execution_service.dispatch_execution(
+   306	                core_execution.id, inputs, self.registry, f"turn-dispatch:{turn_id}",
+   307	            )
+   308	            run = self.provider.get_handle(receipt.dispatch_id)
+   309	            run.work_id = work.id
+   310	            self.records.set_turn_dispatch(
+   311	                turn_id, work_id=work.id, execution_id=core_execution.id,
+   312	                dispatch_id=receipt.dispatch_id, state="running",
+   313	            )
+   314	            with self._lock:
+   315	                self._active[turn_id] = run
+   316	                self._cancel_receipts.pop(turn_id, None)
+   317	            self.on_event()
+   318	            run.completion_thread = threading.Thread(
+   319	                target=self._complete_then_retire, args=(run,), daemon=True,
+   320	            )
+   321	            with self._lock:
+   322	                self._completion_threads.add(run.completion_thread)
+   323	            run.completion_thread.start()
+   324	        except BaseException as exc:
+   325	            self.records.fail_turn(turn_id, _safe_code(exc), queue_records=self.queue)
+   326	            self.resources.release(turn_id)
+   327	            self.on_event()
+   328	            raise
+   329	
+   330	    def _start_run(self, core_execution_id, dispatch_id, workspace, prompt, profile) -> _Run:
+   331	        del workspace, profile
+   332	        with self._lock:
+   333	            turn_id = self._turn_by_core[core_execution_id]
+   334	            context = self._contexts[turn_id]
+   335	        port = self.port_factory(context, lambda execution_id, kind, data: self._native_event(
+   336	            execution_id, kind, data, port,
+   337	        ))
+   338	        # 附件先投影出来（有界对象读取），再打开执行：有效 attach=false 时必须在派发前
+   339	        # 类型化拒绝，而不是打开一个原生会话再静默丢弃附件。
+   340	        stored = json.loads(self.objects.read(context["input_object_digest"]))
+   341	        attachments, file_refs = _sidecar_attachments(self.objects, stored)
+   342	        # 实际副作用（client.start()/spawn）前的唯一强制门：需求来自 launcher 当前
+   343	        # 计划，授权/声明/绑定来自装配边界注入；不满足即类型化拒绝，零 launcher/spawn。
+   344	        _capability_gate(port, turn_id)
+   345	        # Order 80: the first run on a fresh whole-db library is exclusive; a
+   346	        # concurrent first run waits for it (bounded, typed on timeout) and
+   347	        # every later run passes straight through. The gate is taken before the
+   348	        # room exists, because the race is in the harness's own initialisation.
+   349	        hold = None
+   350	        if getattr(port, "whole_db_store", False):
+   351	            hold = first_run_gate().acquire(
+   352	                f"{port.native_platform or 'local'}:{port.profile}")
+   353	        try:
+   354	            native_id = port.open_execution(turn_id)
+   355	            if attachments and not _effective_attachment_support(port, turn_id):
+   356	                # 拒绝时不留一个没有归属的原生会话（否则 _complete 永远不会回收它）。
+   357	                try:
+   358	                    port.close_execution(turn_id)
+   359	                except BaseException:
+   360	                    pass
+   361	                raise SidecarError(
+   362	                    "ATTACHMENT_UNSUPPORTED",
+   363	                    "this execution has no effective 'attach' capability",
+   364	                )
+   365	        except BaseException:
+   366	            # An acquisition that never produced a run must not hold the
+   367	            # library hostage (the attachment refusal above is one such path).
+   368	            if hold is not None:
+   369	                hold.release()
+   370	            raise
+   371	        run = _Run(turn_id, "", core_execution_id, dispatch_id, port, native_id, threading.Event())
+   372	        run.first_run_hold = hold
+   373	        prompt_content = prompt.content
+   374	        if file_refs:
+   375	            prompt_content += "\n\nWorkspace attachments (validated):\n" + "\n".join(
+   376	                f"- {path}" for path in file_refs
+   377	            )
+   378	
+   379	        def prompt_worker() -> None:
+   380	            try:
+   381	                run.result = self._prompt_with_rebuild(port, turn_id, prompt_content, attachments)
+   382	            except BaseException as exc:  # surfaced by the completion owner
+   383	                run.error = exc
+   384	            finally:
+   385	                run.done.set()
+   386	
+   387	        threading.Thread(target=prompt_worker, daemon=True).start()
+   388	        return run
+   389	
+   390	    #: How many times a freshly-opened sidecar may be rebuilt when a prompt
+   391	    #: finds it already closed (the drain the same second a prior sidecar exits,
+   392	    #: ACC-R2-1). Bounded on purpose: recovery is not an infinite retry.
+   393	    PROMPT_REBUILD_LIMIT = 2
+   394	    #: Upper bound on the total backoff spent waiting out an in-flight teardown
+   395	    #: across those rebuilds; the wait is bounded, never open-ended.
+   396	    PROMPT_REBUILD_BACKOFF_SECONDS = 0.2
+   397	
+   398	    def _prompt_with_rebuild(self, port, turn_id, prompt_content, attachments):
+   399	        """Prompt the execution's sidecar, rebuilding it if it is already closed.
+   400	
+   401	        Order 106: the queue drain starts in the same second the previous turn
+   402	        reaches *completed*, and that previous sidecar is mid-teardown. The
+   403	        successor turn gets its own fresh sidecar, but the overlap still surfaces
+   404	        as ``SIDECAR_CLOSED`` at the prompt boundary - a queued message the user
+   405	        sees die in a second. Here the drained (and any) turn ensures a live
+   406	        sidecar before it gives up: on ``SIDECAR_CLOSED`` it drops the dead
+   407	        envelope, reopens a fresh sidecar on the SAME execution, and re-prompts -
+   408	        bounded by ``PROMPT_REBUILD_LIMIT`` and a bounded backoff. If every
+   409	        rebuild still finds a closed sidecar, the failure is typed
+   410	        (``SIDECAR_REBUILD_FAILED``) rather than left as an ambiguous close.
+   411	
+   412	        It reuses the new-turn open path (``open_execution``) rather than a second
+   413	        dispatch path, so it never re-dispatches the turn and touches no queue,
+   414	        idempotency or wire semantics.
+   415	        """
+   416	        deadline = time.monotonic() + self.PROMPT_REBUILD_BACKOFF_SECONDS
+   417	        last: SidecarError | None = None
+   418	        for attempt in range(self.PROMPT_REBUILD_LIMIT + 1):
+   419	            try:
+   420	                return port.prompt(turn_id, prompt_content, attachments)
+
+exec
+/bin/bash -lc "nl -ba src/agent_box/server/execution/sidecar_backend.py | sed -n '421,850p'" in /home/maoqh/projects/ordessa/worktrees/integration-linux/backend
+ succeeded in 0ms:
+   421	            except SidecarError as exc:
+   422	                if exc.code != "SIDECAR_CLOSED":
+   423	                    raise
+   424	                last = exc
+   425	                if attempt == self.PROMPT_REBUILD_LIMIT:
+   426	                    break
+   427	                remaining = deadline - time.monotonic()
+   428	                if remaining > 0:
+   429	                    time.sleep(min(self.PROMPT_REBUILD_BACKOFF_SECONDS / (attempt + 1), remaining))
+   430	                # Rebuild this execution on a fresh sidecar, then retry.
+   431	                port.close_execution(turn_id)
+   432	                port.open_execution(turn_id)
+   433	        raise SidecarRunRecoveryFailure(
+   434	            "sidecar stayed closed after "
+   435	            f"{self.PROMPT_REBUILD_LIMIT} rebuild attempt(s); last: {last}",
+   436	        )
+   437	
+   438	    def _native_event(self, turn_id: str, kind: str, data: Mapping[str, Any], port) -> None:
+   439	        if kind == "message.delta":
+   440	            text = str(data.get("text", ""))
+   441	            if text:
+   442	                self.records.append_turn_event(turn_id, kind, {"text": text})
+   443	                with self._lock:
+   444	                    self._message_parts.setdefault(turn_id, []).append(text)
+   445	        elif kind == "approval.requested":
+   446	            context = self.records.get_turn_context(turn_id)
+   447	            raw = dict(data.get("request") or {})
+   448	            approval = self.approvals.request(
+   449	                session_id=context["session_id"], execution_id=turn_id, request=raw,
+   450	            )
+   451	            # Order 65: a subagent's `ask` rises into the parent turn as the
+   452	            # same kind of interruption the parent already handles - the
+   453	            # approval id is what the existing decide round-trip takes, so no
+   454	            # second mechanism exists to bypass.
+   455	            parent_turn = context.get("parent_turn_id")
+   456	            if parent_turn:
+   457	                self.records.append_turn_event(
+   458	                    str(parent_turn), "approval.requested",
+   459	                    {"approval_id": approval["approvalId"], "version": 1,
+   460	                     "request": raw,
+   461	                     "from_subagent": {"turnId": turn_id,
+   462	                                       "sessionId": context["session_id"]}},
+   463	                )
+   464	            request_id = str(raw.get("requestId") or "")
+   465	            if request_id:
+   466	                port.register_approval(approval["approvalId"], turn_id, request_id)
+   467	                with self._lock:
+   468	                    self._approval_ports[approval["approvalId"]] = port
+   469	        elif kind == "failed":
+   470	            self.records.append_turn_event(turn_id, "tool.update", {
+   471	                "state": "failed", "tool_call_id": "harness", "tool": None,
+   472	                "summary": str(data.get("code") or "HARNESS_FAILED"),
+   473	            })
+   474	        elif kind == "thought.delta":
+   475	            text = str(data.get("text") or "")
+   476	            if text:
+   477	                self.records.append_turn_event(turn_id, "thought.delta", {"text": text})
+   478	        elif kind == "tool.update":
+   479	            # The real tool lifecycle from the harness (Order 52): recorded as
+   480	            # facts, arguments and outputs trimmed and scanned by the same
+   481	            # rules that guard every stored event.
+   482	            self.records.append_turn_event(turn_id, "tool.update", {
+   483	                "tool_call_id": str(data.get("tool_call_id") or "tool"),
+   484	                "tool": data.get("tool"),
+   485	                "state": str(data.get("state") or "requested"),
+   486	                **({"summary": str(data["summary"])[:512]} if data.get("summary") else {}),
+   487	            })
+   488	        elif kind == "plan.updated":
+   489	            self.records.append_turn_event(turn_id, "plan.updated", {
+   490	                "entries": data.get("entries") if isinstance(data.get("entries"), list) else [],
+   491	            })
+   492	        elif kind == "mode.updated":
+   493	            self.records.append_turn_event(turn_id, "mode.updated", {
+   494	                "currentModeId": str(data.get("currentModeId") or ""),
+   495	            })
+   496	        self.on_event()
+   497	
+   498	    def decide_approval(self, approval_id: str, decision: str, scope: Mapping[str, Any]) -> None:
+   499	        with self._lock:
+   500	            port = self._approval_ports.get(approval_id)
+   501	        if port is not None:
+   502	            port.decide_approval(approval_id, decision, scope)
+   503	        self.on_event()
+   504	
+   505	    def _complete(self, run: _Run) -> None:
+   506	        run.done.wait()
+   507	        next_execution_id = None
+   508	        try:
+   509	            # The prompt can become idle before the abort envelope response is
+   510	            # delivered.  Serialize that race so a confirmed stop can never be
+   511	            # persisted as a successful completion.
+   512	            with run.cancel_lock:
+   513	                cancelled = run.cancel_confirmed
+   514	            if cancelled:
+   515	                self.execution_service.apply_finalization(ExecutionFinalizationRequest(
+   516	                    run.core_execution_id, f"turn-terminal:{run.turn_id}",
+   517	                    ExecutionProjection(
+   518	                        Phase.TERMINAL, Outcome.CANCELLED, False, Freshness.OBSERVED,
+   519	                        datetime.now(timezone.utc),
+   520	                    ),
+   521	                ))
+   522	                # A cancel is not an erasure. The Harness kept writing its own
+   523	                # home up to the moment it stopped; audit what is there now and
+   524	                # keep the reference, so the next turn reopens the same native
+   525	                # session and sees the input that was already on disk. If the
+   526	                # audit itself cannot run, the record honestly stays as it was.
+   527	                try:
+   528	                    audit, native_resume_supported = _audited_home(run)
+   529	                    manifest = {
+   530	                        "schema_version": 3,
+   531	                        "nativeSessionId": run.native_id,
+   532	                        "harnessType": self._contexts[run.turn_id]["harness_type"],
+   533	                        "nativePlatform": audit["nativePlatform"],
+   534	                        "homeLocator": audit["homeLocator"],
+   535	                        "resumable": bool(native_resume_supported and audit["files"]),
+   536	                        "sourceExecutionId": run.core_execution_id,
+   537	                        "audited": audit["audited"],
+   538	                        "truncated": audit["truncated"],
+   539	                        "files": audit["files"],
+   540	                    }
+   541	                    checkpoint = self.objects.publish(
+   542	                        json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
+   543	                    )
+   544	                except BaseException:
+   545	                    checkpoint = None
+   546	                self.records.finish_cancelled(
+   547	                    run.turn_id, queue_records=self.queue,
+   548	                    **({"checkpoint_object_digest": checkpoint.digest,
+   549	                        "checkpoint_native_id": run.native_id,
+   550	                        "native_platform": audit["nativePlatform"],
+   551	                        "home_locator": audit["homeLocator"]} if checkpoint is not None else {}),
+   552	                )
+   553	                self.work_service.complete_work(run.work_id, "Turn cancelled through Harness sidecar")
+   554	                return
+   555	            if run.error is not None:
+   556	                raise run.error
+   557	            with self._lock:
+   558	                text = "".join(self._message_parts.get(run.turn_id, ()))
+   559	            audit, native_resume_supported = _audited_home(run)
+   560	            resumable = bool(native_resume_supported and audit["files"])
+   561	            # The manifest is a *record*: it references the home on the machine
+   562	            # that ran the turn (platform + locator, never a host path) and
+   563	            # fixes what that home looked like when the turn ended. The native
+   564	            # bytes themselves are never published.
+   565	            checkpoint = self.objects.publish(json.dumps({
+   566	                "schema_version": 3, "nativeSessionId": run.native_id,
+   567	                "harnessType": self._contexts[run.turn_id]["harness_type"],
+   568	                "nativePlatform": audit["nativePlatform"],
+   569	                "homeLocator": audit["homeLocator"],
+   570	                "resumable": resumable,
+   571	                "sourceExecutionId": run.core_execution_id,
+   572	                "audited": audit["audited"],
+   573	                "truncated": audit["truncated"],
+   574	                "files": audit["files"],
+   575	            }, sort_keys=True, separators=(",", ":")).encode())
+   576	            result = self.objects.publish(json.dumps({
+   577	                "schema_version": 1, "text": text, "nativeResult": run.result or {},
+   578	            }, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode())
+   579	            self.records.append_turn_event(run.turn_id, "message.final", {"text": text})
+   580	            self.execution_service.apply_finalization(ExecutionFinalizationRequest(
+   581	                run.core_execution_id, f"turn-finalize:{run.turn_id}",
+   582	                ExecutionProjection(
+   583	                    Phase.TERMINAL, Outcome.SUCCEEDED, resumable, Freshness.OBSERVED,
+   584	                    datetime.now(timezone.utc),
+   585	                ),
+   586	                native_refs=(Ref(RefType.SESSION, self.provider.provider_id, run.native_id),),
+   587	            ))
+   588	            # Order 51: the usage fact was read while the channel lived
+   589	            # (see _audited_home); absent stays absent in the ledger.
+   590	            usage = getattr(run, "usage_fact", None)
+   591	            usage_source = getattr(run, "usage_source", None)
+   592	            # Order 54: the workspace change set, published as a record
+   593	            # object (a fact document, never harness tool load).
+   594	            change_set_digest = None
+   595	            try:
+   596	                change_set = run.port.workspace_change_set(run.turn_id)
+   597	            except BaseException as read_error:
+   598	                logging.getLogger(__name__).warning(
+   599	                    "turn %s: change set read failed (%s); the turn's change set "
+   600	                    "stays unknown", run.turn_id, read_error,
+   601	                )
+   602	                change_set = None
+   603	            if change_set is not None:
+   604	                change_set_checkpoint = self.objects.publish(json.dumps(
+   605	                    {"schema_version": 1, "changeSet": change_set},
+   606	                    sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+   607	                ).encode())
+   608	                change_set_digest = change_set_checkpoint.digest
+   609	            completed, _event = self.records.complete_turn(
+   610	                run.turn_id, checkpoint_object_digest=checkpoint.digest,
+   611	                checkpoint_native_id=run.native_id, result_object_digest=result.digest,
+   612	                queue_records=self.queue,
+   613	                native_platform=audit["nativePlatform"], home_locator=audit["homeLocator"],
+   614	                usage=usage, usage_source=usage_source,
+   615	                change_set_object_digest=change_set_digest,
+   616	                terminal_reason=_terminal_reason_from_result(run.result),
+   617	            )
+   618	            next_execution_id = completed.get("next_execution_id")
+   619	            self.work_service.complete_work(run.work_id, "Turn completed through Harness sidecar")
+   620	        except BaseException as exc:
+   621	            code = _safe_code(exc)
+   622	            if code != "TURN_CANCELLED":
+   623	                logging.getLogger(__name__).exception("turn %s failed as %s", run.turn_id, code)
+   624	            if code == "TURN_CANCELLED":
+   625	                self.records.finish_cancelled(run.turn_id, queue_records=self.queue)
+   626	            else:
+   627	                self.records.fail_turn(run.turn_id, code, queue_records=self.queue)
+   628	        finally:
+   629	            approval_cleanup_failed = False
+   630	            try:
+   631	                self.approvals.invalidate_for_execution(run.turn_id, "execution_terminal")
+   632	            except BaseException:
+   633	                # The execution terminal fact is already durable; retain a
+   634	                # visible failed-cleanup fact and never turn it into a grant.
+   635	                approval_cleanup_failed = True
+   636	            try:
+   637	                try:
+   638	                    run.port.close_execution(run.turn_id)
+   639	                except BaseException:
+   640	                    # Teardown of the native channel failed; that is a cleanup
+   641	                    # failure to record, never a reason to skip the release below.
+   642	                    approval_cleanup_failed = True
+   643	                self.records.mark_turn_cleanup(
+   644	                    run.turn_id, "failed" if approval_cleanup_failed else "cleaned",
+   645	                )
+   646	            except BaseException:
+   647	                # Order 109: the *fallback* record could itself fail (the shared
+   648	                # SQLite is contended exactly when a second failure follows a
+   649	                # first), and a bare raise here would escape the `finally` and
+   650	                # strand the run's bookkeeping forever. Record it and fall
+   651	                # through - the release must run no matter what.
+   652	                logging.getLogger(__name__).exception(
+   653	                    "turn %s: cleanup record failed", run.turn_id)
+   654	                try:
+   655	                    self.records.mark_turn_cleanup(run.turn_id, "failed")
+   656	                except BaseException:
+   657	                    logging.getLogger(__name__).exception(
+   658	                        "turn %s: cleanup failed-record also could not be written",
+   659	                        run.turn_id)
+   660	            # Guaranteed release of every shared handle, independent of each
+   661	            # other, so no failure above can leak the run or wedge the loop.
+   662	            self._retire_run(run)
+   663	            self.on_event()
+   664	        if next_execution_id is not None:
+   665	            try:
+   666	                self.accept(next_execution_id)
+   667	            except BaseException:
+   668	                # accept() already persisted this dispatch failure and paused
+   669	                # any still-pending items; the completed predecessor stays final.
+   670	                pass
+   671	
+   672	    def _retire_run(self, run: "_Run") -> None:
+   673	        """Release every shared handle a run holds, so a failed turn cannot leak
+   674	        the active maps, the bound resources, or the provider dispatch handle.
+   675	
+   676	        Each step is independent: one raising must not strand the others (that
+   677	        leak is what accumulated across failures into the order-109 HTTP hang).
+   678	        """
+   679	        with self._lock:
+   680	            self._active.pop(run.turn_id, None)
+   681	            self._contexts.pop(run.turn_id, None)
+   682	            self._message_parts.pop(run.turn_id, None)
+   683	            self._turn_by_core.pop(run.core_execution_id, None)
+   684	            self._approval_ports = {
+   685	                key: value for key, value in self._approval_ports.items() if value is not run.port
+   686	            }
+   687	        try:
+   688	            self.resources.release(run.turn_id)
+   689	        except BaseException:
+   690	            logging.getLogger(__name__).exception(
+   691	                "turn %s: bound-resource release failed", run.turn_id)
+   692	        try:
+   693	            self.provider.release_handle(run.dispatch_id)
+   694	        except BaseException:
+   695	            logging.getLogger(__name__).exception(
+   696	                "turn %s: provider handle release failed", run.turn_id)
+   697	
+   698	    def _complete_then_retire(self, run: "_Run") -> None:
+   699	        """Run the durable completion and stop being a live worker afterwards."""
+   700	        try:
+   701	            self._complete(run)
+   702	        finally:
+   703	            # Order 80: this run's terminal is what makes the library "ready" —
+   704	            # every later run (and anyone waiting) passes through from here.
+   705	            if run.first_run_hold is not None:
+   706	                run.first_run_hold.release()
+   707	            with self._lock:
+   708	                self._completion_threads.discard(threading.current_thread())
+   709	
+   710	    def pid_for(self, turn_id: str) -> int | None:
+   711	        """The execution-side pid for one in-flight turn, if this side has it.
+   712	
+   713	        A local run's process object is the only source; a Worker-hosted run
+   714	        has none here, and an unknown turn is simply "not reported" - the
+   715	        inventory shows null rather than a guess.
+   716	        """
+   717	        with self._lock:
+   718	            run = self._active.get(turn_id)
+   719	        if run is None:
+   720	            return None
+   721	        pid = getattr(run.port, "pid", None)
+   722	        if not callable(pid):
+   723	            return None
+   724	        try:
+   725	            return pid(turn_id)
+   726	        except BaseException:  # noqa: BLE001 - unknown is the honest answer
+   727	            return None
+   728	
+   729	    def cancel(self, turn_id: str) -> bool:
+   730	        """Temporary bool shell over the three-state verb (C-EXEC@v1 O-3).
+   731	
+   732	        Only ``confirmed_stopped`` answers True - refused and unknown are both
+   733	        False here because that is exactly the collapse the current consumer
+   734	        already projects (public shape frozen, M-1). The shell is deleted after
+   735	        the consumer switches to ``cancel_execution`` (separate approval).
+   736	        """
+   737	        return self.cancel_execution(turn_id) is CancelOutcome.CONFIRMED_STOPPED
+   738	
+   739	    def cancel_execution(self, execution_key: str) -> CancelOutcome:
+   740	        """Block-1 tristate cancel. A lost answer is captured and classified
+   741	        ``unknown`` here - it is never re-dispatched blindly and never allowed
+   742	        to leak as an exception, because both would erase the distinction the
+   743	        contract promises the consumer.
+   744	        """
+   745	        with self._lock:
+   746	            prior = self._cancel_receipts.get(execution_key)
+   747	            target = self._active.get(execution_key) or self._neutral_runs.get(execution_key)
+   748	        if prior is not None:
+   749	            return prior
+   750	        if target is None:
+   751	            outcome = CancelOutcome.REFUSED_NO_ACTIVE_RUN
+   752	            with self._lock:
+   753	                self._cancel_receipts[execution_key] = outcome
+   754	            return outcome
+   755	        with target.cancel_lock:
+   756	            with self._lock:
+   757	                prior = self._cancel_receipts.get(execution_key)
+   758	            if prior is not None:
+   759	                return prior
+   760	            try:
+   761	                accepted = target.port.cancel(execution_key)
+   762	            except BaseException:  # noqa: BLE001 - timeout/channel-lost: honest unknown
+   763	                accepted = None
+   764	            if accepted is None:
+   765	                outcome = CancelOutcome.UNKNOWN
+   766	            elif accepted:
+   767	                outcome = CancelOutcome.CONFIRMED_STOPPED
+   768	                target.cancel_confirmed = True
+   769	            else:
+   770	                outcome = CancelOutcome.REFUSED_NO_ACTIVE_RUN
+   771	            # recorded while still holding the run's cancel lock: a racer
+   772	            # woken from that lock must find the receipt, never a window
+   773	            # in which it would dispatch the abort a second time.
+   774	            with self._lock:
+   775	                self._cancel_receipts[execution_key] = outcome
+   776	        return outcome
+   777	
+   778	    def observe_execution(self, execution_key: str) -> ExecutionObservation:
+   779	        """Pure read of what this process currently knows (E-D2 supplement A).
+   780	
+   781	        Dispatches nothing, writes nothing, and never invents a transition:
+   782	        ``NOT_KNOWN_TO_E`` is bounded knowledge, not a proof that nothing ever
+   783	        started - only a typed provider-side zero-creation fact may lift an
+   784	        ambiguous dispatch, and that proof arrives through the consumer's
+   785	        channel, never from this method.
+   786	        """
+   787	        now = datetime.now(timezone.utc)
+   788	        with self._lock:
+   789	            run = self._active.get(execution_key)
+   790	            neutral = self._neutral_runs.get(execution_key)
+   791	        if run is not None:
+   792	            if run.result is not None:
+   793	                state, evidence = ObservationState.TERMINAL, EvidenceClass.TERMINAL_RECEIPT
+   794	            elif run.cancel_confirmed:
+   795	                state, evidence = (
+   796	                    ObservationState.STOPPED_CONFIRMED, EvidenceClass.CANCEL_CONFIRMATION)
+   797	            elif run.native_id:
+   798	                state, evidence = ObservationState.RUNNING, EvidenceClass.NATIVE_REPORT
+   799	            else:
+   800	                state, evidence = ObservationState.RUNNING, EvidenceClass.DISPATCH_ACK
+   801	        elif neutral is not None:
+   802	            if neutral.cancel_confirmed:
+   803	                state, evidence = (
+   804	                    ObservationState.STOPPED_CONFIRMED, EvidenceClass.CANCEL_CONFIRMATION)
+   805	            elif neutral.evidence:
+   806	                state, evidence = ObservationState.RUNNING, EvidenceClass.NATIVE_REPORT
+   807	            else:
+   808	                state, evidence = ObservationState.RUNNING, EvidenceClass.DISPATCH_ACK
+   809	        else:
+   810	            state, evidence = ObservationState.NOT_KNOWN_TO_E, EvidenceClass.NONE
+   811	        return ExecutionObservation(execution_key, state, evidence, now)
+   812	
+   813	    def submit(self, request: ExecutionRequest) -> ExecutionReceipt:
+   814	        """Neutral start path - no business record is created, read, or
+   815	        inferred here (the caller issues ``execution_key`` after its own
+   816	        bookkeeping; persistence of ``correlation`` is the caller's).
+   817	
+   818	        A replay of a key already tracked returns the original receipt and
+   819	        never re-dispatches the start. A typed refusal raised before the port
+   820	        exists left no dispatch behind, so it registers nothing and leaves the
+   821	        key clean for a fresh attempt.
+   822	        """
+   823	        execution_key = request.execution_key
+   824	        with self._lock:
+   825	            existing = self._neutral_runs.get(execution_key)
+   826	            if existing is not None:
+   827	                return ExecutionReceipt(execution_key, existing.dispatch_id, replayed=True)
+   828	            # Claim the key *before* the seam exists: two racing submits of one
+   829	            # key must not each build a port and each open a start. A typed
+   830	            # refusal from the factory (nothing was dispatched) releases the
+   831	            # claim again, so the key stays clean for a fresh attempt.
+   832	            run = _NeutralRun(
+   833	                execution_key=execution_key, dispatch_id=f"neutral:{uuid.uuid4()}",
+   834	                port=None)
+   835	            self._neutral_runs[execution_key] = run
+   836	            self._cancel_receipts.pop(execution_key, None)
+   837	        context = {
+   838	            "execution_key": execution_key,
+   839	            "bundle_ref": request.bundle_ref,
+   840	            "resource_bindings": [
+   841	                {"contract_id": b.contract_id, "object_digest": b.object_digest,
+   842	                 "mount_token": b.mount_token}
+   843	                for b in request.resource_bindings
+   844	            ],
+   845	            "capability_demand": sorted(request.capability_demand),
+   846	            "deadline_policy": None if request.deadline_policy is None else {
+   847	                "hard_deadline": (
+   848	                    None if request.deadline_policy.hard_deadline is None
+   849	                    else request.deadline_policy.hard_deadline.isoformat()),
+   850	                "idle_timeout_seconds": request.deadline_policy.idle_timeout_seconds,
+
+exec
+/bin/bash -lc "nl -ba src/agent_box/server/execution/sidecar_backend.py | sed -n '851,1217p'" in /home/maoqh/projects/ordessa/worktrees/integration-linux/backend
+ succeeded in 0ms:
+   851	            },
+   852	            # Passed through unparsed; the sidecar seam normalizes this with
+   853	            # C-HARNESS (IFR-04). Nothing here interprets the values.
+   854	            "correlation": dict(request.correlation),
+   855	        }
+   856	        try:
+   857	            port = self.port_factory(
+   858	                context,
+   859	                lambda execution_id, kind, data: self._neutral_event(execution_id, kind, data),
+   860	            )
+   861	        except BaseException:
+   862	            # typed refusal before the seam produced anything: release the
+   863	            # claim so the key is honestly absent again (nothing was dispatched)
+   864	            with self._lock:
+   865	                if self._neutral_runs.get(execution_key) is run:
+   866	                    del self._neutral_runs[execution_key]
+   867	            raise
+   868	        run.port = port
+   869	        try:
+   870	            run.native_id = str(port.open_execution(execution_key))
+   871	        except BaseException:
+   872	            run.start_uncertain = True
+   873	            raise
+   874	        self.on_event()
+   875	        return ExecutionReceipt(execution_key, run.dispatch_id)
+   876	
+   877	    def _neutral_event(self, execution_key: str, kind: str, data: Mapping[str, Any]) -> None:
+   878	        with self._lock:
+   879	            run = self._neutral_runs.get(execution_key)
+   880	            if run is not None:
+   881	                run.evidence.append((str(kind), datetime.now(timezone.utc)))
+   882	        self.on_event()
+   883	
+   884	    #: How long `stop()` waits for prompts and durable completions to settle.
+   885	    STOP_DEADLINE_SECONDS = 15.0
+   886	
+   887	    def stop(self) -> bool:
+   888	        with self._lock:
+   889	            runs = list(self._active.values())
+   890	        for run in runs:
+   891	            self.cancel(run.turn_id)
+   892	        deadline = time.monotonic() + self.STOP_DEADLINE_SECONDS
+   893	        for run in runs:
+   894	            run.done.wait(max(0, deadline - time.monotonic()))
+   895	        # The prompt worker finishing is not the end of the turn: the completion
+   896	        # worker still writes the durable result through the shared Work Core
+   897	        # connection. Returning before it finishes let a later shutdown (or the
+   898	        # next test) reset that connection underneath it, which crashed the
+   899	        # interpreter inside SQLite. Wait for it, bounded, and report honestly.
+   900	        for thread in list(self._completion_threads):
+   901	            thread.join(max(0, deadline - time.monotonic()))
+   902	        prompts_done = all(run.done.is_set() for run in runs)
+   903	        # Order 80: a run that never reached its terminal must not keep its
+   904	        # library's first-run lock (a later runtime in this process, or a
+   905	        # restart of the same data root, would wait on a dead owner).
+   906	        with self._lock:
+   907	            leftovers = [run for run in self._active.values()
+   908	                         if run.first_run_hold is not None]
+   909	        for run in leftovers:
+   910	            run.first_run_hold.release()
+   911	        with self._lock:
+   912	            # Keep the set meaning "workers still running": a finished worker is
+   913	            # retired here even if it was not started through the wrapper.
+   914	            self._completion_threads = {
+   915	                thread for thread in self._completion_threads if thread.is_alive()
+   916	            }
+   917	            completions_done = not self._completion_threads
+   918	        return prompts_done and completions_done
+   919	
+   920	
+   921	def _sidecar_attachments(
+   922	    objects, stored: Mapping[str, Any],
+   923	) -> tuple[list[dict[str, Any]], list[str]]:
+   924	    """Project stored attachments into (native image attachments, file refs).
+   925	
+   926	    Image bytes are read from the bounded object store only when the attachment
+   927	    carries a content digest; every other attachment stays a workspace file
+   928	    reference that the prompt text may name.
+   929	    """
+   930	    attachments: list[dict[str, Any]] = []
+   931	    file_refs: list[str] = []
+   932	    for item in (stored.get("message") or stored).get("attachments", ()):
+   933	        digest_value = item.get("_contentDigest")
+   934	        if not digest_value:
+   935	            continue
+   936	        if item.get("mediaKind") == "image":
+   937	            attachments.append({
+   938	                "mime": item.get("_mime") or "application/octet-stream",
+   939	                "filename": item.get("displayName") or item.get("ref"),
+   940	                "data": base64.b64encode(objects.read(digest_value)).decode(),
+   941	            })
+   942	        else:
+   943	            file_refs.append(str(item.get("ref")))
+   944	    return attachments, file_refs
+   945	
+   946	
+   947	def _effective_attachment_support(port, execution_id: str) -> bool:
+   948	    """Read the effective `attach` capability from the port's canonical view.
+   949	
+   950	    The answer comes from the intersection of the deployment's static
+   951	    declaration and what this execution actually observed, never from a stored
+   952	    snapshot or from the mere presence of an attachment.
+   953	    """
+   954	    view = port.effective_capabilities(execution_id)
+   955	    for entry in view.get("capabilities", ()):
+   956	        if entry.get("id") == "attach":
+   957	            return bool(entry.get("supported"))
+   958	    return False
+   959	
+   960	
+   961	def _reclaim_subscription(run: "_Run") -> None:
+   962	    """Copy the declared working files back into the account asset.
+   963	
+   964	    Every failure here is typed and recorded; none of them replace the stored
+   965	    asset (order 56 §1: never a half-way overwrite), and none of them fail the
+   966	    turn after the fact - the turn's own result is already durable.
+   967	    """
+   968	    subscription = getattr(run.port, "subscription", None)
+   969	    plumbing = getattr(run.port, "account_plumbing", None)
+   970	    if not subscription or not plumbing:
+   971	        return
+   972	    records, asset_store = plumbing
+   973	    account_id = subscription["account_id"]
+   974	    declared = subscription["files"]
+   975	
+   976	    def stored_digest_of():
+   977	        _locator, digest = records.asset_reference(account_id)
+   978	        return digest
+   979	
+   980	    try:
+   981	        read = getattr(run.port, "read_subscription", None)
+   982	        working = read(run.turn_id) if callable(read) else {}
+   983	        if not working:
+   984	            return
+   985	        locator, digest = asset_store.reclaim(
+   986	            account_id=account_id,
+   987	            stored_digest_of=stored_digest_of,
+   988	            materialized_digest=subscription.get("materialized_digest"),
+   989	            files=working,
+   990	            kind="subscription",
+   991	        )
+   992	        records.record_asset(account_id, locator=locator, digest=digest, state="valid")
+   993	    except BaseException as error:  # noqa: BLE001 - recorded, never silent
+   994	        logging.getLogger(__name__).warning(
+   995	            "turn %s: subscription reclaim for %s refused (%s); the stored "
+   996	            "asset is unchanged", run.turn_id, account_id,
+   997	            getattr(error, "code", type(error).__name__),
+   998	        )
+   999	
+  1000	
+  1001	def _audited_home(run: "_Run") -> tuple[dict[str, Any], bool]:
+  1002	    """Audit the home of a finished attempt, applying the credential rule.
+  1003	
+  1004	    An injected value found in the home means the one-shot projection leaked:
+  1005	    the file that carries it is deleted (the home stays usable for the next
+  1006	    turn), and the typed failure records the fact - the turn does not pass
+  1007	    with a secret sitting in a durable directory.
+  1008	    """
+  1009	    try:
+  1010	        audit, resumable = run.port.capture_execution(run.turn_id)
+  1011	        # Order 51: read the declared usage journal while the execution's own
+  1012	        # channel is still alive (after the final state, the sidecar is gone
+  1013	        # and a read would arrive too late). The result rides on the run.
+  1014	        usage_probe = getattr(run.port, "usage_probe", None)
+  1015	        if usage_probe:
+  1016	            try:
+  1017	                run.usage_fact = run.port.read_usage(run.turn_id, usage_probe)
+  1018	                run.usage_source = usage_probe.get("format")
+  1019	            except BaseException as read_error:
+  1020	                # A failed usage read must not fail the turn: the fact simply
+  1021	                # stays unknown, and the reason is logged for the report.
+  1022	                logging.getLogger(__name__).warning(
+  1023	                    "turn %s: usage read failed (%s); usage stays unknown",
+  1024	                    run.turn_id, read_error,
+  1025	                )
+  1026	                run.usage_fact = None
+  1027	                run.usage_source = None
+  1028	        # Order 56: reclaim the subscription working copy while the channel is
+  1029	        # still alive. A reclaim that cannot take the account's lock, or that
+  1030	        # finds the stored asset moved, is recorded and never overwrites the
+  1031	        # asset - the working copy simply stays unclaimed.
+  1032	        _reclaim_subscription(run)
+  1033	        return audit, resumable
+  1034	    except BaseException as exc:
+  1035	        if getattr(exc, "code", None) == "SIDECAR_STATE_CONTAINS_SECRET":
+  1036	            relative = getattr(exc, "path", None)
+  1037	            disposition = _credential_hit_disposition(exc, run.port)
+  1038	            if disposition == "keep-shared":
+  1039	                logging.getLogger(__name__).warning(
+  1040	                    "turn %s: credential material found in the shared session "
+  1041	                    "library at %s; the shared file is left in place (order 66)",
+  1042	                    run.turn_id, relative,
+  1043	                )
+  1044	            elif disposition == "delete" and relative:
+  1045	                try:
+  1046	                    run.port.delete_home_file(run.turn_id, relative)
+  1047	                except BaseException:  # noqa: BLE001 - the leak failure stands
+  1048	                    pass
+  1049	        raise
+  1050	
+  1051	
+  1052	def _credential_hit_disposition(exc: BaseException, port: Any) -> str:
+  1053	    """What to do with one credential-hit audit failure (order 66 §2.5).
+  1054	
+  1055	    ``keep-shared`` - the audited tree is the shared family library: the hit
+  1056	    stays a typed failure, but the file must not be deleted (it may hold other
+  1057	    Profiles' sessions). ``delete`` - a profile-scoped tree: the old rule, the
+  1058	    leaked file is removed. ``none`` - not a credential hit at all.
+  1059	    """
+  1060	    if getattr(exc, "code", None) != "SIDECAR_STATE_CONTAINS_SECRET":
+  1061	        return "none"
+  1062	    return "keep-shared" if getattr(port, "shared_store", False) else "delete"
+  1063	
+  1064	
+  1065	class CapabilityGateRefusal(SidecarError):
+  1066	    """Raised only by :func:`_capability_gate`, before any native contact.
+  1067	
+  1068	    单独的类型是来源隔离：只有这个类能携带“启动前拒绝”语义进入
+  1069	    ``_CoreSidecarProvider.start`` 的转换分支；post-open 阶段的 sidecar 响应错误
+  1070	    即使返回同名错误码（SidecarError 基类），也绝不会被误标为启动前拒绝。
+  1071	    """
+  1072	
+  1073	    def __init__(self, reason: str) -> None:
+  1074	        super().__init__("CAPABILITY_REQUIREMENT_UNSATISFIED", reason)
+  1075	
+  1076	
+  1077	class SidecarRunRecoveryFailure(SidecarError):
+  1078	    """Raised by the run-recovery path when a fresh sidecar cannot be obtained.
+  1079	
+  1080	    Typed on purpose, like :class:`CapabilityGateRefusal`, and for the same
+  1081	    reason: it is a statement about *this* stage — the sidecar was open and the
+  1082	    prompt boundary failed — so ``_safe_code`` may publish its code. A bare
+  1083	    ``SidecarError`` may not; see LNX-002 ruling decision 1.
+  1084	    """
+  1085	
+  1086	    def __init__(self, reason: str) -> None:
+  1087	        super().__init__("SIDECAR_REBUILD_FAILED", reason)
+  1088	
+  1089	
+  1090	def _capability_gate(port: SidecarHarnessPort, turn_id: str) -> None:
+  1091	    """Refuse an execution whose slice capabilities are not provably satisfied.
+  1092	
+  1093	    demand 取 launcher 本次将实际执行的挂载面（executable/projection/artifact
+  1094	    的 target 与 state target）；grant/声明/授权集/环境绑定由装配边界注入。
+  1095	    选择为确定性单候选（authorized_providers 限定）；任何缺失或不满足都在
+  1096	    ``open_execution`` 之前抛出，调用方沿既有 fail_turn 路径持久化，零 spawn。
+  1097	    """
+  1098	    launcher = getattr(port, "launcher", None)
+  1099	    documents = getattr(port, "capability_documents", ())
+  1100	    grants = getattr(port, "capability_grants", ())
+  1101	    authorized = getattr(port, "capability_authorized_providers", ())
+  1102	    binding = getattr(port, "capability_binding", None)
+  1103	    if binding is None or not documents or not authorized:
+  1104	        # 绑定、候选声明与授权提供者集是“装配边界已为本次执行注入材料”的最低
+  1105	        # 标志；任一缺失即 fail-closed 拒绝（空面部署的合法空 grant 集不是缺失，
+  1106	        # 但空的授权集不是“不限制”，而是未注入——不得改写为放行）。
+  1107	        raise CapabilityGateRefusal(
+  1108	            "capability material incomplete for this execution: "
+  1109	            "binding/documents/authorized required",
+  1110	        )
+  1111	    executable_targets = tuple(
+  1112	        target for _source, target in getattr(launcher, "executable_mounts", ())
+  1113	    )
+  1114	    projection_targets = tuple(
+  1115	        target for _source, target in getattr(launcher, "projection_mounts", ())
+  1116	    )
+  1117	    artifact_targets = tuple(
+  1118	        target for _source, target in getattr(launcher, "runtime_artifact_mounts", ())
+  1119	    )
+  1120	    state_target = getattr(launcher, "state_target", None)
+  1121	    requirements = capability.sidecar_requirements(
+  1122	        executable_targets=executable_targets,
+  1123	        projection_targets=projection_targets,
+  1124	        artifact_targets=artifact_targets,
+  1125	        state_target=state_target,
+  1126	    )
+  1127	    context = capability.MatchContext(environment_binding=binding, now=int(time.time()))
+  1128	    record = capability.select_declaration(
+  1129	        requirements, grants, (), tuple(documents),
+  1130	        context=context, binding=f"turn:{turn_id}",
+  1131	        authorized_providers=tuple(authorized),
+  1132	    )
+  1133	    if record.selected is not None and record.outcome is not None and record.outcome.satisfied:
+  1134	        return
+  1135	    if record.rejected:
+  1136	        _provider, _revision, reason = record.rejected[0]
+  1137	    elif record.outcome is not None and record.outcome.refusals:
+  1138	        reason = record.outcome.refusals[0].reason
+  1139	    else:
+  1140	        reason = "no authorized candidate satisfied the requirements"
+  1141	    raise CapabilityGateRefusal(
+  1142	        f"capability requirements unsatisfied for this execution: {reason}",
+  1143	    )
+  1144	
+  1145	
+  1146	#: The codes a **pre-start refusal** owns. They are claims about a stage - "the
+  1147	#: start was refused before any native contact" - and only
+  1148	#: :class:`CapabilityGateRefusal` may make that claim. A post-open failure that
+  1149	#: merely reuses one of these strings is not making that claim, so the ambiguous
+  1150	#: stage must not publish it (LNX-002 ruling, decision 1).
+  1151	#:
+  1152	#: This is the mirror of a global allow-list, not a copy of one: the vocabulary is
+  1153	#: owned by the type that raises it, and the same string published from a genuine
+  1154	#: pre-start refusal stays correct - that path is an ``ExecutionStartRejected`` and
+  1155	#: never reaches the check in ``_safe_code``.
+  1156	PRE_START_REFUSAL_CODES = frozenset({"CAPABILITY_REQUIREMENT_UNSATISFIED"})
+  1157	
+  1158	
+  1159	
+  1160	def _safe_code(exc: BaseException) -> str:
+  1161	    # 先沿异常链寻找由 provider 显式标注的「启动未发生」拒绝码（gate 在
+  1162	    # open_execution 前抛出的 ExecutionStartRejected 会带上原因码）；只有这一类
+  1163	    # 带码的 ExecutionStartRejected 参与还原，其他包装/运行期异常保持既有归一化。
+  1164	    seen: set[int] = set()
+  1165	    current: BaseException | None = exc
+  1166	    while current is not None and id(current) not in seen:
+  1167	        seen.add(id(current))
+  1168	        if isinstance(current, ExecutionStartRejected):
+  1169	            explicit = getattr(current, "code", None)
+  1170	            if isinstance(explicit, str) and re.fullmatch(r"[A-Z][A-Z0-9_]{2,127}", explicit):
+  1171	                return explicit
+  1172	        current = current.__cause__ or current.__context__
+  1173	    if isinstance(exc, DispatchAmbiguous) and getattr(exc, "code", None) in PRE_START_REFUSAL_CODES:
+  1174	        # LNX-002 ruling, decision 1. The ambiguous stage asserts one thing only:
+  1175	        # we cannot tell whether the start and its side effects happened. A code
+  1176	        # that belongs to the pre-start refusal vocabulary is a claim about a
+  1177	        # stage this stage cannot make, so the *published* reason stays generic and
+  1178	        # the original cause stays on the chain (and on this log).
+  1179	        #
+  1180	        # A genuine pre-start refusal never reaches here: it is an
+  1181	        # `ExecutionStartRejected` and the walk above already returned its code.
+  1182	        # Every other post-open code is still published - order 150's
+  1183	        # HARNESS_LAUNCH_FAILED / HARNESS_SESSION_UNAVAILABLE are exactly the
+  1184	        # diagnoses the client needs, and they are not stage claims.
+  1185	        logging.getLogger(__name__).error(
+  1186	            "ambiguous dispatch keeps the generic reason: it carried a pre-start "
+  1187	            "refusal code, which says nothing about whether the start happened",
+  1188	            exc_info=exc)
+  1189	        return "EXECUTION_FAILED"
+  1190	    explicit = getattr(exc, "code", None)
+  1191	    value = str(explicit or exc).strip().upper()
+  1192	    if re.fullmatch(r"[A-Z][A-Z0-9_]{2,127}", value):
+  1193	        return value
+  1194	    # The typed event can only carry a code; keep the underlying cause visible
+  1195	    # on the server log or a generic EXECUTION_FAILED hides it entirely.
+  1196	    logging.getLogger(__name__).error(
+  1197	        "execution failed without a typed code", exc_info=exc)
+  1198	    return "EXECUTION_FAILED"
+  1199	
+  1200	
+  1201	#: ACP's machine-readable stop reasons (an existing vocabulary, not invented).
+  1202	_CLEAN_STOP_REASONS = frozenset({"end_turn", "stop", "complete", ""})
+  1203	
+  1204	
+  1205	def _terminal_reason_from_result(result) -> str | None:
+  1206	    """Order 134 (122 consumer side): a harness completion may report *why* it
+  1207	    stopped. Return a persisted terminal_reason only when the result actually
+  1208	    says the turn stopped for a non-clean reason (e.g. ``max_tokens``); a
+  1209	    missing field or a clean end returns ``None`` so behavior is byte-identical
+  1210	    to before. We never invent a reason the Worker did not send.
+  1211	    """
+  1212	    if not isinstance(result, dict):
+  1213	        return None
+  1214	    stop = result.get("stopReason") or result.get("stop_reason")
+  1215	    if not isinstance(stop, str) or stop.strip().lower() in _CLEAN_STOP_REASONS:
+  1216	        return None
+  1217	    return stop
+
+exec
+/bin/bash -lc "nl -ba src/agent_box/server/execution/sidecar.py | sed -n '1,420p'" in /home/maoqh/projects/ordessa/worktrees/integration-linux/backend
+ succeeded in 0ms:
+     1	"""AgentBox-side client for the Harness sidecar envelope (Work Order 40 glue).
+     2	
+     3	The sidecar owns ACP; this module only speaks the generic NDJSON envelope. It
+     4	never interprets a native protocol, never decides product state, and never sees
+     5	credential content: the Worker materializes credentials into the isolated
+     6	projection and the sidecar inherits nothing from this process's environment.
+     7	
+     8	A launcher is injected so the same client runs over a local process (tests and
+     9	Linux acceptance) or over the Worker's interactive channel (WSL deployment).
+    10	"""
+    11	from __future__ import annotations
+    12	
+    13	import json
+    14	import base64
+    15	import hashlib
+    16	from pathlib import Path, PurePosixPath
+    17	import queue
+    18	import subprocess
+    19	import sys
+    20	import threading
+    21	import time
+    22	from typing import Any, Callable, Mapping, Protocol, Sequence
+    23	from uuid import uuid4
+    24	
+    25	from .state_capture import StateCaptureError, audit_snapshot
+    26	
+    27	from agent_box.resource_contracts.harness_capabilities import (
+    28	    CapabilityDeclaration, capability_view, merge_capabilities, validate_claims,
+    29	)
+    30	
+    31	
+    32	#: How often a blocked channel reader re-checks its keepalive. Small enough that
+    33	#: a failed lease ends the turn promptly, large enough not to spin.
+    34	LEASE_POLL_SECONDS = 0.25
+    35	
+    36	#: Failures while reading a state subtree that mean "it is still moving", so the
+    37	#: capture keeps waiting (bounded) instead of accepting a mixed snapshot. The
+    38	#: list is deliberately short: everything else - a refusal, a bound violation,
+    39	#: credential material, a plain I/O fault - is reported as it happened, with the
+    40	#: code that names it. Classification reads the code alone, never the message.
+    41	#:
+    42	#: Audited Worker view sites, and what their codes mean here:
+    43	#:
+    44	#:   VIEW_CHANGED          an entry changed identity while the Worker was
+    45	#:                         reading it from an already-opened fd - churn
+    46	#:   VIEW_MISSING          an entry is not there - a refusal by the Worker
+    47	#:                         (it cannot know the caller ever saw it); this
+    48	#:                         capture converts it to its identity conflict
+    49	#:                         because it just listed the path
+    50	#:   VIEW_SPECIAL_FILE     a FIFO, socket or device, or a path resolving
+    51	#:                         through a symlink - a refusal, never churn
+    52	#:   VIEW_TRAVERSAL_LIMIT  more than 4096 visited entries - a refusal
+    53	#:   VIEW_FILE_LIMIT       more than 1024 files, in a listing or a manifest
+    54	#:   VIEW_INVALID          malformed identity, manifest, path or fetch range
+    55	#:                         (including a first fetch past the end of a file)
+    56	#:   VIEW_IO               a real listing, metadata, read or write fault
+    57	#:   VIEW_INCOMPLETE       the view is not committed, or a file is missing
+    58	#:   VIEW_DIGEST_MISMATCH  read-back did not match what was declared
+    59	_STATE_TRANSIENT_CODES = frozenset({
+    60	    "SIDECAR_STATE_IDENTITY_CONFLICT",  # raised here: size, offset or digest moved
+    61	    "VIEW_CHANGED",                     # the Worker's own "the bytes moved" code
+    62	})
+    63	
+    64	
+    65	def _matches_ephemeral_prefix(relative: str, prefixes: Sequence[str]) -> bool:
+    66	    """Whether a state-relative path is (under) a declared attempt-ephemeral
+    67	    directory. Shared by the capture exclusion and the restore drop: decision A
+    68	    keeps this scratch out of the view/state/checkpoint on every path."""
+    69	    for prefix in prefixes:
+    70	        if relative == prefix or relative.startswith(prefix.rstrip("/") + "/"):
+    71	            return True
+    72	    return False
+    73	
+    74	
+    75	def _state_error_is_transient(error: BaseException) -> bool:
+    76	    """Whether a capture may wait for this failure to go away.
+    77	
+    78	    Only the code decides. The same sentence can describe churn or a refusal, so
+    79	    no message text is inspected here: an untyped or unknown failure is reported
+    80	    as it arrived.
+    81	    """
+    82	    code = getattr(error, "code", None)
+    83	    return isinstance(code, str) and code in _STATE_TRANSIENT_CODES
+    84	
+    85	
+    86	#: The guest's isolated home root. Every Harness home is a projection inside it:
+    87	#: read-only configuration files and one bounded writable state subtree, both
+    88	#: declared by the deployment. It is never the host home and never a Windows
+    89	#: profile root.
+    90	
+    91	
+    92	class SidecarError(RuntimeError):
+    93	    def __init__(self, code: str, message: str) -> None:
+    94	        super().__init__(f"{code}: {message}")
+    95	        self.code = code
+    96	        self.message = message
+    97	
+    98	
+    99	class SidecarLauncher(Protocol):
+   100	    """Starts the sidecar and returns (write, read) byte channels plus a stopper."""
+   101	
+   102	    def launch(self, environment: Mapping[str, str]) -> "SidecarChannels": ...
+   103	
+   104	
+   105	class SidecarChannels(Protocol):
+   106	    def write_line(self, value: str) -> None: ...
+   107	    def iter_chunks(self): ...
+   108	    def close(self) -> None: ...
+   109	
+   110	
+   111	class LocalProcessLauncher:
+   112	    """Launch the sidecar as a local child process (tests, Linux acceptance)."""
+   113	
+   114	    def __init__(self, command: Sequence[str], *, cwd: str | None = None) -> None:
+   115	        self.command = tuple(command)
+   116	        self.cwd = cwd
+   117	
+   118	    def launch(self, environment: Mapping[str, str]):
+   119	        process = subprocess.Popen(
+   120	            self.command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+   121	            stderr=subprocess.PIPE, bufsize=0, env=dict(environment), cwd=self.cwd,
+   122	        )
+   123	        assert process.stdin and process.stdout
+   124	        return _ProcessChannels(process)
+   125	
+   126	
+   127	class _ProcessChannels:
+   128	    def __init__(self, process: subprocess.Popen) -> None:
+   129	        self.process = process
+   130	
+   131	    def write_line(self, value: str) -> None:
+   132	        """Write one envelope line, or refuse with the same typed error as the
+   133	        Worker channels do.
+   134	
+   135	        A cancelled or already-finished execution can reach this after its
+   136	        channel was closed; the caller (`SidecarHarnessPort.cancel`) treats a
+   137	        typed closed-sidecar error as "nothing left to cancel", while a bare
+   138	        ValueError from a closed file object would escape it and fail the whole
+   139	        server shutdown.
+   140	        """
+   141	        stream = self.process.stdin
+   142	        if stream is None or getattr(stream, "closed", False):
+   143	            raise SidecarError("SIDECAR_CLOSED", "sidecar channel is closed")
+   144	        try:
+   145	            stream.write((value + "\n").encode("utf-8"))
+   146	            stream.flush()
+   147	        except (ValueError, OSError) as exc:
+   148	            raise SidecarError("SIDECAR_CLOSED", "sidecar channel is closed") from exc
+   149	
+   150	    def iter_chunks(self):
+   151	        assert self.process.stdout
+   152	        return iter(lambda: self.process.stdout.readline().decode("utf-8", "replace"), "")
+   153	
+   154	    def close(self) -> None:
+   155	        process = self.process
+   156	        if process.stdin:
+   157	            try:
+   158	                process.stdin.close()
+   159	            except OSError:
+   160	                pass
+   161	        try:
+   162	            process.wait(timeout=5)
+   163	        except subprocess.TimeoutExpired:
+   164	            process.terminate()
+   165	            try:
+   166	                process.wait(timeout=3)
+   167	            except subprocess.TimeoutExpired:
+   168	                process.kill()
+   169	                process.wait(timeout=3)
+   170	
+   171	
+   172	def _advertised(capability: Any) -> bool | None:
+   173	    """A native capability advertisement, read as the tri-state it really is.
+   174	
+   175	    ACP marks a session capability by its presence, conventionally as an empty
+   176	    object. Treating the value as a boolean would make every such Harness look
+   177	    incapable in Python, where `{}` is falsy but an absent or explicitly false
+   178	    value is the only honest "no". A missing key (or an explicit null) is not an
+   179	    advertisement at all and stays "not observed".
+   180	    """
+   181	    if capability is None:
+   182	        return None
+   183	    if capability is False:
+   184	        return False
+   185	    return True
+   186	
+   187	
+   188	def _advertised_image(capability: Any) -> bool | None:
+   189	    """`promptCapabilities.image`: only an explicit truth is an observation.
+   190	
+   191	    A missing or explicitly false value stays "not observed": attachment
+   192	    support is never inferred from a default policy or from a nearby ability.
+   193	    """
+   194	    if capability is None or capability is False:
+   195	        return None
+   196	    return True
+   197	
+   198	
+   199	def _require_matching_artifact_authorizations(
+   200	    authorizations: Sequence[Mapping[str, str]],
+   201	    mounts: Sequence[tuple[str, str]],
+   202	) -> None:
+   203	    """Every runtime artifact mount must carry its own declaration.
+   204	
+   205	    A mount without a declaration would reach bwrap unverified; a declaration
+   206	    without a mount would be a claim the Server silently dropped.  Both are
+   207	    refused here, before any Worker is contacted.
+   208	    """
+   209	    declared = {(str(item.get("path")), str(item.get("target"))) for item in authorizations}
+   210	    mounted = {(str(source), str(target)) for source, target in mounts}
+   211	    if len(declared) != len(authorizations) or len(mounted) != len(mounts):
+   212	        raise ValueError("SIDECAR_RUNTIME_ARTIFACT_DECLARATION_DUPLICATED")
+   213	    if declared != mounted:
+   214	        raise ValueError("SIDECAR_RUNTIME_ARTIFACT_DECLARATION_MISMATCH")
+   215	
+   216	
+   217	def _safe_bundle_relative(value: str) -> bool:
+   218	    return (isinstance(value, str) and not value.startswith("/")
+   219	            and "\x00" not in value and "//" not in value
+   220	            and not any(part in {"", ".", ".."} for part in value.split("/")))
+   221	
+   222	
+   223	def sidecar_bundle_files(
+   224	    plugin_root: Path | str, *,
+   225	    closure: Sequence[tuple[str, str]] | None = None,
+   226	    additional_files: Mapping[str, bytes] | None = None,
+   227	) -> dict[str, bytes]:
+   228	    """Load the reviewed sidecar closure for one bounded Worker projection.
+   229	
+   230	    E-INC1a (a-6): ``closure`` is the neutral seam - a pure data list of
+   231	    ``(source_relative, target_relative)`` pairs. When given, this function
+   232	    assembles exactly what the declaration says (path-safety validation and
+   233	    bounds unchanged) and touches none of the literal view layout below.
+   234	    The ``closure=None`` branch is the *frozen compatibility shell* for the
+   235	    bootstrap call site's two-positional shape: the hardcoded
+   236	    view-layout names are Harness-runtime content, owned by H (C-HARNESS,
+   237	    IFR-04), and this shell leaves with INC1b once that declaration exists -
+   238	    nothing outside it may grow these literals (pinned in the group tests).
+   239	    """
+   240	    root = Path(plugin_root).resolve()
+   241	    if closure is not None:
+   242	        files: dict[str, bytes] = {}
+   243	        for source_relative, target_relative in closure:
+   244	            if not _safe_bundle_relative(source_relative) or not _safe_bundle_relative(target_relative):
+   245	                raise ValueError("SIDECAR_BUNDLE_PATH_INVALID")
+   246	            if target_relative in files:
+   247	                raise ValueError("SIDECAR_BUNDLE_PATH_CONFLICT")
+   248	            files[target_relative] = (root / source_relative).read_bytes()
+   249	        return _finish_bundle(files, additional_files)
+   250	    runtime = root / "runtime"
+   251	    snapshot = root / "third_party" / "harness_remote"
+   252	    source = json.loads((snapshot / "SOURCE.json").read_text(encoding="utf-8"))
+   253	    files = {
+   254	        "agentbox-sidecar/package.json": (runtime / "package.json").read_bytes(),
+   255	        "agentbox-sidecar/runtime/worker-entry.mjs": (runtime / "worker-entry.mjs").read_bytes(),
+   256	        "agentbox-sidecar/runtime/native-driver.mjs": (runtime / "native-driver.mjs").read_bytes(),
+   257	        # The validated static ceiling, so the sidecar can refuse to project a
+   258	        # capability its Harness never declared instead of guessing.
+   259	        "agentbox-sidecar/runtime/capability_declarations.json": (
+   260	            runtime / "capability_declarations.json"
+   261	        ).read_bytes(),
+   262	        "agentbox-sidecar/runtime/profile_extensions.mjs": (
+   263	            runtime / "profile_extensions.mjs"
+   264	        ).read_bytes(),
+   265	        # Order 65 C: the delegation bridge - the stdio MCP server a parent
+   266	        # Harness starts when its Profile holds delegation grants.
+   267	        "agentbox-sidecar/runtime/subagent-bridge.mjs": (
+   268	            runtime / "subagent-bridge.mjs"
+   269	        ).read_bytes(),
+   270	        "agentbox-sidecar/third_party/harness_remote/SOURCE.json": (
+   271	            snapshot / "SOURCE.json"
+   272	        ).read_bytes(),
+   273	    }
+   274	    for item in source.get("files", ()):
+   275	        relative = str(item["path"])
+   276	        files[f"agentbox-sidecar/third_party/harness_remote/{relative}"] = (
+   277	            snapshot / relative
+   278	        ).read_bytes()
+   279	    return _finish_bundle(files, additional_files)
+   280	
+   281	
+   282	def _finish_bundle(
+   283	    files: dict[str, bytes], additional_files: Mapping[str, bytes] | None,
+   284	) -> dict[str, bytes]:
+   285	    """Shared tail: caller extras and the worker bounds, identical for both
+   286	    the declared-closure path and the frozen compatibility shell."""
+   287	    for relative, content in (additional_files or {}).items():
+   288	        if not _safe_bundle_relative(relative):
+   289	            raise ValueError("SIDECAR_BUNDLE_PATH_INVALID")
+   290	        if relative in files:
+   291	            raise ValueError("SIDECAR_BUNDLE_PATH_CONFLICT")
+   292	        files[relative] = bytes(content)
+   293	    if len(files) > 1024 or sum(map(len, files.values())) > 64 * 1024 * 1024:
+   294	        raise ValueError("SIDECAR_BUNDLE_OUTSIDE_WORKER_BOUNDS")
+   295	    return files
+   296	
+   297	
+   298	class WorkerSidecarLauncher:
+   299	    """Launch the reviewed sidecar through one Worker's interactive channel.
+   300	
+   301	    The Worker is the host boundary, and this launcher is what it looks like from
+   302	    the product side: stage the bytes, ask the sandbox layer for the room, spawn,
+   303	    stream, capture. Which machine the Worker runs on is the connector's fact,
+   304	    not this class's - a WSL Worker and an SSH Worker take exactly this path, and
+   305	    neither one makes this layer know a host name.
+   306	    """
+   307	
+   308	    def __init__(
+   309	        self, connector, *, workspace: Mapping[str, Any], bundle: Mapping[str, bytes],
+   310	        credential: bytes | None = None,
+   311	        executable_authorizations: Sequence[Mapping[str, str]] = (),
+   312	        executable_mounts: Sequence[tuple[str, str]] = (),
+   313	        runtime_artifact_authorizations: Sequence[Mapping[str, str]] = (),
+   314	        runtime_artifact_mounts: Sequence[tuple[str, str]] = (),
+   315	        projection_mounts: Sequence[tuple[str, str]] = (),
+   316	        home_locator: str = "", native_home: str = "", profile_id: str = "",
+   317	        harness_type: str = "", audit_window: str | None = None,
+   318	        state_ephemeral_paths: Sequence[str] = (),
+   319	        protected_state_paths: Sequence[str] = (),
+   320	        timeout_ms: int = 120_000,
+   321	        sandbox_port: "SandboxPort | None" = None,
+   322	        session_store_harness: str | None = None,
+   323	        session_store_target: str | None = None,
+   324	        session_store_shared: Sequence[str] = (),
+   325	        subscription_files: Sequence[str] = (),
+   326	        asset_files: Mapping[str, bytes] | None = None,
+   327	        usage_probe: dict[str, str] | None = None,
+   328	    ) -> None:
+   329	        self.connector = connector
+   330	        self.workspace = dict(workspace)
+   331	        self.bundle = {str(path): bytes(content) for path, content in bundle.items()}
+   332	        self.credential = None if credential is None else bytes(credential)
+   333	        self.executable_authorizations = tuple(dict(item) for item in executable_authorizations)
+   334	        self.executable_mounts = tuple((str(source), str(target)) for source, target in executable_mounts)
+   335	        self.runtime_artifact_authorizations = tuple(
+   336	            dict(item) for item in runtime_artifact_authorizations
+   337	        )
+   338	        self.runtime_artifact_mounts = tuple(
+   339	            (str(source), str(target)) for source, target in runtime_artifact_mounts
+   340	        )
+   341	        _require_matching_artifact_authorizations(
+   342	            self.runtime_artifact_authorizations, self.runtime_artifact_mounts,
+   343	        )
+   344	        self.projection_mounts = tuple((str(source), str(target)) for source, target in projection_mounts)
+   345	        #: The Profile's durable home on the target machine: `<role>/<native
+   346	        #: home>` under the machine's home root. The Worker creates and marker-
+   347	        #: verifies it; nothing about it is ever uploaded or restored.
+   348	        self.home_locator = str(home_locator)
+   349	        self.native_home = str(native_home)
+   350	        self.profile_id = str(profile_id)
+   351	        self.harness_type = str(harness_type)
+   352	        #: The declared audit window: the deployment's `stateProjection.target`
+   353	        #: minus the guest home prefix, relative to the role directory.
+   354	        self.audit_window = audit_window
+   355	        #: Paths (relative to the audit window) that a read-only projection
+   356	        #: owns. They are excluded from the audit by name: configuration the
+   357	        #: deployment projects read-only is not Harness state.
+   358	        self.protected_state_paths = tuple(_safe_relative_state_path(path) for path in protected_state_paths)
+   359	        self.state_ephemeral_paths = tuple(state_ephemeral_paths)
+   360	        self.timeout_ms = timeout_ms
+   361	        #: The resolved sandbox, injected by the assembly boundary. The channel
+   362	        #: states the demand; this object translates it. A missing port is a
+   363	        #: typed refusal at launch, never a silent run without isolation.
+   364	        self.sandbox_port = sandbox_port
+   365	        #: §14: when set, this Harness's session subtree lives in the per-harness
+   366	        #: session library on the target machine (shared by every profile of the
+   367	        #: family) instead of inside the profile's native home. The declared
+   368	        #: state target is then the session subtree's guest path.
+   369	        self.session_store_harness = session_store_harness
+   370	        #: The declared session-subtree guest path the store binds at (the
+   371	        #: deployment's state target when the family split its store out).
+   372	        self.session_store_target = session_store_target
+   373	        #: Order 66's whole-db names and kinds: the entries the family library
+   374	        #: owns, bound over the profile home's own copies. Empty means the
+   375	        #: store (if any) is the §14 subtree shape.
+   376	        self.session_store_shared = tuple(
+   377	            (str(name), str(kind)) for name, kind in session_store_shared)
+   378	        #: Order 58: rendered asset files (role-relative name -> text). They
+   379	        #: are written once per turn and never read back - assets have zero
+   380	        #: writeback by construction.
+   381	        self.asset_files = dict(asset_files or {})
+   382	        #: Order 56: a bound subscription account's working-copy names. The
+   383	        #: Worker-hosted channel has no home-write op yet, so a bound account
+   384	        #: on this channel is a typed refusal rather than a silent no-op.
+   385	        self.subscription_files = tuple(str(name) for name in subscription_files)
+   386	        #: Order 51: a declared usage probe turns the audited journal into the
+   387	        #: neutral usage fact after the attempt (tokens only, no estimates).
+   388	        self.usage_probe = dict(usage_probe) if usage_probe else None
+   389	
+   390	    def launch(self, environment: Mapping[str, str]):
+   391	        from agent_box.extensions.runtime_composition.sandbox_port import (
+   392	            SandboxPortUnavailable, SidecarRoomRequest,
+   393	        )
+   394	
+   395	        if self.sandbox_port is None:
+   396	            raise SidecarError(
+   397	                "SANDBOX_PORT_UNAVAILABLE",
+   398	                "no sandbox provider was resolved for this execution",
+   399	            )
+   400	
+   401	        attempt_id = f"sidecar-{uuid4().hex}"
+   402	        view_id = f"view-{attempt_id}"
+   403	        secret_frame_id = "harness-credential"
+   404	        credential_material, self.credential = self.credential, None
+   405	        client = self.connector.client_for_workspace(
+   406	            distribution=self.workspace["distribution"],
+   407	            user=self.workspace["remote_user"],
+   408	            connection_id=self.workspace["connection_id"],
+   409	            workspace_path=self.workspace["remote_path"],
+   410	            executable_authorizations=self.executable_authorizations,
+   411	            runtime_artifact_authorizations=self.runtime_artifact_authorizations,
+   412	        )
+   413	        try:
+   414	            client.start()
+   415	        except BaseException as error:
+   416	            client.close()
+   417	            # A Worker bootstrap refusal carries a code (an unsupported control
+   418	            # protocol, or a runtime artifact tree whose digest did not match
+   419	            # its declaration). Re-raise it as this layer's typed error so the
+   420	            # reason survives into durable product state instead of a bare
+
+codex
+The two production fixes are present in the reviewed backend: the neutral key claim is installed under the same global-lock section as the existence check, and cancellation stores the receipt before releasing the per-run cancel lock. I’m checking the remaining edge semantics and whether the exact test file exists in `HEAD`; no broad search will be performed.
+exec
+/bin/bash -lc 'git show HEAD:tests/test_e_inc1a_matrix_pins.py' in /home/maoqh/projects/ordessa/worktrees/integration-linux/backend
+ exited 128 in 0ms:
+fatal: path 'tests/test_e_inc1a_matrix_pins.py' does not exist in 'HEAD'
+
+codex
+1. `blocks:impl` — `tests/test_e_inc1a_matrix_pins.py` does not exist in the working tree or at `HEAD`. Therefore the mandatory deterministic race-window pins cannot be reviewed, and criterion 3 lacks acceptance evidence.
+
+2. The production fixes are correct:
+
+   - `submit()` performs lookup and placeholder registration within one `self._lock` critical section.
+   - Racing submissions replay the winner’s `dispatch_id`.
+   - Factory failure releases the claim.
+   - `open_execution()` failure retains the claim and marks `start_uncertain`.
+   - Cancellation double-checks the receipt under `target.cancel_lock`.
+   - The receipt is written before releasing that lock.
+   - No global lock is held across `port.cancel()`.
+
+3. Previously approved invariants remain intact: neutral submit does not invoke Core or introduce an objective; correlation remains opaque; observation is read-only; the declared-closure path avoids compatibility literals; and the boolean cancellation shell maps `UNKNOWN` to `False`.
+
+VERDICT: REJECT
+tokens used
+53,970
+1. `blocks:impl` — `tests/test_e_inc1a_matrix_pins.py` does not exist in the working tree or at `HEAD`. Therefore the mandatory deterministic race-window pins cannot be reviewed, and criterion 3 lacks acceptance evidence.
+
+2. The production fixes are correct:
+
+   - `submit()` performs lookup and placeholder registration within one `self._lock` critical section.
+   - Racing submissions replay the winner’s `dispatch_id`.
+   - Factory failure releases the claim.
+   - `open_execution()` failure retains the claim and marks `start_uncertain`.
+   - Cancellation double-checks the receipt under `target.cancel_lock`.
+   - The receipt is written before releasing that lock.
+   - No global lock is held across `port.cancel()`.
+
+3. Previously approved invariants remain intact: neutral submit does not invoke Core or introduce an objective; correlation remains opaque; observation is read-only; the declared-closure path avoids compatibility literals; and the boolean cancellation shell maps `UNKNOWN` to `False`.
+
+VERDICT: REJECT

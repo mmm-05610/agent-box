@@ -1,0 +1,140 @@
+==============================================================================
+S01 as-written (no register row) FAIL
+==============================================================================
+  FAIL invoke returned ('CapabilityAbsent', 'send'), scenario/design requires Result
+==============================================================================
+S01 R013-repaired            PASS
+==============================================================================
+  PASS invoke returned Result as required
+==============================================================================
+S02                          PASS
+==============================================================================
+==============================================================================
+S03                          PASS
+==============================================================================
+==============================================================================
+S04                          PASS
+==============================================================================
+==============================================================================
+S05                          PASS
+==============================================================================
+==============================================================================
+S06                          PASS
+==============================================================================
+==============================================================================
+S07                          PASS
+==============================================================================
+  PASS no extension claims acme.plot.v1 -> fallback emits an explicit row (opaque: acme.plot.v1, no view installed); the pane is not blank
+==============================================================================
+S08 as-written               FAIL
+==============================================================================
+  FAIL sD received 0 envelope(s) on data-1 but the scenario requires 1: no declared delivery mechanism reaches it
+==============================================================================
+S08 R013-repaired            PASS
+==============================================================================
+  PASS sD received 1 envelope(s) on data-1 (>= 1 required)
+  PASS cursor_resolve(runner-1) -> ExplicitAbsent after teardown
+  PASS the live subscriber learned its resource ended: onEnd(superseded)
+==============================================================================
+S09 as-written               FAIL
+==============================================================================
+  FAIL step `pump ('A', 'job-7', 'acme.job.v1', {'pct': 1})`: NamespaceGone(namespace ns_1 was torn down) — the scenario assumed the namespace was still there
+==============================================================================
+S09 R013-repaired            PASS
+==============================================================================
+  PASS cursor_resolve(job-7) -> ExplicitAbsent after teardown
+  PASS the live subscriber learned its resource ended: onEnd(observed link loss)
+==============================================================================
+S10                          PASS
+==============================================================================
+==============================================================================
+S11                          PASS
+==============================================================================
+  PASS all 3 declared capability values render to an explicit row, including unknown -> [('resume', 'support for resume is unknown — the service has not declared it')]
+==============================================================================
+S12                          PASS
+==============================================================================
+  PASS open_scope -> ExplicitAbsent as required
+==============================================================================
+MC_reg_missing               PASS
+==============================================================================
+  PASS invoke returned CapabilityAbsent as required
+==============================================================================
+MC_events_before_sub         FAIL
+==============================================================================
+  FAIL s received 0 envelope(s) on main but the scenario requires 2: no declared delivery mechanism reaches it
+==============================================================================
+MC_events_before_sub_FIXED   PASS
+==============================================================================
+  PASS s received 2 envelope(s) on main (>= 2 required)
+==============================================================================
+MC_rebuild_burn              PASS
+==============================================================================
+  PASS step `reannounce_same ('A', 'job-7', 'acme.job', 'acme.job.v1', {'cancel': 'supported'})`: LocalIdBurned(job-7) as §R11.3 requires
+  PASS cursor -> ExplicitAbsent as required
+==============================================================================
+MC_spawn_announce_missing    FAIL
+==============================================================================
+  FAIL s received 0 envelope(s) on job-7 but the scenario requires 1: no declared delivery mechanism reaches it
+==============================================================================
+MC_capacity_gap              PASS
+==============================================================================
+  PASS s received 3 envelope(s) on job-7 (>= 3 required)
+  PASS cursor_resolve(job-7) -> ExplicitAbsent after teardown
+  PASS the live subscriber learned its resource ended: onEnd(bound memory)
+  PASS cursor -> ExplicitAbsent as required
+  PASS invoke returned ExplicitAbsent as required
+
+==============================================================================
+SUMMARY
+==============================================================================
+  PASS MC_capacity_gap
+  FAIL MC_events_before_sub
+  PASS MC_events_before_sub_FIXED
+  PASS MC_rebuild_burn
+  PASS MC_reg_missing
+  FAIL MC_spawn_announce_missing
+  PASS S01 R013-repaired
+  FAIL S01 as-written (no register row)
+  PASS S02
+  PASS S03
+  PASS S04
+  PASS S05
+  PASS S06
+  PASS S07
+  PASS S08 R013-repaired
+  FAIL S08 as-written
+  PASS S09 R013-repaired
+  FAIL S09 as-written
+  PASS S10
+  PASS S11
+  PASS S12
+
+5 FAIL, 0 GAP, 16 PASS
+
+==============================================================================
+EXPECTATION CHECK (mode=repaired)
+==============================================================================
+  PASS MC_capacity_gap              expected PASS ok
+  FAIL MC_events_before_sub         expected FAIL ok
+  PASS MC_events_before_sub_FIXED   expected PASS ok
+  PASS MC_rebuild_burn              expected PASS ok
+  PASS MC_reg_missing               expected PASS ok
+  FAIL MC_spawn_announce_missing    expected FAIL ok
+  PASS S01 R013-repaired            expected PASS ok
+  FAIL S01 as-written (no register row) expected FAIL ok
+  PASS S02                          expected PASS ok
+  PASS S03                          expected PASS ok
+  PASS S04                          expected PASS ok
+  PASS S05                          expected PASS ok
+  PASS S06                          expected PASS ok
+  PASS S07                          expected PASS ok
+  PASS S08 R013-repaired            expected PASS ok
+  FAIL S08 as-written               expected FAIL ok
+  PASS S09 R013-repaired            expected PASS ok
+  FAIL S09 as-written               expected FAIL ok
+  PASS S10                          expected PASS ok
+  PASS S11                          expected PASS ok
+  PASS S12                          expected PASS ok
+
+all verdicts match expectation

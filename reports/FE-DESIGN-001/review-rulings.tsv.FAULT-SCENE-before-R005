@@ -1,0 +1,61 @@
+round|digest|kind|id|verdict|evidence
+R001|no-candidate|ce|FE-CE-003|holds|S09 double-execution guarantee is deferred to "adapter discipline" (integrate.md §5); host assigns (namespace_id,action_seq) but no core mechanism dedups against it, so a non-conforming adapter re-executes an unknown-outcome action on reconnect
+R001|no-candidate|sc|S01|insufficient_evidence|scenario ledger "text.stream resource, adapter-chosen CapMap names, no profile/tool/recovery" is a terse note, not the referenced best-candidate §R.5-S01 trajectory; saved candidate is "_none yet_"
+R001|no-candidate|sc|S02|insufficient_evidence|best-candidate §R.5-S02 (pi.conversation/tool-event/approval kinds + resolver + approve action) is cited but absent
+R001|no-candidate|sc|S03|insufficient_evidence|§R.5-S03 "namespace outlives page; re-subscribe from cursor; read-action for snapshots" is a mechanism gloss, no ordered sequence present
+R001|no-candidate|sc|S04|insufficient_evidence|§R.5-S04 "submit/progress/result resources, no chat object in core" not reproduced as steps
+R001|no-candidate|sc|S05|insufficient_evidence|§R.5-S05 "config.tree resource, CapMap{read:supported}, no session" cited, absent
+R001|no-candidate|sc|S06|insufficient_evidence|§R.5-S06 "namespaced resource ids prevent collision" is the reduction-table line, not a step sequence
+R001|no-candidate|sc|S07|insufficient_evidence|§R.5-S07 revised-fallback rendering described in integrate.md §2, not the scenario's own ordered trajectory
+R001|no-candidate|sc|S08|insufficient_evidence|§R.5-S08 "cross-kind view passing ids via typed action, replaceable runner adapter" is a gloss, no steps
+R001|no-candidate|sc|S09|insufficient_evidence|even reported text is partial: integrate.md §5 defers dedup to adapter discipline; no §R.5-S09 core-owned sequence present
+R001|no-candidate|sc|S10|insufficient_evidence|§R.5-S10 "handles closed on unmount, resource stays authoritative, re-subscribe from cursor" not shown as ordered steps
+R001|no-candidate|sc|S11|insufficient_evidence|§R.5-S11 "adapter-named CapMap not_supported + CapabilityAbsent sentinel" mechanism note, no trajectory
+R001|no-candidate|sc|S12|insufficient_evidence|§R.5-S12 "adapter teardown disposes namespace only; resolver absent falls to generic view" is a gloss
+R001|b93d2dbedec53eaa05d7de4a9d762f3621d5f9bc623f8ea7da916298e690d30b|ce|FE-CE-003|holds|§R.5-S08 has the coordinating view "resolves both" data.ref and runner and invokes cross-module, but §R.4 bars an extension from subscribing across namespaces and the artifact never states the two modules share one namespace
+R001|b93d2dbedec53eaa05d7de4a9d762f3621d5f9bc623f8ea7da916298e690d30b|sc|S01|trajectory_ok|§R.5-S01 steps 1-5 with owners host/adapter/extension; core steps namespace.open and stream delivery carry §R.6 deletion consequences (namespaces→S06, stream→S03/S09)
+R001|b93d2dbedec53eaa05d7de4a9d762f3621d5f9bc623f8ea7da916298e690d30b|sc|S02|trajectory_ok|§R.5-S02 steps 1-3 with owners adapter/extension; core ops map to §R.6
+R001|b93d2dbedec53eaa05d7de4a9d762f3621d5f9bc623f8ea7da916298e690d30b|sc|S03|trajectory_ok|§R.5-S03 steps 1-4 with owners extension/host/adapter/host; §R.6 ordered-replayable-stream→S03 step 4
+R001|b93d2dbedec53eaa05d7de4a9d762f3621d5f9bc623f8ea7da916298e690d30b|sc|S04|trajectory_ok|§R.5-S04 steps 1-3 with owners adapter/extension; envelope has no role/turn field; §R.6 host-turn/role removed
+R001|b93d2dbedec53eaa05d7de4a9d762f3621d5f9bc623f8ea7da916298e690d30b|sc|S05|trajectory_ok|§R.5-S05 steps 1-3 with owners adapter/host/extension; §R.6 resource-directory→S05 step 2
+R001|b93d2dbedec53eaa05d7de4a9d762f3621d5f9bc623f8ea7da916298e690d30b|sc|S06|insufficient_evidence|§R.5-S06 "Separate namespaces → (ns_A,job-1) ≠ (ns_B,job-1). Auth/capability checks namespace-scoped." — structural key only, no ordered trajectory and no per-step owner
+R001|b93d2dbedec53eaa05d7de4a9d762f3621d5f9bc623f8ea7da916298e690d30b|sc|S07|trajectory_ok|§R.5-S07 announce→no-match→generic view with owners adapter/host; §R.6 generic-fallback-view→S07 step 2
+R001|b93d2dbedec53eaa05d7de4a9d762f3621d5f9bc623f8ea7da916298e690d30b|sc|S08|insufficient_evidence|§R.5-S08 "Coordinating view resolves both" conflicts with §R.4 "may not subscribe across namespaces" for a replaceable runner in a different adapter
+R001|b93d2dbedec53eaa05d7de4a9d762f3621d5f9bc623f8ea7da916298e690d30b|sc|S09|trajectory_broken|§R.5-S09 step 3 "host-assigned (namespace_id, action_seq) … adapter declares whether it dedups"
+R001|b93d2dbedec53eaa05d7de4a9d762f3621d5f9bc623f8ea7da916298e690d30b|sc|S10|trajectory_ok|§R.5-S10 resolver-throws→host-closes→re-subscribe with owners host/extension; §R.6 namespaces+stream consequences
+R001|b93d2dbedec53eaa05d7de4a9d762f3621d5f9bc623f8ea7da916298e690d30b|sc|S11|trajectory_ok|§R.5-S11 adapter announces not_supported→capabilities.get→invoke CapabilityAbsent with owners adapter/extension/host; §R.6 capability-declaration→S11 step 2
+R001|b93d2dbedec53eaa05d7de4a9d762f3621d5f9bc623f8ea7da916298e690d30b|sc|S12|trajectory_ok|§R.5-S12 adapter-teardown + resolver-absent with owner host; §R.6 namespaces(S06)+generic-view(S07)
+R002|b93d2dbedec53eaa05d7de4a9d762f3621d5f9bc623f8ea7da916298e690d30b|ce|FE-CE-007|pass|extension obtains handle_for(ns_A, res); calls edges.list expecting foreign ns_B targets; relays without user
+R002|2d2dde146c280db1e9ba555b358212f089cb4d99aa3bcbf60d6879699aebc496|ce|FE-CE-001|pass|passive config.tree reached only as a seq-ordered message log, no current-value primitive (§A old core)
+R002|2d2dde146c280db1e9ba555b358212f089cb4d99aa3bcbf60d6879699aebc496|ce|FE-CE-002|pass|core fixes a capability-name vocabulary and the generic fallback renders an agent/run reading
+R002|2d2dde146c280db1e9ba555b358212f089cb4d99aa3bcbf60d6879699aebc496|ce|FE-CE-003|pass|adapter writes a CapMap string, host reads it to toggle auto-replay
+R002|2d2dde146c280db1e9ba555b358212f089cb4d99aa3bcbf60d6879699aebc496|ce|FE-CE-004|pass|runner invoke spawns (ns_R,job) but the view has no subscription path for it
+R002|2d2dde146c280db1e9ba555b358212f089cb4d99aa3bcbf60d6879699aebc496|ce|FE-CE-005|pass|pair gesture → secondary handle subscribes from seq 0 → stale ArtifactReady auto-fires execute
+R002|2d2dde146c280db1e9ba555b358212f089cb4d99aa3bcbf60d6879699aebc496|ce|FE-CE-006|pass|two adapters register the same bare payload_schema_id string, cross-contaminating type
+R002|2d2dde146c280db1e9ba555b358212f089cb4d99aa3bcbf60d6879699aebc496|ce|FE-CE-007|pass|edges.list(ns) returns a foreign target_namespace_id into a scoped handle, enabling adapter-authorized user-less relay
+R002|2d2dde146c280db1e9ba555b358212f089cb4d99aa3bcbf60d6879699aebc496|sc|S01|insufficient_evidence|§R.5-S01 gives an ordered 5-step sequence with per-step owners, but no deletion consequence for its core steps exists in §R.5 or §R.6 (which map namespaces→S06, typed-action→S08, ordered-stream→S03/S09)
+R002|2d2dde146c280db1e9ba555b358212f089cb4d99aa3bcbf60d6879699aebc496|sc|S02|insufficient_evidence|§R.5-S02 lists ordered steps with owners (adapter/host/extension) but carries no per-core-step deletion consequence, and §R.6 names no mechanism to S02
+R002|2d2dde146c280db1e9ba555b358212f089cb4d99aa3bcbf60d6879699aebc496|sc|S03|trajectory_ok|§R.5-S03 ordered steps 1–4 with owners + §R.6 ordered-replayable-stream→"S03 step 4 no return-later catch-up"
+R002|2d2dde146c280db1e9ba555b358212f089cb4d99aa3bcbf60d6879699aebc496|sc|S04|insufficient_evidence|§R.5-S04 has ordered steps+owners but no deletion consequence for its live core steps; §R.6's "host-session-object removed" entry is a reduction of a removed item, not a consequence for S04
+R002|2d2dde146c280db1e9ba555b358212f089cb4d99aa3bcbf60d6879699aebc496|sc|S05|trajectory_ok|§R.5-S05 steps 1–3 with owners + §R.6 resource-directory→"S05 step 2 cannot list/lookup without session"
+R002|2d2dde146c280db1e9ba555b358212f089cb4d99aa3bcbf60d6879699aebc496|sc|S06|trajectory_ok|§R.5-S06 ordered 6 steps + explicit "Deletion: remove namespaces→collide; ns-scoped registry→bleed; scope-check→leak"
+R002|2d2dde146c280db1e9ba555b358212f089cb4d99aa3bcbf60d6879699aebc496|sc|S07|trajectory_ok|§R.5-S07 + §R.6 generic-fallback-view→"S07 step 2 unknown artefact renders blank"
+R002|2d2dde146c280db1e9ba555b358212f089cb4d99aa3bcbf60d6879699aebc496|sc|S08|trajectory_ok|§R.5-S08 ordered 7 steps + §R.6 typed-action→S08 step5, spawned-resource-grant→S08 step6, live-default-subscribe→S08 step5
+R002|2d2dde146c280db1e9ba555b358212f089cb4d99aa3bcbf60d6879699aebc496|sc|S09|trajectory_ok|§R.5-S09 ordered 3 steps + explicit "Deletion: remove typed ReplayPolicy → FE-CE-003 reopens" and §R.6 ordered-stream→S09 step2
+R002|2d2dde146c280db1e9ba555b358212f089cb4d99aa3bcbf60d6879699aebc496|sc|S10|insufficient_evidence|§R.5-S10 has ordered steps+owners; its core step (host force-closes handles incl. spawned set on unmount) has no deletion consequence anywhere in §R.6
+R002|2d2dde146c280db1e9ba555b358212f089cb4d99aa3bcbf60d6879699aebc496|sc|S11|trajectory_ok|§R.5-S11 + §R.6 capability-declaration→"S11 step 2 absence inferred from null, faking support"
+R002|2d2dde146c280db1e9ba555b358212f089cb4d99aa3bcbf60d6879699aebc496|sc|S12|insufficient_evidence|§R.5-S12 lists three ordered removals with owner host but no deletion consequence is tied to S12's core steps; §R.6 reduction entries concern removed mechanisms, not S12
+R004||sc|S01|trajectory_ok|§R4.5-S01 steps 1–5 with owners (host, adapter, extension) and deletion consequences for typed-action and ordered-stream
+R004||sc|S02|trajectory_ok|§R4.5-S02 steps 1–5 with owners and deletion consequences for announce, ordered-stream, typed-action
+R004||sc|S03|trajectory_ok|§R4.5-S03 steps 1–5 with owners and deletion consequences for ordered-replayable-stream, resource-directory, typed-action
+R004||sc|S04|trajectory_ok|§R4.5-S04 steps 1–3 with owners and deletion consequences for resource-lifecycle, typed-action, ordered-stream; host-session-object confirmed dead
+R004||sc|S05|trajectory_ok|§R4.5-S05 steps 1–3 with owners and deletion consequences for resource-directory, typed-action
+R004||sc|S06|trajectory_ok|§R4.5-S06 steps 1–6 with owners and deletion consequences for namespaces, scope-check, per-namespace action registry
+R004||sc|S07|trajectory_ok|§R4.5-S07 announce→no-match→fallback-render sequence with owners (adapter, host) and deletion consequence for generic-fallback-view
+R004||sc|S08|trajectory_ok|§R4.5-S08 steps 1–7 with owners and deletion consequences for spawned-resource-grant, explicit-cursor pair-mint, typed-action, namespaces
+R004||sc|S09|trajectory_ok|§R4.5-S09 steps 1–3 with owners (host, adapter) and deletion consequences for ordered-stream dedup/reorder and typed-action; candidate self-flags partial (joint double-exec prevention) but trajectory is ordered, owned, and checkable
+R004||sc|S10|trajectory_ok|§R4.5-S10 steps 1–4 with owners and deletion consequences for handle force-close and cursor.resolve/replayable-stream
+R004||sc|S11|trajectory_ok|§R4.5-S11 informational CapMap + structural CapabilityAbsent sequence with owners and deletion consequence for open-capability-map
+R004||sc|S12|trajectory_ok|§R4.5-S12 steps 1–3 with owners and deletion consequences for namespaces/teardown and generic-fallback
+R004||ce|FE-CE-007|pass|Sequence: edges.list(ns_B) from h_A returns (ns_B,target) foreign-id to scoped handle
+R004||ce|FE-CE-009|pass|Sequence: view on h_R calls subscribe((ns_R,guessed_sibling),cursor) without Result.spawned_resource_id grant

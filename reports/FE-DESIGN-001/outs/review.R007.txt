@@ -1,0 +1,7 @@
+<tool_call>
+<read_file>
+<parameter=path>
+/home/maoqh/projects/ordessa/control/reports/FE-DESIGN-001/candidates/best.md
+</parameter>
+</function>
+</tool_call>

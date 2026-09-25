@@ -1,0 +1,33 @@
+# R008 Round Plan — planner
+
+CANDIDATES: A
+DIMENSION: D06-adapter-burden
+
+## 1. Why one candidate
+A is the only surviving core. Every major raised against A's lineage (FE-CE-002/003/004/005/006/008/009/010/011/012/013/014/015/016/017) is CLOSED on the current bytes; the single still-OPEN row, FE-CE-007, is a cross-namespace-edges defect that exists only in the demoted B, which A does not implement. So a second structurally different core is *not* demanded this round, and proposing one would contradict the directive, whose whole subject is making the existing candidate `0376a549…` checkable rather than re-opening core selection. This is a coverage-and-cost round on A, not a candidate-competition round.
+
+## 2. Why this dimension
+The immediately previous dimension, D01-order-dedup (R007), was clean against A (no new established major; FE-CE-016/017 were fixed on new bytes), so D01 is forbidden to repeat. D06-adapter-burden is unused and is the dimension that matches the directive's explicit second face — "what a new service must write and what core internals it must know; give counts, not adjectives" — and targets A's single acknowledged weak seam (§R7.8: correctness of catch-up and head-capture is delegated to the subscriber/view, and adapter items force the service to register read/status to be actionable and to dedup by its own id). That is the "core internal leaking into the adapter contract" a D06 finding must name. The first face (default-view actionability distinguishing still-running vs done) is carried by the designer's S05/S07/S12 checkable trajectories and the two named EXPERIMENTs, reviewed by the verifier, while the attacker concentrates on the adapter/extension cost contract.
+
+## 3. THE QUESTION THIS ROUND MUST SETTLE
+On this round's bytes, does each of S01–S04 get an ordered event trajectory with a named owner per step *and* a per-core-mechanism delete-it→scenario-fails consequence sufficient to move it off `insufficient_evidence`?
+
+## 4. Core bet, strongest objection, settling evidence (candidate A)
+Core bet (two sentences): the host is a namespaced directory of `(ns_id, local_id)` resources with a per-resource monotonic stream, subscriber-chosen single-integer `from_cursor`, same-namespace scoped handles, an adapter-owned open CapMap, and ns-scoped typed actions; no session/turn/role object exists so submit/progress/result agents (S04) work without faking a conversation. The bet is that all recovery semantics fit the one integer `0 | resolve(id) | saved+1` plus a subscriber-side ns-domain guard, without a host `replay_mode` or a host event store.
+
+Strongest objection: the correctness of S03/S04/S08/S10 rests on rules the subscriber/view must itself obey and persist — take `from_cursor=0` for a just-spawned resource, and persist `recorded_ns_id` alongside the saved seq and fall back to `0` on namespace regeneration. Under D06 that is core-derived correctness knowledge leaking into the extension contract (§R7.7 lists it as a fact the view "must know"), and under the same lens the adapter is forced to register a typed `read`/`status` merely to be actionable in the default view and to dedup by its own stable id — host duties pushed onto the service.
+
+What would settle the objection this round: a D06 count that separates (a) naming/negotiation the adapter legitimately owns from (b) core-derived correctness the adapter/view must replicate; plus a concrete counterexample trajectory for S03 and S04 where a view implementing §R7.2 *exactly as written* still drops `seq=1` or still skips the post-reconnect window, proving the contract under-specifies the decision input. The suggested EXPERIMENTs — whether one `from_cursor` can be both catch-up and live on the same stream (re-tests the FE-CE-015 double-duty), and whether the default view without a registered `status` can distinguish "still running" from "done" (honesty, not a fabricated reading) — are the evidence that closes or reopens this. If no view that follows the documented rules loses head/catch-up, and no adapter fact beyond naming is required, the objection fails and A's minimality holds; note FE-CE-016/017 stay CLOSED unless the new bytes reintroduce their failure.
+
+## 5. Scenarios that must be this round's centre of gravity
+S01, S02, S03, S04 are the gate: each is currently `insufficient_evidence` (§R7.5 gives step 1–5 overviews, not per-step owner + per-mechanism deletion consequence). S05, S07, S12 are the secondary centre: the default view must show concrete rendering inputs and the click consequence that distinguishes current value / what changed / running-vs-done, with a deletion consequence for the `read`/`status` actionability path — "not blank" does not count. The other scenarios are not this round's focus and are not restated.
+
+<<<FE-SCENARIO-START>>>
+S01|open|core|text-only trajectory must name per-step owner + deletion of typed-action/ordered-stream|directives/R008-focus.md ; R007 §R7.5-S01 (overview, no per-step owner)
+S02|open|adaptation|Pi tool/approval live-subscribe trajectory needs per-step owner + deletion of announce/typed-action|directives/R008-focus.md ; R007 §R7.5-S02 (T-Pi overview)
+S03|open|core|leave/return catch-up needs per-step owner + deletion of cursor-stream/directory + ns-guard consequence|directives/R008-focus.md ; R007 §R7.5-S03 (T-Boring overview)
+S04|open|core|submit/progress/result needs per-step owner, no-chat proof, just-spawned from_cursor=0 deletion consequence|directives/R008-focus.md ; R007 §R7.5-S04 (overview)
+S05|partial|core|config read snapshot must show current value as actionable rows + Read re-invoke consequence|directives/R008-focus.md ; R007 §R7.4/§R7.5-S05 (actionability unproven)
+S07|partial|core|uninstalled special-artefact fallback must render kind/actions/CapMap/schema + click consequence|directives/R008-focus.md ; R007 §R7.4/§R7.5-S07 (actionability unproven)
+S12|partial|core|removed resolver must fall back actionably, other namespaces unaffected, per-step deletion consequence|directives/R008-focus.md ; R007 §R7.5-S12 (actionability unproven)
+<<<FE-SCENARIO-END>>>

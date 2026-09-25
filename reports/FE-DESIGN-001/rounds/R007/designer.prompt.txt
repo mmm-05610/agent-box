@@ -1,0 +1,548 @@
+You are one role in an adversarial design loop for the FE-DESIGN-001 Agent
+Desktop design task. Role: **designer**. Round: R007. Phase: designer.
+Run root: /home/maoqh/projects/ordessa/control/reports/FE-DESIGN-001
+
+Ground rules, non-negotiable:
+- You are given every material you are allowed to see, inlined below. You have
+  no tools and cannot read anything else. Do not ask to.
+- Product code is a migration constraint and evidence, not the answer. Do not
+  propose work orders or implementation.
+- Never soften, delete or reinterpret a required scenario or an established
+  counterexample. If you disagree, say so as a DISPUTED ledger row with a
+  concrete reason.
+- Be concrete enough that a reader can reject you. Style opinions, adjectives and
+  general advice are contract violations.
+
+OUTPUT CONTRACT (machine-checked; a phase that fails it is recorded as failed, never as passed)
+- Every deliverable section must be wrapped, on their own lines, in these two markers, in order:
+  <<<FE-OUT-START>>>
+  <the section>
+  <<<FE-OUT-END>>>
+- If a ledger block is required, wrap its rows in:
+  <<<FE-LEDGER-START>>>
+  FE-CE-NNN|<round>|<severity: major|minor>|<status: OPEN|CLOSED|DISPUTED|REJECTED|SUPERSEDED>|<invariant violated>|<title>|<evidence pointer>|<target CE ids or ->
+  <<<FE-LEDGER-END>>>
+- If a scenario table is required, wrap it in:
+  <<<FE-SCENARIO-START>>>
+  S01|<covered|partial|open>|<owner: core|adaptation|extension|unassigned>|<mechanism>|<evidence pointer>
+  <<<FE-SCENARIO-END>>>
+- If a mechanisms table is required, wrap it in:
+  <<<FE-MECH-START>>>
+  <mechanism name>|<core|delegated|removed>|<the scenario that fails if it is deleted>|<experiment pointer>
+  <<<FE-MECH-END>>>
+- One row per line. Exactly the field order above, pipe separated, no header row, no extra prose inside a block.
+- Ids: counterexamples FE-CE-001..FE-CE-999, scenarios S01..S12. Propose a fresh FE-CE-NNN for anything new.
+
+===== MATERIAL: role contract (authoritative for this call) =====
+(source: /home/maoqh/projects/ordessa/control/design-loop/roles/designer.md, sha256: 3ab90af77c4f62103706a7c10805af530a6a3efafc40287a78c87a6c1a6a6787)
+
+ROLESPEC|min_words|1400
+ROLESPEC|extra|none
+OUTPUT|candidate
+---
+
+# Role: designer
+
+Produce one complete design candidate per id the round plan declares, in plan
+order, each as its own output section. No stubs, no "similarly for the rest", no
+delegating a hard part to a later round or to an unspecified adapter.
+
+The task: a **backend-independent, Agent-facing, extensible Desktop host**.
+Find the **minimum set of host mechanisms** that satisfies every required
+scenario. Dialogue, tool calling, model configuration and a plugin host may all
+be capabilities; **none of them is assumed to be the organising centre.** Do not
+presuppose that session / task / agent object / plugin host is the core — earn
+that claim per scenario, or state plainly that it is carried by an extension.
+
+The existing implementation is **migration constraint and evidence**, not the
+right answer. You may not restate it as the design.
+
+Every candidate must contain, in this order:
+
+1. **Core bet** — 1–2 sentences: what the host core is, and why nothing smaller
+   satisfies the scenarios.
+2. **Core concepts and operations** — for each: name, the operations on it, what
+   state is authoritative where, and its lifecycle including disposal and
+   unsubscribe.
+3. **Boundary rules** — what a service adapter must translate, and the exact
+   shape for expressing "this service does not support this" (absent must be
+   explicit, never inferred, never a null).
+4. **Extension mechanism** — what an extension may and may not do, how it is
+   selected, what the default fallback is, and what the host guarantees when an
+   extension is absent, throws, or is uninstalled mid-operation.
+5. **Scenario trajectories** — one subsection per scenario, S01..S12, each an
+   ordered event sequence: who acts, what state changes, who is authoritative.
+   Any trajectory needing "and then we would add..." is `open` — mark it so.
+6. **Deletion / delegation experiments** — one row per core mechanism: remove it
+   or move it into an extension; name the specific scenario and step that then
+   fails. A mechanism with no failing scenario **must be removed**, and you must
+   record that you removed it.
+7. **Second-service onboarding cost** — the exact list of things an implementer
+   must write to attach a service with a different protocol; then the same list
+   for a module that only adds a view. No hand-wave.
+8. **Honest cost and non-goals** — what this design does not cover, which
+   scenarios are weakest, and the largest second-order cost.
+
+## Hard prohibitions
+
+These are disqualifiers, not style preferences. Violating one invalidates the
+candidate:
+
+* `execute(any)`-style escape hatches; a call whose parameters or result are
+  untyped or free-form.
+* A single omnipotent `context` object exposing unrelated capabilities.
+* An arbitrary event bus as the extension mechanism — events must have named
+  producers, named consumers and a declared payload per channel.
+* Pushing the required-scenario burden into "plugins can provide it" to claim the
+  core is minimal. **Complexity is charged to the total: core + adapters + the
+  burden on extension authors.** Moving the core's job into an extension does not
+  reduce complexity; it hides it.
+* Inventing new scenario requirements, or dropping one.
+
+Where the plan names a question this round must settle, answer it explicitly
+with a position and its cost, not with a menu.
+
+
+===== MATERIAL: required scenario set (authoritative) =====
+
+# Required scenario set S01–S12 (authoritative; user-approved goals, not to be cut)
+
+A scenario states only the user-observable result. It never states an internal
+object, a UI or a mechanism. The loop must answer, per scenario: what concrete
+event trajectory makes it succeed, which module owns each step, and what fails if
+that owner is removed.
+
+| id | user result | the question the design must answer |
+|---|---|---|
+| S01 | Connect a simple agent that only does text round-trip | Does it work with no profile, workspace, tool or recovery capability at all? |
+| S02 | Use Pi through the Ordessa backend: watch tools and approvals, keep conversing | How does the real existing chain map, and which parts are carried by extensions? |
+| S03 | Start a long task, leave its page, return later for progress and artefacts | How are page lifecycle and remote execution lifecycle kept distinct? |
+| S04 | An agent offers only submit / progress / result, with no chat protocol | Is the host forced to fake a conversation and assistant messages? |
+| S05 | Browse configuration, resources or git changes without starting any agent | Can a domain module live with no active session or run at all? |
+| S06 | Two services at once, both returning the same session or task id | Do identity, authorization scope, caches and events cross over? |
+| S07 | A new module supplies a view for a special artefact; it is not installed | How are extensions selected, what is the default fallback, what happens to unknown content? |
+| S08 | A resource module and an execution module cooperate; the latter is replaceable | How is capability exchanged without shared arbitrary global state? |
+| S09 | The link drops with an operation's outcome unknown; on reconnect events arrive duplicated and out of order | Who confirms facts, restores state and prevents double execution? |
+| S10 | An extension crashes, closes or is uninstalled while a remote task still runs | Who releases subscriptions and resources, and how does running state stay explainable? |
+| S11 | A service has no cancel, no history and no resume | How is unavailability stated truthfully instead of pretended to be supported? |
+| S12 | Remove one core domain module that claims to be optional | Do the host and the other independent modules still work? |
+
+S01 and S02 anchor near-term real need. The rest are extension and failure
+tests. Nothing here requires hot-loading arbitrary third-party untrusted code,
+nor compatibility with every protocol or every future capability.
+
+## Scenario ledger format (`scenarios.tsv`)
+
+```
+S01|<covered|partial|open>|<core|adaptation|extension|unassigned>|<mechanism or trajectory>|<evidence pointer: round/artifact section>
+```
+
+`covered` requires (a) a named trajectory with an owning module per step and
+(b) the deletion consequence for each core step in that trajectory. Anything
+less is `partial`. S01..S12 all covered is the convergence gate.
+
+===== MATERIAL: judging rubric (authoritative) =====
+
+# Judging rubric (authoritative for every role in this loop)
+
+## What wins
+
+A candidate wins by satisfying the required scenarios and their invariants under
+the smallest **total** cost — core + adapter burden + extension-author burden.
+Not by having the fewest files, not by self-scoring, not by naming things well.
+
+## The three tests every candidate must pass
+
+1. **Coverage** — S01–S12 each has a concrete trajectory with a named owner and
+   a stated deletion consequence. No "later" slots.
+2. **Non-smuggling** — the core is not a service/model/harness/conversation
+   assumption wearing a neutral name.
+3. **Minimality** — every core mechanism has a "deleting it breaks scenario X"
+   argument. If the argument is missing, the mechanism is deleted.
+
+## Disqualifiers (each ends the candidate, not just the section)
+
+* `execute(any)` and any other untyped escape hatch.
+* An omnipotent `context` object handed to extensions.
+* An arbitrary event bus used as the extension mechanism.
+* Complexity relocated into a plugin so the core *looks* minimal.
+* Faking support for a capability the service does not have.
+* Reinterpreting, weakening or dropping a required scenario.
+* A trajectory that only works when every adapter is the one we already have.
+
+## What counts as evidence
+
+* A specific event sequence beats an adjective.
+* An existing artifact beats an assertion about one.
+* A model experiment proves **the model only**. It is never product verification,
+  never protocol verification, never "the design works".
+* This repository's current code is a migration constraint and evidence about the
+  problem space. It is not the answer and not the baseline a candidate must keep.
+* Anything marked "unverified" in the inputs stays marked unverified in outputs.
+
+## Honest outcomes
+
+* Two candidates that cannot be simply ranked may both stay; say so, and say what
+  observation would rank them.
+* "I could not break it" and "it is correct" are different claims. Use the first.
+* A clean round is a real result only if the attack dimension was actually taken
+  up. Record which dimension was used, always.
+
+===== MATERIAL: attack dimensions =====
+
+# Attack dimensions — one per round, recorded, never repeated while clean
+
+The controller rotates these and writes the assignment into
+`rounds/RNNN/dimension.txt`. The attacker is confined to that dimension.
+
+| key | what the attacker must construct |
+|---|---|
+| D01-order-dedup | duplicate, reordered, interleaved and late events; two producers for one slot |
+| D02-lifecycle-leak | unsubscribe, page destroyed, extension unmounted, service restart, crash mid-operation |
+| D03-identity-scope | two services or tenants, colliding ids, cache bleed, authorization scope confusion |
+| D04-absent-capability | service lacks cancel/history/resume; where is it stated, and what does the UI claim meanwhile |
+| D05-fallback-unknown | unregistered view, unknown content type, partial data, malformed payload |
+| D06-adapter-burden | count what a *new service author* must write or must know about the core; any core internal leaking into the adapter contract is a finding |
+| D07-extension-burden | count what a *new module author* must learn; boilerplate, implicit coupling, ordering assumptions |
+| D08-reduction | delete one core mechanism and show a required scenario still passes; or show every candidate has one mechanism too many |
+| D09-splits-truth | two owners of one fact; who reconciles them when they disagree; find a state where the UI shows something that never happened remotely |
+| D10-cross-module | modules cooperating without shared global state; find the hidden channel — a shared key, an ordering assumption, a mutable context field |
+| D11-long-run | hours-long task, client restart, page never opened again, memory and subscription growth |
+| D12-authority-boundary | the candidate smuggling a service, model, harness, plugin-host or conversation assumption into the core as if it were neutral |
+
+Rotation rule: never reuse the immediately previous dimension while it is clean;
+after `FE_STALL_AFTER` consecutive clean rounds the controller rotates hard
+rather than polishing.
+
+===== MATERIAL: design brief (the approved statement of goal) =====
+(source: /home/maoqh/projects/ordessa/control/product/agent-desktop-design-brief.md, sha256: 0d36056c1039b3ae0bec6797e58824b247d19d093ae9505a74119fe8d648b47e)
+
+# Agent Desktop：设计循环目标与场景草案
+
+状态：目标已获用户认可；下列场景与循环参数由 I 提议，待用户查看。
+未启动循环、未安装外部框架、未任命新执行者。产品代码只读。
+
+## 用户确认的方向
+
+独立于特定后端、面向 Agent 使用的可扩展 Desktop。对话、工具调用、模型
+配置均可以成为能力，但不预设为整个产品的组织中心。
+Ordessa 后端可以提供最完整能力，不是所有接入的必需前提。
+不预先把 Agent、会话、任务或插件宿主指定为核心答案。
+通过场景、反例与删减实验寻找宿主最小机制与扩展领域能力的边界。
+
+## I 提议的场景集
+
+每个场景只规定用户结果，不提前规定内部对象或必须采用哪个 UI。
+
+| ID | 场景 | 需要设计回答的问题 |
+| --- | --- | --- |
+| S01 | 接入简单 Agent，仅支持文本往返 | 没有 Profile、工作区、工具和恢复能力时能否使用？ |
+| S02 | 通过 Ordessa 后端使用 Pi，观察工具与授权并持续交流 | 现有真实链如何映射，哪些能力由扩展承担？ |
+| S03 | 启动长任务，离开其页面，稍后查看进度和产物 | 页面生命周期与远端执行生命周期如何区分？ |
+| S04 | Agent 只提供任务提交、进度和结果，没有聊天协议 | 是否被迫伪造会话和 assistant 消息？ |
+| S05 | 不启动 Agent，独立浏览配置、资源或 Git 变更 | 领域模块能否不依赖活跃会话/运行？ |
+| S06 | 多服务同时接入，两个服务返回同名会话或任务 ID | 身份、授权范围、缓存和事件是否会串？ |
+| S07 | 新模块为特殊产物提供视图，未安装时仍能查看基础信息 | 扩展选择、默认回退与未知内容如何处理？ |
+| S08 | 一个资源模块与执行模块协作，后者可替换 | 怎样交换能力而不共享任意全局状态？ |
+| S09 | 连接断开后操作结果未知，重连收到重复/乱序事件 | 谁确认事实、恢复状态、防重复执行？ |
+| S10 | 扩展崩溃、关闭或卸载，远端任务仍在运行 | 谁释放订阅/资源，如何保留可解释的运行状态？ |
+| S11 | 服务缺少取消、历史或恢复能力 | 如何如实表达不可用，而非伪造支持？ |
+| S12 | 移除一个宣称可选的核心领域模块 | 宿主和其他独立模块是否还能工作？ |
+
+S01/S02 为近期真实需求锚点；其余是扩展与故障检验场景，不代表今夜实施范围。
+不要求任意第三方不可信代码热加载，不要求兼容所有协议或无限未来能力。
+
+## 评判方式
+
+先满足明确场景与不变式，再比较复杂度；不以文件少或自评分高判胜。
+对每个候选列：核心概念、接口操作、状态权威、生命周期、扩展依赖、接入成本、
+实现成本和不能覆盖的范围。不能用 execute(any)、万能 context/事件总线
+隐藏接口与错误语义后宣布核心最小。
+
+每个核心概念必须给一个“删掉它会失败”的具体场景；若移入扩展仍能满足
+全部必需条件，就列作可移除候选。总复杂度包含核心、适配器与扩展作者负担。
+允许保留多个不可简单排序的候选，不强行宣称存在唯一最简模型。
+
+## 建议循环（未启动）
+
+1. 首轮至少提出两个结构不同的候选，不以旧 mcode 方案为唯一出发点。
+2. 设计者给类型/伪代码、所有权与逐步场景轨迹。
+3. 攻击者给具体事件序列、被违反的不变式及最小反例；禁止只给风格意见。
+4. 验证者判断成立/不成立/证据不足，必要时在隔离设计目录写小型模型测试。
+   模型测试只能证明所建模型，不得冒充实际产品集成通过。
+5. 设计者修订并回放所有成立反例；不得删除场景、偷偷降低要求或压制攻击。
+6. 做删减攻击与新场景攻击，保存最佳候选、反例账和完整版本，不默认最后版最好。
+
+可借鉴的方法：
+- Self-Refine：https://github.com/madaan/self-refine （生成/反馈/修订）
+- Reflexion：https://github.com/noahshinn/reflexion （失败反思记忆）
+- evaluator–optimizer：https://www.anthropic.com/engineering/building-effective-agents
+- 运行控制候选：https://github.com/Kiriketsuki/ralph-loop
+以上阅读不代表已验证 Qoder 兼容、已安装或已授权其代码执行。
+
+建议上限：12 轮或 6 小时，先到者停止；这只是预算上限，不需要凑满时间。
+连续三轮没有新成立重大反例，且必需场景与删减检查通过，可提前交审。
+三轮仅换措辞/重复争论无实质进展则交出争议，不无限循环。
+目标冲突或产品取舍不明，记录交 I；其余独立问题可以继续。
+
+角色尽量用独立上下文；同一模型不同角色不等于独立质量证明。
+若 Qoder 无独立会话编排机制，先标注此限制，不假装已经启动独立审阅者。
+实现调度器前需读本机 Qoder --help，验证真实可用的非交互/会话参数，不猜 CLI。
+外部资料每条标实际读过的来源、版本与适用限制；未打开不作证据。
+
+## 次日交付
+
+一页最佳候选说明、核心/扩展边界、S01–S12 覆盖表、成立反例与修复记录、
+删减实验、未解决取舍，以及按真实模块划分的后续实施建议。
+停止状态为候选待审/预算截止/需决策，不自行宣布最终架构锁定。
+
+
+===== MATERIAL: counterexample ledger (authoritative; full) =====
+
+REGRESSION  FE-CE-007|R002|major|OPEN|extensions cannot derive foreign ns ids from their own handle and isolation is enforced at the registration boundary, but edges.list returns core-stored target ids enabling adapter-authorized, user-less relay edges|edges.list leaks foreign namespace ids into scoped handle|rounds/R002/cand-B.md §B.4 vs §B.1, §B.2, §B.3 ; verifier ruled it holds (RR002) ; Candidate B defect; §B.4 vs §B.1-§B.3; integrated candidate has no edges mechanism; N/A for A; remains OPEN against B as open alternative ; rounds/R003/cand-B.md §R003.B.5 (withdrawn not repaired) ; rounds/R002/cand-B.md §B.4 vs §B.1-§B.3 ; cand-A has no edges mechanism ; verifier ruled it holds (RR003) ; rounds/R003/cand-B.md §R003.B.3,B.5 carrier withdrawn not repaired; best candidate A has no edges mechanism; N/A vs A, OPEN vs demoted B ; rounds/R002/cand-B.md §B.4; N/A against A (no edges mechanism) ; verifier ruled it holds (RR006)|-|R004|B-alternative|R002/R003 evidence names cand-B sections; saved candidate A has no edges mechanism; deferring B is not repairing B
+
+-- all rows --
+id|raised_round|severity|status|invariant|title|evidence|targets|replayed|subject|subject_note
+FE-CE-001|R001|major|REJECTED|core defines observable content only as a seq-ordered replayable message log (no value/snapshot primitive), forcing the conversation/run shape onto passive data — violates "resource kinds are adapter types, host has no content authority"|A core has no value primitive: passive resource is content-as-message-log|rounds/R001/cand-A.md §A.1,§A.2,§A.5-S03,§A.5-S05 ; verifier ruled it does not hold (RR001) ; rounds/R001/verify.md §2 (does_not_hold); action.invoke→Result provides current-value path; replay against revised candidate confirms unchanged|-|R006|A-lineage|ruled does_not_hold in R001; concerns candidate A text
+FE-CE-002|R001|minor|CLOSED|core capability-declaration fixes a session-recovery vocabulary and core fallback view renders an agent/run reading while host claims no content interpretation|A core smuggles run/agent reading via fixed CapSet and generic last-envelope view|rounds/R001/cand-A.md §A.2,§A.4,§A.9 ; verifier ruled it holds (RR001) ; rounds/R001/verify.md §3 (holds); closed by open CapMap + revised fallback rendering per best candidate §R.2 §R.4 ; rounds/R001/verify.md §3 (holds); closed by open CapMap + revised fallback rendering per best candidate §R.2 §R.4|-|R006|A-lineage|closed in R002 against A
+FE-CE-003|R002|major|CLOSED|host defines no meaning for capability names yet core replay behaviour keys on the literal string idempotent-apply — covert shared-key channel adapter→core, and unknown-outcome calls are auto-replayed to adapters that never negotiated invoke_id|idempotent-apply string toggles host auto-replay|rounds/R002/cand-A.md §A.5-S09 step 3 vs §A.2/§R.2 (FE-CE-002 closure text) ; verifier ruled it holds (RR002) ; revised: §R.2 replay_policy is a typed enum on action.register; §R.5-S09 step 3 host reads ONLY typed field; CapMap strings carry zero behavioral authority|FE-CE-002|R006|A-lineage|verifier-added row during R002 against A
+FE-CE-004|R002|major|CLOSED|every resource is reached only via a user-gated exactly-one-id handle, so a job resource spawned by a paired invoke is unobservable|S08 step 6 job resource has no subscription path|rounds/R002/cand-A.md §A.5-S08 steps 5-6 vs §A.2 handle_for, §A.4 user-gated mint ; verifier ruled it holds (RR002) ; revised: §R.2 handle model gains spawned set from typed Result.spawned_resource_id; §R.5-S08 step 6 subscribes via h_R accessible set|-|R006|A-lineage|R002 D10 against A
+FE-CE-005|R002|major|CLOSED|cooperation occurs only when the user asks (cand-A §A.8), but history replay into a freshly paired handle re-fires execute from stale events|pair gesture auto-executes on replayed envelopes|rounds/R002/cand-A.md §A.5-S08 step 5 vs §A.2 subscribe from_cursor, Envelope fields ; verifier ruled it holds (RR002) ; revised: §R.2 subscribe default is current cursor (live-only); §R.4 pair gesture's secondary handle uses default; §R.5-S08 step 4 no replay from seq 0|-|R006|A-lineage|R002 D10 against A
+FE-CE-006|R002|major|CLOSED|host authority is identity/namespace isolation only, but the payload-type registry keyed by bare payload_schema_id string is a cross-namespace shared mutable key|global type registry bleeds registration across services|rounds/R002/cand-A.md §A.2 Envelope refusal clause vs §A.7, §A.1 ; verifier ruled it holds (RR002) ; revised: §R.2 ns-scoped payload-type registry keyed (ns_id, payload_schema_id); §R.3 registration call carries ns_id; §R.5-S06 step 5 checks ns-partitioned registry|-|R006|A-lineage|R002 D10 against A
+FE-CE-007|R002|major|OPEN|extensions cannot derive foreign ns ids from their own handle and isolation is enforced at the registration boundary, but edges.list returns core-stored target ids enabling adapter-authorized, user-less relay edges|edges.list leaks foreign namespace ids into scoped handle|rounds/R002/cand-B.md §B.4 vs §B.1, §B.2, §B.3 ; verifier ruled it holds (RR002) ; Candidate B defect; §B.4 vs §B.1-§B.3; integrated candidate has no edges mechanism; N/A for A; remains OPEN against B as open alternative ; rounds/R003/cand-B.md §R003.B.5 (withdrawn not repaired) ; rounds/R002/cand-B.md §B.4 vs §B.1-§B.3 ; cand-A has no edges mechanism ; verifier ruled it holds (RR003) ; rounds/R003/cand-B.md §R003.B.3,B.5 carrier withdrawn not repaired; best candidate A has no edges mechanism; N/A vs A, OPEN vs demoted B ; rounds/R002/cand-B.md §B.4; N/A against A (no edges mechanism) ; verifier ruled it holds (RR006)|-|R004|B-alternative|R002/R003 evidence names cand-B sections; saved candidate A has no edges mechanism; deferring B is not repairing B
+FE-CE-008|R003|minor|CLOSED|every core mechanism must have a delete-it-breaks-a-required-scenario argument; the ns-scoped payload_schema_id descriptor store has no host consumer after FE-CE-008 removes the delivery gate, so it is non-load-bearing|payload-type registry outlived its reader|rounds/R003/cand-A.md §R003.2 (FE-CE-008 forward clause) vs §R003.2 ns-scoped registration + §R003.5-S06 step5 (claims FE-CE-006 reopens) ; S06/S07 pass with payload store deleted while action RegisteredType store kept ; verifier ruled it holds (RR003) ; verifier ruled it holds (RR003) ; rounds/R003/verify.md (holds); best candidate §R4.2 opaque label + §R4.5-S06 step5 / §R4.5-S07 pass without store|-|R006|A-lineage|R003 D08 against A
+FE-CE-009|R003|minor|CLOSED|spawned-resource-grant's per-handle accessible-set is not minimal; a same-namespace subscription-scope rule passes S08 without accumulating a set, and also removes the R003.8-admitted unbounded-growth weakness|spawned-set bookkeeping over-built for a same-ns guarantee|rounds/R003/cand-A.md §R003.2 (Result.spawned_resource_id / SubscriberScope.spawned) vs §R003.5-S08 steps5-6 (justification invokes foreign-id leak that R.2 says cannot occur) + §R003.8 ; verifier ruled it holds (RR003) ; insufficient evidence (RR003) ; rounds/R003/verify.md (insufficient_evidence) + EXPERIMENT both gates pass S08; best candidate §R4.2 spawned grant retained ; rounds/R006/cand-A.md §R6.6 EXPERIMENT Model2 + §R6.9 FE-CE-009 RESOLVED ; rounds/R006/cand-A.md §R6.6 Model2 experiment + §R6.2/§R6.5-S06,S08 ; integrated §R6.2/§R6.5-S08|FE-CE-004|R006|A-lineage|A minimality dispute: preventing the foreign-id leak is not a necessity proof for per-handle spawned sets ; minimality dispute remains; a safety argument is not a necessity proof
+FE-CE-010|R003|minor|CLOSED|invoke_id on OutcomeUnknown has no surviving host consumer after FE-CE-009 removes the auto-resubmit path; call-site return correlation is sufficient, so the token is residual non-load-bearing state|invoke_id orphaned by the fixed no-auto-replay invariant|rounds/R003/cand-A.md §R003.2 Typed action (removed replay_policy) + §R003.5-S09 step1/3 (invoke_id named only by §R003.5, no host reader) ; S09 dedup keys (ns,resource,seq) not invoke_id ; rounds/R003/verify.md (holds); best candidate §R4.2 OutcomeUnknown carries no token + §R4.5-S09 dedup keys ns,resource,seq|FE-CE-009|R006|A-lineage|R003 D08 against A
+FE-CE-011|R003|minor|CLOSED|live-default-subscribe is presented as a distinct core mechanism but is only a parameter default; making from_cursor explicit and having the pair-gesture mint supply cursor.resolve(id) preserves S08/FE-CE-005 without an implicit-default primitive|implicit-subscribe-default is not a load-bearing mechanism|rounds/R003/cand-A.md §R003.2 Event stream (default current cursor) + §R003.4 pair gesture (host mints h_R) vs §R003.6/R003.5-S08 step4 ; rounds/R003/verify.md (holds); best candidate §R4.2/§R4.4 from_cursor mandatory, pair-mint passes current cursor|FE-CE-005|R006|A-lineage|R003 D08 against A
+FE-CE-012|R006|major|CLOSED|host dedup by (ns,resource,seq) is vacuous: seq is host-assigned monotonic per resource, so no two envelopes for the same resource ever share a key; the dedup predicate is false for all inputs|host dedup key has no collision domain|rounds/R006/cand-A.md §R6.5-S09 step2 "host dedups/reorders by (ns,resource,seq)" vs §R6.2 "seq host-assigned monotonic per resource" ; verifier ruled it holds (RR006) ; rounds/R006/cand-A.md §R6.2 (seq = stream index, not dedup key) + §R6.5-S09 + §R6.6|-|R006|A-lineage|R006 D01 against the saved candidate A
+FE-CE-013|R006|major|CLOSED|adapter boundary rule R6.3 item7 instructs dedup by (ns_id, resource_local_id, seq) but seq is host-assigned and not returned to the adapter at pump time, making the rule unimplementable or a core-internal leak into the adapter contract|adapter cannot dedup by an opaque host counter|rounds/R006/cand-A.md §R6.3 item7 vs §R6.2 Event stream (host-assigned seq, no pump return specified) ; verifier ruled it holds (RR006) ; rounds/R006/cand-A.md §R6.3 item6 + §R6.7 item6|FE-CE-012|R006|A-lineage|R006 D01 against the saved candidate A
+FE-CE-014|R006|major|CLOSED|host "reorders by (ns,resource,seq)" is identity since the host assigned seq in arrival order; S09's out-of-order premise has no core correction mechanism|reorder-by-self-assigned-seq is a no-op|rounds/R006/cand-A.md §R6.5-S09 step2 "dedups/reorders by (ns,resource,seq)" + §R6.2 "seq host-assigned monotonic" + §R6.3 item3 "seq-ordered pump" ; verifier ruled it holds (RR006) ; rounds/R006/cand-A.md §R6.3 item3 + §R6.5-S09 + §R6.6|-|R006|A-lineage|R006 D01 against the saved candidate A
+
+===== MATERIAL: scenario coverage ledger (authoritative; full) =====
+
+sid|status|owner|mechanism|evidence|round
+S01|claimed|core|text.stream + typed-action send + ordered stream|rounds/R006/cand-A.md §R6.5-S01|R006
+S02|claimed|adaptation|pi kinds via announce; subscribe-live; approve/send typed actions|rounds/R006/cand-A.md §R6.5-S02|R006
+S03|claimed|core|from_cursor=0 history + cursor.resolve return-later replay + read snapshot|rounds/R006/cand-A.md §R6.5-S03|R006
+S04|claimed|core|submit/progress/result resources + typed-action + ordered stream; no chat object|rounds/R006/cand-A.md §R6.5-S04|R006
+S05|claimed|core|config.tree resource; directory_list; invoke(read) snapshot, no stream|rounds/R006/cand-A.md §R6.5-S05|R006
+S06|claimed|core|namespaced ids; same-ns scoped handle; per-ns action registry|rounds/R006/cand-A.md §R6.5-S06|R006
+S07|claimed|core|generic fallback renders kind/actions/CapMap/schema label|rounds/R006/cand-A.md §R6.5-S07|R006
+S08|claimed|core|same-ns handle permits step6 job subscribe; pair gesture explicit cursor|rounds/R006/cand-A.md §R6.5-S08|R006
+S09|claimed|adaptation|adapter dedups by own stable id + pumps logical order; core never-auto-resubmit+cursor|rounds/R006/cand-A.md §R6.5-S09|R006
+S10|claimed|core|handle force-close on unmount; cursor.resolve replay; no pair record|rounds/R006/cand-A.md §R6.5-S10|R006
+S11|claimed|core|open CapMap informational + CapabilityAbsent structural|rounds/R006/cand-A.md §R6.5-S11|R006
+S12|claimed|adaptation|namespace teardown isolation; generic fallback for removed resolver|rounds/R006/cand-A.md §R6.5-S12|R006
+
+===== MATERIAL: unresolved independent-review findings (full) =====
+
+A scenario is only settled when a reviewer ruled its trajectory good against the CURRENT candidate bytes. Anything else is still open:
+scenario|verdict|round|evidence   (rulings bound to b6da557abfc4…)
+S03|trajectory_broken|R006|§R6.5-S03 step4 "subscribe(from_cursor=cursor.resolve(id)); host replays missed stream"
+S04|trajectory_broken|R006|§R6.5-S08 step5 "h_D receives new live ArtifactReady (not replayed)"
+S10|trajectory_broken|R006|§R6.5-S10 step3 "subscribe(from_cursor=cursor.resolve(…)) → catches up"
+
+_4 ruling set(s) above this line are VOID: they were made against different candidate bytes and are kept only as history._
+
+===== MATERIAL: mechanism disposition ledger (full) =====
+
+mechanism|disposition|failure_scenario|experiment_ref|round
+namespaces|core|S06 step2 raw-id collision|rounds/R006/cand-A.md §R6.5-S06|6
+resource-directory|core|S05 step2 cannot list/lookup without active session|rounds/R006/cand-A.md §R6.5-S05|6
+ordered-replayable-stream|core|S03 step4 no catch-up / S10 step3 no replay (meaning narrowed to stream index)|rounds/R006/cand-A.md §R6.5-S03,S10|6
+capability-declaration|core|S11 step 2 — absence inferred from null, faking support|best-candidate §R.2 CapMap (open)|1
+typed-action|core|S01/S04/S05/S08 fall back to execute(any) disqualifier|rounds/R006/cand-A.md §R6.5-S01,S04,S05,S08|6
+generic-fallback-view|core|S07/S12 unknown or removed-resolver renders blank|rounds/R006/cand-A.md §R6.5-S07,S12|6
+host-session-object|removed|none — S04 passes without it|rounds/R006/cand-A.md §R6.5-S04|6
+host-turn/role-envelope-field|removed|none — D12 disqualifier; S04 passes|rounds/R006/cand-A.md §R6.5-S04|6
+host-event-store|removed|none — S03/S09/S10 are adapter burden|rounds/R004/integrate.md §R4.6|6
+host-resource-directory-B|removed|none — per-service ns handles suffice|rounds/R001/cand-B §B.9|4
+capability-declaration-open-map|core|S11 step 2 absence inferred from null; fake support|best-candidate §R.2-§R.5-S11|2
+typed-replay-policy-on-registration|core|S09 step 3 host branches on CapMap string (FE-CE-003 reopens if removed)|best-candidate §R.2-§R.5-S09|2
+spawned-resource-grant|removed|none — Model2 experiment: same-ns rule passes S08+S06 without the set|rounds/R006/cand-A.md §R6.6 Model2|6
+live-default-subscribe|core|S08 step 5 pair gesture replays stale events and auto-executes (FE-CE-005 reopens if removed)|best-candidate §R.2-§R.4-§R.5-S08|2
+ns-scoped-payload-registration|removed|none — payload_schema_id opaque; FE-CE-008 closed|rounds/R006/cand-A.md §R6.2|6
+cross-namespace-edge|removed|none — S08 passes on two ns-local handles|rounds/R004/integrate.md §R4.5-S08|6
+persistent-pair-record|removed|none — re-pairing is a user action|rounds/R004/integrate.md §R4.4|6
+open capability map|core|S11 fake-support disqualifier; a fixed enum reopens FE-CE-002|rounds/R004/integrate.md §R4.2-§R4.5-S11|4
+ns-scoped-action-type-registration|core|S06 two services same kind/action name share a mutable key; FE-CE-006 reopens|rounds/R004/integrate.md §R4.2-§R4.5-S06|4
+handle-accessible-set|core|S06 step3-4 out-of-scope subscribe/invoke; FE-CE-007 leak class|rounds/R004/integrate.md §R4.2-§R4.5-S06,S08|4
+ns-scoped-envelope-payload-descriptor-store|removed|none — S06/S07 pass without it; sole reader (delivery gate) already gone FE-CE-008|rounds/R004/integrate.md §R4.6 (FE-CE-008)|4
+invoke-id-on-OutcomeUnknown|removed|none — no auto-resubmit; FE-CE-010 closed|rounds/R006/cand-A.md §R6.2|6
+implicit-live-default-subscribe|removed|none — explicit from_cursor mandatory; FE-CE-011 closed|rounds/R006/cand-A.md §R6.2|6
+envelope-payload-delivery-gate|removed|none — S07 renders unregistered schema identically; confirmed R003|rounds/R004/integrate.md §R4.2|4
+typed-replay-policy-enum|removed|none — fixed never-auto-resubmit; FE-CE-003 closed|rounds/R004/integrate.md §R4.6|6
+same-namespace-scoped-handle|core|S06 step3-4 same-ns ScopeDenied / S08 step6 job subscribe fails if removed|rounds/R006/cand-A.md §R6.2/§R6.5-S06,S08|6
+host-dedup-(ns,resource,seq)|removed|none — vacuous under host-assigned seq; S09 passes via adapter dedup|rounds/R006/cand-A.md §R6.2/§R6.6|6
+host-reorder-by-seq|removed|none — identity; adapter pumps logical order|rounds/R006/cand-A.md §R6.3 item3/§R6.6|6
+never-auto-resubmit-invariant|core|S09 step2 host replays command -> double execution if removed|rounds/R006/cand-A.md §R6.5-S09|6
+open-capability-map|core|S11 absence inferred from null; fixed enum reopens FE-CE-002|rounds/R006/cand-A.md §R6.5-S11|6
+per-namespace-action-typing|core|S06 step5 shared mutable key reopens FE-CE-006|rounds/R006/cand-A.md §R6.5-S06|6
+
+===== MATERIAL: per-round counters (full) =====
+
+round|holds_major|new_major|closed_major|clean|note|digest|review_holds
+R001|0|0|0|0|dim=D12-authority-boundary attack=1095w verify=1110w|b93d2dbedec53eaa05d7de4a9d762f3621d5f9bc623f8ea7da916298e690d30b|1
+R002|0|1|4|1|dim=D10-cross-module attack=1725w verify=1215w|2d2dde146c280db1e9ba555b358212f089cb4d99aa3bcbf60d6879699aebc496|0
+R004|0|0|4|1|dim=D08-reduction attack=0w verify=0w|82e626862a1629503f37199869ae75f4ed0d21dad63bef890ce7a163ce265ebc|0
+R006|0|0|7|0|dim=D01-order-dedup attack=1512w verify=907w|b6da557abfc47cc25d1e770381afa126bd2668e13b85563ddc6edc599f220560|0
+
+===== SAVED CANDIDATE (digest b6da557abfc47cc25d1e770381afa126bd2668e13b85563ddc6edc599f220560) =====
+
+===== MATERIAL: candidates/best.md =====
+(source: /home/maoqh/projects/ordessa/control/reports/FE-DESIGN-001/candidates/best.md, sha256: b6da557abfc47cc25d1e770381afa126bd2668e13b85563ddc6edc599f220560)
+
+# Best Candidate (R006 integrated, A) — Namespaced resource/event core with same-namespace scoped handles; spawned set removed (Model2), host dedup/reorder claims withdrawn, S09 correctly owned by the adapter.
+
+## R6.1 Core bet
+The host core is a **namespaced directory** of `(ns_id, local_id)` resources, each with a **monotonically indexed, replayable event stream** and an adapter-owned open capability map, plus per-namespace typed actions and namespace-scoped handles. Handles carry exactly one `ns_id`; a handle may subscribe to or invoke any resource where `resource_id.ns_id == handle.ns_id`, and cross-namespace access is structurally impossible. This round further reduces R004/R006: the per-handle `spawned` set is removed (a same-namespace subscription rule passes S08 without accumulating per-handle state — proven by the Model2 experiment), and the core's **dedup/reorder** vocabulary is withdrawn, because a host-assigned monotonic `seq` has no collision domain to dedup on and defines order as arrival so "reordering by seq" is identity. Duplicate and out-of-order correction is adapter-primary; the core contributes only the never-auto-resubmit invariant, `cursor.resolve`, and monotonic per-resource delivery order.
+
+## R6.2 Core concepts and operations
+**Namespace.** `namespaces.open(descriptor) → NamespaceHandle{ns_id}`; `namespace.teardown(reason)`. `ns_id` is host-minted per connection, never service-supplied; a *full* reconnect yields a new `ns_id`. Teardown disposes its resources and force-closes every handle scoped to that namespace. `resource_id = (ns_id, local_id)`; raw-id collision structurally impossible.
+
+**Resource.** `namespace.announce({local_id, kind:string, capabilities:CapMap})` (adapter-origin; host verifies in-namespace uniqueness); `namespace.retire(local_id, reason)`; `handle.directory_list({kind?}) → [descriptor]`; `handle.directory_lookup(local_id) → descriptor | ExplicitAbsent`. Content authority = producing adapter; identity/lifecycle = host.
+
+**Event stream.** `handle.subscribe(resource_id, from_cursor:int) → Subscription{close(), onNext(Envelope)}`. **`from_cursor` is mandatory (FE-CE-011):** `from_cursor=cursor.resolve(resource_id)` begins live; `from_cursor=0` replays from the first envelope. `Envelope{resource_id, seq:int, ts, kind:string, payload_schema_id:string, payload:opaque}`. `payload_schema_id` is an **opaque routing/selection label** — the host neither registers, gates, nor interprets it (FE-CE-008). **`seq` is a host-assigned monotonic stream index per resource, defined as pump-arrival order; the host uses it only for cursor resume and to deliver envelopes in a stable per-resource order — it is NOT a dedup key and NOT a reorder mechanism (FE-CE-012/014).** `cursor.resolve(resource_id) → current_seq`. Release: `Subscription.close()`, handle destruction, or namespace teardown.
+
+**Open capability map.** `capabilities.get(resource_id) → CapMap{name→{supported|not_supported|unknown}}`. Host defines no valid names, assigns no behavioural authority, never branches on a value in routing/replay/lifecycle. Absence = "unknown", never "unsupported".
+
+**ns-scoped action-type declaration.** `action.register(kind, action_type, params_type:ActionSchema, result_type:ActionSchema)`, keyed by `(ns_id, kind, action_type)`. No `execute(any)`: params/results are concrete schemas. Two namespaces sharing a `kind`/`action_type` name never share a mutable key (FE-CE-006 isolation, structural via namespace-local registration).
+
+**Typed action.** `handle.invoke(resource_id, action_type, params) → Result | CapabilityAbsent(action_type) | OutcomeUnknown`. **`OutcomeUnknown` carries no token (FE-CE-010):** fixed invariant — an invoke whose outcome is unknown is **never auto-resubmitted by the host**; the caller correlates by the synchronous return and decides a fresh re-invoke. `CapabilityAbsent` returned only when the action is unregistered for the resource's kind. `Result` is a typed schema; `spawned_resource_id:(ns_id,local_id)` MAY appear as an **informational** field — the host does not use it for access control (spawned-set removed, FE-CE-009).
+
+**Namespace-scoped handle.** `handle_for(ns_id) → SubscriberScope{ns_id, subscriptionHandle, typedInvoker, directory_list, directory_lookup}`. Permission rule: a handle may subscribe/invoke any resource where `resource_id.ns_id == handle.ns_id`. The handle exposes no `parent`/`sibling`/`enumerateForeignNs`; it carries exactly one `ns_id`, so foreign access is impossible. **No per-handle spawned/accessible set is maintained.**
+
+## R6.3 Boundary rules
+A service adapter: (1) `namespaces.open`; (2) `announce/retire` kind + open CapMap; (3) **pump events in remote-stable logical order** (the adapter is responsible for reordering its source before pumping; the host does not correct order it was given); (4) `action.register(...)` under its own namespace; (5) explicit `not_supported` CapMap entries for absent features; (6) **on reconnect, the adapter deduplicates using its own protocol-level stable event id** — never the host-assigned `seq`, which the adapter cannot observe at pump time (FE-CE-013). "No cancel" = `CapMap{"cancel":not_supported}` (informational) AND omission of `"cancel"` from the kind's action registry (structural) → `invoke(...,"cancel") → CapabilityAbsent`. `ExplicitAbsent`, `CapabilityAbsent`, `ScopeDenied`, `NamespaceGone`, `OutcomeUnknown` are distinct non-null terminals; absence is never inferred from null/timeout. The adapter sees only its own namespace; no adapter-side API names or resolves another namespace's resource.
+
+## R6.4 Extension mechanism
+An extension registers a view resolver `{match: kind + payload_schema_id, component, optional typed action bindings}`; selection exact/most-specific-first; **default fallback** = host-builtin generic view rendering resource kind, registered action names + typed param schemas, CapMap name→state pairs, and the last envelope's `payload_schema_id` label (not content), plus *"No dedicated view installed; structured data available via subscription."* Unknown content is never blank and never given a run/agent reading; an unregistered `payload_schema_id` lands in the same fallback. A view receives only host-minted `SubscriberScope` handles. **Pair gesture:** user points at two on-screen resources; host mints `h_A=handle_for(ns_A)` and `h_B=handle_for(ns_B)` and hands both over, with the initial subscription using explicit `from_cursor=cursor.resolve(id)`. Core records **nothing** about the pairing. A view may render, `directory_list`/`subscribe`/`invoke` within its handle's namespace; it may not enumerate other namespaces, derive a foreign ns_id, register free-form event names, or hold a global context. Guarantees: resolver absent → generic view; throws → error boundary keeps delivering on still-mounted handles; unmounted mid-operation → host force-closes that view's handles; re-subscription uses explicit `from_cursor`.
+
+## R6.5 Scenario trajectories (owner + per-core-step deletion consequence)
+**S01 text-only.** 1. `namespaces.open→ns` (host). 2. `announce{kind:"text.stream",CapMap{cancel:not_supported}}` (adapter). 3. `h=handle_for(ns)`; `h.invoke((ns,"main"),"send",{text})` (extension→host). 4. adapter pumps TextDeltas; host delivers in stream order (adapter/host). 5. resolver renders (extension). Delete typed-action → step3 has no typed call (`execute(any)` = disqualifier) → fails; delete ordered-stream → step4 deltas never arrive → fails. **covered** (core).
+
+**S02 Pi via Ordessa.** 1. `namespaces.open` (host). 2. `announce` `pi.conversation/pi.tool-event/pi.approval` (adapter). 3. `h.subscribe((ns,tool-event), from_cursor=cursor.resolve(...))` → live tool/approval events (host routing). 4. `h.invoke(approval,"approve",…)`, `h.invoke(conversation,"send",…)` (typed-action). 5. resolver renders (extension). Delete announce/lifecycle → step2 no addressable resource; delete ordered-stream → step3 not watchable; delete typed-action → step4 approve/send undefined. **covered** (adaptation).
+
+**S03 long task, leave/return.** 1. `subscribe(id, from_cursor=0)` for history (extension+host). 2. navigate away → `Subscription.close()` (host). 3. remote keeps emitting; adapter pumps (adapter). 4. return → `directory_lookup` then `subscribe(from_cursor=cursor.resolve(id))`; host replays missed stream in order (host). 5. passive snapshot `invoke("read")→current value` (host+adapter). Delete ordered-replayable-stream → step4 no catch-up; delete resource-directory → step4 lookup impossible; delete typed-action → step5 snapshot gone. **covered** (core).
+
+**S04 submit/progress/result, no chat.** 1. `namespaces.open`; `announce{kind:"acme.job"}`; register `submit`(result schema MAY carry informational `spawned_resource_id`) + `result` (adapter). 2. `h=handle_for(ns)`; subscribe `(ns,job)` for progress; invoke `submit`→Result with `(ns,job-progress)` → subscribe that (extension+host, same-ns rule permits). 3. no session/turn/role in any envelope (host+adapter). Delete resource lifecycle → step1 fails; delete typed-action → step1 submit undefined; delete ordered-stream → step2 progress never delivered. **covered** (core).
+
+**S05 browse config/git, no session.** 1. `announce{kind:"config.tree",CapMap{read:supported}}` (adapter). 2. `h.directory_list({kind:"config.tree"})` (host, handle-scoped). 3. `h.invoke(item_id,"read")→snapshot` (extension+host). No subscribe/cursor/stream for the read. Delete resource-directory → step2 fails; delete typed-action → step3 read fails. **covered** (core).
+
+**S06 two services, same id.** 1. `namespaces.open→ns_A, ns_B` (host). 2. both announce `job-1`; keys `(ns_A,job-1)`, `(ns_B,job-1)` distinct (host). 3. `h_A.subscribe((ns_B,job-1)) → ScopeDenied` (ns mismatch). 4. `h_A.invoke((ns_B,job-1)) → ScopeDenied`. 5. action registry per-`(ns,kind,action_type)`; "Config" in ns_A ≠ ns_B. 6. `h_A.directory_list` sees only ns_A. Delete namespaces → step2 collides; delete same-ns rule → step3-4 leak; delete per-ns action registry → step5 shares a mutable key (FE-CE-006 reopens). **covered** (core).
+
+**S07 special artefact, view not installed.** `announce{kind:"acme.plot"}`; no resolver matches → generic view renders kind+actions+CapMap+`payload_schema_id` label + "no dedicated view installed". Delete generic-fallback-view → renders blank → fails. **covered** (core).
+
+**S08 resource + replaceable runner.** 1. ns_R `announce{kind:"runner"}`, register `execute` with result schema carrying informational `spawned_resource_id:(ns_R,job)` (adapter). 2. ns_D `announce{kind:"data.ref"}` (adapter). 3. `h_D=handle_for(ns_D)` (host). 4. user pair → `h_R=handle_for(ns_R)`, initial subscription `from_cursor=cursor.resolve((ns_R,runner))` (host). 5. `h_D` receives new live ArtifactReady (not replayed); view calls `h_R.invoke((ns_R,runner),"execute",{ref})`→`Result{...,(ns_R,job)}` (extension→adapter). 6. view calls `h_R.subscribe((ns_R,job), from_cursor=cursor.resolve(...))` — permitted by same-ns rule `ns_R==h_R.ns_id` (host). 7. replace runner: `ns_R.teardown` → `h_R` ops → `NamespaceGone`; `h_D` unaffected; user re-pairs. Delete same-ns rule → step6 ScopeDenied → FE-CE-004 reopens; delete typed-action → step5 fails; delete namespaces/teardown → step7 silent mis-bind. **covered** (core+extension).
+
+**S09 drop / unknown outcome / dup-out-of-order.** 1. invoke sent, link drops pre-ack → host returns `OutcomeUnknown` (no token) (host). 2. fixed **never-auto-resubmit** invariant → user re-invokes fresh; adapter, if the original command was already applied, returns the same Result without side effects using its **own** stable id (adapter). 3. on reconnect the **adapter** dedups by its own protocol-level event id and pumps in remote-stable logical order (adapter); the host assigns monotonic stream indices and delivers in that order — it neither dedups nor reorders (host). 4. view reads current state via `invoke("read")` or `subscribe(from_cursor=0)` (host+adapter). Owner: **adaptation-primary, core structural** — core contributes never-auto-resubmit + cursor.resume + monotonic delivery order; adapter contributes dedup + reorder + apply-idempotency. Delete never-auto-resubmit → step2 host replays command → double execution without adapter cooperation; delete ordered-stream/cursor → step4 no coherent state; delete adapter dedup → duplicates reach view. **covered** (core+adaptation; genuinely joint, both named, no "later").
+
+**S10 extension crash while remote runs.** 1. coordinating view throws/unmounts → host force-closes its handles (host). 2. ns_D/ns_R remain authoritative (adapters). 3. new view: `handle_for(ns_R)`, `subscribe(from_cursor=cursor.resolve(...))` → catches up (extension+host). 4. no core pair record → nothing to lose. Delete force-close → subscriptions leak, dead view receives → fails at 1; delete cursor.resolve/replayable-stream → step3 can't catch up. **covered** (core).
+
+**S11 no cancel/history/resume.** `announce{CapMap{"cancel":not_supported,"history":not_supported,"resume":not_supported}}` (adapter, informational); `invoke(...,"cancel") → CapabilityAbsent` because "cancel" is absent from the kind's action registry (host). Delete open-capability-map → history/resume absence inferred from null/timeout → fake-support disqualifier; a fixed enum reopens FE-CE-002, so the open map is minimal. **covered** (core).
+
+**S12 remove an "optional" core domain module.** 1. remove optional adapter → its `namespace.teardown`; other namespaces unaffected (host). 2. remove optional resolver → generic fallback (host). 3. remove paired view → other single-resource modules untouched (core recorded no pair). Delete namespaces/teardown isolation → step1 touches shared key-space → fails; delete generic-fallback → step2 blanks. **covered** (adaptation + core).
+
+## R6.6 Deletion / reduction experiments
+**FE-CE-009 (spawned set → same-ns rule):** Model2 experiment (same-namespace subscription scope, no accumulated set) passes S08 steps 4–6 and preserves S06 isolation, while the spawned set only restricts same-ns sibling access no S01–S12 trajectory exercises → spawned set is non-load-bearing → **removed**.
+**FE-CE-012/014 (host dedup/reorder):** model run confirms the host dedup predicate `(ns,resource,seq)` never fires under monotonic host-assigned `seq`, and reorder-by-self-`seq` is identity. Test the claim's necessity: removing host dedup leaves S09 passing via adapter dedup by its own stable id → host dedup/reorder is non-load-bearing → **the core claim is withdrawn, not replaced with a new core store** (adding one would be the "complexity relocated/hidden" disqualifier or an unnecessary mechanism).
+**FE-CE-013:** adapter dedup key rewritten to the adapter's own stable event id; no core-internal (host `seq`) required in adapter state → rule becomes implementable.
+Carried-and-still-dead: envelope payload descriptor store (FE-CE-008), invoke_id (FE-CE-010), implicit live-default (FE-CE-011), host-session-object, host-turn/role field, host-event-store, host-resource-directory-B, cross-namespace-edge, persistent-pair-record, typed replay_policy. Retained because a scenario fails without them: namespaces (S06), resource-directory (S05), ordered-replayable-stream (S03/S10), open capability map (S11), typed-action (S01/S04/S05/S08), generic-fallback-view (S07/S12), per-namespace action typing (S06), same-ns subscription scope (S06+S08), never-auto-resubmit (S09).
+
+## R6.7 Second-service onboarding cost
+**New service adapter must write:** (1) `namespaces.open`; (2) `announce/retire` per kind; (3) event pump in remote-stable logical order; (4) `action.register(kind, action_type, params, result)` per callable under its own namespace; (5) explicit `not_supported` CapMap entries; (6) **reconnect dedup using its own protocol-level stable event id** (not host `seq`); (7) if an action spawns a job, an informational `spawned_resource_id` field in the result schema.
+**Core facts the adapter must know (5):** `ns_id` is opaque/host-minted; `seq` is host-assigned (and the adapter must NOT use it for dedup); the handle is namespace-scoped; CapMap has zero host behavioural authority; the never-auto-resubmit invariant. No spawned set, no payload registry, no replay policy, no host dedup key to learn.
+**View-only module (S07):** one resolver `{match:kind+schema, component}` — 1 registration, 0 core knowledge.
+
+## R6.8 Honest cost and non-goals
+**Weakest:** S09 is genuinely joint — the host cannot dedup a stream it indexed by arrival; correctness on duplicate/out-of-order is adapter burden, and a new adapter must supply a stable event id. S08 cooperation requires a user pair gesture, no standing link. Transient text-as-resource is heavier than a pure broker.
+**Open observation (not silently relaxed):** same-ns handles expose `directory_list` and sibling subscription within a namespace (required by S05). If a future product constraint requires "a view sees only explicitly-paired resources, not same-ns siblings," a bounded subset of the spawned set returns — but **no S01–S12 trajectory demands this**, so the reduction stands.
+**D11 growth:** removing the spawned set eliminates per-handle accumulated state; handle state is `{ns_id, subscriptions[]}`, bounded by `Subscription.close()` on force-close. Any adapter-side dedup store growth is the adapter's own cost, outside the core.
+**Non-goals:** no cross-namespace joins/edges, no content search, no host turn/role/session model, no host capability vocabulary, no automatic re-pairing, no host-verified apply-idempotency, no host-side event dedup.
+
+## R6.9 FE-CE-007 and candidate B
+FE-CE-007 remains **OPEN against demoted B**; A has no edges mechanism, so it is N/A against A. Deferring B is not repairing B. B is carried as history only; it is not promoted unless a required scenario forces standing cross-namespace relay without user initiation, which none of S01–S12 does. A strictly dominates B on total cost and on the isolation invariant, so the two are not genuinely incomparable and B is not blended in.
+
+
+===== MATERIAL: this round's artifact /home/maoqh/projects/ordessa/control/design-loop/../reports/FE-DESIGN-001/rounds/R007/plan.md =====
+(source: /home/maoqh/projects/ordessa/control/design-loop/../reports/FE-DESIGN-001/rounds/R007/plan.md, sha256: 44b58b7d44e4123b22f8e124ee91353e126c0ac1b484d28b4845b55f86487d60)
+
+CANDIDATES: A
+
+One id, deliberately. The only structurally different core that ever existed is B's cross-namespace relay, and it is demoted (§R6.9): no S01–S12 trajectory demands standing cross-namespace relay without user initiation, and A strictly dominates B on total cost and on the namespace-isolation invariant. R007's settled question is an *internal coherence* defect in the saved A text — the same `subscribe(from_cursor = cursor.resolve(id))` call is promised to *replay the missed stream* in §R6.5-S03 step4 / §R6.5-S10 step3 and promised to *deliver new events live, not replayed* in §R6.5-S08 step5. Forcing a second fresh core would not answer that question and would produce a polished-but-undecided round; the attacker's target is A's cursor semantics, not a rival host. If a reader judges this a mistake, the concrete test is: does any required scenario become coverable only by a second core this round — it does not.
+
+DIMENSION: D01-order-dedup
+
+Assigned because D01 was **not** clean last round (it raised the major FE-CE-012/013/014, all closed under b6da557) and the three R006 independent-review findings (S03, S04, S10 trajectory_broken) are exactly D01 replay/dedup-semantics breaks. This is an unfinished dimension being taken up, not a clean one repeated. The attacker must construct an event trajectory where S03's replay promise and S08's live promise fire on the **same** subscription declaration.
+
+THE QUESTION THIS ROUND MUST SETTLE
+Can the candidate name a single decision owner and a concrete decision input for `from_cursor=cursor.resolve(id)` such that no legal event sequence yields both "host replays missed envelopes" and "new events are live, not replayed" for that one subscription?
+
+Per-candidate (A)
+- **Core bet:** the host core is a namespaced directory of `(ns_id,local_id)` resources, each with a per-resource monotonic replayable stream, an adapter-owned open CapMap, ns-scoped typed actions, and namespace-scoped handles whose only permission rule is `resource.ns_id == handle.ns_id`. Replay vs liveness must be a property the *subscriber declares*, not something the host infers from whether the cursor happens to equal the resolve value.
+- **Strongest objection:** `cursor` is doing double duty — "stream position for resume/catch-up" and "start-living-here signal" — so one literal call carries two meanings. The likely fix (a subscriber-declared `replay_mode`) is itself a new core concept, and by I's FE-CE-009 standard its necessity must be proven by a **deletion experiment** (does S03/S04/S08/S10 pass without it?), not by "it disambiguates the cursor."
+- **Evidence that settles it this round:** a named owner + decision input, restated step-by-step on §R6.5-S03, S04, S08, S10 so no two outcomes survive; plus an `EXPERIMENT:` model run encoding whether one cursor/subscribe declaration triggers both promises (model-only, not product/protocol verification).
+
+Uncovered — this round's center of gravity
+All S01–S12 are only "claimed"; **S03, S04, S08, S10** are ruled `trajectory_broken` against the current bytes and are the live surface. Secondary: S07/S12 default-view actionability (must show current config value, Git diff, and "still running?" — not merely "not blank"), and §R6.7 adapter/onboarding cost. The three integration traces T-Pi, T-Boring, T-Static must survive restatement with per-step owner + deletion consequence, not prose.
+
+
+===== MATERIAL: this round's artifact /home/maoqh/projects/ordessa/control/design-loop/../reports/FE-DESIGN-001/directives/R007-focus.md =====
+(source: /home/maoqh/projects/ordessa/control/design-loop/../reports/FE-DESIGN-001/directives/R007-focus.md, sha256: a51f7d5b838f669429b5c76b6b1392f4be721045b756201efb514278b4bcf8d6)
+
+# R007 指示（权威材料，逐字交给角色）
+
+## 必须先解的那一处矛盾（唯一目标）
+
+同一份候选文本现在对**同一机制**给出两种互斥承诺：
+
+- `S03` / `S10` 依赖：`subscribe(from_cursor = cursor.resolve(id))` → **宿主重放错过的流**；
+- `S08` step5 写的是：新事件是 live、**不重放**。
+
+这不是措辞问题。要求：给出一套**自洽**的重放语义，并说明它按什么维度取值
+（例如：按资源 kind？按订阅者声明？按 cursor 是否存在？），然后**在所有场景轨迹上逐条重述**
+受影响的那一步，使读者无法再构造出"同一情形两种结果"的序列。
+
+若你选择"两种都存在"，必须给出**决定用哪一种的具名归属者与判定输入**，否则就是矛盾没解。
+
+## 本轮重点攻击面
+
+1. 上述重放语义在 S03 / S08 / S10 三条轨迹上是否还留下可构造矛盾（给事件序列）。
+2. 缺少专用视图时，**默认展示是否真的能让人行动**：不是"不空白"，而是
+   配置浏览能看到当前值、Git 变更能看出改了什么、长任务能看出还在不在跑。
+   给出具名渲染输入与点击后果。
+3. **适配器成本**：接入一个新服务必须写几件东西、必须知道哪些核心内部；
+   恢复与去重责任落在谁身上，能不能更便宜。给清单和计数。
+
+## 三条接入轨迹必须继续走通（不许退化成散文）
+
+T-Pi（Pi 会话，含工具与授权）、T-Boring（无聊天长任务，离开页面数小时后回来）、
+T-Static（不启动任何 agent 的配置 / Git 浏览）。每条给有序步骤 + 每步归属者 +
+删除该步核心机制后哪一条场景失败。
+
+## 硬要求
+
+- **最小接口草图**：真实类型与签名，不接受"某接口提供某能力"式描述。
+- **可执行模型实验**：`EXPERIMENT:` + fenced python3 块，编码争议机制本身
+  （本轮至少编码：同一 cursor/订阅声明下，S03 与 S08 两种承诺是否会同时发生）。
+  实验只能证明所编码的模型，**不得写成产品或协议已验证**。
+- 沿用 I 对 `FE-CE-009` 的处理标准：论证"必要性"要靠**删除实验**，
+  不能靠"它能防某个越权"。
+- `FE-CE-007` 属被淘汰的 B：**保持 OPEN、留在 B 账上**；不得声称已修。
+- 要改 S01–S12 任一场景或新增产品约束，必须单列
+  `SCENARIO_CHANGE_PROPOSAL: <S0x|NEW> | <改动> | <为什么这是产品约束问题>`；
+  没有这一行的改动视为越界。
+
+
+===== FINAL: THE ONLY ACCEPTABLE ANSWER SHAPE =====
+Your reply is machine-checked. Anything not inside these markers is read as
+commentary and cannot enter the record. Emit the sections and blocks below,
+in this order, with the markers alone on their own lines:
+
+<<<FE-OUT-START>>>
+<deliverable>
+<<<FE-OUT-END>>>
+
+If a block applies and you leave it empty, that is a failed phase, not an
+empty result: the verdict block in particular is the only thing that can move
+a counterexample, and prose verdicts are not read.

@@ -1,0 +1,133 @@
+........................................................................ [  4%]
+........................................................................ [  9%]
+........................................................................ [ 14%]
+........................................................................ [ 18%]
+.................s...................................................... [ 23%]
+..................................................................F..... [ 28%]
+........................................................................ [ 33%]
+........................................................................ [ 37%]
+.....................s....F...............ssss.......................... [ 42%]
+...........................ssss....................................ss... [ 47%]
+...........................F............................................ [ 52%]
+.......................................................FFF.F.....FFFF..F [ 56%]
+FF.FFF......FF.......................................................... [ 61%]
+........................................................................ [ 66%]
+........................................................................ [ 71%]
+.....................................................................ssF [ 75%]
+ssss..................................................ssss........s..... [ 80%]
+........................................................................ [ 85%]
+........................................................................ [ 90%]
+........................................ssss.............ssssss......... [ 94%]
+........................................................................ [ 99%]
+......                                                                   [100%]
+=================================== FAILURES ===================================
+E   KeyError: 'result'
+/home/maoqh/projects/ordessa/worktrees/harness-desktop-001/bc/tests/server/test_delegation.py:676: KeyError: 'result'
+E   AssertionError: ('pi-production-chain-gate.py', 'the refusal must name the bundles that exist on disk')
+    assert '.acceptance-bundle-' in 'pass --worker <agent-box-worker binary>; bundles on disk: '
+     +  where 'pass --worker <agent-box-worker binary>; bundles on disk: ' = <built-in method get of dict object at 0x78333830f3c0>('error', '')
+     +    where <built-in method get of dict object at 0x78333830f3c0> = {'code': 'GATE_WORKER_REQUIRED', 'error': 'pass --worker <agent-box-worker binary>; bundles on disk: ', 'result': 'PI_PRODUCTION_CHAIN_GATE_FAILED', 'script': 'scripts/server-round1/pi-production-chain-gate.py'}.get
+/home/maoqh/projects/ordessa/worktrees/harness-desktop-001/bc/tests/server/test_gate_worker_defaults.py:48: AssertionError: ('pi-production-chain-gate.py', 'the refusal must name the bundles that exist on disk')
+E   ModuleNotFoundError: No module named 'yaml'
+/home/maoqh/projects/ordessa/worktrees/harness-desktop-001/bc/plugins/agent-box-harnesses/src/agent_box_harnesses/hermes/production.py:279: ModuleNotFoundError: No module named 'yaml'
+E   AssertionError: {'code': 'OPENCODE_GATE_WORKER_MISSING', 'error': 'the release Worker binary is unavailable: /home/maoqh/projects/orde...lt': 'OPENCODE_PRODUCTION_CHAIN_GATE_FAILED', 'script': 'scripts/server-round1/opencode-production-chain-gate.py', ...}
+    assert 1 == 0
+/home/maoqh/projects/ordessa/worktrees/harness-desktop-001/bc/tests/server/test_opencode_gate_cleanup.py:126: AssertionError: {'code': 'OPENCODE_GATE_WORKER_MISSING', 'error': 'the release Worker binary is unavailable: /home/maoqh/projects/orde...lt': 'OPENCODE_PRODUCTION_CHAIN_GATE_FAILED', 'script': 'scripts/server-round1/opencode-production-chain-gate.py', ...}
+E   AssertionError: {'code': 'OPENCODE_GATE_WORKER_MISSING', 'error': 'the release Worker binary is unavailable: /home/maoqh/projects/orde...lt': 'OPENCODE_PRODUCTION_CHAIN_GATE_FAILED', 'script': 'scripts/server-round1/opencode-production-chain-gate.py', ...}
+    assert 1 == 0
+/home/maoqh/projects/ordessa/worktrees/harness-desktop-001/bc/tests/server/test_opencode_gate_cleanup.py:139: AssertionError: {'code': 'OPENCODE_GATE_WORKER_MISSING', 'error': 'the release Worker binary is unavailable: /home/maoqh/projects/orde...lt': 'OPENCODE_PRODUCTION_CHAIN_GATE_FAILED', 'script': 'scripts/server-round1/opencode-production-chain-gate.py', ...}
+E   AssertionError: {'code': 'OPENCODE_GATE_WORKER_MISSING', 'error': 'the release Worker binary is unavailable: /home/maoqh/projects/orde...lt': 'OPENCODE_PRODUCTION_CHAIN_GATE_FAILED', 'script': 'scripts/server-round1/opencode-production-chain-gate.py', ...}
+    assert 1 == 0
+/home/maoqh/projects/ordessa/worktrees/harness-desktop-001/bc/tests/server/test_opencode_gate_cleanup.py:168: AssertionError: {'code': 'OPENCODE_GATE_WORKER_MISSING', 'error': 'the release Worker binary is unavailable: /home/maoqh/projects/orde...lt': 'OPENCODE_PRODUCTION_CHAIN_GATE_FAILED', 'script': 'scripts/server-round1/opencode-production-chain-gate.py', ...}
+E   AssertionError: {'code': 'OPENCODE_GATE_WORKER_MISSING', 'error': 'the release Worker binary is unavailable: /home/maoqh/projects/orde...lt': 'OPENCODE_PRODUCTION_CHAIN_GATE_FAILED', 'script': 'scripts/server-round1/opencode-production-chain-gate.py', ...}
+    assert 'OPENCODE_GATE_WORKER_MISSING' == 'OPENCODE_GAT...INARY_DAMAGED'
+      
+      - OPENCODE_GATE_EXTERNAL_BINARY_DAMAGED
+      + OPENCODE_GATE_WORKER_MISSING
+/home/maoqh/projects/ordessa/worktrees/harness-desktop-001/bc/tests/server/test_opencode_gate_cleanup.py:204: AssertionError: {'code': 'OPENCODE_GATE_WORKER_MISSING', 'error': 'the release Worker binary is unavailable: /home/maoqh/projects/orde...lt': 'OPENCODE_PRODUCTION_CHAIN_GATE_FAILED', 'script': 'scripts/server-round1/opencode-production-chain-gate.py', ...}
+E   KeyError: 'run'
+/home/maoqh/projects/ordessa/worktrees/harness-desktop-001/bc/tests/server/test_opencode_gate_cleanup.py:266: KeyError: 'run'
+E   KeyError: 'run'
+/home/maoqh/projects/ordessa/worktrees/harness-desktop-001/bc/tests/server/test_opencode_gate_cleanup.py:288: KeyError: 'run'
+E   KeyError: 'run'
+/home/maoqh/projects/ordessa/worktrees/harness-desktop-001/bc/tests/server/test_opencode_gate_cleanup.py:312: KeyError: 'run'
+E   AssertionError: assert 'OPENCODE_GATE_WORKER_MISSING' == 'OPENCODE_GAT...OUND_VIOLATED'
+      
+      - OPENCODE_GATE_RETRY_BOUND_VIOLATED
+      + OPENCODE_GATE_WORKER_MISSING
+/home/maoqh/projects/ordessa/worktrees/harness-desktop-001/bc/tests/server/test_opencode_gate_cleanup.py:328: AssertionError: assert 'OPENCODE_GATE_WORKER_MISSING' == 'OPENCODE_GAT...OUND_VIOLATED'
+E   AssertionError: {'code': 'OPENCODE_GATE_WORKER_MISSING', 'error': 'the release Worker binary is unavailable: /home/maoqh/projects/orde...lt': 'OPENCODE_PRODUCTION_CHAIN_GATE_FAILED', 'script': 'scripts/server-round1/opencode-production-chain-gate.py', ...}
+    assert 1 == 0
+/home/maoqh/projects/ordessa/worktrees/harness-desktop-001/bc/tests/server/test_opencode_gate_cleanup.py:446: AssertionError: {'code': 'OPENCODE_GATE_WORKER_MISSING', 'error': 'the release Worker binary is unavailable: /home/maoqh/projects/orde...lt': 'OPENCODE_PRODUCTION_CHAIN_GATE_FAILED', 'script': 'scripts/server-round1/opencode-production-chain-gate.py', ...}
+E   AssertionError: {'code': 'OPENCODE_GATE_WORKER_MISSING', 'error': 'the release Worker binary is unavailable: /home/maoqh/projects/orde...lt': 'OPENCODE_PRODUCTION_CHAIN_GATE_FAILED', 'script': 'scripts/server-round1/opencode-production-chain-gate.py', ...}
+    assert 1 == 0
+/home/maoqh/projects/ordessa/worktrees/harness-desktop-001/bc/tests/server/test_opencode_gate_cleanup.py:470: AssertionError: {'code': 'OPENCODE_GATE_WORKER_MISSING', 'error': 'the release Worker binary is unavailable: /home/maoqh/projects/orde...lt': 'OPENCODE_PRODUCTION_CHAIN_GATE_FAILED', 'script': 'scripts/server-round1/opencode-production-chain-gate.py', ...}
+E   AssertionError: 门没有调用扫描入口
+    assert []
+/home/maoqh/projects/ordessa/worktrees/harness-desktop-001/bc/tests/server/test_opencode_gate_cleanup.py:499: AssertionError: 门没有调用扫描入口
+E   AssertionError: {'code': 'PI_GATE_WORKER_MISSING', 'error': 'the release Worker binary is unavailable: /home/maoqh/projects/ordessa/wo...rker', 'result': 'PI_PRODUCTION_CHAIN_GATE_FAILED', 'script': 'scripts/server-round1/pi-production-chain-gate.py', ...}
+    assert 1 == 0
+/home/maoqh/projects/ordessa/worktrees/harness-desktop-001/bc/tests/server/test_pi_gate_cleanup.py:128: AssertionError: {'code': 'PI_GATE_WORKER_MISSING', 'error': 'the release Worker binary is unavailable: /home/maoqh/projects/ordessa/wo...rker', 'result': 'PI_PRODUCTION_CHAIN_GATE_FAILED', 'script': 'scripts/server-round1/pi-production-chain-gate.py', ...}
+E   AssertionError: {'code': 'PI_GATE_WORKER_MISSING', 'error': 'the release Worker binary is unavailable: /home/maoqh/projects/ordessa/wo...rker', 'result': 'PI_PRODUCTION_CHAIN_GATE_FAILED', 'script': 'scripts/server-round1/pi-production-chain-gate.py', ...}
+    assert 1 == 0
+/home/maoqh/projects/ordessa/worktrees/harness-desktop-001/bc/tests/server/test_pi_gate_cleanup.py:139: AssertionError: {'code': 'PI_GATE_WORKER_MISSING', 'error': 'the release Worker binary is unavailable: /home/maoqh/projects/ordessa/wo...rker', 'result': 'PI_PRODUCTION_CHAIN_GATE_FAILED', 'script': 'scripts/server-round1/pi-production-chain-gate.py', ...}
+E   AssertionError: {'code': 'PI_GATE_WORKER_MISSING', 'error': 'the release Worker binary is unavailable: /home/maoqh/projects/ordessa/wo...rker', 'result': 'PI_PRODUCTION_CHAIN_GATE_FAILED', 'script': 'scripts/server-round1/pi-production-chain-gate.py', ...}
+    assert 1 == 0
+/home/maoqh/projects/ordessa/worktrees/harness-desktop-001/bc/tests/server/test_pi_gate_cleanup.py:161: AssertionError: {'code': 'PI_GATE_WORKER_MISSING', 'error': 'the release Worker binary is unavailable: /home/maoqh/projects/ordessa/wo...rker', 'result': 'PI_PRODUCTION_CHAIN_GATE_FAILED', 'script': 'scripts/server-round1/pi-production-chain-gate.py', ...}
+E   KeyError: 'run'
+/home/maoqh/projects/ordessa/worktrees/harness-desktop-001/bc/tests/server/test_pi_gate_cleanup.py:245: KeyError: 'run'
+E   KeyError: 'run'
+/home/maoqh/projects/ordessa/worktrees/harness-desktop-001/bc/tests/server/test_pi_gate_cleanup.py:267: KeyError: 'run'
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/maoqh/projects/ordessa/worktrees/harness-desktop-001/bc/workers/agent-box-worker/target/debug/agent-box-worker'
+/home/maoqh/.local/share/uv/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/pathlib.py:1013: FileNotFoundError: [Errno 2] No such file or directory: '/home/maoqh/projects/ordessa/worktrees/harness-desktop-001/bc/workers/agent-box-worker/target/debug/agent-box-worker'
+=============================== warnings summary ===============================
+../../integration-linux/backend/.venv/lib/python3.12/site-packages/fastapi/testclient.py:1
+  /home/maoqh/projects/ordessa/worktrees/integration-linux/backend/.venv/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+../../integration-linux/backend/.venv/lib/python3.12/site-packages/starlette/testclient.py:53
+  /home/maoqh/projects/ordessa/worktrees/integration-linux/backend/.venv/lib/python3.12/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+ARTIFACT_worker-debug=ABSENT workers/agent-box-worker/target/debug/agent-box-worker
+ARTIFACT_worker-release=ABSENT workers/agent-box-worker/target/release/agent-box-worker
+ARTIFACT_worker-musl-dir=ABSENT workers/agent-box-worker/target/x86_64-unknown-linux-musl
+ARTIFACT_sidecar-entry=present plugins/agent-box-harnesses/runtime/worker-entry.mjs
+ARTIFACT_acp-npm-closure=ABSENT plugins/agent-box-harnesses/runtime-claude/node_modules/@agentclientprotocol/claude-agent-acp
+TOOL_bwrap=present
+TOOL_node=present
+TOOL_npm=present
+TOOL_claude=ABSENT
+TOOL_tmux=present
+TOOL_wsl.exe=ABSENT
+SKIPPED_CLASSIFIED_artifact=5
+SKIPPED_CLASSIFIED_tool=24
+SKIPPED_CLASSIFIED_design=1
+SKIPPED_CLASSIFIED_unknown=4
+SKIPPED_TOTAL=33
+WORKER_ARTIFACT=ABSENT
+VERDICT=FAILED
+=========================== short test summary info ============================
+FAILED tests/server/test_delegation.py::test_the_real_bridge_process_runs_a_child_turn_end_to_end
+FAILED tests/server/test_gate_worker_defaults.py::test_chain_gate_without_worker_fails_typed
+FAILED tests/server/test_hermes_production_chain.py::test_the_wire_model_is_the_product_id_and_is_asserted
+FAILED tests/server/test_opencode_gate_cleanup.py::test_default_run_removes_everything_it_created
+FAILED tests/server/test_opencode_gate_cleanup.py::test_keep_retains_the_tree_and_never_claims_removal
+FAILED tests/server/test_opencode_gate_cleanup.py::test_an_external_binary_is_neither_deleted_nor_chmodded
+FAILED tests/server/test_opencode_gate_cleanup.py::test_a_binary_that_changed_during_the_run_fails_the_gate
+FAILED tests/server/test_opencode_gate_cleanup.py::test_an_injected_removal_failure_exits_nonzero
+FAILED tests/server/test_opencode_gate_cleanup.py::test_a_primary_failure_is_not_masked_by_a_cleanup_failure
+FAILED tests/server/test_opencode_gate_cleanup.py::test_a_cleanup_failure_alone_is_the_primary_failure
+FAILED tests/server/test_opencode_gate_cleanup.py::test_the_retry_bound_is_enforced_by_the_gate
+FAILED tests/server/test_opencode_gate_cleanup.py::test_the_dynamic_token_is_not_tracked_content
+FAILED tests/server/test_opencode_gate_cleanup.py::test_each_run_generates_its_own_token
+FAILED tests/server/test_opencode_gate_cleanup.py::test_a_token_that_reaches_tracked_content_fails_the_gate
+FAILED tests/server/test_pi_gate_cleanup.py::test_default_run_removes_a_read_only_nested_artifact
+FAILED tests/server/test_pi_gate_cleanup.py::test_keep_retains_the_tree_and_never_claims_removal
+FAILED tests/server/test_pi_gate_cleanup.py::test_an_external_artifact_is_neither_deleted_nor_chmodded
+FAILED tests/server/test_pi_gate_cleanup.py::test_an_injected_removal_failure_exits_nonzero
+FAILED tests/server/test_pi_gate_cleanup.py::test_a_primary_failure_is_not_masked_by_a_cleanup_failure
+FAILED tests/server/test_sidecar_lease_keepalive.py::test_the_production_default_lease_is_five_seconds
+20 failed, 1465 passed, 33 skipped, 2 warnings in 182.63s (0:03:02)
+GATE_EXIT=1

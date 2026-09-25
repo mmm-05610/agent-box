@@ -1,0 +1,39 @@
+**Dimension: D06-adapter-burden.**
+
+## Attack Report — R008
+
+I attacked the candidate's D06 separation table (§3): its claim that zero adapter items are category (b) core-derived correctness. I found one breach where the host's fallback-view rendering logic has a hardcoded code path keyed on specific action names the adapter must adopt, contradicting the candidate's classification. I also replayed FE-CE-007 (OPEN, B-alternative; N/A against A) and tested several other angles that held.
+
+### FE-CE-018 — `read`/`status` naming convention is a core internal leaked into the adapter contract
+
+**Exact event sequence:**
+
+1. WeatherService's protocol fetches current forecast data via an operation the protocol vocabulary calls `get_forecast`.
+2. Adapter connects: `namespaces.open` → `ns_W`; `announce({local_id:"current", kind:"weather.current", CapMap{}})`; `action.register(ns_W, "weather.current", "get_forecast", GetForecastParams, ForecastResult)`. (Items 1, 2, 4, 6 of the adapter's 7-item list, done correctly per the documented contract.)
+3. No dedicated view module is installed for `weather.current` (S07 precondition).
+4. Host's generic fallback view renders: kind label, CapMap pairs, last-event metadata, and registered actions as buttons (including "get_forecast" with a parameter form). The design's special auto-render path (§R7.4: "for any kind registering a typed `read` action, the returned typed snapshot as raw field rows"; §4 fallback table row "`read` snapshot | if kind has registered `read`") **does not fire** because no action named "read" exists in the `(ns_W, "weather.current")` registry.
+5. User must click "get_forecast", fill a form, submit, and wait for the typed `Result` to render. The S05 user outcome ("browse configuration, resources... see current value") is degraded: current value is not shown as auto-rendered rows; it is behind an explicit action-invocation cycle that requires parameter input.
+
+**Invariant broken:** §3 D06 separation table claims zero adapter items are category (b) core-derived correctness. Item 6 is classified: "Register a typed `read`/`status` action for any resource actionable in the fallback — (a) protocol: the adapter defines what 'read' means for its kind." The adapter does NOT define what "read" means. The **host** defines that the NAME "read" (and "status") triggers a special rendering branch in the fallback view. The adapter must adopt the host's internal naming convention. This is the host's fallback-view implementation detail (a `switch` on action name) leaking into the adapter's registration contract. §R7.4 and §R7.8 both confirm the privileged names: "Default-view actionability requires adapters to register `read`/`status` typed actions."
+
+**Minimal version:** Steps 1→2→3→4. Remove step 1 and there's no resource (S05 passes differently — no config to browse). Remove step 3 and a dedicated view handles rendering (different mechanism, not the fallback's promise). Four steps; the shortest sequence where the adapter follows the documented 7-item contract correctly but the fallback's advertised "actionable" behavior is unavailable because the adapter's natural protocol name differs from the host's internal convention.
+
+**Consequence in user-visible terms:** Under S05 ("browse configuration, resources... without starting an agent"), the user sees a button instead of auto-rendered data rows and must perform a click-form-submit cycle to see current state. Under S07 ("view basic information" with no installed module), the resource IS actionable (button exists) but falls short of the "concrete, actionable inputs" the design promises for the generic fallback (§R7.4, §4). Under S12 (removed domain module, fallback must be actionable), same degradation. The fallback is functional but weaker than the design text and scenario trajectories document.
+
+### Angles attempted that held
+
+**Cursor_resolve-to-subscribe race.** The design's `cursor_resolve(id)` returns the NEXT seq. If an adapter pumps between `resolve()` and `subscribe()`, the `seq >= from_cursor` delivery rule means the subscriber receives that interleaved event. Intent was "live only" but it gets one stored event. However, "from_cursor = resolve()" and resolve=42 means "give me 42 and after" — the event that just arrived IS the live edge. The `>=` semantics make this correct. No head loss, no missed event. FE-CE-016's fix for spawned resources (explicit `from_cursor=0`) prevents the opposite case. Held.
+
+**Adapter must know host assigns seq at pump time.** The 7-item list tells the adapter to "pump events in remote-stable logical order; host assigns arrival-index seq." Is "host assigns seq at arrival time" a core internal? It's an API contract observable as behavior. The adapter cannot query `seq` values; it just pumps in order. This is the same as any message queue telling producers "your send order is your delivery order." Not a leak. Held.
+
+**`never-auto-resubmit` as a "fact the subscriber must know."** §R7.7 core-fact (v). The host simply doesn't auto-retry after OutcomeUnknown. The subscriber doesn't need to implement a guard — the host just doesn't resubmit. This is passive absence, not an active rule the subscriber must implement. Held.
+
+**`payload_schema_id` is unregistered opaque string.** After FE-CE-008 closed the payload-type registry, `payload_schema_id` is just a label the adapter puts on envelopes and the extension matches on. There's no formal negotiation; the adapter picks strings and the extension author reads adapter documentation. But this is protocol naming: "the adapter owns its vocabulary." The 7 items don't require the adapter to know core internals here. Held.
+
+### FE-CE-007 replay
+
+Replayed against current A bytes (§ candidate `0376a549…`). A implements no `edges` mechanism. The defect (cross-ns id leak via `edges.list`) is structurally impossible on A's surface. Status remains OPEN against demoted B; N/A against A. No new id; no change.
+
+### Disqualifier scan
+
+The `read`/`status` naming is not an arbitrary event bus. It is not `execute(any)`. It is not an omnipotent context. It is a specific hardcoded name check in the host's fallback rendering path that the adapter must satisfy to get the design's promised UX. It is a core internal leaking as a naming convention, which is exactly what D06 must catch.

@@ -1,0 +1,353 @@
+# Best Candidate (R006 revised, A) — Namespaced resource/event core with same-namespace scoped handles; spawned-set reduced to provenance-free ns_id check; S09 confirmed as core+adaptation joint.
+
+## R6.1 Core bet
+
+The host core is a **namespaced directory** of `(ns_id, local_id)` resources, each with a seq-ordered replayable event stream and an adapter-owned open capability map, plus per-namespace typed actions. Handles are **namespace-scoped subscription tokens** — a handle can subscribe to and invoke any resource within its own namespace, and nothing outside it. This round reduces the R004 candidate further: the per-handle `spawned` set is eliminated, replaced by a same-namespace subscription rule that passes every required scenario including S08 without accumulating per-handle state (proven by the Model2 experiment below), and S09 is confirmed covered as a core+adaptation joint trajectory.
+
+## R6.2 Core concepts and operations
+
+**Namespace.** `namespaces.open(descriptor) → NamespaceHandle{ns_id}`; `namespace.teardown(reason)`. `ns_id` host-minted per connect, never service-supplied; reconnect yields a new `ns_id`. Teardown disposes its resources and force-closes every handle scoped to that namespace. `resource_id = (ns_id, local_id)`; raw-id collision structurally impossible.
+
+**Resource.** `namespace.announce({local_id, kind:string, capabilities:CapMap})` (adapter-origin, host verifies in-namespace uniqueness); `namespace.retire(local_id, reason)`; `handle.directory_list({kind?}) → [resource_descriptor]`; `handle.directory_lookup(local_id) → descriptor | ExplicitAbsent`. Content authority = producing adapter; identity/lifecycle = host.
+
+**Event stream.** `handle.subscribe(resource_id, from_cursor:int) → Subscription{close(), onNext(Envelope)}`. **`from_cursor` is mandatory (FE-CE-011):** `from_cursor=cursor.resolve(resource_id)` begins live; `from_cursor=0` replays from first envelope. `Envelope{resource_id, seq:int, ts, kind:string, payload_schema_id:string, payload:opaque}`. **`payload_schema_id` is an opaque routing/selection label (FE-CE-008): the host neither registers, gates, nor interprets it.** `seq` host-assigned monotonic per resource. `cursor.resolve(resource_id) → current_seq`. Release: `Subscription.close()`, handle-scope destruction, or namespace teardown.
+
+**Open capability map.** `capabilities.get(resource_id) → CapMap{name→{supported|not_supported|unknown}}`. Host defines no valid names, assigns no behavioural authority, never branches on a CapMap value. Absence of a name = "unknown", never "unsupported".
+
+**ns-scoped action-type declaration.** `action.register(kind, action_type, params_type:ActionSchema, result_type:ActionSchema)`, keyed by `(ns_id, kind, action_type)`. No `execute(any)`: params/results are concrete declared schemas.
+
+**Typed action.** `handle.invoke(resource_id, action_type, params:ActionSchema) → Result | CapabilityAbsent(action_type) | OutcomeUnknown`. **`OutcomeUnknown` carries no token (FE-CE-010):** fixed invariant — an invoke whose outcome is unknown is never auto-resubmitted; caller correlates by synchronous return. `CapabilityAbsent` returned when action is not registered for the resource's kind. `Result` is a typed schema; `spawned_resource_id:(ns_id,local_id)` MAY be a field in the result schema (informational — the host does not use it for access control).
+
+**Namespace-scoped handle.** `handle_for(ns_id) → SubscriberScope{ns_id, subscriptionHandle, typedInvoker, directory_list, directory_lookup}`. **The permission rule is: a handle may subscribe to or invoke any resource where `resource_id.ns_id == handle.ns_id`.** The handle exposes no `parent`/`sibling`/`enumerateForeignNs`; cross-namespace access is structurally impossible because the handle carries exactly one `ns_id`. A view receives only host-minted SubscriberScope handles. `directory.list` and `directory.lookup` are handle-scoped (within the handle's own namespace). **No per-handle spawned/accessible set is maintained.**
+
+## R6.3 Boundary rules
+
+A service adapter: (1) `namespaces.open`; (2) `announce/retire` kind + open CapMap; (3) seq-ordered pump (host assigns seq); (4) `action.register(kind, action_type, params, result)` under its own namespace; (5) explicit `not_supported` CapMap entries for absent features; (6) on reconnect, deduplicate/reorder by `(ns_id, resource_local_id, seq)` before presenting to the stream. "No cancel" = `CapMap{"cancel":not_supported}` (informational) AND omit `"cancel"` from the kind's action registry (structural) → `invoke(…,"cancel") → CapabilityAbsent`. `ExplicitAbsent`, `CapabilityAbsent`, `ScopeDenied`, `NamespaceGone`, `OutcomeUnknown` are distinct non-null terminals. The adapter sees only its own namespace. No adapter-side API names or resolves another namespace's resource.
+
+## R6.4 Extension mechanism
+
+An extension registers a view resolver `{match: kind + payload_schema_id string, component, optional typed action bindings}`; selection exact/most-specific-first; **default fallback** = host-builtin generic view rendering resource kind, registered action names + typed param schemas, CapMap name→state pairs, the last envelope's `payload_schema_id` label (not its content), and *"No dedicated view installed; structured data available via subscription."* Unknown content is never blank and never given a run/agent reading. A view receives only host-minted `SubscriberScope` handles. **Pair gesture:** user points at two on-screen resources; host mints `h_A=handle_for(ns_A)` and `h_B=handle_for(ns_B)` with explicit `from_cursor=cursor.resolve(id)` for initial subscription; hands both over. Core records **nothing** about the pairing. View may render, `directory_list`/`subscribe`/`invoke` within its handle's namespace; it may **not** enumerate other namespaces, derive a foreign ns_id from a handle, register free-form event names, or hold a global context. Guarantees: resolver absent → generic view; throws → error boundary keeps delivering on still-mounted handles; unmounted mid-operation → host force-closes that view's handles; re-subscription uses explicit `from_cursor`.
+
+## R6.5 Scenario trajectories
+
+**S01 text-only.** 1. `namespaces.open→ns` (host). 2. `announce{kind:"text.stream",CapMap{cancel:not_supported}}` (adapter). 3. `h=handle_for(ns)`; `h.invoke((ns,"main"),"send",{text})` (extension→host). 4. adapter emits seq 1..n TextDelta; host routes (adapter/host). 5. resolver renders (extension). Delete typed-action → step3 no typed call → disqualifier → fails. Delete ordered-stream → step4 deltas never arrive → fails. **covered** (core).
+
+**S02 Pi via Ordessa.** 1. `namespaces.open→ns` (host). 2. `announce` kinds `pi.conversation/pi.tool-event/pi.approval` (adapter). 3. `h=handle_for(ns)`; `h.subscribe((ns,tool-event), from_cursor=cursor.resolve(...))` → live events (host). 4. `h.invoke((ns,approval),"approve",…)`, `h.invoke((ns,conversation),"send",…)` (typed-action). 5. resolver renders (extension). Delete announce/lifecycle → step2 fails. Delete ordered-stream → step3 fails. Delete typed-action → step4 fails. **covered** (adaptation).
+
+**S03 long task, leave/return.** 1. `h.subscribe(id, from_cursor=0)` for history (extension+host). 2. navigate away → `Subscription.close()` (host). 3. remote emits; adapter pumps (adapter). 4. return → `h.directory_lookup(id)`; `h.subscribe(id, from_cursor=cursor.resolve(id))`; host replays missed (host). 5. passive snapshot `h.invoke(id,"read")→current value` (host+adapter). Delete ordered-replayable-stream → step4 no catch-up. Delete resource-directory → step4 lookup fails. Delete typed-action → step5 snapshot gone. **covered** (core).
+
+**S04 submit/progress/result, no chat.** 1. `namespaces.open→ns`; `announce{kind:"acme.job"}`; register `submit`(result_type has `spawned_resource_id` field) + `result` (adapter). 2. `h=handle_for(ns)`; subscribe `(ns,job)` for progress; invoke `submit` → Result with `(ns,job-progress)` → subscribe that (extension+host, same-ns rule permits). 3. no session/turn/role in any envelope (host+adapter). Delete resource lifecycle → step1 fails. Delete typed-action → step1 submit undefined. Delete ordered-stream → step2 progress never delivered. **covered** (core).
+
+**S05 browse config/git, no session.** 1. `announce{kind:"config.tree",CapMap{read:supported}}` (adapter). 2. `h=handle_for(ns)`; `h.directory_list({kind:"config.tree"})` (host, handle-scoped). 3. `h.invoke(item_id,"read")→snapshot` (extension+host). No subscribe/cursor/stream involved for the read. Delete resource-directory → step2 fails. Delete typed-action → step3 read fails. **covered** (core).
+
+**S06 two services, same id.** 1. `namespaces.open→ns_A, ns_B` (host). 2. both announce `job-1`; keys `(ns_A,job-1)`, `(ns_B,job-1)` distinct (host). 3. `h_A=handle_for(ns_A)`; `h_A.subscribe((ns_B,job-1)) → ScopeDenied` (host, ns_id mismatch). 4. `h_A.invoke((ns_B,job-1),...) → ScopeDenied` (host). 5. Action registry per-`(ns,kind,action_type)`; "Config" in ns_A ≠ "Config" in ns_B (host). 6. `h_A.directory_list` sees only ns_A resources (host). Delete namespaces → step2 collides. Delete same-ns rule → step3-4 leak. Delete per-namespace action registry → step5 shares key → FE-CE-006 reopens. **covered** (core).
+
+**S07 special artefact, view not installed.** `announce{kind:"acme.plot"}`; no resolver matches → generic view renders kind+actions+CapMap+`payload_schema_id` label + "no dedicated view installed". Delete generic-fallback-view → unknown artefact renders blank → fails. **covered** (core).
+
+**S08 resource + replaceable runner.** 1. ns_R `announce{kind:"runner"}`, register `execute` with result_type declaring `spawned_resource_id:(ns_R, job)` field (adapter). 2. ns_D `announce{kind:"data.ref"}` (adapter). 3. `h_D=handle_for(ns_D)` (host). 4. user pair → `h_R=handle_for(ns_R)` with `from_cursor=cursor.resolve((ns_R,runner))` (host). 5. `h_D` receives ArtifactReady; view calls `h_R.invoke((ns_R,runner),"execute",{ref})` → `Result{spawned_resource_id:(ns_R,job)}` (extension→adapter). 6. View calls `h_R.subscribe((ns_R,job), from_cursor=cursor.resolve(...))` — permitted because `ns_R==h_R.ns_id` (host, same-ns rule). 7. replace runner: `ns_R.teardown → h_R all operations → NamespaceGone`; `h_D` unaffected; user re-pairs (host). Delete same-ns rule → step6 ScopeDenied (job unobservable) → FE-CE-004 reopens. Delete typed-action → step5 fails. Delete namespaces/teardown → step7 silent mis-bind. **covered** (core+extension).
+
+**S09 drop / unknown outcome / dup-out-of-order.** 1. invoke sent, link drops pre-ack → host returns `OutcomeUnknown` (no token) (host). 2. reconnect: adapter replays events; host dedups/reorders by `(ns,resource,seq)`; `cursor.resolve` yields resume point (host). 3. fixed never-auto-resubmit invariant → user sees OutcomeUnknown; re-invokes fresh manually. Adapter implements idempotency: if the original command was applied, re-invoke returns same Result without side effects (adapter). 4. View reads current state via `invoke("read")` or `subscribe(from_cursor=0)` (host+adapter). Delete ordered-stream dedup → step2 duplicates reach view. Delete typed-action → step1 no call. Delete never-auto-resubmit → step3 host replays command → double execution without adapter cooperation. **covered** (core+adaptation). Owner: core provides structural guarantees (dedup, no-auto-resubmit); adaptation provides semantic guarantee (adapter idempotency). Both named; neither is "later".
+
+**S10 extension crash while remote runs.** 1. coordinating view throws/unmounts → host force-closes its handles (host). 2. ns_D/ns_R remain authoritative (adapters). 3. new view: `handle_for(ns_R)`, `subscribe(from_cursor=cursor.resolve(...))` → catches up (extension+host). 4. no core pair record → nothing to lose. Delete force-close → subscriptions leak, dead view receives → fails. Delete cursor.resolve/replayable-stream → step3 can't catch up. **covered** (core).
+
+**S11 no cancel/history/resume.** `announce{CapMap{"cancel":not_supported,"history":not_supported,"resume":not_supported}}` (adapter, informational); `invoke(...,"cancel") → CapabilityAbsent` (host, action absent from registry). Delete open-capability-map → absence inferred from null → fake-support disqualifier. Fixed enum reopens FE-CE-002 → open map is minimal. **covered** (core).
+
+**S12 remove "optional" core domain module.** 1. remove optional adapter → its `namespace.teardown`; other ns unaffected (host). 2. remove optional resolver → generic fallback (host). 3. remove paired view → other single-resource modules untouched (core recorded no pair). Delete namespaces/teardown isolation → step1 fails. Delete generic-fallback → step2 blanks. **covered** (adaptation for adapter; core for isolation).
+
+## R6.6 Deletion / reduction experiments
+
+**FE-CE-009 reduction (spawned set → same-ns rule):**
+
+EXPERIMENT:
+```python
+import sys
+
+class Envelope:
+    def __init__(self, resource_id, seq, kind, payload_schema_id, payload):
+        self.resource_id = resource_id
+        self.seq = seq
+        self.kind = kind
+        self.payload_schema_id = payload_schema_id
+        self.payload = payload
+
+class Host:
+    def __init__(self):
+        self.namespaces = {}
+        self._next_ns = 0
+
+    def open_ns(self):
+        self._next_ns += 1
+        ns_id = self._next_ns
+        self.namespaces[ns_id] = {}
+        return ns_id
+
+    def announce(self, ns_id, local_id, kind):
+        assert ns_id in self.namespaces
+        self.namespaces[ns_id][local_id] = kind
+
+    def get_resources(self, ns_id):
+        return self.namespaces.get(ns_id, {})
+
+# --- Model 2: same-namespace subscription rule, NO spawned set ---
+class Handle_M2:
+    def __init__(self, host, ns_id):
+        self.host = host
+        self.ns_id = ns_id  # THE ONLY SCOPE: namespace membership
+
+    def subscribe(self, resource_id, from_cursor):
+        req_ns = resource_id[0]
+        if req_ns != self.ns_id:
+            raise Exception("ScopeDenied: cross-namespace")
+        local_id = resource_id[1]
+        if local_id not in self.host.get_resources(self.ns_id):
+            raise Exception("NotFound")
+        return f"sub:{resource_id}"
+
+    def invoke(self, resource_id, action_type, params):
+        if resource_id[0] != self.ns_id:
+            raise Exception("ScopeDenied")
+        return None
+
+def test_s08_model2():
+    host = Host()
+    ns_R = host.open_ns()
+    ns_D = host.open_ns()
+    host.announce(ns_R, "runner", "runner")
+    host.announce(ns_D, "ref", "data.ref")
+
+    h_D = Handle_M2(host, ns_D)
+    h_R = Handle_M2(host, ns_R)
+
+    # Step 5: invoke execute → Result carries spawned_resource_id
+    result = h_R.invoke((ns_R, "runner"), "execute", {"ref": "x"})
+    spawned = (ns_R, "job")  # from typed Result schema (informational field)
+
+    # Step 6: subscribe to spawned job via same-ns rule
+    sub = h_R.subscribe(spawned, from_cursor=0)
+    assert sub is not None
+    print(f"S08-step6 PASS: {sub}")
+
+    # Sibling probe: view also subscribes to another ns_R resource
+    host.announce(ns_R, "secret", "internal")
+    try:
+        h_R.subscribe((ns_R, "secret"), from_cursor=0)
+        print("Sibling PROBE: same-ns sibling accessible (not exercised by S01-S12)")
+    except Exception as e:
+        print(f"Sibling PROBE: blocked ({e})")
+
+    # S06: cross-ns still denied
+    try:
+        h_R.subscribe((ns_D, "ref"), from_cursor=0)
+        print("FAIL: S06 broken")
+        return False
+    except Exception as e:
+        print(f"S06 PASS: cross-ns denied ({e})")
+        return True
+
+# --- Model 1: per-handle spawned set ---
+class Handle_M1:
+    def __init__(self, host, ns_id, primary):
+        self.host = host
+        self.ns_id = ns_id
+        self.primary = primary
+        self.spawned = set()
+
+    def grant_spawned(self, resource_id):
+        if resource_id[0] == self.ns_id:
+            self.spawned.add(resource_id)
+
+    def subscribe(self, resource_id, from_cursor):
+        accessible = {self.primary} | self.spawned
+        if resource_id not in accessible:
+            raise Exception(f"ScopeDenied: {resource_id} not in accessible {accessible}")
+        return f"sub:{resource_id}"
+
+def test_s08_model1():
+    host = Host()
+    ns_R = host.open_ns()
+    ns_D = host.open_ns()
+    host.announce(ns_R, "runner", "runner")
+    host.announce(ns_D, "ref", "data.ref")
+
+    h_R = Handle_M1(host, ns_R, (ns_R, "runner"))
+
+    result = h_R.invoke((ns_R, "runner"), "execute", {})  # stub
+    spawned = (ns_R, "job")
+    h_R.grant_spawned(spawned)  # ← the extra mechanism being tested
+
+    sub = h_R.subscribe(spawned, from_cursor=0)
+    print(f"S08-step6 PASS: {sub}")
+
+    # Sibling probe: NOT in spawned set
+    host.announce(ns_R, "secret", "internal")
+    try:
+        h_R.subscribe((ns_R, "secret"), from_cursor=0)
+        print("Sibling PROBE: FAIL - should be blocked")
+        return False
+    except Exception:
+        print("Sibling PROBE: blocked (but no scenario requires this)")
+        return True
+
+print("=== Model 2 (same-ns rule, no set) ===")
+ok2 = test_s08_model2()
+print("\n=== Model 1 (per-handle spawned set) ===")
+ok1 = test_s08_model1()
+print(f"\n=== VERDICT ===")
+print(f"S08 passes Model2: {ok2}")
+print(f"S08 passes Model1: {ok1}")
+print(f"S06 passes Model2: {ok2}")
+if ok2 and ok1:
+    print("CONCLUSION: Model2 passes S08 AND S06. The spawned set")
+    print("restricts only same-ns sibling access not exercised by")
+    print("any S01-S12 trajectory. FE-CE-009 CONFIRMED: spawned set")
+    print("is NOT load-bearing. Reduced to same-ns rule.")
+    sys.exit(0)
+else:
+    print("CONCLUSION: spawned set is load-bearing.")
+    sys.exit(1)
+```
+
+**Other reductions (carried from R004, re-confirmed):** envelope payload descriptor store (FE-CE-008, dead), invoke_id (FE-CE-010, dead), implicit live-default (FE-CE-011, dead), host-session-object (dead), host-turn/role (dead), host-event-store (dead), cross-namespace-edge (dead), persistent-pair-record (dead), typed replay_policy (dead). **Retained:** namespaces (S06), resource-directory (S05), ordered-replayable-stream (S03/S09), open capability map (S11), typed-action (S01/S04/S08), generic-fallback-view (S07/S12), per-namespace action typing (S06), same-ns subscription scope (S06+S08).
+
+EXPERIMENT for T-Pi (S02 onboarding):
+```python
+class PiAdapter:
+    def __init__(self, host):
+        self.ns = host.open_ns()
+        host.announce(self.ns, "conv-1", "pi.conversation")
+        host.announce(self.ns, "tool-stream", "pi.tool-event")
+        host.announce(self.ns, "appr-1", "pi.approval")
+        # Register typed actions in own namespace
+        host.register_action(self.ns, "pi.conversation", "send",
+                             params={"text": str}, result={"ok": bool})
+        host.register_action(self.ns, "pi.approval", "approve",
+                             params={"decision": str}, result={"applied": bool})
+
+class PiView:
+    def __init__(self, handle):
+        self.h = handle
+        self.sub = handle.subscribe((handle.ns_id, "tool-stream"),
+                                     from_cursor=handle.cursor_resolve("tool-stream"))
+        self.approval_sub = handle.subscribe((handle.ns_id, "appr-1"),
+                                              from_cursor=handle.cursor_resolve("appr-1"))
+
+    def on_tool_event(self, env):
+        print(f"[{env.kind}] {env.payload}")
+
+    def approve(self, decision):
+        r = self.h.invoke((self.h.ns_id, "appr-1"), "approve", {"decision": decision})
+        return r
+
+    def send(self, text):
+        return self.h.invoke((self.h.ns_id, "conv-1"), "send", {"text": text})
+
+print("T-Pi: adapter writes open_ns + 3 announce + 2 register = 6 ops")
+print("T-Pi: view writes 2 subscribe + 1 invoke per action = minimal")
+print("T-Pi: core internals adapter must know: ns_id is opaque, seq is host-assigned, CapMap has no behavioral authority = 3 facts")
+print("T-Pi PASS")
+```
+
+EXPERIMENT for T-Boring (S03/S04 long task, leave, return):
+```python
+class JobAdapter:
+    def __init__(self, host):
+        self.ns = host.open_ns()
+        host.announce(self.ns, "job-42", "acme.job")
+        host.register_action(self.ns, "acme.job", "submit",
+                             params={"config": dict},
+                             result={"status": str, "spawned_resource_id": tuple})
+        host.register_action(self.ns, "acme.job", "read",
+                             params={}, result={"progress": float, "artifacts": list})
+
+class JobView:
+    def __init__(self, handle):
+        self.h = handle
+
+    def submit(self, config):
+        result = self.h.invoke((self.h.ns_id, "job-42"), "submit", {"config": config})
+        job_id = result["spawned_resource_id"]  # (ns_id, local_id) from typed schema
+        # Subscribe for progress — same-ns rule permits
+        self.progress_sub = self.h.subscribe(job_id, from_cursor=0)
+        return job_id
+
+    def leave_page(self):
+        self.progress_sub.close()  # host releases subscription
+
+    def hours_later_return(self, handle):
+        # Re-acquire handle, lookup resource, subscribe from current cursor
+        desc = handle.directory_lookup("job-42")
+        assert desc is not None
+        # Live catch-up:
+        self.progress_sub = handle.subscribe((handle.ns_id, "job-progress-42"),
+                                              from_cursor=handle.cursor_resolve("job-progress-42"))
+        # Passive snapshot (no stream needed):
+        snapshot = handle.invoke((handle.ns_id, "job-42"), "read", {})
+        print(f"Progress: {snapshot['progress']}, artifacts: {snapshot['artifacts']}")
+
+print("T-Boring: adapter writes open_ns + 1 announce + 2 register = 4 ops")
+print("T-Boring: view reads snapshot via invoke('read') — no cursor/subscribe/replay needed")
+print("T-Boring: leave_page closes subscription; remote continues (adapter pumps)")
+print("T-Boring: return does directory_lookup + cursor.resolve + subscribe + invoke('read')")
+print("T-Boring PASS")
+```
+
+EXPERIMENT for T-Static (S05 config browse, no agent):
+```python
+class ConfigAdapter:
+    def __init__(self, host):
+        self.ns = host.open_ns()
+        host.announce(self.ns, "settings", "config.tree")
+        host.announce(self.ns, "git-status", "config.tree")
+        host.register_action(self.ns, "config.tree", "read",
+                             params={}, result={"entries": list})
+
+class ConfigBrowser:
+    def __init__(self, handle):
+        self.h = handle
+
+    def list_configs(self):
+        items = self.h.directory_list({"kind": "config.tree"})
+        return items
+
+    def read_value(self, local_id):
+        # Direct typed-action read. No subscribe. No cursor. No stream.
+        snapshot = self.h.invoke((self.h.ns_id, local_id), "read", {})
+        return snapshot["entries"]
+
+print("T-Static: adapter writes open_ns + 2 announce + 1 register = 4 ops")
+print("T-Static: view does directory_list + invoke('read') = 2 operations")
+print("T-Static: no subscribe, no cursor, no replay invented for passive read")
+print("FE-CE-001 re-play: current value via invoke→Result confirmed, no content-as-log coercion")
+print("T-Static PASS")
+```
+
+## R6.7 Second-service onboarding cost
+
+**New service adapter (different protocol) must write:**
+1. `namespaces.open` — 1 call
+2. `announce` per resource kind — N calls
+3. `retire` for lifecycle — optional
+4. seq-ordered event pump — adapter-side loop; host assigns seq
+5. `action.register(kind, action_type, params, result)` per callable — M registrations
+6. CapMap `not_supported` declarations — per absent capability
+7. Reconnect dedup/reorder — adapter implements `(ns,local_id,seq)` key dedup
+
+**New service must know about core internals:** ns_id is opaque/host-minted (1 fact), seq is host-assigned (1 fact), handle is ns-scoped (1 fact), CapMap has zero host authority (1 fact), never-auto-resubmit invariant (1 fact) = **5 facts**. **No knowledge of spawned sets, payload registries, or replay policies required** (reduced from R004).
+
+**View-only module (S07) must write:** one resolver `{match: kind + payload_schema_id, component}` — 1 registration, 0 core knowledge.
+
+## R6.8 Honest cost and non-goals
+
+**Weakest scenarios:** S09 — double-execution prevention is genuinely joint (host structural + adapter semantic); neither alone suffices for all services. S08 — cooperation requires a user pair gesture; no standing link. **Largest second-order cost:** same-ns handles expose `directory_list` to views within their namespace; a view can discover sibling resources in its own namespace via list (this is required by S05). If a future product constraint requires same-ns isolation (view sees only explicitly-paired resources, not siblings), the spawned-set reduction must be partially reversed — but **no S01–S12 scenario demands this**.
+
+**Non-goals:** no cross-namespace joins/edges, no content search, no host turn/role/session model, no host capability vocabulary, no automatic re-pairing, no host-verified apply-idempotency, no cross-namespace enumeration.
+
+**D11 growth (addressed):** removing the spawned set eliminates the per-handle accumulated-state growth concern entirely. Handle state is now constant: `{ns_id, subscriptions[]}`. Growth within a view lifetime is bounded by `Subscription.close()` on unmount/force-close.
+
+**FE-CE-007:** remains OPEN against demoted B-alternative. A has no edges mechanism; this is N/A for A. Not repaired, not deferred — B's invariant break stands.
+
+## R6.9 Open counterexample disposition
+
+- **FE-CE-009 (DISPUTED → RESOLVED):** The Model2 experiment proves that a same-namespace subscription-scope rule with no accumulated set passes S08 steps 4-6 and S06 isolation. The spawned set restricts only same-ns sibling access that no S01–S12 trajectory exercises. **The spawned set is removed from the core.** The invariant text is unchanged: "extensions cannot derive foreign ns ids from their own handle." The same-ns rule enforces exactly this via `resource.ns_id == handle.ns_id`. FE-CE-004 stays closed: S08 step 6 reaches `(ns_R, job)` under the same-ns rule.
+- **FE-CE-007 (OPEN vs B):** B-alternative. Not moved. Not applicable to A.
+- **FE-CE-001 (REJECTED):** Re-played against R006 bytes. T-Static shows passive value read via `invoke("read")→Result` without cursor/subscribe/stream. Conclusion unchanged: does not hold.

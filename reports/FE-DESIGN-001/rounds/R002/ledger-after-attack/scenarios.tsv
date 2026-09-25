@@ -1,0 +1,13 @@
+sid|status|owner|mechanism|evidence|round
+S01|claimed|core|text.stream resource, adapter-chosen CapMap names, no profile/tool/recovery|best-candidate §R.5-S01|R001
+S02|claimed|adaptation|kinds pi.conversation/pi.tool-event/pi.approval + conversation resolver + approve action|best-candidate §R.5-S02|R001
+S03|claimed|core|namespace outlives page; re-subscribe from cursor; read-action for snapshots|best-candidate §R.5-S03|R001
+S04|claimed|core|submit/progress/result resources, adapter-chosen CapMap names, no chat object in core|best-candidate §R.5-S04|R001
+S05|claimed|core|config.tree resource, CapMap{read:supported} valid under open map, no session|best-candidate §R.5-S05|R001
+S06|claimed|core|namespaced resource ids structurally prevent collision|best-candidate §R.5-S06|R001
+S07|claimed|core|generic fallback renders kind + schema + CapMap labels, not run-strip|best-candidate §R.5-S07|R001
+S08|claimed|extension|cross-kind view passing ids via typed action, replaceable runner adapter|best-candidate §R.5-S08|R001
+S09|partial|core|host seq/dedup on stream; action double-exec needs adapter idempotency; (namespace_id,action_seq) is D06 deferred|best-candidate §R.5-S09|R001
+S10|claimed|core|handles closed on unmount, resource stays authoritative, re-subscribe from cursor|best-candidate §R.5-S10|R001
+S11|claimed|core|adapter-named CapMap not_supported + CapabilityAbsent sentinel; absence stated, never inferred|best-candidate §R.5-S11|R001
+S12|claimed|adaptation|adapter teardown disposes namespace only; resolver absent falls to generic view|best-candidate §R.5-S12|R001

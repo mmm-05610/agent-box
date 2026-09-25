@@ -1,0 +1,94 @@
+<<<FE-OUT-START>>>
+## Verifier R001 — dimension D12-authority-boundary
+
+Verdict rationale (rows in the verdict block): FE-CE-001 holds as a major; FE-CE-002 does not hold as written, and its one valid residual is folded into CE-001 rather than double-counted. Candidate B is recorded as holding this round (I could not break it on D12); that is "I could not break it", not "B is correct."
+
+### 1. Fabrication check
+- CE-001's load-bearing facts are in the text: §A.2 gives `directory.lookup → descriptor` only and content solely via `stream.subscribe` envelopes; there is no read-value / snapshot / invalidate op. The claim "content is representable only as a seq-ordered, cursor-resumable log" is not fabricated. §A.5-S05 confirms it: a `config.tree` / `git.diff` resource exposes its content by emitting envelopes, not by returning a value. Not fabricated.
+- CE-001 mildly overstates the *visibility* of the harm: "the old diff is shown as live with no replaced marker" is guaranteed only for a history/timeline-style resolver; a last-envelope resolver would display the current value. I flag this so the record is honest — the *structural* claim (the core cannot express "superseded / current" as a fact) holds; the *pixel-level* claim is view-contingent. The invariant that fails is about the core's definition of observable content, so it still holds.
+- CE-002 mis-states the candidate. It asserts a read-only config is presented "with a cancel/resume capability strip," but §A.5-S05 assigns that resource `CapSet{read}`, not the recovery trio; §A.4 renders the *declared* capabilities, so no cancel/resume strip is produced for config. The attacker presented §A.2's "e.g. cancel/history/resume" as a fixed core enumeration; the "e.g." plus §A.5-S05's `read` member leaves it ambiguous, not proven fixed. The specific sequence does not exist in A as written.
+
+### 2. Missed-check
+No separate new D12 break to add for either candidate. The strongest remaining D12 angle — the core `generic-fallback-view` rendering a "last-envelope summary" (§A.4) — is the same root as CE-001 (the core has no current-value primitive, so its default reading of *any* resource is "the most recent event of a run," a stream/run shape imposed on passive data). I record it as a sub-instance of CE-001, not a new row. For B: its `builtin-default-view-provider` is an *admitted* core materialisation (§B.4), not smuggled-as-neutral, and removing it would weaken S07; I concur it is not a D12 counterexample.
+
+### 3. Self-contradiction check
+A contradicts itself between §A.1 and §A.4/§A.8. §A.1 claims the host "owns only directory, subscription, namespacing and event delivery" and has no content authority; §A.8 claims the removed session/turn/role fields avoid "conversation smuggling." But §A.4 has the core *choose* "last envelope" as the representative reading of a resource, and the only content primitive is a replayable ordered log. So the run/replay shape survives in the log and the fallback even after the cosmetic removal of role fields — the property the trajectory section (S05, S07) actually relies on contradicts the "no content interpretation" claim. This is the mechanism CE-001 names.
+
+### 4. Verdicts
+- FE-CE-001 → **holds (major)**. Nothing in A prevents the sequence: with `read-value`/`invalidate` absent (§A.2) and §A.5-S03 step 4 replaying `seq=1` then `seq=2` on return, a snapshot resource's superseded value carries no core "void" marker; §A.5-S05 proves passive content is expressed *only* as a resumable stream, i.e. the conversation/run-log primitive onto non-conversation data — a service/conversation assumption wearing the neutral name "event delivery."
+- FE-CE-002 → **does_not_hold (rejected)** on its stated sequence; §A.5-S05's `CapSet{read}` and §A.4's declared-capability rendering block the "cancel/resume strip on config" step. The residual (CapSet membership open-vs-fixed is underspecified; fallback "last-envelope summary" is a content reading) is captured under CE-001.
+
+EXPERIMENT: does an append-only seq-ordered snapshot log with no invalidate/current marker, re-read from cursor 0 on return, expose "current value" as a core-addressable fact, or only as a per-view derivation from max-seq? This models only the disputed read mechanism; it verifies nothing about the product.
+
+```python
+# Model of A's event-plane for a SNAPSHOT resource (git.diff). Proves the model only.
+# Question (CE-001): can the core mark a superseded value as not-current?
+from dataclasses import dataclass, field
+
+@dataclass
+class Env:                      # A.2 Envelope, host-guaranteed order only
+    resource_id: str
+    seq: int
+    kind: str
+    payload: str                # the diff text
+
+class CoreStream:               # A.2: content = ordered replayable log, nothing else
+    def __init__(self, rid):
+        self.rid = rid
+        self.log = []
+    def ingest(self, payload):  # host assigns monotonic seq on ingest
+        s = (self.log[-1].seq + 1) if self.log else 1
+        self.log.append(Env(self.rid, s, "git.diff", payload))
+    def subscribe(self, from_cursor=0):   # A.2/A.5-S03: replay in seq order
+        return [e for e in self.log if e.seq > from_cursor]
+    # NO read_value(); NO invalidate(); NO supersede flag on Env -> that is the disputed point.
+
+def main():
+    st = CoreStream("git.diff")
+    st.ingest("DIFF-V1")        # working tree diff at t0
+    st.ingest("DIFF-V2")        # tree changed -> new diff at t1
+    returned = st.subscribe(from_cursor=0)   # user leaves page, returns
+
+    # What the core returns on a return-later read:
+    seqs = [e.seq for e in returned]
+    payloads = [e.payload for e in returned]
+    # Is "which entry is current" a CORE fact?
+    has_current_flag = any(hasattr(e, "is_current") for e in returned)
+    has_superseded_flag = any(hasattr(e, "superseded") for e in returned)
+    # Core-addressable current value requires an op; A has none. Derive it the only way:
+    derived_current = max(returned, key=lambda e: e.seq).payload
+
+    print("delivered:", seqs, payloads)
+    print("core exposes an is_current/superseded flag:", has_current_flag or has_superseded_flag)
+    print("core has a read-value op returning ONLY current value: False")
+    print("max-seq must be derived by the view to get current diff:", derived_current)
+
+    # Assert the structural claim CE-001 makes:
+    assert 1 in seqs and 2 in seqs, "superseded DIFF-V1 is still delivered on return"
+    assert not (has_current_flag or has_superseded_flag), "core cannot mark it superseded"
+    assert derived_current == "DIFF-V2", "current value only reconstructable from max-seq, not a core fact"
+    # A history/timeline resolver that renders all delivered envelopes therefore shows
+    # DIFF-V1 alongside DIFF-V2 with no core void marker. That is structural, not a bug.
+    print("MODEL RESULT: with stream-as-sole-content, 'current value' is NOT a core primitive;")
+    print("superseded snapshots are indistinguishable from live ones at the core layer.")
+
+main()
+```
+<<<FE-OUT-END>>>
+
+<<<FE-VERDICT-START>>>
+FE-CE-001|holds|A §A.2 (no read-value/snapshot/invalidate; content only via stream.subscribe) and §A.5-S03 step 4 / §A.5-S05 fail to prevent a passive snapshot being modelled only as a replayable ordered log; superseded values carry no core void marker|A must add a current-value/invalidate primitive OR concede passive snapshot content is expressible only as a supersede-less run-log; update S05 (covered->fails) and S03-artefact
+FE-CE-002|does_not_hold|§A.5-S05 assigns config CapSet{read} and §A.4 renders only declared capabilities, so no cancel/resume strip is produced on a read-only resource; §A.2's "e.g." leaves CapSet membership not-proven-fixed|residual (CapSet open-vs-fixed underspecified; core fallback "last-envelope summary" is a content reading) folded into CE-001
+S01|trajectory_ok|A §A.5-S01 — text.stream works with zero profile/tool/recovery|nothing
+S02|trajectory_ok|A §A.5-S02 — adapter kinds + extension conversation resolver|nothing
+S03|partial|A §A.5-S03 step 4|run-progress replay in seq order is ok, but artefact-as-snapshot inherits CE-001 (no current-value/invalidate)
+S04|trajectory_ok|A §A.5-S04 — submit/progress/result with no core chat/session/role object|nothing
+S05|fails|A §A.5-S05|config/git content only representable as the replayable stream; no read-value op (CE-001)
+S06|trajectory_ok|A §A.5-S06 — namespaced ids prevent collision|nothing (D03 not attacked this round)
+S07|partial|A §A.5-S07|never blank, but core fallback "last-envelope summary" is a run/stream-tail reading of content (see checks)
+S08|trajectory_ok|A §A.5-S08 — id + typed params, no shared global state|nothing
+S09|partial|A §A.5-S09|double-exec idempotency is adapter-joint (D01/D06, A-admitted; not D12)
+S10|trajectory_ok|A §A.5-S10 — handles closed, resource stays authoritative|nothing
+S11|trajectory_ok|A §A.5-S11 — not_supported CapSet + CapabilityAbsent stated|nothing
+S12|trajectory_ok|A §A.5-S12 — adapter teardown / resolver fallback|nothing
+<<<FE-VERDICT-END>>>

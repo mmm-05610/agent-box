@@ -1,0 +1,48 @@
+{
+  "evidence": "agents/PROFILE/v0.2-delta.md；agents/PROFILE/verification-map.md §08:33；BE 96cdc337／FE a1baa218a2；agents/PROFILE/outbox/PROFILE-0011.md",
+  "id": "profile",
+  "modules": [
+    {
+      "blockers": "无；不影响 CP-SESSION-001。",
+      "doing": "无（四项已交，停在验收映射回核）。",
+      "done": "符合度核查（差量表纠正三项）；store#clone；portable（export/inspect/import＋store.import_bundle）；root.tsx#createProfileRoot（形参 0 由测试断言）；demo.ts#runDemo（明标测试端口，不在产物内）；BE 73 tests OK、FE 17/17、产物 17152 bytes（规范 cwd）。",
+      "evidence": "agents/PROFILE/v0.2-delta.md；BE 58074749／96cdc337；FE ba748793e8／a1baa218a2",
+      "name": "Profile 逻辑蓝图",
+      "next": "逐项把 v0.2 验收面对回测试实名并补进 verification-map；等接缝/装配另裁。",
+      "observed_at": "2026-09-23T08:42:30Z",
+      "owner": "PROFILE",
+      "status": "IN_PROGRESS",
+      "summary": "本批独立插件面四项差量已实施并包内跑绿（复制、导出/导入含校验预览、零 props 根视图、独立演示）；仍待把 v0.2 验收面逐项对回测试实名，故本模块记 IN_PROGRESS 而非完成。"
+    },
+    {
+      "blockers": "无。已登记而不由本包自修的缺口：app vitest include 不含本包测试；跑 build-all 会重写已提交 extensions.lock.json（本包不跑，处置权在 FC/C）。",
+      "doing": "无（该阶段已交，保持不返工）。",
+      "done": "BE 58 unittest OK 与零 entry_points/零 Requires-Dist wheel（15296 bytes）；FE tsc --noEmit 0 → CJS 出件 0 → node --test 12/12 → esbuild entry.js 15453 bytes；两树 HEAD 未变且 git status --porcelain 各 0 行（本轮 07:07 实测）。 v0.2 增量四项：clone、portable 导出/导入＋校验预览、零 props 根视图、独立演示；BE unittest 73 OK、FE node --test 17/17。",
+      "evidence": "agents/PROFILE/verification-map.md；BC-0026:16；BE 58074749／96cdc337（父 f3bcbde9）／FE e869683469",
+      "name": "Profile 独立插件包（P0/P1，仅独立验证）",
+      "next": "若 v0.2 差量触及既有码，改动一律另起提交并在 verification-map 补验收映射。",
+      "observed_at": "2026-09-23T08:42:30Z",
+      "owner": "PROFILE",
+      "status": "DONE",
+      "summary": "既有独立包与本批四项增量在同轮现跑中全绿（BE 73、FE 17/17、tsc/esbuild 0）；「收件」仍只覆盖独立插件验证这一状态。"
+    },
+    {
+      "blockers": "无（未启动即未启动，不写成执行中）。",
+      "doing": "无。",
+      "done": "无。唯一已核事实：本包依赖的宿主契约 platform/extension-api/src/index.ts 与 FC 集成树字节同源（1797 bytes），故接缝批不必先追平上游。",
+      "evidence": "agents/PROFILE/outbox/PROFILE-0006.md §2；BC-0026:16；control/product/profile-blueprint-v0.2.md:20",
+      "name": "Profile 宿主接缝与产品装配",
+      "next": "等 FC/C 对装配或接缝另裁；本包不自行进入，不把 Profile 列为 CP-SESSION-001 前置。",
+      "observed_at": "2026-09-23T07:07:48Z",
+      "owner": "PROFILE",
+      "status": "NOT_STARTED",
+      "summary": "未做，且明确不在本包授权内：v0.2:20 只要求独立插件面，装配/接缝若要做需 C 另裁单写域。"
+    }
+  ],
+  "next": "把 v0.2 验收面逐项对回测试实名并补验收映射；此后等 FC/C 对接缝或装配另裁，本包不自行进入宿主面。",
+  "revision": 4,
+  "status": "IN_PROGRESS",
+  "summary": "v0.2 四项真差量已全部实施并跑绿（复制、导出/导入含校验预览、零 props 根视图、独立演示）；四状态仍只有独立插件验证成立，接缝与产品装配未做、不在 CP-SESSION-001 基线内。",
+  "try_it": "产品内暂无入口。本包自跑门：BE 在 backend/plugins/agent-box-profile-preset 下 PYTHONPATH=src python3 -m unittest discover -s tests -p 'test_*.py' → 58 OK；FE 需借工具链，复跑配方见 verification-map.md。",
+  "updated_at": "2026-09-23T08:43:53.798140+00:00"
+}

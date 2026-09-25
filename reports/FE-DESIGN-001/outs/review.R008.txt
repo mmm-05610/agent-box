@@ -1,0 +1,27 @@
+I'll verify the saved best candidate against each required scenario and replay the counterexample ledger.
+
+<tool_call>
+<function=update_memory>
+<parameter=action>
+create
+</parameter>
+<parameter=category>
+user_behavior
+</parameter>
+<parameter=content>
+User runs adversarial design loops (FE-DESIGN-001) as Qoder Ultimate Model calls. Two phases observed: candidate-attacker and candidate-reviewer. Both phases share one non-negotiable rule set (never soften/delete/reinterpret required scenarios; disagreements become DISPUTED ledger rows with concrete reason; no work orders or implementation proposals; product code is evidence not answer) and one strict machine-checked output contract: deliverables wrapped in <<<FE-OUT-START>>>/<<<FE-OUT-END>>>; ledger rows in FE-LEDGER-START/END as FE-CE-NNN|round|severity|status|invariant|title|evidence-pointer|target-CE-ids; scenarios in FE-SCENARIO-START/END as S01..S12|covered|partial|open|owner|mechanism|evidence; mechanisms in FE-MECH-START/END. Reviewer phase additionally emits FE-VERDICT-START/END (S01..S12 trajectory_ok|trajectory_broken|insufficient_evidence) and FE-REPLAY-START/END (CE|pass|fail|sequence|exact-text-that-stops-it) and requires BOUNDARY_SCAN: and ESCAPE_HATCH_SCAN: lines. Ids FE-CE-001..999, S01..S12. Everything outside markers is commentary and cannot enter the record.
+</parameter>
+<parameter=keywords>
+FE-DESIGN-001,adversarial design loop,FE-OUT markers,FE-CE counterexample ledger,scenarios S01-S12,role phases
+</parameter>
+<parameter=source>
+auto
+</parameter>
+<parameter=title>
+Adversarial design-loop protocol and output contract
+</parameter>
+<parameter=usage_scenario>
+["recurring adversarial design-loop role phases","emitting machine-checked deliverable blocks","FE-DESIGN-001 Agent Desktop loop"]
+</parameter>
+</function>
+</tool_call>

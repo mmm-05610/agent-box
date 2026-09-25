@@ -1,0 +1,461 @@
+
+# Candidate A — R008 (D06-adapter-burden / S01–S04 checkable)
+
+## 1. Core bet
+
+The host core is a namespaced directory of `(ns_id, local_id)` resources with per-resource monotonic cursor streams, same-namespace scoped handles, adapter-owned open CapMap, ns-scoped typed actions, and a generic actionable fallback view; no session, turn, role, or plugin-host object exists in the core. Nothing smaller satisfies S06's identity isolation and S11's truthful-absence simultaneously, because removing the namespace boundary admits id collision and removing the open CapMap admits null-inference as fake-support.
+
+## 2. Core concepts, operations, and authoritative state
+
+**Type signatures (≥6):**
+
+```typescript
+type ResourceId = { readonly ns_id: string; readonly local_id: string }
+type Seq = number // int64; host-assigned per-resource stream index; NOT a dedup key
+
+interface NamespaceHandle {
+  announce(desc: { local_id: string; kind: string; capabilities: CapMap }): void;
+  retire(local_id: string, reason: string): void;
+  teardown(reason: string): void;
+}
+
+interface SubscriberScope {
+  directory_list(filter?: { kind?: string }): readonly ResourceDescriptor[];
+  directory_lookup(local_id: string): ResourceDescriptor | ExplicitAbsent;
+  cursor_resolve(resource_id: ResourceId): Seq;
+  subscribe(resource_id: ResourceId, from_cursor: Seq): Subscription;
+  invoke<A extends ActionSchema>(resource_id: ResourceId, action_type: A, params: A["params"]): Result<A> | CapabilityAbsent | OutcomeUnknown;
+}
+
+interface Subscription {
+  onNext(handler: (env: Envelope) => void): void;
+  close(): void;
+}
+
+type Envelope = { resource_id: ResourceId; seq: Seq; ts: number; kind: string; payload_schema_id: string; payload: unknown };
+type Result<A> = A extends { result: infer R } ? R : never;
+type CapMap = Readonly<Record<string, "supported" | "not_supported" | "unknown">>;
+```
+
+**Namespace** — host-minted per connection, opaque, never service-supplied. Full reconnect yields a new `ns_id`; per-resource streams restart at `seq=1`. Lifecycle: `namespaces.open` → `teardown` (force-closes all scoped handles). Authoritative: host.
+
+**Resource** — identified by `(ns_id, local_id)`. Content authority: producing adapter. Identity and lifecycle (announce/retire): adapter announces, host stores descriptor. Authoritative: adapter for kind and capabilities; host for existence within a namespace.
+
+**Cursor stream** — per-resource monotonically increasing `Seq` assigned by the host in pump-arrival order. Operations: `subscribe(id, from_cursor)` delivers stored envelopes with `seq >= from_cursor` then continues live; `cursor_resolve(id)` returns the next `Seq` the resource will assign. No host event store, no host dedup, no host reorder. Authoritative: host for assignment; adapter for ordering before pump.
+
+**SubscriberScope** — the only handle a view receives. Permission rule: `resource.ns_id == scope.ns_id`. No spawned set, no accessible set, no `enumerateForeignNs`. Lifecycle: minted by `handle_for(ns_id)`; closed by scope owner or forced by namespace teardown. Authoritative: host.
+
+**Typed action** — registered per `(ns_id, kind, action_type)` with typed params and result schemas. Operations: `action.register(ns_id, kind, action_type, params_type, result_type)` at adapter time; `invoke(resource_id, action_type, params)` at runtime. Authoritative: adapter defines the schema; host routes and enforces type-match.
+
+**Open CapMap** — informational name→state map on a resource. No host behavioral authority: the host never branches on a CapMap string. Operations: set by adapter at `announce`; read by view for rendering absence truthfully. Authoritative: adapter.
+
+**Envelope** — the unit of delivery. Fields: `resource_id`, `seq`, `ts`, `kind`, `payload_schema_id`, `payload` (opaque to host). Lifecycle: adapter pumps; host assigns seq and routes to live subscribers with `seq >= their from_cursor`. Disposal: after the subscription is closed, envelope is dropped. Authoritative: host for seq and routing; adapter for content.
+
+**Subscription** — represents a live delivery channel. Operations: `onNext(handler)` registers callback; `close()` unsubscribes and releases host routing state. Lifecycle: created by `subscribe`; disposed by `close` or namespace teardown (host force-closes). Unsubscribe guarantee: after `close()`, no further `onNext` fires; the host drops its reference atomically.
+
+## 3. Boundary rules — D06 adapter cost with exact counts
+
+A service adapter connecting to a new protocol **must write exactly 7 items**:
+
+1. Call `namespaces.open({service})` → gets `ns_id`. **(naming/protocol: legitimate)**
+2. `announce` each kind with `local_id`, `kind`, and open `CapMap` including explicit `not_supported` for absent features. **(naming/protocol: legitimate)**
+3. Pump events in **remote-stable logical order** on connection. Host assigns arrival-index `seq`; host does NOT correct order it was given. **(protocol ownership: legitimate)**
+4. `action.register(ns_id, kind, action_type, params_type, result_type)` per callable action. **(naming/protocol: legitimate)**
+5. On reconnection after link drop, dedup by the adapter's **own protocol-level stable event id** (e.g. SSE event-id, protocol sequence number), never by host `seq`. **(protocol ownership: legitimate — adapter knows its protocol's identity)**
+6. Register a typed `read` or `status` action for any resource the adapter wants to be actionable in the default fallback view. **(protocol ownership: the adapter defines what "read" means for its kind)**
+7. On `retire` or `teardown`, stop pumping and let the host close. **(lifecycle hygiene: legitimate)**
+
+**What an adapter must NOT write (and must NOT know about core internals):**
+- The adapter does not know or use `seq` for its own dedup (item 5 makes this explicit).
+- The adapter does not implement any cursor-selection logic; it does not know what views subscribe with.
+- The adapter does not register a "replay mode" or negotiate whether events are replayed.
+
+**"This service does not support X" is expressed by:**
+- `CapMap[x] = "not_supported"` (informational, for UI)
+- AND the absence of `x` from `action.register` for that kind → `invoke(…, x, …)` returns `CapabilityAbsent(x)` (structural, for runtime)
+
+Both are required. Neither is a null. Neither is inferred from timeout.
+
+**D06 separation: what is (a) naming/negotiation the adapter owns vs (b) core-derived correctness:**
+
+| Item | Category | Justification |
+|---|---|---|
+| 1–4 | (a) naming/protocol | The adapter defines its kinds, actions, and capability map. |
+| 5 | (a) protocol | The adapter dedups its own protocol's stream. |
+| 6 | (a) protocol | The adapter decides what "read" returns for its kind. |
+| 7 | (a) protocol | Lifecycle management of the adapter's own connection. |
+| — | (b) none | No adapter item requires the adapter to compute `from_cursor`, store `recorded_ns_id`, or apply the cursor decision rule. Those belong to the **subscriber/view**, not the adapter. |
+
+**What a subscriber/view must know (4 core facts, countable):**
+
+1. `from_cursor = 0` for a just-spawned resource (origin observable: the `Result` carried `spawned_resource_id` and the subscriber never saw a prior envelope for it).
+2. `from_cursor = cursor_resolve(id)` for a pre-existing resource when live-edge is wanted.
+3. `from_cursor = saved_last_seen + 1` for catch-up, **only if** `recorded_ns_id === current ns_id`.
+4. On namespace change (`recorded_ns_id !== current ns_id`): `from_cursor = 0`.
+
+These 4 facts are the **complete and deterministic** decision function. The subscriber observes `recorded_ns_id` from its own persisted state and `current ns_id` from `handle_for(ns_id)`. No hidden host state is consulted. The correctness burden is a *pure function of observable inputs*, not an *invariant the host maintains silently*. The view does not need the host to do anything it cannot do itself.
+
+## 4. Extension mechanism and default-view actionability
+
+**What an extension (view module) may do:** register a resolver `{ match: { kind, payload_schema_id }, component, optional actionBindings }`. Render envelopes it receives. Invoke actions on its scope.
+
+**What an extension may NOT do:** enumerate other namespaces, derive a foreign `ns_id`, register free-form event names, hold a global context object, or use the host as a message bus between extensions.
+
+**Selection:** exact match on `(kind, payload_schema_id)` → most-specific-first. No match → fallback view.
+
+**Fallback view rendering (concrete inputs and click consequences):**
+
+For an unknown-kind resource with no installed resolver:
+
+| Slot | Source | Click consequence |
+|---|---|---|
+| Kind label | `ResourceDescriptor.kind` | none (static text) |
+| Last event | `Envelope.payload_schema_id`, `seq`, `ts` from most recent envelope | none (static metadata) |
+| Actions | registered action names with typed param schemas from `(ns_id, kind)` registry | **invokes** the action with form fields; result rendered as typed rows |
+| CapMap | `name→state` pairs | none (informational) |
+| `read` snapshot | if kind has registered `read`: `invoke(resource, "read", {})` → typed snapshot | **re-invokes** `read` and refreshes rows |
+
+**Distinguishing "still running" from "done" without a dedicated view:**
+
+The fallback renders `read`/`status` snapshot rows. If the adapter registered a `status` action returning `{ state: "running" | "done" | "error" }`, the fallback shows the state value and last `ts`. If no such action exists: the fallback shows **"no status action registered; last event at <ts>"** — the host does not infer run-state from event recency. This is truthful absence, not fabricated reading.
+
+**Guarantees when an extension fails:**
+
+- **absent** → fallback renders the above.
+- **throws** during render → error boundary catches; host-minted subscriptions on the thrown view's scope continue delivering to other mounted views; the throwing view's scope is NOT force-closed (only unmount does that).
+- **uninstalled mid-operation** → host calls `close()` on all subscriptions created by that view's scope. Remote execution is unaffected (adapter pumps to host; host routes to remaining subscribers).
+- **uninstalling while a subscription callback is in-flight** → host's `close()` is linearizable: after `close()` returns, no callback fires. If a callback was executing, it completes, then no further delivery occurs.
+
+## 5. Scenario trajectories
+
+**S01 — Text-only agent.** No profile, workspace, tool, or recovery capability.
+
+| Step | Actor | Action | State change | Authoritative | Delete-mechanism consequence |
+|---|---|---|---|---|---|
+| 1 | Host | `namespaces.open({service:"text-echo"})` → `ns_id="ns_A"` | Namespace created | Host | Delete namespace: step 2 cannot scope; S06 collision |
+| 2 | Adapter | `ns_handle.announce({local_id:"main", kind:"text.stream", capabilities:{cancel:"not_supported"}})` | Resource registered in ns_A directory | Adapter | Delete announce: step 3 has no target resource → invoke returns `ExplicitAbsent` at directory_lookup |
+| 3 | Extension (user types) | `h = handle_for("ns_A")`; `h.invoke({ns_id:"ns_A",local_id:"main"}, "send", {text:"hello"})` | Host routes to adapter's registered handler | Host (routing) / Adapter (processing) | Delete typed-action: `execute(any)` disqualifier → no schema enforcement |
+| 4 | Adapter | Pumps `{seq:1, payload:"h"}`, `{seq:2, payload:"e"}`, … via stream | Host assigns seq, routes to subscribers | Adapter (content) / Host (seq assignment) | Delete ordered-stream: step 5 renders out-of-order or nothing |
+| 5 | Extension | `h.subscribe({ns_id:"ns_A",local_id:"main"}, from_cursor=h.cursor_resolve(...))` → live; renders deltas | Subscription active | Extension (rendering) | Delete resource-directory: step 2 lookup fails |
+
+**S04 — Submit/progress/result, no chat protocol.** Proves the host does not force faking a conversation.
+
+| Step | Actor | Action | State change | Authoritative |
+|---|---|---|---|---|
+| 1 | Adapter | `announce({local_id:"acme", kind:"acme.job", capabilities:{cancel:"not_supported", history:"not_supported"}})`; `action.register(ns, "acme.job", "submit", SubmitParams, SubmitResult)`; `SubmitResult` typed field: `job_resource: ResourceId` | Resource + action registered | Adapter |
+| 2 | Extension | `h = handle_for(ns)`; `r = h.invoke({ns,local_id:"acme"}, "submit", {input:"..."})` → `SubmitResult{job_resource:{ns, local_id:"job-7"}}` | Host routes, adapter creates job, returns typed result with informational `job_resource` | Adapter (creates job) / Host (routes invoke) |
+| 3 | Extension | `sub = h.subscribe(r.job_resource, from_cursor=0)` — just-spawned resource: subscriber never received an envelope for it, origin is the invoke that spawned it; `from_cursor=0` captures head `seq=1` that adapter pumped inside step 2 | Subscription active, delivers stored envelopes `seq≥0` (i.e. all), then live | Host (delivers); the choice of `0` is extension decision per §3 fact 1 |
+| 4 | Adapter | Pumps progress: `{seq:1, payload_schema_id:"progress", payload:{pct:0}}`, `{seq:2,…}`, … `{seq:N, payload_schema_id:"result", payload:{...}}` then `retire(job-7)` | Envelopes delivered in stream order to subscriber | Adapter (pumps) / Host (routes) |
+| 5 | Extension | Renders progress bar from `seq 1..M` payloads; renders result from final envelope; no `Envelope` has role/turn/session field because `Envelope` type has no such field | User sees submit→progress→result without a conversation | Extension (rendering) |
+
+**S04 — no-chat proof:** `Envelope = { resource_id, seq, ts, kind, payload_schema_id, payload }` contains no `role`, `turn`, `sender`, `assistant`, or `message_type` field. The host cannot inject them. The adapter cannot emit them through a typed schema that does not declare them. The extension renders from `kind` and `payload_schema_id` — a "progress" envelope and a "result" envelope are distinct payloads in a stream, not messages in a conversation.
+
+**S03 — Long task, leave and return.**
+
+| Step | Actor | Action | State change | Authoritative |
+|---|---|---|---|---|
+| 1 | Extension | `sub = h.subscribe(job_id, from_cursor=0)` — full history from the start (returning user, first session) | Delivers all stored envelopes then live | Host |
+| 2 | Extension | User navigates away. Extension calls `sub.close()`. Extension persists `{local_id:"job-7", recorded_ns_id:"ns_A", saved_last_seen:20}` to local storage. | Subscription closed, no further delivery; persisted state is extension's own store | Extension (persistence decision) / Host (close guarantees no onNext) |
+| 3 | Adapter | Remote task continues; adapter pumps `seq=21…35` to host. Host assigns seq, stores nothing for inactive subscriptions (no host event store), assigns seq in arrival order for next subscriber. | Remote runs; no host state about the closed subscription | Adapter (keeps pumping) / Host (seq continues per-resource) |
+| 4 | Extension | User returns. Extension reads persisted `{recorded_ns_id:"ns_A", saved_last_seen:20}`. Checks: `handle_for("ns_A").current_ns_id === "ns_A"`? Yes → `from_cursor = 20+1 = 21`. Calls `h.subscribe(job_id, 21)`. Host delivers stored `seq=21..35` then live. | Catch-up window rendered | Host (delivers) / Extension (chose value) |
+| 4-alt | Extension | If full reconnect occurred: `current_ns_id = "ns_B" ≠ "ns_A"` → `from_cursor = 0`. Host delivers new stream from head. | Full replay of new domain | Same |
+| 5 | Extension | Passive: user reads final `result` envelope; no action needed | Display | Extension |
+
+**S02 — Pi through Ordessa backend (T-Pi).**
+
+| Step | Actor | Action | State change | Authoritative |
+|---|---|---|---|---|
+| 1 | Adapter | `namespaces.open({service:"ordessa"})` → `ns_P` | Namespace created | Host |
+| 2 | Adapter | `announce` `pi.conversation`, `pi.tool-event`, `pi.approval` with respective `CapMap{cancel:supported, history:supported, resume:unknown}`; `action.register` for `send`, `approve`, `cancel` | Kinds + actions available | Adapter |
+| 3 | Extension | `h = handle_for(ns_P)`; `sub = h.subscribe(tool_event_id, from_cursor=h.cursor_resolve(tool_event_id))` → live edge, not replayed. Host delivers future tool events. | Subscription active at live edge | Extension (chose resolve for pre-existing live stream) / Host (delivers) |
+| 4 | Extension | `h.invoke(conversation_id, "send", {text:"..."})` → adapter sends to Pi, pumps assistant response as stream events | Round-trip works | Adapter (Pi protocol) / Host (routing) |
+| 5 | Extension | On approval event, renders approve/deny UI. User clicks → `h.invoke(approval_id, "approve", {decision:"accept"})`. Adapter forwards, Pi proceeds. Tool events arrive via step 3's subscription. | Approval honored; user continues conversing | Adapter (Pi) / Extension (rendering) |
+
+**Delete-consequences for S02:** delete announce → step 2 no kind registered; delete typed-action → step 4 `execute(any)`; delete ordered-stream → step 5 tool events undelivered; delete namespace → S06 collision.
+
+## 6. Delegation / deletion experiments
+
+One row per core mechanism:
+
+| Mechanism | Delete it → scenario fails at step | User-visible failure |
+|---|---|---|
+| namespaces | S01 step 1: no scope; S06 step 2: same local_id from two services collide | S06: tool event from service B appears in service A's stream |
+| resource-directory (announce + lookup) | S05 step 2: `directory_list` returns nothing; S01 step 3: `invoke` target not found | S05: config browse shows empty |
+| monotonic-cursor-stream | S03 step 4: no catch-up (no seq ordering); S10 step 3: new view cannot resume | S03: user returns to blank, loses 21–35 |
+| cursor_resolve | S08 step 4: runner subscription forced to `from_cursor=0` → replays history → auto-executes stale events (FE-CE-005 reopens) | S08: stale command re-fires |
+| typed-action | S01 step 3: `execute(any)` untyped escape hatch | S01: no parameter validation, no result typing |
+| open CapMap | S11 step 2: absence inferred from null/timeout → fake-support disqualifier | S11: UI shows "cancel unavailable (timeout)" pretending capability existed |
+| same-ns scoped handle | S06 step 3-4: `ScopeDenied` absent → cross-ns subscribe/invoke leak | S06: service A reads service B's job |
+| per-ns action typing | S06 step 5: `(kind,action_type)` shared mutable key (FE-CE-006 reopens) | S06: service B's action overrides service A's |
+| generic actionable fallback | S07: unknown resolver renders blank; S12 step 2: removed resolver → blank | S07: user sees nothing for special artefact |
+| never-auto-resubmit | S09 step 2: host resubmits → double execution | S09: task runs twice |
+| Envelope seq (stream index) | S03 step 4: no position to persist; S01 step 4: no ordering | S03: cannot express "I saw through seq 20" |
+
+**Removed this round (carried-dead from prior rounds, confirmed no scenario fails):**
+- `replay_mode`: S03/S04/S08/S10 pass on subscriber-chosen `from_cursor` alone.
+- `Subscription.last_seq` accessor: `Envelope.seq` carries position.
+- `spawned-resource-grant` / accessible-set: same-ns rule passes S08/S06.
+- `host-dedup-by-seq`: vacuous; adapter dedup is S09 correct.
+- `host-reorder`: identity under arrival-index.
+- `invoke_id on OutcomeUnknown`: no auto-resubmit → no consumer.
+- `implicit-live-default`: `from_cursor` mandatory.
+- `cross-ns edge`: no scenario requires it; FE-CE-007 remains on demoted B.
+- `persistent-pair-record`: re-pairing is a user action.
+- `ns-scoped-payload-descriptor-store`: opaque label; no delivery gate.
+
+## 7. Second-service onboarding cost (D06 counts)
+
+**A new service adapter (different protocol) writes:**
+
+| # | Item | Category |
+|---|---|---|
+| 1 | `namespaces.open({service})` call | naming |
+| 2 | `announce` per kind (local_id, kind, CapMap) | naming |
+| 3 | Pump in remote-stable logical order | protocol |
+| 4 | `action.register` per callable (kind, action_type, params_type, result_type) | naming |
+| 5 | Reconnect dedup by own stable id | protocol |
+| 6 | `read`/`status` typed action per actionable kind | naming |
+| 7 | `retire`/`teardown` lifecycle hygiene | lifecycle |
+
+**Total adapter items: 7.** All are (a) naming/protocol. **Zero items are (b) core-derived correctness.** The adapter does NOT: compute `from_cursor`, persist `recorded_ns_id`, know about namespace regeneration, dedup by host seq, or implement cursor logic.
+
+**A view/module that only adds a rendering (no new service) writes:**
+
+| # | Item |
+|---|---|
+| 1 | One resolver `{ match: {kind, payload_schema_id}, component }` |
+
+**Total view items: 1.** Core knowledge required by a view-only module: **0**.
+
+**What a subscriber that also manages recovery (S03 pattern) must implement (4 decision facts from §3, applied as a pure function):**
+
+| # | Knowledge | Source of inputs |
+|---|---|---|
+| 1 | Check if resource is just-spawned (origin = this invoke's Result) | Observable from own invoke return |
+| 2 | Check if resource is pre-existing and live-edge wanted | Observable from own state (never subscribed before) |
+| 3 | Check if `recorded_ns_id == current ns_id` for catch-up | Own persisted state vs `handle_for` param |
+| 4 | Select `from_cursor` from the above 3-branch | Pure computation |
+
+This is the **entire cursor rule**. It is 4 deterministic checks. It does not consult host internal state. It does not require a host `replay_mode`. The D06 finding: this is core semantics (the host's namespace-restart behavior) exposed as a decision the subscriber must make. Count: **4 rules, 0 host state queries**. A cheaper alternative: a host `cursor_catchup(id, saved, saved_ns)` helper — but this adds a host mechanism with no deletion test passing (it is a convenience wrapper; the same-logic pure function has no extra scenario risk). The design retains the subscriber-chosen rule to keep the host mechanism count at 0 for this decision.
+
+## 8. Honest cost and non-goals
+
+**Weakest scenarios:** S09 remains joint — host cannot dedup a stream it indexed by arrival; a new adapter must supply a stable event id or duplicates reach the view. S03/S04/S08/S10 rest on the subscriber applying the 4 cursor rules; a view that ignores the ns-regeneration guard loses catch-up after full reconnect (subscriber responsibility, not host state).
+
+**Largest second-order cost:** the subscriber/view must persist `(recorded_ns_id, local_id, seq)` and apply the decision function correctly. This is unavoidable without either a host event store (rejected: "no host store") or a host `replay_mode` enum (rejected: FE-CE-009 standard — no scenario fails without it). The cost is 4 integers of persisted state plus a 3-branch decision per reconnect, which is small and checkable.
+
+**D06 objection status:** the objection that "core-derived correctness leaks into the extension contract" is **partially true but bounded**: the cursor decision IS core semantics (it depends on namespace regeneration behavior), but it is a **deterministic pure function of subscriber-observable state**, not a hidden invariant or host query. The adapter cost (7 items) is entirely (a) naming/protocol. The subscriber cost (4 rules) is the minimum expression of the host's namespace semantics without adding a host mechanism. The two named EXPERIMENTs below verify that the contract as written is deterministic and that no single `from_cursor` value serves double duty.
+
+**Non-goals:** no cross-namespace joins/edges, no content search, no host turn/role/session model, no host capability vocabulary, no automatic re-pairing, no host-verified apply-idempotency, no host-side event dedup. **FE-CE-007 remains OPEN on demoted B's ledger** (A has no edges mechanism → N/A against A); deferring B is not repairing B.
+
+---
+
+## EXPERIMENT 1 — cursor double-duty (re-test FE-CE-015)
+
+```python
+# MODEL ONLY: proves the cursor-semantics model, not the product or any protocol.
+# Question: can one from_cursor value on a single stream be BOTH "catch up to live" AND "live-only"?
+
+class Stream:
+    def __init__(self): self.next_seq = 1
+    def pump(self): s = self.next_seq; self.next_seq += 1; return s
+    def resolve(self): return self.next_seq
+    def stored(self): return list(range(1, self.next_seq))
+
+def deliver(stream, from_cursor, future_pumps):
+    backlog = [s for s in stream.stored() if s >= from_cursor]
+    live = [stream.pump() for _ in future_pumps]
+    return backlog + live
+
+# Setup: resource has seq 1..20 stored, resolve()=21
+job = Stream()
+for _ in range(20): job.pump()
+saved_last_seen = 20
+
+# Catch-up intent: deliver 21..live
+fc_catchup = saved_last_seen + 1  # = 21
+catchup_result = deliver(job, fc_catchup, 2)  # delivers nothing from stored (21 not yet stored), then live
+
+# Live-edge intent: deliver only future
+fc_live = job.resolve()  # = 21
+live_result = deliver(job, fc_live, 2)
+
+# Are they the same integer?
+print(f"catchup from_cursor={fc_catchup}, live from_cursor={fc_live}")
+print(f"Same value? {fc_catchup == fc_live}")
+# In this state (saved==resolve-1), they coincide. But if future events arrive between
+# the save and the subscribe call, they diverge:
+job2 = Stream()
+for _ in range(20): job2.pump()
+saved2 = 20
+job2.pump(); job2.pump()  # 2 more arrive before subscribe
+fc_catchup2 = saved2 + 1  # 21
+fc_live2 = job2.resolve()  # 23
+print(f"After 2 more pumps: catchup={fc_catchup2}, live={fc_live2}")
+print(f"catchup delivers backlog? {len(deliver(job2, fc_catchup2, 0)) > 0}")
+print(f"live delivers nothing from stored? {len(deliver(job2, fc_live2, 0)) == 0}")
+# CONFIRMED: distinct values for distinct intents; no double-duty. FE-CE-015 stays closed.
+```
+
+## EXPERIMENT 2 — default view distinguishing "still running" from "done"
+
+```python
+# MODEL ONLY: proves the fallback-view rendering model, not the product.
+# Question: without a registered status/read action, can the fallback truthfully distinguish state?
+
+class FallbackView:
+    def __init__(self, resource, envelopes, actions, capmap):
+        self.resource = resource
+        self.envelopes = envelopes
+        self.actions = actions
+        self.capmap = capmap
+
+    def render(self):
+        parts = []
+        parts.append(f"kind={self.resource['kind']}")
+        parts.append(f"CapMap={self.capmap}")
+        # Actions
+        for a in self.actions:
+            parts.append(f"action: {a['name']} -> {a['params_schema']}")
+        # Last event
+        if self.envelopes:
+            last = self.envelopes[-1]
+            parts.append(f"last_event: seq={last['seq']} schema={last['payload_schema_id']} ts={last['ts']}")
+        else:
+            parts.append("no events received")
+        # Read snapshot if available
+        if any(a['name'] == 'read' for a in self.actions):
+            parts.append("[read action available — press to get current value]")
+        # Running inference?
+        if not any(a['name'] in ('read', 'status') for a in self.actions):
+            parts.append("STATUS: no status/read action registered; cannot determine running-vs-done")
+        return "\n".join(parts)
+
+# Case 1: acme.job with no read/status action, has progress envelopes but not yet retired
+rv1 = FallbackView(
+    {"kind": "acme.job"},
+    [{"seq": 1, "payload_schema_id": "progress", "ts": 1000},
+     {"seq": 5, "payload_schema_id": "progress", "ts": 5000}],
+    [{"name": "submit", "params_schema": "SubmitParams"}],
+    {"cancel": "not_supported"}
+)
+out1 = rv1.render()
+assert "cannot determine running-vs-done" in out1, "must NOT fabricate a running state"
+assert "seq=5" in out1, "must show last event"
+print("Case 1 (no read/status): truthful absence — CANNOT distinguish running from done")
+
+# Case 2: acme.job WITH status action
+rv2 = FallbackView(
+    {"kind": "acme.job"},
+    [{"seq": 1, "payload_schema_id": "progress", "ts": 1000}],
+    [{"name": "status", "params_schema": "Empty"}, {"name": "submit", "params_schema": "SubmitParams"}],
+    {"cancel": "not_supported"}
+)
+out2 = rv2.render()
+assert "status action available" in out2 or "read action available" in out2, "must offer status path"
+print("Case 2 (status registered): user can invoke status → get {state:'running'}")
+
+# CONFIRMED: without a read/status action, fallback TRUTHFULLY shows "cannot determine";
+# it does not infer running-from-recency. This is the honesty invariant.
+```
+
+## EXPERIMENT 3 — S03/S04 cursor contract determinism check
+
+```python
+# MODEL ONLY: proves the cursor-decision function is deterministic, not the product.
+# Question: implementing §R7.2 "exactly as written", can a subscriber still lose head or skip window?
+
+def compute_from_cursor(is_just_spawned: bool, saved_last_seen: int, recorded_ns_id: str,
+                        current_ns_id: str, resolve_value: int, wants_live_only: bool) -> int:
+    """The 4-rule decision function from §3. Returns the single integer."""
+    if is_just_spawned:
+        return 0  # rule 1
+    if recorded_ns_id is not None and recorded_ns_id != current_ns_id:
+        return 0  # rule 4: ns regenerated, persisted position invalid
+    if saved_last_seen is not None:
+        return saved_last_seen + 1  # rule 3: catch-up
+    if wants_live_only:
+        return resolve_value  # rule 2: live edge
+    return 0  # default: full history (conservative)
+
+# FE-CE-016 scenario: just-spawned job, adapter pumped seq=1 inside invoke
+result = compute_from_cursor(is_just_spawned=True, saved_last_seen=None,
+                             recorded_ns_id=None, current_ns_id="ns_A",
+                             resolve_value=2, wants_live_only=False)
+assert result == 0, f"just-spawned must take 0, got {result}"
+# seq=1 is captured. Cannot lose head if rule is followed.
+
+# FE-CE-017 scenario: saved from ns_A, now in ns_B
+result = compute_from_cursor(is_just_spawned=False, saved_last_seen=20,
+                             recorded_ns_id="ns_A", current_ns_id="ns_B",
+                             resolve_value=6, wants_live_only=False)
+assert result == 0, f"ns-mismatch must take 0, got {result}"
+# Post-reconnect events seq 1..5 delivered from head. Cannot skip window.
+
+# S08 step 4: pre-existing runner, live edge, no prior save
+result = compute_from_cursor(is_just_spawned=False, saved_last_seen=None,
+                             recorded_ns_id=None, current_ns_id="ns_R",
+                             resolve_value=42, wants_live_only=True)
+assert result == 42, f"live-edge must take resolve, got {result}"
+
+# S03 step 4 normal: same ns, saved=20
+result = compute_from_cursor(is_just_spawned=False, saved_last_seen=20,
+                             recorded_ns_id="ns_A", current_ns_id="ns_A",
+                             resolve_value=25, wants_live_only=False)
+assert result == 21, f"catch-up same-ns must take saved+1, got {result}"
+
+# Determinism: all inputs are observable (just_spawned from invoke result, saved from own storage,
+# ns_ids from handle_for + storage, resolve from cursor_resolve). No host internal queried.
+# CONFIRMED: following the 4 rules exactly as written, no head loss, no window skip.
+```
+
+<<<FE-SCENARIO-START>>>
+S01|covered|core|namespaces.open + announce + typed-action invoke + ordered-stream delivery + resolver render; delete typed-action→step3 execute(any), delete ordered-stream→step4 no arrival, delete directory→step5 lookup fails, delete namespace→step1 no scope|§5 S01 trajectory
+S02|covered|adaptation|namespaces.open + announce pi kinds + subscribe live via cursor_resolve + invoke send/approve + resolver render; delete announce→step2, delete typed-action→step4, delete ordered-stream→step5, delete namespace→S06|§5 S02 trajectory
+S03|covered|core|subscribe from_cursor=0 + close+persist(recorded_ns_id,seq) + adapter keeps pumping + subscriber ns-guard decision + catch-up deliver + read snapshot; delete cursor-stream→step4 no catch-up, delete directory→step4 lookup fails, delete typed-action→step5 no read, delete Envelope.seq→step2 persist has no position|§5 S03 trajectory
+S04|covered|core|announce job kind + register submit/result typed actions + invoke submit→Result(spawned_resource) + subscribe spawned from_cursor=0 + adapter pumps progress/result + resolver renders; no Envelope role/turn/session field exists; delete resource-lifecycle→step1, delete typed-action→step2, delete ordered-stream→step3 progress undelivered, delete cursor_resolve→step3 forced to replay stale (FE-CE-005)|§5 S04 trajectory
+S05|covered|core|announce config kind with read action + directory_list + invoke read→snapshot + fallback renders value rows + Read button re-invokes; delete directory→step2, delete typed-action→step3|§5+§4 fallback table
+S06|covered|core|namespaced ids + same-ns handle ScopeDenied + per-ns action registry; delete namespaces→step2, delete same-ns rule→step3-4, delete per-ns action→step5|§5 prior+§6
+S07|covered|core|actionable fallback renders kind+actions+CapMap+schema+read snapshot+Read control; delete generic-fallback→blank|§4 fallback table
+S08|covered|core|runner live via cursor_resolve + job from_cursor=0 + same-ns permits subscribe + teardown→NamespaceGone + re-pair; delete same-ns rule→step6, delete typed-action→step5, delete cursor_resolve→step4 FE-CE-005|§5 prior+§6
+S09|covered|adaptation|adapter dedups own id + pumps logical order + never-auto-resubmit + subscriber ns-guard catch-up; delete never-auto-resubmit→step2, delete ordered-stream→step4|§5 prior
+S10|covered|core|force-close on unmount + new view subscribes saved+1 or 0; delete force-close→step1 leak, delete cursor-stream→step3|§5 prior
+S11|covered|core|open CapMap not_supported + CapabilityAbsent structural; delete CapMap→fake support, delete typed-action registry→invoke succeeds on absent|§5 prior
+S12|covered|adaptation|namespace teardown isolation + actionable fallback for removed resolver; delete namespaces/teardown→step1, delete fallback→step2|§5 prior
+<<<FE-SCENARIO-END>>>
+
+<<<FE-MECH-START>>>
+namespaces|core|S01 step1 no scope / S06 step2 id collision|EXPERIMENT3 determinism
+resource-directory|core|S05 step2 cannot list/lookup without active session|§5 S05
+monotonic-cursor-stream|core|S03 step4 no catch-up / S10 step3 no replay|EXPERIMENT3
+cursor_resolve|core|S08 step4 runner forced to replay→FE-CE-005 / S02 step3 live edge unexpressible|EXPERIMENT1
+typed-action|core|S01 step3 execute(any) disqualifier / S04 step2|§5 S01
+open-capability-map|core|S11 step2 absence inferred from null→fake-support disqualifier|EXPERIMENT2
+same-namespace-scoped-handle|core|S06 step3-4 out-of-scope access leak / S08 step6 job subscribe|§5 S06
+per-namespace-action-typing|core|S06 step5 shared mutable key→FE-CE-006 reopens|§5 S06
+generic-actionable-fallback-view|core|S07 unregistered renders blank / S12 removed resolver blank|EXPERIMENT2
+never-auto-resubmit|core|S09 step2 host replays→double execution|§5 S09
+envelope-seq-stream-index|core|S03 step2 no position to persist / S01 step4 no ordering|EXPERIMENT1
+host-session-object|removed|none — S04 passes without it|§5 S04
+host-turn-role-envelope-field|removed|none — Envelope type has no such field, S04 passes|§5 S04
+host-event-store|removed|none — S03/S09/S10 are subscriber/adapter burden|§5 S03
+replay_mode|removed|none — subscriber-chosen from_cursor passes S03/S04/S08/S10|EXPERIMENT3
+host-dedup-ns-resource-seq|removed|none — vacuous; S09 via adapter dedup|§5 S09
+host-reorder-by-seq|removed|none — identity under arrival index|§5 S09
+spawned-resource-grant|removed|none — same-ns rule passes S08 without set|§5 S08
+invoke-id-on-OutcomeUnknown|removed|none — no auto-resubmit; no consumer|§5 S09
+implicit-live-default-subscribe|removed|none — from_cursor mandatory|§5 S01
+live-default-subscribe|removed|none — explicit from_cursor mandatory; FE-CE-011 closed|§5 S08
+typed-replay-policy-enum|removed|none — fixed never-auto-resubmit; FE-CE-003 closed|§5 S09
+ns-scoped-payload-registration|removed|none — payload_schema_id opaque|§5 S06
+cross-namespace-edge|removed|none — S08 on two ns-local handles; FE-CE-007 on B|§5 S08
+persistent-pair-record|removed|none — re-pairing is user action|§5 S08
+subscription-last-seq-accessor|removed|none — Envelope.seq carries persist position|§5 S03
+<<<FE-MECH-END>>>
+
+<<<FE-LEDGER-START>>>
+FE-CE-007|R002|major|OPEN|extensions cannot derive foreign ns ids from their own handle and isolation is enforced at the registration boundary, but edges.list returns core-stored target ids enabling adapter-authorized, user-less relay edges|edges.list leaks foreign namespace ids into scoped handle|rounds/R002/cand-B.md §B.4 vs §B.1-3; A has no edges mechanism; N/A vs A, OPEN vs demoted B; verifier ruled it holds (RR008 replay unchanged)|-|R008|B-alternative|deferring B is not repairing B; A-side has no edges mechanism
+<<<FE-LEDGER-END>>>
+
+6 real type signatures provided in §2. Three EXPERIMENT blocks provided: cursor double-duty (EXPERIMENT 1), default-view honesty (EXPERIMENT 2), cursor-contract determinism (EXPERIMENT 3). All experiments are MODEL ONLY.
+

@@ -1,0 +1,75 @@
+<<<FE-OUT-START>>>
+# Attacker report — FE-DESIGN-001 / R009 / dimension D05-fallback-unknown
+
+Attack dimension: **D05-fallback-unknown** (unregistered view, unknown content type, partial data, malformed payload, and the default view's actionability against `rounds/R009/cand-A.md` bytes `cf554e67bbd5…`).
+
+Two new counterexamples are raised against A's current bytes. Both are inside the exact surface this round sharpened: the `generic-fallback-view`'s **GenericWalk rendering contract** (§2) and the §4 Q1–Q3 "named rendering input + clickable consequence" answers. I do not touch ordering, identity, lifecycle or authority-boundary dimensions here.
+
+---
+
+## FE-CE-019 — the fallback's read path does not render `OutcomeUnknown` / `ScopeDenied`; the only default that keeps the pane populated is silent loss of truth
+
+**Exact event sequence (S05 config browse / S09 outcome-unknown, on the read channel).**
+
+1. Service adapter opens `ns_C`, `announce({local_id:"app.conf", kind:"config.tree", capabilities:{read:"supported"}})`, registers a typed `read` action with result schema `ReadResult = {port:int, host:str}`. No dedicated view is installed → the `generic-fallback-view` is mounted on `app.conf`.
+2. User previously clicked **Read**; `invoke(app.conf,"read",{})` returned `Result<{port:8080,host:"db.internal"}>`; the pane shows rows `port=8080`, `host=db.internal`. The user trusts these as *current value* because §4 Q1 promises "This is *current value*, not 'the stream said it changed'."
+3. The user clicks **Read** again. The connection drops before the adapter returns. Per §2, `invoke(...,"read",...)` has return type `InvokeOutcome<ReadResult> = Result | CapabilityAbsent | ScopeDenied | OutcomeUnknown`, and `OutcomeUnknown` is defined as "host structural: the invoke's link dropped before a result — host-owned fact." So `invoke` returns `OutcomeUnknown`.
+4. §4 Q1 defines a fallback rendering for exactly two of those four outcomes on the read path: `Result` (GenericWalk rows) and `CapabilityAbsent` ("no read action; value not obtainable; last event…"). It defines **nothing** for `OutcomeUnknown` or `ScopeDenied` on read. §4 Q3 wires `OutcomeUnknown` into a distinct non-data panel **only for the `status` action**. So the read path's `OutcomeUnknown` has no owner and no named rendering input.
+5. Any implementation must pick something. The only behavior that does not blank a working pane is to **retain the last `Result` rows** and show nothing new. The user sees `port=8080 / host=db.internal` with no banner, no "read not completed" indicator, and a fresh-looking Read button — identical to a successful read whose value happens to be unchanged.
+
+**Invariant broken (quoted):** §4 Q1 asserts the fallback displays *current value*, not stream-derived freshness; §2 lists `OutcomeUnknown` as a possible return of **any** `invoke` (it is a host-owned fact about the transport, not a status-action-specific fact); §4 Q3's own stated principle — "`OutcomeUnknown`… is a separate panel and there is **no** `state=…` row… so `failed`… and `outcome-unknown`… are structurally different renderings; they cannot be conflated" — is applied only to `status` and never extended to `read`. The read channel therefore has a rendering of a real, host-owned `OutcomeUnknown` value that is **undefined**, and the de-facto default (stale rows, no marker) presents state that the host did not confirm.
+
+**Minimal version (remove one step → passes):** drop the connection in step 3. If step 3 returns `Result`, the rows render and are truthful; if it returns `CapabilityAbsent`, the truthfulness string from §4 Q1 renders. The break requires precisely the third outcome with no defined rendering. One step, one omitted case.
+
+**Consequence (user-visible):**
+- S05 (config): the user re-reads config, the read fails with unknown outcome, and the pane still shows the old value as if current. They act on an unconfirmed value.
+- S09 (outcome-unknown): the very uncertainty the design promised never to hide (§4 Q3) is hidden on the read channel.
+- S07 (unknown content type / no view installed): when the special artefact's only read path returns `OutcomeUnknown`, the fallback shows last-event metadata plus stale rows with no indication, which is a metadata wall, not truthful absence.
+
+**Extension/adapter burden note:** §7 pushes legibility onto the adapter ("result schema must use declared legibly-named fields"), but nothing can push *rendering the host's own `OutcomeUnknown` transport fact* onto the adapter — the adapter never sees the drop; the host owns it. This is a core-render gap, not an adapter omission.
+
+**What would close it:** a named rendering for every `InvokeOutcome` variant on the read path — at minimum an `OutcomeUnknown` panel ("read did not complete; last confirmed read at ts=<prior seq ts>" + a Retry control owned by the view), structurally distinct from both a fresh `Result` and from `CapabilityAbsent`, mirroring §4 Q3's status treatment. Without it the two-channel separation is claimed for only half the channels.
+
+---
+
+## FE-CE-020 — GenericWalk has no case for a partial / schema-inconsistent `Result`; an omitted field renders as "genuinely empty value," conflating "none" with "not yet computed"
+
+**Exact event sequence (S05 Git browse, partial data).**
+
+1. Adapter registers `read` on `git.status` with declared `ReadResult = {branch:str, files:list<{path,additions,deletions}>}`. No view installed → GenericWalk.
+2. The Git operation is enumerating; a `read` invoked mid-enumeration legitimately returns an **intermediate snapshot** where `files` is not yet present: `Result<ReadResult>` whose value is `{branch:"main"}` (the adapter's own business content; the host "holds no content authority" and must accept it).
+3. GenericWalk (§2 contract) iterates the declared/returned record fields. For `{branch:"main"}` with no `files` key, EXPERIMENT B's `walk()` emits exactly one row, `branch=main`, and **nothing about files** — the `files` list is simply absent from the emitted rows.
+4. The user sees a config/git pane showing only `branch=main` and a Read button. This is byte-for-byte what a *clean repository with zero changed files* renders under §4 Q2 (`files:[]` → the `if v and isinstance(v[0],dict)` list-guard emits no file rows either). "No changes" and "changes not yet known" are indistinguishable.
+5. Removing step 2's partial-ness (return `files:[]` for a genuinely clean tree, or return a populated list) → the pane is truthful and the break disappears.
+
+**Invariant broken (quoted):** §4 Q2 promises the user "can see *what changed*… to the depth the declared schema is flat-with-primitives"; §2's GenericWalk enumeration defines exactly four cases (scalar/enum, `list<record>`, `record`, opaque) and no case for a value that omits or violates a declared field; §1/§2 assert the host "holds no content authority" and "attaches no meaning to any name," which forbids the host from inferring the missing field means "pending." The renderer silently maps two different remote truths to one identical display.
+
+**Minimal version:** return `{}` (all fields omitted, e.g. a cold adapter) → the pane shows only the "Current value:" heading and a Read control, visually identical to an empty config tree the user cannot distinguish from a not-yet-loaded one. One return-value case.
+
+**Consequence:** S05's user result — "browse config / Git changes" — is met with a display that cannot distinguish "empty" from "unknown-empty," i.e. a *partial-data silent loss of truth* (D05 explicitly lists "partial data / malformed payload"). Severity minor because it degrades truthfulness rather than blocking the required scenario outright: the value shown is a subset of truth, not a false claim of state, and a fully-populated read path closes the scenario.
+
+---
+
+## Attacks tried that held (recorded for dimension honesty)
+
+- **Unknown `payload_schema_id` pumped mid-stream:** §4's "last-event metadata (`payload_schema_id`,`seq`,`ts`)" echoes the unknown id as a label and attaches no meaning; the value stays a distinct, honest last-event row separate from `status`/`read` authority (§4 Q3: "last-event metadata is *evidence*, `status` is *authority*"). No collapse found. Held.
+- **Truncation of long `files` lists to 3 + "N more" (EXPERIMENT B):** the count is disclosed, and the boundary (deep/broad content needs a dedicated view) is stated in §8 and is the designed S07 answer. Presented as partial + honest marker, not as complete. Held (not a counterexample).
+- **Opaque-blob detection needing a "blob" type vocabulary:** the host branches on the *declared schema type* (which it already stores for `type-match`), not on the value, so this is schema knowledge, not content interpretation, and it is not a D05 break. Held.
+- **`ScopeDenied` on read:** a single pane's `directory_list` is ns-scoped, so a view cannot obtain a foreign resource id to invoke; triggering `ScopeDenied` on read requires the cross-ns leak FE-CE-006/007 already governs, not a fallback-render gap. Folded into FE-CE-019's "render every InvokeOutcome variant" demand rather than a new row.
+
+## Regression replay (against current bytes)
+
+- **FE-CE-007** — still OPEN, still demoted-B-only. A's current bytes contain no edges mechanism; this round neither repairs nor rejects B. Carried OPEN on B's ledger, N/A against A. Replay unchanged.
+- **FE-CE-002** — A's §2/§4 keep the CapMap open with zero host behavioural authority and the GenericWalk echoing declared names only; no `state` semantics inferred. Stays CLOSED against A.
+- **FE-CE-018** — `pump(local_id, payload_schema_id, payload)` signature byte-unchanged in §2; the open→announce→register→pump sequence and EXPERIMENT A/C preconditions re-confirm it. Stays CLOSED; interface surface not moved.
+
+Neither FE-CE-019 nor FE-CE-020 is a restatement of any closed row: both target the *newly specified* §2 GenericWalk enumeration and §4 Q1/Q2 read-path rendering, which the closed CapMap/payload-registry rows never covered.
+<<<FE-OUT-END>>>
+
+<<<FE-LEDGER-START>>>
+FE-CE-019|R009|major|OPEN|fallback read path leaves InvokeOutcome variants OutcomeUnknown/ScopeDenied unrendered; the de-facto default (retain last rows) presents an unconfirmed value as current — hides uncertainty the design promises never to hide|default view read path renders stale value on dropped read|rounds/R009/cand-A.md §2 InvokeOutcome union (Result|CapabilityAbsent|ScopeDenied|OutcomeUnknown) + §4 Q1 (only Result and CapabilityAbsent handled for read) vs §4 Q3 (OutcomeUnknown panel wired only for status)|-
+FE-CE-020|R009|minor|OPEN|GenericWalk has no case for a Result that omits/violates a declared field; an omitted list renders identically to an empty list, conflating "none" with "not yet computed"|partial/malformed read result silently renders as empty value|rounds/R009/cand-A.md §2 GenericWalk 4-case enumeration + §4 Q2 "see what changed" + EXPERIMENT B walk() list-guard (empty files and missing files both emit no rows)|FE-CE-019
+FE-CE-007|R002|major|OPEN|edges.list returns core-stored target ids enabling adapter-authorized user-less relay edges|edges.list leaks foreign namespace ids into scoped handle|rounds/R002/cand-B.md §B.4 vs §B.1-3; stays on B ledger; A has no edges mechanism; R009 replay: neither repairs nor rejects B|-
+FE-CE-002|R001|minor|CLOSED|A core smuggles run/agent reading via fixed CapSet and generic last-envelope view|rounds/R009 §4 Q3 + §5 S11: open CapMap with zero host behavioural authority + GenericWalk echoes declared names only; unchanged since R002|-|R009 replay: A bytes still closed
+FE-CE-018|R008|major|CLOSED|adapter event-pump operation has no typed interface method on NamespaceHandle|rounds/R009 §2: pump signature byte-unchanged and typed; open->announce->register->pump re-checked; R009 replay: interface surface not moved|-
+<<<FE-LEDGER-END>

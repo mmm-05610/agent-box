@@ -1,0 +1,204 @@
+Two full candidates follow, in plan order (A then B). Both are written to answer this round's D12 question directly: whether S04/S11 can be expressed against the core with no host concept shaped like conversation/assistant-message/session/run.
+
+<<<FE-OUT-START>>>
+
+# Candidate A — Namespaced resource/event space
+
+## A.1 Core bet
+
+The host core is a **namespaced directory of resources**, each an addressable service-scoped identity plus a seq-ordered replayable event stream plus a declared capability set. The host's only authority is identity, namespace isolation, subscription routing, and per-resource event ordering; "agent", "session" and "chat" are resource **kinds declared by adapters**, never host types — nothing smaller keeps a remote task observable while its page and its view resolver are both gone (S03/S10) or keeps two services' colliding ids from crossing (S06).
+
+## A.2 Core concepts and operations
+
+**Namespace.** `namespaces.open(service_descriptor) → NamespaceHandle{id}`; `namespace.teardown(reason)`. Authoritative in host. Holds the id partition: every `resource_id` is `(namespace_id, local_id)`, so a raw id collision across services is structurally impossible. Lifecycle: opened on adapter connect, torn down on adapter disconnect; teardown disposes all its resources and force-closes every subscription to them.
+
+**Resource.** `namespace.announce(resource_descriptor{id, kind:string, capabilities:CapSet})` (adapter-origin only, host verifies uniqueness within namespace); `namespace.retire(resource_id, reason)`; `directory.list(namespace_id, filter{kind?}) → [descriptor]`; `directory.lookup(namespace_id, resource_id) → descriptor | ExplicitAbsent`. Content authority is the **producing adapter**; identity/lifecycle authority is the host. Created on announce; disposed on retire or namespace teardown.
+
+**Event stream.** `stream.subscribe(resource_id, from_cursor?) → Subscription{ close(), onNext(Envelope) }`. `Envelope = {resource_id, seq:int, ts, kind:string, payload:T}`, where `T` is the concrete type registered for `kind` — the host refuses to deliver any `kind` whose payload type was not registered (this is what keeps it from being an `execute(any)` bus). `cursor.resolve(resource_id) → seq` supports resume. `seq` is monotonic per resource, assigned by the host on ingest; dedup/reorder is the host's guarantee within a resource. Authority: ordering in host, payload content in adapter. Unsubscribe = `Subscription.close()`; host also closes it on view-resolver unmount or page destroy (handle owned by the subscriber's scope).
+
+**Capability set.** `capabilities.get(resource_id) → CapSet`. `CapSet` is a declared tagged union per feature, e.g. `cancel ∈ {supported, not_supported}`, `history ∈ {supported{depth}, not_supported}`, `resume ∈ {supported, not_supported}`. Declared by the adapter, never probed or inferred.
+
+**Action.** `action.invoke(resource_id, action_type:string, params:RegisteredType) → Result{registered type} | CapabilityAbsent(action_type)`. `action_type`s are registered per `kind` with concrete param/result types; no free-form params or results.
+
+## A.3 Boundary rules
+
+A service adapter must translate its protocol into four things: (1) `announce`/`retire` of resources with `kind` + `CapSet`; (2) a seq-numbered typed event stream per resource; (3) a registry of the `kind` payload types it emits; (4) typed `action` handlers. To express "this service does not support this," the adapter **omits the feature from `CapSet` and the action from the kind's registry**; any attempt to `invoke` it returns the explicit sentinel `CapabilityAbsent(action_type)`, and `capabilities.get` returns `not_supported`. `ExplicitAbsent` and `CapabilityAbsent` are distinct non-null terminal states; absence is never inferred from a missing message, a timeout, or a null.
+
+## A.4 Extension mechanism
+
+An extension registers a **view resolver**: `{match: kind + payload_schema_id, component, optional typed action bindings}`. Selection: host resolves by exact kind/schema match, most-specific-first; **default fallback is a host-builtin generic descriptor view** that renders kind, capability set, declared actions and a last-envelope summary — so unknown content is never blank or silently dropped (S07). An extension may render, subscribe (via the subscription handle), and invoke registered actions; it may **not** mint ids, bypass its namespace, subscribe across namespaces, register free-form event names, or touch a global context — it receives only a resource-scoped `SubscriberScope{descriptor, subscriptionHandle, typedInvoker}`, not a capability grab-bag. Guarantees: resolver **absent** → generic view; resolver **throws** → host error-boundary keeps delivering the stream to a re-mounted resolver (resolvers are consumers, not transport owners); resolver **unmounted mid-operation** → host closes its handles, the remote resource stays authoritative and observable, and a new page re-subscribes via `from_cursor`.
+
+## A.5 Scenario trajectories (owner per step)
+
+**S01 — text-only agent, no profile/workspace/tool/recovery.** 1. User connects simple service → host: `namespaces.open` (host). 2. Adapter `announce` one resource, kind `text.stream`, `CapSet{cancel:not_supported, history:not_supported, resume:not_supported}` (adapter). 3. User types; extension bound to kind `text.stream` calls `action.invoke(id,"send",{text})` (extension → adapter). 4. Adapter emits envelopes `seq 1..n` of a registered `TextDelta` payload (adapter). 5. Resolver renders deltas as it chooses; **no assistant-message object is materialised in the core** — "message" is purely the view's interpretation (extension). Covered; works with zero profile/workspace/tool/recovery.
+
+**S04 — submit/progress/result, no chat protocol.** 1. `namespaces.open`; adapter `announce` kind `acme.job`, `CapSet{cancel:supported, history:supported{depth:∞}, resume:supported}`, actions registered `submit`,`result` (adapter). 2. View resolver for `acme.job` renders three sections from envelopes of payload types `JobProgress`/`JobResult` (extension). 3. No session, no turn, no role field exists in any envelope — the envelope is `{resource_id,seq,ts,kind,payload}` only. Answer to the D12 question for A: **yes** — the trajectory is written against core ops with no core concept named or shaped like conversation/assistant/session/run.
+
+**S05 — browse config/git without a session.** 1. Adapter `announce` kind `config.tree` `CapSet{read}` and `git.diff` `CapSet{read}` (adapter). 2. `directory.list(ns, filter{kind:config.tree})` (host). 3. Resolver for `config.tree` renders; **no `namespaces.open` for an agent and no run** — only the read-connection namespace exists (host/extension). Covered: a domain module lives with no active session/run.
+
+**S02 — Pi via Ordessa, tools + approvals, keep conversing.** 1. Ordessa adapter `namespaces.open`; `announce` a resource per stream with kinds like `pi.conversation`, `pi.tool-event`, `pi.approval`, each a distinct kind the adapter declares (adapter). 2. The "conversation" view is an **extension resolver** on `pi.conversation`, not a core type (extension). 3. Approvals are `action.invoke(pi.approval,"approve",…)` (extension → adapter). Mapping: the real chain's session/tools/approval become resources+actions carried by the adapter and a conversation-shaped **extension**; the core stays neutral. Covered via adaptation+extension.
+
+**S03 — long task, leave page, return later for progress+artefacts.** 1. User opens `acme.job` resolver → subscribes (extension). 2. User navigates away → host closes that `Subscription` (handle owned by page scope) (host). 3. Remote keeps emitting; adapter keeps `announce`+envelopes (adapter). 4. User returns → new resolver `directory.lookup(ns,job_id)` then `stream.subscribe(id, from_cursor=resolved)`; host replays missed envelopes in seq order (host). Page lifecycle ≠ execution lifecycle: resource lives with the namespace/adapter, subscription lives with the page. Covered.
+
+**S06 — two services, same session/task id.** 1. Two adapters open **separate** namespaces → `resource_id = (ns_A,"job-1")` and `(ns_B,"job-1")` cannot collide in directory or routing (host). 2. Capability/auth checks are namespace-scoped, so an action can't cross (host). Covered by namespacing.
+
+**S07 — special artefact, view not installed.** 1. Adapter `announce` kind `acme.plot`, registered payload `PlotData` (adapter). 2. No resolver matches → **host generic descriptor view** shows kind, `PlotData` fields summary, declared actions (host). Unknown content is explained, not blank. Covered.
+
+**S08 — resource + execution modules cooperate; execution replaceable.** 1. Resource module exposes a resource of kind `data.ref`; execution module exposes kind `runner`. 2. A coordinating view resolves both kinds and calls `action.invoke(runner,"execute",{ref})` — passing an **id + typed params**, not shared mutable state (extension). 3. Replacing the runner adapter only changes who answers `kind:runner`; the resource side is untouched (adaptation). Covered without a global-state channel.
+
+**S09 — drop, unknown outcome, reconnect dup/out-of-order.** 1. Link drops mid `send` → `invoke` returns `Unknown`; UI does not guess (adapter). 2. Reconnect: adapter **replays** its envelope history; host dedups by `(resource_id,seq)` and reorders to seq; `cursor.resolve` tells the resume point (host). 3. Idempotent action re-delivery: the `invoke` request carries a host-assigned `(namespace_id,action_seq)` so a double-send is visible; the adapter declares whether it dedups. Authority for "what is true": the adapter's replayed seq-ordered stream; the host only guarantees order/dedup, never invents outcomes. Covered (host+adapter).
+
+**S10 — extension crashes/closes/uninstalls while remote task runs.** 1. Resolver throws/unmounts → host closes its subscription handles, resource stays (host). 2. Remote still authoritative; a re-mounted or the generic resolver re-subscribes from `cursor` (host). 3. Running state stays explainable because the resource+stream never depended on the extension. Covered.
+
+**S11 — no cancel/history/resume.** 1. Adapter `announce` with `CapSet{cancel:not_supported, history:not_supported, resume:not_supported}` (adapter). 2. UI reads `capabilities.get` → renders disabled controls labelled "not offered by this service" (extension, driven by declared absence). 3. `invoke(...,"cancel")` → `CapabilityAbsent`. Absence is stated, never pretended. Covered.
+
+**S12 — remove an "optional" core domain module.** 1. Removing an optional **adapter** (e.g. git) tears down its namespace; other namespaces and host unaffected (host). 2. Removing an optional **resolver** falls back to the generic view (host). Covered.
+
+## A.6 Delegation / deletion experiments
+
+Each claimed-core mechanism is named with the scenario-step that fails if it is deleted; two mechanisms were considered and **removed** because no required scenario fails.
+
+## A.7 Second-service onboarding cost
+
+To attach a **service with a different protocol**, an implementer must write: (1) a `namespaces.open` connect; (2) for each observable thing, an `announce(descriptor{id,kind,CapSet})`/`retire`; (3) a payload-type registration per `kind`; (4) a seq-ordered event pump (or rely on host seq-assignment on ingest); (5) typed `action` handlers per registered `action_type`; (6) an explicit `CapSet` for every feature the service lacks, as `not_supported` sentinels. Six items; the core event-ordering/dedup/namespace/cursor machinery is **reused, not rewritten**. To add **only a view**, an implementer must write: one `{match:kind+schema, component}` resolver with no protocol code and no knowledge of other modules.
+
+## A.8 Honest cost and non-goals
+
+Weakest points: modelling transient text as an addressable **resource** is heavier than B for pure stateless round-trips; the generic fallback view (S07) is shallow and every rich view is an extension; the host assigns `seq` but relies on the adapter to make `action` re-delivery idempotent (S09's double-execution guarantee is **partial**, host+adapter joint). Non-goals: no cross-namespace joins, no content search, no host-level turn/role model. Largest second-order cost: every "thing" being a resource pushes adapters to give identity + capability declarations to otherwise ephemeral streams. I removed, and did not add, a host `session` object and a host `turn/message-role` envelope field: no required scenario fails without them (S04 explicitly passes without them), so including them would be relabelled conversation smuggling.
+
+## A.9 Mechanism disposition
+
+<<<FE-MECH-START>>>
+namespaces|core|S06 step 1 — colliding resource ids from two services would cross in directory and routing|R001/A §A.6-namespaces
+resource-directory|core|S05 step 2 — domain module could not be listed/looked-up without a session|R001/A §A.6-directory
+ordered-replayable-stream|core|S03 step 4 and S09 step 2 — no return-later catch-up, no host dedup/reorder|R001/A §A.6-stream
+capability-declaration|core|S11 step 2 — absence would be inferred from null, faking support|R001/A §A.6-cap
+typed-action|core|S08 step 2 — no idempotent typed request without execute(any)|R001/A §A.6-action
+generic-fallback-view|core|S07 step 2 — unknown artefact renders blank|R001/A §A.6-fallback
+host-session-object|removed|none — no scenario requires it; S04 passes without it|R001/A §A.8
+host-turn/role-envelope-field|removed|none — its presence is the D12 disqualifier; S04 passes without it|R001/A §A.8
+<<<FE-MECH-END>>>
+
+## A.10 Proposed scenario status (pending verifier)
+
+<<<FE-SCENARIO-START>>>
+S01|covered|core|A §A.5 text.stream resource, no profile/tool|R001/A §A.5-S01
+S02|covered|adaptation|A §A.5 kinds + conversation resolver + approve action|R001/A §A.5-S02
+S03|covered|core|A §A.5 namespace outlives page; re-subscribe from cursor|R001/A §A.5-S03
+S04|covered|core|A §A.5 submit/progress/result, no chat object|R001/A §A.5-S04
+S05|covered|core|A §A.5 config/git resources, no session|R001/A §A.5-S05
+S06|covered|core|A §A.5 namespaced resource ids|R001/A §A.5-S06
+S07|covered|core|A §A.5 generic fallback descriptor view|R001/A §A.5-S07
+S08|covered|extension|A §A.5 cross-kind view passing ids, replaceable runner|R001/A §A.5-S08
+S09|partial|core|A §A.5 host seq/dedup; double-exec needs adapter idempotency|R001/A §A.5-S09
+S10|covered|core|A §A.5 handles closed, resource stays authoritative|R001/A §A.5-S10
+S11|covered|core|A §A.5 not_supported CapSet + CapabilityAbsent|R001/A §A.5-S11
+S12|covered|adaptation|A §A.5 adapter teardown / resolver fallback|R001/A §A.5-S12
+<<<FE-SCENARIO-END>>>
+
+<<<FE-OUT-END>>>
+
+<<<FE-OUT-START>>>
+
+# Candidate B — Typed connection broker, no default event plane
+
+## B.1 Core bet
+
+The host core is a **typed connection broker**: it authenticates module-declared ports, enforces service-namespace scoping, and wires declared port pairs — and holds **no** event store, cursor, replay, or resource directory. Absence of a capability is then structurally true (no port, no feature), which answers S11/S04 head-on; every "observable" is whatever some module offers as a typed stream port.
+
+## B.2 Core concepts and operations
+
+**Port.** `ports.declare(module_id, PortDescriptor{id, service_namespace, direction, kind ∈ {request,stream}, req_type?, resp_type?, msg_type})`. All `*_type` are registered concrete types; a port with no registered type is refused (blocks `execute(any)`). Authority: descriptor registry in host; message semantics in the offering module.
+
+**Binding.** `ports.bind(requestor_module, service_namespace, port_id)` after host auth + namespace check; `ports.unbind`. Authority: host. Only declared pairs are live; there is no implicit broadcast.
+
+**Request port.** `port.call(port_id, typed_req) → typed_resp`. **Stream port.** `stream.open(port_id) → StreamHandle{ onMsg(T), close() }`. The host does **not** assign seq, dedup, reorder, or retain history — those belong to whatever module offers the port.
+
+**Namespace / scope.** A `service_namespace` tag on every port id; broker refuses cross-namespace binds unless explicitly granted. There is **no** host resource directory and **no** host cursor.
+
+**Lifecycle.** A port dies with its offering module; a `StreamHandle` closes on `close()` or when either endpoint unmounts. The broker holds bindings, not data.
+
+## B.3 Boundary rules
+
+A service adapter must translate its protocol into concrete typed request/stream ports and must register every message type. "Does not support this" is expressed by **not declaring the port**: there is no cancel request port ⇒ no `port.call` target exists. But a UI that must *show* a disabled control needs to know whether something is "absent because unsupported" vs "absent because not loaded"; B cannot read that from binding state alone, so truthful absence at the legibility layer forces a **capability-descriptor port** the adapter must offer and maintain — i.e. B reintroduces, per adapter, the very `CapSet` A centralises. This is relocation, not elimination (see B.8).
+
+## B.4 Extension mechanism
+
+A view module declares `artefact-view.request` ports answering `describe(artefact_type) → ViewDescriptor`; the host keeps a **builtin default provider** answering unknown types with a generic descriptor view, so S07 never renders blank (without it, B would fail the "faking/blank for unknown" disqualifier — so this provider is admitted to the core, a mild materialisation B would rather not carry). Selection: query declared `artefact-view.request` ports in scope, first responder wins. Guarantees: provider **absent** → default provider renders descriptor; provider **throws** → error descriptor; provider **unmounted mid-operation** → its stream ports unbind and close, and because the broker retains no data, re-subscription recovers only if the *offering* module (typically the long-lived adapter) kept state. B cannot claim more than that.
+
+## B.5 Scenario trajectories (owner per step)
+
+**S01 — text-only agent.** 1. `namespaces`-tagged service adapter declares `text.request` (send) + `text.stream` (reply) ports (adapter). 2. View binds both; `port.call(text.request,"hi")`, `onMsg(TxtChunk)` (extension). No profile/workspace/tool exists anywhere. Covered.
+
+**S04 — submit/progress/result, no chat.** 1. Adapter declares `job.submit.request`, `job.progress.stream`, `job.result.request` — three concrete typed ports, **no** message type resembling a chat turn. 2. View calls and renders each. D12 answer for B: **strongly yes** — the core has no event plane and no chat shape at all. This is B's clearest advantage over A.
+
+**S11 — no cancel/history/resume.** 1. Adapter declares no `*.cancel.request`, no history port, no resume port. 2. Absence at transport is automatic (nothing to call); but the UI needs the adapter's `capability-descriptor.request` port (B.3) to *say why*. Covered with the caveat that the explanatory port is per-adapter burden.
+
+**S05 — browse without session.** 1. Config module declares `config.read.request`; git module declares `git.diff.stream`; no execution/agent port exists or is bound (adaptation). 2. View binds read ports only. Covered — trivially, since B has no session concept to begin with.
+
+**S02 — Pi via Ordessa.** 1. Ordessa adapter declares typed ports for conversation/tool-event/approval; 2. a conversation view binds them; 3. approvals call `approval.request`. Mapping mirrors A but every stream's ordering/replay is the **adapter's** own job. Covered via adaptation.
+
+**S03 — return later for progress+artefacts.** 1. Page binds `job.progress.stream`; 2. page destroyed → `StreamHandle.close()`, broker holds nothing (host). 3. If the **offering adapter** (long-lived) retained a progress buffer and exposes `job.progress.replay.request`, a returning page re-binds and pulls the buffer (adapter). This *works only because the adapter reimplemented cursor/replay* — the host provided zero. 4. If the offering module was itself a UI extension that unmounted, there is **no** retained state and the trajectory breaks. Status: **partial**, owner = adapter, not core.
+
+**S06 — two services, same id.** 1. Port ids carry `service_namespace`; broker refuses cross-namespace binds (host). 2. But caches are per-module with no core directory, so **cache bleed is prevented only by adapter discipline**, not by a host invariant. Status: **partial**.
+
+**S07 — special artefact, view not installed.** 1. Unknown `artefact_type` query → **core default provider** returns generic descriptor (core). Covered.
+
+**S08 — resource + execution cooperate; replaceable.** 1. Coordination is by binding to two modules' ports by id; replacing the execution module changes which `port_id` answers. No shared global state. Covered.
+
+**S09 — reconnect dup/out-of-order.** 1. Broker provides no seq/dedup. 2. The **adapter** must number messages and the view must dedup, per service, with no host guarantee. Two producers for one slot and out-of-order arrival have no core arbiter. Status: **open** at core level (would require the adapter to rebuild A's event plane).
+
+**S10 — extension crashes/uninstalls while remote runs.** 1. Its stream port unbinds/closes (host). 2. Remote continues in the adapter; a new page recovers **only if** the adapter kept state (adapter). 3. If the offering module was the crashed extension, running state has no owner. Status: **partial**, owner = adapter, and fails if the offering module is non-resident.
+
+**S12 — remove an "optional" module.** 1. Its ports unbind; independent modules' bindings unaffected (host). 2. A coordinator binding to the removed port simply gets no responder → must handle missing binding. Covered (core+adaptation).
+
+## B.6 Delegation / deletion experiments
+
+See B.9. The deletion test that hurts B is the *reverse*: remove the hypothetical **host event store** (which B does not have) → S03/S09/S10 stay "working" only if some module already reimplemented it, proving the capability was relocated, not removed. B's genuinely core-removable item is its per-module cache discipline (no failing scenario ⇒ pushed to adapter, recorded as the source of B's partial status on S06).
+
+## B.7 Second-service onboarding cost
+
+To attach a **service with a different protocol**, an implementer must write: (1) typed request/stream ports for every operation *and* every observable; (2) register each message type; (3) a capability-descriptor port so absence is legible (B.3); (4) **its own** seq/dedup/replay/cursor for `job.progress.stream`-style ports (S03/S09); (5) a **retained-state buffer** for post-unmount recovery (S03/S10). Five items, of which (3)(4)(5) are the machinery A centralises, re-implemented **per adapter**. To add **only a view**, an implementer must write a `artefact-view.request` provider — more ceremony than A's single `{match, component}` resolver because the view must declare ports and the host must bind them.
+
+## B.8 Honest cost and non-goals
+
+B wins the D12 question most cleanly for S04/S11 (no core concept is shaped like chat). It loses the structural cluster: **S03 partial, S06 partial, S09 open, S10 partial**, all because the event plane has no core owner and lands on adapters. That is the plan's predicted failure: B is either **smuggling A into every adapter** (relocating, per B.7 items 3–5, so total complexity is not lower — it is A duplicated N times plus worse) or **lacking an owner** for return-later and reconnect. Largest second-order cost: because "the offering module must stay resident" is an implicit correctness requirement, B quietly assumes an always-on subscription ledger in the adapter layer — the thing it claimed to refuse. Non-goals: B deliberately carries no ordering, replay, or resource identity, so it cannot make guarantees that depend on them.
+
+## B.9 Mechanism disposition
+
+<<<FE-MECH-START>>>
+port-declaration-registry|core|S01 step 1 — without registered typed ports there is no wireable, typed connection|R001/B §B.6
+namespace-scope-check|core|S06 step 1 — same-id ports from two services would cross-bind|R001/B §B.6
+bind/authorize|core|S08 step 1 — replacement module could not be re-bound by id|R001/B §B.6
+builtin-default-view-provider|core|S07 step 1 — unknown artefact renders blank (disqualifier if removed)|R001/B §B.4
+host-event-store|removed|none at core — S03/S09/S10 consequence relocated to adapters|R001/B §B.5/B.8
+host-resource-directory|removed|none at core — S05/S06 handled by port ids + adapter cache discipline|R001/B §B.8
+<<<FE-MECH-END>>>
+
+## B.10 Proposed scenario status (pending verifier)
+
+<<<FE-SCENARIO-START>>>
+S01|covered|adaptation|B §B.5 text.request + text.stream ports|R001/B §B.5-S01
+S02|covered|adaptation|B §B.5 typed ports per chain element|R001/B §B.5-S02
+S03|partial|adaptation|B §B.5 needs adapter-retained replay buffer|R001/B §B.5-S03
+S04|covered|core|B §B.5 submit/progress/result ports, no chat|R001/B §B.5-S04
+S05|covered|adaptation|B §B.5 read ports only, no session concept|R001/B §B.5-S05
+S06|partial|core|B §B.5 namespace-scope on binds; caches uncared|R001/B §B.5-S06
+S07|covered|core|B §B.4 builtin default view provider|R001/B §B.5-S07
+S08|covered|extension|B §B.5 bind to two ports by id|R001/B §B.5-S08
+S09|open|unassigned|B §B.5 no core owner for dedup/reorder|R001/B §B.5-S09
+S10|partial|adaptation|B §B.5 recovery needs resident offering module|R001/B §B.5-S10
+S11|covered|adaptation|B §B.5 no port + capability-descriptor port|R001/B §B.5-S11
+S12|covered|core|B §B.5 unbind removed ports|R001/B §B.5-S12
+<<<FE-SCENARIO-END>>>
+
+<<<FE-OUT-END>>>
+
+Below, the two self-disclosed structural risks, so the attacker has concrete targets rather than having to find them:
+
+<<<FE-LEDGER-START>>>
+FE-CE-001|R001|minor|OPEN|Core must carry no conversation/turn/role-shaped state; absence must be explicit not null|A: risk that resource.kind or the event envelope smuggles turn/message-role/session, making S04 pass only by faking|see R001/A §A.2 (envelope fields = {resource_id,seq,ts,kind,payload} only) and §A.8 (session-object & turn/role-field removed)|->
+FE-CE-002|R001|major|OPEN|Total complexity (core+adapter+extension) minimized and S03/S06/S09/S10 each have a named owner|B: event plane (seq/dedup/replay/cursor/retained-state/capability-descriptor) relocated into every adapter, so B may be A-duplicated-per-service or have no owner on reconnect/unmount|see R001/B §B.3, §B.5-S03/S09/S10, §B.7 items 3-5, §B.8|->
+<<<FE-LEDGER-END>>>
+
+Summary for the controller: A answers the D12 question "yes" while keeping S03/S06/S09/S10 owned by a centralized core event plane (cost: every thing is a resource). B answers D12 most purely for S04/S11 (no chat shape exists at all) but at the price of leaving the structural cluster `partial`/`open` because durability has no core owner — either smuggling A per-adapter (FE-CE-002) or lacking an owner, which is exactly the trade the next round's attack should resolve.

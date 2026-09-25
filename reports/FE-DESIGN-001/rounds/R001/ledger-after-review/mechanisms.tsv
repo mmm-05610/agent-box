@@ -1,0 +1,11 @@
+mechanism|disposition|failure_scenario|experiment_ref|round
+namespaces|core|S06 step 1 — colliding resource ids from two services cross directory and routing|rounds/R001/cand-A §A.6-namespaces|1
+resource-directory|core|S05 step 2 — domain module cannot be listed/looked-up without a session|rounds/R001/cand-A §A.6-directory|1
+ordered-replayable-stream|core|S03 step 4 and S09 step 2 — no return-later catch-up, no host dedup/reorder|rounds/R001/cand-A §A.6-stream|1
+capability-declaration|core|S11 step 2 — absence inferred from null, faking support|best-candidate §R.2 CapMap (open)|1
+typed-action|core|S08 step 2 — no idempotent typed request without execute(any)|rounds/R001/cand-A §A.6-action|1
+generic-fallback-view|core|S07 step 2 — unknown artefact renders blank|best-candidate §R.4 revised fallback|1
+host-session-object|removed|none — no scenario requires it; S04 passes without it|rounds/R001/cand-A §A.8|1
+host-turn/role-envelope-field|removed|none — D12 disqualifier; S04 passes without it|rounds/R001/cand-A §A.8|1
+host-event-store|removed|none at core — S03/S09/S10 consequences are adapter-burden findings for D06|rounds/R001/cand-B §B.9|1
+host-resource-directory-B|removed|none at core — S05/S06 handled by port ids + adapter discipline|rounds/R001/cand-B §B.9|1

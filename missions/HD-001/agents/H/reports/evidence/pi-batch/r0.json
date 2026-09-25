@@ -1,0 +1,6 @@
+{
+  "code": "GATE_WORKER_REQUIRED",
+  "error": "pass --worker <agent-box-worker binary>; bundles on disk: ",
+  "result": "PI_PRODUCTION_CHAIN_GATE_FAILED",
+  "script": "scripts/server-round1/pi-production-chain-gate.py"
+}

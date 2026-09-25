@@ -1,0 +1,2 @@
+[2026-09-22T02:56:18Z] validate[attack]:   invalid: ledger row FE-CE-001 needs 8 pipe fields (id|round|severity|status|invariant|title|evidence|targets)
+[2026-09-22T02:56:18Z] validate[attack]:   invalid: ledger block present but contained no valid rows

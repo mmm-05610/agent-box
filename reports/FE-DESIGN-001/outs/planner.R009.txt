@@ -1,0 +1,32 @@
+<tool_call>
+<unknown>
+Let me produce the planner round_plan. I have everything inlined; no tools needed. Word minimum is 260, output is round_plan wrapped in FE-OUT markers. I'll keep it concrete and rejectable, honoring the R009 directive (close S05/S11 deletion gaps, attack the actionable/truthful default view, one new four-state experiment) and the ledger-discipline guards (FE-CE-007 stays open on B, FE-CE-018 must be re-checked if the interface surface moves).
+</unknown>
+
+<<<FE-OUT-START>>>
+# R009 round plan — planner
+
+CANDIDATES: A
+
+Rationale for a single core this round: A has survived every dimension attacked so far (D12, D10, D08, D01, D06) with no held major against its current bytes; the only surviving major (FE-CE-007) is a B-only defect that stays OPEN on B's ledger and is explicitly out of scope for a re-rank. The open items are an evidence-completeness gap (S05, S11) and a fresh attack on one existing posture — the default view's actionability — not a fork of "what is the host core." A fork becomes mandatory **only if** this round's D05 attack produces a held major showing that A's "opaque payload + subscriber computes value, no host content authority" posture cannot render current value or distinguish run-state at all from the fields `SubscriberScope` exposes; that would force a rival core with a host-recognized value/snapshot primitive. Until then, one core.
+
+DIMENSION: D05-fallback-unknown
+
+Why this dimension: R008's attack (D06-adapter-burden) was clean against A after FE-CE-018 closed, so it is barred as the immediate prior. D05 has never been used and is exactly the directive's centre of gravity — unregistered/unknown/partial content and the default view. D04-absent-capability is folded in only insofar as the OutcomeUnknown-vs-failed truthfulness is a fallback-render question, not a separate axis.
+
+THE QUESTION THIS ROUND MUST SETTLE
+Can a user, from the host's default (no dedicated view installed) rendering of an unregistered or partially-known resource, determine the current value, name the concrete change, and distinguish running / done / failed / outcome-unknown — each backed by a named clickable consequence and an owner?
+
+Core bet (A, two sentences): The host core is a namespaced directory of cursor-streamed resources with same-ns scoped subscriber handles, a subscriber-chosen single `from_cursor`, adapter-owned open CapMap and typed actions, and a typed `pump`; it holds no content authority. Its default view therefore renders only what the adapter registered — kind label, last-event metadata (`payload_schema_id`,`seq`,`ts`), typed action names+schemas, CapMap, and a re-invokable `read` snapshot — and truthfully says "cannot determine" when no such action exists.
+
+Strongest objection against A: "not blank" is being offered where "user can act and tell states apart" is required. If an adapter registers no `read`/`status` action, or surfaces `failed` and `OutcomeUnknown` merely as two opaque `payload_schema_id` rows the host cannot read, then S05/S07's value display and S11/S09's failed-vs-unknown distinction both collapse to a metadata wall the user cannot act on. This is a disqualifier class (faking support / hiding uncertainty), not a styling nit.
+
+Evidence that settles the objection this round:
+- One NEW coded experiment (MODEL ONLY, never product/protocol) rendering the four states running / done / failed / outcome-unknown from ONLY the fields `SubscriberScope` exposes, proving whether they are distinguishable or whether the design forces a hidden content-authority assumption.
+- Per-step "delete mechanism X → S05/S11 fails at step N in this user-visible way" rows against the current bytes (the R008 insufficient_evidence closers), for every core step including generic-fallback-view and the per-ns action registry.
+- If any interface surface moves, a re-check of FE-CE-018; the R008 pass does not inherit.
+
+Centre-of-gravity scenarios: S05 and S11 (currently `insufficient_evidence`) must close; S07 and S09's OutcomeUnknown rendering are this round's attack surface. S01–S04, S06, S08, S10, S12 remain claimed and must not be restated or weakened.
+
+Boundary discipline: do not re-rank B or convert FE-CE-007 on A's "no mechanism" argument (guards E6/E7); necessity claims ride on deletion experiments, not on "it prevents an over-reach."
+<<<FE-OUT-END>>>

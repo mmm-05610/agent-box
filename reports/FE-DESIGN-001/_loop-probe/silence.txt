@@ -1,0 +1,6 @@
+observed_at=2026-09-21T16:44:28Z
+lines_after_280s=6
+expected=6 (no wake armed; both loops stopped)
+tick=4 at=2026-09-21T16:33:11Z pid=737373 host=maoqh-g15
+tick=5 at=2026-09-21T16:36:21Z pid=738128 host=maoqh-g15
+tick=6 at=2026-09-21T16:39:14Z pid=739102 host=maoqh-g15

@@ -1,0 +1,14 @@
+# F0 复用账 — HD-001 Phase 0（2026-09-23）
+
+基线：worktrees/harness-desktop-001/f0 @ 85cc3cd01497bb185be417a38dbeeeca4edb08e6。证据均本人实测/实读。
+
+| 能力/组件 | 候选项目+版本/commit | 源码路径/官方链接 | 许可证 | 检查/实验结果 | 直接/适配/参考/不用 | 修改边界/拒绝原因 | 本地落点/升级方式 | owner |
+|---|---|---|---|---|---|---|---|---|
+| 插件生命周期/依赖解析/自动启动 | @lumino/coreutils 2.2.3（已采用，本地锁定） | 本地 packages/desktop-host/src/runtime.ts:12 实读用法；上游 https://github.com/jupyterlab/lumino | BSD-3-Clause（上游 LICENSE 与源码头实测） | runtime.ts 用 PluginRegistry 注册/激活/停用，宿主不重排依赖；loader 拒绝重复 id/provider（packages/extension-loader/src/index.ts:22-37 实读） | 直接复用 | 不自研第二调度器（AGENTS.md 红线）；不改 Lumino 语义 | platform/extension-host 机械迁移，版本锁定不动 | F0 |
+| Token 契约身份 | @lumino/coreutils Token 2.2.3 | 上游源码实读：https://raw.githubusercontent.com/jupyterlab/lumino/main/packages/coreutils/src/token.ts | BSD-3-Clause | Token 相等=对象引用相等，name 仅调试用 → 跨插件必须共享同一模块实例；本地 contracts 走 @extensions/<id>/contract.js import map 满足（extensions/commands/src/entry.ts:2、extension-protocol.ts:12 实读） | 直接复用 | 契约禁止每插件各带副本（会破坏 Token 身份）；只能经 import map 单实例 | contracts/** 迁移后仍以运行时模块+import map 暴露 | F0 |
+| 每扩展独立构建 + 共享依赖单一身份 | JupyterLab @jupyterlab/builder 4.5.11（2026-09 npm latest 实测） | 实读 npm tarball lib/extensionConfig.js（/tmp/hd001-f0-research）：ModuleFederationPlugin；core deps 设 `import:false` 不打进扩展，singletonPackages 设 `singleton:true,import:false`；扩展 package.json `jupyterlab` 元数据经 ajv 校验；产物为静态目录由宿主枚举 | BSD-3-Clause（源码头+registry 实测） | 机制与本仓 esbuild+importmap 等价映射：其 shared(import:false) ≙ 本仓 external；其 federation remote ≙ 本仓 ordessa:// import map；其每扩展独立构建 ≙ PLAN 目标 | 参考 | 不引入 webpack/联邦运行时（增加双构建体系，Electron 单 origin 下 import map 足够且已是验收语义）；仅借鉴"宿主 pin 共享单例集合+每包元数据校验"的形制 | 无新依赖；方案写入 F0 构建提案 | F0 |
+| 打包器（per-plugin bundle） | esbuild 0.28.1（已采用 devDep） | 本地 extensions/build.mjs、examples/build.mjs、apps/desktop/scripts/build.mjs 实读；https://esbuild.github.io | MIT | bundle+splitting+esm+external 已支撑现原型；examples/build.mjs 证明"独立构建输入"形制可行（输出 Host 未重建，console 实证文案） | 直接复用 | 每插件独立构建后跨插件 splitting 共享消失 → 除宿主 pin 共享集（react/react-dom/@ordessa/extension-api/@extensions/*）外一律打进包内，防重复 React 危险 | tooling/ 每插件 build + 发现式总脚本 | F0 |
+| 运行时裸说明符解析 | WICG Import Maps（Chromium 内建，无依赖） | 本地 apps/desktop/electron/extension-protocol.ts:7-12,17-24 实读（单张静态 import map + CSP nonce） | 标准（无许可证问题） | Electron 40(Chromium≥132) 完整支持；manifest fail-closed 发现链（electron/extensions.ts 实读）与之配套 | 参考/继续用 | 不引 module-federation 运行时；不改 CSP 模型 | platform/extension-loader + protocol 机械迁移 | F0 |
+| UI 运行时 | react/react-dom 19.2.7（已采用） | apps/desktop/package.json 实读；host 以 shared/*.js 单 splitting 构建保证单实例（apps/desktop/scripts/build.mjs:9-14 实读） | MIT | 现行为验收基础 | 直接复用 | 继续作为唯一宿主 pin 单例外部集合成员 | apps/desktop/renderer 迁移后不变 | F0 |
+
+候选覆盖：≥2 候选（Lumino、JupyterLab builder、esbuild、import maps、React），≥1 实读源码（Lumino token.ts 上游实读 + @jupyterlab/builder 4.5.11 tarball 实读 + 本仓 8 个关键文件实读）。每个涉及新增/重做的构建组件均有行；无未知许可证引入。备选未深读（仅记录）：Eclipse Theia（EPL-2.0/GPL-2.0 双许可，npm 包编译期模型，与本仓运行时插件模型不匹配，不采用）。

@@ -1,0 +1,3 @@
+[2026-09-22T02:56:21Z] validate[review]:   invalid: verdict FE-CE-001: status [WONKY] is not one of {pass|fail}
+[2026-09-22T02:56:21Z] validate[review]:   invalid: verdict block had no valid rows
+[2026-09-22T02:56:21Z] validate[review]:   invalid: regression set is non-empty and no replay block was produced

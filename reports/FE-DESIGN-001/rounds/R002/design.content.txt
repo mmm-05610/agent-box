@@ -1,0 +1,188 @@
+Two complete candidates follow, in plan order (A then B), each with the eight required sections, then its scenario and mechanism blocks. The round question is settled in §A.1 and confirmed self-critically in §B.8: the core does **not** need a first-class cross-namespace join; S08 is satisfied by a two-handle pattern the namespace-isolated core merely permits and never records.
+
+<<<FE-OUT-START>>>
+# Candidate A (R002 revision) — Namespace-isolated resource/event core; S08 via two ns-local handles, no cross-namespace primitive
+
+## A.1 Core bet (and this round's settled position)
+
+The core stays a flat directory of **per-namespace** resources, each an addressable `(namespace_id, local_id)` plus a seq-ordered replayable stream plus an **open** capability map; the host has no cross-namespace reference, join, edge, or pair record. S08's "resource module + replaceable execution module cooperate" is satisfied when a user-launched coordinating view holds **two independently minted, namespace-local `SubscriberScope` handles** and invokes a typed action on one using what it observed on the other. The settling position for the round question: the core needs **no** first-class cross-namespace mechanism — the handle-mint used for every ordinary view is reused twice, and because the core stores nothing about the pairing, "no cross-namespace subscription" is a structural guarantee, not a naming fiction. Nothing smaller than the namespace itself satisfies S06 (raw `job-1` from two services must not merge), and nothing as large as Candidate B's graph is required, since no scenario beyond S08 fails without edges and S08 passes with two handles.
+
+## A.2 Core concepts and operations
+
+**Namespace.** `namespaces.open(service_descriptor) → NamespaceHandle{ns_id}`; `namespace.teardown(reason)`. Host-authoritative. `ns_id` is minted by the host per connect, never supplied by the service, so a reconnect of the same service is a **new** `ns_id`. Teardown disposes every resource under it and force-closes every handle subscribed to them.
+
+**Resource.** `namespace.announce(descriptor{local_id, kind:string, capabilities:CapMap})`; `namespace.retire(local_id, reason)`; `directory.lookup(ns_id, local_id) → descriptor | ExplicitAbsent`; `directory.list(ns_id, filter{kind?}) → [descriptor]`. Content authority is the producing adapter; identity/lifecycle authority is the host. Both directory calls take an explicit `ns_id` and are **scope-checked** against the caller's handle (see A.4) — a handle bound to ns_A cannot pass ns_B.
+
+**Event stream.** `subscribe(resource_id) → Subscription{close(), onNext(Envelope)}` with `from_cursor`; `cursor.resolve(resource_id) → seq`. `Envelope{resource_id, seq:int, ts, kind:string, payload_schema_id:string, payload:RegisteredType}`; host refuses delivery of an unregistered `payload_schema_id`. `seq` monotonic per resource, host-assigned on ingest. Unsubscribe = `Subscription.close()`; host also closes it when the owning handle's scope is destroyed.
+
+**Open capability map.** `capabilities.get(resource_id) → CapMap{capability_name → {supported|not_supported|unknown}}`; names are adapter-chosen strings with **no** host-defined vocabulary. Absence of a name = "unknown", never "unsupported".
+
+**Typed action.** `action.invoke(resource_id, action_type:string, params:RegisteredType) → Result | CapabilityAbsent(action_type) | OutcomeUnknown(invoke_id)`. Action types registered per kind with concrete param/result types; no free-form. `invoke_id` is host-assigned and stable (A.5-S09).
+
+**Resource-scoped handle (the only cooperation primitive).** `handle_for(ns_id, local_id) → SubscriberScope{descriptor, subscriptionHandle, typedInvoker}` — this is the same object the host already mints to let any single view drive its own resource. It carries **exactly one** `(ns_id, local_id)`; it exposes no `parent`, no `sibling`, no `enumerateNamespace`, no way to discover another ns_id. S08 obtains **two** such handles (one per participant) and nothing more; there is no "dual handle", no combined scope, no pair object in the core.
+
+## A.3 Boundary rules
+
+A service adapter translates its protocol into: (1) announce/retire with kind + open CapMap; (2) a seq-numbered typed event stream per resource; (3) payload-type registration per kind; (4) typed action handlers; (5) explicit `not_supported` CapMap entries and/or omission from the kind's action registry to state absence. `ExplicitAbsent` vs `CapabilityAbsent` are distinct non-null terminals. On the cross-module question: an adapter sees **only its own namespace**; there is no adapter-side API to name, target, or resolve a resource in another namespace, and no adapter can mint a handle for one. A `handle_for(ns_B, …)` is available **only** to a view that the user selected ns_B for, never to ns_A's adapter or to a handle bound to ns_A. Absence and scope rejection are always stated (`ScopeDenied`, `NamespaceGone`), never inferred from null or timeout.
+
+## A.4 Extension mechanism
+
+An extension registers a **view resolver** `{match: kind + payload_schema_id, component}`. Selection: exact kind/schema match, most-specific-first; default fallback is the host-builtin generic descriptor view (renders kind, declared action names + typed param schemas, CapMap as name→state labels, last envelope's `payload_schema_id` only, and the line "No dedicated view installed; structured data available via subscription."). Unknown content is never blank and never given a run/agent reading.
+
+An extension receives only the **per-resource `SubscriberScope` handle(s)** the host minted to it. For a coordinating view, that is the ordinary handle for its primary resource **plus**, if the user paired, a separately-minted handle for the second resource. The extension may render, subscribe via each handle, and invoke registered actions on each handle. It may **not**: enumerate namespaces from a handle, derive a foreign id, register free-form event names, or hold a combined/global context. The **pair gesture** is a user action at the host affordance layer — the user points at two on-screen resources and says "drive B from A"; the host responds by handing the view two independent handles it could have minted separately. The core records nothing about that pairing: closing the view, tearing down a namespace, or reloading the page does not resurrect it. Guarantees: resolver absent → generic view; throws → host error-boundary keeps the streams on the still-mounted handles; uninstalled mid-operation → host force-closes **that view's** handles, each resource remains authoritative and re-subscribable from cursor.
+
+## A.5 Scenario trajectories (owner per step)
+
+**S01 text-only.** 1. Connect → `namespaces.open→ns` (host). 2. `announce{kind:"text.stream", CapMap{streaming:supported,cancel:not_supported,resume:not_supported}}` (adapter; names adapter-chosen). 3. User types → view calls `action.invoke(id,"send",{text})` (extension→adapter). 4. Adapter emits `seq 1..n` of registered `TextDelta` (adapter). 5. Resolver renders deltas; no core assistant/session object (extension). Covered; zero profile/tool/recovery.
+
+**S02 Pi/Ordessa.** 1. Ordessa adapter opens ns, announces kinds `pi.conversation`/`pi.tool-event`/`pi.approval` (adapter). 2. Conversation UI is a resolver on `pi.conversation`, not a core type (extension). 3. Approvals via `action.invoke(approval,"approve",…)` (extension→adapter). Core stays neutral. Covered via adaptation+extension.
+
+**S03 long task, leave/return.** 1. Resolver subscribes via its handle (extension). 2. Navigate away → host closes that Subscription (host). 3. Remote keeps emitting; adapter keeps announce+envelopes (adapter). 4. Return → new resolver `directory.lookup(ns,job)` then `subscribe(id, from_cursor)`; host replays missed envelopes in seq order (host). Page lifecycle ≠ execution lifecycle. Covered.
+
+**S04 submit/progress/result, no chat.** 1. Open ns; `announce{kind:"acme.job", CapMap…}`, actions `submit`,`result` (adapter). 2. Resolver renders sections from `JobProgress`/`JobResult` envelopes (extension). 3. No session/turn/role field in any envelope (host+adapter). Covered; D12 clean.
+
+**S05 browse config/git, no session.** 1. `announce{kind:"config.tree", CapMap{read:supported}}` (adapter; `read` not reserved). 2. `directory.list(ns,filter{kind:"config.tree"})` (host). 3. Resolver invokes `read` for snapshot or reads stream (extension). No agent ns opened, no run. Covered.
+
+**S06 two services, same id (ordered).** 1. Alpha connects → `namespaces.open→ns_A`; Beta → `ns_B` (host, host-minted ids). 2. Alpha `announce` local `job-1`; Beta `announce` local `job-1`; stored as `(ns_A,job-1)` and `(ns_B,job-1)` — distinct keys (host). 3. Alpha view's `handle_for(ns_A,job-1)` carries ns_A only; its directory/stream/`lookup` calls are ns-scoped; it cannot pass ns_B (host enforces scope). 4. Auth: Alpha's connect grant is bound to ns_A; a request whose handle scope ≠ target resource ns is rejected `ScopeDenied`; ns_B's job-1 is unreachable from ns_A (host). 5. Events/cache keyed `(ns,resource,seq)`; a replayed `seq=k` for ns_A never matches ns_B's entry; Beta's envelopes never enter Alpha's cursor (host). 6. Only a **user** pair gesture can ever present a second ns_B handle; ns_A's data never yielded ns_B's id (user+host). Deletion: remove namespaces → step 2 collides and steps 4-5 bleed. Covered (core).
+
+**S07 special artefact, view not installed.** Adapter `announce{kind:"acme.plot"}`; no resolver matches → generic view renders kind + actions + CapMap labels + last `payload_schema_id` + "no dedicated view installed" (host). Covered.
+
+**S08 resource + replaceable execution cooperate (this round's target).** 1. Runner adapter opens ns_R, announces `kind:"runner"` exposing action `execute{ref:RegisteredType}→JobHandle` (adapter, host-ns). 2. Resource adapter opens ns_D, announces `kind:"data.ref"` (adapter). 3. User selects the data.ref view; it holds handle `h_D=handle_for(ns_D,ref)` (extension; host-minted). 4. User issues the **pair** gesture pointing at h_D's artefact and a runner resource; host mints a **second, independent** handle `h_R=handle_for(ns_R,runner)` and hands both to a coordinating view. The core stores **no** relationship; h_R was not derived from h_D nor discovered by it (user+host). 5. h_D's stream shows the artefact ready; the coordinating view calls `h_R.typedInvoker("execute",{ref:h_D.descriptor.id})` — id + typed params; no shared mutable state (extension→adapter). 6. `JobHandle` arrives on h_R's stream; progress rendered from `(ns_R, job)` envelopes (extension). 7. Replace runner: adapter R `namespace.teardown`; a different runner adapter opens **new** ns_R′ and announces `kind:"runner"`. h_R is now bound to a **gone** ns_R → next `h_R.typedInvoker(...)` returns `NamespaceGone`, and `h_D`'s subscription is unaffected. The view does **not** silently re-bind to ns_R′; the user re-pairs to receive `h_R′=handle_for(ns_R′,…)`. Replaceability is therefore real (resource untouched, adapter swappable) without the core ever holding a pointer from ns_D into ns_R. Covered (extension owns cooperation; core permits via two ns-local handles). (a) handles minted by host at steps 3 and 4; (b) at user's select (3) and pair (4); (c) `subscribe`/`invoke`/`directory` are handle-scope-checked so ns_R cannot be discovered from h_D — the id must come from the user's separate selection; (d) on replacement h_R goes stale with `NamespaceGone`, resource unaffected, re-pair required.
+
+**S09 drop, unknown outcome, dup/out-of-order (fixed to partial with owners).** 1. `action.invoke` sent, link drops before ack → host returns `OutcomeUnknown(invoke_id)` where `invoke_id` is the host-assigned stable token for that call (host). 2. Reconnect: adapter replays history; host dedups by `(ns,resource,seq)` and reorders; `cursor.resolve` yields resume (host). 3. Exactly-once apply: **owner = adapter**, declared via `CapMap{"idempotent-apply": supported|not_supported}`. If `supported`, the host re-sends the SAME `invoke_id` and the adapter guarantees no second execution; if `not_supported`, the host **refuses to auto-replay** the unknown-outcome call and surfaces `OutcomeUnknown` for the user to decide (host+adapter). Owners named: (1) host id assignment, (2) host dedup/reorder, (3) adapter apply-idempotency guarded by host refusal. Deletion: remove stable `invoke_id` → step 3 adapter cannot distinguish replay from fresh. **Partial** — double-execution is host+adapter joint, not pure-host.
+
+**S10 extension crashes while remote runs.** Coordinating view throws/unmounts → host force-closes **its** handles h_D and h_R (host); resources in ns_D/ns_R remain authoritative (adapters); a new view re-subscribes each from cursor (extension). Running state stays explainable because neither the resource nor the pairing record ever lived in the core — closing the view deletes no facts. Covered.
+
+**S11 no cancel/history/resume.** Adapter `announce{CapMap{"cancel":not_supported,"history":not_supported,"resume":not_supported}}` (adapter; names adapter-chosen). UI reads `capabilities.get`, renders each name with its state as "not offered by this service" (extension); `invoke(...,"cancel") → CapabilityAbsent`. Absence stated, never pretended. Covered.
+
+**S12 remove an "optional" core domain module.** Remove optional adapter → its ns tears down; other namespaces unaffected (host). Remove optional resolver → generic fallback (host). Remove a **paired** coordinating view → the other, single-resource modules are untouched because the core never recorded the pair (host). Covered.
+
+## A.6 Delegation / deletion experiments
+
+See the FE-MECH block. Each core mechanism has a failing scenario. `cross-namespace-edge` and `persistent-pair-record` are recorded as **removed** — deleting them breaks no core step because S08 uses two ns-local handles and re-pairing is a user action, so the graph of Candidate B is surplus under D08.
+
+## A.7 Second-service onboarding cost
+
+Attach a different-protocol service: (1) `namespaces.open`; (2) `announce/retire` kind + open CapMap (adapter-chosen names, no host vocabulary); (3) payload-type registration per kind; (4) seq-ordered event pump (or host ingest-seq); (5) typed action handlers, incl. a stable `invoke_id` replay contract if `idempotent-apply:supported`; (6) explicit `not_supported` CapMap entries for absent features. Six items; no cross-namespace concept to learn — an adapter never names or resolves another service. Add a view only: one `{match:kind+schema, component}` resolver; a **coordinating** view additionally needs the user-pair gesture (host affordance, not adapter code) and to call `handle_for` on the paired id it is shown — still no protocol code and no knowledge of other adapters' internals.
+
+## A.8 Honest cost and non-goals
+
+The D10 cost is charged honestly: the core's price for S08 is (i) handle-mint remains strictly single-resource and scope-checked, (ii) the user-facing pair gesture, and (iii) `NamespaceGone` stale-handle semantics on replacement. Weakest: S09 is partial (host+adapter joint idempotency); S08 cooperation requires a user gesture rather than a standing automatic link (deliberate, to keep isolation structural); modelling transient text as a resource is heavier than a broker for stateless round-trips. Non-goals: no cross-namespace joins/edges, no content search, no host turn/role/session model, no host capability vocabulary. Largest second-order cost: "everything is a resource" pushes adapters to give identity+capabilities to ephemeral streams. Answering the objection in the plan: because the core stores no pair and mints each handle ns-locally, dual handles are **not** a cross-namespace channel — the only state that "joins" is the user's own open view, exactly as two side-by-side windows.
+<<<FE-OUT-END>>>
+
+<<<FE-SCENARIO-START>>>
+S01|covered|core|text.stream resource, adapter-chosen CapMap names, no profile/tool/recovery|rounds/R002/cand-A §A.5-S01
+S02|covered|adaptation|kinds pi.conversation/pi.tool-event/pi.approval + conversation resolver + approve action|rounds/R002/cand-A §A.5-S02
+S03|covered|core|namespace outlives page; re-subscribe from cursor; read-action snapshot|rounds/R002/cand-A §A.5-S03
+S04|covered|core|submit/progress/result resources, no chat object in core|rounds/R002/cand-A §A.5-S04
+S05|covered|core|config.tree resource, CapMap{read:supported} under open map, no session|rounds/R002/cand-A §A.5-S05
+S06|covered|core|ordered collision trajectory; ns-scoped directory/scope-check + keyed caches|rounds/R002/cand-A §A.5-S06
+S07|covered|core|generic fallback renders kind+schema+CapMap labels, not run-strip|rounds/R002/cand-A §A.5-S07
+S08|covered|extension|two independently-minted ns-local handles via user pair; no stored cross-ns reference|rounds/R002/cand-A §A.5-S08
+S09|partial|core|host dedup/reorder + stable invoke_id; exactly-once apply is adapter-owned (idempotent-apply)|rounds/R002/cand-A §A.5-S09
+S10|covered|core|view handles closed on unmount; resource authoritative; no stored pair to leak|rounds/R002/cand-A §A.5-S10
+S11|covered|core|adapter-named CapMap not_supported + CapabilityAbsent; absence stated|rounds/R002/cand-A §A.5-S11
+S12|covered|adaptation|adapter teardown disposes ns only; resolver absent → generic view; pair not stored|rounds/R002/cand-A §A.5-S12
+<<<FE-SCENARIO-END>>>
+
+<<<FE-MECH-START>>>
+namespaces|core|S06 step 2 — colliding local job-1 merges and step 4 auth scope bleeds|rounds/R002/cand-A §A.6-namespaces
+resource-directory|core|S05 step 2 — cannot list/lookup a domain module without a session|rounds/R002/cand-A §A.6-directory
+ordered-replayable-stream|core|S03 step 4 and S09 step 2 — no catch-up, no dedup/reorder|rounds/R002/cand-A §A.6-stream
+open-capability-map|core|S11 step 2 — absence inferred from null, faking support|rounds/R002/cand-A §A.6-capmap
+typed-action|core|S08 step 5 — no idempotent typed cross-invoke without execute(any)|rounds/R002/cand-A §A.6-action
+resource-scoped-handle|core|S07/S08 — with no handle-bound scope a view could neither subscribe nor invoke, nor be denied cross-ns|rounds/R002/cand-A §A.6-handle
+generic-fallback-view|core|S07 step 2 — unknown artefact renders blank|rounds/R002/cand-A §A.6-fallback
+cross-namespace-edge|removed|none — S08 uses two ns-local handles, not a core edge; deleting cross-ns support breaks no core step|rounds/R002/cand-A §A.6-D08
+persistent-pair-record|removed|none — core stores no pairing; S10/S08 explainability holds because re-pair is a user action|rounds/R002/cand-A §A.6-D08
+host-session-object|removed|none — no scenario requires it; S04 passes without it|rounds/R002/cand-A §A.6
+host-turn/role-envelope-field|removed|none — D12 disqualifier; S04 passes without it|rounds/R002/cand-A §A.6
+host-event-store|removed|none at core — S03/S09/S10 consequences are adapter-burden findings for D06|rounds/R002/cand-A §A.6
+<<<FE-MECH-END>>>
+
+<<<FE-OUT-START>>>
+# Candidate B (R002) — Typed-reference graph as host primitive (retained for ranking; self-assessed as larger than required)
+
+## B.1 Core bet
+
+The host core is a directed graph of typed references between resources: an edge `(source_id, edge_type:string, target_namespace_id, target_local_id)`. Cross-namespace cooperation is native — a resource module declares an outgoing edge to a runner resource; the core resolves the target, authorises it in the target namespace, subscribes both, and relays events along the edge. Identity/namespace isolation is enforced at the **edge-registration** boundary: only the adapter owning the source may register edges out of its namespace, and the target namespace must validate the incoming reference before the edge is live. I offer this as the structurally different alternative the plan requires, and I settle the round question from B's side too: B needs the graph to satisfy S08 automatically, whereas A satisfies S08 by permission, so **B is the larger core** — see §B.8.
+
+## B.2 Core concepts and operations
+
+**Namespace.** `namespaces.open(descriptor)→NamespaceHandle`; `teardown(reason)`; host-authoritative; host-minted per-connect id. **Resource.** `announce/retire`, `directory.lookup/list` (all as A). **Event stream.** `subscribe/cursor.resolve`; Envelope as A. **Open CapMap.** as A. **Typed action.** as A. **Edge (B addition).** `edges.register(source_id, edge_type, target_ref{ns_id,local_id}, mode:relay|reference) → EdgeId | EdgeDenied`; the core calls `target_namespace.authorize_incoming(edge)`; if the target adapter rejects, `EdgeDenied`. `edges.remove(edge_id)`; `edges.list(source_id)→[EdgeId]`. Edge state is authoritative in the host and **survives view lifecycle** (a page can leave, the edge keeps relaying). Disposal: teardown of either endpoint removes incident edges and emits `EdgeSevered` to any subscriber of the source. `authorize_incoming` is a typed adapter op returning `{accept | reject(reason)}` — no free-form.
+
+## B.3 Boundary rules
+
+As A, plus: to participate in a cross-module edge an adapter must implement `authorize_incoming(edge_type, source_kind) → accept|reject` and may register outgoing edges only from resources it owns. Expressing "this service does not support this capability" is unchanged (open CapMap + `CapabilityAbsent`). Expressing "no incoming cooperation allowed" is `authorize_incoming` returning `reject`, an explicit non-null terminal — never an inferred timeout.
+
+## B.4 Extension mechanism
+
+As A, plus a view may call `edges.list/register` on a resource it already holds a handle for (scoped to that resource's namespace as source). Selection, generic fallback, and absence guarantees identical to A. Guarantees when a resolver is absent/throws/uninstalled: the **edge and its relay continue in the host** (this is B's distinguishing behaviour) — so a remote task that must notify a replaceable runner keeps flowing after the coordinating view is gone. An extension still cannot enumerate arbitrary namespaces, mint foreign ids, or receive a global context; it references a target by an id the user or an adapter supplied.
+
+## B.5 Scenario trajectories (owner per step)
+
+**S01 text-only.** As A; no edges exist or are used — but the resource still lives in the graph as a node with zero edges (host). The unused edge machinery is a per-resource cost paid even here (see §B.8). Covered with the caveat that S01 pays graph overhead.
+
+**S02 Pi/Ordessa.** As A; conversation/tool/approval kinds as resources+actions (adapter+extension); no edges required for the S02 chain itself. Covered.
+
+**S03 long task, leave/return.** As A; host re-subscribes from cursor; edges (if any incident) persist, so no edge re-setup on return. Covered (edge persistence is a minor convenience over A, not a requirement).
+
+**S04 submit/progress/result, no chat.** As A; no session/turn/role fields. The graph node exists but carries no conversation shape. Covered.
+
+**S05 browse config/git, no session.** As A; `config.tree` is a node with no edges. Covered; again with the "every resource is a node" cost.
+
+**S06 two services, same id (ordered, and where B weakens).** 1. Alpha→ns_A, Beta→ns_B (host). 2. Both announce `job-1` → `(ns_A,job-1)`, `(ns_B,job-1)` distinct keys (host). 3. A coordinating view registers an **edge** out of `(ns_A,job-1)` targeting `(ns_B,job-1)` — the edge stores `target_namespace_id`, i.e. a **cross-namespace reference in the core**. 4. The core must now `authorize_incoming` on ns_B, and ns_A's source adapter has effectively named ns_B — the collision/authorization surface A deliberately has none of. A colliding `target_local_id` that a malformed edge points at the wrong ns is validated only by target-namespace check, reintroducing the very id-routing risk namespaces were meant to remove. 5. Caches keyed per-edge too, doubling the partition surface. Deletion: remove namespaces → step 2 collides; remove edge authorization → step 3-4 cross. Covered **but partial** — B reopens the ns_B-addressing vector inside the core that A keeps out; reviewer must judge the added attack surface.
+
+**S07 special artefact, view not installed.** As A; generic fallback renders kind+schema+CapMap+`payload_schema_id`. Edges irrelevant. Covered.
+
+**S08 resource + replaceable execution cooperate.** 1. Runner adapter opens ns_R, announces `kind:"runner"` (adapter). 2. Resource adapter opens ns_D, announces `kind:"data.ref"` (adapter). 3. A coordinating view (or the data.ref adapter, if it registers edges) calls `edges.register((ns_D,ref),"executed-by",{ns_R,runner},mode:relay)` (extension/adapter); core `authorize_incoming` on ns_R → accept (host). 4. Artefact-ready envelope on `(ns_D,ref)` is **relayed by the host along the edge** to ns_R's `execute`, producing a JobHandle stream (host). 5. Replace runner: ns_R `teardown` → host emits `EdgeSevered`; a new adapter opens ns_R′; ns_R′ must register `authorize_incoming`, and the edge's stale `target_namespace_id=ns_R` is **not** auto-remapped — the edge stays severed until re-registered against ns_R′ (host). So "replaceable" is no cheaper than A: the persistent edge does **not** automatically re-bind, because host-minted per-connect ns ids (A §A.2) already make a stored cross-ns pointer go stale. Covered, but the claimed advantage (recorded relationship survives to auto-reconnect S10) does not actually hold because replacement changes ns id.
+
+**S09 drop/unknown/dup.** 1-3 as A (host stable invoke_id + dedup/reorder; adapter idempotent-apply). Edge relay introduces a second unknown-outcome: an envelope relayed to ns_R mid-drop may or may not have reached the runner; owner for that sub-step is the edge-relay protocol in the host, adding a new exactly-once surface A never has. Partial, with a strictly larger owner set.
+
+**S10 extension crashes while remote runs.** Edge and relay continue in the host after the view unmounts (host) — this is the only genuine B advantage: a standing cooperation survives no view. But S10's stated requirement is only "releases subscriptions/resources" and "running state stays explainable"; A satisfies both without a persistent edge. B's persistent edge, however, holds subscription resources and memory after the view is gone (see §B.8 largest cost). Covered.
+
+**S11 no cancel/history/resume.** As A; `not_supported` in open CapMap, `CapabilityAbsent` on invoke. Absence stated. Covered.
+
+**S12 remove optional core domain module.** Removing an adapter tears down its ns and all incident edges (host); other modules unaffected. Removing a resolver → generic fallback (host). Covered.
+
+## B.6 Delegation / deletion experiments
+
+See FE-MECH block. The decisive row: **edges fail only S08, and A satisfies S08 without edges** — so under the plan's own test, if no second scenario needs the graph, B loses minimality. I attempted to make S10 a second scenario (auto-re-subscribe after runner replacement via a persistent recorded relationship) and it **fails to hold**: because the host mints a new ns id per connect, the stored edge goes stale exactly as A's handle does, so the edge saves no re-pairing step; the persistent-edge advantage for S10 is illusory. I therefore record `edge-persistence-for-reconnect` as removed.
+
+## B.7 Second-service onboarding cost
+
+Attach a different-protocol service: A's six items **plus** (7) `authorize_incoming(edge_type, source_kind)` if it may receive cooperation, and knowledge of which `edge_type` strings the core relays — the edge vocabulary leaks into the adapter contract (a D06 finding). Add a view only: A's one resolver, and a coordinating view still needs the pair selection to choose a target; the difference is the relationship persists in the core. Higher total burden than A.
+
+## B.8 Honest cost and non-goals
+
+Self-assessment against the round question: the graph is **not** required. S08 is B's only scenario whose *automatic* cooperation depends on edges, and A covers S08 by permission at lower total cost; my second-candidate-for-reliance (S10 auto-reconnect) does not survive host-minted ns ids. Non-goals/weakest: S01–S05 pay an unused edge subsystem per resource node; S06 gains a cross-namespace reference stored in the core (reopening the routing/authorization surface namespaces were built to eliminate); S09 gains a second unknown-outcome owner. Largest second-order cost: persistent edges hold subscriptions/resources in the host after their view is gone, growing memory and keeping stale relays alive on long runs (D11 territory) — the opposite of S10's release guarantee. Position: B is retained only as evidence that the alternative core shape was considered; A is strictly preferred under D10 and D08.
+<<<FE-OUT-END>>>
+
+<<<FE-SCENARIO-START>>>
+S01|partial|core|text.stream as a graph node with zero edges — works but pays unused edge machinery per resource|rounds/R002/cand-B §B.5-S01
+S02|covered|adaptation|pi.conversation/pi.tool-event/pi.approval as resources+actions; no edge needed|rounds/R002/cand-B §B.5-S02
+S03|covered|core|host re-subscribe from cursor; incident edges persist|rounds/R002/cand-B §B.5-S03
+S04|covered|core|submit/progress/result nodes, no chat object|rounds/R002/cand-B §B.5-S04
+S05|partial|core|config.tree as edge-free node — works but pays graph overhead|rounds/R002/cand-B §B.5-S05
+S06|partial|core|ns keeps id distinct, but stored cross-ns edge target reopens the routing/auth vector A avoids|rounds/R002/cand-B §B.5-S06
+S07|covered|core|generic fallback renders kind+schema+CapMap; edges irrelevant|rounds/R002/cand-B §B.5-S07
+S08|covered|core|native edge register+authorize+relay; replaceable only with re-register (stale ns id)|rounds/R002/cand-B §B.5-S08
+S09|partial|core|host dedup/invoke_id + adapter idempotent-apply, plus a second edge-relay unknown-outcome owner|rounds/R002/cand-B §B.5-S09
+S10|covered|core|edge+relay persist after view unmount (B's sole advantage), at cost of held resources|rounds/R002/cand-B §B.5-S10
+S11|covered|core|open CapMap not_supported + CapabilityAbsent|rounds/R002/cand-B §B.5-S11
+S12|covered|adaptation|adapter teardown removes ns + incident edges; other modules unaffected|rounds/R002/cand-B §B.5-S12
+<<<FE-SCENARIO-END>>>
+
+<<<FE-MECH-START>>>
+namespaces|core|S06 step 2 — colliding local job-1 merges; edge targets must still be ns-qualified|rounds/R002/cand-B §B.6-namespaces
+typed-reference-graph|core|S08 step 4 — only scenario whose automatic cooperation needs edges; A covers S08 by two-handle permission, so surplus per D08|rounds/R002/cand-B §B.6-D08
+edge-relay-authorization|core|S06 step 3-4 — needed to admit cross-ns references; deleting it deletes the mechanism that weakens S06|rounds/R002/cand-B §B.6-edgeauth
+resource-directory|core|S05 step 2 — cannot list/lookup without a session|rounds/R002/cand-B §B.6-directory
+ordered-replayable-stream|core|S03 step 4, S09 step 2 — no catch-up, no dedup|rounds/R002/cand-B §B.6-stream
+open-capability-map|core|S11 step 2 — absence inferred from null|rounds/R002/cand-B §B.6-capmap
+typed-action|core|S08 step 5 — no idempotent typed invoke without execute(any)|rounds/R002/cand-B §B.6-action
+generic-fallback-view|core|S07 step 2 — unknown renders blank|rounds/R002/cand-B §B.6-fallback
+edge-persistence-for-reconnect|removed|none — S10 auto-reconnect does not survive host-minted per-connect ns ids, so persistent edge saves no step|rounds/R002/cand-B §B.6-D08
+host-session-object|removed|none — S04 passes|rounds/R002/cand-B §B.6
+host-turn/role-envelope-field|removed|none — D12 disqualifier|rounds/R002/cand-B §B.6
+<<<FE-MECH-END>>>

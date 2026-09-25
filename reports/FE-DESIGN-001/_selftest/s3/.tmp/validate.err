@@ -1,0 +1,3 @@
+  invalid: output section #1 below 900 words
+  invalid: ledger row FE-CE-001: empty invariant
+  invalid: ledger block present but contained no valid rows

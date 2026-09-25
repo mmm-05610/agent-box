@@ -1,5 +1,9 @@
 # Workspaces — every preserved repository and worktree
 
+**2026-09-21 更新：**当前角色与新集成树见 [development-layout.md](development-layout.md)，
+版本见 [development-baseline.json](development-baseline.json)。下文为清理时历史清单，
+其 HEAD、进程状态和“当前工作”分类不再代表新开发组织。
+
 Written 2026-09-20. `HEAD`, cleanliness and unique-commit counts are **measured by
 the cleanup executor on 2026-09-20**; "owner status" and the class letters come
 from the user's four-class instruction — **A** current work retained, **B**

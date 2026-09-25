@@ -1,0 +1,179 @@
+{
+  "id": "CP-SESSION-001",
+  "revision": 3,
+  "status": "IN_PROGRESS",
+  "summary": "connector 已合入但未启用；草稿视图在修；真实 Pi CLI 正常，旧 ACP 桥兼容性阻塞后端。尚不能整机验收。",
+  "next": "FC 收 F3 并装配候选；BC 收敛 ACP 兼容方案；随后进行真实前后端配对。",
+  "evidence": "I于2026-09-23 13:36核读 FC-0061、FC-0059、F3-0016、BC-0038/0039/0044及C状态；这是报告核对，不是本轮亲跑产品测试。",
+  "try_it": "",
+  "sections": [
+    {
+      "id": "frontend",
+      "name": "前端整体检查点",
+      "status": "IN_PROGRESS",
+      "summary": "connector 已源码集成、150 项 renderer 测试通过；草稿视图与产品运行装配仍未完成。",
+      "next": "收 F3 窄包后独立装配 Ordessa-only 候选。",
+      "blockers": "源码集成不等于产品启用，真实配对未验。",
+      "modules": [
+        {
+          "name": "桌面壳与工作台",
+          "owner": "F0 / FC",
+          "status": "IN_PROGRESS",
+          "summary": "现有桌面可启动；最终候选尚未装配成仅接 Ordessa 后端的产品。",
+          "done": "已有工作台与中间版本应用探针。",
+          "doing": "等待 F3 包收齐后开展独立候选装配。",
+          "next": "更新 enabled、workspace、构建闭包和锁文件，再验双命令同实例。",
+          "blockers": "connector 源码已合，但产品未启用；候选装配未验。",
+          "evidence": "agents/FC/outbox/FC-0061.md；agents/F0/status.md",
+          "observed_at": "2026-09-23T13:36:00+08:00"
+        },
+        {
+          "name": "连接管理与后端适配器",
+          "owner": "F1 / FC",
+          "status": "IN_PROGRESS",
+          "summary": "Ordessa connector 已合入并通过离线测试，但尚未装配启用或真实配对。",
+          "done": "FC-0061 收三提交至 afe7f41e97；typecheck、connector 40 项、renderer 150 项通过。",
+          "doing": "由 FC 准备候选启用和运行接线；F1 本批已交。",
+          "next": "在候选中启用 ordessa.agent-server，核实认证与会话身份。",
+          "blockers": "运行装配与真实后端链未完成。",
+          "evidence": "agents/FC/outbox/FC-0061.md",
+          "observed_at": "2026-09-23T13:36:00+08:00"
+        },
+        {
+          "name": "项目与会话列表",
+          "owner": "F2 / FC",
+          "status": "DONE",
+          "summary": "草稿首次发送误投旧会话已修复并集成；整机行为仍待联调。",
+          "done": "E1→New 首发只走 createAndSend，不调用旧 E1 send；endedBy 区分丢弃与暂离。",
+          "doing": "本包已交，等待跨包验收反馈。",
+          "next": "与 F3 草稿视图及真实 connector 联验。",
+          "blockers": "本包无未交项；不代表整机已通过。",
+          "evidence": "agents/FC/outbox/FC-0059.md",
+          "observed_at": "2026-09-23T13:36:00+08:00"
+        },
+        {
+          "name": "对话、思考与工具呈现",
+          "owner": "F3 / FC",
+          "status": "IN_PROGRESS",
+          "summary": "正在修草稿视图优先与未发文本清理；尚未收到本批交付。",
+          "done": "前批呈现和缓存测试已集成；F3-0016 更正旧持批和集成误报。",
+          "doing": "在 cp3 同补丁统一 pane、Thread key 与有效 sessionId，按 endedBy 清理。",
+          "next": "交 F3-0017 精确提交及草稿丢弃/暂离反例，由 FC 集成。",
+          "blockers": "此视图包未交前不能启动最终首发用户验收。",
+          "evidence": "agents/F3/outbox/F3-0016.md；agents/FC/outbox/FC-0059.md；agents/C/status.md",
+          "observed_at": "2026-09-23T13:36:00+08:00"
+        },
+        {
+          "name": "权限审批与交互",
+          "owner": "F3 / F1 / BC",
+          "status": "IN_PROGRESS",
+          "summary": "对话内审批已有界面；后端假对端审批通过，真实 Agent 往返未验。",
+          "done": "审批界面与会话作用域已实现；BC-0038 假 ACP permission→allow 完成。",
+          "doing": "等待真实 ACP 桥和整机配对。",
+          "next": "实际触发支持的审批并核同意/拒绝；普通输入不冒充支持。",
+          "blockers": "真实链未通；普通 input/editor/choice 通路未证。",
+          "evidence": "agents/BC/outbox/BC-0038.md；agents/F3/status.md",
+          "observed_at": "2026-09-23T13:36:00+08:00"
+        }
+      ],
+      "observed_at": "2026-09-23T13:36:00+08:00",
+      "evidence": "I本轮核读 C/FC/BC 状态及各模块所列回执；未重跑测试。"
+    },
+    {
+      "id": "backend",
+      "name": "后端整体检查点",
+      "status": "IN_PROGRESS",
+      "summary": "原生 Server 假链已验证；真实 Pi CLI 状态可读，旧 ACP 桥创建会话仍失败。",
+      "next": "评估并接入兼容 ACP 桥，再验真实会话。",
+      "blockers": "当前 ACP 原生目录兼容性阻塞真实对话。",
+      "modules": [
+        {
+          "name": "Server与项目接入",
+          "owner": "S / BC",
+          "status": "IN_PROGRESS",
+          "summary": "原生 Server 项目与身份门已通过实际 CLI 加假 ACP 测试；真实会话创建仍卡桥接。",
+          "done": "BC-0038：37 项通过；A/B cwd、认证、稳定身份及项目门。",
+          "doing": "与真实 Pi 适配器核对原生准入。",
+          "next": "修通真实 session/new，再验证项目首发及续聊。",
+          "blockers": "旧 Pi ACP 在当前用户 agent dir 的 session/new 失败。",
+          "evidence": "agents/BC/outbox/BC-0038.md；agents/BC/outbox/BC-0044.md",
+          "observed_at": "2026-09-23T13:36:00+08:00"
+        },
+        {
+          "name": "执行组合与核心记账",
+          "owner": "BC",
+          "status": "IN_PROGRESS",
+          "summary": "原生执行路径已落地，假 ACP 首发、续发、停止与回放通过；真实结果未验。",
+          "done": "原生树 1d3a9575；BC-0038 假链及 BC-0039 回放门修复已收。",
+          "doing": "等待兼容 ACP 桥接入后的真实验证。",
+          "next": "确认真实多轮、停止及未知结果仍正确记账。",
+          "blockers": "fake peer 不能替代真实 Agent 的完成/取消/续聊证据。",
+          "evidence": "agents/BC/outbox/BC-0038.md；agents/BC/outbox/BC-0039.md",
+          "observed_at": "2026-09-23T13:36:00+08:00"
+        },
+        {
+          "name": "Harness与ACP接入",
+          "owner": "H / BC",
+          "status": "BLOCKED",
+          "summary": "本机 Pi CLI 状态读取成功，但旧 ACP 桥在用户原生目录下创建会话失败。",
+          "done": "BC-0044：get_state success=true/modelPresent=true，零 prompt；空目录旧 ACP 可建会话。",
+          "doing": "BC 只读评估兼容用户现装 CLI 的 ACP 桥或适配器来源。",
+          "next": "由 C 裁最小兼容接线，先验证真实会话创建，再跑对话。",
+          "blockers": "ACP 0.5.0 当前原生目录 session/new ENOENT；具体根因未定。",
+          "evidence": "agents/BC/outbox/BC-0044.md；agents/C/status.md",
+          "observed_at": "2026-09-23T13:36:00+08:00"
+        },
+        {
+          "name": "启动与部署入口",
+          "owner": "BC / F0 / FC",
+          "status": "IN_PROGRESS",
+          "summary": "原生 Server 可做受控启动检查；面向用户的前后端配对启动入口尚未交付。",
+          "done": "Server 认证 hello 与临时项目 open 已通过无 prompt 门；不以旧 bwrap 链作为前置。",
+          "doing": "等 ACP 兼容修复及前端候选装配。",
+          "next": "固定两个启动命令并验连接同一实例。",
+          "blockers": "后端 session/new 和前端最终装配尚未闭合。",
+          "evidence": "agents/BC/outbox/BC-0040.md；agents/FC/outbox/FC-0061.md",
+          "observed_at": "2026-09-23T13:36:00+08:00"
+        }
+      ],
+      "observed_at": "2026-09-23T13:36:00+08:00",
+      "evidence": "I本轮核读 C/FC/BC 状态及各模块所列回执；未重跑测试。"
+    },
+    {
+      "id": "integration",
+      "name": "整机与用户验收检查点",
+      "status": "BLOCKED",
+      "summary": "尚未形成真实前后端对话配对证据，不可交付最终验收。",
+      "next": "等前端候选与后端真实 Agent 通过后串行联验。",
+      "blockers": "ACP 兼容与前端装配未完成。",
+      "modules": [
+        {
+          "name": "真实对话闭环",
+          "owner": "C / FC / BC",
+          "status": "BLOCKED",
+          "summary": "真实无 prompt 探针已进行，但前后端配对的真实对话尚未开始。",
+          "done": "已区分本机 Pi CLI 正常与旧 ACP 桥失败，不把假对端测试算真实闭环。",
+          "doing": "前后端分别补草稿视图、装配和 ACP 兼容缺口。",
+          "next": "配对验证项目首发、多轮、工具、审批及停止。",
+          "blockers": "真实 ACP 会话创建未通；最终前端候选未装配。",
+          "evidence": "agents/C/status.md；agents/BC/outbox/BC-0044.md；agents/FC/outbox/FC-0061.md",
+          "observed_at": "2026-09-23T13:36:00+08:00"
+        },
+        {
+          "name": "基线发布与用户试用",
+          "owner": "C",
+          "status": "NOT_STARTED",
+          "summary": "尚无可交用户验收的 Session 基线，main 未发布。",
+          "done": "范围仍仅 Session；Profile、Provider/Model 不进本检查点。",
+          "doing": "等待真实闭环与候选净化。",
+          "next": "固定配对 SHA、工件和实际启动入口，再发布 READY_FOR_USER_REVIEW。",
+          "blockers": "整机未验收，不用中间源码/离线绿态代替可用基线。",
+          "evidence": "agents/C/status.md；agents/FC/outbox/FC-0061.md",
+          "observed_at": "2026-09-23T13:36:00+08:00"
+        }
+      ],
+      "observed_at": "2026-09-23T13:36:00+08:00",
+      "evidence": "I本轮核读 C/FC/BC 状态及各模块所列回执；未重跑测试。"
+    }
+  ]
+}

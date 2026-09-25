@@ -1,0 +1,4 @@
+[2026-09-22T02:56:19Z] validate[review]:   invalid: verdict S01: status [holds] is not one of {trajectory_ok|trajectory_broken|insufficient_evidence}
+[2026-09-22T02:56:19Z] validate[review]:   invalid: verdict block had no valid rows
+[2026-09-22T02:56:19Z] validate[review]:   invalid: no valid verdict block (<<<FE-VERDICT-START>>> ... <<<FE-VERDICT-END>>>)
+[2026-09-22T02:56:19Z] validate[review]:   invalid: this role must rule at least 12 scenarios; it ruled 0

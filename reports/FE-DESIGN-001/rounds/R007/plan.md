@@ -1,0 +1,18 @@
+CANDIDATES: A
+
+One id, deliberately. The only structurally different core that ever existed is B's cross-namespace relay, and it is demoted (§R6.9): no S01–S12 trajectory demands standing cross-namespace relay without user initiation, and A strictly dominates B on total cost and on the namespace-isolation invariant. R007's settled question is an *internal coherence* defect in the saved A text — the same `subscribe(from_cursor = cursor.resolve(id))` call is promised to *replay the missed stream* in §R6.5-S03 step4 / §R6.5-S10 step3 and promised to *deliver new events live, not replayed* in §R6.5-S08 step5. Forcing a second fresh core would not answer that question and would produce a polished-but-undecided round; the attacker's target is A's cursor semantics, not a rival host. If a reader judges this a mistake, the concrete test is: does any required scenario become coverable only by a second core this round — it does not.
+
+DIMENSION: D01-order-dedup
+
+Assigned because D01 was **not** clean last round (it raised the major FE-CE-012/013/014, all closed under b6da557) and the three R006 independent-review findings (S03, S04, S10 trajectory_broken) are exactly D01 replay/dedup-semantics breaks. This is an unfinished dimension being taken up, not a clean one repeated. The attacker must construct an event trajectory where S03's replay promise and S08's live promise fire on the **same** subscription declaration.
+
+THE QUESTION THIS ROUND MUST SETTLE
+Can the candidate name a single decision owner and a concrete decision input for `from_cursor=cursor.resolve(id)` such that no legal event sequence yields both "host replays missed envelopes" and "new events are live, not replayed" for that one subscription?
+
+Per-candidate (A)
+- **Core bet:** the host core is a namespaced directory of `(ns_id,local_id)` resources, each with a per-resource monotonic replayable stream, an adapter-owned open CapMap, ns-scoped typed actions, and namespace-scoped handles whose only permission rule is `resource.ns_id == handle.ns_id`. Replay vs liveness must be a property the *subscriber declares*, not something the host infers from whether the cursor happens to equal the resolve value.
+- **Strongest objection:** `cursor` is doing double duty — "stream position for resume/catch-up" and "start-living-here signal" — so one literal call carries two meanings. The likely fix (a subscriber-declared `replay_mode`) is itself a new core concept, and by I's FE-CE-009 standard its necessity must be proven by a **deletion experiment** (does S03/S04/S08/S10 pass without it?), not by "it disambiguates the cursor."
+- **Evidence that settles it this round:** a named owner + decision input, restated step-by-step on §R6.5-S03, S04, S08, S10 so no two outcomes survive; plus an `EXPERIMENT:` model run encoding whether one cursor/subscribe declaration triggers both promises (model-only, not product/protocol verification).
+
+Uncovered — this round's center of gravity
+All S01–S12 are only "claimed"; **S03, S04, S08, S10** are ruled `trajectory_broken` against the current bytes and are the live surface. Secondary: S07/S12 default-view actionability (must show current config value, Git diff, and "still running?" — not merely "not blank"), and §R6.7 adapter/onboarding cost. The three integration traces T-Pi, T-Boring, T-Static must survive restatement with per-step owner + deletion consequence, not prose.

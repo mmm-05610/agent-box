@@ -1,0 +1,8 @@
+Stale-anchor repair #2, 2026-09-22T04:50Z.
+R004 integrate was accepted but candidates/best.md stayed on the R002 bytes, because an earlier "fix"
+for this was applied with str.replace against text that exists only in lib/handoff.sh while
+the edit targeted lib/phases.sh — a silent no-op, and the unit suite had no end-to-end check
+of the anchor, so it passed anyway. The live fix (per-destination cp + byte-identical
+invariant) is now in lib/handoff.sh. This file was promoted from rounds/R004/best-candidate.md,
+which is what the commit should have written. R002-rulings bound to 2d2dde14... are void by
+digest binding and were re-run.

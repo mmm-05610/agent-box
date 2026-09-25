@@ -1,0 +1,52 @@
+# BE-LOOP-001 implementation-path allowlist (machine-readable; source of truth for the
+# impl-binds generator). Paths are RELATIVE TO /source (= dev-0 root). A line "allow P"
+# permits approved writes under prefix P; "deny P" forbids them even if an allow matches.
+# The generator REJECTS: absolute host paths, ".." traversal, anything not under /source,
+# any approved path outside these prefixes, and any path shadowing a read-only/overlay mount.
+# This closes defect 2: impl mounts come ONLY from an approved+allowlist-validated record.
+
+server
+allow src/agent_box/server/sessions
+allow src/agent_box/server/profiles
+allow src/agent_box/server/model_configs
+allow src/agent_box/server/accounts
+allow src/agent_box/server/approvals
+allow src/agent_box/server/workspaces
+allow src/agent_box/server/transport
+allow src/agent_box/server/services.py
+allow src/agent_box/server/records.py
+allow src/agent_box/server/persistence.py
+allow src/agent_box/server/errors.py
+deny src/agent_box/server/execution
+deny src/agent_box/server/bootstrap
+deny src/agent_box/server/wire
+deny src/agent_box/server/credentials.py
+deny src/agent_box/server/credential_cli.py
+deny src/agent_box/server/events
+
+execution
+allow src/agent_box/extensions/runtime_composition
+allow src/agent_box/server/execution
+deny src/agent_box/server/execution/protocols.py
+deny src/agent_box/extensions/api.py
+deny src/agent_box/extensions/bootstrap.py
+deny src/agent_box/work_core
+
+harness
+allow plugins/agent-box-harnesses/src
+deny plugins/agent-box-harnesses/src/__init__.py
+deny src/agent_box/extensions/api.py
+deny src/agent_box/work_core
+
+platform
+allow plugins/agent-box-runtime-local/src
+allow plugins/agent-box-sandbox-bwrap/src
+allow plugins/agent-box-skills/src
+allow plugins/agent-box-git/src
+allow plugins/agent-box-artifacts/src
+allow plugins/agent-box-terminal-session/src
+deny plugins/agent-box-sandbox-windows
+deny plugins/agent-box-runtime-wsl
+deny plugins/agent-box-web
+deny src/agent_box/work_core
+deny src/agent_box/resource_contracts

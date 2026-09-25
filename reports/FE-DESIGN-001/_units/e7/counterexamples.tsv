@@ -1,0 +1,2 @@
+id|raised_round|severity|status|invariant|title|evidence|targets|replayed|subject|subject_note
+FE-CE-001|R996|major|OPEN|inv|title|e|-|-|B-alternative|defect of a discarded alternative

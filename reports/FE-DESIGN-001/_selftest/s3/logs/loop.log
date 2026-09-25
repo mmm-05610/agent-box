@@ -1,0 +1,11 @@
+[2026-09-21T16:28:09Z] sol: budget record created at zero (cap=10, final reserve=2)
+[2026-09-21T16:28:09Z] R001: round start (best= sol=cap=10 reserved=0 ok=0 bad=0 remaining=10 final_reserve=2)
+[2026-09-21T16:28:09Z] R001/plan attempt 1 of 2
+[2026-09-21T16:28:09Z] R001/plan commit rejected — phase not passed
+[2026-09-21T16:28:10Z] validate[attack]:   invalid: output section #1 below 900 words
+[2026-09-21T16:28:10Z] validate[attack]:   invalid: output section #1 below 900 words
+[2026-09-21T16:28:10Z] validate[attack]:   invalid: ledger row FE-CE-001: bad severity [catastrophic]
+[2026-09-21T16:28:10Z] validate[attack]:   invalid: ledger block present but contained no valid rows
+[2026-09-21T16:28:10Z] validate[attack]:   invalid: output section #1 below 900 words
+[2026-09-21T16:28:10Z] validate[attack]:   invalid: ledger row FE-CE-001: empty invariant
+[2026-09-21T16:28:10Z] validate[attack]:   invalid: ledger block present but contained no valid rows

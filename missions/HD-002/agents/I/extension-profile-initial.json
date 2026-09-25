@@ -1,0 +1,23 @@
+{
+  "id": "profile",
+  "revision": 1,
+  "status": "IN_PROGRESS",
+  "summary": "执行者已 ACK v0.2 蓝图，最新报告仍是差量核查阶段；不在会话基线内。",
+  "next": "完成逻辑蓝图差量与独立插件验证，发布自身进度。",
+  "evidence": "agents/PROFILE/status.md；agents/PROFILE/outbox/PROFILE-0009.md",
+  "try_it": "",
+  "modules": [
+    {
+      "name": "Profile 逻辑蓝图",
+      "owner": "PROFILE",
+      "status": "IN_PROGRESS",
+      "summary": "执行者已 ACK v0.2 蓝图，最新报告仍是差量核查阶段；不在会话基线内。",
+      "done": "既有 P0/P1 独立包获 BC 收件；自报 BE58/FE12 测试，非本轮复跑。",
+      "doing": "按 PROFILE-0009/status 报告推进 v0.2；尚无新实施交付证据。",
+      "next": "完成逻辑蓝图差量与独立插件验证，发布自身进度。",
+      "blockers": "无；不影响 CP-SESSION-001。",
+      "evidence": "agents/PROFILE/status.md；agents/PROFILE/outbox/PROFILE-0009.md",
+      "observed_at": "2026-09-23T07:04:42Z"
+    }
+  ]
+}

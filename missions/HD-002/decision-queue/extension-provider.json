@@ -1,0 +1,24 @@
+{
+  "evidence": "worktrees/harness-desktop-002/provider/reports/*；agents/PROVIDER/outbox/PROVIDER-{0002,0003}.md",
+  "id": "provider",
+  "modules": [
+    {
+      "blockers": "实施待 I 批准；权限面 gate 验证属 BC 主线停门（非本研究阻塞）。turn 上限：机制在、实测 100、生效需用户命令。",
+      "doing": "待 I 审；§10b-2 待决挂 C-DEC-0002=A 后续复验结果（BC 线执行）。",
+      "done": "TAKEOVER；≥3 多 Harness 来源（2 读源码）；Codex/Pi/Claude 原生机制交叉核实；字段归属表/生效时机契约/生命周期/非目标/切片；13 场景走查。；本机一手 CLI 交叉（Codex 0.155.1 profile 层叠/strict-config、Pi 0.86.1 auth/模型模式）；claude model 写入核实为 materializer v2 预留缺口。；缺口收口：CCS AuthBinding 委托引用形状（accountId 空=跟随原生默认、归属存疑即拒）定入 delegate_native 设计；Pi PI_CODING_AGENT_DIR 原生重定向与 execution-local 同向互证。；BC-0076 Pi 锁/EROFS 回退机制收入 §10b，acceptance 13→14 条反例（只读暴露原生 settings=违例，回退必须显式诊断）。；审前完整性复读：修 Codex 行表格列错位、S1 措辞与已核实结论对齐；§10b-2 与 H-0013/0014 同题风险建立交叉引用。；BC-0077 收入：Pi 读路径即写 3 锁（--offline/--no-session 不消除）——“只读共享原生 agent-dir”物理不成立升为一手事实，execution-local 投影为唯一零触路径；acceptance 13→15 场景。；承重锚点一手复核完成：DDL/freeze/probe 三坐标与引用全吻合，新增“双侧声明才阻断、未知≠不可用”精化与有界 probe 事实（曾误删“前端现状”行当即恢复，经复读确认在位）。；发现并对齐 Order 56 server_accounts（“binding not credential”成文）：delegate_native 改为引用既有账号行+复用 state/last_verified_at 探针缓存，零新表。；§10b-5/6：用户批准件同向互证；--offline 非写禁止（radius.js persist-before-network）；execution-local 隔离升为“无替代机制”级事实；组件探针部分回补 §10b-2。；§10b-2 由 BC-0080 闭合（锁可用→EROFS 消失、原生模型/思考级别确认=“按原样生效”实证）；VK/CCS/BE/radius 关键锚一手抽核登记入 reuse-map。；proposal 附诊断码分层表（provider 域 5 码/执行 gate 域归 BC 词表只透传/会话域既有），预答审阅重叠问题。；BC-0082 真实两轮通过收入：场景1(无卡原生可用)与会话内零漂移获外部真实对应物；FE providerModels 零消费者一手复核证实，S3 定位自证。；自我红队补漏：probe 网络边界成节（一次有界 GET/只到自填 baseUrl/响应体不入日志/非声明外联先报单列，对齐 C-0074 网络门），acceptance 增第 16 条反例，场景共 16 条。；红队#2：共享 delegate_native 卡×server_accounts(harness_type NOT NULL) 归属语义成文——按执行侧 harness 解析、无账号即 NATIVE_LOGIN_MISSING、绝不串用他 harness 凭据；acceptance 达 17 条（编辑事故当场修复并全量编号校验 1-17 无损）。；红队#3：Codex“下条消息”生效条件化为进程寿命假设+S1 前置核实项（一跳证据不足即不猜）。三轮红队共消除 probe 网络归因/跨 harness 串凭据/寿命假设三处可质疑点。",
+      "evidence": "reports sha[:8] proposal=83619f13（acceptance 见 rev16，research/reuse-map 不变）；outbox/PROVIDER-0001..0007",
+      "name": "Provider/model 研究",
+      "next": "收 BC/I 对 DESIGN_READY(rev6 增量后) 的回执；C-DEC-0002 复验结果可回补 §10b-2 待决。",
+      "observed_at": "2026-09-23T08:40:21.572292Z",
+      "owner": "PROVIDER",
+      "status": "DONE",
+      "summary": "四份交付完成：事实矩阵、复用图（CCS/VK 承重源码+Zed+ACP）、最简方案与反例验收；结论=不新建框架，扩展已有 providerModels+两注册插件，零代理、原生继承默认、无 Profile 可用。"
+    }
+  ],
+  "next": "I 审 proposal.md；批准后按切片 S1(materialize 生产接线+delegate_native)→S2(BE 插件壳)→S3(FE settings 分区)推进。",
+  "revision": 17,
+  "status": "READY_FOR_USER_REVIEW",
+  "summary": "研究完成，DESIGN_READY 待审：推荐复用既有 providerModels 子系统的最小方案；未实施。",
+  "try_it": "阅读 provider/reports/proposal.md（字段归属表+两方案对比）与 acceptance.md 13 场景走查。",
+  "updated_at": "2026-09-23T08:40:21.633235+00:00"
+}

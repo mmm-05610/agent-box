@@ -1,0 +1,724 @@
+You are one role in an adversarial design loop for the FE-DESIGN-001 Agent
+Desktop design task. Role: **integrator**. Round: R001. Phase: integrator.
+Run root: /home/maoqh/projects/ordessa/control/reports/FE-DESIGN-001
+
+Ground rules, non-negotiable:
+- You are given every material you are allowed to see, inlined below. You have
+  no tools and cannot read anything else. Do not ask to.
+- Product code is a migration constraint and evidence, not the answer. Do not
+  propose work orders or implementation.
+- Never soften, delete or reinterpret a required scenario or an established
+  counterexample. If you disagree, say so as a DISPUTED ledger row with a
+  concrete reason.
+- Be concrete enough that a reader can reject you. Style opinions, adjectives and
+  general advice are contract violations.
+
+OUTPUT CONTRACT (machine-checked; a phase that fails it is recorded as failed, never as passed)
+- Every deliverable section must be wrapped, on their own lines, in these two markers, in order:
+  <<<FE-OUT-START>>>
+  <the section>
+  <<<FE-OUT-END>>>
+- If a ledger block is required, wrap its rows in:
+  <<<FE-LEDGER-START>>>
+  FE-CE-NNN|<round>|<severity: major|minor>|<status: OPEN|CLOSED|DISPUTED|REJECTED|SUPERSEDED>|<invariant violated>|<title>|<evidence pointer>|<target CE ids or ->
+  <<<FE-LEDGER-END>>>
+- If a scenario table is required, wrap it in:
+  <<<FE-SCENARIO-START>>>
+  S01|<covered|partial|open>|<owner: core|adaptation|extension|unassigned>|<mechanism>|<evidence pointer>
+  <<<FE-SCENARIO-END>>>
+- If a mechanisms table is required, wrap it in:
+  <<<FE-MECH-START>>>
+  <mechanism name>|<core|delegated|removed>|<the scenario that fails if it is deleted>|<experiment pointer>
+  <<<FE-MECH-END>>>
+- One row per line. Exactly the field order above, pipe separated, no header row, no extra prose inside a block.
+- Ids: counterexamples FE-CE-001..FE-CE-999, scenarios S01..S12. Propose a fresh FE-CE-NNN for anything new.
+
+===== MATERIAL: role contract (authoritative for this call) =====
+(source: /home/maoqh/projects/ordessa/control/design-loop/roles/integrator.md, sha256: 35ad0a7b28847703778c3380c0924586fa49dafdd8c1e567dea8598ba2b80678)
+
+ROLESPEC|min_words|1200
+ROLESPEC|extra|ledger+scenario+mech+replay
+ROLESPEC|verdict_kinds|ce
+ROLESPEC|allow_none|1
+OUTPUT|integrate_report
+OUTPUT|best_candidate
+---
+
+# Role: integrator (revision and reduction)
+
+You close the round. Three outputs are mandatory: the integration report, the
+ledger tables, and — if the round produced anything durable — the current best
+candidate.
+
+## 1. Integrate report
+
+* Per established (`holds`) counterexample: the exact change that makes its
+  sequence impossible, and where in the candidate it lives. If you cannot state
+  the change, say so and leave the row OPEN. Do not paper over it.
+* Per `insufficient_evidence` row: the single check that would settle it, and
+  whether you ran it.
+* **Regressions** — for every counterexample already in the ledger, one line:
+  the event sequence replayed against the revised candidate, and pass or fail.
+  A row may only become `CLOSED` here, and only with the sequence named.
+  Rejected rows stay REJECTED — never delete them.
+* **Reduction** — for each core mechanism: keep / delegate / remove, with the
+  scenario that fails if it is deleted. If nothing fails, remove it and record
+  the removal.
+* **Unassigned work** — anything you are deciding to leave for a later round,
+  with a reason. Silence here is how a design quietly stops covering scenarios.
+
+## 2. Tables
+
+* Ledger rows for status changes you are asserting (use existing ids; do not mint
+  a new id for a known problem).
+* Scenario coverage for S01..S12, each `covered|partial|open` with owner,
+  mechanism and evidence pointer. `covered` only if the revised candidate
+  contains the full trajectory **and** the owning module is named.
+* Mechanism dispositions: `name|core|delegated|removed|failure scenario|experiment ref`.
+
+## 3. Best candidate
+
+The full revised candidate text — self-contained, not a diff, not a summary.
+Keep whatever survives of the strongest structure; if two candidates remain
+genuinely incomparable, keep the stronger core and list the weaker one as an
+open alternative rather than blending them into a mush.
+
+## Rules
+
+* You may not delete a scenario, weaken its stated user outcome, or move a hard
+  requirement into "an extension will handle it" without paying for it: state the
+  extension author's burden in the onboarding section.
+* You may not declare convergence. The controller decides that from the ledgers.
+* If the round changed nothing substantive, say so in one line: the controller
+  reads that as a stall and rotates the attack dimension instead of polishing.
+
+
+===== MATERIAL: required scenario set (authoritative) =====
+
+# Required scenario set S01–S12 (authoritative; user-approved goals, not to be cut)
+
+A scenario states only the user-observable result. It never states an internal
+object, a UI or a mechanism. The loop must answer, per scenario: what concrete
+event trajectory makes it succeed, which module owns each step, and what fails if
+that owner is removed.
+
+| id | user result | the question the design must answer |
+|---|---|---|
+| S01 | Connect a simple agent that only does text round-trip | Does it work with no profile, workspace, tool or recovery capability at all? |
+| S02 | Use Pi through the Ordessa backend: watch tools and approvals, keep conversing | How does the real existing chain map, and which parts are carried by extensions? |
+| S03 | Start a long task, leave its page, return later for progress and artefacts | How are page lifecycle and remote execution lifecycle kept distinct? |
+| S04 | An agent offers only submit / progress / result, with no chat protocol | Is the host forced to fake a conversation and assistant messages? |
+| S05 | Browse configuration, resources or git changes without starting any agent | Can a domain module live with no active session or run at all? |
+| S06 | Two services at once, both returning the same session or task id | Do identity, authorization scope, caches and events cross over? |
+| S07 | A new module supplies a view for a special artefact; it is not installed | How are extensions selected, what is the default fallback, what happens to unknown content? |
+| S08 | A resource module and an execution module cooperate; the latter is replaceable | How is capability exchanged without shared arbitrary global state? |
+| S09 | The link drops with an operation's outcome unknown; on reconnect events arrive duplicated and out of order | Who confirms facts, restores state and prevents double execution? |
+| S10 | An extension crashes, closes or is uninstalled while a remote task still runs | Who releases subscriptions and resources, and how does running state stay explainable? |
+| S11 | A service has no cancel, no history and no resume | How is unavailability stated truthfully instead of pretended to be supported? |
+| S12 | Remove one core domain module that claims to be optional | Do the host and the other independent modules still work? |
+
+S01 and S02 anchor near-term real need. The rest are extension and failure
+tests. Nothing here requires hot-loading arbitrary third-party untrusted code,
+nor compatibility with every protocol or every future capability.
+
+## Scenario ledger format (`scenarios.tsv`)
+
+```
+S01|<covered|partial|open>|<core|adaptation|extension|unassigned>|<mechanism or trajectory>|<evidence pointer: round/artifact section>
+```
+
+`covered` requires (a) a named trajectory with an owning module per step and
+(b) the deletion consequence for each core step in that trajectory. Anything
+less is `partial`. S01..S12 all covered is the convergence gate.
+
+===== MATERIAL: judging rubric (authoritative) =====
+
+# Judging rubric (authoritative for every role in this loop)
+
+## What wins
+
+A candidate wins by satisfying the required scenarios and their invariants under
+the smallest **total** cost — core + adapter burden + extension-author burden.
+Not by having the fewest files, not by self-scoring, not by naming things well.
+
+## The three tests every candidate must pass
+
+1. **Coverage** — S01–S12 each has a concrete trajectory with a named owner and
+   a stated deletion consequence. No "later" slots.
+2. **Non-smuggling** — the core is not a service/model/harness/conversation
+   assumption wearing a neutral name.
+3. **Minimality** — every core mechanism has a "deleting it breaks scenario X"
+   argument. If the argument is missing, the mechanism is deleted.
+
+## Disqualifiers (each ends the candidate, not just the section)
+
+* `execute(any)` and any other untyped escape hatch.
+* An omnipotent `context` object handed to extensions.
+* An arbitrary event bus used as the extension mechanism.
+* Complexity relocated into a plugin so the core *looks* minimal.
+* Faking support for a capability the service does not have.
+* Reinterpreting, weakening or dropping a required scenario.
+* A trajectory that only works when every adapter is the one we already have.
+
+## What counts as evidence
+
+* A specific event sequence beats an adjective.
+* An existing artifact beats an assertion about one.
+* A model experiment proves **the model only**. It is never product verification,
+  never protocol verification, never "the design works".
+* This repository's current code is a migration constraint and evidence about the
+  problem space. It is not the answer and not the baseline a candidate must keep.
+* Anything marked "unverified" in the inputs stays marked unverified in outputs.
+
+## Honest outcomes
+
+* Two candidates that cannot be simply ranked may both stay; say so, and say what
+  observation would rank them.
+* "I could not break it" and "it is correct" are different claims. Use the first.
+* A clean round is a real result only if the attack dimension was actually taken
+  up. Record which dimension was used, always.
+
+===== MATERIAL: attack dimensions =====
+
+# Attack dimensions — one per round, recorded, never repeated while clean
+
+The controller rotates these and writes the assignment into
+`rounds/RNNN/dimension.txt`. The attacker is confined to that dimension.
+
+| key | what the attacker must construct |
+|---|---|
+| D01-order-dedup | duplicate, reordered, interleaved and late events; two producers for one slot |
+| D02-lifecycle-leak | unsubscribe, page destroyed, extension unmounted, service restart, crash mid-operation |
+| D03-identity-scope | two services or tenants, colliding ids, cache bleed, authorization scope confusion |
+| D04-absent-capability | service lacks cancel/history/resume; where is it stated, and what does the UI claim meanwhile |
+| D05-fallback-unknown | unregistered view, unknown content type, partial data, malformed payload |
+| D06-adapter-burden | count what a *new service author* must write or must know about the core; any core internal leaking into the adapter contract is a finding |
+| D07-extension-burden | count what a *new module author* must learn; boilerplate, implicit coupling, ordering assumptions |
+| D08-reduction | delete one core mechanism and show a required scenario still passes; or show every candidate has one mechanism too many |
+| D09-splits-truth | two owners of one fact; who reconciles them when they disagree; find a state where the UI shows something that never happened remotely |
+| D10-cross-module | modules cooperating without shared global state; find the hidden channel — a shared key, an ordering assumption, a mutable context field |
+| D11-long-run | hours-long task, client restart, page never opened again, memory and subscription growth |
+| D12-authority-boundary | the candidate smuggling a service, model, harness, plugin-host or conversation assumption into the core as if it were neutral |
+
+Rotation rule: never reuse the immediately previous dimension while it is clean;
+after `FE_STALL_AFTER` consecutive clean rounds the controller rotates hard
+rather than polishing.
+
+===== MATERIAL: design brief (the approved statement of goal) =====
+(source: /home/maoqh/projects/ordessa/control/product/agent-desktop-design-brief.md, sha256: 0d36056c1039b3ae0bec6797e58824b247d19d093ae9505a74119fe8d648b47e)
+
+# Agent Desktop：设计循环目标与场景草案
+
+状态：目标已获用户认可；下列场景与循环参数由 I 提议，待用户查看。
+未启动循环、未安装外部框架、未任命新执行者。产品代码只读。
+
+## 用户确认的方向
+
+独立于特定后端、面向 Agent 使用的可扩展 Desktop。对话、工具调用、模型
+配置均可以成为能力，但不预设为整个产品的组织中心。
+Ordessa 后端可以提供最完整能力，不是所有接入的必需前提。
+不预先把 Agent、会话、任务或插件宿主指定为核心答案。
+通过场景、反例与删减实验寻找宿主最小机制与扩展领域能力的边界。
+
+## I 提议的场景集
+
+每个场景只规定用户结果，不提前规定内部对象或必须采用哪个 UI。
+
+| ID | 场景 | 需要设计回答的问题 |
+| --- | --- | --- |
+| S01 | 接入简单 Agent，仅支持文本往返 | 没有 Profile、工作区、工具和恢复能力时能否使用？ |
+| S02 | 通过 Ordessa 后端使用 Pi，观察工具与授权并持续交流 | 现有真实链如何映射，哪些能力由扩展承担？ |
+| S03 | 启动长任务，离开其页面，稍后查看进度和产物 | 页面生命周期与远端执行生命周期如何区分？ |
+| S04 | Agent 只提供任务提交、进度和结果，没有聊天协议 | 是否被迫伪造会话和 assistant 消息？ |
+| S05 | 不启动 Agent，独立浏览配置、资源或 Git 变更 | 领域模块能否不依赖活跃会话/运行？ |
+| S06 | 多服务同时接入，两个服务返回同名会话或任务 ID | 身份、授权范围、缓存和事件是否会串？ |
+| S07 | 新模块为特殊产物提供视图，未安装时仍能查看基础信息 | 扩展选择、默认回退与未知内容如何处理？ |
+| S08 | 一个资源模块与执行模块协作，后者可替换 | 怎样交换能力而不共享任意全局状态？ |
+| S09 | 连接断开后操作结果未知，重连收到重复/乱序事件 | 谁确认事实、恢复状态、防重复执行？ |
+| S10 | 扩展崩溃、关闭或卸载，远端任务仍在运行 | 谁释放订阅/资源，如何保留可解释的运行状态？ |
+| S11 | 服务缺少取消、历史或恢复能力 | 如何如实表达不可用，而非伪造支持？ |
+| S12 | 移除一个宣称可选的核心领域模块 | 宿主和其他独立模块是否还能工作？ |
+
+S01/S02 为近期真实需求锚点；其余是扩展与故障检验场景，不代表今夜实施范围。
+不要求任意第三方不可信代码热加载，不要求兼容所有协议或无限未来能力。
+
+## 评判方式
+
+先满足明确场景与不变式，再比较复杂度；不以文件少或自评分高判胜。
+对每个候选列：核心概念、接口操作、状态权威、生命周期、扩展依赖、接入成本、
+实现成本和不能覆盖的范围。不能用 execute(any)、万能 context/事件总线
+隐藏接口与错误语义后宣布核心最小。
+
+每个核心概念必须给一个“删掉它会失败”的具体场景；若移入扩展仍能满足
+全部必需条件，就列作可移除候选。总复杂度包含核心、适配器与扩展作者负担。
+允许保留多个不可简单排序的候选，不强行宣称存在唯一最简模型。
+
+## 建议循环（未启动）
+
+1. 首轮至少提出两个结构不同的候选，不以旧 mcode 方案为唯一出发点。
+2. 设计者给类型/伪代码、所有权与逐步场景轨迹。
+3. 攻击者给具体事件序列、被违反的不变式及最小反例；禁止只给风格意见。
+4. 验证者判断成立/不成立/证据不足，必要时在隔离设计目录写小型模型测试。
+   模型测试只能证明所建模型，不得冒充实际产品集成通过。
+5. 设计者修订并回放所有成立反例；不得删除场景、偷偷降低要求或压制攻击。
+6. 做删减攻击与新场景攻击，保存最佳候选、反例账和完整版本，不默认最后版最好。
+
+可借鉴的方法：
+- Self-Refine：https://github.com/madaan/self-refine （生成/反馈/修订）
+- Reflexion：https://github.com/noahshinn/reflexion （失败反思记忆）
+- evaluator–optimizer：https://www.anthropic.com/engineering/building-effective-agents
+- 运行控制候选：https://github.com/Kiriketsuki/ralph-loop
+以上阅读不代表已验证 Qoder 兼容、已安装或已授权其代码执行。
+
+建议上限：12 轮或 6 小时，先到者停止；这只是预算上限，不需要凑满时间。
+连续三轮没有新成立重大反例，且必需场景与删减检查通过，可提前交审。
+三轮仅换措辞/重复争论无实质进展则交出争议，不无限循环。
+目标冲突或产品取舍不明，记录交 I；其余独立问题可以继续。
+
+角色尽量用独立上下文；同一模型不同角色不等于独立质量证明。
+若 Qoder 无独立会话编排机制，先标注此限制，不假装已经启动独立审阅者。
+实现调度器前需读本机 Qoder --help，验证真实可用的非交互/会话参数，不猜 CLI。
+外部资料每条标实际读过的来源、版本与适用限制；未打开不作证据。
+
+## 次日交付
+
+一页最佳候选说明、核心/扩展边界、S01–S12 覆盖表、成立反例与修复记录、
+删减实验、未解决取舍，以及按真实模块划分的后续实施建议。
+停止状态为候选待审/预算截止/需决策，不自行宣布最终架构锁定。
+
+
+===== MATERIAL: counterexample ledger (authoritative; full) =====
+
+REGRESSION  FE-CE-002|R001|minor|OPEN|core capability-declaration fixes a session-recovery vocabulary and core fallback view renders an agent/run reading while host claims no content interpretation|A core smuggles run/agent reading via fixed CapSet and generic last-envelope view|rounds/R001/cand-A.md §A.2,§A.4,§A.9 ; verifier ruled it holds (RR001)|-|-
+
+-- all rows --
+id|raised_round|severity|status|invariant|title|evidence|targets|replayed
+FE-CE-001|R001|major|REJECTED|core defines observable content only as a seq-ordered replayable message log (no value/snapshot primitive), forcing the conversation/run shape onto passive data — violates "resource kinds are adapter types, host has no content authority"|A core has no value primitive: passive resource is content-as-message-log|rounds/R001/cand-A.md §A.1,§A.2,§A.5-S03,§A.5-S05 ; verifier ruled it does not hold (RR001)|-|-
+FE-CE-002|R001|minor|OPEN|core capability-declaration fixes a session-recovery vocabulary and core fallback view renders an agent/run reading while host claims no content interpretation|A core smuggles run/agent reading via fixed CapSet and generic last-envelope view|rounds/R001/cand-A.md §A.2,§A.4,§A.9 ; verifier ruled it holds (RR001)|-|-
+
+===== MATERIAL: scenario coverage ledger (authoritative; full) =====
+
+sid|status|owner|mechanism|evidence|round
+
+===== MATERIAL: mechanism disposition ledger (full) =====
+
+mechanism|disposition|failure_scenario|experiment_ref|round
+
+===== MATERIAL: per-round counters (full) =====
+
+round|holds_major|new_major|closed_major|clean|note|digest
+
+===== SAVED CANDIDATE (digest no-candidate) =====
+_none yet_
+
+===== MATERIAL: this round's artifact ../reports/FE-DESIGN-001/rounds/R001/plan.md =====
+(source: ../reports/FE-DESIGN-001/rounds/R001/plan.md, sha256: fa7521f36e29a96bc35dde5846976bcb45b54c5ac1bdbe9364674be7959b28b6)
+
+CANDIDATES: A,B
+
+DIMENSION: D12-authority-boundary
+
+# THE QUESTION THIS ROUND MUST SETTLE
+
+Does each candidate's core state, for a service that has no chat protocol and no
+cancel/history/resume, an owner other than a host-builtin object — i.e. can the
+S04 and S11 trajectories be written against the core without any core concept
+named or shaped like conversation, assistant message, session or run?
+
+The two candidates answer "what is the host core" differently, not the same
+answer in two vocabularies:
+
+**A — the host core is a namespaced resource/event space.** Every remotely
+observable thing (text stream, task progress, config tree, git diff, artefact
+descriptor) is a *resource*: an addressable, service-scoped identity plus a
+replayable event stream plus a declared capability set. The host owns only
+directory, subscription, namespacing and event delivery; "agent", "session" and
+"chat" are resource kinds declared by adapters, not host types.
+
+**B — the host core is a typed connection broker with no default event plane.**
+Extensions declare *ports* (typed request/response and typed streams) and the
+host only authenticates, namespacing-checks and wires declared port pairs.
+Nothing is observable unless some module offers a port for it; progress is a
+stream port offered by an execution module, not a property of a core resource.
+
+## Candidate A
+
+*Core bet:* a resource is the smallest unit that both S05 (domain module with no
+session) and S03 (remote task outliving its page) need: it has its own identity
+and lifecycle independent of any view or conversation. The host's only authority
+is over resource identity, subscription and event ordering within a namespace.
+*Strongest objection:* "resource kind" and the event envelope smuggle a run/turn
+correlation model — if the envelope carries fields like turn, message-role or
+session-state, or if kind registration is pre-seeded with agent/session views,
+A is a conversation host relabelled, and S04 passes only by faking.
+*Settling evidence:* the designer writes the S04 trajectory (submit → progress →
+result, no chat) and S01 (text round-trip, no profile/workspace/tool/recovery)
+step by step against A's declared operations only. Any step that materialises an
+assistant message, a session object, or a workspace to satisfy the core is a
+major counterexample; if both trajectories land without such steps, the
+objection is answered for this round.
+
+## Candidate B
+
+*Core bet:* the host has no opinion about what exists at all — it brokers typed
+connections between modules, so absence of a capability is trivially truthful
+(no port, no feature), which attacks S11/S04 head-on. State, replay and
+ordering live entirely in whatever module offers the stream port.
+*Strongest objection:* S03's return-later, S06's two-same-id and S09's
+reconnect-duplicate-out-of-order have no owner: without a core event plane
+someone must keep running state addressable while its page and its extension
+author module are both gone — either a hidden long-lived default broker (B
+becomes A with extra ceremony) or the responsibility lands on adapters, which
+D06 will score as adapter burden. Also a new service author must know every
+port pair, so progress may end up smuggled per-extension.
+*Settling evidence:* the designer writes S03 (progress after page destroyed and
+after the offering extension is unmounted, S10) and S09 (duplicate/out-of-order
+events on reconnect) using only B's declared operations; if the trajectory needs
+an implicit always-on subscription ledger, B is either smuggling A or has no
+owner for these scenarios, both of which the attacker records.
+
+## Centre of gravity
+
+All of S01–S12 are open in the ledger; R001 cannot carry them. This round's
+centre is the cluster that decides whether a core is admissible at all:
+**S01, S04, S05, S11** — simple text-only agent, no-chat service,
+no-session domain module, absent capability. S03/S06/S09 are carried as the
+structural stress on B (do they have an owner, or does B secretly need A?).
+The designer must produce, per candidate, the core's declared operations, the
+per-scenario step trajectories with the owning module named per step, and the
+deletion consequence for each claimed-core mechanism. No scenario may be marked
+"later": an unowned step is an open question, not a gap in this round's plan.
+
+
+===== MATERIAL: this round's artifact ../reports/FE-DESIGN-001/rounds/R001/cand-A.md =====
+(source: ../reports/FE-DESIGN-001/rounds/R001/cand-A.md, sha256: f638f6cb4c2c903301b34e3f875965a273f93f616732242385ba8f774bc94fcd)
+
+
+# Candidate A — Namespaced resource/event space
+
+## A.1 Core bet
+
+The host core is a **namespaced directory of resources**, each an addressable service-scoped identity plus a seq-ordered replayable event stream plus a declared capability set. The host's only authority is identity, namespace isolation, subscription routing, and per-resource event ordering; "agent", "session" and "chat" are resource **kinds declared by adapters**, never host types — nothing smaller keeps a remote task observable while its page and its view resolver are both gone (S03/S10) or keeps two services' colliding ids from crossing (S06).
+
+## A.2 Core concepts and operations
+
+**Namespace.** `namespaces.open(service_descriptor) → NamespaceHandle{id}`; `namespace.teardown(reason)`. Authoritative in host. Holds the id partition: every `resource_id` is `(namespace_id, local_id)`, so a raw id collision across services is structurally impossible. Lifecycle: opened on adapter connect, torn down on adapter disconnect; teardown disposes all its resources and force-closes every subscription to them.
+
+**Resource.** `namespace.announce(resource_descriptor{id, kind:string, capabilities:CapSet})` (adapter-origin only, host verifies uniqueness within namespace); `namespace.retire(resource_id, reason)`; `directory.list(namespace_id, filter{kind?}) → [descriptor]`; `directory.lookup(namespace_id, resource_id) → descriptor | ExplicitAbsent`. Content authority is the **producing adapter**; identity/lifecycle authority is the host. Created on announce; disposed on retire or namespace teardown.
+
+**Event stream.** `stream.subscribe(resource_id, from_cursor?) → Subscription{ close(), onNext(Envelope) }`. `Envelope = {resource_id, seq:int, ts, kind:string, payload:T}`, where `T` is the concrete type registered for `kind` — the host refuses to deliver any `kind` whose payload type was not registered (this is what keeps it from being an `execute(any)` bus). `cursor.resolve(resource_id) → seq` supports resume. `seq` is monotonic per resource, assigned by the host on ingest; dedup/reorder is the host's guarantee within a resource. Authority: ordering in host, payload content in adapter. Unsubscribe = `Subscription.close()`; host also closes it on view-resolver unmount or page destroy (handle owned by the subscriber's scope).
+
+**Capability set.** `capabilities.get(resource_id) → CapSet`. `CapSet` is a declared tagged union per feature, e.g. `cancel ∈ {supported, not_supported}`, `history ∈ {supported{depth}, not_supported}`, `resume ∈ {supported, not_supported}`. Declared by the adapter, never probed or inferred.
+
+**Action.** `action.invoke(resource_id, action_type:string, params:RegisteredType) → Result{registered type} | CapabilityAbsent(action_type)`. `action_type`s are registered per `kind` with concrete param/result types; no free-form params or results.
+
+## A.3 Boundary rules
+
+A service adapter must translate its protocol into four things: (1) `announce`/`retire` of resources with `kind` + `CapSet`; (2) a seq-numbered typed event stream per resource; (3) a registry of the `kind` payload types it emits; (4) typed `action` handlers. To express "this service does not support this," the adapter **omits the feature from `CapSet` and the action from the kind's registry**; any attempt to `invoke` it returns the explicit sentinel `CapabilityAbsent(action_type)`, and `capabilities.get` returns `not_supported`. `ExplicitAbsent` and `CapabilityAbsent` are distinct non-null terminal states; absence is never inferred from a missing message, a timeout, or a null.
+
+## A.4 Extension mechanism
+
+An extension registers a **view resolver**: `{match: kind + payload_schema_id, component, optional typed action bindings}`. Selection: host resolves by exact kind/schema match, most-specific-first; **default fallback is a host-builtin generic descriptor view** that renders kind, capability set, declared actions and a last-envelope summary — so unknown content is never blank or silently dropped (S07). An extension may render, subscribe (via the subscription handle), and invoke registered actions; it may **not** mint ids, bypass its namespace, subscribe across namespaces, register free-form event names, or touch a global context — it receives only a resource-scoped `SubscriberScope{descriptor, subscriptionHandle, typedInvoker}`, not a capability grab-bag. Guarantees: resolver **absent** → generic view; resolver **throws** → host error-boundary keeps delivering the stream to a re-mounted resolver (resolvers are consumers, not transport owners); resolver **unmounted mid-operation** → host closes its handles, the remote resource stays authoritative and observable, and a new page re-subscribes via `from_cursor`.
+
+## A.5 Scenario trajectories (owner per step)
+
+**S01 — text-only agent, no profile/workspace/tool/recovery.** 1. User connects simple service → host: `namespaces.open` (host). 2. Adapter `announce` one resource, kind `text.stream`, `CapSet{cancel:not_supported, history:not_supported, resume:not_supported}` (adapter). 3. User types; extension bound to kind `text.stream` calls `action.invoke(id,"send",{text})` (extension → adapter). 4. Adapter emits envelopes `seq 1..n` of a registered `TextDelta` payload (adapter). 5. Resolver renders deltas as it chooses; **no assistant-message object is materialised in the core** — "message" is purely the view's interpretation (extension). Covered; works with zero profile/workspace/tool/recovery.
+
+**S04 — submit/progress/result, no chat protocol.** 1. `namespaces.open`; adapter `announce` kind `acme.job`, `CapSet{cancel:supported, history:supported{depth:∞}, resume:supported}`, actions registered `submit`,`result` (adapter). 2. View resolver for `acme.job` renders three sections from envelopes of payload types `JobProgress`/`JobResult` (extension). 3. No session, no turn, no role field exists in any envelope — the envelope is `{resource_id,seq,ts,kind,payload}` only. Answer to the D12 question for A: **yes** — the trajectory is written against core ops with no core concept named or shaped like conversation/assistant/session/run.
+
+**S05 — browse config/git without a session.** 1. Adapter `announce` kind `config.tree` `CapSet{read}` and `git.diff` `CapSet{read}` (adapter). 2. `directory.list(ns, filter{kind:config.tree})` (host). 3. Resolver for `config.tree` renders; **no `namespaces.open` for an agent and no run** — only the read-connection namespace exists (host/extension). Covered: a domain module lives with no active session/run.
+
+**S02 — Pi via Ordessa, tools + approvals, keep conversing.** 1. Ordessa adapter `namespaces.open`; `announce` a resource per stream with kinds like `pi.conversation`, `pi.tool-event`, `pi.approval`, each a distinct kind the adapter declares (adapter). 2. The "conversation" view is an **extension resolver** on `pi.conversation`, not a core type (extension). 3. Approvals are `action.invoke(pi.approval,"approve",…)` (extension → adapter). Mapping: the real chain's session/tools/approval become resources+actions carried by the adapter and a conversation-shaped **extension**; the core stays neutral. Covered via adaptation+extension.
+
+**S03 — long task, leave page, return later for progress+artefacts.** 1. User opens `acme.job` resolver → subscribes (extension). 2. User navigates away → host closes that `Subscription` (handle owned by page scope) (host). 3. Remote keeps emitting; adapter keeps `announce`+envelopes (adapter). 4. User returns → new resolver `directory.lookup(ns,job_id)` then `stream.subscribe(id, from_cursor=resolved)`; host replays missed envelopes in seq order (host). Page lifecycle ≠ execution lifecycle: resource lives with the namespace/adapter, subscription lives with the page. Covered.
+
+**S06 — two services, same session/task id.** 1. Two adapters open **separate** namespaces → `resource_id = (ns_A,"job-1")` and `(ns_B,"job-1")` cannot collide in directory or routing (host). 2. Capability/auth checks are namespace-scoped, so an action can't cross (host). Covered by namespacing.
+
+**S07 — special artefact, view not installed.** 1. Adapter `announce` kind `acme.plot`, registered payload `PlotData` (adapter). 2. No resolver matches → **host generic descriptor view** shows kind, `PlotData` fields summary, declared actions (host). Unknown content is explained, not blank. Covered.
+
+**S08 — resource + execution modules cooperate; execution replaceable.** 1. Resource module exposes a resource of kind `data.ref`; execution module exposes kind `runner`. 2. A coordinating view resolves both kinds and calls `action.invoke(runner,"execute",{ref})` — passing an **id + typed params**, not shared mutable state (extension). 3. Replacing the runner adapter only changes who answers `kind:runner`; the resource side is untouched (adaptation). Covered without a global-state channel.
+
+**S09 — drop, unknown outcome, reconnect dup/out-of-order.** 1. Link drops mid `send` → `invoke` returns `Unknown`; UI does not guess (adapter). 2. Reconnect: adapter **replays** its envelope history; host dedups by `(resource_id,seq)` and reorders to seq; `cursor.resolve` tells the resume point (host). 3. Idempotent action re-delivery: the `invoke` request carries a host-assigned `(namespace_id,action_seq)` so a double-send is visible; the adapter declares whether it dedups. Authority for "what is true": the adapter's replayed seq-ordered stream; the host only guarantees order/dedup, never invents outcomes. Covered (host+adapter).
+
+**S10 — extension crashes/closes/uninstalls while remote task runs.** 1. Resolver throws/unmounts → host closes its subscription handles, resource stays (host). 2. Remote still authoritative; a re-mounted or the generic resolver re-subscribes from `cursor` (host). 3. Running state stays explainable because the resource+stream never depended on the extension. Covered.
+
+**S11 — no cancel/history/resume.** 1. Adapter `announce` with `CapSet{cancel:not_supported, history:not_supported, resume:not_supported}` (adapter). 2. UI reads `capabilities.get` → renders disabled controls labelled "not offered by this service" (extension, driven by declared absence). 3. `invoke(...,"cancel")` → `CapabilityAbsent`. Absence is stated, never pretended. Covered.
+
+**S12 — remove an "optional" core domain module.** 1. Removing an optional **adapter** (e.g. git) tears down its namespace; other namespaces and host unaffected (host). 2. Removing an optional **resolver** falls back to the generic view (host). Covered.
+
+## A.6 Delegation / deletion experiments
+
+Each claimed-core mechanism is named with the scenario-step that fails if it is deleted; two mechanisms were considered and **removed** because no required scenario fails.
+
+## A.7 Second-service onboarding cost
+
+To attach a **service with a different protocol**, an implementer must write: (1) a `namespaces.open` connect; (2) for each observable thing, an `announce(descriptor{id,kind,CapSet})`/`retire`; (3) a payload-type registration per `kind`; (4) a seq-ordered event pump (or rely on host seq-assignment on ingest); (5) typed `action` handlers per registered `action_type`; (6) an explicit `CapSet` for every feature the service lacks, as `not_supported` sentinels. Six items; the core event-ordering/dedup/namespace/cursor machinery is **reused, not rewritten**. To add **only a view**, an implementer must write: one `{match:kind+schema, component}` resolver with no protocol code and no knowledge of other modules.
+
+## A.8 Honest cost and non-goals
+
+Weakest points: modelling transient text as an addressable **resource** is heavier than B for pure stateless round-trips; the generic fallback view (S07) is shallow and every rich view is an extension; the host assigns `seq` but relies on the adapter to make `action` re-delivery idempotent (S09's double-execution guarantee is **partial**, host+adapter joint). Non-goals: no cross-namespace joins, no content search, no host-level turn/role model. Largest second-order cost: every "thing" being a resource pushes adapters to give identity + capability declarations to otherwise ephemeral streams. I removed, and did not add, a host `session` object and a host `turn/message-role` envelope field: no required scenario fails without them (S04 explicitly passes without them), so including them would be relabelled conversation smuggling.
+
+## A.9 Mechanism disposition
+
+<<<FE-MECH-START>>>
+namespaces|core|S06 step 1 — colliding resource ids from two services would cross in directory and routing|R001/A §A.6-namespaces
+resource-directory|core|S05 step 2 — domain module could not be listed/looked-up without a session|R001/A §A.6-directory
+ordered-replayable-stream|core|S03 step 4 and S09 step 2 — no return-later catch-up, no host dedup/reorder|R001/A §A.6-stream
+capability-declaration|core|S11 step 2 — absence would be inferred from null, faking support|R001/A §A.6-cap
+typed-action|core|S08 step 2 — no idempotent typed request without execute(any)|R001/A §A.6-action
+generic-fallback-view|core|S07 step 2 — unknown artefact renders blank|R001/A §A.6-fallback
+host-session-object|removed|none — no scenario requires it; S04 passes without it|R001/A §A.8
+host-turn/role-envelope-field|removed|none — its presence is the D12 disqualifier; S04 passes without it|R001/A §A.8
+<<<FE-MECH-END>>>
+
+## A.10 Proposed scenario status (pending verifier)
+
+<<<FE-SCENARIO-START>>>
+S01|covered|core|A §A.5 text.stream resource, no profile/tool|R001/A §A.5-S01
+S02|covered|adaptation|A §A.5 kinds + conversation resolver + approve action|R001/A §A.5-S02
+S03|covered|core|A §A.5 namespace outlives page; re-subscribe from cursor|R001/A §A.5-S03
+S04|covered|core|A §A.5 submit/progress/result, no chat object|R001/A §A.5-S04
+S05|covered|core|A §A.5 config/git resources, no session|R001/A §A.5-S05
+S06|covered|core|A §A.5 namespaced resource ids|R001/A §A.5-S06
+S07|covered|core|A §A.5 generic fallback descriptor view|R001/A §A.5-S07
+S08|covered|extension|A §A.5 cross-kind view passing ids, replaceable runner|R001/A §A.5-S08
+S09|partial|core|A §A.5 host seq/dedup; double-exec needs adapter idempotency|R001/A §A.5-S09
+S10|covered|core|A §A.5 handles closed, resource stays authoritative|R001/A §A.5-S10
+S11|covered|core|A §A.5 not_supported CapSet + CapabilityAbsent|R001/A §A.5-S11
+S12|covered|adaptation|A §A.5 adapter teardown / resolver fallback|R001/A §A.5-S12
+<<<FE-SCENARIO-END>>>
+
+
+
+===== MATERIAL: this round's artifact ../reports/FE-DESIGN-001/rounds/R001/cand-B.md =====
+(source: ../reports/FE-DESIGN-001/rounds/R001/cand-B.md, sha256: 85d97cd93d0f1010d87b2166d9f689a14534395989254178ae149314efb675bb)
+
+
+# Candidate B — Typed connection broker, no default event plane
+
+## B.1 Core bet
+
+The host core is a **typed connection broker**: it authenticates module-declared ports, enforces service-namespace scoping, and wires declared port pairs — and holds **no** event store, cursor, replay, or resource directory. Absence of a capability is then structurally true (no port, no feature), which answers S11/S04 head-on; every "observable" is whatever some module offers as a typed stream port.
+
+## B.2 Core concepts and operations
+
+**Port.** `ports.declare(module_id, PortDescriptor{id, service_namespace, direction, kind ∈ {request,stream}, req_type?, resp_type?, msg_type})`. All `*_type` are registered concrete types; a port with no registered type is refused (blocks `execute(any)`). Authority: descriptor registry in host; message semantics in the offering module.
+
+**Binding.** `ports.bind(requestor_module, service_namespace, port_id)` after host auth + namespace check; `ports.unbind`. Authority: host. Only declared pairs are live; there is no implicit broadcast.
+
+**Request port.** `port.call(port_id, typed_req) → typed_resp`. **Stream port.** `stream.open(port_id) → StreamHandle{ onMsg(T), close() }`. The host does **not** assign seq, dedup, reorder, or retain history — those belong to whatever module offers the port.
+
+**Namespace / scope.** A `service_namespace` tag on every port id; broker refuses cross-namespace binds unless explicitly granted. There is **no** host resource directory and **no** host cursor.
+
+**Lifecycle.** A port dies with its offering module; a `StreamHandle` closes on `close()` or when either endpoint unmounts. The broker holds bindings, not data.
+
+## B.3 Boundary rules
+
+A service adapter must translate its protocol into concrete typed request/stream ports and must register every message type. "Does not support this" is expressed by **not declaring the port**: there is no cancel request port ⇒ no `port.call` target exists. But a UI that must *show* a disabled control needs to know whether something is "absent because unsupported" vs "absent because not loaded"; B cannot read that from binding state alone, so truthful absence at the legibility layer forces a **capability-descriptor port** the adapter must offer and maintain — i.e. B reintroduces, per adapter, the very `CapSet` A centralises. This is relocation, not elimination (see B.8).
+
+## B.4 Extension mechanism
+
+A view module declares `artefact-view.request` ports answering `describe(artefact_type) → ViewDescriptor`; the host keeps a **builtin default provider** answering unknown types with a generic descriptor view, so S07 never renders blank (without it, B would fail the "faking/blank for unknown" disqualifier — so this provider is admitted to the core, a mild materialisation B would rather not carry). Selection: query declared `artefact-view.request` ports in scope, first responder wins. Guarantees: provider **absent** → default provider renders descriptor; provider **throws** → error descriptor; provider **unmounted mid-operation** → its stream ports unbind and close, and because the broker retains no data, re-subscription recovers only if the *offering* module (typically the long-lived adapter) kept state. B cannot claim more than that.
+
+## B.5 Scenario trajectories (owner per step)
+
+**S01 — text-only agent.** 1. `namespaces`-tagged service adapter declares `text.request` (send) + `text.stream` (reply) ports (adapter). 2. View binds both; `port.call(text.request,"hi")`, `onMsg(TxtChunk)` (extension). No profile/workspace/tool exists anywhere. Covered.
+
+**S04 — submit/progress/result, no chat.** 1. Adapter declares `job.submit.request`, `job.progress.stream`, `job.result.request` — three concrete typed ports, **no** message type resembling a chat turn. 2. View calls and renders each. D12 answer for B: **strongly yes** — the core has no event plane and no chat shape at all. This is B's clearest advantage over A.
+
+**S11 — no cancel/history/resume.** 1. Adapter declares no `*.cancel.request`, no history port, no resume port. 2. Absence at transport is automatic (nothing to call); but the UI needs the adapter's `capability-descriptor.request` port (B.3) to *say why*. Covered with the caveat that the explanatory port is per-adapter burden.
+
+**S05 — browse without session.** 1. Config module declares `config.read.request`; git module declares `git.diff.stream`; no execution/agent port exists or is bound (adaptation). 2. View binds read ports only. Covered — trivially, since B has no session concept to begin with.
+
+**S02 — Pi via Ordessa.** 1. Ordessa adapter declares typed ports for conversation/tool-event/approval; 2. a conversation view binds them; 3. approvals call `approval.request`. Mapping mirrors A but every stream's ordering/replay is the **adapter's** own job. Covered via adaptation.
+
+**S03 — return later for progress+artefacts.** 1. Page binds `job.progress.stream`; 2. page destroyed → `StreamHandle.close()`, broker holds nothing (host). 3. If the **offering adapter** (long-lived) retained a progress buffer and exposes `job.progress.replay.request`, a returning page re-binds and pulls the buffer (adapter). This *works only because the adapter reimplemented cursor/replay* — the host provided zero. 4. If the offering module was itself a UI extension that unmounted, there is **no** retained state and the trajectory breaks. Status: **partial**, owner = adapter, not core.
+
+**S06 — two services, same id.** 1. Port ids carry `service_namespace`; broker refuses cross-namespace binds (host). 2. But caches are per-module with no core directory, so **cache bleed is prevented only by adapter discipline**, not by a host invariant. Status: **partial**.
+
+**S07 — special artefact, view not installed.** 1. Unknown `artefact_type` query → **core default provider** returns generic descriptor (core). Covered.
+
+**S08 — resource + execution cooperate; replaceable.** 1. Coordination is by binding to two modules' ports by id; replacing the execution module changes which `port_id` answers. No shared global state. Covered.
+
+**S09 — reconnect dup/out-of-order.** 1. Broker provides no seq/dedup. 2. The **adapter** must number messages and the view must dedup, per service, with no host guarantee. Two producers for one slot and out-of-order arrival have no core arbiter. Status: **open** at core level (would require the adapter to rebuild A's event plane).
+
+**S10 — extension crashes/uninstalls while remote runs.** 1. Its stream port unbinds/closes (host). 2. Remote continues in the adapter; a new page recovers **only if** the adapter kept state (adapter). 3. If the offering module was the crashed extension, running state has no owner. Status: **partial**, owner = adapter, and fails if the offering module is non-resident.
+
+**S12 — remove an "optional" module.** 1. Its ports unbind; independent modules' bindings unaffected (host). 2. A coordinator binding to the removed port simply gets no responder → must handle missing binding. Covered (core+adaptation).
+
+## B.6 Delegation / deletion experiments
+
+See B.9. The deletion test that hurts B is the *reverse*: remove the hypothetical **host event store** (which B does not have) → S03/S09/S10 stay "working" only if some module already reimplemented it, proving the capability was relocated, not removed. B's genuinely core-removable item is its per-module cache discipline (no failing scenario ⇒ pushed to adapter, recorded as the source of B's partial status on S06).
+
+## B.7 Second-service onboarding cost
+
+To attach a **service with a different protocol**, an implementer must write: (1) typed request/stream ports for every operation *and* every observable; (2) register each message type; (3) a capability-descriptor port so absence is legible (B.3); (4) **its own** seq/dedup/replay/cursor for `job.progress.stream`-style ports (S03/S09); (5) a **retained-state buffer** for post-unmount recovery (S03/S10). Five items, of which (3)(4)(5) are the machinery A centralises, re-implemented **per adapter**. To add **only a view**, an implementer must write a `artefact-view.request` provider — more ceremony than A's single `{match, component}` resolver because the view must declare ports and the host must bind them.
+
+## B.8 Honest cost and non-goals
+
+B wins the D12 question most cleanly for S04/S11 (no core concept is shaped like chat). It loses the structural cluster: **S03 partial, S06 partial, S09 open, S10 partial**, all because the event plane has no core owner and lands on adapters. That is the plan's predicted failure: B is either **smuggling A into every adapter** (relocating, per B.7 items 3–5, so total complexity is not lower — it is A duplicated N times plus worse) or **lacking an owner** for return-later and reconnect. Largest second-order cost: because "the offering module must stay resident" is an implicit correctness requirement, B quietly assumes an always-on subscription ledger in the adapter layer — the thing it claimed to refuse. Non-goals: B deliberately carries no ordering, replay, or resource identity, so it cannot make guarantees that depend on them.
+
+## B.9 Mechanism disposition
+
+<<<FE-MECH-START>>>
+port-declaration-registry|core|S01 step 1 — without registered typed ports there is no wireable, typed connection|R001/B §B.6
+namespace-scope-check|core|S06 step 1 — same-id ports from two services would cross-bind|R001/B §B.6
+bind/authorize|core|S08 step 1 — replacement module could not be re-bound by id|R001/B §B.6
+builtin-default-view-provider|core|S07 step 1 — unknown artefact renders blank (disqualifier if removed)|R001/B §B.4
+host-event-store|removed|none at core — S03/S09/S10 consequence relocated to adapters|R001/B §B.5/B.8
+host-resource-directory|removed|none at core — S05/S06 handled by port ids + adapter cache discipline|R001/B §B.8
+<<<FE-MECH-END>>>
+
+## B.10 Proposed scenario status (pending verifier)
+
+<<<FE-SCENARIO-START>>>
+S01|covered|adaptation|B §B.5 text.request + text.stream ports|R001/B §B.5-S01
+S02|covered|adaptation|B §B.5 typed ports per chain element|R001/B §B.5-S02
+S03|partial|adaptation|B §B.5 needs adapter-retained replay buffer|R001/B §B.5-S03
+S04|covered|core|B §B.5 submit/progress/result ports, no chat|R001/B §B.5-S04
+S05|covered|adaptation|B §B.5 read ports only, no session concept|R001/B §B.5-S05
+S06|partial|core|B §B.5 namespace-scope on binds; caches uncared|R001/B §B.5-S06
+S07|covered|core|B §B.4 builtin default view provider|R001/B §B.5-S07
+S08|covered|extension|B §B.5 bind to two ports by id|R001/B §B.5-S08
+S09|open|unassigned|B §B.5 no core owner for dedup/reorder|R001/B §B.5-S09
+S10|partial|adaptation|B §B.5 recovery needs resident offering module|R001/B §B.5-S10
+S11|covered|adaptation|B §B.5 no port + capability-descriptor port|R001/B §B.5-S11
+S12|covered|core|B §B.5 unbind removed ports|R001/B §B.5-S12
+<<<FE-SCENARIO-END>>>
+
+
+
+===== MATERIAL: this round's artifact ../reports/FE-DESIGN-001/rounds/R001/attack.md =====
+(source: ../reports/FE-DESIGN-001/rounds/R001/attack.md, sha256: 7fe71ddc760ac27929f56fb339fc84737884366647906854a7f1b7b7dd6c432f)
+
+# R001 attacker report — dimension D12-authority-boundary
+
+I attacked only D12: does each candidate smuggle a service / model / harness / plugin-host / **conversation / session / run** assumption into the *core* and present it as neutral plumbing? I did not touch ordering (D01), identity (D03), absent-capability UX (D04), fallback rendering quality (D05), adapter burden (D06), extension burden (D07), reduction (D08), dual-truth (D09), cross-module channels (D10), long-run (D11), or lifecycle leaks (D02) — where those surface below I name them and explicitly leave them out of the ledger. The counterexample ledger was empty at round start, so there are no OPEN/DISPUTED rows to replay. Two counterexamples land on Candidate A; Candidate B holds this round (the attempts are recorded).
+
+## FE-CE-001 (major, Candidate A): A's core has no "value" primitive — passive content can only be represented as a conversation-shaped message log
+
+**Event sequence (S05 origin, S03 return-later failure).** A service exposes a *snapshot* — a git diff of the working tree. (1) Adapter `namespaces.open` (host). (2) Adapter `announce{kind:"git.diff"}` (adapter). (3) The view asks for the current diff. Here is the leak: A's core exposes **no** operation that returns a resource's content as a *current value*. `directory.lookup` returns only the `{id, kind, CapSet}` *descriptor* (§A.2); the content exists **only** as envelopes on `stream.subscribe` (§A.2). (4) So the adapter must emit the diff as envelope `seq=1` (adapter). (5) The working tree changes; adapter emits `seq=2` = the new diff (adapter). (6) User leaves the page and returns; the resolver re-subscribes with `from_cursor` and the host replays `seq=1` then `seq=2` in order (§A.2 cursor + §A.5-S03 step 4). (7) A seq log carries **no** "superseded / invalidated" state — ordering *is* the only content-truth the host guarantees (§A.1 "per-resource event ordering"). The returning page therefore sees the old diff (`seq=1`) presented inside the live timeline with no core marker that it was replaced.
+
+**Invariant broken.** A.1: "the host owns only directory, subscription, namespacing and event delivery; 'agent', 'session' and 'chat' are resource kinds declared by adapters, never host types," and "a resource has its own identity and lifecycle independent of any view or conversation." The plan's neutrality test: "Any step that materialises an assistant message, a session object, or a workspace to satisfy the core is a major counterexample." A cannot materialise a *passive value* without materialising it as an **append-only, seq-ordered, cursor-resumable message log** — which is precisely the assistant-message/conversation stream shape. The core's *definition* of "observable thing" (identity + replayable event stream) imports the conversation-log shape and then forces it onto S05's non-conversation data and S03's return-later reading.
+
+**Minimal version.** Give the core a `snapshot`/`read-value(resource_id) → current content` op with an `invalidate` signal instead of per-item seq replay. With that, a `git.diff` resource exposes its current value; S05 browses it and S03's return-later pulls the *current* diff — no message-log machinery, no stale-as-live. Remove that value op (back to stream-as-sole-content, as A is written) and the leak returns. So "content is representable only as a seq log" is the smuggle, and it is *not* required by S04, S05 or S11 (each of which A claims to satisfy on other grounds). Contrast with B, where the same S03 return pulls a *current* adapter buffer, not a host-replayed log — confirming the defect is A's core event-plane choice, not a shared fact.
+
+**User-visible consequence.** On S03 (return later for progress and artefacts) applied to a browsable passive resource: the user is shown a superseded diff/tree as part of the current timeline with no "replaced" marker, i.e. silent loss of truth. On S05: "browse config without a session/run" is satisfied *only* by modelling the config file as a live, resumable event stream — the run/message shape the brief's S04 was written to forbid, smuggled into the core's sole content primitive.
+
+## FE-CE-002 (minor, Candidate A): the core fixes a session-recovery capability vocabulary and renders it agent-shaped
+
+**Event sequence.** (1) Adapter `announce{kind:"config.tree"}`. (2) No resolver installed → the host-builtin generic view renders it (§A.4): "kind, capability set, declared actions and a **last-envelope summary**." (3) A's core `CapSet` is a fixed tagged union `cancel/history/resume` (§A.2) — the exact recovery features of an interactive agent session. (4) So a read-only config item is presented by the *core* with a cancel/resume capability strip and an invoked-latest-output affordance — a live invokable agent.
+
+**Invariant broken.** Same A.1 claim: the host has **no** content authority and ships no interpretation of a resource. Yet the core `generic-fallback-view` (declared core in §A.9) *interprets* a resource as "thing-with-outputs-you-can-invoke-and-resume," and `capability-declaration` (core) *names* a session-run recovery taxonomy instead of treating capability names as opaque adapter strings. That is a run/agent reading baked into the core while the core is billed as neutral plumbing.
+
+**Minimal version.** Make `CapSet` an open map `{capability_name:string → {supported|not_supported|unknown}}` with adapter-chosen names, and have the fallback render the raw payload schema plus an "install a view for details" line. The agent-strip disappears; S07 (unknown content not blank) still holds — so the run-shaped rendering is not required, it is smuggled. Non-blocking (config is still browsable), hence **minor**.
+
+## Candidate B — D12 taken up, held
+
+I wrote the two settle-scenarios against B's declared ops and could not smuggle a conversation/session/run object into its core. **S04**: `job.submit.request` + `job.progress.stream` + `job.result.request` are three typed ports with **no** message type shaped like a chat turn (§B.5-S04) — no core concept materialises a session/assistant. **S11**: absence is structural (no `*.cancel.request` port to bind) and the explanatory layer is an *adapter-declared* port whose `msg_type` B leaves concrete but unnamed by the core (§B.2, §B.3), so unlike A, B's core fixes **no** capability vocabulary. I also tested the "plugin-host smuggled into core as neutral" angle on `builtin-default-view-provider`: it *is* in B's core, but B names the impurity openly ("a mild materialisation B would rather not carry," §B.4) instead of dressing it as neutral broker plumbing, so it is an *admitted* core concept for the verifier to weigh, not a *smuggle-as-neutral* — the S07 default-render responsibility is genuinely required of the always-present component, and penalising it would soften S07. The residual event-plane cost in B is *relocated to adapters* (admitted, §B.8) — that is a D06/D01 finding, which I deliberately do not file here. Result: no D12 counterexample against B; it is the cleaner candidate on the literal authority-boundary test this round.
+
+## Out-of-dimension notes (recorded so the verifier can rotate)
+A's `§A.5-S09` "host-assigned `(namespace_id, action_seq)`" that the adapter must know to dedup, and B's S03/S06/S09/S10 "needs a resident offering module," are real core-leak / adapter-burden findings but belong to D06/D01/D02, not D12; I leave them for those rounds.
+
+
+===== MATERIAL: this round's artifact ../reports/FE-DESIGN-001/rounds/R001/verify.md =====
+(source: ../reports/FE-DESIGN-001/rounds/R001/verify.md, sha256: 5f52c22f2242612e923c8c54b87c44037da9c93b9f67ab447f2c47f70a541d42)
+
+# R001 verifier — dimension D12-authority-boundary
+
+Ledger at round start held exactly two OPEN rows (FE-CE-001 major, FE-CE-002 minor), both against Candidate A; nothing was DISPUTED. The attacker filed no D12 counterexample against Candidate B and recorded its two settle-scenarios as attempts. I replay only those two rows and render a verdict on each; scenario ownership is not mine and no S0x row appears below.
+
+## 1. Fabrication check
+No fabricated quote. Every candidate string the attacker used is verbatim in cand-A.md: §A.4 generic view "kind, capability set, declared actions and a last-envelope summary"; §A.2 "seq is monotonic per resource, assigned by the host on ingest"; §A.1 "per-resource event ordering"; §A.8 the removal of a turn/role envelope field. One claim is a mischaracterisation rather than a fabrication: the attacker states A's "content exists **only** as envelopes on `stream.subscribe`." §A.2 also defines `action.invoke(resource_id, action_type:string, params:RegisteredType) → Result{registered type}`, a typed current-value return whose result type is registered per kind. Treating the action Result as not-a-content-path is an argument move, not invented text, so I record it under the FE-CE-001 verdict, not under fabrication.
+
+## 2. FE-CE-001 — does_not_hold
+The counterexample's spine is that the core *forces* passive data into a conversation-shaped log because a value primitive is absent. Under A as written that forcing does not hold. (a) The current-value gap is filled by `action.invoke → Result{registered type}` (§A.2); a `git.diff` adapter can register a `read` action whose Result is the current snapshot, which returns a value without any seq replay and is not a message log. (b) The attacker's equation "seq-ordered cursor-resumable message log == assistant-message/conversation stream shape" is contradicted by A's own text: §A.5-S04 states the envelope is `{resource_id,seq,ts,kind,payload}` only — no role, no turn — and §A.8 records that a host turn/role field was deliberately removed precisely because its presence is the D12 disqualifier. An ordered typed-event stream carrying no conversational semantics is generic, not the conversation shape the brief forbids. (c) The stale-diff step relies on choosing a replay-from-origin rendering; §A.2 offers `cursor.resolve` and §A.5-S03 uses `from_cursor=resolved`, so pulling the latest value (or a `read` action) is available at the core. What is still missing for this to hold: a required scenario in which the action Result path is unusable *and* the seq stream is the only representation, which A's S05 trajectory (`directory.list` + a `read`-shaped CapSet) does not supply.
+
+## 3. FE-CE-002 — holds
+The minor counterexample survives. §A.2 defines `CapSet` as a *closed* tagged union whose members are `cancel`, `history`, `resume` — literally the recovery features of an interactive agent run — fixed by the host core. That is a session-recovery vocabulary encoded in a host type, against §A.1's claim that "agent", "session", "chat" are adapter resource-kinds "never host types." The closedness is not stylistic: §A.5-S05 announces `config.tree`/`git.diff` with `CapSet{read}`, a member §A.2's union does not admit, so the core vocabulary cannot even describe a passive read. §A.4 then has the *core-builtin* fallback view surface "kind, capability set, declared actions and a last-envelope summary," so an unviewed config item is presented with an invokable-run capability strip. The run/agent reading is materialised by core code, which is the D12 test. The non-destructive fix the attacker proposes (open `capability_name → {supported|not_supported|unknown}` map, adapter-chosen names) keeps S07 non-blank, so the agent-strip is a smuggle and not a requirement. Severity minor stands: the resource is still browsable.
+
+## 4. Missed-check (D12 only)
+None beyond the two filed. I examined A's other core surfaces for a hidden service/model/harness/conversation assumption and found none: `SubscriberScope{descriptor, subscriptionHandle, typedInvoker}` (§A.4) is resource-scoped, not an omnipotent context; the host refusing to deliver an unregistered `kind` payload (§A.2) is the opposite of `execute(any)`; host-assigned `seq` (§A.2/§A.5-S09) is event-plane authority, not a conversation object. On B I agree with the attacker: B's core declares no session/run/turn type, and `builtin-default-view-provider` (§B.4) is an *admitted* materialisation for the always-present component, named openly, not smuggled as neutral plumbing. No new FE-CE row is warranted this dimension.
+
+## 5. Self-contradiction check
+Candidate A contradicts itself twice, both consistent with FE-CE-002: it claims (§A.1) the host has no content authority and no session shape, yet §A.2's closed `CapSet` bakes in a session-recovery taxonomy, and §A.5-S05 uses `CapSet{read}`, a capability §A.2 does not define — the fixed union is too narrow even for A's own passive-resource trajectory. A clean pass on the D12 literal test would need `CapSet` opened to adapter-named capabilities.
+
+## 6. Experiment
+The FE-CE-001 dispute is "is a current value reachable in A's core, or only via replay?" This model encodes only that question. It shows that, given A's two documented ops, the stale-superseded snapshot the attacker describes is a rendering choice (replay-from-origin), not a core mandate. It proves the model only — not A, not the protocol, not any product.
+
+EXPERIMENT:
+```python3
+# A's documented ops for one resource, modelled minimally.
+# Question: does A FORCE stale-on-return, or is a current value reachable?
+
+class Model:
+    def __init__(self):
+        self.stream = {}          # rid -> list of (seq, diff) envelopes  (A.2 stream)
+        self.current = {}         # rid -> value returned by read action   (A.2 action.invoke->Result)
+        self.cursor = {}          # rid -> last delivered seq             (A.2 cursor.resolve)
+        self.next_seq = {}
+
+    def ingest_diff(self, rid, diff):          # adapter emits envelope (A.2 seq on ingest)
+        s = self.next_seq.get(rid, 0) + 1
+        self.next_seq[rid] = s
+        self.stream.setdefault(rid, []).append((s, diff))
+        self.current[rid] = diff               # the read-action Result reflects latest
+
+    def resolve(self, rid):                    # A.2 cursor.resolve
+        return self.cursor.get(rid, 0)
+
+    def replay_from(self, rid, from_seq):       # A.5-S03 step4 re-subscribe from_cursor
+        return [d for (s, d) in self.stream.get(rid, []) if s > from_seq]
+
+    def action_read(self, rid):                # A.2 action.invoke(rid,"read")->Result
+        return self.current[rid]
+
+m = Model()
+# Working tree changes twice; each change is a superseding snapshot.
+m.ingest_diff("git.diff", "OLD-diff")
+page_open = m.replay_from("git.diff", 0)          # while viewing: sees current tail
+m.ingest_diff("git.diff", "NEW-diff")             # tree changes, page gone
+# Page returns. Two legal A strategies:
+replay_all   = m.replay_from("git.diff", 0)        # stale-as-live possible here
+fresh_read   = m.action_read("git.diff")           # current value, no replay
+tail_from_cur= m.replay_from("git.diff", m.resolve("git.diff") if m.cursor.get("git.diff") else 1)
+
+assert replay_all == ["OLD-diff", "NEW-diff"]       # if you replay from origin you see the superseded one
+assert fresh_read == "NEW-diff"                     # core value path returns the current diff
+print("stale-present-in-replay-from-origin:", "OLD-diff" in replay_all)
+print("current-via-action-read:", fresh_read)
+print("CONCLUSION (model only): a current-value path exists in A's ops;")
+print("stale-on-return is a rendering choice, not a core-forced conversation shape.")
+```
+
+## 7. Dimension record
+D12-authority-boundary taken up against both candidates. Result NOT clean: one new `holds` row (FE-CE-002, minor) plus one `does_not_hold` (FE-CE-001) on A; B held. Out-of-dimension notes the attacker deferred (A §A.5-S09 host-assigned `(namespace_id, action_seq)` adapter must know → D06/D01; B "offering module must stay resident" → D02/D06) are recorded and left for their rounds; I do not file them here.
+
+
+===== FINAL: THE ONLY ACCEPTABLE ANSWER SHAPE =====
+Your reply is machine-checked. Anything not inside these markers is read as
+commentary and cannot enter the record. Emit the sections and blocks below,
+in this order, with the markers alone on their own lines:
+
+<<<FE-OUT-START>>>
+<deliverable>
+<<<FE-OUT-START>>>
+<one deliverable per declared candidate id>
+<<<FE-OUT-END>>>
+<<<FE-OUT-END>>>
+<<<FE-LEDGER-START>>>
+FE-CE-NNN|round|major|OPEN|the invariant broken|short title|evidence pointer|-
+<<<FE-LEDGER-END>>>
+<<<FE-SCENARIO-START>>>
+S01|covered|core|the mechanism|evidence pointer
+<<<FE-SCENARIO-END>>>
+<<<FE-MECH-START>>>
+mechanism name|core|the scenario that fails if deleted|experiment pointer
+<<<FE-MECH-END>>>
+<<<FE-REPLAY-START>>>
+FE-CE-NNN|pass|the sequence you replayed|the text that stops it
+<<<FE-REPLAY-END>>>
+
+If a block applies and you leave it empty, that is a failed phase, not an
+empty result: the verdict block in particular is the only thing that can move
+a counterexample, and prose verdicts are not read.

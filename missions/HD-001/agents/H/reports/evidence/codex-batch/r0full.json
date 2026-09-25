@@ -1,0 +1,736 @@
+{
+  "artifact": {
+    "adapter": {
+      "entry": "node_modules/@agentclientprotocol/codex-acp/dist/index.js",
+      "package": "@agentclientprotocol/codex-acp",
+      "version": "1.1.14"
+    },
+    "bytes": 320807886,
+    "doubleBuild": {
+      "bytes": 320807886,
+      "entries": 529,
+      "firstDigest": "sha256:9051b844a8feeb241667dd0cc03e80d082e140e88e49ecb3f195385e209f2ca1",
+      "identical": true,
+      "secondDigest": "sha256:9051b844a8feeb241667dd0cc03e80d082e140e88e49ecb3f195385e209f2ca1"
+    },
+    "entries": 529,
+    "native": {
+      "cliVersion": "0.147.0",
+      "entrypoint": "bin/codex",
+      "package": "@openai/codex-linux-x64",
+      "target": "x86_64-unknown-linux-musl",
+      "version": "0.147.0-linux-x64"
+    },
+    "output": "/tmp/agentbox-codex-gate-nq1n0gn0/artifacts/codex-runtime-a",
+    "packages": 20,
+    "sourceLockDigest": "sha256:75e25605bd3b57da85fd098dc160f7bb7ef5cea2fccf52755d8b85b3434c1240",
+    "treeDigest": "sha256:9051b844a8feeb241667dd0cc03e80d082e140e88e49ecb3f195385e209f2ca1"
+  },
+  "cancel": {
+    "cancelStatus": 202,
+    "captureState": "captured",
+    "cleanupState": "cleaned",
+    "elapsedSeconds": 0.059,
+    "profileVersionUsed": 2,
+    "providerRequestsBeforeCancel": 3,
+    "turnState": "cancelled"
+  },
+  "checkpointAfterFirst": {
+    "fileCount": 2,
+    "files": [
+      "codex/2026/09/23/rollout-2026-09-23T01-55-31-01a0ca42-329e-7503-801a-81cd7476d186.jsonl",
+      "codex/codex/MDFhMGNhNDItMzI5ZS03NTAzLTgwMWEtODFjZDc0NzZkMTg2.json"
+    ],
+    "harnessType": "codex",
+    "nativeSessionId": "01a0ca42-329e-7503-801a-81cd7476d186",
+    "resumable": true,
+    "schemaVersion": 3
+  },
+  "checkpointNativeIdStable": true,
+  "cleanup": {
+    "adapterProcessesRemoved": true,
+    "fakeTokenRemoved": true,
+    "madeWritable": 1583,
+    "removed": true,
+    "workerProjectionsRemoved": true,
+    "workspaceRemoved": true
+  },
+  "configProjection": {
+    "deployedBytes": 2650,
+    "mode": "loopback-fake-endpoint",
+    "projectedBytes": 2720,
+    "projectedSha256": "sha256:fedb3557a3e6c15bf76206a465c7d607bc8fc81e768a318abf506185dec9b8ff",
+    "unchangedFromDeployment": false
+  },
+  "credential": {
+    "injectedTokenReachedProvider": true,
+    "noCredentialMaterialInProductionConfig": true,
+    "tokenInDeployment": false,
+    "tokenInEvents": false,
+    "tokenInReportableState": false,
+    "tokenInWorkspace": false,
+    "unauthorizedRequests": 0
+  },
+  "credentialPathHits": [],
+  "credentialScan": {
+    "cyclesCompleted": 0,
+    "error": null,
+    "filesObserved": 0,
+    "harnessExited": true,
+    "incompleteEvents": [],
+    "perPhase": [
+      {
+        "captureEvidence": {
+          "bytes": 45915,
+          "files": 2,
+          "nativeSessionId": true,
+          "tokenHits": []
+        },
+        "harnessExited": true,
+        "hits": [],
+        "incompleteEvents": 0,
+        "phase": "turn-chain",
+        "races": 0,
+        "scanError": null,
+        "settledComplete": false,
+        "settledHits": [],
+        "settledScan": "capture-boundary",
+        "stoppedCleanly": true
+      },
+      {
+        "captureEvidence": {
+          "bytes": 254329,
+          "files": 14,
+          "nativeSessionId": true,
+          "tokenHits": []
+        },
+        "harnessExited": true,
+        "hits": [],
+        "incompleteEvents": 0,
+        "phase": "reopen",
+        "races": 0,
+        "scanError": null,
+        "settledComplete": false,
+        "settledHits": [],
+        "settledScan": "capture-boundary",
+        "stoppedCleanly": true
+      }
+    ],
+    "phases": 2,
+    "raceEvents": [],
+    "settledCycles": 2,
+    "settledIncomplete": null,
+    "stoppedCleanly": true
+  },
+  "deltaAttribution": {
+    "deltas": 2,
+    "perTurn": {
+      "execution_d58d203a1baa46fd82a500305e4fd87a": 1,
+      "execution_f401f0bcc44b44e4955625b24d6d28e9": 1
+    },
+    "unattributed": 0
+  },
+  "guestRuns": 2,
+  "mode": "loopback-fake-endpoint",
+  "nativeSessionId": "01a0ca42-329e-7503-801a-81cd7476d186",
+  "provider": {
+    "baseUrl": "http://127.0.0.1:33537",
+    "paths": [
+      "/responses",
+      "/responses",
+      "/responses"
+    ],
+    "requests": [
+      {
+        "authorizationMatchesInjectedToken": true,
+        "contentType": "application/json",
+        "index": 1,
+        "path": "/responses",
+        "structure": {
+          "input": [
+            {
+              "chars": 7197,
+              "containsRound1Assistant": false,
+              "containsRound1User": false,
+              "containsRound2User": false,
+              "role": "developer",
+              "type": "message"
+            },
+            {
+              "chars": 2438,
+              "containsRound1Assistant": false,
+              "containsRound1User": false,
+              "containsRound2User": false,
+              "role": "developer",
+              "type": "message"
+            },
+            {
+              "chars": 410,
+              "containsRound1Assistant": false,
+              "containsRound1User": false,
+              "containsRound2User": false,
+              "role": "developer",
+              "type": "message"
+            },
+            {
+              "chars": 911,
+              "containsRound1Assistant": false,
+              "containsRound1User": false,
+              "containsRound2User": false,
+              "role": "user",
+              "type": "message"
+            },
+            {
+              "chars": 185,
+              "containsRound1Assistant": false,
+              "containsRound1User": true,
+              "containsRound2User": false,
+              "role": "user",
+              "type": "message"
+            }
+          ],
+          "instructionsChars": 17730,
+          "model": "deepseek-flash",
+          "previousResponseId": null,
+          "reasoning": {
+            "effort": "high",
+            "summary": "auto"
+          },
+          "store": false,
+          "stream": true,
+          "toolCount": 10
+        }
+      },
+      {
+        "authorizationMatchesInjectedToken": true,
+        "contentType": "application/json",
+        "index": 2,
+        "path": "/responses",
+        "structure": {
+          "input": [
+            {
+              "chars": 7197,
+              "containsRound1Assistant": false,
+              "containsRound1User": false,
+              "containsRound2User": false,
+              "role": "developer",
+              "type": "message"
+            },
+            {
+              "chars": 2438,
+              "containsRound1Assistant": false,
+              "containsRound1User": false,
+              "containsRound2User": false,
+              "role": "developer",
+              "type": "message"
+            },
+            {
+              "chars": 410,
+              "containsRound1Assistant": false,
+              "containsRound1User": false,
+              "containsRound2User": false,
+              "role": "developer",
+              "type": "message"
+            },
+            {
+              "chars": 911,
+              "containsRound1Assistant": false,
+              "containsRound1User": false,
+              "containsRound2User": false,
+              "role": "user",
+              "type": "message"
+            },
+            {
+              "chars": 185,
+              "containsRound1Assistant": false,
+              "containsRound1User": true,
+              "containsRound2User": false,
+              "role": "user",
+              "type": "message"
+            },
+            {
+              "chars": 137,
+              "containsRound1Assistant": true,
+              "containsRound1User": true,
+              "containsRound2User": false,
+              "role": "assistant",
+              "type": "message"
+            },
+            {
+              "chars": 187,
+              "containsRound1Assistant": false,
+              "containsRound1User": false,
+              "containsRound2User": false,
+              "role": "user",
+              "type": "message"
+            }
+          ],
+          "instructionsChars": 17730,
+          "model": "deepseek-flash",
+          "previousResponseId": null,
+          "reasoning": {
+            "effort": "high",
+            "summary": "auto"
+          },
+          "store": false,
+          "stream": true,
+          "toolCount": 10
+        }
+      },
+      {
+        "authorizationMatchesInjectedToken": true,
+        "contentType": "application/json",
+        "index": 3,
+        "path": "/responses",
+        "structure": {
+          "input": [
+            {
+              "chars": 7197,
+              "containsRound1Assistant": false,
+              "containsRound1User": false,
+              "containsRound2User": false,
+              "role": "developer",
+              "type": "message"
+            },
+            {
+              "chars": 2438,
+              "containsRound1Assistant": false,
+              "containsRound1User": false,
+              "containsRound2User": false,
+              "role": "developer",
+              "type": "message"
+            },
+            {
+              "chars": 410,
+              "containsRound1Assistant": false,
+              "containsRound1User": false,
+              "containsRound2User": false,
+              "role": "developer",
+              "type": "message"
+            },
+            {
+              "chars": 911,
+              "containsRound1Assistant": false,
+              "containsRound1User": false,
+              "containsRound2User": false,
+              "role": "user",
+              "type": "message"
+            },
+            {
+              "chars": 177,
+              "containsRound1Assistant": false,
+              "containsRound1User": false,
+              "containsRound2User": false,
+              "role": "user",
+              "type": "message"
+            }
+          ],
+          "instructionsChars": 17730,
+          "model": "deepseek-flash",
+          "previousResponseId": null,
+          "reasoning": {
+            "effort": "high",
+            "summary": "auto"
+          },
+          "store": false,
+          "stream": true,
+          "toolCount": 10
+        }
+      }
+    ],
+    "requestsBeyondBudget": 0,
+    "silentFirstAnswerObservedSeconds": 8.0,
+    "unauthorizedRequests": 0
+  },
+  "providerRequestShape": {
+    "inputCounts": [
+      5,
+      7
+    ],
+    "models": [
+      "deepseek-flash",
+      "deepseek-flash"
+    ],
+    "paths": [
+      "/responses",
+      "/responses"
+    ],
+    "secondRoundCarriesRoundOneAssistant": true,
+    "secondRoundCarriesRoundOneUser": true,
+    "toolCounts": [
+      10,
+      10
+    ]
+  },
+  "reopenObservation": {
+    "acpMethodsFirstRun": [
+      "initialize",
+      "authenticate",
+      "session/new",
+      "session/prompt"
+    ],
+    "acpMethodsSecondRun": [
+      "initialize",
+      "authenticate",
+      "session/list",
+      "session/load",
+      "session/prompt"
+    ],
+    "captureEvidence": {
+      "bytes": 254329,
+      "capturedRounds": 2,
+      "files": 14,
+      "nativeSessionId": true,
+      "tokenHits": []
+    },
+    "chunksAfterReopenPrompt": [
+      {
+        "kind": "started",
+        "text": ""
+      },
+      {
+        "kind": "message.delta",
+        "text": "CODEX-GATE-NONCE-2B7D31"
+      }
+    ],
+    "chunksDuringReopen": [
+      {
+        "kind": "started",
+        "text": ""
+      }
+    ],
+    "nativeReopenMethod": "session/load",
+    "nativeSessionIdStable": true,
+    "processEvidence": {
+      "adapterEnvironment": {
+        "CODEX_HOME": "/runtime/home/.codex",
+        "HOME": "/runtime/home",
+        "PATH": "/usr/bin:/bin",
+        "noBrowser": "1"
+      },
+      "appServerChildren": [
+        {
+          "cmdline": [
+            "/usr/bin/node",
+            "/runtime/artifacts/codex-runtime/node_modules/@openai/codex/bin/codex.js",
+            "app-server"
+          ],
+          "environment": {
+            "CODEX_HOME": "/runtime/home/.codex",
+            "HOME": "/runtime/home",
+            "NO_BROWSER": "1",
+            "PATH": "/usr/bin:/bin"
+          },
+          "inheritsChildEnvironment": true,
+          "pid": 27
+        },
+        {
+          "cmdline": [
+            "/usr/bin/node",
+            "/runtime/artifacts/codex-runtime/node_modules/@openai/codex/bin/codex.js",
+            "app-server"
+          ],
+          "environment": {
+            "CODEX_HOME": "/runtime/home/.codex",
+            "HOME": "/runtime/home",
+            "NO_BROWSER": "1",
+            "PATH": "/usr/bin:/bin"
+          },
+          "inheritsChildEnvironment": true,
+          "pid": 27
+        }
+      ],
+      "codexHomeMatchesDerivedDefault": true,
+      "derivedDefaultHome": "/runtime/home/.codex",
+      "homedir": "/runtime/home"
+    },
+    "projectionEvidence": {
+      "codexHomeListing": [
+        ".tmp",
+        "config.toml",
+        "models.json",
+        "sessions",
+        "shell_snapshots"
+      ],
+      "config": {
+        "bytes": 2720,
+        "sha256": "9102baf61d1db3b2b2eafd1ae7e638215e89f7fdc5c67f6dfd5892b0d904fd67"
+      },
+      "configCarriesProfileSentinel": true,
+      "hostCodexVisible": false,
+      "hostHomeSentinelVisible": false,
+      "hostHomeVisible": false,
+      "models": {
+        "bytes": 76107,
+        "sha256": "bce20f679495809f4fa6e48672b6dcbab84b6adff5251890b6e6a21eddb9c12f"
+      },
+      "stateProbeBytes": 32,
+      "writeConfig": "EROFS",
+      "writeModels": "EROFS",
+      "writeState": "wrote"
+    },
+    "providerEndpoint": "loopback-mechanism-audit",
+    "providerEndpointMode": "loopback-fake-endpoint",
+    "providerRequests": 2,
+    "providerRequestsAreModelCalls": false,
+    "reopenedStateFiles": 7,
+    "reopenedStateResumable": true,
+    "secondRunCarriesRoundOneContext": true,
+    "stateFiles": 7,
+    "stateResumable": true
+  },
+  "result": "CODEX_PRODUCTION_CHAIN_GATE_OK",
+  "rounds": {
+    "first": {
+      "completedSeq": 9,
+      "deltaSeq": [
+        5
+      ],
+      "deltaText": [
+        "CODEX-GATE-NONCE-1F4A9C"
+      ],
+      "deltasBeforeCompletion": true,
+      "elapsedSeconds": 8.111,
+      "state": "completed"
+    },
+    "second": {
+      "completedSeq": 18,
+      "deltaSeq": [
+        14
+      ],
+      "deltaText": [
+        "CODEX-GATE-NONCE-2B7D31"
+      ],
+      "deltasBeforeCompletion": true,
+      "state": "completed"
+    }
+  },
+  "run": {
+    "controlledHostHome": "/tmp/agentbox-codex-gate-nq1n0gn0/controlled-host-home",
+    "hostHomeSentinel": "CODEX-GATE-HOST-HOME-SENTINEL-9C31",
+    "removed": true,
+    "temporary": "/tmp/agentbox-codex-gate-nq1n0gn0",
+    "workspace": "/tmp/agentbox-codex-gate-nq1n0gn0/workspace"
+  },
+  "script": "scripts/server-round1/codex-production-chain-gate.py",
+  "sessionId": "session_1a58113fa4b3434389ec002c4a42888e",
+  "settledWindow": {
+    "captureEvidence": null,
+    "cyclesCompleted": 0,
+    "failure": null,
+    "filesObserved": 0,
+    "harnessExited": true,
+    "harnessSeenAlive": true,
+    "hits": [],
+    "incompleteEvents": [],
+    "phase": "turn-chain",
+    "races": [],
+    "result": {
+      "cancel": {
+        "cancelStatus": 202,
+        "captureState": "captured",
+        "cleanupState": "cleaned",
+        "elapsedSeconds": 0.059,
+        "profileVersionUsed": 2,
+        "providerRequestsBeforeCancel": 3,
+        "turnState": "cancelled"
+      },
+      "checkpointAfterFirst": {
+        "fileCount": 2,
+        "files": [
+          "codex/2026/09/23/rollout-2026-09-23T01-55-31-01a0ca42-329e-7503-801a-81cd7476d186.jsonl",
+          "codex/codex/MDFhMGNhNDItMzI5ZS03NTAzLTgwMWEtODFjZDc0NzZkMTg2.json"
+        ],
+        "harnessType": "codex",
+        "nativeSessionId": "01a0ca42-329e-7503-801a-81cd7476d186",
+        "resumable": true,
+        "schemaVersion": 3
+      },
+      "checkpointNativeIdStable": true,
+      "configProjection": {
+        "deployedBytes": 2650,
+        "mode": "loopback-fake-endpoint",
+        "projectedBytes": 2720,
+        "projectedSha256": "sha256:fedb3557a3e6c15bf76206a465c7d607bc8fc81e768a318abf506185dec9b8ff",
+        "unchangedFromDeployment": false
+      },
+      "credential": {
+        "injectedTokenReachedProvider": true,
+        "noCredentialMaterialInProductionConfig": true,
+        "tokenInDeployment": false,
+        "tokenInEvents": false,
+        "tokenInReportableState": false,
+        "tokenInWorkspace": false,
+        "unauthorizedRequests": 0
+      },
+      "deltaAttribution": {
+        "deltas": 2,
+        "perTurn": {
+          "execution_d58d203a1baa46fd82a500305e4fd87a": 1,
+          "execution_f401f0bcc44b44e4955625b24d6d28e9": 1
+        },
+        "unattributed": 0
+      },
+      "nativeSessionId": "01a0ca42-329e-7503-801a-81cd7476d186",
+      "providerRequestShape": {
+        "inputCounts": [
+          5,
+          7
+        ],
+        "models": [
+          "deepseek-flash",
+          "deepseek-flash"
+        ],
+        "paths": [
+          "/responses",
+          "/responses"
+        ],
+        "secondRoundCarriesRoundOneAssistant": true,
+        "secondRoundCarriesRoundOneUser": true,
+        "toolCounts": [
+          10,
+          10
+        ]
+      },
+      "rounds": {
+        "first": {
+          "completedSeq": 9,
+          "deltaSeq": [
+            5
+          ],
+          "deltaText": [
+            "CODEX-GATE-NONCE-1F4A9C"
+          ],
+          "deltasBeforeCompletion": true,
+          "elapsedSeconds": 8.111,
+          "state": "completed"
+        },
+        "second": {
+          "completedSeq": 18,
+          "deltaSeq": [
+            14
+          ],
+          "deltaText": [
+            "CODEX-GATE-NONCE-2B7D31"
+          ],
+          "deltasBeforeCompletion": true,
+          "state": "completed"
+        }
+      },
+      "sessionId": "session_1a58113fa4b3434389ec002c4a42888e",
+      "stateScan": {
+        "bytes": 45915,
+        "files": 2,
+        "nativeSessionId": true,
+        "scan": "fail-closed audit; a hit would have failed the turn",
+        "tokenHits": [],
+        "tokenInState": false
+      },
+      "unknownModel": {
+        "providerRequestsAfterRefusal": 0,
+        "reasonMentionsModel": true,
+        "reasons": [
+          "SidecarError: SIDECAR_OP_FAILED: Harness model is not available: deepseek-unknown"
+        ],
+        "refusalCounted": true,
+        "refusedBeforeProviderRequest": true,
+        "state": "failed"
+      }
+    },
+    "scanError": null,
+    "settledComplete": false,
+    "settledCycles": 0,
+    "settledHits": [],
+    "settledIncomplete": null,
+    "settledScan": "capture-boundary",
+    "stoppedCleanly": true
+  },
+  "stateProjectionObservation": {
+    "listingFileLimit": 1024,
+    "overListingLimit": false,
+    "peakDirectoryCounts": [
+      {
+        "directory": "agentbox-sidecar/third_party/harness_remote/bridge/src",
+        "files": 21
+      },
+      {
+        "directory": "agentbox-sidecar/runtime",
+        "files": 5
+      },
+      {
+        "directory": "agentbox-sidecar/deployment/codex",
+        "files": 2
+      },
+      {
+        "directory": "agentbox-sidecar",
+        "files": 1
+      },
+      {
+        "directory": "agentbox-sidecar/third_party/harness_remote",
+        "files": 1
+      }
+    ],
+    "peakNonRegularEntries": 0,
+    "peakRegularFiles": 30,
+    "peakRegularFilesSubtree": "agentbox-sidecar/third_party/harness_remote",
+    "peakSamplePaths": [
+      "agentbox-sidecar/third_party/harness_remote/bridge/src/acp-client.js",
+      "agentbox-sidecar/third_party/harness_remote/bridge/src/acp-prompt-echo-filter.js",
+      "agentbox-sidecar/third_party/harness_remote/bridge/src/acp-registration.js",
+      "agentbox-sidecar/third_party/harness_remote/bridge/src/acp-service.js",
+      "agentbox-sidecar/third_party/harness_remote/bridge/src/agent-model-catalog.js",
+      "agentbox-sidecar/third_party/harness_remote/bridge/src/agent-router.js",
+      "agentbox-sidecar/third_party/harness_remote/bridge/src/backward-line-scan.js",
+      "agentbox-sidecar/third_party/harness_remote/bridge/src/bounded-lru.js",
+      "agentbox-sidecar/third_party/harness_remote/bridge/src/codex-session-history.js",
+      "agentbox-sidecar/third_party/harness_remote/bridge/src/extension-actions.js",
+      "agentbox-sidecar/third_party/harness_remote/bridge/src/harness-capability-contract.js",
+      "agentbox-sidecar/third_party/harness_remote/bridge/src/harness-profiles.js"
+    ]
+  },
+  "stateScan": {
+    "bytes": 45915,
+    "files": 2,
+    "nativeSessionId": true,
+    "scan": "fail-closed audit; a hit would have failed the turn",
+    "tokenHits": [],
+    "tokenInState": false
+  },
+  "stateSymlinksObserved": [],
+  "template": {
+    "adapterEntry": "/runtime/artifacts/codex-runtime/node_modules/@agentclientprotocol/codex-acp/dist/index.js",
+    "artifactTarget": "/runtime/artifacts/codex-runtime",
+    "configTarget": "/runtime/home/.codex/config.toml",
+    "credentialEnvironment": "CODEX_API_KEY",
+    "loopbackOverrideChanges": {
+      "model_providers.deepseek.base_url": [
+        "https://api.deepseek.com/",
+        "http://127.0.0.1:33537"
+      ]
+    },
+    "loopbackSentinel": "CODEX-GATE-PROFILE-SENTINEL-7D12",
+    "modelCatalogBytes": 76107,
+    "modelCatalogSha256": "sha256:bce20f679495809f4fa6e48672b6dcbab84b6adff5251890b6e6a21eddb9c12f",
+    "modelsTarget": "/runtime/home/.codex/models.json",
+    "nativeModelId": "deepseek-flash",
+    "officialBaseUrl": "https://api.deepseek.com/",
+    "preferredAuthMethod": "api-key",
+    "productModelId": "deepseek-flash",
+    "silentFirstAnswerSeconds": 8.0,
+    "stateTarget": "/runtime/home/.codex/sessions"
+  },
+  "unknownModel": {
+    "providerRequestsAfterRefusal": 0,
+    "reasonMentionsModel": true,
+    "reasons": [
+      "SidecarError: SIDECAR_OP_FAILED: Harness model is not available: deepseek-unknown"
+    ],
+    "refusalCounted": true,
+    "refusedBeforeProviderRequest": true,
+    "state": "failed"
+  },
+  "worker": {
+    "path": "/home/maoqh/projects/agent-box-env-provider/workers/agent-box-worker/.acceptance-bundle-c12/agent-box-worker",
+    "sha256": "sha256:9d8df86d214bf2b3e99afa461bd5ca83c62caae847cec507ea20e2518ce97088"
+  }
+}

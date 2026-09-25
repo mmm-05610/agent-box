@@ -1,0 +1,51 @@
+I verified the saved candidate (digest b6da557…) as a cold read. Here is my review.
+
+The artifact is well-reduced on the ledger's own terms (dedup/reorder claims withdrawn, spawned set removed, payload registry gone). But I found three scenarios whose stated trajectories are internally contradicted by the artifact's own subscription model: the design defines only two cursors — `from_cursor=0` (full replay) and `from_cursor=cursor.resolve` (live, explicitly "begins live") — yet S03 step4, S08 step5, and S10 step3 each claim a `cursor.resolve` resubscribe "replays/catches up" events the client missed. That is not a wording quibble; the load-bearing mechanism (ordered-replayable-stream for catch-up) is justified by a step that cannot perform catch-up under the defined semantics, and there is no "resume from my last-seen cursor" operation anywhere in §R6.2.
+
+<<<FE-OUT-START>>>
+## Candidate review — FE-DESIGN-001 R006 (digest b6da557a…)
+
+### Overall
+
+I judged the saved candidate text as it stands. The core bet (namespaced resource directory + monotonic replayable stream + same-namespace scoped handles + open CapMap + typed actions) is coherent on identity/isolation (S06), absence-truthfulness (S11), fallback (S07/S12), and no-chat (S04). The R006 reductions (host dedup/reorder withdrawn, spawned set removed via Model2, adapter dedup by its own stable id) faithfully close the three D01 counterexamples and every prior A-lineage row I replayed. However, three scenario trajectories are broken because they claim a catch-up capability the artifact's own two-cursor subscription model does not provide: `from_cursor=cursor.resolve(id)` is defined as "begins live" and `from_cursor=0` as "replays from the first envelope", with **no resume-from-a-stored-position** operation. A view that navigated away or crashed, then resubscribes at `cursor.resolve`, receives only future events — so the missed progress the step says it "replays"/"catches up" cannot arrive. Worse, the deletion-consequence for the ordered-replayable-stream in S03 (the load-bearing justification §R6.6 cites as "S03 catch-up") is attached to a step (S03 step4) that does not perform catch-up, and the step that actually catches up (step1/step5, `from_cursor=0`/read) is not the one tested. This is a real coverage hole, not a phrasing issue.
+
+### Where the artifact is thin
+
+S01 and several scenarios lean on §R6.6's global "Retained because a scenario fails without them: namespaces (S06)" for the `namespaces.open` step's deletion consequence rather than naming it inline; I granted that as present-in-text. The S08 ordering (a live `ArtifactReady` for a runner job arriving to a view before the paired `execute` returns and announces that job) is only fixable by assuming the runner pre-announces the job, which the step sequence omits.
+
+BOUNDARY_SCAN: No service/model/plugin-host/conversation assumption smuggled into the core. The core holds no content authority ("Content authority = producing adapter"; `payload_schema_id` is "an opaque routing/selection label — the host neither registers, gates, nor interprets it"), has no capability vocabulary ("Host defines no valid names"), no host session/turn/role (§R6.6 carried-and-still-dead), and the pair gesture "records nothing". The generic fallback "never given a run/agent reading". No required burden was relocated into "an extension provides it" without cost: S09's dedup/reorder burden is paid explicitly in the onboarding section §R6.7 items 3 and 6 (adapter pumps remote-stable order; dedups by its own stable id).
+
+ESCAPE_HATCH_SCAN: None found, checked. No `execute(any)` — `handle.invoke` takes typed `action_type` + schema'd params/results and `action.register` binds concrete `params_type/result_type:ActionSchema` ("No `execute(any)`: params/results are concrete schemas"). No omnipotent context — a view "receives only host-minted SubscriberScope handles … may not enumerate other namespaces, derive a foreign ns_id, register free-form event names, or hold a global context". No arbitrary event bus — extension subscription is per-resource via `handle.subscribe(resource_id, …)`; the only "event" surface is the per-resource stream, not a global pub/sub.
+<<<FE-OUT-END>>>
+
+<<<FE-VERDICT-START>>>
+S01|trajectory_ok|§R6.5-S01 steps1-5; deletions typed-action step3 and ordered-stream step4 stated inline, namespaces via §R6.6|nothing
+S02|trajectory_ok|§R6.5-S02 steps1-5 with announce/ordered-stream/typed-action deletions stated|nothing
+S03|trajectory_broken|§R6.5-S03 step4 "subscribe(from_cursor=cursor.resolve(id)); host replays missed stream"|cursor.resolve is defined "begins live" (§R6.2); a resubscribe at current cursor cannot replay the step-3 missed events, and no resume-from-last-seen-cursor operation exists|
+S04|trajectory_broken|§R6.5-S08 step5 "h_D receives new live ArtifactReady (not replayed)"|the (ns_R,job) resource is not announced until step1/step2 and its id is returned by execute only at step5, so a live event for it cannot be delivered to the view before the resource exists on the host|
+S05|trajectory_ok|§R6.5-S04 steps1-3 with resource-lifecycle/typed-action/ordered-stream deletions|nothing
+S06|trajectory_ok|§R6.5-S05 steps1-3; directory+typed-action deletions inline, namespaces via §R6.6|nothing
+S07|trajectory_ok|§R6.5-S06 steps1-6; all core deletions stated inline|nothing
+S08|trajectory_ok|§R6.5-S07 announce→generic fallback; fallback-view deletion stated|nothing
+S09|trajectory_ok|§R6.5-S09 steps1-4; step4 uses from_cursor=0 or read (coherent); never-auto-resubmit/ordered-stream/adapter-dedup deletions stated|nothing
+S10|trajectory_broken|§R6.5-S10 step3 "subscribe(from_cursor=cursor.resolve(…)) → catches up"|same live-only contradiction as S03: a new view resubscribing at the current cursor does not catch up missed progress, and the step3 deletion test (replayable-stream→"can't catch up") fails because step3 never replays|
+S11|trajectory_ok|§R6.5-S11 CapMap not_supported + CapabilityAbsent; open-map deletion stated|nothing
+S12|trajectory_ok|§R6.5-S12 steps1-3 teardown isolation + generic fallback; both deletions stated|nothing
+<<<FE-VERDICT-END>>>
+
+<<<FE-REPLAY-START>>>
+FE-CE-001|pass|trace passive current-value read of a config/git resource under R006 bytes|§R6.5-S05 step3 "h.invoke(item_id,read)→snapshot. No subscribe/cursor/stream for the read" gives a non-log value path
+FE-CE-002|pass|attempt to make the host branch on a fixed capability name and read a run/agent meaning off the fallback view|§R6.2 open CapMap "Host defines no valid names … never branches"; §R6.4 fallback renders kind/actions/CapMap/schema label only, "never given a run/agent reading"
+FE-CE-003|pass|register a kind, set a capability string, then trigger host auto-replay of an unknown-outcome invoke|§R6.2 OutcomeUnknown "never auto-resubmitted by the host", carries no token; §R6.2 CapMap has "zero behavioral authority"; replay_policy enum gone (§R6.6)
+FE-CE-004|pass|spawn a job via paired invoke then try to subscribe it|§R6.5-S08 step6 "h_R.subscribe((ns_R,job)) … permitted by same-ns rule ns_R==h_R.ns_id" makes the spawned job observable without a per-handle set
+FE-CE-005|pass|pair a runner and observe whether replayed stale envelopes re-fire execute|§R6.4 "Pair gesture … initial subscription using explicit from_cursor=cursor.resolve(id)" (live), so no history replays into the fresh handle; §R6.5-S08 step5 "not replayed"
+FE-CE-006|pass|register the same kind/action name in two namespaces and check for a shared mutable key|§R6.2 "keyed by (ns_id, kind, action_type)" and payload_schema_id "opaque … host neither registers, gates, nor interprets it" — global registry gone
+FE-CE-007|pass|attempt the edges.list foreign-id relay sequence against candidate A|§R6.9 "A has no edges mechanism, so it is N/A against A"; no edges.list exists in the saved artifact (row stays OPEN against demoted B, not against this candidate)
+FE-CE-008|pass|look for a host consumer of the ns-scoped payload_schema_id descriptor store|§R6.2 payload_schema_id is opaque and ungated; §R6.6 "Carried-and-still-dead: envelope payload descriptor store (FE-CE-008)" — store removed, so it cannot outlive a reader
+FE-CE-009|pass|demand the spawned set be required by an S01-S12 trajectory|§R6.6 Model2 experiment passes S08 steps4-6 and preserves S06 without the set; §R6.2 "No per-handle spawned/accessible set is maintained" — non-load-bearing, removed
+FE-CE-010|pass|look for a host reader of an invoke_id on OutcomeUnknown|§R6.2 "OutcomeUnknown carries no token (FE-CE-010)"; §R6.6 carried-and-still-dead invoke-id — no token exists to correlate
+FE-CE-011|pass|attempt an implicit live-default subscribe to replay stale events|§R6.2 "from_cursor is mandatory (FE-CE-011)" — no implicit default primitive survives; §R6.6 carried-and-still-dead implicit-live-default
+FE-CE-012|pass|construct two envelopes for one resource sharing a (ns,resource,seq) dedup key|§R6.2 "seq is a host-assigned monotonic stream index … NOT a dedup key"; §R6.6 host-dedup claim withdrawn — no dedup predicate exists to be vacuous
+FE-CE-013|pass|instruct the adapter to dedup by the host-assigned seq it cannot observe|§R6.3 item6 "the adapter deduplicates using its own protocol-level stable event id — never the host-assigned seq, which the adapter cannot observe at pump time"
+FE-CE-014|pass|require a core mechanism to correct out-of-order arrivals|§R6.2 host uses seq only "to deliver envelopes in a stable per-resource order", not to reorder; §R6.3 item3 "adapter pumps in remote-stable order"; §R6.6 host-reorder-by-seq withdrawn — identity-claim gone
+<<<FE-REPLAY-END>>>

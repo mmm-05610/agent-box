@@ -1,0 +1,12 @@
+S01|covered|core|namespaces.open + announce + action.register(send) + ViewHost.open_scope mint + invoke + pump + subscribe from_cursor=0 just-created|§R13.7-S01
+S02|covered|adaptation|namespaces.open + open_scope + announce pi kinds + register send/approve/cancel + cursor_resolve live edge + pump|§R13.7-S02
+S03|covered|core|open_scope + subscribe 0 + close releases reference + persist triple + pump appends + ns-guard catch-up + register/read|§R13.7-S03
+S04|covered|core|announce job + register submit + open_scope + spawn-announce inside handler + subscribe 0 + pump + retire sends onEnd|§R13.7-S04
+S05|covered|core|announce + register read + open_scope + directory_list + invoke read → recursive walk rows|§R13.7-S05
+S06|covered|core|two namespaces + per-ns action typing + open_scope + same-ns ScopeDenied on subscribe/invoke + scoped directory_list|§R13.7-S06
+S07|covered|core|open CapMap + open_scope + namespaced recorded claim table + fallback + read or CapabilityAbsent + opaque row + on_claim_changed|§R13.7-S07
+S08|covered|core|two ns + register execute + pair gesture + cursor_resolve live + spawn-announce + subscribe 0 + s_D.subscribe(data-1) + teardown onEnd|§R13.7-S08 + EXPERIMENT R13-A
+S09|covered|adaptation|adapter dedup by own id + pump logical order + never-auto-resubmit + five-variant rendering + transient/permanent split + ns-guard catch-up + burn ExplicitAbsent|§R13.7-S09 + EXPERIMENT R13-B
+S10|covered|core|open_scope + onEnd termination signal + error boundary + uninstall closes scopes + retention + replay|§R13.7-S10 + EXPERIMENT R13-C
+S11|covered|core|open CapMap not_supported + registry absence → CapabilityAbsent + fallback renders absence + unknown row|§R13.7-S11
+S12|covered|adaptation|teardown scoped disposal + recorded selection revert with on_claim_changed + no pair record + new ns_id|§R13.7-S12

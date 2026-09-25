@@ -1,0 +1,183 @@
+{
+  "evidence": "C-0091/0092/0093；BC-0086/0087；FC 本批只读归因；BC-0083",
+  "id": "CP-SESSION-001",
+  "next": "FC 交修正分类器/反例 clean SHA 后 C 排新根 FE 无发送复验；BC 交正常 gate 最小离线反例与保能力修法。",
+  "revision": 45,
+  "sections": [
+    {
+      "blockers": "分类器误判未修并复验，FE paired 仍 FAIL。",
+      "evidence": "C-0093；BC-0086；FC 终版待交",
+      "id": "frontend",
+      "modules": [
+        {
+          "blockers": "待修后 live 复验，不能把 UI 原始断言冒充总门通过。",
+          "doing": "FC 定向修四条近时歧义与两条 Node→Server loopback 分类。",
+          "done": "FC-0095 背景词典 302 分类及业务串用/降级/凭据反例通过，typecheck/build 绿。",
+          "evidence": "C-0091；FC 终版待交",
+          "name": "桌面壳与工作台",
+          "next": "新门区分真实 TCP/发送/未知，准备本项目功能联调。",
+          "observed_at": "2026-09-23T07:58:10.104328+00:00",
+          "owner": "F0 / FC",
+          "status": "IN_PROGRESS",
+          "summary": "本批 FE UI 十项原始 true，但网络分类器 unknown6 使总门 FAIL；无新远端 TCP/send 证据。"
+        },
+        {
+          "blockers": "WireClient.fetch 重定向边界待显式 fail-closed；真实 Profile/项目/首发 ID 未经过 FE。",
+          "doing": "FC 只读核词典跳转目的地；不启带 token Electron。",
+          "done": "FC-0093 认证 POST 显式 redirect:error；同源/跨源假 307 无第二请求，typecheck/build 通过。",
+          "evidence": "FC-0093；C-0082",
+          "name": "连接管理与后端适配器",
+          "next": "做双命令同实例与真实项目首发。",
+          "observed_at": "2026-09-23T06:33:36.291177+00:00",
+          "owner": "F1 / FC",
+          "status": "IN_PROGRESS",
+          "summary": "ordessa connector 已启入八包候选并通过假 Server 认证 hello；真后端配对仍待。"
+        },
+        {
+          "blockers": "尚未 FE/BE 配对。",
+          "doing": "等待独立候选运行装配。",
+          "done": "FC-0059/0063 合并 typecheck、renderer 153 通过。",
+          "evidence": "FC-0059/0063",
+          "name": "项目与会话列表",
+          "next": "验证真实项目恢复、首发 ID 与列表。",
+          "observed_at": "2026-09-23T06:33:36.291177+00:00",
+          "owner": "F2 / FC",
+          "status": "DONE",
+          "summary": "草稿首发错目标和可见草稿 pane 在 FC 合并树通过，仍待产品启用和真实项目联调。"
+        },
+        {
+          "blockers": "离线门不能证明真实流式/工具/审批。",
+          "doing": "等待候选装配与真实 Server 事件联调。",
+          "done": "FC-0063 clean d14ac6e0e6，typecheck、renderer 153、conversation 18 通过。",
+          "evidence": "FC-0063",
+          "name": "对话、思考与工具呈现",
+          "next": "在固定 FE/BE 配对中验证真实会话行为。",
+          "observed_at": "2026-09-23T06:33:36.291177+00:00",
+          "owner": "F3 / FC",
+          "status": "IN_PROGRESS",
+          "summary": "F3 pane/key/身份修复已由 FC 收编，opened 回原 S1 补测；合并树 renderer 153 通过。"
+        },
+        {
+          "blockers": "缺真实审批往返证据。",
+          "doing": "等待真实 Agent 与 FE/BE 配对。",
+          "done": "卡片按会话隔离，支持响应/失败呈现；界面测试通过。",
+          "evidence": "BC-0038；SESSION-CHECKPOINT.md",
+          "name": "权限审批与交互",
+          "next": "在固定配对中验证同意/拒绝及会话隔离。",
+          "observed_at": "2026-09-23T06:33:36.291177+00:00",
+          "owner": "F3 / F1",
+          "status": "IN_PROGRESS",
+          "summary": "对话内审批界面已集成，假 ACP allow/stop 门通过；真实 Pi 审批未测。"
+        }
+      ],
+      "name": "前端整体检查点",
+      "next": "交 clean 修法后只重跑一轮新根同实例门。",
+      "observed_at": "2026-09-23T08:00:48.026459+00:00",
+      "status": "IN_PROGRESS",
+      "summary": "FE live unknown6 根因已定：4条本地连接匹配时间窗过宽、2条 Node→本批 Server TCP 不属 Chromium NetLog；UI 原始十项 true，总门仍 FAIL。",
+      "doing": "FC 修近时唯一匹配和精确本批 Server port 的 Node TCP 分类，补错误 port/歧义反例。"
+    },
+    {
+      "blockers": "正常工具 gate 漏 powershell/custom，后置用户扩展可改已批准 input；FE 配对另待分类器复验。",
+      "evidence": "BC-0083/0086/0087；C-0092",
+      "id": "backend",
+      "modules": [
+        {
+          "blockers": "FE×同实例 Server 尚未测。",
+          "doing": "BC 整理本批运行清理与真实回执。",
+          "done": "BC-0083 产品真实两轮通过；BC-0086 同实例无发送 Server 半门只收 hello/list/open/profile，零 Send/OTHER，DB 三表零且清理。",
+          "evidence": "BC-0083/0086",
+          "name": "Server与项目接入",
+          "next": "依据 C-0036 决定兼容 ACP 接线。",
+          "observed_at": "2026-09-23T06:33:36.291177+00:00",
+          "owner": "S / BC",
+          "status": "IN_PROGRESS",
+          "summary": "真实 Server 会话首发/续发通过，待 FE 接入同实例。"
+        },
+        {
+          "blockers": "正常工具与审批、停止、历史恢复未实测。",
+          "doing": "准备实际权限/停止反例。",
+          "done": "BC 本批真实 createAndSend/同 Server session send accepted/completed，两轮回复 HD002_SERVER_OK_1/2、native id 稳定。",
+          "evidence": "C-0088；BC 终版待交",
+          "name": "执行组合与核心记账",
+          "next": "修兼容接线并验证真实事件与终态。",
+          "observed_at": "2026-09-23T06:33:36.291177+00:00",
+          "owner": "BC",
+          "status": "IN_PROGRESS",
+          "summary": "Server×Go桥×Pi 后端真实两轮通过，工具/审批/停止另门。"
+        },
+        {
+          "blockers": "正常 gate 覆盖不足且后置扩展可改最终输入；无工具真实两轮不证审批。",
+          "doing": "BC 离线构造 A→B 后置 input 改写与未知工具漏 gate 反例。",
+          "done": "direct Pi 无 prompt 与无工具两轮通过，且本批 Server×桥×Pi 真实首/续发通过。",
+          "evidence": "BC-0087；C-0092",
+          "name": "Harness与ACP接入",
+          "next": "核原生身份、模型、权限及无敏感首发/同会话第二轮。",
+          "observed_at": "2026-09-23T08:00:48.026459+00:00",
+          "owner": "H / BC",
+          "status": "IN_PROGRESS",
+          "summary": "旧 Pi global settings warning 的直接错误为 mkdir settings 锁目标时 EROFS，非已证 JSON 损坏。"
+        },
+        {
+          "blockers": "旧 Electron 外联判据误将 UDP 探测计作 TCP；FC 正更正配对门，真实配对尚未执行。",
+          "doing": "本批停服完成，等待下一配对裁决。",
+          "done": "BC-0068 修复 token-before-tap 监督；BC-0070 C-0058 Server 半门通过，12 个相关 DB 表均 0。",
+          "evidence": "BC-0068/0070；FC-0076",
+          "name": "启动与部署入口",
+          "next": "FC 交付按协议/发送分类的更正门后，固定候选版本与 BC 做配对。",
+          "observed_at": "2026-09-23T06:57:28.149655+00:00",
+          "owner": "BC / F0",
+          "status": "IN_PROGRESS",
+          "summary": "第三批真实 Server 同实例身份/Profile/项目通过，tap 禁止/未知入站 0，停服后 port/lock/进程清。"
+        }
+      ],
+      "name": "后端整体检查点",
+      "next": "交 clean 回执，配合 FC 做 FE 实机，再定向跑权限/停止门。",
+      "observed_at": "2026-09-23T08:00:48.026459+00:00",
+      "status": "IN_PROGRESS",
+      "summary": "真实产品 Server createAndSend 与同会话 send 两轮 accepted/completed，精确回复 HD002_SERVER_OK_1/2，native id 本次稳定。",
+      "doing": "BC 做 gate 顺序/后置改写离线反例与保能力方案草案，不触真实工具。",
+      "done": "BC 原生直达两轮及 Server×Go桥×Pi 真实首/续发两轮均通过。"
+    },
+    {
+      "blockers": "Pi managed launcher 额外写域未授权且无prompt复验未做；native 权限/续聊仍未证。",
+      "evidence": "C-0075；FC-0091",
+      "id": "integration",
+      "modules": [
+        {
+          "blockers": "本批 FE 无发送门 FAIL unknown6，UI 最终断言未到；工具审批/停止亦未测。",
+          "doing": "等待 FC unknown6 归因与最小修法，尚无 FE 真发送。",
+          "done": "BC 产品后端 createAndSend/同 session send 真实两轮通过，回复 HD002_SERVER_OK_1/2。",
+          "evidence": "C-0091；BC-0086",
+          "name": "真实对话闭环",
+          "next": "单流验证项目首发、多轮、工具、审批、停止。",
+          "observed_at": "2026-09-23T06:57:28.149655+00:00",
+          "owner": "C / FC / BC",
+          "status": "NOT_STARTED",
+          "summary": "真实后端产品对话闭环已过，FE×Server 成套尚未验证。"
+        },
+        {
+          "blockers": "实际验收面未通过。",
+          "doing": "等待真实配对与候选净化。",
+          "done": "已明确Profile及后续增量不纳入。",
+          "evidence": "SESSION-CHECKPOINT.md；integration/checkpoint.json",
+          "name": "基线发布与用户试用",
+          "next": "固定 SHA/命令/端口/目录与已知限制后交用户验收。",
+          "observed_at": "2026-09-23T06:33:36.291177+00:00",
+          "owner": "C",
+          "status": "NOT_STARTED",
+          "summary": "尚无满足检查点的可启动配对工件，Profile 独立包仍隔离。"
+        }
+      ],
+      "name": "整机与用户验收检查点",
+      "next": "C 收两边 clean/安全证据后组织项目首发→同会话第二轮→历史/权限/停止。",
+      "observed_at": "2026-09-23T08:00:48.026459+00:00",
+      "status": "NOT_STARTED",
+      "summary": "BE 产品后端两轮通过；FE×Server 本轮因网络 unknown6 FAIL，零 Send，完整 UI/对话闭环尚未过。",
+      "doing": "FC 修 FE 网络分类器待新根复验；BC 权限门离线反例并行，后端产品两轮成果保留。"
+    }
+  ],
+  "status": "IN_PROGRESS",
+  "summary": "BE 产品真实两轮已过；FE 无发送门的 unknown6 已定位为近时 NetLog 匹配歧义4条及 Node→Server loopback TCP 误分类2条，FC 修最小门后复验。正常工具审批另有后置扩展改写缺口，BC 做离线反例，不阻非敏感 FE 联调。",
+  "try_it": ""
+}

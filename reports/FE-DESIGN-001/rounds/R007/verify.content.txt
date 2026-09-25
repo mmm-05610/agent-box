@@ -1,0 +1,70 @@
+<<<FE-OUT-START>>>
+**R007 Verifier — D01-order-dedup**
+
+Verdict rows follow. Then checks and experiment.
+
+**FE-CE-016: holds.** §A.5-S04 step2 prescribes `subscribe((ns,job-progress), from_cursor=cursor.resolve())` asserting "fresh resource so next_seq=1". §A.5-S08 step6 mirrors this. The interface in §A.2 defines `cursor.resolve(resource_id) -> seq # NEXT seq the resource will assign` and permits the adapter to pump during the synchronous invoke call (step5: "view calls `h_R.invoke(...)` → `Result{...,(ns_R,job)}`" — spawn and pump are adapter-internal). If the adapter pumps seq=1 before the invoke returns, `cursor.resolve((ns_R,"job-1"))` yields 2, and the single delivery rule (`seq >= from_cursor`) excludes seq=1. No text in §A.1, §A.2, or §A.5 guarantees the first envelope arrives only after the subscriber registers. §A.6 explicitly forbids the only correct input: "deleting [cursor.resolve] forces `from_cursor=0` (replay) into S08 step5 → contradicts S08 and reopens FE-CE-005" — conflating the runner resource (step5) with the spawned job (step6) and thereby prescribing an input that silently drops the job head.
+
+**FE-CE-017: holds.** §A.2: "full reconnect yields a new ns_id" and "`seq` is a host-assigned monotonic stream index per resource" scoped to the connection. §A.5-S03 step4 and §A.5-S10 step3 prescribe `from_cursor = saved_last_seen + 1` without any mention of the ns-boundary invalidating that integer. If a full reconnect occurs between persist and return, `saved_last_seen=20` (ns_A) applied to ns_B's stream (which starts at seq=1) skips the entire post-reconnect window. §A.7 claims exactly "5 core facts the subscriber must know" and none address cursor-domain binding to ns_id; the candidate's own text makes seq ns-scoped while the catch-up algorithm treats it as persistent across ns regeneration.
+
+**FE-CE-007: does_not_hold (against A).** The candidate as written has no `edges` mechanism. §A.8: "A has no edges mechanism → N/A against A". The sequence relies on `edges.list` which exists only in cand-B §B.4. It remains OPEN on B's ledger; ruling does_not_hold only against the current candidate.
+
+**FE-CE-015: does_not_hold (replay confirms authoritative CLOSED).** §A.2 makes live and catch-up use distinct inputs (`cursor.resolve` vs `saved_last_seen+1`), and the §A.6 EXPERIMENT `both=[]` confirms no single integer satisfies both intents. The double-duty is gone.
+
+---
+
+FABRICATION_CHECK: none. Every quote attributed to §A.1, §A.2, §A.5-S04, §A.5-S08, §A.6, §A.7 matches the candidate text verbatim. The invariant broken in FE-CE-016 ("fresh resource so next_seq=1, live-only permitted") is present in §A.5-S04. The invariant broken in FE-CE-017 (persisted cursor applied to a regenerated ns stream) is derivable from §A.2's own definitions. The attack proposes no scenario change.
+
+CONTRADICTION_CHECK: §A.5-S04 step2 asserts "fresh resource so next_seq=1" while §A.2's invoke→Result model makes the adapter pump inside the invoke (the design's own S08 step5 writes the adapter producing the spawned resource as part of the call). These two claims cannot both hold: if pumping occurs before invoke returns, next_seq > 1. Additionally, §A.7 claims "5 core facts" is the complete subscriber contract, but correctly using `saved_last_seen+1` across ns boundaries requires a 6th fact (ns regeneration resets seq per-resource) that §A.7 omits while §A.2's own text demands.
+
+MISSED_CHECK: none. The attack's four held attempts (handoff interleave, two producers, duplicate-via-core, equality-trap) are all correctly reasoned against the candidate. No additional D01 break in the same namespace-stream without reconnect is constructible given in-namespace uniqueness and monotonic per-resource indexing.
+
+---
+
+EXPERIMENT:
+```python
+# Models FE-CE-016 (head-loss on spawned resource) and FE-CE-017
+# (cursor domain invalidation across ns regeneration). MODEL ONLY.
+
+class Stream:
+    def __init__(self):
+        self.next_seq = 1
+    def pump(self):
+        s = self.next_seq; self.next_seq += 1; return s
+    def resolve(self): return self.next_seq
+    def deliver(self, c): return [s for s in range(1, self.next_seq) if s >= c]
+
+# FE-CE-016: adapter pumps inside invoke before subscriber resolves
+job = Stream()
+job.pump()                    # seq=1, "starting", inside invoke
+result = "spawned(job-1)"    # invoke returns
+from_cursor = job.resolve()   # subscriber calls cursor.resolve → 2
+delivered = job.deliver(from_cursor)
+print(f"CE-016: from_cursor={from_cursor} delivered={delivered}")
+print(f"CE-016: seq=1 lost? {1 not in delivered}")  # True
+
+# Without pump-before-return
+job2 = Stream()
+fc2 = job2.resolve()          # 1 (nothing pumped yet)
+job2.pump()
+print(f"CE-016-OK: from_cursor={fc2} delivered={job2.deliver(fc2)}")
+
+# FE-CE-017: persisted cursor across ns regeneration
+ns_A = Stream()
+for _ in range(20): ns_A.pump()
+saved = 20                    # subscriber persists
+# Full reconnect → ns_B
+ns_B = Stream()
+for _ in range(5): ns_B.pump()  # seq 1..5 post-reconnect
+fc = saved + 1                # 21, following §A.5-S03 step4
+delivered = ns_B.deliver(fc)
+print(f"CE-017: from_cursor={fc} delivered={delivered}")
+print(f"CE-017: all 5 post-reconnect events lost? {delivered == []}")  # True
+<<<FE-OUT-END>>>
+
+<<<FE-VERDICT-START>>>
+FE-CE-016|holds|§A.5-S04 step2 asserts "fresh resource so next_seq=1" but §A.2's interface permits the adapter to pump before invoke returns, making cursor.resolve yield 2 and silently dropping seq=1; §A.6 forbids from_cursor=0 for spawned resources, leaving no correct input|a timing guarantee on adapter pump relative to invoke return, or a gap-marker in the stream protocol
+FE-CE-017|holds|§A.5-S03 step4 and §A.5-S10 step3 prescribe from_cursor=saved_last_seen+1 without ns-boundary awareness; §A.2 makes seq per-connection-stream and full reconnect yields new ns_id; §A.7 claims 5 complete core facts but omits cursor-domain reset|a stated rule that saved_last_seen is ns_id-scoped and must reset on ns regeneration, or an explicit 6th core fact in §A.7
+FE-CE-007|does_not_hold|A has no edges mechanism; §A.8: "N/A against A"|sequence requires cand-B §B.4 edges.list; remains OPEN on B's ledger
+FE-CE-015|does_not_hold|§A.2 assigns live and catch-up distinct integer inputs (resolve vs saved+1); §A.6 EXPERIMENT both=[] confirms no single value satisfies both|authoritative ledger already CLOSED; attack replay agrees
+<<<FE-VERDICT-END>>>

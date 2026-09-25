@@ -1,0 +1,101 @@
+repo	branch	sha12	contained_in_targets	unique_vs_targets
+backend	feature/env-provider-v1	003b52b2b18a	NONE	0
+backend	demo/work-core-self-use-2026-08-25	03903e85481b	NONE	9
+backend	fix/gui-1.7.3	06a3b26339ec	NONE	1
+backend	feature/capability-entry-v1	1c74d1559ca7	NONE	51
+backend	feature/server-http-codex-r1	219f8b986cde	 feature/env-provider-v1 feature/env-provider-runtime	0
+backend	fix/staging-datawsl	29bdd7587420	NONE	3
+backend	fix/gui-1.7.2	30b786ccba97	NONE	1
+backend	spike/real-governed-binding	33c44076bf8c	NONE	4
+backend	refactor/remove-shims	36741af9c5e8	 feature/env-provider-v1 feature/env-provider-runtime main	0
+backend	frontend/07-i18n	3d91c24d124c	 feature/env-provider-v1 feature/env-provider-runtime main	0
+backend	feature/server-harness-extension-v1	577b47ad402b	NONE	501
+backend	docs/9p-landmine	5d132071aeb5	NONE	1
+backend	refactor/layered-arch	60b9e8b3ed8f	 feature/env-provider-v1 feature/env-provider-runtime main	0
+backend	main	6c14ea8db813	NONE	0
+backend	fix/gui-1.6.2	6de6457cc822	NONE	1
+backend	frontend/06-hooks	71af132482f5	 feature/env-provider-v1 feature/env-provider-runtime main	0
+backend	frontend/03-migrate	7e0ef697ad16	 feature/env-provider-v1 feature/env-provider-runtime main	0
+backend	feat/work-core-runtime-v0.1	8726785b6d1c	NONE	11
+backend	frontend/01-config	899bb2650de2	 feature/env-provider-v1 feature/env-provider-runtime main	0
+backend	feat/acs-integration	8a07e768aa45	 feature/env-provider-v1 feature/env-provider-runtime main	0
+backend	experiment/work-core-v0.1	986b221bc635	 feature/env-provider-v1 feature/env-provider-runtime main	0
+backend	feat/2.0-project-profiles	986b221bc635	 feature/env-provider-v1 feature/env-provider-runtime main	0
+backend	spike/checkpoint-workflow-contract	986b221bc635	 feature/env-provider-v1 feature/env-provider-runtime main	0
+backend	spike/minimal-work-core	986b221bc635	 feature/env-provider-v1 feature/env-provider-runtime main	0
+backend	spike/real-provider-compat	986b221bc635	 feature/env-provider-v1 feature/env-provider-runtime main	0
+backend	frontend/02-domains	9a8dbea29934	 feature/env-provider-v1 feature/env-provider-runtime main	0
+backend	feat/studio-codex-product-vertical	9ad2044221bf	NONE	1
+backend	fix/gui-1.7.6	9ae3c6520f04	NONE	1
+backend	refactor/fix-resources-audit	9ee6d4c088dd	 feature/env-provider-v1 feature/env-provider-runtime main	0
+backend	refactor/harness-registry	9fcecd229910	NONE	6
+backend	feature/env-provider-runtime	a7b7b6ff15ab	NONE	0
+backend	studio-backend	a9f749f6ff8c	NONE	9
+backend	fix/gui-1.6.4	b37029a4be40	NONE	1
+backend	frontend/04-form	b4b6b2044cb1	 feature/env-provider-v1 feature/env-provider-runtime main	0
+backend	fix/gui-1.6.3	b770214cf4d9	NONE	1
+backend	fix/gui-1.6.5	bc5247232011	NONE	1
+backend	refactor/remove-agent-box-crud	bd9516a57c8c	 feature/env-provider-v1 feature/env-provider-runtime main	0
+backend	feature/harness-expansion-v1	c1a7ea9b8207	 feature/env-provider-v1 feature/env-provider-runtime	0
+backend	frontend/05-tabs	c267c00c3922	 feature/env-provider-v1 feature/env-provider-runtime main	0
+backend	refactor/agent-type-registry	c95301c7ecbb	 feature/env-provider-v1 feature/env-provider-runtime main	0
+backend	fix/gui-1.7.5	d168485bfd1e	NONE	1
+backend	refactor/centralize-agent-registry	d4c65cdd478b	 feature/env-provider-v1 feature/env-provider-runtime main	0
+backend	frontend/08-verify	d66e11f4d305	 feature/env-provider-v1 feature/env-provider-runtime main	0
+backend	feature/work-core-v0.1	e340f3b89d85	NONE	1
+backend	spike/execution-binding-flow-stress	e340f3b89d85	NONE	1
+backend	feat/detail-storage-monaco-pr1	e6e6d6c990a2	 feature/env-provider-v1 feature/env-provider-runtime main	0
+backend	feat/resource-routing-phase2	ea4880825b06	NONE	4
+backend	fix/gui-1.7.4	ef3f1c31597a	NONE	1
+desktop	feature/agentbox-desktop-settings	01083212aaad	NONE	0
+desktop	stageA/13	03750b315bd4	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	feature/agentbox-desktop-product	08b4eac7fe10	NONE	0
+desktop	stageA/01	0d3f10c9ada5	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	stageA/07b	121a21950f6a	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	stageA/12	15be23b7080a	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	stageA/06c1	164205a2a4f5	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	experiment/agentbox-desktop-frontend	31588667e19a	NONE	9
+desktop	feature/desktop-wsl-round1	39291df26b90	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	stageA/24	443ea54a3c03	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	stageA/09	463f05b8579b	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	stageA/31	4c79152f7ba8	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	stageA/06c2	55d40e967436	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	stageA/28	62a3ce749543	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	stageA/wt-a	7037d037e154	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	stageA/25	724b82a9483c	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	stageA/15	72a32048a786	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	stageA/32	73fec18ce24e	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	stageA/10	766e40785deb	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	stageA/23r	84f09ccec0fc	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	stageA/29	84f09ccec0fc	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	stageA/next-a	85463647a832	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	stageA/next-b	85463647a832	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	stageA/next-c	85463647a832	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	stageA/08	9dbac86b9d41	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	stageA/23	a6cf664e0149	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	stageA/14	b487aa65608e	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	stageA/16	b92dc1eb807e	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	stageA/11	be459aa01f52	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	stageA/21	c5bd645ef3df	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	stageA/26	c5bd645ef3df	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	stageA/wt-b	ca2b69371685	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	stageA/06b1	cd9746acb68c	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	stageA/27	d29be000d4e8	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	stageA/20	d80c5aabc447	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	stageA/30	df798459fd5f	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	main	e08fa034f247	NONE	0
+desktop	stageA/19	e5bf5c60a2e5	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	stageA/22	e5bf5c60a2e5	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	stageA/17	e6dd58c76e0d	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	stageA/wt-c	e6f67b0ad85c	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	stageA/05	e9a61eca5380	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	stageA/06a2	eb0b0c6a4cc5	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	stageA/33	eeb5daf2bab6	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	stageA/03	f136e79b0e50	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	stageA/18	f27544e448c1	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+desktop	stageA/07a	fd1fcb2dc826	 feature/agentbox-desktop-product feature/agentbox-desktop-settings main	0
+studio-legacy	feat/profile-provider-flat-transcript-ui	3763d0c831ae	 feat/agentbox-frontend-clean	0
+studio-legacy	studio-shell	8dce2c022925	NONE	0
+studio-legacy	main	93c338612899	 feat/agentbox-frontend-clean studio-shell	0
+studio-legacy	feat/agentbox-frontend-clean	c65c133c4eea	NONE	0
+studio-legacy	feat/studio-product-ui-reconstruction	c65c133c4eea	NONE	0

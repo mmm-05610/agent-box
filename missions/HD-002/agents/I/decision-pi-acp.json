@@ -1,0 +1,9 @@
+{
+  "id": "I-DEC-0002",
+  "title": "Pi ACP兼容阻塞：接入路线与能力边界由你审批",
+  "question": "旧ACP桥在你的原生Pi目录创建会话失败，而本机Pi CLI状态读取成功。是否同意优先验证Zed采用的外部Pi RPC桥，满足当前对话/工具/思考/审批/续聊要求才接入；若存在任何能力缺口，再交你单独决定，不默认接受缩水？这不是批准立刻更换产品依赖。",
+  "recommendation": "A：优先核svkozak/pi-acp（Zed官方Pi页指向），与当前Go桥做最小能力对照；固定版本并做隔离验证。已授权的Go临时构建/无prompt诊断保留证据，不因已投入就锁定。只有满足原定能力才由C组织接入；缺口或改变原生行为另报你。",
+  "alternatives": "B：继续优先验证现有Go桥（复用本机CLI，但会注入工具审批扩展，覆盖及续聊需实证）；C：先修/升级现有嵌入SDK桥（保持当前适配形态，但与本机Pi版本及原生目录兼容仍未知）。三者均未证明当前真实对话闭环，不默认批准能力减少或用户配置修改。",
+  "impact": "阻塞后端真实session/new及前后端对话验收；前端草稿修复等无关工作继续。候选产品选型/接线等用户意见；已有授权诊断可继续，不强杀在途进程。版本号与具体缺口由C核实补报，不让用户审批每条测试命令。",
+  "evidence": "agents/BC/outbox/BC-0042.md、BC-0044.md、BC-0045.md、BC-0046.md；agents/C/outbox/C-0039.md；agents/I/outbox/I-PI-ACP-REUSE-001.md；https://zed.dev/acp/agent/pi；https://github.com/svkozak/pi-acp 。Zed入口证明已有接入路线，不证明本机能力全部满足。"
+}

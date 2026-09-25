@@ -1,0 +1,108 @@
+{
+  "budget_id": "BE-LOOP-001-backend",
+  "date_opened": "2026-09-22",
+  "group_cap": {
+    "H": 3
+  },
+  "group_used": {
+    "E": 4,
+    "H": 0,
+    "P": 0,
+    "S": 0,
+    "central": 0
+  },
+  "history": [
+    {
+      "counted": true,
+      "group": "E",
+      "path": "reservation",
+      "request_id": "E-DESIGN-FINAL-001",
+      "result": "ok",
+      "ts": "2026-09-22T01:34:55+0800",
+      "used_after": 1
+    },
+    {
+      "counted": true,
+      "group": "E",
+      "path": "flexible",
+      "request_id": "E-DESIGN-FINAL-002",
+      "result": "ok",
+      "ts": "2026-09-22T01:59:25+0800",
+      "used_after": 2
+    },
+    {
+      "counted": true,
+      "group": "E",
+      "path": "flexible",
+      "request_id": "c71fcc4f-62bd-4d5a-9337-8d17326e584f",
+      "result": "ok",
+      "ts": "2026-09-22T03:06:33+0800",
+      "used_after": 3
+    },
+    {
+      "counted": true,
+      "group": "E",
+      "path": "flexible",
+      "request_id": "3eb6faff-eaa3-4091-88e8-409157af35f9",
+      "result": "ok",
+      "ts": "2026-09-22T03:19:23+0800",
+      "used_after": 4
+    }
+  ],
+  "model": "gpt-5.6-sol",
+  "requests": {
+    "3eb6faff-eaa3-4091-88e8-409157af35f9": {
+      "counted": true,
+      "group": "E",
+      "milestone": "E-impl-accept",
+      "path": "flexible",
+      "status": "ok",
+      "ts": "2026-09-22T03:15:53+0800",
+      "used_after": 4
+    },
+    "E-DESIGN-FINAL-001": {
+      "counted": true,
+      "group": "E",
+      "milestone": "design-final",
+      "path": "reservation",
+      "status": "ok",
+      "ts": "2026-09-22T01:29:53+0800",
+      "used_after": 1
+    },
+    "E-DESIGN-FINAL-002": {
+      "counted": true,
+      "group": "E",
+      "milestone": "design-final",
+      "path": "flexible",
+      "status": "ok",
+      "ts": "2026-09-22T01:54:18+0800",
+      "used_after": 2
+    },
+    "c71fcc4f-62bd-4d5a-9337-8d17326e584f": {
+      "counted": true,
+      "group": "E",
+      "milestone": "E-impl-accept",
+      "path": "flexible",
+      "status": "ok",
+      "ts": "2026-09-22T02:58:22+0800",
+      "used_after": 3
+    }
+  },
+  "reservations": {
+    "E-design-final": {
+      "holder": "E",
+      "milestone": "design-final",
+      "request_id": "E-DESIGN-FINAL-001",
+      "state": "used",
+      "used_ts": "2026-09-22T01:29:53+0800"
+    },
+    "E-impl-accept": {
+      "holder": "E",
+      "milestone": "impl-accept",
+      "state": "reserved"
+    }
+  },
+  "total": 10,
+  "used": 4,
+  "version": 1
+}
