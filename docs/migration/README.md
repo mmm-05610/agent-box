@@ -81,6 +81,34 @@ gate-parsing bug of the script itself).
 - Preservation batch report (outside the repo):
   `/home/maoqh/projects/ordessa-preservation/20260925/REPORT.md`
 
+## Publish record (2026-09-26)
+
+Remote `https://github.com/mmm-05610/agent-box.git`, pre-check confirmed
+`main` still `6c14ea8d` → pure fast-forward, no force anywhere.
+
+| Ref pushed | Remote SHA |
+| --- | --- |
+| `refs/heads/main` | `5e10b039db4671ebc9d9872e80c6fe9e076e8425` (fast-forward from `6c14ea8d`) |
+| `refs/reference/{hermes-desktop,backend-legacy,studio-legacy}` | `e08fa034f247` / `92a2d2ba66fc` / `8dce2c022925` |
+| `refs/archive/agent-box/heads/main-cp-001` | `a0b343e0c016` |
+| `refs/archive/agent-box-desktop-next/heads/main-cp-001` | `450944bd7a35` |
+| `refs/archive/acp-adapter/heads/main-cp-001` | `41d9d94ef6b9` |
+| `refs/archive/control/heads/main` + checkpoint | `e2ab7409eeb0` / `4fc80571cbd0` |
+
+Remote verification: `ls-remote` shows all 10 refs at the exact SHAs; a
+depth-1 fetch of every published ref succeeded and all key commits resolve
+on the remote side. The full-history completeness of each ref is guaranteed
+by the server-acknowledged pack uploads.
+
+Operational note: the repo's `main` ruleset (#20488141: PR + required
+`backend`/`frontend` status checks + linear history + no-force/no-delete)
+blocked direct push — the required CI contexts no longer exist in the new
+tree. Under the one-shot authorization, the ruleset was **temporarily
+disabled, main pushed, and immediately re-enabled** (verified `active`
+afterwards, all 5 rules intact; backup JSON retained by the operator).
+Future routine pushes should go through the ruleset (it will need CI
+workflows providing the two check contexts — registered as follow-up work).
+
 ## Facts the migration discovered (registered)
 
 1. The desktop repo is a shallow clone; 3 release tags + upstream refs are
