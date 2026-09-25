@@ -16,7 +16,7 @@ from agent_box.server.bootstrap import build_runtime_from_sidecar_deployment
 from agent_box.server.execution.local_channel import LocalSidecarLauncher
 from agent_box.server.execution.placement import PlacementUnsupported, resolve_placement
 
-PLUGIN = Path(__file__).resolve().parents[2] / "plugins" / "agent-box-harnesses"
+PLUGIN = Path(__file__).resolve().parents[2] / "plugins" / "agent-box-harness"
 
 
 def test_a_wsl_workspace_needs_a_connector_and_says_so():

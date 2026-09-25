@@ -45,6 +45,9 @@ _PARAM_SHAPES = {
     "workspaces.archive": ({"requestId", "workspaceId", "expectedVersion"}, set()),
     "workspaces.gitStatus": ({"requestId", "workspaceId"}, set()),
     "executions.list": ({"requestId"}, {"limit"}),
+    "executions.get": ({"requestId", "executionId"}, set()),
+    "acp.channel.open": ({"harnessId", "projectId"}, {"requestId"}),
+    "acp.channel.release": ({"connectionId"}, {"requestId"}),
     "profiles.list": ({"includeArchived"}, set()),
     "profiles.create": ({"requestId", "displayName", "harness"}, {"credentialId"}),
     "profiles.update": ({"requestId", "profileId", "expectedVersion", "displayName"}, set()),
@@ -406,6 +409,11 @@ class WireService:
     ) -> None:
         self._server_id_provider = server_id_provider
         self.native_execution_provider = native_execution_provider
+        #: The managed ACP channel registry (seam doc `docs/acp-channel-minimal-seam.md`).
+        #: Composed post-construction by whichever composition offers channels - the
+        #: same precedent as `native_execution_provider` above; a Server without one
+        #: answers the two `acp.channel.*` methods as typed unsupported, never 500.
+        self.acp_channels = None
         self.artifact_store = artifact_store
         self.usage_aggregator = usage_aggregator
         #: Order 56's managed subscription accounts (records + assets). None
@@ -450,6 +458,9 @@ class WireService:
             "workspaces.archive": self.workspaces_archive,
             "workspaces.gitStatus": self.workspaces_git_status,
             "executions.list": self.executions_list,
+            "executions.get": self.executions_get,
+            "acp.channel.open": self.acp_channel_open,
+            "acp.channel.release": self.acp_channel_release,
             "profiles.list": self.profiles_list,
             "profiles.create": self.profiles_create,
             "profiles.update": self.profiles_update,
@@ -1435,6 +1446,68 @@ class WireService:
         except InventoryError as refusal:
             raise WireError("INVALID_REQUEST", f"{refusal.code}: {refusal.message}") from refusal
         return {"executions": rows}
+
+    def executions_get(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        """One execution's run record, read as a run ended or is in flight.
+
+        `channel_run_view` is the single adaptation point where the ledger's
+        real terminal facts become the channel-run vocabulary; nothing else
+        in this Server translates them, and a run that has not ended is
+        reported as exactly that.
+        """
+        from agent_box.server.acp_channel import channel_run_view
+
+        _require(params, "requestId", "executionId")
+        row = self.sessions.records.get_turn_context(
+            _bounded(params["executionId"], "executionId"))
+        return channel_run_view(row)
+
+    def acp_channel_open(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        """Establish or re-acquire the managed bidirectional ACP channel.
+
+        Every refusal happens before any launch: this Server's native
+        identity, the Project record, and the authoritative working dir are
+        all checked first, so a rejected request starts no process and writes
+        no run. A pair that already holds a live channel returns that same
+        connection - the binding never moves underneath a client.
+        """
+        _require(params, "harnessId", "projectId")
+        if self.acp_channels is None:
+            raise WireError("CAPABILITY_UNSUPPORTED", "this Server composes no managed ACP channel")
+        harness_id = _bounded(params["harnessId"], "harnessId", 64)
+        identity = self.native_execution_provider() if self.native_execution_provider else None
+        if (not isinstance(identity, Mapping) or identity.get("mode") != "native"
+                or identity.get("harness") != harness_id or not identity.get("profileId")):
+            raise WireError(
+                "CAPABILITY_UNSUPPORTED",
+                f"{harness_id} is not the native Harness this Server answers channels for",
+            )
+        workspace_id = _bounded(params["projectId"], "projectId")
+        row = self.workspaces.records.get(workspace_id)
+        if str(row.get("env_kind") or "") != "local":
+            raise WireError("CAPABILITY_UNSUPPORTED", "managed channels are placed on local projects only")
+        selected = str(row.get("normalized_path") or "")
+        if not selected:
+            raise WireError("INVALID_REQUEST", "the project record carries no authoritative path")
+        normalized = self.workspaces.local.validate(selected)
+        if normalized != selected:
+            raise ServerError("NATIVE_PROJECT_CHANGED", "selected project changed", status=409)
+        return self.acp_channels.acquire(
+            harness_id=harness_id, workspace_id=workspace_id,
+            profile_id=str(identity["profileId"]), cwd=selected,
+        )
+
+    def acp_channel_release(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        """Release one channel by ownership: its transport stops, its run
+        record ends saying `released`, and no in-flight request is answered
+        on anyone's behalf. Only the live holder of the id is touched."""
+        _require(params, "connectionId")
+        if self.acp_channels is None:
+            raise WireError("CAPABILITY_UNSUPPORTED", "this Server composes no managed ACP channel")
+        result = self.acp_channels.release(_bounded(params["connectionId"], "connectionId"))
+        if result is None:
+            raise WireError("NOT_FOUND", "no live managed channel carries that connectionId")
+        return result
 
     def workspaces_git_status(self, params: Mapping[str, Any]) -> dict[str, Any]:
         """Read-only Git status of one workspace, on the side that owns it.

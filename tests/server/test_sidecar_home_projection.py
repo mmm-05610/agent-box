@@ -37,7 +37,7 @@ from agent_box_runtime_wsl import WorkerClient
 
 
 REPO = Path(__file__).resolve().parents[2]
-PLUGIN = REPO / "plugins" / "agent-box-harnesses"
+PLUGIN = REPO / "plugins" / "agent-box-harness"
 WORKER = REPO / "workers" / "agent-box-worker" / "target" / "debug" / "agent-box-worker"
 PEER = "tests/server/fixtures/home_probe_acp_peer.mjs"
 GUEST_HOME = "/runtime/home"

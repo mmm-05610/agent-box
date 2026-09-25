@@ -293,7 +293,7 @@ def test_a_granted_parent_renders_the_bridge_entry_and_zero_grants_does_not(tmp_
     import agent_box.server.bootstrap.runtime as runtime_module
 
     REPO = __import__("pathlib").Path(__file__).resolve().parents[2]
-    PLUGIN = REPO / "plugins" / "agent-box-harnesses"
+    PLUGIN = REPO / "plugins" / "agent-box-harness"
     peer_source = "tests/harness_remote/home_probe_acp_peer.mjs"
     peer_bytes = REPO / "tests" / "server" / "fixtures" / "home_probe_acp_peer.mjs"
     deployment = {"schemaVersion": 1, "harnesses": [{
@@ -557,7 +557,7 @@ def test_the_real_bridge_process_runs_a_child_turn_end_to_end(tmp_path, monkeypa
         pytest.skip("bwrap and node are required")
 
     REPO = __import__("pathlib").Path(__file__).resolve().parents[2]
-    PLUGIN = REPO / "plugins" / "agent-box-harnesses"
+    PLUGIN = REPO / "plugins" / "agent-box-harness"
     peer_source = "tests/harness_remote/home_probe_acp_peer.mjs"
     peer_bytes = REPO / "tests" / "server" / "fixtures" / "home_probe_acp_peer.mjs"
     harness = "claude-code"
@@ -640,7 +640,7 @@ def test_the_real_bridge_process_runs_a_child_turn_end_to_end(tmp_path, monkeypa
             time.sleep(0.05)
         assert server.started, "the loopback server did not start"
 
-        bridge = REPO / "plugins" / "agent-box-harnesses" / "runtime" / "subagent-bridge.mjs"
+        bridge = REPO / "plugins" / "agent-box-harness" / "runtime" / "subagent-bridge.mjs"
         process = subprocess.Popen(
             ["/usr/bin/node", str(bridge)],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,

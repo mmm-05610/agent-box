@@ -29,7 +29,7 @@ from agent_box.storage import Database, ObjectStore
 
 
 REPO = Path(__file__).resolve().parents[2]
-PLUGIN = REPO / "plugins" / "agent-box-harnesses"
+PLUGIN = REPO / "plugins" / "agent-box-harness"
 SIDECAR_ENTRY = PLUGIN / "runtime" / "worker-entry.mjs"
 FAKE_PEER = PLUGIN / "tests" / "harness_remote" / "fake_acp_peer.mjs"
 FIXTURE_DRIVER = Path(__file__).resolve().parent / "fixtures" / "fixture_native_driver.mjs"

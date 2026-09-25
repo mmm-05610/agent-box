@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-PLUGIN = REPO / "plugins" / "agent-box-harnesses"
+PLUGIN = REPO / "plugins" / "agent-box-harness"
 
 import pytest
 

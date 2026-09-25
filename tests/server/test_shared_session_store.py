@@ -21,7 +21,7 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parents[2]
-PLUGIN = REPO / "plugins" / "agent-box-harnesses"
+PLUGIN = REPO / "plugins" / "agent-box-harness"
 PEER_SOURCE = "tests/harness_remote/home_probe_acp_peer.mjs"
 PEER_BYTES = REPO / "tests" / "server" / "fixtures" / "home_probe_acp_peer.mjs"
 

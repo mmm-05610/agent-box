@@ -222,7 +222,7 @@ def test_runtime_host_and_harness_are_tmux_free():
     runtime_local = (REPO_ROOT / "plugins" / "agent-box-runtime-local" / "src").rglob("*.py")
     offenders = [str(p) for p in runtime_local if "tmux" in p.read_text(encoding="utf-8").lower()]
     assert offenders == []
-    harnesses = (REPO_ROOT / "plugins" / "agent-box-harnesses" / "src").rglob("*.py")
+    harnesses = (REPO_ROOT / "plugins" / "agent-box-harness" / "src").rglob("*.py")
     offenders = [str(p) for p in harnesses if "tmux" in p.read_text(encoding="utf-8").lower()]
     assert offenders == []
 

@@ -1,0 +1,88 @@
+....F.......FFFFFFFFF.FFF.........................F.F..FFF               [100%]
+=================================== FAILURES ===================================
+E   AssertionError: assert 'failed' == 'completed'
+      
+      - completed
+      + failed
+tests/acp_orchestration/test_access_authorization.py:105: AssertionError: assert 'failed' == 'completed'
+E   agent_box.server.execution.sidecar.SidecarError: SIDECAR_CLOSED: sidecar exited before answering
+src/agent_box/server/execution/sidecar.py:1097: agent_box.server.execution.sidecar.SidecarError: SIDECAR_CLOSED: sidecar exited before answering
+E   agent_box.server.execution.sidecar.SidecarError: SIDECAR_CLOSED: sidecar exited before answering
+src/agent_box/server/execution/sidecar.py:1097: agent_box.server.execution.sidecar.SidecarError: SIDECAR_CLOSED: sidecar exited before answering
+E   agent_box.server.execution.sidecar.SidecarError: SIDECAR_CLOSED: sidecar exited before answering
+src/agent_box/server/execution/sidecar.py:1097: agent_box.server.execution.sidecar.SidecarError: SIDECAR_CLOSED: sidecar exited before answering
+E   agent_box.server.execution.sidecar.SidecarError: SIDECAR_CLOSED: sidecar exited before answering
+src/agent_box/server/execution/sidecar.py:1097: agent_box.server.execution.sidecar.SidecarError: SIDECAR_CLOSED: sidecar exited before answering
+E   agent_box.server.execution.sidecar.SidecarError: SIDECAR_CLOSED: sidecar exited before answering
+src/agent_box/server/execution/sidecar.py:1097: agent_box.server.execution.sidecar.SidecarError: SIDECAR_CLOSED: sidecar exited before answering
+E   agent_box.server.execution.sidecar.SidecarError: SIDECAR_CLOSED: sidecar exited before answering
+src/agent_box/server/execution/sidecar.py:1097: agent_box.server.execution.sidecar.SidecarError: SIDECAR_CLOSED: sidecar exited before answering
+E   agent_box.server.execution.sidecar.SidecarError: SIDECAR_CLOSED: sidecar exited before answering
+src/agent_box/server/execution/sidecar.py:1097: agent_box.server.execution.sidecar.SidecarError: SIDECAR_CLOSED: sidecar exited before answering
+E   agent_box.server.execution.sidecar.SidecarError: SIDECAR_CLOSED: sidecar exited before answering
+src/agent_box/server/execution/sidecar.py:1097: agent_box.server.execution.sidecar.SidecarError: SIDECAR_CLOSED: sidecar exited before answering
+E   agent_box.server.execution.sidecar.SidecarError: SIDECAR_CLOSED: sidecar exited before answering
+src/agent_box/server/execution/sidecar.py:1097: agent_box.server.execution.sidecar.SidecarError: SIDECAR_CLOSED: sidecar exited before answering
+E   agent_box.server.execution.sidecar.SidecarError: SIDECAR_CLOSED: sidecar exited before answering
+src/agent_box/server/execution/sidecar.py:1097: agent_box.server.execution.sidecar.SidecarError: SIDECAR_CLOSED: sidecar exited before answering
+E   agent_box.server.execution.sidecar.SidecarError: SIDECAR_CLOSED: sidecar exited before answering
+src/agent_box/server/execution/sidecar.py:1097: agent_box.server.execution.sidecar.SidecarError: SIDECAR_CLOSED: sidecar exited before answering
+E   AssertionError: timed out waiting for approval for alpha
+tests/acp_orchestration/conftest.py:72: AssertionError: timed out waiting for approval for alpha
+E   AssertionError: {'id': 'execution_c6908ab8ba8c4f25b96c680116cc9dc2', 'state': 'failed', 'capture_state': 'failed', 'cleanup_state': 'pending', ...}
+    assert 'failed' == 'completed'
+      
+      - completed
+      + failed
+tests/acp_orchestration/test_project_binding.py:26: AssertionError: {'id': 'execution_c6908ab8ba8c4f25b96c680116cc9dc2', 'state': 'failed', 'capture_state': 'failed', 'cleanup_state': 'pending', ...}
+E   AssertionError: assert 'failed' == 'completed'
+      
+      - completed
+      + failed
+tests/acp_orchestration/test_project_binding.py:63: AssertionError: assert 'failed' == 'completed'
+E   agent_box.server.execution.sidecar.SidecarError: SIDECAR_CLOSED: sidecar exited before answering
+src/agent_box/server/execution/sidecar.py:1097: agent_box.server.execution.sidecar.SidecarError: SIDECAR_CLOSED: sidecar exited before answering
+E   agent_box.server.execution.sidecar.SidecarError: SIDECAR_CLOSED: sidecar exited before answering
+src/agent_box/server/execution/sidecar.py:1097: agent_box.server.execution.sidecar.SidecarError: SIDECAR_CLOSED: sidecar exited before answering
+E   agent_box.server.execution.sidecar.SidecarError: SIDECAR_CLOSED: sidecar exited before answering
+src/agent_box/server/execution/sidecar.py:1097: agent_box.server.execution.sidecar.SidecarError: SIDECAR_CLOSED: sidecar exited before answering
+=============================== warnings summary ===============================
+.venv/lib/python3.12/site-packages/fastapi/testclient.py:1
+  .venv/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+ARTIFACT_worker-debug=ABSENT workers/agent-box-worker/target/debug/agent-box-worker
+ARTIFACT_worker-release=ABSENT workers/agent-box-worker/target/release/agent-box-worker
+ARTIFACT_worker-musl-dir=ABSENT workers/agent-box-worker/target/x86_64-unknown-linux-musl
+ARTIFACT_sidecar-entry=ABSENT plugins/agent-box-harness/runtime/worker-entry.mjs
+ARTIFACT_acp-npm-closure=ABSENT plugins/agent-box-harness/packaging/claude/node_modules/@agentclientprotocol/claude-agent-acp
+TOOL_bwrap=present
+TOOL_node=present
+TOOL_npm=present
+TOOL_claude=ABSENT
+TOOL_tmux=present
+TOOL_wsl.exe=ABSENT
+SKIPPED_TOTAL=0
+WORKER_ARTIFACT=ABSENT
+VERDICT=FAILED
+=========================== short test summary info ============================
+FAILED tests/acp_orchestration/test_access_authorization.py::test_unauthorised_send_launches_nothing
+FAILED tests/acp_orchestration/test_channel_passthrough.py::test_request_result_and_upward_notification_flow
+FAILED tests/acp_orchestration/test_channel_passthrough.py::test_downward_cancel_reaches_the_agent_and_settles_the_turn
+FAILED tests/acp_orchestration/test_channel_passthrough.py::test_cancelled_stop_reason_flows_through
+FAILED tests/acp_orchestration/test_channel_passthrough.py::test_upward_error_carries_the_native_error_identity
+FAILED tests/acp_orchestration/test_channel_passthrough.py::test_advertised_session_capability_is_observed
+FAILED tests/acp_orchestration/test_channel_passthrough.py::test_unknown_update_kind_flows_through
+FAILED tests/acp_orchestration/test_channel_passthrough.py::test_message_meta_flows_through
+FAILED tests/acp_orchestration/test_channel_passthrough.py::test_advertised_extension_capability_flows_through
+FAILED tests/acp_orchestration/test_disconnect_and_release.py::test_channel_death_during_prompt_is_not_success_or_cancel
+FAILED tests/acp_orchestration/test_disconnect_and_release.py::test_release_only_touches_the_owned_channel
+FAILED tests/acp_orchestration/test_disconnect_and_release.py::test_no_reprompt_no_replacement_session_after_death
+FAILED tests/acp_orchestration/test_dual_connections.py::test_two_channels_same_jsonrpc_ids_and_same_native_id_do_not_cross
+FAILED tests/acp_orchestration/test_project_binding.py::test_project_cwd_reaches_both_launch_boundaries
+FAILED tests/acp_orchestration/test_project_binding.py::test_project_replaced_by_different_tree_refused
+FAILED tests/acp_orchestration/test_reverse_request.py::test_reverse_request_arrives_verbatim_and_answer_completes_round_trip
+FAILED tests/acp_orchestration/test_reverse_request.py::test_client_chosen_option_id_is_not_replaced_by_a_kind_guess
+FAILED tests/acp_orchestration/test_reverse_request.py::test_permission_request_without_a_decision_is_not_answered_by_the_server
+18 failed, 40 passed, 1 warning in 51.74s

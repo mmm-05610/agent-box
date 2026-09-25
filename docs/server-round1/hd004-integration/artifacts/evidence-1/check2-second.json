@@ -1,0 +1,221 @@
+{
+ "messages": [
+  "hd004 round one",
+  "got:hd004 round one",
+  "hd004 round two",
+  "got:hd004 round two"
+ ],
+ "peerEvents": [
+  {
+   "file": "peer.353735.hd004-main",
+   "peer": "hd004-main",
+   "pid": 353735,
+   "event": "peer-start",
+   "cwd": "/tmp/hd004-int-1790246856/project"
+  },
+  {
+   "file": "peer.353735.hd004-main",
+   "peer": "hd004-main",
+   "pid": 353735,
+   "dir": "recv",
+   "frame": {
+    "jsonrpc": "2.0",
+    "id": 0,
+    "method": "initialize",
+    "params": {
+     "protocolVersion": 1,
+     "clientCapabilities": {}
+    }
+   }
+  },
+  {
+   "file": "peer.353735.hd004-main",
+   "peer": "hd004-main",
+   "pid": 353735,
+   "dir": "send",
+   "frame": {
+    "jsonrpc": "2.0",
+    "id": 0,
+    "result": {
+     "agentInfo": {
+      "name": "hd003-peer",
+      "version": "test",
+      "vendorExtensions": {
+       "hd003": true
+      }
+     },
+     "agentCapabilities": {
+      "loadSession": true,
+      "sessionCapabilities": {
+       "resume": {}
+      },
+      "hd003_custom_capability": {
+       "level": 3
+      }
+     },
+     "promptCapabilities": {
+      "image": {}
+     },
+     "authMethods": [
+      {
+       "id": "none",
+       "name": "none"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "file": "peer.353735.hd004-main",
+   "peer": "hd004-main",
+   "pid": 353735,
+   "dir": "recv",
+   "frame": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "session/new",
+    "params": {
+     "cwd": "/tmp/hd004-int-1790246856/project",
+     "mcpServers": []
+    }
+   }
+  },
+  {
+   "file": "peer.353735.hd004-main",
+   "peer": "hd004-main",
+   "pid": 353735,
+   "event": "session-new",
+   "sessionId": "hd003-hd004-main-1",
+   "cwdParam": "/tmp/hd004-int-1790246856/project",
+   "cwd": "/tmp/hd004-int-1790246856/project",
+   "params": {
+    "cwd": "/tmp/hd004-int-1790246856/project",
+    "mcpServers": []
+   }
+  },
+  {
+   "file": "peer.353735.hd004-main",
+   "peer": "hd004-main",
+   "pid": 353735,
+   "dir": "send",
+   "frame": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "result": {
+     "sessionId": "hd003-hd004-main-1",
+     "configOptions": []
+    }
+   }
+  },
+  {
+   "file": "peer.353735.hd004-main",
+   "peer": "hd004-main",
+   "pid": 353735,
+   "dir": "recv",
+   "frame": {
+    "jsonrpc": "2.0",
+    "id": 2,
+    "method": "session/prompt",
+    "params": {
+     "sessionId": "hd003-hd004-main-1",
+     "prompt": [
+      {
+       "type": "text",
+       "text": "hd004 round one"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "file": "peer.353735.hd004-main",
+   "peer": "hd004-main",
+   "pid": 353735,
+   "dir": "send",
+   "frame": {
+    "jsonrpc": "2.0",
+    "method": "session/update",
+    "params": {
+     "sessionId": "hd003-hd004-main-1",
+     "update": {
+      "sessionUpdate": "agent_message_chunk",
+      "content": {
+       "type": "text",
+       "text": "got:hd004 round one"
+      }
+     }
+    }
+   }
+  },
+  {
+   "file": "peer.353735.hd004-main",
+   "peer": "hd004-main",
+   "pid": 353735,
+   "dir": "send",
+   "frame": {
+    "jsonrpc": "2.0",
+    "id": 2,
+    "result": {
+     "stopReason": "end_turn"
+    }
+   }
+  },
+  {
+   "file": "peer.353735.hd004-main",
+   "peer": "hd004-main",
+   "pid": 353735,
+   "dir": "recv",
+   "frame": {
+    "jsonrpc": "2.0",
+    "id": 3,
+    "method": "session/prompt",
+    "params": {
+     "sessionId": "hd003-hd004-main-1",
+     "prompt": [
+      {
+       "type": "text",
+       "text": "hd004 round two"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "file": "peer.353735.hd004-main",
+   "peer": "hd004-main",
+   "pid": 353735,
+   "dir": "send",
+   "frame": {
+    "jsonrpc": "2.0",
+    "method": "session/update",
+    "params": {
+     "sessionId": "hd003-hd004-main-1",
+     "update": {
+      "sessionUpdate": "agent_message_chunk",
+      "content": {
+       "type": "text",
+       "text": "got:hd004 round two"
+      }
+     }
+    }
+   }
+  },
+  {
+   "file": "peer.353735.hd004-main",
+   "peer": "hd004-main",
+   "pid": 353735,
+   "dir": "send",
+   "frame": {
+    "jsonrpc": "2.0",
+    "id": 3,
+    "result": {
+     "stopReason": "end_turn"
+    }
+   }
+  }
+ ],
+ "ps": {
+  "entry": "353727 /usr/bin/node /home/maoqh/projects/ordessa/worktrees/harness-desktop-002/bc-native/plugins/agent-box-harness/runtime/access-entry.mjs --native\n354196 /bin/sh -c pgrep -af \"access-entry.mjs\"",
+  "peer": "351983 /home/maoqh/projects/ordessa/worktrees/harness-desktop-002/bc-native/.venv/bin/python -m agent_box.server --data-root /tmp/hd004-int-1790246856/data --port 57333 --execution-mode native --plugin-root /home/maoqh/projects/ordessa/worktrees/harness-desktop-002/bc-native/plugins/agent-box-harness --native-harness pi --native-adapter-command /usr/bin/node --native-adapter-arg /home/maoqh/projects/ordessa/worktrees/harness-desktop-002/bc-native/tests/acp_orchestration/fixtures/bidirectional_acp_peer.mjs --native-continuation\n353735 /usr/bin/node /home/maoqh/projects/ordessa/worktrees/harness-desktop-002/bc-native/tests/acp_orchestration/fixtures/bidirectional_acp_peer.mjs\n354198 /bin/sh -c pgrep -af \"bidirectional_acp_peer\""
+ }
+}

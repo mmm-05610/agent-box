@@ -17,7 +17,7 @@ from agent_box.server.execution.sidecar import NativeProcessLauncher
 
 
 HELLO = {"clientVersions": ["wire/1"], "clientPresentationSupports": []}
-PLUGIN = Path(__file__).resolve().parents[2] / "plugins" / "agent-box-harnesses"
+PLUGIN = Path(__file__).resolve().parents[2] / "plugins" / "agent-box-harness"
 
 
 def _native(root: Path):

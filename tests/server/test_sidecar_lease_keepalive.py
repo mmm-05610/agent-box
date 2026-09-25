@@ -30,9 +30,9 @@ from agent_box_runtime_wsl import WorkerClient, WorkerError
 
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
-PLUGIN = REPO / "plugins" / "agent-box-harnesses"
+PLUGIN = REPO / "plugins" / "agent-box-harness"
 WORKER = REPO / "workers" / "agent-box-worker" / "target" / "debug" / "agent-box-worker"
-PEER = "plugins/agent-box-harnesses/tests/harness_remote/fake_acp_peer.mjs"
+PEER = "plugins/agent-box-harness/tests/harness_remote/fake_acp_peer.mjs"
 #: Longer than the production lease on purpose: the turn must not need the
 #: silence to be shortened, nor the lease to be raised.
 SILENCE_MS = 8_000

@@ -1012,6 +1012,7 @@ class SessionRecords:
 
     def finish_cancelled(
         self, turn_id: str, *, queue_records=None,
+        terminal_reason: str | None = None,
         checkpoint_object_digest: str | None = None,
         checkpoint_native_id: str | None = None,
         native_platform: str | None = None,
@@ -1034,10 +1035,13 @@ class SessionRecords:
             if row["state"] in {"completed", "failed", "cancelled", "unknown"}:
                 return dict(row)
             timestamp = now()
+            terminal_column = ",terminal_reason=?" if terminal_reason is not None else ""
+            terminal_values = [terminal_reason] if terminal_reason is not None else []
             conn.execute(
-                "UPDATE server_turns SET state='cancelled',capture_state=?,"
-                "error_code='TURN_CANCELLED',updated_at=? WHERE id=?",
-                ("captured" if checkpoint_object_digest else "not-captured", timestamp, turn_id),
+                f"UPDATE server_turns SET state='cancelled',capture_state=?,"
+                f"error_code='TURN_CANCELLED'{terminal_column},updated_at=? WHERE id=?",
+                ["captured" if checkpoint_object_digest else "not-captured",
+                 *terminal_values, timestamp, turn_id],
             )
             conn.execute(
                 "UPDATE server_sessions SET status='ready',"

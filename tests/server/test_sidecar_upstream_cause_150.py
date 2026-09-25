@@ -1,6 +1,6 @@
 """Work Order 150: an op failure's *upstream cause* must reach the product state.
 
-Everything here drives the real Worker (`plugins/agent-box-harnesses/runtime/
+Everything here drives the real Worker (`plugins/agent-box-harness/runtime/
 worker-entry.mjs`) over the real Python envelope (`SidecarEnvelope.request`, the leg
 `sidecar.py:1039-1063` names), through deliberately different upstream faults, and
 lands each fault on the real statement production uses
@@ -35,7 +35,7 @@ from agent_box.server.sessions import SessionRecords
 from agent_box.server.workspaces import WorkspaceRecords
 from agent_box.storage import Database, ObjectStore
 
-PLUGIN = pathlib.Path(__file__).resolve().parents[2] / "plugins" / "agent-box-harnesses"
+PLUGIN = pathlib.Path(__file__).resolve().parents[2] / "plugins" / "agent-box-harness"
 WORKER = PLUGIN / "runtime" / "worker-entry.mjs"
 PEER = PLUGIN / "tests" / "harness_remote" / "fake_acp_peer.mjs"
 NODE = shutil.which("node") or "/usr/bin/node"

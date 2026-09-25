@@ -37,7 +37,7 @@ from fastapi.testclient import TestClient
 
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
-PLUGIN = REPO / "plugins" / "agent-box-harnesses"
+PLUGIN = REPO / "plugins" / "agent-box-harness"
 SIDEcar_ENTRY = PLUGIN / "runtime" / "worker-entry.mjs"
 FAKE_PEER = PLUGIN / "tests" / "harness_remote" / "fake_acp_peer.mjs"
 
@@ -513,7 +513,7 @@ def test_real_worker_bwrap_interactive_sidecar_streams_before_terminal(tmp_path)
         launcher, environment={"AGENTBOX_SIDECAR_ISOLATED": "1"}, profile="pi",
         adapter={
             "command": "/usr/bin/node",
-            "args": ["/workspace/plugins/agent-box-harnesses/tests/harness_remote/fake_acp_peer.mjs"],
+            "args": ["/workspace/plugins/agent-box-harness/tests/harness_remote/fake_acp_peer.mjs"],
         },
         state_directory="/tmp/agentbox-sidecar-state", directory="/workspace",
         on_event=lambda *event: observed.append(event),
@@ -596,7 +596,7 @@ def test_server_core_real_worker_persists_stream_before_terminal(tmp_path, monke
             "adapter": {
                 "command": "/usr/bin/node",
                 "args": [
-                    "/workspace/plugins/agent-box-harnesses/tests/harness_remote/fake_acp_peer.mjs",
+                    "/workspace/plugins/agent-box-harness/tests/harness_remote/fake_acp_peer.mjs",
                 ],
             },
             "timeoutMs": 30_000,

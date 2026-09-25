@@ -404,6 +404,75 @@ def create_app(runtime: ServerRuntime) -> FastAPI:
         except WebSocketDisconnect:
             return
 
+    @app.websocket("/wire/v1/acp-channel/{connection_id}")
+    async def wire_acp_channel(websocket: WebSocket, connection_id: str):
+        """Verbatim bidirectional ACP frame relay for one owned channel.
+
+        The Server never parses a frame on this route: attach, relay bytes,
+        detach. A client disconnecting is not a release - the channel, its
+        Agent and its run record stay exactly as they were (seam doc §2).
+        """
+        import asyncio
+
+        # Admission pinned by the reviewed tests: non-loopback Origin -> 4403,
+        # missing/wrong bearer -> 4401, unknown connectionId -> 4400, all
+        # before accept.  Unlike /wire/v1/event-stream there is no Host clause:
+        # the pinned client (ManagedChannel) attaches over the TestClient's
+        # default host, and this route is bearer-gated regardless.
+        origin = websocket.headers.get("origin")
+        provided = websocket.headers.get("authorization")
+        if origin and not _loopback_authority(origin.split("//", 1)[-1]):
+            await websocket.close(code=4403, reason="LOOPBACK_POLICY_REJECTED")
+            return
+        if provided is None or not secrets.compare_digest(provided, "Bearer " + runtime.token):
+            await websocket.close(code=4401, reason="UNAUTHENTICATED")
+            return
+        registry = getattr(runtime, "acp_channels", None)
+        connection = registry.get(connection_id) if registry is not None else None
+        if connection is None:
+            await websocket.close(code=4400, reason="UNKNOWN_CONNECTION")
+            return
+        await websocket.accept()
+        inbox: asyncio.Queue = asyncio.Queue()
+
+        def _sink(item):
+            inbox.put_nowait(item)
+
+        async def _pump():
+            while True:
+                item = await inbox.get()
+                if item is None:
+                    try:
+                        await websocket.close(code=1001)
+                    except Exception:  # noqa: BLE001 - the socket is already gone
+                        pass
+                    return
+                await websocket.send_text(item)
+
+        loop = asyncio.get_running_loop()
+        connection.attach(loop, _sink)
+        pump = asyncio.create_task(_pump())
+        try:
+            while True:
+                message = await websocket.receive()
+                if message["type"] == "websocket.disconnect":
+                    break
+                text = message.get("text")
+                if text is None:
+                    continue
+                transport = connection.transport
+                if transport is None:
+                    break
+                try:
+                    transport.send_line(text)
+                except Exception:  # noqa: BLE001 - the Agent is gone; answer nothing for it
+                    break
+        except WebSocketDisconnect:
+            pass
+        finally:
+            connection.detach(loop, _sink)
+            pump.cancel()
+
     @app.post("/api/v1/turns/{turn_id}/cancel", dependencies=protected)
     def cancel(turn_id: str, response: Response, key: str = Depends(idempotency_key)):
         status, result = runtime.service.cancel_turn(turn_id, key)

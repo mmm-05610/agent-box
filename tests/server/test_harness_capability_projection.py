@@ -25,7 +25,7 @@ from agent_box.server.execution.sidecar import (
 
 
 REPO = Path(__file__).resolve().parents[2]
-PLUGIN = REPO / "plugins" / "agent-box-harnesses"
+PLUGIN = REPO / "plugins" / "agent-box-harness"
 ACP_PEER = PLUGIN / "tests" / "harness_remote" / "fake_acp_peer.mjs"
 FIXTURE_DRIVER = Path(__file__).resolve().parent / "fixtures" / "fixture_native_driver.mjs"
 DRIVER_BUNDLE_PATH = "agentbox-sidecar/deployment/fixture-native/driver.mjs"

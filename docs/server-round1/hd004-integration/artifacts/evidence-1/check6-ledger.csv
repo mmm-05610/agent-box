@@ -1,0 +1,3 @@
+id,state,terminal_reason,stop_requested_at,created_at,updated_at
+turn_a3e8380617b646f687dad6d1f1e16c72,cancelled,released,,2026-09-24T10:53:17.487256+00:00,2026-09-24T10:59:38.659366+00:00
+turn_98ca5b3112ea4159b3eb9ce7cf21c0fd,accepted,,,2026-09-24T11:01:00.299166+00:00,2026-09-24T11:01:00.299166+00:00

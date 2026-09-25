@@ -1,0 +1,25 @@
+{"peer":"hd004-main","pid":355788,"event":"peer-start","cwd":"/tmp/hd004-int-1790246856/project"}
+{"peer":"hd004-main","pid":355788,"dir":"recv","frame":{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":1,"clientCapabilities":{}}}}
+{"peer":"hd004-main","pid":355788,"dir":"send","frame":{"jsonrpc":"2.0","id":0,"result":{"agentInfo":{"name":"hd003-peer","version":"test","vendorExtensions":{"hd003":true}},"agentCapabilities":{"loadSession":true,"sessionCapabilities":{"resume":{}},"hd003_custom_capability":{"level":3}},"promptCapabilities":{"image":{}},"authMethods":[{"id":"none","name":"none"}]}}}
+{"peer":"hd004-main","pid":355788,"dir":"recv","frame":{"jsonrpc":"2.0","id":1,"method":"session/new","params":{"cwd":"/tmp/hd004-int-1790246856/project","mcpServers":[]}}}
+{"peer":"hd004-main","pid":355788,"event":"session-new","sessionId":"hd003-hd004-main-1","cwdParam":"/tmp/hd004-int-1790246856/project","cwd":"/tmp/hd004-int-1790246856/project","params":{"cwd":"/tmp/hd004-int-1790246856/project","mcpServers":[]}}
+{"peer":"hd004-main","pid":355788,"dir":"send","frame":{"jsonrpc":"2.0","id":1,"result":{"sessionId":"hd003-hd004-main-1","configOptions":[]}}}
+{"peer":"hd004-main","pid":355788,"dir":"recv","frame":{"jsonrpc":"2.0","id":2,"method":"session/prompt","params":{"sessionId":"hd003-hd004-main-1","prompt":[{"type":"text","text":"scenario:permission twin-options"}]}}}
+{"peer":"hd004-main","pid":355788,"dir":"send","frame":{"jsonrpc":"2.0","id":7777,"method":"session/request_permission","params":{"sessionId":"hd003-hd004-main-1","toolCall":{"toolCallId":"hd003-tool-hd004-main","name":"shell","title":"hd003 approval"},"options":[{"kind":"allow_once","optionId":"pick-1-hd004-main","name":"Pick one"},{"kind":"allow_once","optionId":"pick-2-hd004-main","name":"Pick two"},{"kind":"reject_once","optionId":"reject-hd004-main","name":"Reject"}]}}}
+{"peer":"hd004-main","pid":355788,"dir":"recv","frame":{"jsonrpc":"2.0","id":7777,"result":{"outcome":{"outcome":"selected","optionId":"pick-2-hd004-main"}}}}
+{"peer":"hd004-main","pid":355788,"event":"permission-answer","frame":{"jsonrpc":"2.0","id":7777,"result":{"outcome":{"outcome":"selected","optionId":"pick-2-hd004-main"}}}}
+{"peer":"hd004-main","pid":355788,"dir":"send","frame":{"jsonrpc":"2.0","id":2,"result":{"stopReason":"end_turn"}}}
+{"peer":"hd004-main","pid":355788,"dir":"recv","frame":{"jsonrpc":"2.0","id":3,"method":"session/prompt","params":{"sessionId":"hd003-hd004-main-1","prompt":[{"type":"text","text":"scenario:hang hd004-stop"}]}}}
+{"peer":"hd004-main","pid":355788,"dir":"recv","frame":{"jsonrpc":"2.0","method":"session/cancel","params":{"sessionId":"hd003-hd004-main-1"}}}
+{"peer":"hd004-main","pid":355788,"dir":"send","frame":{"jsonrpc":"2.0","id":3,"result":{"stopReason":"cancelled"}}}
+{"peer":"hd004-main","pid":355788,"dir":"recv","frame":{"jsonrpc":"2.0","id":4,"method":"session/prompt","params":{"sessionId":"hd003-hd004-main-1","prompt":[{"type":"text","text":"hd004 after view switch"}]}}}
+{"peer":"hd004-main","pid":355788,"dir":"send","frame":{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"hd003-hd004-main-1","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"got:hd004 after view switch"}}}}}
+{"peer":"hd004-main","pid":355788,"dir":"send","frame":{"jsonrpc":"2.0","id":4,"result":{"stopReason":"end_turn"}}}
+{"peer":"hd004-main","pid":355788,"dir":"recv","frame":{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":1,"clientCapabilities":{}}}}
+{"peer":"hd004-main","pid":355788,"dir":"send","frame":{"jsonrpc":"2.0","id":0,"result":{"agentInfo":{"name":"hd003-peer","version":"test","vendorExtensions":{"hd003":true}},"agentCapabilities":{"loadSession":true,"sessionCapabilities":{"resume":{}},"hd003_custom_capability":{"level":3}},"promptCapabilities":{"image":{}},"authMethods":[{"id":"none","name":"none"}]}}}
+{"peer":"hd004-main","pid":355788,"dir":"recv","frame":{"jsonrpc":"2.0","id":1,"method":"session/new","params":{"cwd":"/tmp/hd004-int-1790246856/project","mcpServers":[]}}}
+{"peer":"hd004-main","pid":355788,"event":"session-new","sessionId":"hd003-hd004-main-2","cwdParam":"/tmp/hd004-int-1790246856/project","cwd":"/tmp/hd004-int-1790246856/project","params":{"cwd":"/tmp/hd004-int-1790246856/project","mcpServers":[]}}
+{"peer":"hd004-main","pid":355788,"dir":"send","frame":{"jsonrpc":"2.0","id":1,"result":{"sessionId":"hd003-hd004-main-2","configOptions":[]}}}
+{"peer":"hd004-main","pid":355788,"dir":"recv","frame":{"jsonrpc":"2.0","id":2,"method":"session/prompt","params":{"sessionId":"hd003-hd004-main-2","prompt":[{"type":"text","text":"hd004 after reload"}]}}}
+{"peer":"hd004-main","pid":355788,"dir":"send","frame":{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"hd003-hd004-main-2","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"got:hd004 after reload"}}}}}
+{"peer":"hd004-main","pid":355788,"dir":"send","frame":{"jsonrpc":"2.0","id":2,"result":{"stopReason":"end_turn"}}}

@@ -1,0 +1,24 @@
+{
+ "dom": {
+  "msgs": [
+   "hd004 round one",
+   "got:hd004 round one",
+   "hd004 round two",
+   "got:hd004 round two",
+   "scenario:rich hd004",
+   "Thinkingplanning the answer… then running a tool.rich streaming answer",
+   "echo tool · Resultnulltool result: 3 passed"
+  ],
+  "reasoning": [
+   {
+    "open": false,
+    "text": "Thinkingplanning the answer… then running a tool."
+   }
+  ],
+  "tool": {
+   "state": "completed",
+   "innerHTML": "<summary>echo tool · Result</summary><pre>null</pre><pre>tool result: 3 passed</pre>"
+  }
+ },
+ "note": "driver settle predicate over-strict; final verified manually; answer text shares card with reasoning because fixture reuses one messageId"
+}

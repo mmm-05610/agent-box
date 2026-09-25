@@ -52,7 +52,7 @@ NONCE = "STATEFUL-NONCE-7A21"
 SANDBOX_MODULE = "agent_box_sandbox_bwrap"
 PLUGIN_PATHS = [
     "src",
-    "plugins/agent-box-harnesses/src",
+    "plugins/agent-box-harness/src",
     "plugins/agent-box-runtime-wsl/src",
     "plugins/agent-box-runtime-local/src",
     "plugins/agent-box-sandbox-bwrap/src",

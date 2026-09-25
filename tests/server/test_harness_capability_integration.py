@@ -25,8 +25,8 @@ from agent_box_harnesses.registry.loader import load_builtin_registry
 
 
 REPO = Path(__file__).resolve().parents[2]
-PLUGIN = REPO / "plugins" / "agent-box-harnesses"
-DEFINITIONS = PLUGIN / "src" / "agent_box_harnesses" / "harnesses.toml"
+PLUGIN = REPO / "plugins" / "agent-box-harness"
+DEFINITIONS = PLUGIN / "src" / "agent_box_harness" / "harnesses.toml"
 JS_PROJECTION = PLUGIN / "runtime" / "capability_declarations.json"
 #: Files on the capability path of the Server: none of them may name a Harness.
 NEUTRAL_FILES = (

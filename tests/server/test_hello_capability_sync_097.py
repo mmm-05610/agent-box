@@ -51,6 +51,16 @@ MISSING_AT_BASELINE = (
     "usage.aggregate", "usage.export",
 )
 
+#: The methods this tree added *after* the baseline measurement, by name. The
+#: 097 rule is "a hand-maintained list cannot rot in silence", so growth is
+#: allowed only when it is named here: an unnamed new method still fails the
+#: gate below, and a dropped one leaves a hole in this tuple.
+#: (HD003, `docs/acp-channel-minimal-seam.md` §1: the managed ACP channel pair
+#: and the single-run-record read that closes it.)
+ADDED_SINCE_BASELINE = (
+    "acp.channel.open", "acp.channel.release", "executions.get",
+)
+
 
 @pytest.fixture
 def hello(tmp_path, request):
@@ -119,8 +129,10 @@ def test_the_37_methods_missing_at_baseline_are_all_declared_now(hello):
     _, _, result = hello
     declared = {item["id"] for item in result["capabilities"]}
     assert len(MISSING_AT_BASELINE) == 37, "the baseline measurement is part of this gate"
-    assert sorted(declared - set(DECLARED_AT_BASELINE)) == sorted(MISSING_AT_BASELINE)
+    assert sorted(declared - set(DECLARED_AT_BASELINE) - set(ADDED_SINCE_BASELINE)) == sorted(
+        MISSING_AT_BASELINE), "post-baseline growth must be named in ADDED_SINCE_BASELINE"
     assert set(DECLARED_AT_BASELINE) <= declared
+    assert set(ADDED_SINCE_BASELINE) <= declared
 
 
 @pytest.mark.parametrize("hello", ["plain"], indirect=True)
@@ -130,7 +142,7 @@ def test_a_method_dropped_from_dispatch_diverges_and_the_gate_bites(hello):
     Derivation alone cannot catch a missing handler - both sides of that
     equality shrink together. The gate that bites is the one against the *other*
     statement: drop `usage.export` from dispatch and hello honestly follows it
-    down to 63 while the shape table still says 64. If this case ever stops
+    down to 66 while the shape table still says 67. If this case ever stops
     reporting the hole, someone has put a hand-maintained list back.
     """
     runtime, _, result = hello
@@ -222,7 +234,7 @@ def test_the_baseline_deployment_answers_the_pre_existing_27_verbatim(tmp_path):
 def test_an_id_that_no_rule_covers_still_answers_supported(hello):
     """The fallback is pinned, not inherited by accident.
 
-    Most of the 64 rows are answered by `return True, None` now that the table is
+    Most of the 67 rows are answered by `return True, None` now that the table is
     derived. That is right for support state and wrong for existence, which is
     why the same composition still refuses the call: the two questions stay in
     two places.

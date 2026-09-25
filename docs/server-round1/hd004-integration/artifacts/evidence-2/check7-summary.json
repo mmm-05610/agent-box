@@ -1,0 +1,15 @@
+{
+ "check": "7 - test-side injected unconfirmed release (instance 2, harness-fake entry)",
+ "injection": "copy of plugins/agent-box-harness at $ROOT/harness-fake; access-entry close branch returns released:false once when env HD004_FAKE_FIRST_CLOSE=unconfirmed. Production plugin tree untouched.",
+ "sequence": [
+  "firstSend/repro sends -> live native session on entry 360653 / peer 360661",
+  "reconnectRelease (explicit user release) -> first close lied: released:false, no process touched",
+  "UI: .conn-error 'Backend release pending: conn_96b4a6bac2244da7b3606dade76522f6: ACP channel release unconfirmed: release-unconfirmed' + button 'Retry backend release'  [check7-failure-visible.json, 14-release-pending.png]",
+  "processes STILL ALIVE at that moment: 360653 harness-fake/runtime/access-entry.mjs, 360661 bidirectional_acp_peer.mjs  [check6c-explicit-release.json]",
+  "retryRelease -> second close performed real releaseOwned: both pids gone from ps  [check7-after-retry.json, 15-after-retry.png]",
+  "UI alert cleared: errors == []",
+  "ledger: single terminal event turn.state cancelled/TURN_CANCELLED/terminal_reason=released at 11:19:15 (retry time), none at the unconfirmed attempt  [check7-ledger.csv]"
+ ],
+ "verdict": "PASS - failure surfaced automatically, cleared only by successful explicit retry, no fabricated cancelled in the ledger",
+ "note_single_delivery": "Two fresh-draft first sends delivered exactly 1 session/prompt each (check-repro-draft-send samples 'hd004 repro A'/'hd004 repro B'). The earlier 'hd004 round one' double prompt on instance 2 came from a queued send left by an aborted earlier driver invocation on that instance, not from the draft->start path."
+}

@@ -1,0 +1,5 @@
+{
+ "entry": "355387 /bin/sh -c pgrep -af \"access-entry.mjs\"",
+ "peer": "351983 /home/maoqh/projects/ordessa/worktrees/harness-desktop-002/bc-native/.venv/bin/python -m agent_box.server --data-root /tmp/hd004-int-1790246856/data --port 57333 --execution-mode native --plugin-root /home/maoqh/projects/ordessa/worktrees/harness-desktop-002/bc-native/plugins/agent-box-harness --native-harness pi --native-adapter-command /usr/bin/node --native-adapter-arg /home/maoqh/projects/ordessa/worktrees/harness-desktop-002/bc-native/tests/acp_orchestration/fixtures/bidirectional_acp_peer.mjs --native-continuation\n355389 /bin/sh -c pgrep -af \"bidirectional_acp_peer\"",
+ "stdinEof": []
+}

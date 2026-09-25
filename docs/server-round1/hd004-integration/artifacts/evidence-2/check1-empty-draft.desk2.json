@@ -1,0 +1,98 @@
+{
+ "draft": {
+  "head": "NEW SESSIONNew sessionidle",
+  "startDisabled": true,
+  "value": ""
+ },
+ "peerEvents": [
+  {
+   "file": "peer.360661.hd004-fake",
+   "peer": "hd004-fake",
+   "pid": 360661,
+   "event": "peer-start",
+   "cwd": "/tmp/hd004-int-1790246856/project2"
+  },
+  {
+   "file": "peer.360661.hd004-fake",
+   "peer": "hd004-fake",
+   "pid": 360661,
+   "dir": "recv",
+   "frame": {
+    "jsonrpc": "2.0",
+    "id": 0,
+    "method": "initialize",
+    "params": {
+     "protocolVersion": 1,
+     "clientCapabilities": {}
+    }
+   }
+  },
+  {
+   "file": "peer.360661.hd004-fake",
+   "peer": "hd004-fake",
+   "pid": 360661,
+   "dir": "send",
+   "frame": {
+    "jsonrpc": "2.0",
+    "id": 0,
+    "result": {
+     "agentInfo": {
+      "name": "hd003-peer",
+      "version": "test",
+      "vendorExtensions": {
+       "hd003": true
+      }
+     },
+     "agentCapabilities": {
+      "loadSession": true,
+      "sessionCapabilities": {
+       "resume": {}
+      },
+      "hd003_custom_capability": {
+       "level": 3
+      }
+     },
+     "promptCapabilities": {
+      "image": {}
+     },
+     "authMethods": [
+      {
+       "id": "none",
+       "name": "none"
+      }
+     ]
+    }
+   }
+  }
+ ],
+ "executions": {
+  "jsonrpc": "2.0",
+  "id": "executions.list",
+  "result": {
+   "executions": [
+    {
+     "executionId": "turn_770ed11aec57497594b73f23b51ccc42",
+     "turnId": "turn_770ed11aec57497594b73f23b51ccc42",
+     "sessionId": "session_9f46c21882eb406b96bc1dd3b74cf346",
+     "profileId": "profile_11a8227a59fb4285b8bd0af9d89a1101",
+     "profile": "Native pi",
+     "harness": "pi",
+     "placement": "local",
+     "state": "queued",
+     "startedAt": "2026-09-24T11:12:38.396516+00:00",
+     "workspaceId": "ws_0fcfdfa78a2248719b350f14861e6b58",
+     "workspace": "project2",
+     "queueItemId": null,
+     "pid": null,
+     "pidReason": "PID_NOT_REPORTED",
+     "adapterPid": null,
+     "adapterPidReason": "ADAPTER_PID_NOT_REPORTED"
+    }
+   ]
+  }
+ },
+ "ps": {
+  "entry": "355780 /usr/bin/node /home/maoqh/projects/ordessa/worktrees/harness-desktop-002/bc-native/plugins/agent-box-harness/runtime/access-entry.mjs --native\n360653 /usr/bin/node /tmp/hd004-int-1790246856/harness-fake/runtime/access-entry.mjs --native\n360669 /bin/sh -c pgrep -af \"access-entry.mjs\"",
+  "peer": "351983 /home/maoqh/projects/ordessa/worktrees/harness-desktop-002/bc-native/.venv/bin/python -m agent_box.server --data-root /tmp/hd004-int-1790246856/data --port 57333 --execution-mode native --plugin-root /home/maoqh/projects/ordessa/worktrees/harness-desktop-002/bc-native/plugins/agent-box-harness --native-harness pi --native-adapter-command /usr/bin/node --native-adapter-arg /home/maoqh/projects/ordessa/worktrees/harness-desktop-002/bc-native/tests/acp_orchestration/fixtures/bidirectional_acp_peer.mjs --native-continuation\n355788 /usr/bin/node /home/maoqh/projects/ordessa/worktrees/harness-desktop-002/bc-native/tests/acp_orchestration/fixtures/bidirectional_acp_peer.mjs\n360437 /bin/bash -c { source '/home/maoqh/.qoder/shell-snapshots/snapshot-bash-1790220707509-idnc1k.sh' 2>/dev/null || true; } && export PATH=\"${__QODER_BASH_PATH_PREFIX:+$__QODER_BASH_PATH_PREFIX:}$PATH\" && { shopt -u extglob 2>/dev/null || true; } && { source /home/maoqh/.qoder/shell-snapshots/pkill-guard-66577-1407bbb69d8fde8f.sh 2>/dev/null || true; } && eval 'cd /tmp/hd004-int-1790246856 && REPO=/home/maoqh/projects/ordessa/worktrees/harness-desktop-002/bc-native && PORT2=$(python3 -c \"import socket; s=socket.socket(); s.bind(('\"'\"'127.0.0.1'\"'\"',0)); print(s.getsockname()[1]); s.close()\") && DBG2=$(python3 -c \"import socket; s=socket.socket(); s.bind(('\"'\"'127.0.0.1'\"'\"',0)); print(s.getsockname()[1]); s.close()\") && echo $PORT2 > port2.txt && echo $DBG2 > dbg2.txt && mkdir -p peers2 && cat > start-server2.sh <<EOF #!/bin/bash umask 077 REPO=$REPO ROOT=/tmp/hd004-int-1790246856 PORT=$PORT2 export HD003_LOG=\\$ROOT/peers2/peer HD003_PEER_ID=hd004-fake PYTHONPATH=\\$REPO/src HD004_FAKE_FIRST_CLOSE=unconfirmed exec setsid \\$REPO/.venv/bin/python -m agent_box.server --data-root \\$ROOT/data2 --port \\$PORT --execution-mode native --plugin-root \\$ROOT/harness-fake --native-harness pi --native-adapter-command \\$(which node) --native-adapter-arg \\$REPO/tests/acp_orchestration/fixtures/bidirectional_acp_peer.mjs --native-continuation >>\\$ROOT/srv2.stderr 2>&1 EOF cat > start-desktop2.sh <<EOF #!/bin/bash REPO=$REPO FE=/home/maoqh/projects/ordessa/worktrees/harness-desktop-002/fc-functional ROOT=/tmp/hd004-int-1790246856 PORT=$PORT2 DEBUG=$DBG2 mkdir -p \\$ROOT/euser2 cd \\$FE/apps/desktop exec env -i PATH=/usr/local/bin:/usr/bin:/bin DISPLAY=\\$DISPLAY XAUTHORITY=\\$XAUTHORITY HOME=\\$ROOT/euser2 XDG_CONFIG_HOME=\\$ROOT/euser2 XDG_CACHE_HOME=\\$ROOT/euser2 MODULAR_USER_DATA=\\$ROOT/euser2 ORDESSA_EXTENSION_HOME=\\$ROOT/euser2 ORDESSA_SERVER_ORIGIN=http://127.0.0.1:\\$PORT ORDESSA_SERVER_TOKEN_FILE=\\$ROOT/data2/secrets/http-token \\$FE/node_modules/electron/dist/electron --no-sandbox --disable-gpu --ozone-platform=x11 --remote-debugging-port=\\$DEBUG . >>\\$ROOT/desk2.out 2>&1 EOF chmod +x start-server2.sh start-desktop2.sh && nohup bash start-server2.sh >/dev/null 2>&1 & echo $! > srv2.pid; sleep 6; ls -la data2/secrets/http-token 2>/dev/null && cat port2.txt dbg2.txt' && pwd -P >| /tmp/qoder-21cc-cwd\n360440 /home/maoqh/projects/ordessa/worktrees/harness-desktop-002/bc-native/.venv/bin/python -m agent_box.server --data-root /tmp/hd004-int-1790246856/data2 --port 46503 --execution-mode native --plugin-root /tmp/hd004-int-1790246856/harness-fake --native-harness pi --native-adapter-command /usr/bin/node --native-adapter-arg /home/maoqh/projects/ordessa/worktrees/harness-desktop-002/bc-native/tests/acp_orchestration/fixtures/bidirectional_acp_peer.mjs --native-continuation\n360661 /usr/bin/node /home/maoqh/projects/ordessa/worktrees/harness-desktop-002/bc-native/tests/acp_orchestration/fixtures/bidirectional_acp_peer.mjs\n360671 /bin/sh -c pgrep -af \"bidirectional_acp_peer\""
+ }
+}

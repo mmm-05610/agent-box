@@ -1,0 +1,14 @@
+{
+ "text": "hd004 repro B",
+ "before": 0,
+ "after": 1,
+ "promptCount": 1,
+ "msgs": [
+  "hd004 repro B",
+  "got:hd004 repro B"
+ ],
+ "sessionNew": 3,
+ "ps": {
+  "entry": "360653 /usr/bin/node /tmp/hd004-int-1790246856/harness-fake/runtime/access-entry.mjs --native\n362091 /bin/sh -c pgrep -af \"harness-fake/runtime/access-entry\""
+ }
+}

@@ -65,7 +65,7 @@ def test_the_control_transform_drops_only_the_features_table():
     spec.loader.exec_module(gate)
     import tomllib
 
-    original = (REPO_ROOT / "plugins" / "agent-box-harnesses" / "deploy" / "codex"
+    original = (REPO_ROOT / "plugins" / "agent-box-harness" / "deploy" / "codex"
                 / "config.toml").read_bytes()
     control = gate.without_feature_flags(original)
     document = tomllib.loads(control.decode("utf-8"))
@@ -92,7 +92,7 @@ def test_a_single_flag_strip_keeps_the_other_flag_and_rejects_unknown_keys():
         "gate", REPO_ROOT / "scripts" / "server-round1" / "codex-production-chain-gate.py")
     gate = util.module_from_spec(spec)
     spec.loader.exec_module(gate)
-    original = (REPO_ROOT / "plugins" / "agent-box-harnesses" / "deploy" / "codex"
+    original = (REPO_ROOT / "plugins" / "agent-box-harness" / "deploy" / "codex"
                 / "config.toml").read_bytes()
 
     single = tomllib.loads(gate.without_feature_flags(original, "shell_snapshot").decode("utf-8"))

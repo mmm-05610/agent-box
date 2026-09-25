@@ -1,0 +1,18 @@
+{
+ "id": "perm_3",
+ "text": "hd003 approvalpendingPick onePick twoReject",
+ "buttons": [
+  {
+   "text": "Pick one",
+   "aria": null
+  },
+  {
+   "text": "Pick two",
+   "aria": null
+  },
+  {
+   "text": "Reject",
+   "aria": null
+  }
+ ]
+}

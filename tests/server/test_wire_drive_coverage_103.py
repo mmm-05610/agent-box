@@ -49,7 +49,7 @@ def test_the_scanner_sees_every_method_the_dispatcher_can_dispatch(tmp_path):
     parsed = set(coverage.dispatch_methods())
     live = set(build_runtime(tmp_path / "data").wire._handlers)  # noqa: SLF001
     assert parsed == live, (sorted(live - parsed), sorted(parsed - live))
-    assert len(parsed) == 64
+    assert len(parsed) == 67
 
 
 def test_every_registered_method_is_driven_over_the_wire_or_exempted():
@@ -58,7 +58,7 @@ def test_every_registered_method_is_driven_over_the_wire_or_exempted():
     driven, gaps, exemptions = coverage.survey()
     assert gaps == {}, sorted(gaps)
     assert set(driven) | set(exemptions) == set(coverage.dispatch_methods())
-    assert len(driven) == 64
+    assert len(driven) == 67
 
 
 # -- the document cannot drift from the tool ------------------------------
@@ -70,9 +70,11 @@ def test_the_generated_ledger_lists_each_method_with_the_evidence_the_tool_found
     scanner actually credits.
     """
     driven, _gaps, exemptions = coverage.survey()
+    # `(?:[a-zA-Z]+\.)*[a-zA-Z]+` - namespaced ids may carry more than one dot
+    # (`acp.channel.open`), and the ledger must be able to say so.
     rows = {method: (body, count)
             for method, body, count in re.findall(
-                r"^\|\s*`([a-zA-Z]+\.[a-zA-Z]+)`\s*\|(.*)\|\s*(\d+)\s*\|\s*$",
+                r"^\|\s*`((?:[a-zA-Z]+\.)+[a-zA-Z]+)`\s*\|(.*)\|\s*(\d+)\s*\|\s*$",
                 LEDGER.read_text(encoding="utf-8"), re.M)}
     assert set(rows) == set(coverage.dispatch_methods()), (
         set(coverage.dispatch_methods()) ^ set(rows))
@@ -93,7 +95,7 @@ def test_hiding_the_only_evidence_for_a_method_opens_a_gap():
 
     `usage.aggregate` and the three `providerArtifacts.*` methods are driven by
     exactly one file each (added by 101); take that file away and the gap
-    appears, which is what the ledger's 64/64 is actually asserting.
+    appears, which is what the ledger's 67/67 is actually asserting.
     """
     driven, _, _ = coverage.survey()
     #: 101 is the order that turned these five from "no evidence at all" into
@@ -147,7 +149,7 @@ def test_the_register_explains_every_row_and_hides_nothing_drivable():
     if not EXEMPTIONS.exists():
         assert coverage.survey()[2] == {}
         return
-    rows = re.findall(r"^\|\s*`([a-zA-Z]+\.[a-zA-Z]+)`\s*\|(.*)\|\s*$",
+    rows = re.findall(r"^\|\s*`((?:[a-zA-Z]+\.)+[a-zA-Z]+)`\s*\|(.*)\|\s*$",
                       EXEMPTIONS.read_text(encoding="utf-8"), re.M)
     driven, _gaps, exemptions = coverage.survey()
     assert {m for m, _ in rows} == set(exemptions)

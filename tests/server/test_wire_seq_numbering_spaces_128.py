@@ -241,7 +241,7 @@ def test_no_event_kind_or_payload_was_invented(server):
         "jsonrpc": "2.0", "id": "hello", "method": "server.hello",
         "params": {"clientVersions": ["1.0"], "clientPresentationSupports": []},
     }).json()["result"]
-    assert len(hello["capabilities"]) == 64, len(hello["capabilities"])
+    assert len(hello["capabilities"]) == 67, len(hello["capabilities"])
 
 
 def test_the_gate_reads_frames_over_http_and_not_the_helper(server):

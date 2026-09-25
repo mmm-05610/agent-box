@@ -48,7 +48,7 @@ def build(document: Path, *, secret_store, data_root: Path | None = None):
 
 CREDENTIAL_ID = "credential_0123456789abcdef0123456789abcdef"
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PLUGIN_ROOT = REPO_ROOT / "plugins" / "agent-box-harnesses"
+PLUGIN_ROOT = REPO_ROOT / "plugins" / "agent-box-harness"
 
 
 def deployment_document(tmp_path: Path, credentials: list[dict] | None = None) -> Path:

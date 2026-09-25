@@ -158,7 +158,7 @@ def test_the_effective_view_is_read_through_the_port_only_after_operations(tmp_p
     """
     from agent_box.server.execution.sidecar import LocalProcessLauncher, SidecarHarnessPort
 
-    plugin = Path(__file__).resolve().parents[2] / "plugins" / "agent-box-harnesses"
+    plugin = Path(__file__).resolve().parents[2] / "plugins" / "agent-box-harness"
     state: dict = {}
     observed: list[tuple[str, str, dict]] = []
     port = SidecarHarnessPort(
@@ -205,7 +205,7 @@ def test_the_effective_view_never_pre_fills_observations(tmp_path):
     """Fail if anyone answers the honesty problem by inventing observations."""
     from agent_box.server.execution.sidecar import LocalProcessLauncher, SidecarHarnessPort
 
-    plugin = Path(__file__).resolve().parents[2] / "plugins" / "agent-box-harnesses"
+    plugin = Path(__file__).resolve().parents[2] / "plugins" / "agent-box-harness"
     port = SidecarHarnessPort(
         LocalProcessLauncher(["node", str(plugin / "runtime" / "worker-entry.mjs")]),
         environment={

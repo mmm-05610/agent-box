@@ -31,7 +31,7 @@ from agent_box.server.execution.sidecar import (
 
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
-PLUGIN = REPO / "plugins" / "agent-box-harnesses"
+PLUGIN = REPO / "plugins" / "agent-box-harness"
 FIXTURE_DRIVER = pathlib.Path(__file__).resolve().parent / "fixtures" / "fixture_native_driver.mjs"
 #: The bundle path the sidecar itself loads, relative to a bundle root.
 DRIVER_BUNDLE_PATH = "agentbox-sidecar/deployment/fixture-native/driver.mjs"
@@ -310,7 +310,7 @@ def test_every_shipped_driver_implements_the_declared_contract():
     """
     drivers = [
         FIXTURE_DRIVER,
-        PLUGIN / "deploy" / "opencode" / "driver-native.mjs",
+        PLUGIN / "runtime" / "drivers" / "opencode-native.mjs",
     ]
     result = subprocess.run(
         ["node", "--input-type=module", "-e", CONFORMANCE_PROBE,

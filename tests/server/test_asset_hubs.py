@@ -17,7 +17,7 @@ import time
 import pytest
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
-PLUGIN = REPO / "plugins" / "agent-box-harnesses"
+PLUGIN = REPO / "plugins" / "agent-box-harness"
 
 from agent_box.server.assets.skills import (
     MAX_ASSET_ENTRIES,

@@ -138,7 +138,7 @@ def test_a_deployment_with_no_families_answers_an_empty_list_not_an_error(tmp_pa
     with TestClient(app, base_url="http://127.0.0.1") as client:
         result = Client(client, runtime.token).hello()
     assert result["harnesses"] == []
-    assert len(result["capabilities"]) == 64
+    assert len(result["capabilities"]) == 67
 
 
 # -- G2: declarations only, no implementation ------------------------------

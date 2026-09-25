@@ -2,7 +2,7 @@
   "$protocolVersion": "wire/1",
   "$schemaKind": "agent-box-server.wire-inventory",
   "generatedBy": "scripts/server-round1/wire_artifact.py",
-  "methodCount": 64,
+  "methodCount": 67,
   "methods": {
     "accounts.bind": {
       "handler": "accounts_bind",
@@ -55,6 +55,37 @@
       "params": {
         "optional": [],
         "required": []
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "acp.channel.open": {
+      "handler": "acp_channel_open",
+      "params": {
+        "optional": [
+          "requestId"
+        ],
+        "required": [
+          "harnessId",
+          "projectId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "acp.channel.release": {
+      "handler": "acp_channel_release",
+      "params": {
+        "optional": [
+          "requestId"
+        ],
+        "required": [
+          "connectionId"
+        ]
       },
       "result": {
         "authority": "contract",
@@ -262,6 +293,20 @@
           "overrides",
           "profileId",
           "workspaceId"
+        ]
+      },
+      "result": {
+        "authority": "contract",
+        "declared": false
+      }
+    },
+    "executions.get": {
+      "handler": "executions_get",
+      "params": {
+        "optional": [],
+        "required": [
+          "executionId",
+          "requestId"
         ]
       },
       "result": {

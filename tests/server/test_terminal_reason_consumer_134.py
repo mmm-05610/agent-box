@@ -168,7 +168,7 @@ from agent_box.server.execution.sidecar import (  # noqa: E402
 )
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
-PLUGIN = REPO / "plugins" / "agent-box-harnesses"
+PLUGIN = REPO / "plugins" / "agent-box-harness"
 SIDECAR_ENTRY = PLUGIN / "runtime" / "worker-entry.mjs"
 FAKE_PEER = PLUGIN / "tests" / "harness_remote" / "fake_acp_peer.mjs"
 

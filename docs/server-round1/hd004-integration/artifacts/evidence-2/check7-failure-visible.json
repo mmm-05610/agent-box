@@ -1,0 +1,8 @@
+{
+ "errors": [
+  "Backend release pending: conn_96b4a6bac2244da7b3606dade76522f6: ACP channel release unconfirmed: release-unconfirmed"
+ ],
+ "buttons": [
+  "Retry backend release"
+ ]
+}

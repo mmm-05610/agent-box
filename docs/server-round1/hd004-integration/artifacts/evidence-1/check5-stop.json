@@ -1,0 +1,66 @@
+{
+ "before": {
+  "buttons": [
+   {
+    "t": "Send",
+    "d": true
+   },
+   {
+    "t": "Request stop",
+    "d": false
+   }
+  ],
+  "msgs": 3,
+  "alerts": []
+ },
+ "requested": {
+  "buttons": [
+   {
+    "t": "Send",
+    "d": true
+   }
+  ],
+  "msgs": [
+   "scenario:permission twin-options",
+   "scenario:hang hd004-stop"
+  ],
+  "alerts": []
+ },
+ "peerSawCancel": true,
+ "after": {
+  "msgs": [
+   "scenario:permission twin-options",
+   "scenario:hang hd004-stop"
+  ],
+  "buttons": [
+   "Send"
+  ],
+  "statuses": []
+ },
+ "executions": {
+  "jsonrpc": "2.0",
+  "id": "executions.list",
+  "result": {
+   "executions": [
+    {
+     "executionId": "turn_98ca5b3112ea4159b3eb9ce7cf21c0fd",
+     "turnId": "turn_98ca5b3112ea4159b3eb9ce7cf21c0fd",
+     "sessionId": "session_e9909142d56d424ba1b46829ff3b445b",
+     "profileId": "profile_8c38244c0627468282c3547e8afcee0d",
+     "profile": "Native pi",
+     "harness": "pi",
+     "placement": "local",
+     "state": "queued",
+     "startedAt": "2026-09-24T11:01:00.299166+00:00",
+     "workspaceId": "ws_caf6bb390fd740de8ba208570ba8aa1b",
+     "workspace": "project",
+     "queueItemId": null,
+     "pid": null,
+     "pidReason": "PID_NOT_REPORTED",
+     "adapterPid": null,
+     "adapterPidReason": "ADAPTER_PID_NOT_REPORTED"
+    }
+   ]
+  }
+ }
+}

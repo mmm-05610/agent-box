@@ -24,7 +24,7 @@ from fastapi.testclient import TestClient
 import pytest
 
 REPO = Path(__file__).resolve().parents[2]
-PLUGIN = REPO / "plugins" / "agent-box-harnesses"
+PLUGIN = REPO / "plugins" / "agent-box-harness"
 REPORT = REPO / "docs/server-round1/import-asset-request-id-129.md"
 
 from agent_box.server.accounts.assets import AccountAssetStore

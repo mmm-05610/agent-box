@@ -232,7 +232,7 @@ def test_symlink_and_special_file_sources_fail_closed(tmp_path):
 
 # 12. The Codex composition has no second assembly path.
 def test_codex_composition_has_no_fallback_bundle_factory():
-    text = (REPO_ROOT / "plugins" / "agent-box-harnesses" / "src" / "agent_box_harnesses" / "codex" / "composition.py").read_text(encoding="utf-8")
+    text = (REPO_ROOT / "plugins" / "agent-box-harness" / "src" / "agent_box_harness" / "codex" / "composition.py").read_text(encoding="utf-8")
     assert "bundle_factory" not in text
     assert "composition_from_resolved_inputs(request, command" in text or "assemble_runtime_composition(\n        request, command" in text
     assert "hasattr(coordinator" not in text

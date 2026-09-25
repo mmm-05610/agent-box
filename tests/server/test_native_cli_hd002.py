@@ -15,7 +15,7 @@ from agent_box.storage import ObjectStore
 
 
 REPO = Path(__file__).resolve().parents[2]
-PLUGIN = REPO / "plugins" / "agent-box-harnesses"
+PLUGIN = REPO / "plugins" / "agent-box-harness"
 FAKE = Path(__file__).with_name("fake_native_acp_peer_hd002.mjs")
 HELLO = {"clientVersions": ["wire/1"], "clientPresentationSupports": []}
 

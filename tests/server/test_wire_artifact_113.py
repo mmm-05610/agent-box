@@ -71,11 +71,11 @@ def _json(path):
 
 # -- G1 本体：可复跑、稳定、就是派发表 ------------------------------------
 
-def test_the_generator_is_deterministic_and_counts_sixty_four_methods():
+def test_the_generator_is_deterministic_and_counts_sixty_seven_methods():
     first, second = TOOL.render(TOOL.build()), TOOL.render(TOOL.build())
     assert first == second, "a generator that drifts between runs cannot be pinned"
     document = json.loads(first)
-    assert document["methodCount"] == 64 == len(document["methods"])
+    assert document["methodCount"] == 67 == len(document["methods"])
     assert TOOL.digest(first) == TOOL.digest(second)
 
 
@@ -86,7 +86,7 @@ def test_the_inventory_names_exactly_what_the_dispatcher_routes(tmp_path):
     with TestClient(create_app(runtime), base_url="http://127.0.0.1"):
         routed = set(runtime.wire._handlers)
     assert set(TOOL.build()["methods"]) == routed
-    assert len(routed) == 64
+    assert len(routed) == 67
 
 
 def test_the_committed_inventory_is_current():
@@ -195,7 +195,7 @@ def test_the_tool_refuses_to_write_or_read_outside_this_repository(target):
 
 def test_the_method_set_did_not_move_under_this_order():
     document = _json(INVENTORY)
-    assert document["methodCount"] == 64
+    assert document["methodCount"] == 67
     assert "server.hello" in document["methods"]
     assert document["methods"]["server.hello"]["handler"] == "hello"
     assert document["methods"]["providerModels.update"]["params"]["required"] == [

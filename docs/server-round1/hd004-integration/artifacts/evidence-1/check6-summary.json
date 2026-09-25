@@ -1,0 +1,26 @@
+{
+ "6a-viewSwitch": "entry 355780 + peer 355788 unchanged; peer log: 1 peer-start, 1 session-new, 0 stdin-eof; same native session hd003-hd004-main-1 reused across Sessions/project/Conversation switches",
+ "6b-transportDrop-reload": {
+  "pids": {
+   "pidsBefore": {
+    "entry": "355780 /usr/bin/node /home/maoqh/projects/ordessa/worktrees/harness-desktop-002/bc-native/plugins/agent-box-harness/runtime/access-entry.mjs --native\n356668 /bin/sh -c pgrep -af \"access-entry.mjs\"",
+    "peer": "351983 /home/maoqh/projects/ordessa/worktrees/harness-desktop-002/bc-native/.venv/bin/python -m agent_box.server --data-root /tmp/hd004-int-1790246856/data --port 57333 --execution-mode native --plugin-root /home/maoqh/projects/ordessa/worktrees/harness-desktop-002/bc-native/plugins/agent-box-harness --native-harness pi --native-adapter-command /usr/bin/node --native-adapter-arg /home/maoqh/projects/ordessa/worktrees/harness-desktop-002/bc-native/tests/acp_orchestration/fixtures/bidirectional_acp_peer.mjs --native-continuation\n355788 /usr/bin/node /home/maoqh/projects/ordessa/worktrees/harness-desktop-002/bc-native/tests/acp_orchestration/fixtures/bidirectional_acp_peer.mjs\n356670 /bin/sh -c pgrep -af \"bidirectional_acp_peer\""
+   },
+   "pidsAfter": {
+    "entry": "355780 /usr/bin/node /home/maoqh/projects/ordessa/worktrees/harness-desktop-002/bc-native/plugins/agent-box-harness/runtime/access-entry.mjs --native\n356674 /bin/sh -c pgrep -af \"access-entry.mjs\"",
+    "peer": "351983 /home/maoqh/projects/ordessa/worktrees/harness-desktop-002/bc-native/.venv/bin/python -m agent_box.server --data-root /tmp/hd004-int-1790246856/data --port 57333 --execution-mode native --plugin-root /home/maoqh/projects/ordessa/worktrees/harness-desktop-002/bc-native/plugins/agent-box-harness --native-harness pi --native-adapter-command /usr/bin/node --native-adapter-arg /home/maoqh/projects/ordessa/worktrees/harness-desktop-002/bc-native/tests/acp_orchestration/fixtures/bidirectional_acp_peer.mjs --native-continuation\n355788 /usr/bin/node /home/maoqh/projects/ordessa/worktrees/harness-desktop-002/bc-native/tests/acp_orchestration/fixtures/bidirectional_acp_peer.mjs\n356676 /bin/sh -c pgrep -af \"bidirectional_acp_peer\""
+   },
+   "stdinEof": []
+  },
+  "note": "renderer reload (transport drop + re-establish): same entry/peer, zero stdin-eof; post-reload send replied on live channel (second session-new is a NEW UI draft session on the SAME agent process, not a restart)"
+ },
+ "6c-explicit-release": "Reconnect at 10:59 disposed client → wire release → entry close; old entry 353727 + peer 353735 absent from ps afterwards (evidence/check6c-explicit-release.json, evidence/peer.log.old-353735.jsonl)",
+ "ledger": "server_turns: turn_a3e8(session1) state=cancelled terminal_reason=released updated 10:59:38 (release moment); turn_98ca(session2) state=accepted still live while channel open; sendOutcome style: native_continuation keeps one live turn per session (HEAD commit e996e9d2)",
+ "evidence_files": [
+  "evidence/check6a-views.json",
+  "evidence/check6b-reload.json",
+  "evidence/check6c-explicit-release.json",
+  "evidence/check6-ledger.csv",
+  "evidence/check5-cancel-events.txt"
+ ]
+}

@@ -42,7 +42,7 @@ def test_real_bwrap_direct_stdio_fake_claude_is_independently_staged(tmp_path):
     sandbox_provider=BwrapSandboxProvider(tmp_path / "sandbox")
     if sandbox_provider.probe()["status"] != "available": pytest.skip("bwrap unavailable")
     workspace=tmp_path / "workspace"; workspace.mkdir()
-    executable=tmp_path / "staged-claude"; executable.write_text("#!/usr/bin/python3\n" + Path(__file__).parents[4].joinpath("plugins/agent-box-harnesses/src/agent_box_harnesses/claude/fake_claude.py").read_text(), encoding="utf-8"); executable.chmod(0o755)
+    executable=tmp_path / "staged-claude"; executable.write_text("#!/usr/bin/python3\n" + Path(__file__).parents[4].joinpath("plugins/agent-box-harness/src/agent_box_harness/claude/fake_claude.py").read_text(), encoding="utf-8"); executable.chmod(0o755)
     home=tmp_path / "home"; (home / ".claude").mkdir(parents=True); (home / ".claude/settings.json").write_text("{}")
     hooks=tmp_path / "hooks"; hooks.mkdir(); (hooks / "session-start").write_text("", encoding="utf-8")
     plan=SimpleNamespace(argv=(str(executable), "--print", "offline"), env={}, cwd=workspace, profile_home=home, helper_dir=hooks)

@@ -1,0 +1,11 @@
+{
+ "pidsBefore": {
+  "entry": "355780 /usr/bin/node /home/maoqh/projects/ordessa/worktrees/harness-desktop-002/bc-native/plugins/agent-box-harness/runtime/access-entry.mjs --native\n356668 /bin/sh -c pgrep -af \"access-entry.mjs\"",
+  "peer": "351983 /home/maoqh/projects/ordessa/worktrees/harness-desktop-002/bc-native/.venv/bin/python -m agent_box.server --data-root /tmp/hd004-int-1790246856/data --port 57333 --execution-mode native --plugin-root /home/maoqh/projects/ordessa/worktrees/harness-desktop-002/bc-native/plugins/agent-box-harness --native-harness pi --native-adapter-command /usr/bin/node --native-adapter-arg /home/maoqh/projects/ordessa/worktrees/harness-desktop-002/bc-native/tests/acp_orchestration/fixtures/bidirectional_acp_peer.mjs --native-continuation\n355788 /usr/bin/node /home/maoqh/projects/ordessa/worktrees/harness-desktop-002/bc-native/tests/acp_orchestration/fixtures/bidirectional_acp_peer.mjs\n356670 /bin/sh -c pgrep -af \"bidirectional_acp_peer\""
+ },
+ "pidsAfter": {
+  "entry": "355780 /usr/bin/node /home/maoqh/projects/ordessa/worktrees/harness-desktop-002/bc-native/plugins/agent-box-harness/runtime/access-entry.mjs --native\n356674 /bin/sh -c pgrep -af \"access-entry.mjs\"",
+  "peer": "351983 /home/maoqh/projects/ordessa/worktrees/harness-desktop-002/bc-native/.venv/bin/python -m agent_box.server --data-root /tmp/hd004-int-1790246856/data --port 57333 --execution-mode native --plugin-root /home/maoqh/projects/ordessa/worktrees/harness-desktop-002/bc-native/plugins/agent-box-harness --native-harness pi --native-adapter-command /usr/bin/node --native-adapter-arg /home/maoqh/projects/ordessa/worktrees/harness-desktop-002/bc-native/tests/acp_orchestration/fixtures/bidirectional_acp_peer.mjs --native-continuation\n355788 /usr/bin/node /home/maoqh/projects/ordessa/worktrees/harness-desktop-002/bc-native/tests/acp_orchestration/fixtures/bidirectional_acp_peer.mjs\n356676 /bin/sh -c pgrep -af \"bidirectional_acp_peer\""
+ },
+ "stdinEof": []
+}

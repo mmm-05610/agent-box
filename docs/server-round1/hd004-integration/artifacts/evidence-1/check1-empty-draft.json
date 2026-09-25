@@ -1,0 +1,462 @@
+{
+ "note": "reshoot after earlier file was overwritten by instance-2 run",
+ "draft": {
+  "head": "NEW SESSIONNew sessionidle",
+  "startDisabled": true,
+  "value": ""
+ },
+ "peerEvents": [
+  {
+   "file": "peer.355788.hd004-main",
+   "peer": "hd004-main",
+   "pid": 355788,
+   "event": "peer-start",
+   "cwd": "/tmp/hd004-int-1790246856/project"
+  },
+  {
+   "file": "peer.355788.hd004-main",
+   "peer": "hd004-main",
+   "pid": 355788,
+   "dir": "recv",
+   "frame": {
+    "jsonrpc": "2.0",
+    "id": 0,
+    "method": "initialize",
+    "params": {
+     "protocolVersion": 1,
+     "clientCapabilities": {}
+    }
+   }
+  },
+  {
+   "file": "peer.355788.hd004-main",
+   "peer": "hd004-main",
+   "pid": 355788,
+   "dir": "send",
+   "frame": {
+    "jsonrpc": "2.0",
+    "id": 0,
+    "result": {
+     "agentInfo": {
+      "name": "hd003-peer",
+      "version": "test",
+      "vendorExtensions": {
+       "hd003": true
+      }
+     },
+     "agentCapabilities": {
+      "loadSession": true,
+      "sessionCapabilities": {
+       "resume": {}
+      },
+      "hd003_custom_capability": {
+       "level": 3
+      }
+     },
+     "promptCapabilities": {
+      "image": {}
+     },
+     "authMethods": [
+      {
+       "id": "none",
+       "name": "none"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "file": "peer.355788.hd004-main",
+   "peer": "hd004-main",
+   "pid": 355788,
+   "dir": "recv",
+   "frame": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "session/new",
+    "params": {
+     "cwd": "/tmp/hd004-int-1790246856/project",
+     "mcpServers": []
+    }
+   }
+  },
+  {
+   "file": "peer.355788.hd004-main",
+   "peer": "hd004-main",
+   "pid": 355788,
+   "event": "session-new",
+   "sessionId": "hd003-hd004-main-1",
+   "cwdParam": "/tmp/hd004-int-1790246856/project",
+   "cwd": "/tmp/hd004-int-1790246856/project",
+   "params": {
+    "cwd": "/tmp/hd004-int-1790246856/project",
+    "mcpServers": []
+   }
+  },
+  {
+   "file": "peer.355788.hd004-main",
+   "peer": "hd004-main",
+   "pid": 355788,
+   "dir": "send",
+   "frame": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "result": {
+     "sessionId": "hd003-hd004-main-1",
+     "configOptions": []
+    }
+   }
+  },
+  {
+   "file": "peer.355788.hd004-main",
+   "peer": "hd004-main",
+   "pid": 355788,
+   "dir": "recv",
+   "frame": {
+    "jsonrpc": "2.0",
+    "id": 2,
+    "method": "session/prompt",
+    "params": {
+     "sessionId": "hd003-hd004-main-1",
+     "prompt": [
+      {
+       "type": "text",
+       "text": "scenario:permission twin-options"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "file": "peer.355788.hd004-main",
+   "peer": "hd004-main",
+   "pid": 355788,
+   "dir": "send",
+   "frame": {
+    "jsonrpc": "2.0",
+    "id": 7777,
+    "method": "session/request_permission",
+    "params": {
+     "sessionId": "hd003-hd004-main-1",
+     "toolCall": {
+      "toolCallId": "hd003-tool-hd004-main",
+      "name": "shell",
+      "title": "hd003 approval"
+     },
+     "options": [
+      {
+       "kind": "allow_once",
+       "optionId": "pick-1-hd004-main",
+       "name": "Pick one"
+      },
+      {
+       "kind": "allow_once",
+       "optionId": "pick-2-hd004-main",
+       "name": "Pick two"
+      },
+      {
+       "kind": "reject_once",
+       "optionId": "reject-hd004-main",
+       "name": "Reject"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "file": "peer.355788.hd004-main",
+   "peer": "hd004-main",
+   "pid": 355788,
+   "dir": "recv",
+   "frame": {
+    "jsonrpc": "2.0",
+    "id": 7777,
+    "result": {
+     "outcome": {
+      "outcome": "selected",
+      "optionId": "pick-2-hd004-main"
+     }
+    }
+   }
+  },
+  {
+   "file": "peer.355788.hd004-main",
+   "peer": "hd004-main",
+   "pid": 355788,
+   "event": "permission-answer",
+   "frame": {
+    "jsonrpc": "2.0",
+    "id": 7777,
+    "result": {
+     "outcome": {
+      "outcome": "selected",
+      "optionId": "pick-2-hd004-main"
+     }
+    }
+   }
+  },
+  {
+   "file": "peer.355788.hd004-main",
+   "peer": "hd004-main",
+   "pid": 355788,
+   "dir": "send",
+   "frame": {
+    "jsonrpc": "2.0",
+    "id": 2,
+    "result": {
+     "stopReason": "end_turn"
+    }
+   }
+  },
+  {
+   "file": "peer.355788.hd004-main",
+   "peer": "hd004-main",
+   "pid": 355788,
+   "dir": "recv",
+   "frame": {
+    "jsonrpc": "2.0",
+    "id": 3,
+    "method": "session/prompt",
+    "params": {
+     "sessionId": "hd003-hd004-main-1",
+     "prompt": [
+      {
+       "type": "text",
+       "text": "scenario:hang hd004-stop"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "file": "peer.355788.hd004-main",
+   "peer": "hd004-main",
+   "pid": 355788,
+   "dir": "recv",
+   "frame": {
+    "jsonrpc": "2.0",
+    "method": "session/cancel",
+    "params": {
+     "sessionId": "hd003-hd004-main-1"
+    }
+   }
+  },
+  {
+   "file": "peer.355788.hd004-main",
+   "peer": "hd004-main",
+   "pid": 355788,
+   "dir": "send",
+   "frame": {
+    "jsonrpc": "2.0",
+    "id": 3,
+    "result": {
+     "stopReason": "cancelled"
+    }
+   }
+  },
+  {
+   "file": "peer.355788.hd004-main",
+   "peer": "hd004-main",
+   "pid": 355788,
+   "dir": "recv",
+   "frame": {
+    "jsonrpc": "2.0",
+    "id": 4,
+    "method": "session/prompt",
+    "params": {
+     "sessionId": "hd003-hd004-main-1",
+     "prompt": [
+      {
+       "type": "text",
+       "text": "hd004 after view switch"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "file": "peer.355788.hd004-main",
+   "peer": "hd004-main",
+   "pid": 355788,
+   "dir": "send",
+   "frame": {
+    "jsonrpc": "2.0",
+    "method": "session/update",
+    "params": {
+     "sessionId": "hd003-hd004-main-1",
+     "update": {
+      "sessionUpdate": "agent_message_chunk",
+      "content": {
+       "type": "text",
+       "text": "got:hd004 after view switch"
+      }
+     }
+    }
+   }
+  },
+  {
+   "file": "peer.355788.hd004-main",
+   "peer": "hd004-main",
+   "pid": 355788,
+   "dir": "send",
+   "frame": {
+    "jsonrpc": "2.0",
+    "id": 4,
+    "result": {
+     "stopReason": "end_turn"
+    }
+   }
+  },
+  {
+   "file": "peer.355788.hd004-main",
+   "peer": "hd004-main",
+   "pid": 355788,
+   "dir": "recv",
+   "frame": {
+    "jsonrpc": "2.0",
+    "id": 0,
+    "method": "initialize",
+    "params": {
+     "protocolVersion": 1,
+     "clientCapabilities": {}
+    }
+   }
+  },
+  {
+   "file": "peer.355788.hd004-main",
+   "peer": "hd004-main",
+   "pid": 355788,
+   "dir": "send",
+   "frame": {
+    "jsonrpc": "2.0",
+    "id": 0,
+    "result": {
+     "agentInfo": {
+      "name": "hd003-peer",
+      "version": "test",
+      "vendorExtensions": {
+       "hd003": true
+      }
+     },
+     "agentCapabilities": {
+      "loadSession": true,
+      "sessionCapabilities": {
+       "resume": {}
+      },
+      "hd003_custom_capability": {
+       "level": 3
+      }
+     },
+     "promptCapabilities": {
+      "image": {}
+     },
+     "authMethods": [
+      {
+       "id": "none",
+       "name": "none"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "file": "peer.355788.hd004-main",
+   "peer": "hd004-main",
+   "pid": 355788,
+   "dir": "recv",
+   "frame": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "session/new",
+    "params": {
+     "cwd": "/tmp/hd004-int-1790246856/project",
+     "mcpServers": []
+    }
+   }
+  },
+  {
+   "file": "peer.355788.hd004-main",
+   "peer": "hd004-main",
+   "pid": 355788,
+   "event": "session-new",
+   "sessionId": "hd003-hd004-main-2",
+   "cwdParam": "/tmp/hd004-int-1790246856/project",
+   "cwd": "/tmp/hd004-int-1790246856/project",
+   "params": {
+    "cwd": "/tmp/hd004-int-1790246856/project",
+    "mcpServers": []
+   }
+  },
+  {
+   "file": "peer.355788.hd004-main",
+   "peer": "hd004-main",
+   "pid": 355788,
+   "dir": "send",
+   "frame": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "result": {
+     "sessionId": "hd003-hd004-main-2",
+     "configOptions": []
+    }
+   }
+  },
+  {
+   "file": "peer.355788.hd004-main",
+   "peer": "hd004-main",
+   "pid": 355788,
+   "dir": "recv",
+   "frame": {
+    "jsonrpc": "2.0",
+    "id": 2,
+    "method": "session/prompt",
+    "params": {
+     "sessionId": "hd003-hd004-main-2",
+     "prompt": [
+      {
+       "type": "text",
+       "text": "hd004 after reload"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "file": "peer.355788.hd004-main",
+   "peer": "hd004-main",
+   "pid": 355788,
+   "dir": "send",
+   "frame": {
+    "jsonrpc": "2.0",
+    "method": "session/update",
+    "params": {
+     "sessionId": "hd003-hd004-main-2",
+     "update": {
+      "sessionUpdate": "agent_message_chunk",
+      "content": {
+       "type": "text",
+       "text": "got:hd004 after reload"
+      }
+     }
+    }
+   }
+  },
+  {
+   "file": "peer.355788.hd004-main",
+   "peer": "hd004-main",
+   "pid": 355788,
+   "dir": "send",
+   "frame": {
+    "jsonrpc": "2.0",
+    "id": 2,
+    "result": {
+     "stopReason": "end_turn"
+    }
+   }
+  }
+ ],
+ "ps": {
+  "entry": "362643 /bin/sh -c pgrep -af \"harness-fake/runtime/access-entry\"",
+  "real": "355780 /usr/bin/node /home/maoqh/projects/ordessa/worktrees/harness-desktop-002/bc-native/plugins/agent-box-harness/runtime/access-entry.mjs --native\n362645 /bin/sh -c pgrep -af \"agent-box-harness/runtime/access-entry\""
+ }
+}

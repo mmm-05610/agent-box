@@ -1,0 +1,27 @@
+{
+ "clicked": {
+  "text": "Pick two",
+  "aria": null
+ },
+ "peerAnswer": [
+  {
+   "peer": "hd004-main",
+   "pid": 355788,
+   "event": "permission-answer",
+   "frame": {
+    "jsonrpc": "2.0",
+    "id": 7777,
+    "result": {
+     "outcome": {
+      "outcome": "selected",
+      "optionId": "pick-2-hd004-main"
+     }
+    }
+   }
+  }
+ ],
+ "msgs": [
+  "scenario:permission twin-options"
+ ],
+ "note": "stale old-peer event replaced; fresh peer 355788; optionId pick-2 returned verbatim (kind-based guessing would have produced pick-1)"
+}

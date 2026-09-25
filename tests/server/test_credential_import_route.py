@@ -24,7 +24,7 @@ from agent_box.storage import MemorySecretStore
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PLUGIN_ROOT = REPO_ROOT / "plugins" / "agent-box-harnesses"
+PLUGIN_ROOT = REPO_ROOT / "plugins" / "agent-box-harness"
 
 
 @pytest.fixture

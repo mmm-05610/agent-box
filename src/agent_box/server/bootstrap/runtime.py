@@ -231,6 +231,9 @@ class ServerRuntime:
     declared_credentials: tuple[dict[str, str], ...] = ()
     native_harness_id: str | None = None
     native_profile_id: str | None = None
+    #: Managed ACP channel registry (owned transports and their run records);
+    #: composed only where a transport provider is injected.
+    acp_channels: Any | None = None
     started: bool = False
 
     def start(self) -> None:
@@ -274,6 +277,11 @@ class ServerRuntime:
         self.started = True
 
     def stop(self) -> None:
+        # Owned ACP channel transports stop first: their run records are
+        # closed with the honest server-stop reason while the ledger is up.
+        channels = getattr(self, "acp_channels", None)
+        if channels is not None:
+            channels.stop_all()
         if self.execution is not None and hasattr(self.execution, "stop"):
             if not self.execution.stop():
                 raise RuntimeError("SERVER_STOP_TIMEOUT")
@@ -510,7 +518,7 @@ def build_runtime_from_native_adapter(
     """Compose one current-user ACP Agent in an explicitly native Server.
 
     The adapter is a launch reference, never a credential or projected home.
-    The worker entry verifies its bundled bridge provenance at launch.
+    The plugin entry verifies its bundled bridge provenance at launch.
     """
     import shutil
     from agent_box.server.execution import HarnessDescriptor
@@ -528,10 +536,11 @@ def build_runtime_from_native_adapter(
             or any(not isinstance(arg, str) or "\x00" in arg for arg in adapter_args)):
         raise RuntimeError("NATIVE_ADAPTER_INVALID")
     plugin = Path(plugin_root).resolve()
-    entry = plugin / "runtime" / "worker-entry.mjs"
+    entry = plugin / "runtime" / "worker-entry.mjs"  # retired old chain, launch-fail honest
+    access_entry = plugin / "runtime" / "access-entry.mjs"
     provenance = plugin / "third_party" / "harness_remote" / "SOURCE.json"
     node = shutil.which("node")
-    if not entry.is_file() or not provenance.is_file() or node is None:
+    if not access_entry.is_file() or not provenance.is_file() or node is None:
         raise RuntimeError("NATIVE_HARNESS_ARTIFACT_MISSING")
     registry = HarnessRegistry()
     registry.register(HarnessDescriptor(
@@ -612,6 +621,31 @@ def build_runtime_from_native_adapter(
             "profileId": identity if valid else None,
         }
     runtime.wire.native_execution_provider = native_identity
+    # -- managed ACP channels (seam doc §5: the composition's transport entry) --
+    # The channel is carried by the Harness plugin's production access entry:
+    # the entry connects (verifying provenance, launching the declared adapter
+    # with the Server-resolved cwd as the authoritative directory) and only
+    # then relays ACP lines transparently; release goes through the entry's
+    # own close-with-OS-confirmation contract.  Nothing here spawns an Agent
+    # directly.
+    from agent_box.server.acp_channel import AcpChannelRegistry
+    from agent_box.server.acp_channel.access_entry import AccessEntryTransport
+
+    def launch_channel_transport(*, harness_id: str, cwd: str, on_line, on_exit):
+        environment = dict(os.environ)
+        environment.pop("AGENTBOX_SIDECAR_ISOLATED", None)
+        return AccessEntryTransport(
+            node=node, entry=str(access_entry), harness_id=harness_id,
+            cwd=cwd, adapter=adapter, on_line=on_line, on_exit=on_exit,
+            environment=environment,
+        ).start()
+
+    runtime.acp_channels = AcpChannelRegistry(
+        session_records=runtime.service.sessions.records,
+        profile_records=runtime.service.profiles.records,
+        launch=launch_channel_transport,
+    )
+    runtime.wire.acp_channels = runtime.acp_channels
     return runtime
 
 
