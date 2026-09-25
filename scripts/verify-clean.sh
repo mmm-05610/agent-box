@@ -6,7 +6,7 @@
 # definition. Known reds are asserted at their exact counts — a *new* red,
 # a missing inherited red, or an unrunnable suite all fail this script.
 set -u
-CAND=/home/maoqh/projects/ordessa-monorepo-candidate
+CAND=${ORDESSA_CANDIDATE:-/home/maoqh/projects/ordessa}
 CLEAN=/home/maoqh/projects/ordessa-verify-clean
 VENV=/tmp/ordessa-verify-venv
 BRIDGE_OUT=/tmp/ordessa-verify-bridge
