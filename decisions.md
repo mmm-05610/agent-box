@@ -137,3 +137,270 @@ the original text.
 | **U-5** | Role truth: is the QA line / scout alive or cut (C-2, C-3)? This matters only if the formation is rebuilt; it does not affect the product. |
 | **U-6** | Cloud verification line (old `R-0047`/`R-0048`/`R-0049`): the records say "mechanism proven" and leave three user decisions open (`rulings.md:54`). No follow-up. Whether that mechanism is still wanted is a `I` decision. |
 | **U-7** | Skill repository version: whether to tag 0.3.0 and re-sync the installed copy was left to the user (`rulings.md:29`, `:31`). No decision recorded. Out of scope for this cleanup. |
+
+## Part 6 — 2026-09-21 native Linux direction
+
+### D-0016 — Native Linux first (user decision)
+
+Source: user-facing session, 2026-09-21: Windows remote-to-WSL product line is
+deferred; native Linux is the first delivery target. Preserve existing Windows/
+WSL code and history; deferral is not deletion or a compatibility guarantee.
+**Supersedes D-0009's mandatory Windows location for this native Linux line.**
+Retain the single-authoritative-store invariant; the precise local service/data
+layout must be specified and verified during baseline integration. No credential
+or user-data migration is authorised by this direction alone.
+
+### D-0017 — Converge before business parallelism (user direction; plan pending)
+
+First inspect current trees and establish one product checkpoint, then split
+worktrees by business outcome. See `linux-native-baseline-plan.md` for the
+proposed checkpoint gates, roles and boundaries. This records the direction,
+not approval of all implementation details. Product branch merging remains
+prohibited by AGENTS.md; a scoped exception is needed for integration branches.
+No executor has been appointed and no feature order has been dispatched.
+
+### Evidence correction E-001 — integration history
+
+The cleanup inference “no cross-repository integration ever occurred” is
+withdrawn: archived `status.md:90–101` records authorised takeover and
+`docs/acceptance/round-5.md` ACC-R5-10 records five UI replies. This does not
+manufacture independent-review ACCEPT, close defects, or grant user acceptance.
+Original archive and cleanup report remain unchanged as provenance.
+
+### D-0018 — Integration branches and native Linux development authorised
+
+2026-09-21, user explicitly confirmed the proposal: create new branches, combine
+existing work into the new product line, then develop native Linux there.
+**Supersedes D-0017's pending-authorisation condition and the blanket product
+merge/code freeze only for this scope.** Each of backend and desktop may create
+`integration/linux-native-0` in a dedicated worktree, integrate the four primary
+implementation lines, and implement native Linux adaptations. Other historical
+branches require relevance/content audit before selecting additional changes;
+this is not an instruction to merge every branch blindly.
+
+These branches together form the candidate product mainline; publishing `main`
+branches remain unchanged. No push, deletion of old worktrees, user-data or
+credential migration, or interference with existing services is authorised.
+No executor has yet been appointed. This is implementation authority, not a
+claim that a branch, unified checkpoint or user acceptance already exists.
+
+### D-0019 — Appoint Qoder investigation assistant
+
+2026-09-21: user has opened Qoder and requested its task prompt. I appoints that
+session as the bounded investigation assistant for `tasks/LNX-001-qoder-audit.md`.
+It may read scoped product sources and write only `control/reports/LNX-001/`.
+This updates the previous “no executor appointed” state only for investigation;
+no product implementation executor or background scheduler is appointed.
+Task issued; receipt/running/completion require the assistant's own report.
+
+### D-0020 — Integration baseline and bounded assignments
+
+2026-09-21 I reviewed LNX-001; findings and qualifications are in
+`LNX-001-review.md`. This supersedes the earlier proposed backend service starting
+point: use runtime as backend base and retain service wire changes; desktop starts
+from chat and incorporates settings. Use isolated test roots, no user-data migration.
+LNX-002 appoints one user-launched DeepSeek session as candidate integration writer;
+LNX-003 appoints the Qoder assistant for bounded read-only follow-up. Tasks are issued,
+not yet acknowledged/running. No old scheduler or feature-development queue resumes.
+
+### E-002 — Candidate stop-reason claim corrected
+
+I verified `003b52b2` changes only the 156 work-order document (134 added lines).
+It is not evidence that message.final stop-reason production was implemented.
+The candidate manifest is corrected accordingly. Static absence of a field spelling
+does not establish runtime reproduction; truncation repair remains unverified.
+
+### E-003 / D-0021 — Follow-up evidence and integration test scope
+
+LNX-003 supersedes LNX-001's broad media-choice and absent-stopReason claims.
+See `LNX-003-review.md` for I's qualifications and binding LNX-002 update:
+test PNG through the actual handler, controlled max_tokens through persistence/
+projection, and default Linux credential refusal. Existing credential import
+HTTP/IPC code is recognised; Linux persistent SecretStore remains absent in the
+inspected composition. Backend main's additional plugin lineage is preserved
+but excluded from this two-source integration pending architectural evaluation.
+No new feature executor is appointed. Qoder's LNX-003 investigation is concluded;
+the DeepSeek writer continues LNX-002 and must acknowledge this update.
+
+### D-0022 — Source snapshot recorded; bounded changes requested
+
+I verified LNX-002 candidate HEADs and matching schema digests, then reproduced
+3 failures / 24 passes in a targeted run. The run incorrectly printed
+GREEN_NO_SKIPS despite pytest exit 1. `LNX-002-review.md` records the findings
+and authorises the existing integration writer's bounded follow-up fixes.
+No promotion to runnable/user-accepted checkpoint or business parallelism yet.
+
+### D-0023 — Resolve ambiguity mapping and ACP result loss
+
+I authorises the existing LNX-002 writer to perform the two bounded fixes in
+`LNX-002-runtime-ruling.md`: preserve dispatch ambiguity independently of cause
+codes, and carry the actual ACP turn stop reason through the existing bridge.
+The strict xfail is temporary evidence, not a resolution. No real-model calls,
+new harness integration, user-data migration or unrelated feature expansion.
+Independent review follows the corrected candidate and its regression evidence.
+
+### D-0024 — Organisation first; development baseline fixed
+
+User corrected the priority: organise worktrees before extending bug repair.
+Already-completed LNX-002 repairs are retained at the SHAs in development-baseline.json.
+I records linux-native-dev-0 as the shared source starting point with known defects;
+this supersedes D-0022's prohibition on business worktree derivation. Independent
+review and all-green tests are not prerequisites for organising/branching development.
+LNX-001/002/003 assignments are concluded; no further repairs under their old cards.
+development-layout.md defines current vs preserved tree roles and next business lanes.
+No new feature writer appointed yet; new implementation requires a bounded task card.
+No push, publishing-main change, historical-tree deletion or user-data migration.
+
+### D-0025 — First Pi GUI loop
+
+User requests mcode to map conversation capabilities and then attempt a first real
+Pi loop through our Desktop, before expanding product scope. I appoints one mcode
+writer for tasks/C1-001-pi-loop.md. It may create work/pi-loop-0 in the two dedicated
+worktrees from dev-0 and make the minimum changes/isolated runs required. This is
+a scoped extension of the branch-write boundary beyond integration/linux-native-0;
+the fixed baseline and old trees stay unchanged. Necessary limited real Pi requests
+may use an existing authorised account via application credential handling under
+the task's stated limits; no secret disclosure or user-data migration. Missing
+account/access is reported to I, not bypassed. Task issued, not yet acknowledged.
+
+### D-0026 — Frontend extensibility first; backend work deferred
+
+User explicitly prioritises a generic slot-based Harness GUI: adding a service
+should use adapter/component registration without modifying the core for already
+supported semantics. This supersedes D-0025's backend/real-loop-first execution.
+The same mcode session follows tasks/C1-001-frontend-first.md, writes only its
+desktop task tree, preserves existing backend work, and pauses new backend/model
+work. Reuse the existing contribution/Slot framework where suitable; validate a
+neutral session boundary with the existing service adapter and a labelled test
+adapter. Pi real-loop verification follows frontend readiness. Task amendment
+is issued; the running session must explicitly acknowledge receipt.
+
+### D-0027 — Architecture implementation on hold; design-loop preparation
+
+User supersedes the frontend implementation direction: first discuss product
+intent, then prepare an adversarial design/refinement loop. Confirmed intent is
+an extensible Agent-oriented Desktop independent of a mandatory Ordessa backend;
+conversation/tool/model is not predetermined as its core. Current reference:
+product/agent-desktop-design-brief.md. Scenarios and loop limits there are I's
+proposal, not a launched overnight job. Prior C1 frontend refactoring is on hold;
+preserve current work and services. No new implementation or unattended loop started.
+
+### D-0028 — Backend coordinated research and implementation design
+
+User approves the S/E/H/P groups and central coordination model documented in
+product/backend-coordinated-loop.md. This supersedes the backend-deferred planning
+direction of D-0026, but does not resume C1, legacy queues or any existing writer.
+Research precedes design approval and bounded implementation. H is ACP-first;
+P prioritises reuse; E must withstand boundary attacks; S first coordinates the
+execution migration then accepts centrally assigned product-module tasks.
+Backend Sol budget is ten calls, separate from frontend's ten: two reserved for
+E design and implementation acceptance; H at most three, not reserved. Only the
+central coordinator may invoke Sol, with risk-based allocation after central review.
+The plan is recorded, not a running formation. Exact write allowlists, filesystem
+isolation tests, immutable baseline and startup controls require I's readiness
+acceptance before launching groups. Existing code/data/services remain untouched.
+Public protocol/Core changes and real-Harness credential/model use require explicit
+scope approval; general overnight persistence does not grant that authority.
+
+### D-0029 — Native Qoder goals, implementation enabled
+
+User explicitly requests switching to native goal sessions with implementation,
+not a research-only night. backend-loop/GOAL-START.md supersedes D-0028 startup
+gates and historical sandbox/fake-only instructions. Five user-launched Qoder
+sessions may research, obtain C approval, implement bounded tasks, and integrate.
+I created four source worktrees at fixed dev-0, branches work/be-goal-<group>-0.
+No models launched by I. Full bwrap isolation is not active; ordinary-session
+path/credential/reviewer restrictions are task rules, not OS-enforced guarantees.
+E's mandatory two reviews, H cap three and backend total ten remain in force.
+Only C invokes actual Sol with prior budget reservation; fake tests never qualify.
+No push, publishing-main changes, old-service operations or credential disclosure.
+
+### D-0030 — Profile as an independent capability
+
+User confirms independent Profile ownership for identity, versions, persistence,
+configuration composition and immutable execution snapshots. H retains only
+Harness-specific configuration declaration, validation and native translation.
+I dispatches tasks/BE-PROFILE-001.md to C for S/E/H research and a coordinated
+separation proposal; implementation/data migration under this new task awaits
+I's proposal approval. Existing approved S/E snapshot work continues unchanged.
+No new group, model replacement or review quota is authorised by this decision.
+
+### D-0031 — Resume backend goals with coordination v2
+
+User confirms all five sessions paused and requests inspection and restart prompts.
+I verified five handovers, group HEADs and the existing budget (4/10 consumed).
+backend-loop/COORDINATION-V2.md governs the resumed C/S/E/H/P formation: C-owned
+short task board, explicit ownership and handoff, active collection, scoped
+approval and integration, and task-local rather than formation-wide blocking.
+C may commit explicitly handed-off, stopped, approved work after exact scope
+verification; unresponsive writers are not presumed stopped. Stable-snapshot
+takeover requires a separate tree and recorded ownership transfer, never an
+unannounced concurrent writer. Product authority, review caps and D-0030 remain.
+S 405b8b4 resolves the old missing-commit blocker; C first verifies and integrates
+the paired S/E beta2 increment, then dispatches bounded continuation and Profile
+research. I updates instructions only; user launches/resumes the five sessions.
+
+### D-0032 — Implement minimal ACP-centric H structure; user controls expansion
+
+User approves the minimal H structure: generic ACP core plus per-Agent integration
+packages, with host request handlers injected rather than implemented inside H.
+I issues tasks/BE-H-MINIMAL-001.md through C. C may approve bounded equivalent
+refactoring and migration; new capabilities, custom extensions or boundary
+expansion require user approval through I. Moving generic file/terminal/Profile/
+credential/runtime responsibilities into per-Agent helpers or adapters is forbidden.
+OpenCode native ACP is the preferred migration target, subject to actual pinned
+version and behavior verification. No premature deletion or unapproved data
+migration; D-0030 Profile authority migration remains proposal-gated. Existing
+in-flight work is preserved. Review budget and other safety boundaries unchanged.
+
+### D-0033 — Product rulings for completion, streaming and retention
+
+User approves truthful distinguishable terminal/cancellation facts and timely
+upstream streaming without a per-character or fixed-latency promise. Minimal
+compatible public protocol changes necessary for those facts are authorised,
+subject to C-reviewed S/E/H design, versioning and verification; unrelated
+capability expansion remains I-gated. OpenCode ACP migration takes priority over
+expanding the legacy SSE driver. Retention approval is principles-only: temporary
+execution copies, recovery copies and version history are separate classes;
+no existing-data deletion or new automatic cleanup policy is authorised before
+a concrete retention/recovery proposal. Profile authority migration and unresolved
+redistribution remain separately gated. Dispatch and precise bounds are recorded
+in reports/BE-LOOP-001/goal/decisions/I-product-rulings-0033.md.
+
+### D-0034 — Implement modular Agent Desktop v1 in an isolated tree
+
+User approves creating a new Desktop worktree and a basic plan for a user-launched
+Sol executor to refine and implement. Task: tasks/FE-MODULAR-001.md. Scope is a
+small extensible shell, capability contracts, Ordessa connector, conversation UI
+and a separate model-settings extension. Functional reference is the user's
+description of DeepSeek Harness Web UI, not an independently verified parity claim.
+The new apps/desktop-modular entry preserves the old application. Branch
+work/desktop-modular-v1 starts at 80872f556c001b42217d43bf5f73ab08029bfcb9 in
+worktrees/desktop-modular-v1. D-0027 implementation pause is superseded only for
+this task/tree; the previous frontend research loop is not resumed. In-scope
+design refinement, implementation, tests and local explicit-path commits are
+authorised without a second design gate. No executor/model is started by I.
+No backend writes, publishing-main changes, push, existing-service operations,
+real credential access or real model calls are authorised. Existing FE/BE reviewer
+budgets remain unchanged. Product acceptance remains the user's decision.
+
+## Part 7 — 2026-09-25 baseline closeout
+
+### D-0035 — Local baseline main created per user's "merge with small issues" ruling
+
+User (direct instruction to the closeout session, 2026-09-25): merging a baseline
+main while carrying the known small issues is acceptable. Acting on it, the
+closeout session created local branch `main-cp-001` in each of the three repos,
+pointing at the frozen CP-SESSION-001 candidate tips: backend `a0b343e0`
+(work/hd002-bc-native), desktop `450944bd` (work/hd002-fc-functional), bridge
+`41d9d94` (work/round-h). Branch pointers only — no working tree moved, nothing
+pushed, publishing `main` branches untouched (backend publishing main is still
+the studio-era `6c14ea8d`, a diverged lineage; promotion to it remains a
+separate explicit release decision, not granted here). The carried issues are
+exactly CP-SESSION-001 §5 (stop does not interrupt in-flight tools; approval
+card lacks timeout feedback; one uncharacterized flaky bridge test; input-box
+scroll pending confirmation; deliberate old-chain test reds). This entry is the
+user's acceptance of merging WITH those issues; it is not by itself
+`USER_ACCEPTED` for CP-SESSION-001, which still awaits the user's own trial
+verdict. **Source:** user instruction 2026-09-25; see
+missions/HD-002/integration/CP-SESSION-001.md.
