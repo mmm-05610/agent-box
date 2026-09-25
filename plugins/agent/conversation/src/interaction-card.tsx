@@ -11,7 +11,7 @@ function InteractionCard({ item, service, canRespond }: { item: AgentInteraction
   const submit = (answer: InteractionAnswer) => { setError(''); void service.respond(item.id, answer).catch(error => setError(String(error))) }
   const fieldValue = (id: string) => values[id] ?? ''
   const change = (id: string, value: string) => setValues(current => ({ ...current, [id]: value }))
-  return <article className="agent-interaction" data-interaction={item.id}>
+  return <article className="agent-interaction" data-interaction={item.id} data-state={item.state}>
     <header><strong>{item.title}</strong><small>{item.state}</small></header>
     {item.detail && <p>{item.detail}</p>}
     {item.state === 'pending' && !canRespond && <p role="status" className="agent-interaction-muted">This agent cannot receive a response over the current connection.</p>}

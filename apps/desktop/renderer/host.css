@@ -1,8 +1,22 @@
-:root { font-family: system-ui, sans-serif; color: #243247; background: #f5f7fa; }
+:root { font-family: system-ui, sans-serif; color: #202123; background: #f6f6f6; }
 * { box-sizing: border-box; }
 body { margin: 0; }
 button, input, select { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; }
-:focus-visible { outline: 2px solid #315fa8; outline-offset: 3px; }
+:focus-visible { outline: 2px solid #3b82f6; outline-offset: 3px; }
 .host-diagnostic { padding: 48px; }
+/* Frameless window chrome (host-owned; <html data-frameless> is set by window-chrome.tsx on Windows/Linux only). */
+html[data-frameless] .wb-region > header, html[data-frameless] .wb-full > .wb-bar { -webkit-app-region: drag; }
+html[data-frameless] .wb-region > header button,
+html[data-frameless] .wb-region > header select,
+html[data-frameless] .wb-region > header [draggable=true],
+html[data-frameless] .wb-full > .wb-bar button { -webkit-app-region: no-drag; }
+/* Keep the main header's right-aligned actions clear of the fixed window buttons. */
+html[data-frameless] .wb-main > header { padding-right: var(--wb-window-controls, 0); }
+.window-controls { position: fixed; top: 0; right: 0; z-index: 1000; display: flex; height: 34px; -webkit-app-region: no-drag; }
+.window-controls button { width: 46px; height: 34px; border: 0; border-radius: 0; background: transparent; color: var(--ui-ink-secondary, #6b6e73); display: flex; align-items: center; justify-content: center; padding: 0; }
+.window-controls button:hover { background: var(--ui-hover, #eaeaea); }
+.window-controls button.wc-close:hover { background: #c42b1c; color: #fff; }
+.window-controls svg { stroke-width: 1; fill: none; }
+

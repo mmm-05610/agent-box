@@ -21,6 +21,7 @@
   ],
   "scripts": {
     "test:agent-ui": "node apps/desktop/scripts/test-agent-ui.mjs",
+    "test:ui-preview": "node apps/desktop/scripts/test-ui-preview.mjs",
     "test:agent-shell": "node apps/desktop/scripts/test-agent-shell.mjs",
     "build:foundations": "node tooling/build-all.mjs",
     "dev": "npm run --workspace apps/desktop dev",

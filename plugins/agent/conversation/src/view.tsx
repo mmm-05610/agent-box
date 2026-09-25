@@ -46,14 +46,24 @@ function ReasoningPart() { return <details className="agent-reasoning"><summary>
 // Partially streamed arguments are not valid JSON yet; show them verbatim rather than dropping them.
 const prettyJson = (text: string) => { try { return JSON.stringify(JSON.parse(text), null, 2) } catch { return text } }
 const toolStateLabels: Record<AgentToolCall['status'], string> = { running: 'Running', completed: 'Result', failed: 'Failed', unknown: 'Outcome unknown' }
+// ZCode ai-elements/tool.tsx: each tool row carries a state icon (spinner, check, cross) instead of relying on text alone.
+function ToolStateIcon({ status }: { status: AgentToolCall['status'] }) {
+  const icon = { width: 13, height: 13, viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor', strokeWidth: 1.7, 'aria-hidden': true } as const
+  if (status === 'completed') return <svg {...icon}><path d="M3 8.5l3.2 3.2L13 5" /></svg>
+  if (status === 'failed') return <svg {...icon}><path d="M4.5 4.5l7 7m0-7l-7 7" /></svg>
+  if (status === 'running') return <svg {...icon} className="agent-tool-spin"><circle cx="8" cy="8" r="5.4" strokeDasharray="25 9" /></svg>
+  return <svg {...icon}><circle cx="8" cy="8" r="5.4" /><path d="M8 5.4v3.2M8 10.6v.6" /></svg>
+}
 function ToolPart({ toolName, argsText, result, artifact }: ToolCallMessagePartProps) {
   const status = (artifact as { toolStatus: AgentToolCall['status'] }).toolStatus
-  return <details className="agent-tool" data-tool-state={status}><summary>{toolName} · {toolStateLabels[status]}</summary>
+  return <details className="agent-tool" data-tool-state={status}><summary><ToolStateIcon status={status} />{toolName} · {toolStateLabels[status]}</summary>
     <pre>{prettyJson(argsText)}</pre>{result !== undefined && <pre>{typeof result === 'string' ? result : JSON.stringify(result, null, 2)}</pre>}</details>
 }
-function ChatMessage() {
-  return <MessagePrimitive.Root className="agent-message"><MessagePrimitive.Parts components={{ Text: TextPart, Reasoning: ReasoningPart, tools: { Fallback: ToolPart } }} /></MessagePrimitive.Root>
+function ChatMessage({ role }: { role: 'user' | 'assistant' }) {
+  return <MessagePrimitive.Root className="agent-message" data-role={role}><MessagePrimitive.Parts components={{ Text: TextPart, Reasoning: ReasoningPart, tools: { Fallback: ToolPart } }} /></MessagePrimitive.Root>
 }
+const UserChatMessage = () => <ChatMessage role="user" />
+const AssistantChatMessage = () => <ChatMessage role="assistant" />
 function ConversationThread({ service, connectionId, drafting, pane, sessionId, draft, compositions }: { service: AgentSessions; connectionId: string; drafting: boolean; pane: string; sessionId: string; draft: Draft | undefined; compositions: Compositions }) {
   const state = useWorkspace(service), agent = state.agent!
   const [actionError, setActionError] = useState('')
@@ -86,13 +96,14 @@ function ConversationThread({ service, connectionId, drafting, pane, sessionId, 
     {run?.status === 'stop-requested' && <p role="status" className="agent-notice">Stop requested. Waiting for the agent to confirm.</p>}
     {run?.status === 'unknown' && <p role="status" className="agent-notice">Run outcome unknown after disconnect.</p>}
     {agent.diagnostic && <p role="status" className="agent-notice">{agent.diagnostic}</p>}
-    <SessionInteractions service={service} agent={agent} sessionId={sessionId} />
     {agent.options.length > 0 && <div className="agent-options">{agent.options.filter(option => !hiddenOptionIds.has(option.id) && option.availability === 'supported' && option.values?.length).map(option =>
       <label key={option.id}>{option.title}<select value={option.value ?? ''} onChange={event => { setActionError(''); void service.setOption(option.id, event.target.value).catch(error => setActionError(errorText(error))) }}>
         {option.values!.map(value => <option key={value.id} value={value.id}>{value.title}</option>)}
       </select></label>)}</div>}
     <ThreadPrimitive.Root className="agent-thread"><ThreadPrimitive.Viewport className="agent-viewport">
-      <ThreadPrimitive.Messages components={{ Message: ChatMessage }} />
+      <ThreadPrimitive.Messages components={{ UserMessage: UserChatMessage, AssistantMessage: AssistantChatMessage }} />
+      {/* ZCode keeps approval requests inline at the tail of the stream, directly above the composer. */}
+      <SessionInteractions service={service} agent={agent} sessionId={sessionId} />
       {!messages.length && <p className="agent-empty">{drafting ? 'Nothing has been sent yet. Your first message opens the session in the selected project.' : 'No messages in this session yet.'}</p>}
     </ThreadPrimitive.Viewport><div className="agent-compose">
       {drafting && blocked && <p role="status" className="agent-compose-block">{draftBlockCopy[draft!.blockReason ?? 'no-project']}</p>}
