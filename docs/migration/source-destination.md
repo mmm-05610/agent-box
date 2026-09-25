@@ -129,3 +129,28 @@
 - **无服务被停止/重启。** 57411 腿（pid 381142 等）继续以 `ordessa-legacy` 之前的原路径运行；其工作树条目 6 定案为原位保留：§3 v3 的换名落位后，`worktrees/` 等环境例外目录被搬回新根**原物理路径**（§3 步骤 8 搬回段），服务腿的路径解析不受影响；仅存在亚秒级换名窗口（§3 窗口说明，GATE A 时可指定执行时刻）。会话与服务腿结束后再清理（[USER GATE B] 另批）。
 - 4 个 qoder 会话（bc-native×2、fc-functional、desktop-ui-codex）的 cwd 在旧树；原位不动则不受影响。
 - 18790/18810 试验服务器已在此前停止（2026-09-25 实测无监听），与本次切换无关。
+
+
+## 6. 执行记录（2026-09-26）
+
+- **进程停止**：4 个 qoder 会话此前已自行退出（无需处理）；57411 服务腿进程树
+  （381142 python server → 394938 access-entry → 394946 桥）经单次 SIGTERM 于
+  ~5 秒内全部退出，端口释放，父进程 systemd --user 未重启它。未按名杀进程。
+- **保全预核验**：10/10 bundle verify + 9/9 SHA256SUMS 通过后才动目录。
+- **新改动补存**：68 棵工作树逐一 status 比对，9 棵有脏内容者全量补存至
+  `ordessa-preservation/20260926-pre-switch/workspace-backups/`（18/18 校验和，
+  含 studio-ui-reconstruction 961 文件）；59 棵干净（bc-native/fc-functional 均净）。
+  hd002 容器的 profile/provider 裸副本与 .git/.agents/.codex 存根另存
+  `hd002-profile-provider-stubs.tar.gz`。
+- **工作树退役**：三主仓 65 棵非主仓工作树全部 `git worktree remove`（44 干净 +
+  24 保全后 --force 清理忽略产物），0 失败，随后 prune；主仓对象库与全部分支未动
+  （抽查 work/hd002-bc-native=a0b343e0 等均在）。日志 RETIREMENT-LOG.txt。
+- **搬迁**（SWITCH-MOVES.txt 逐条）：.c1-001-secrets/.c1-001-runtime/.mimocode/
+  .qoder/runtime/worktrees 骨架(含 backend-loop 整体)/tools → `ordessa-legacy/env/`；
+  control → `ordessa-legacy/control`；repos/harness-{profile,provider,workboard} →
+  `ordessa-legacy/repos/`（三独立插件仓原样保留）；archive→`archive-20260920`、
+  backups、releases → legacy；根三文档 → `legacy/workspace-root/`；悬空符号链接删除。
+- **换名落位**：`ordessa→ordessa-old-root`、`ordessa-monorepo-candidate→ordessa`
+  两条 rename 完成；mv-back 清单为空（例外已全部外迁）。亚秒窗口内无活动进程
+  （服务腿已先停）。
+- **验收**：见 §0 与 `verify-clean-run7-newroot.log`（新根为源的严格门禁克隆验证）。

@@ -27,7 +27,8 @@ require explicit user confirmation with concrete evidence.
 | 6 | `df6327574d03` | restore 2 files missed by migration (server-windows lockfile, native CLI fixture) — found by the independent file-integrity sweep |
 | 7 | `c0ff0479e07b` | drop the vendored 7.4 MB bridge binary (kept in archive, byte-reproducible) |
 | 8 | `fa461219ceda`…`7e171f667e` | review-closure series: strict gate script, verified-closure lockfile, dev extras, restore loop, per-item rulings, handshake evidence, run6 record |
-| 9 | (this commit) | switch plan v3 (rename-landing), evidence-gate split (Q/I), run6 per-ID dump |
+| 9 | `711cfbf2be`/`6a3f244561` | switch plan v3 + evidence-gate split (Q/I) |
+| 10 | `3eb9232aef`… | post-switch series: verify script source parameterization (default = new root), executed-switch record |
 
 ## Verification gates — two evidence kinds, cited separately
 
