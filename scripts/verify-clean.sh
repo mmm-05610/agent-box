@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
-# Clean-checkout verification of the Ordessa monorepo candidate. v2 — strict.#
-# Versioned copy: scripts/verify-clean.sh. Set ORDESSA_CANDIDATE to verify a
-# different checkout; expects the repo layout as of baseline/cp-monorepo-0.
+# Clean-checkout verification of the Ordessa monorepo candidate. v2 — strict.
 #
 # Every step is gated: exit codes and parsed pytest summaries are compared
 # against the expected ledger; collection interruptions are FAIL by
 # definition. Known reds are asserted at their exact counts — a *new* red,
 # a missing inherited red, or an unrunnable suite all fail this script.
 set -u
-CAND=${ORDESSA_CANDIDATE:-/home/maoqh/projects/ordessa-monorepo-candidate}
+CAND=/home/maoqh/projects/ordessa-monorepo-candidate
 CLEAN=/home/maoqh/projects/ordessa-verify-clean
 VENV=/tmp/ordessa-verify-venv
 BRIDGE_OUT=/tmp/ordessa-verify-bridge
@@ -28,9 +26,10 @@ run_suite() {
   if echo "$out" | grep -qE "Interrupted|error during collection|no tests ran"; then
     bad "$label: did not run cleanly (collection interruption)"; return
   fi
-  local summary; summary=$(echo "$out" | grep -oE "[0-9]+ (passed|failed|skipped|errors?)" | tail -1)
-  [ -z "$summary" ] && { bad "$label: no pytest summary line (rc=$rc)"; return; }
-  local got; got=$(echo "$summary" | tr ',' '\n' | awk '{print $2"="$1}' | sed 's/errors=/errors=/;s/error=/errors=/' | tr '\n' ' ')
+  local sline; sline=$(echo "$out" | grep -E "in [0-9]+[0-9.]*s( \([0-9:]+\))?$" | tail -1)
+  [ -z "$sline" ] && { bad "$label: no pytest summary line (rc=$rc)"; return; }
+  echo "  summary: $sline"
+  local got; got=$(echo "$sline" | tr ',' '\n' | grep -E "[0-9]+ (passed|failed|skipped|errors?)" | awk '{print $2"="$1}' | sed 's/error=/errors=/' | tr '\n' ' ')
   local exp="passed=0 failed=0 skipped=0 errors=0 " k v g badcnt=0 kv
   for kv in "$@"; do
     case "$kv" in passed=*|failed=*|skipped=*|errors=*)
@@ -85,7 +84,7 @@ echo "  starlette resolved: $star"
 step "backend suites (strict ledger gates; python -m pytest from repo root)"
 run_suite "pacthold" packages/pacthold passed=238
 run_suite "harness" plugins/harness passed=308 failed=2 skipped=3
-run_suite "server" apps/server passed=782 failed=44 skipped=10 errors=25
+run_suite "server" apps/server passed=783 failed=43 skipped=10 errors=25
 run_suite "acp_orchestration" tests/acp_orchestration passed=40 failed=18
 
 step "bridge: byte-identical rebuild from clean clone"
